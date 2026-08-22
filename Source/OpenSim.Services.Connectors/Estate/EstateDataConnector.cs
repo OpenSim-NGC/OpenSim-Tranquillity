@@ -27,8 +27,6 @@
 using System.Net;
 using System.Reflection;
 
-using log4net;
-
 using OpenMetaverse;
 using Nini.Config;
 
@@ -36,11 +34,13 @@ using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = string.Empty;
     private ExpiringCache<string, List<EstateSettings>> m_EstateCache = new ExpiringCache<string, List<EstateSettings>>();
@@ -56,14 +56,14 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
         IConfig gridConfig = source.Configs["EstateService"];
         if (gridConfig is null)
         {
-            m_log.Error("[ESTATE CONNECTOR]: EstateService missing from OpenSim.ini");
+            m_log.LogError("[ESTATE CONNECTOR]: EstateService missing from OpenSim.ini");
             throw new Exception("Estate connector init error");
         }
 
         string serviceURI = gridConfig.GetString("EstateServerURI", string.Empty);
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[ESTATE CONNECTOR]: No Server URI named in section EstateService");
+            m_log.LogError("[ESTATE CONNECTOR]: No Server URI named in section EstateService");
             throw new Exception("Estate connector init error");
         }
         m_ServerURI = serviceURI;
@@ -83,7 +83,7 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
         Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
         if (replyData != null && replyData.Count > 0)
         {
-            m_log.Debug($"[ESTATE CONNECTOR]: LoadEstateSettingsAll returned {replyData.Count} elements");
+            m_log.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettingsAll returned {replyData.Count} elements");
             Dictionary<string, object>.ValueCollection estateData = replyData.Values;
             List<EstateSettings> estates = [];
             foreach (object r in estateData)
@@ -98,7 +98,7 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
             return estates;
         }
         else
-            m_log.Debug($"[ESTATE CONNECTOR]: LoadEstateSettingsAll from {uri} received empty response");
+            m_log.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettingsAll from {uri} received empty response");
 
         return [];
     }
@@ -156,7 +156,7 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
         Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
         if (replyData != null && replyData.Count > 0)
         {
-            m_log.Debug($"[ESTATE CONNECTOR]: GetRegions for estate {estateID} returned {replyData.Count} elements");
+            m_log.LogDebug($"[ESTATE CONNECTOR]: GetRegions for estate {estateID} returned {replyData.Count} elements");
             List<UUID> regions = [];
             Dictionary<string, object>.ValueCollection data = replyData.Values;
             foreach (object r in data)
@@ -167,7 +167,7 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
             return regions;
         }
         else
-            m_log.Debug($"[ESTATE CONNECTOR]: GetRegions from {uri} received null or zero response");
+            m_log.LogDebug($"[ESTATE CONNECTOR]: GetRegions from {uri} received null or zero response");
         return [];
     }
 
@@ -183,7 +183,7 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
         string reply = MakeRequest("GET", uri, string.Empty);
         if (string.IsNullOrEmpty(reply))
         {
-            m_log.DebugFormat("[ESTATE CONNECTOR] connection to remote estates service failed");
+            m_log.LogDebug("[ESTATE CONNECTOR] connection to remote estates service failed");
             return null;
         }
 
@@ -191,13 +191,13 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
 
         if (replyData != null && replyData.Count > 0)
         {
-            m_log.DebugFormat("[ESTATE CONNECTOR]: LoadEstateSettings({0}) returned {1} elements", regionID, replyData.Count);
+            m_log.LogDebug("[ESTATE CONNECTOR]: LoadEstateSettings({0}) returned {1} elements", regionID, replyData.Count);
             EstateSettings es = new EstateSettings(replyData);
             return es;
         }
         else
         {
-            m_log.DebugFormat("[ESTATE CONNECTOR]: LoadEstateSettings(regionID) from {0} received null or zero response", uri);
+            m_log.LogDebug("[ESTATE CONNECTOR]: LoadEstateSettings(regionID) from {0} received null or zero response", uri);
         }
 
         return null;
@@ -216,12 +216,12 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
 
         if (replyData != null && replyData.Count > 0)
         {
-            m_log.Debug($"[ESTATE CONNECTOR]: LoadEstateSettings({estateID}) returned {replyData.Count} elements");
+            m_log.LogDebug($"[ESTATE CONNECTOR]: LoadEstateSettings({estateID}) returned {replyData.Count} elements");
             EstateSettings es = new EstateSettings(replyData);
             return es;
         }
         else
-            m_log.DebugFormat("[ESTATE CONNECTOR]: LoadEstateSettings(estateID) from {0} received null or zero response", uri);
+            m_log.LogDebug("[ESTATE CONNECTOR]: LoadEstateSettings(estateID) from {0} received null or zero response", uri);
 
         return null;
     }
@@ -274,13 +274,13 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
             {
                 if (bool.TryParse(srtmp, out  bool result))
                 {
-                    m_log.Debug($"[ESTATE CONNECTOR]: PostRequest {uri} returned {result}");
+                    m_log.LogDebug($"[ESTATE CONNECTOR]: PostRequest {uri} returned {result}");
                     return result;
                 }
             }
         }
         else
-            m_log.Debug($"[ESTATE CONNECTOR]: PostRequest {uri} received empty response");
+            m_log.LogDebug($"[ESTATE CONNECTOR]: PostRequest {uri} received empty response");
 
         return false;
     }
@@ -310,20 +310,20 @@ public class EstateDataRemoteConnector : BaseServiceConnector, IEstateDataServic
             {
                 if (status == HttpStatusCode.Unauthorized)
                 {
-                    m_log.Error($"[ESTATE CONNECTOR]: Web request {uri} requires authentication ");
+                    m_log.LogError($"[ESTATE CONNECTOR]: Web request {uri} requires authentication ");
                 }
                 else if (status != HttpStatusCode.NotFound)
                 {
-                    m_log.Error($"[ESTATE CONNECTOR]: Resource {uri} not found ");
+                    m_log.LogError($"[ESTATE CONNECTOR]: Resource {uri} not found ");
                     return reply;
                 }
             }
             else
-                m_log.Error($"[ESTATE CONNECTOR]: WebException for {verb} {uri} {formdata} {e.Message}");
+                m_log.LogError($"[ESTATE CONNECTOR]: WebException for {verb} {uri} {formdata} {e.Message}");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat($"[ESTATE CONNECTOR]: Exception when contacting estate server at {uri}: {e.Message}");
+            m_log.LogDebug($"[ESTATE CONNECTOR]: Exception when contacting estate server at {uri}: {e.Message}");
         }
 
         return null;

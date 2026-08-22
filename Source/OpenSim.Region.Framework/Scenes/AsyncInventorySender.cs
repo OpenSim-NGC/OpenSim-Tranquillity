@@ -30,6 +30,8 @@ using System.Collections.Concurrent;
 using OpenMetaverse;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes;
 
 class FetchHolder
@@ -68,7 +70,7 @@ class FetchHolder
 /// </remarks>
 public class AsyncInventorySender
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Scene m_scene;
 
@@ -95,7 +97,7 @@ public class AsyncInventorySender
     /// <param name="ownerID"></param>
     public void HandleFetchInventory(IClientAPI remoteClient, UUID[] items, UUID[] owners)
     {
-           //m_log.DebugFormat(
+           //m_log.LogDebug(
            //     "[ASYNC INVENTORY SENDER]: Putting request from {0} for {1} on queue", remoteClient.Name, itemID);
 
         m_fetchHolder.Enqueue(new FetchHolder(remoteClient, items, owners));
@@ -123,7 +125,7 @@ public class AsyncInventorySender
                 {
                     if (!fh.Client.IsActive)
                         continue;
-                    // m_log.DebugFormat(
+                    // m_log.LogDebug(
                     //     "[ASYNC INVENTORY SENDER]: Handling request from {0} for {1} on queue", fh.Client.Name, fh.ItemID);
 
                     var items = new List<InventoryItemBase>();

@@ -26,7 +26,6 @@
  */
 
 using Nini.Config;
-using log4net;
 using System.Reflection;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -36,13 +35,14 @@ using OpenSim.Framework;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAccounts;
 
 public class RemoteUserAccountServicesConnector : UserAccountServicesConnector,
         ISharedRegionModule, IUserAccountService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
@@ -69,7 +69,7 @@ public class RemoteUserAccountServicesConnector : UserAccountServicesConnector,
                 IConfig userConfig = source.Configs["UserAccountService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[USER CONNECTOR]: UserAccountService missing from OpenSim.ini");
+                    m_log.LogError("[USER CONNECTOR]: UserAccountService missing from OpenSim.ini");
                     return;
                 }
 
@@ -78,7 +78,7 @@ public class RemoteUserAccountServicesConnector : UserAccountServicesConnector,
                 base.Initialise(source);
                 m_Cache = new UserAccountCache();
 
-                m_log.Info("[USER CONNECTOR]: Remote users enabled");
+                m_log.LogInformation("[USER CONNECTOR]: Remote users enabled");
             }
         }
     }

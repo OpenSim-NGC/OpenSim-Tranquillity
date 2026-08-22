@@ -27,16 +27,18 @@
 
 using System.Reflection;
 
-using log4net;
 using OpenMetaverse;
 
 using OpenSim.Region.Framework.Interfaces;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.CoreModules.World.Wind.Plugins;
 
 class ConfigurableWind : IWindModelPlugin
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Vector2[] m_windSpeeds = new Vector2[16 * 16];
     //private Random m_rndnums = new Random(Environment.TickCount);
@@ -220,11 +222,11 @@ class ConfigurableWind : IWindModelPlugin
 
     private void LogSettings()
     {
-        m_log.InfoFormat("[ConfigurableWind] Average Strength   : {0}", m_avgStrength);
-        m_log.InfoFormat("[ConfigurableWind] Average Direction  : {0}", m_avgDirection);
-        m_log.InfoFormat("[ConfigurableWind] Varience Strength  : {0}", m_varStrength);
-        m_log.InfoFormat("[ConfigurableWind] Varience Direction : {0}", m_varDirection);
-        m_log.InfoFormat("[ConfigurableWind] Rate Change        : {0}", m_rateChange);
+        m_log.LogInformation("[ConfigurableWind] Average Strength   : {0}", m_avgStrength);
+        m_log.LogInformation("[ConfigurableWind] Average Direction  : {0}", m_avgDirection);
+        m_log.LogInformation("[ConfigurableWind] Varience Strength  : {0}", m_varStrength);
+        m_log.LogInformation("[ConfigurableWind] Varience Direction : {0}", m_varDirection);
+        m_log.LogInformation("[ConfigurableWind] Rate Change        : {0}", m_rateChange);
     }
 
     #region IWindModelPlugin Members

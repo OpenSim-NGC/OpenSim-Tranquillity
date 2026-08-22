@@ -1,16 +1,15 @@
 ﻿using System.Reflection;
 
 using Nini.Config;
-using log4net;
-
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
 public class AssetPermissions
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
         MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool[] m_DisallowExport, m_DisallowImport;
@@ -44,7 +43,7 @@ public class AssetPermissions
             if (index >= 0)
                 bitArray[index] = true;
             else
-                m_log.Warn($"[Asset Permissions]: Invalid AssetType {s}");
+                m_log.LogWarning($"[Asset Permissions]: Invalid AssetType {s}");
         }
 
     }
@@ -56,7 +55,7 @@ public class AssetPermissions
         int index = Array.IndexOf(m_AssetTypeNames, assetTypeName.ToLower());
         if (index >= 0 && m_DisallowExport[index])
         {
-            m_log.Debug($"[Asset Permissions]: Export denied: configuration does not allow export of AssetType {assetTypeName}");
+            m_log.LogDebug($"[Asset Permissions]: Export denied: configuration does not allow export of AssetType {assetTypeName}");
             return false;
         }
 
@@ -70,7 +69,7 @@ public class AssetPermissions
         int index = Array.IndexOf(m_AssetTypeNames, assetTypeName.ToLower());
         if (index >= 0 && m_DisallowImport[index])
         {
-            m_log.Debug($"[Asset Permissions]: Import denied: configuration does not allow import of AssetType {assetTypeName}");
+            m_log.LogDebug($"[Asset Permissions]: Import denied: configuration does not allow import of AssetType {assetTypeName}");
             return false;
         }
 

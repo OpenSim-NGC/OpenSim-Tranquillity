@@ -32,14 +32,15 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
 using System.Reflection;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL;
 
 public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_name = "LoadImageURL";
     private Scene m_scene;
@@ -163,7 +164,7 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
     {
         if (m_textureManager is null)
         {
-            m_log.WarnFormat("[LOADIMAGEURLMODULE]: No texture manager. Can't function.");
+            m_log.LogWarning("[LOADIMAGEURLMODULE]: No texture manager. Can't function.");
             return false;
         }
 
@@ -261,12 +262,12 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
                         }
                         catch (Exception)
                         {
-                            m_log.Error("[LOADIMAGEURLMODULE]: Image Conversion Failed.  Empty byte data returned!");
+                            m_log.LogError("[LOADIMAGEURLMODULE]: Image Conversion Failed.  Empty byte data returned!");
                         }
                     }
                     else
                     {
-                        m_log.WarnFormat("[LOADIMAGEURLMODULE] No data returned");
+                        m_log.LogWarning("[LOADIMAGEURLMODULE] No data returned");
                     }
                 }
                 response.Dispose();
@@ -274,10 +275,10 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[LOADIMAGEURLMODULE]: unexpected exception {0}", e.Message);
+            m_log.LogError("[LOADIMAGEURLMODULE]: unexpected exception {0}", e.Message);
         }
 
-        m_log.DebugFormat("[LOADIMAGEURLMODULE]: Returning {0} bytes of image data for request {1}",
+        m_log.LogDebug("[LOADIMAGEURLMODULE]: Returning {0} bytes of image data for request {1}",
                           imageJ2000.Length, state.RequestID);
 
         m_textureManager.ReturnData(

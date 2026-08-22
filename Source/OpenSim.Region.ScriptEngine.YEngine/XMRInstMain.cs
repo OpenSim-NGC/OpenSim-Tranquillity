@@ -34,8 +34,7 @@ using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 // This class exists in the main app domain
 //
 namespace OpenSim.Region.ScriptEngine.Yengine;
@@ -84,8 +83,7 @@ public partial class XMRInstance: XMRInstAbstract, IDisposable
     public static readonly DetectParams[] zeroDetectParams = new DetectParams[0];
     public static readonly object[] zeroObjectArray = new object[0];
 
-    public static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    public static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public XMRInstance m_NextInst;  // used by XMRInstQueue
     public XMRInstance m_PrevInst;
@@ -316,7 +314,7 @@ public partial class XMRInstance: XMRInstAbstract, IDisposable
         }
         catch(Exception e)
         {
-            m_log.Warn("[YEngine]: unable to build API fingerprint", e);
+            m_log.LogWarning(e, "[YEngine]: unable to build API fingerprint");
             return string.Empty;
         }
     }

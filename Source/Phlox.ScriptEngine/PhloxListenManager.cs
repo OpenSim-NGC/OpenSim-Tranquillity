@@ -14,11 +14,13 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 using InWorldz.Phlox.VM;
 using InWorldz.Phlox.Types;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace Phlox.ScriptEngine
 {
@@ -41,8 +43,7 @@ namespace Phlox.ScriptEngine
 
     internal class PhloxListenManager
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private readonly PhloxExecutionScheduler m_Scheduler;
         private readonly object m_Lock = new();
@@ -94,7 +95,7 @@ namespace Phlox.ScriptEngine
                 }
                 byHandle[handle] = entry;
 
-                m_log.DebugFormat("[PhloxListen]: Registered listen handle {0} ch={1} item={2}",
+                m_log.LogDebug("[PhloxListen]: Registered listen handle {0} ch={1} item={2}",
                     handle, channel, itemID);
                 return handle;
             }
@@ -197,7 +198,7 @@ namespace Phlox.ScriptEngine
                     {
                         if (entry.Count >= MAX_LISTENS_PER_SECOND)
                         {
-                            m_log.WarnFormat("[PhloxListen]: Rate limit hit for script {0} ({1}/s), dropping listen event",
+                            m_log.LogWarning("[PhloxListen]: Rate limit hit for script {0} ({1}/s), dropping listen event",
                                 itemID, entry.Count);
                             return true;
                         }
@@ -239,13 +240,13 @@ namespace Phlox.ScriptEngine
 
                 m_Scheduler.PostEvent(entry.ItemID, evt);
 
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[PhloxListen]: Delivered listen ch={0} from '{1}' to item={2}",
                     channel, name, entry.ItemID);
             }
             catch (Exception ex)
             {
-                m_log.ErrorFormat("[PhloxListen]: Exception delivering listen to {0}: {1}",
+                m_log.LogError("[PhloxListen]: Exception delivering listen to {0}: {1}",
                     entry.ItemID, ex.Message);
             }
         }

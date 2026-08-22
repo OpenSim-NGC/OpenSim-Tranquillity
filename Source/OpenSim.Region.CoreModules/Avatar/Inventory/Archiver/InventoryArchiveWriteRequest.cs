@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
@@ -36,13 +35,14 @@ using OpenSim.Region.CoreModules.World.Archiver;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using System.IO.Compression;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
 
 public class InventoryArchiveWriteRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Determine whether this archive will save assets.  Default is true.
@@ -174,7 +174,7 @@ public class InventoryArchiveWriteRequest
             {
                 if (options.ContainsKey("verbose"))
                 {
-                    m_log.InfoFormat(
+                    m_log.LogInformation(
                         "[INVENTORY ARCHIVER]: Skipping inventory item {0} {1} at {2}",
                         inventoryItem.Name, inventoryItem.ID, path);
                 }
@@ -188,7 +188,7 @@ public class InventoryArchiveWriteRequest
         // Check For Permissions Filter Flags
         if (!CanUserArchiveObject(m_userInfo.PrincipalID, inventoryItem))
         {
-            m_log.InfoFormat(
+            m_log.LogInformation(
                         "[INVENTORY ARCHIVER]: Insufficient permissions, skipping inventory item {0} {1} at {2}",
                         inventoryItem.Name, inventoryItem.ID, path);
 
@@ -211,13 +211,13 @@ public class InventoryArchiveWriteRequest
                 AssetBase asset = m_scene.AssetService.Get(inventoryItem.AssetID.ToString());
                 if(asset is null)
                 {
-                    m_log.Error($"[INVENTORY ARCHIVER] missing asset {inventoryItem.AssetID} on item { inventoryItem.Name} ({inventoryItem.ID}) type {inventoryItem.InvType}({itemAssetType})");
+                    m_log.LogError($"[INVENTORY ARCHIVER] missing asset {inventoryItem.AssetID} on item { inventoryItem.Name} ({inventoryItem.ID}) type {inventoryItem.InvType}({itemAssetType})");
                     CountBadAssetSkipItems++;
                     return;
                 }
                 if(asset.Data is null || asset.Data.Length == 0)
                 {
-                    m_log.Error($"[INVENTORY ARCHIVER] empty asset {inventoryItem.AssetID} on item { inventoryItem.Name} ({inventoryItem.ID}) type {inventoryItem.InvType}({itemAssetType})");
+                    m_log.LogError($"[INVENTORY ARCHIVER] empty asset {inventoryItem.AssetID} on item { inventoryItem.Name} ({inventoryItem.ID}) type {inventoryItem.InvType}({itemAssetType})");
                     CountBadAssetSkipItems++;
                     return;
                 }
@@ -241,20 +241,20 @@ public class InventoryArchiveWriteRequest
 
                 if(curErrorCntr > 0)
                 {
-                    m_log.ErrorFormat("[INVENTORY ARCHIVER Warning]: item {0} '{1}', type {2}, in '{3}', contains {4} references to  missing or damaged assets",
+                    m_log.LogError("[INVENTORY ARCHIVER Warning]: item {0} '{1}', type {2}, in '{3}', contains {4} references to  missing or damaged assets",
                         inventoryItem.ID, inventoryItem.Name, itemAssetType.ToString(), spath, curErrorCntr);
                     if(possible > 0)
-                        m_log.WarnFormat("[INVENTORY ARCHIVER Warning]: item also contains {0} references that may be to missing or damaged assets or not a problem", possible);
+                        m_log.LogWarning("[INVENTORY ARCHIVER Warning]: item also contains {0} references that may be to missing or damaged assets or not a problem", possible);
                 }
                 else if(possible > 0)
                 {
-                    m_log.WarnFormat("[INVENTORY ARCHIVER Warning]: item {0} '{1}', type {2}, in '{3}', contains {4} references that may be to missing or damaged assets or not a problem", inventoryItem.ID, inventoryItem.Name, itemAssetType.ToString(), spath, possible);
+                    m_log.LogWarning("[INVENTORY ARCHIVER Warning]: item {0} '{1}', type {2}, in '{3}', contains {4} references that may be to missing or damaged assets or not a problem", inventoryItem.ID, inventoryItem.Name, itemAssetType.ToString(), spath, possible);
                 }
             }
         }
 
         if (options.ContainsKey("verbose"))
-            m_log.Info(
+            m_log.LogInformation(
                 $"[INVENTORY ARCHIVER]: Saving item {inventoryItem.ID} {inventoryItem.Name} (asset UUID {inventoryItem.AssetID})");
         string filename = path + CreateArchiveItemName(inventoryItem);
         string serialization = UserInventoryItemSerializer.Serialize(inventoryItem, options, userAccountService);
@@ -282,7 +282,7 @@ public class InventoryArchiveWriteRequest
             {
                 if (options.ContainsKey("verbose"))
                 {
-                    m_log.InfoFormat(
+                    m_log.LogInformation(
                         "[INVENTORY ARCHIVER]: Skipping folder {0} at {1}",
                         inventoryFolder.Name, path);
                 }
@@ -291,7 +291,7 @@ public class InventoryArchiveWriteRequest
         }
 
         if (options.ContainsKey("verbose"))
-            m_log.InfoFormat("[INVENTORY ARCHIVER]: Saving folder {0}", inventoryFolder.Name);
+            m_log.LogInformation("[INVENTORY ARCHIVER]: Saving folder {0}", inventoryFolder.Name);
 
         if (saveThisFolderItself)
         {
@@ -433,7 +433,7 @@ public class InventoryArchiveWriteRequest
 
             m_archiveWriter = new TarArchiveWriter(m_saveStream);
 
-            m_log.InfoFormat("[INVENTORY ARCHIVER]: Adding control file to archive.");
+            m_log.LogInformation("[INVENTORY ARCHIVER]: Adding control file to archive.");
 
             // Write out control file.  This has to be done first so that subsequent loaders will see this file first
             // XXX: I know this is a weak way of doing it since external non-OAR aware tar executables will not do this
@@ -442,7 +442,7 @@ public class InventoryArchiveWriteRequest
 
             if (inventoryFolder != null)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[INVENTORY ARCHIVER]: Found folder {0} {1} at {2}",
                     inventoryFolder.Name,
                     inventoryFolder.ID,
@@ -453,7 +453,7 @@ public class InventoryArchiveWriteRequest
             }
             else if (inventoryItem != null)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[INVENTORY ARCHIVER]: Found item {0} {1} at {2}",
                     inventoryItem.Name, inventoryItem.ID, m_invPath);
 
@@ -469,10 +469,10 @@ public class InventoryArchiveWriteRequest
 
                 int errors = m_assetGatherer.FailedUUIDs.Count;
 
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[INVENTORY ARCHIVER]: The items to save reference {0} possible assets", m_assetGatherer.GatheredUuids.Count + errors);
                 if(errors > 0)
-                    m_log.DebugFormat("[INVENTORY ARCHIVER]: {0} of these have problems or are not assets and will be ignored", errors);
+                    m_log.LogDebug("[INVENTORY ARCHIVER]: {0} of these have problems or are not assets and will be ignored", errors);
 
                 AssetsRequest ar = new AssetsRequest(
                         new AssetsArchiver(m_archiveWriter),
@@ -484,7 +484,7 @@ public class InventoryArchiveWriteRequest
             }
             else
             {
-                m_log.DebugFormat("[INVENTORY ARCHIVER]: Not saving assets since --noassets was specified");
+                m_log.LogDebug("[INVENTORY ARCHIVER]: Not saving assets since --noassets was specified");
 
                 ReceivedAllAssets(new List<UUID>(), new List<UUID>(), false);
             }
@@ -501,7 +501,7 @@ public class InventoryArchiveWriteRequest
     /// </summary>
     protected void SaveUsers()
     {
-        m_log.InfoFormat("[INVENTORY ARCHIVER]: Saving user information for {0} users", m_userUuids.Count);
+        m_log.LogInformation("[INVENTORY ARCHIVER]: Saving user information for {0} users", m_userUuids.Count);
 
         foreach (UUID creatorId in m_userUuids.Keys)
         {
@@ -516,7 +516,7 @@ public class InventoryArchiveWriteRequest
             }
             else
             {
-                m_log.WarnFormat("[INVENTORY ARCHIVER]: Failed to get creator profile for {0}", creatorId);
+                m_log.LogWarning("[INVENTORY ARCHIVER]: Failed to get creator profile for {0}", creatorId);
             }
         }
     }
@@ -599,7 +599,7 @@ public class InventoryArchiveWriteRequest
             minorVersion = 3;
         }
 
-        m_log.InfoFormat("[INVENTORY ARCHIVER]: Creating version {0}.{1} IAR", majorVersion, minorVersion);
+        m_log.LogInformation("[INVENTORY ARCHIVER]: Creating version {0}.{1} IAR", majorVersion, minorVersion);
 
         StringWriter sw = new StringWriter();
         XmlTextWriter xtw = new XmlTextWriter(sw);

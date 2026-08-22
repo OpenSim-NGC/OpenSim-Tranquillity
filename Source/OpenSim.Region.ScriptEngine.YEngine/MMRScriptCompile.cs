@@ -29,6 +29,8 @@
  * @brief Compile a script to produce a ScriptObjCode object
  */
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ScriptEngine.Yengine;
 
 public partial class XMRInstance
@@ -63,7 +65,7 @@ public partial class XMRInstance
             if (m_Engine.m_ScriptDebugSaveSource)
             {
                 string lslFileName = GetScriptFileName (m_ScriptObjCodeKey + ".lsl");           
-//                    m_log.Debug ("[YEngine]: MMRScriptCompileSaveSource: saving to " + lslFileName);
+//                    m_log.LogDebug("[YEngine]: MMRScriptCompileSaveSource: saving to " + lslFileName);
                 saveSource = File.CreateText (lslFileName);
             }
 
@@ -80,7 +82,7 @@ public partial class XMRInstance
             }
             if (tokenBegin == null)
             {
-                m_log.Debug ($"[YEngine]: parsing errors at (primName:scriptName): {m_DescName} (partid: {m_PartUUID})");
+                m_log.LogDebug($"[YEngine]: parsing errors at (primName:scriptName): {m_DescName} (partid: {m_PartUUID})");
                 return null;
             }
 
@@ -91,7 +93,7 @@ public partial class XMRInstance
                 TokenScript tokenScript = ScriptReduce.Reduce(tokenBegin);
                 if (tokenScript == null)
                 {
-                    m_log.Warn ("[YEngine]: reduction errors on " + m_ScriptObjCodeKey + " (" + m_CameFrom + ")");
+                    m_log.LogWarning("[YEngine]: reduction errors on " + m_ScriptObjCodeKey + " (" + m_CameFrom + ")");
                     PrintCompilerErrors();
                     return null;
                 }
@@ -102,7 +104,7 @@ public partial class XMRInstance
                     bool ok = ScriptCodeGen.CodeGen(tokenScript, objFileWriter, sourceHash);
                     if (!ok)
                     {
-                        m_log.Warn ("[YEngine]: compile error on " + m_ScriptObjCodeKey + " (" + m_CameFrom + ")");
+                        m_log.LogWarning("[YEngine]: compile error on " + m_ScriptObjCodeKey + " (" + m_CameFrom + ")");
                         PrintCompilerErrors ();
                         return null;
                     }
@@ -128,7 +130,7 @@ public partial class XMRInstance
             if (m_Engine.m_ScriptDebugSaveIL)
             {
                 string asmFileName = GetScriptILFileName(m_ScriptObjCodeKey + ".yasm");
-//                    m_log.Debug ("[YEngine]: MMRScriptCompileSaveILGen: saving to " + asmFileName);
+//                    m_log.LogDebug("[YEngine]: MMRScriptCompileSaveILGen: saving to " + asmFileName);
                 asmFileWriter = File.CreateText (asmFileName);
             }
         }
@@ -156,10 +158,10 @@ public partial class XMRInstance
 
     private void PrintCompilerErrors ()
     {
-        m_log.Info ("[YEngine]: - " + m_Part.GetWorldPosition () + " " + m_DescName);
+        m_log.LogInformation("[YEngine]: - " + m_Part.GetWorldPosition () + " " + m_DescName);
         foreach (string error in m_CompilerErrors)
         {
-            m_log.Info ("[YEngine]: - " + error);
+            m_log.LogInformation("[YEngine]: - " + error);
         }
     }
 

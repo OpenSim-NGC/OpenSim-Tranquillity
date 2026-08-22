@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -33,11 +32,13 @@ using System.Net;
 using System.Reflection;
 using System.Xml;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework;
 
 public class RegionInfo
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[REGION INFO]";
 
     public bool commFailTF = false;
@@ -435,7 +436,7 @@ public class RegionInfo
         string keylower = key.ToLower();
         if (m_extraSettings.TryGetValue(keylower, out val))
             return val;
-        m_log.DebugFormat("[RegionInfo] Could not locate value for parameter {0}", key);
+        m_log.LogDebug("[RegionInfo] Could not locate value for parameter {0}", key);
         return null;
     }
 
@@ -606,7 +607,7 @@ public class RegionInfo
         if (externalName == "SYSTEMIP")
         {
             m_externalHostName = Util.GetLocalHost().ToString();
-            m_log.InfoFormat(
+            m_log.LogInformation(
                 "[REGIONINFO]: Resolving SYSTEMIP to {0} for external hostname of region {1}",
                 m_externalHostName, name);
         }
@@ -634,7 +635,7 @@ public class RegionInfo
         if (Vector3.TryParse(temp_location, out temp_vector))
             DefaultLandingPoint = temp_vector;
         else
-            m_log.ErrorFormat("[RegionInfo]: Unable to parse DefaultLanding for '{0}'. The value given was '{1}'", RegionName, temp_location);
+            m_log.LogError("[RegionInfo]: Unable to parse DefaultLanding for '{0}'. The value given was '{1}'", RegionName, temp_location);
 
         allKeys.Remove("DefaultLanding");
 
@@ -747,7 +748,7 @@ public class RegionInfo
         }
 
         if (ValuesCapped)
-            m_log.WarnFormat("[RegionInfo]: The default landing location for {0} has been capped to {1}", RegionName, DefaultLandingPoint);
+            m_log.LogWarning("[RegionInfo]: The default landing location for {0} has been capped to {1}", RegionName, DefaultLandingPoint);
     }
 
     // Make sure user specified region sizes are sane.
@@ -764,7 +765,7 @@ public class RegionInfo
                 RegionSizeX -= partial;
                 if (RegionSizeX == 0)
                     RegionSizeX = Constants.RegionSize;
-                m_log.ErrorFormat("{0} Region size must be multiple of {1}. Enforcing {2}.RegionSizeX={3} instead of specified {4}",
+                m_log.LogError("{0} Region size must be multiple of {1}. Enforcing {2}.RegionSizeX={3} instead of specified {4}",
                     LogHeader, Constants.RegionSize, m_regionName, RegionSizeX, RegionSizeX + partial);
             }
             partial = RegionSizeY % Constants.RegionSize;
@@ -773,7 +774,7 @@ public class RegionInfo
                 RegionSizeY -= partial;
                 if (RegionSizeY == 0)
                     RegionSizeY = Constants.RegionSize;
-                m_log.ErrorFormat("{0} Region size must be multiple of {1}. Enforcing {2}.RegionSizeY={3} instead of specified {4}",
+                m_log.LogError("{0} Region size must be multiple of {1}. Enforcing {2}.RegionSizeY={3} instead of specified {4}",
                     LogHeader, Constants.RegionSize, m_regionName, RegionSizeY, RegionSizeY + partial);
             }
 
@@ -784,7 +785,7 @@ public class RegionInfo
                 uint minSize = Math.Min(RegionSizeX, RegionSizeY);
                 RegionSizeX = minSize;
                 RegionSizeY = minSize;
-                m_log.ErrorFormat("{0} Regions must be square until viewers are updated. Forcing region {1} size to <{2},{3}>",
+                m_log.LogError("{0} Regions must be square until viewers are updated. Forcing region {1} size to <{2},{3}>",
                                     LogHeader, m_regionName, RegionSizeX, RegionSizeY);
             }
 
@@ -793,11 +794,11 @@ public class RegionInfo
             {
                 RegionSizeX = Math.Clamp(RegionSizeX, Constants.RegionSize, Constants.MaximumRegionSize);
                 RegionSizeY = Math.Clamp(RegionSizeY, Constants.RegionSize, Constants.MaximumRegionSize);
-                m_log.ErrorFormat("{0} Region dimensions must be less than {1}. Clamping {2}'s size to <{3},{4}>",
+                m_log.LogError("{0} Region dimensions must be less than {1}. Clamping {2}'s size to <{3},{4}>",
                                     LogHeader, Constants.MaximumRegionSize, m_regionName, RegionSizeX, RegionSizeY);
             }
 
-            m_log.InfoFormat("{0} Region {1} size set to <{2},{3}>", LogHeader, m_regionName, RegionSizeX, RegionSizeY);
+            m_log.LogInformation("{0} Region {1} size set to <{2},{3}>", LogHeader, m_regionName, RegionSizeX, RegionSizeY);
         }
     }
 

@@ -27,12 +27,12 @@
 
 using System.Reflection;
 using System.Text;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
@@ -40,7 +40,7 @@ namespace OpenSim.Services.UserAccountService;
 
 public class UserAccountService : UserAccountServiceBase, IUserAccountService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static UserAccountService m_RootInstance;
 
     /// <summary>
@@ -171,7 +171,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
     public UserAccount GetUserAccount(UUID scopeID, string firstName,
             string lastName)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[USER ACCOUNT SERVICE]: Retrieving account by username for {0} {1}, scope {2}",
 //                firstName, lastName, scopeID);
 
@@ -326,7 +326,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
 
     public bool StoreUserAccount(UserAccount data)
     {
-        //            m_log.DebugFormat(
+        //            m_log.LogDebug(
         //                "[USER ACCOUNT SERVICE]: Storing user account for {0} {1} {2}, scope {3}",
         //                data.FirstName, data.LastName, data.PrincipalID, data.ScopeID);
 
@@ -765,7 +765,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
 
         if (account is not null)
         {
-            m_log.Error($"[USER ACCOUNT SERVICE]: A user with the name {firstName} {lastName} already exists!");
+            m_log.LogError($"[USER ACCOUNT SERVICE]: A user with the name {firstName} {lastName} already exists!");
             return null;
         }
 
@@ -782,7 +782,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
 
         if (!StoreUserAccount(account))
             {
-            m_log.Error($"[USER ACCOUNT SERVICE]: Account creation failed for account {firstName} {lastName}");
+            m_log.LogError($"[USER ACCOUNT SERVICE]: Account creation failed for account {firstName} {lastName}");
             return null;
         }
 
@@ -791,7 +791,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
                 {
                     success = m_AuthenticationService.SetPassword(account.PrincipalID, password);
                     if (!success)
-                m_log.Warn($"[USER ACCOUNT SERVICE]: Unable to set password for account {firstName} {lastName}");
+                m_log.LogWarning($"[USER ACCOUNT SERVICE]: Unable to set password for account {firstName} {lastName}");
                 }
 
                 GridRegion home = null;
@@ -804,11 +804,11 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
             if (home != null)
                         m_GridUserService.SetHome(account.PrincipalID.ToString(), home.RegionID, new Vector3(128, 128, 0), new Vector3(0, 1, 0));
                     else
-                m_log.Warn($"[USER ACCOUNT SERVICE]: Unable to set home for account {firstName} {lastName}");
+                m_log.LogWarning($"[USER ACCOUNT SERVICE]: Unable to set home for account {firstName} {lastName}");
                 }
                 else
                 {
-            m_log.Warn(
+            m_log.LogWarning(
                 $"[USER ACCOUNT SERVICE]: Unable to retrieve default home region for account {firstName} {lastName}");
                 }
 
@@ -817,12 +817,12 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
                     success = m_InventoryService.CreateUserInventory(account.PrincipalID);
                     if (!success)
                     {
-                m_log.Warn(
+                m_log.LogWarning(
                     $"[USER ACCOUNT SERVICE]: Unable to create inventory for account {firstName} {lastName}");
                     }
                     else
                     {
-                m_log.Debug(
+                m_log.LogDebug(
                     $"[USER ACCOUNT SERVICE]: Created user inventory for {firstName} {lastName}");
                     }
 
@@ -835,7 +835,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
                     }
                 }
 
-        m_log.Info(
+        m_log.LogInformation(
             $"[USER ACCOUNT SERVICE]: Account {firstName} {lastName} {account.PrincipalID} created successfully");
 
         return account;
@@ -843,7 +843,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
 
     protected void CreateDefaultAppearanceEntries(UUID principalID)
     {
-        m_log.DebugFormat("[USER ACCOUNT SERVICE]: Creating default appearance items for {0}", principalID);
+        m_log.LogDebug("[USER ACCOUNT SERVICE]: Creating default appearance items for {0}", principalID);
 
         InventoryFolderBase bodyPartsFolder = m_InventoryService.GetFolderForType(principalID, FolderType.BodyPart);
         // Get Current Outfit folder
@@ -949,7 +949,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
 
         if (m_AvatarService != null)
         {
-            m_log.DebugFormat("[USER ACCOUNT SERVICE]: Creating default avatar entries for {0}", principalID);
+            m_log.LogDebug("[USER ACCOUNT SERVICE]: Creating default avatar entries for {0}", principalID);
 
             AvatarWearable[] wearables = new AvatarWearable[6];
             wearables[AvatarWearable.EYES] = new AvatarWearable(eyes.ID, eyes.AssetID);
@@ -972,13 +972,13 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
 
     protected void EstablishAppearance(UUID destinationAgent, string model)
     {
-        m_log.DebugFormat("[USER ACCOUNT SERVICE]: Establishing new appearance for {0} - {1}",
+        m_log.LogDebug("[USER ACCOUNT SERVICE]: Establishing new appearance for {0} - {1}",
                           destinationAgent.ToString(), model);
 
         string[] modelSpecifiers = model.Split();
         if (modelSpecifiers.Length != 2)
         {
-            m_log.WarnFormat("[USER ACCOUNT SERVICE]: Invalid model name \'{0}\'. Falling back to Ruth for {1}",
+            m_log.LogWarning("[USER ACCOUNT SERVICE]: Invalid model name \'{0}\'. Falling back to Ruth for {1}",
                              model, destinationAgent);
             CreateDefaultAppearanceEntries(destinationAgent);
             return;
@@ -988,7 +988,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
         UserAccount modelAccount = GetUserAccount(UUID.Zero, modelSpecifiers[0], modelSpecifiers[1]);
         if (modelAccount == null)
         {
-            m_log.WarnFormat("[USER ACCOUNT SERVICE]: Requested model \'{0}\' not found. Falling back to Ruth for {1}",
+            m_log.LogWarning("[USER ACCOUNT SERVICE]: Requested model \'{0}\' not found. Falling back to Ruth for {1}",
                              model, destinationAgent);
             CreateDefaultAppearanceEntries(destinationAgent);
             return;
@@ -998,7 +998,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
         AvatarAppearance modelAppearance = m_AvatarService.GetAppearance(modelAccount.PrincipalID);
         if (modelAppearance == null)
         {
-            m_log.WarnFormat("USER ACCOUNT SERVICE]: Requested model \'{0}\' does not have an established appearance. Falling back to Ruth for {1}",
+            m_log.LogWarning("USER ACCOUNT SERVICE]: Requested model \'{0}\' does not have an established appearance. Falling back to Ruth for {1}",
                              model, destinationAgent);
             CreateDefaultAppearanceEntries(destinationAgent);
             return;
@@ -1012,11 +1012,11 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[USER ACCOUNT SERVICE]: Error transferring appearance for {0} : {1}",
+            m_log.LogWarning("[USER ACCOUNT SERVICE]: Error transferring appearance for {0} : {1}",
                 destinationAgent, e.Message);
         }
 
-        m_log.DebugFormat("[USER ACCOUNT SERVICE]: Finished establishing appearance for {0}",
+        m_log.LogDebug("[USER ACCOUNT SERVICE]: Finished establishing appearance for {0}",
             destinationAgent.ToString());
     }
 
@@ -1052,7 +1052,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
             destinationFolder.ParentID = m_InventoryService.GetRootFolder(destination).ID;
             destinationFolder.Version  = 1;
             m_InventoryService.AddFolder(destinationFolder);     // store base record
-            m_log.ErrorFormat("[USER ACCOUNT SERVICE]: Created folder for destination {0} Clothing", source);
+            m_log.LogError("[USER ACCOUNT SERVICE]: Created folder for destination {0} Clothing", source);
         }
 
         // Wearables
@@ -1073,7 +1073,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
                 wearable = basewearable[j];
                 if (!wearable.ItemID.IsZero())
                 {
-                    m_log.DebugFormat("[XXX]: Getting item {0} from avie {1} for {2} {3}",
+                    m_log.LogDebug("[XXX]: Getting item {0} from avie {1} for {2} {3}",
                         wearable.ItemID, source, i, j);
                     // Get inventory item and copy it
                     InventoryItemBase item = m_InventoryService.GetItem(source, wearable.ItemID);
@@ -1112,7 +1112,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
                         ApplyNextOwnerPermissions(destinationItem);
 
                         m_InventoryService.AddItem(destinationItem);
-                        m_log.DebugFormat("[USER ACCOUNT SERVICE]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
+                        m_log.LogDebug("[USER ACCOUNT SERVICE]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
 
                         // Wear item
                         newbasewearable.Add(destinationItem.ID,wearable.AssetID);
@@ -1122,7 +1122,7 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
                     }
                     else
                     {
-                        m_log.WarnFormat("[USER ACCOUNT SERVICE]: Error transferring {0} to folder {1}", wearable.ItemID, destinationFolder.ID);
+                        m_log.LogWarning("[USER ACCOUNT SERVICE]: Error transferring {0} to folder {1}", wearable.ItemID, destinationFolder.ID);
                     }
                 }
             }
@@ -1169,18 +1169,18 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
                     ApplyNextOwnerPermissions(destinationItem);
 
                     m_InventoryService.AddItem(destinationItem);
-                    m_log.DebugFormat("[USER ACCOUNT SERVICE]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
+                    m_log.LogDebug("[USER ACCOUNT SERVICE]: Added item {0} to folder {1}", destinationItem.ID, destinationFolder.ID);
 
                     // Attach item
                     avatarAppearance.SetAttachment(attachpoint, destinationItem.ID, destinationItem.AssetID);
-                    m_log.DebugFormat("[USER ACCOUNT SERVICE]: Attached {0}", destinationItem.ID);
+                    m_log.LogDebug("[USER ACCOUNT SERVICE]: Attached {0}", destinationItem.ID);
 
                     // Add to Current Outfit
                     CreateCurrentOutfitLink(destinationItem.InvType, item.Flags, item.Name, destinationItem.ID, destination, currentOutfitFolder.ID);
                 }
                 else
                 {
-                    m_log.WarnFormat("[USER ACCOUNT SERVICE]: Error transferring {0} to folder {1}", itemID, destinationFolder.ID);
+                    m_log.LogWarning("[USER ACCOUNT SERVICE]: Error transferring {0} to folder {1}", itemID, destinationFolder.ID);
                 }
             }
         }

@@ -30,18 +30,18 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Serialization;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.Framework.Scenes;
 
 public partial class Scene
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     //private static readonly string LogHeader = "[SCENE INVENTORY]";
 
     /// <summary>
@@ -63,7 +63,7 @@ public partial class Scene
     /// </returns>
     public int CreateScriptInstances()
     {
-        m_log.Info($"[SCENE]: Initializing script instances in {RegionInfo.RegionName}");
+        m_log.LogInformation($"[SCENE]: Initializing script instances in {RegionInfo.RegionName}");
 
         int scriptsValidForStarting = 0;
 
@@ -77,7 +77,7 @@ public partial class Scene
             }
         }
 
-        m_log.Info($"[SCENE]: Initialized {scriptsValidForStarting} script instances in {RegionInfo.RegionName}");
+        m_log.LogInformation($"[SCENE]: Initialized {scriptsValidForStarting} script instances in {RegionInfo.RegionName}");
 
         return scriptsValidForStarting;
     }
@@ -87,7 +87,7 @@ public partial class Scene
     /// </summary>
     public void StartScripts()
     {
-        //m_log.InfoFormat("[SCENE]: Starting scripts in {0}, please wait.", RegionInfo.RegionName);
+        //m_log.LogInformation("[SCENE]: Starting scripts in {0}, please wait.", RegionInfo.RegionName);
 
         IScriptModule[] engines = RequestModuleInterfaces<IScriptModule>();
         foreach (IScriptModule engine in engines)
@@ -107,7 +107,7 @@ public partial class Scene
         if (AddInventoryItem(item))
             return true;
 
-        m_log.Warn($"[AGENT INVENTORY]: Unable to add item {item.Name} to agent {AgentId} inventory");
+        m_log.LogWarning($"[AGENT INVENTORY]: Unable to add item {item.Name} to agent {AgentId} inventory");
             return false;
         }
 
@@ -138,7 +138,7 @@ public partial class Scene
             f = InventoryService.GetFolderForType(item.Owner, (FolderType)item.AssetType);
         if (f is not null)
         {
-            m_log.Debug(
+            m_log.LogDebug(
                 $"[AGENT INVENTORY]: Found folder {f.Name} type {(AssetType)f.Type} for item {item.Name}");
 
             item.Folder = f.ID;
@@ -152,7 +152,7 @@ public partial class Scene
             }
             else
             {
-                m_log.Warn(
+                m_log.LogWarning(
                     $"[AGENT INVENTORY]: Could not find root folder for {item.Owner} when trying to add item {item.Name} with no parent folder specified");
                 return false;
             }
@@ -174,7 +174,7 @@ public partial class Scene
         }
         else
         {
-            m_log.Warn($"[AGENT INVENTORY]: Agent {item.Owner} could not add item {item.Name} {item.ID}");
+            m_log.LogWarning($"[AGENT INVENTORY]: Agent {item.Owner} could not add item {item.Name} {item.ID}");
 
             return false;
         }
@@ -230,7 +230,7 @@ public partial class Scene
     {
         if (!TryGetScenePresence(avatarId, out ScenePresence avatar))
         {
-            m_log.ErrorFormat("[CapsUpdateItemAsset]: Avatar {0} cannot be found to update item asset", avatarId);
+            m_log.LogError("[CapsUpdateItemAsset]: Avatar {0} cannot be found to update item asset", avatarId);
             return UUID.Zero;
         }
 
@@ -243,14 +243,14 @@ public partial class Scene
         SceneObjectPart sop = GetSceneObjectPart(objectID);
         if(sop is null || sop.ParentGroup.IsDeleted)
         {
-            m_log.ErrorFormat("[CapsUpdateItemAsset]: Object {0} cannot be found to update item asset", objectID);
+            m_log.LogError("[CapsUpdateItemAsset]: Object {0} cannot be found to update item asset", objectID);
             return UUID.Zero;
         }
 
         TaskInventoryItem item = sop.Inventory.GetInventoryItem(itemID);
         if (item is null)
         {
-            m_log.ErrorFormat("[CapsUpdateItemAsset]: Could not find item {0} for asset update", itemID);
+            m_log.LogError("[CapsUpdateItemAsset]: Could not find item {0} for asset update", itemID);
             return UUID.Zero;
         }
 
@@ -360,7 +360,7 @@ public partial class Scene
         TaskInventoryItem item = group.GetInventoryItem(part.LocalId, itemId);
         if (item is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Tried to retrieve item ID {0} from prim {1}, {2} for caps script update "
                     + " but the item does not exist in this inventory",
                 itemId, part.Name, part.UUID);
@@ -372,7 +372,7 @@ public partial class Scene
         AssetBase asset = CreateAsset(item.Name, item.Description, (sbyte)AssetType.LSLText, data, remoteClient.AgentId);
         AssetService.Store(asset);
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[PRIM INVENTORY]: Stored asset {0} when updating item {1} in prim {2} for {3}",
         //    asset.ID, item.Name, part.Name, remoteClient.Name);
 
@@ -429,7 +429,7 @@ public partial class Scene
         }
         else
         {
-            m_log.ErrorFormat("[PRIM INVENTORY]: Avatar {0} cannot be found to update its prim item asset", avatarId);
+            m_log.LogError("[PRIM INVENTORY]: Avatar {0} cannot be found to update its prim item asset", avatarId);
             return new ArrayList();
         }
     }
@@ -451,7 +451,7 @@ public partial class Scene
     public void UpdateInventoryItem(IClientAPI remoteClient, UUID transactionID,
                                          UUID itemID, InventoryItemBase itemUpd)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[USER INVENTORY]: Updating asset for item {0} {1}, transaction ID {2} for {3}",
         //    itemID, itemUpd.Name, transactionID, remoteClient.Name);
 
@@ -489,7 +489,7 @@ public partial class Scene
             item.Name = itemUpd.Name;
             item.Description = itemUpd.Description;
 
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[USER INVENTORY]: itemUpd {0} {1} {2} {3}, item {4} {5} {6} {7}",
             //    itemUpd.NextPermissions, itemUpd.GroupPermissions, itemUpd.EveryOnePermissions, item.Flags,
             //    item.NextPermissions, item.GroupPermissions, item.EveryOnePermissions, item.CurrentPermissions);
@@ -500,13 +500,13 @@ public partial class Scene
                 // is not allowed to change the export flag.
                 bool denyExportChange = false;
 
-                //m_log.DebugFormat("[XXX]: B: {0} O: {1} E: {2}", itemUpd.BasePermissions, itemUpd.CurrentPermissions, itemUpd.EveryOnePermissions);
+                //m_log.LogDebug("[XXX]: B: {0} O: {1} E: {2}", itemUpd.BasePermissions, itemUpd.CurrentPermissions, itemUpd.EveryOnePermissions);
 
                 // If the user is not the creator or doesn't have "E" in both "B" and "O", deny setting export
                 if ((item.BasePermissions & (uint)(PermissionMask.All | PermissionMask.Export)) != (uint)(PermissionMask.All | PermissionMask.Export) || (item.CurrentPermissions & (uint)PermissionMask.Export) == 0 || item.CreatorIdAsUuid != item.Owner)
                     denyExportChange = true;
 
-                //m_log.DebugFormat("[XXX]: Deny Export Update {0}", denyExportChange);
+                //m_log.LogDebug("[XXX]: Deny Export Update {0}", denyExportChange);
 
                 // If it is already set, force it set and also force full perm
                 // else prevent setting it. It can and should never be set unless
@@ -530,7 +530,7 @@ public partial class Scene
                     // If the new state is exportable, force full perm
                     if ((itemUpd.EveryOnePermissions & (uint)PermissionMask.Export) != 0)
                     {
-                        //m_log.DebugFormat("[XXX]: Force full perm");
+                        //m_log.LogDebug("[XXX]: Force full perm");
                         itemUpd.NextPermissions = (uint)(PermissionMask.All);
                     }
                 }
@@ -594,7 +594,7 @@ public partial class Scene
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[AGENTINVENTORY]: Item id {0} not found for an inventory item update for {1}.",
                 itemID, remoteClient.Name);
         }
@@ -652,7 +652,7 @@ public partial class Scene
         InventoryItemBase item = InventoryService.GetItem(senderId, itemId);
         if (item is null)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[AGENT INVENTORY]: Failed to find item {0} sent by {1} to {2}", itemId, senderId, recipient);
             message = string.Format("Item not found: {0}.", itemId);
             return null;
@@ -666,7 +666,7 @@ public partial class Scene
 
         if (item.Owner.NotEqual(senderId))
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[AGENT INVENTORY]: Attempt to send item {0} {1} to {2} failed because sender {3} did not match item owner {4}",
                 item.Name, item.ID, recipient, senderId, item.Owner);
             message = "Sender did not match item owner.";
@@ -908,13 +908,13 @@ public partial class Scene
         InventoryFolderBase folder = InventoryService.GetFolder(senderId, folderId);
         if (folder is null)
         {
-            m_log.ErrorFormat("[AGENT INVENTORY]: Could not find inventory folder {0} to give", folderId);
+            m_log.LogError("[AGENT INVENTORY]: Could not find inventory folder {0} to give", folderId);
             return null;
         }
 
         if (denyGiveFolderTypes.Contains(folder.Type))
         {
-            m_log.ErrorFormat("[AGENT INVENTORY]: can not give inventory folder {0}", folderId);
+            m_log.LogError("[AGENT INVENTORY]: can not give inventory folder {0}", folderId);
             return null;
         }
 
@@ -925,7 +925,7 @@ public partial class Scene
                 recipientParentFolderId = recipientRootFolder.ID;
             else
             {
-                m_log.WarnFormat("[AGENT INVENTORY]: Unable to find root folder for receiving agent");
+                m_log.LogWarning("[AGENT INVENTORY]: Unable to find root folder for receiving agent");
                 return null;
             }
         }
@@ -963,7 +963,7 @@ public partial class Scene
         InventoryFolderBase folder = InventoryService.GetFolder(senderId, folderId);
         if (folder is null)
         {
-            m_log.ErrorFormat("[AGENT INVENTORY]: Could not find inventory folder {0} to give", folderId);
+            m_log.LogError("[AGENT INVENTORY]: Could not find inventory folder {0} to give", folderId);
             return null;
         }
 
@@ -972,7 +972,7 @@ public partial class Scene
 
         if (denyGiveFolderTypes.Contains(folder.Type))
         {
-            m_log.ErrorFormat("[AGENT INVENTORY]: can not give inventory folder {0}", folderId);
+            m_log.LogError("[AGENT INVENTORY]: can not give inventory folder {0}", folderId);
             return null;
         }
 
@@ -983,7 +983,7 @@ public partial class Scene
                 recipientParentFolderId = recipientRootFolder.ID;
             else
             {
-                m_log.WarnFormat("[AGENT INVENTORY]: Unable to find root folder for receiving agent");
+                m_log.LogWarning("[AGENT INVENTORY]: Unable to find root folder for receiving agent");
                 return null;
             }
         }
@@ -1026,7 +1026,7 @@ public partial class Scene
     public void CopyInventoryItem(IClientAPI remoteClient, uint callbackID, UUID oldAgentID, UUID oldItemID,
                                   UUID newFolderID, string newName)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[AGENT INVENTORY]: CopyInventoryItem received by {0} with oldAgentID {1}, oldItemID {2}, new FolderID {3}, newName {4}",
             remoteClient.AgentId, oldAgentID, oldItemID, newFolderID, newName);
 
@@ -1040,7 +1040,7 @@ public partial class Scene
 
             if (item is null)
             {
-                m_log.Error("[AGENT INVENTORY]: Failed to find item " + oldItemID.ToString());
+                m_log.LogError("[AGENT INVENTORY]: Failed to find item " + oldItemID.ToString());
                 return;
             }
 
@@ -1119,11 +1119,11 @@ public partial class Scene
     public void MoveInventoryItem(IClientAPI remoteClient, List<InventoryItemBase> items)
     {
         UUID agentId = remoteClient.AgentId;
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[AGENT INVENTORY]: Moving {0} items for user {1}", items.Count, agentId);
 
         if (!InventoryService.MoveItems(agentId, items))
-            m_log.Warn("[AGENT INVENTORY]: Failed to move items for user " + agentId);
+            m_log.LogWarning("[AGENT INVENTORY]: Failed to move items for user " + agentId);
 
         foreach (InventoryItemBase it in items)
         {
@@ -1199,7 +1199,7 @@ public partial class Scene
         else
         {
             m_dialogModule.SendAlertToUser(remoteClient, "Failed to create item");
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "Failed to add item for {0} in CreateNewInventoryItem!",
                  remoteClient.Name);
         }
@@ -1225,7 +1225,7 @@ public partial class Scene
                                          uint callbackID, string description, string name,
                                          sbyte invType, sbyte type, UUID olditemID)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[AGENT INVENTORY]: Received request from {0} to create inventory item link {1} in folder {2} pointing to {3}, assetType {4}, inventoryType {5}",
         //    remoteClient.Name, name, folderID, olditemID, (AssetType)type, (InventoryType)invType);
 
@@ -1247,7 +1247,7 @@ public partial class Scene
             //
             //                if (existingLink != null)
             //                {
-            //                    m_log.WarnFormat(
+            //                    m_log.LogWarning(
             //                        "[AGENT INVENTORY]: Ignoring request from {0} to create item link {1} in folder {2} pointing to {3} since a link named {4} with id {5} already exists",
             //                        remoteClient.Name, name, folderID, olditemID, existingLink.Name, existingLink.ID);
             //
@@ -1263,7 +1263,7 @@ public partial class Scene
         }
         else
         {
-            m_log.Error($"[HandleLinkInventoryItem] ScenePresence for agent {remoteClient.AgentId} not found");
+            m_log.LogError($"[HandleLinkInventoryItem] ScenePresence for agent {remoteClient.AgentId} not found");
         }
     }
 
@@ -1274,7 +1274,7 @@ public partial class Scene
     /// <param name="itemID"></param>
     private void RemoveInventoryItem(IClientAPI remoteClient, List<UUID> itemIDs)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[AGENT INVENTORY]: Removing inventory items {0} for {1}",
         //    string.Join(",", itemIDs.ConvertAll<string>(uuid => uuid.ToString()).ToArray()),
         //    remoteClient.Name);
@@ -1290,7 +1290,7 @@ public partial class Scene
     /// <param name="folderID"></param>
     private void RemoveInventoryFolder(IClientAPI remoteClient, List<UUID> folderIDs)
     {
-        m_log.DebugFormat("[SCENE INVENTORY]: RemoveInventoryFolders count {0}", folderIDs.Count);
+        m_log.LogDebug("[SCENE INVENTORY]: RemoveInventoryFolders count {0}", folderIDs.Count);
         InventoryService.DeleteFolders(remoteClient.AgentId, folderIDs);
     }
 
@@ -1343,7 +1343,7 @@ public partial class Scene
 
         if (item2 is null)
         {
-            m_log.WarnFormat("[SCENE INVENTORY]: RemoveTaskInventory of item {0} failed: {1}", itemID, message);
+            m_log.LogWarning("[SCENE INVENTORY]: RemoveTaskInventory of item {0} failed: {1}", itemID, message);
             remoteClient.SendAgentAlertMessage(message, false);
             return;
         }
@@ -1372,7 +1372,7 @@ public partial class Scene
         TaskInventoryItem taskItem = part.Inventory.GetInventoryItem(itemId);
         if (taskItem is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Tried to retrieve item ID {0} from prim {1}, {2} for creating an avatar"
                     + " inventory item from a prim's inventory item "
                     + " but the required item does not exist in the prim's inventory",
@@ -1474,7 +1474,7 @@ public partial class Scene
     /// <param name="itemID"></param>
     public InventoryItemBase MoveTaskInventoryItem(IClientAPI remoteClient, UUID folderId, SceneObjectPart part, UUID itemId, out string message)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[PRIM INVENTORY]: Adding item {0} from {1} to folder {2} for {3}",
             itemId, part.Name, folderId, remoteClient.Name);
 
@@ -1506,7 +1506,7 @@ public partial class Scene
         SceneObjectPart part = GetSceneObjectPart(primLocalId);
         if (part is null)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[PRIM INVENTORY]: " +
                 "Move of inventory item {0} from prim with local id {1} failed because the prim could not be found",
                 itemId, primLocalId);
@@ -1517,7 +1517,7 @@ public partial class Scene
         TaskInventoryItem taskItem = part.Inventory.GetInventoryItem(itemId);
         if (taskItem is null)
         {
-            m_log.WarnFormat("[PRIM INVENTORY]: Move of inventory item {0} from prim with local id {1} failed"
+            m_log.LogWarning("[PRIM INVENTORY]: Move of inventory item {0} from prim with local id {1} failed"
                 + " because the inventory item could not be found",
                 itemId, primLocalId);
 
@@ -1576,7 +1576,7 @@ public partial class Scene
         TaskInventoryItem srcTaskItem = part.Inventory.GetInventoryItem(itemId);
         if (srcTaskItem is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Tried to retrieve item ID {0} from prim {1}, {2} for moving"
                     + " but the item does not exist in this inventory",
                 itemId, part.Name, part.UUID);
@@ -1587,7 +1587,7 @@ public partial class Scene
         SceneObjectPart destPart = GetSceneObjectPart(destId);
         if (destPart is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                     "[PRIM INVENTORY]: " +
                     "Could not find prim for ID {0}",
                     destId);
@@ -1729,7 +1729,7 @@ public partial class Scene
         // Fetch the folder itself to get its current version
         InventoryFolderBase containingFolder = InventoryService.GetFolder(client.AgentId, folder.ID);
 
-        //m_log.DebugFormat("[AGENT INVENTORY]: Sending inventory folder contents ({0} nodes) for \"{1}\" to {2} {3}",
+        //m_log.LogDebug("[AGENT INVENTORY]: Sending inventory folder contents ({0} nodes) for \"{1}\" to {2} {3}",
         //    contents.Folders.Count + contents.Items.Count, containingFolder.Name, client.FirstName, client.LastName);
 
         if (containingFolder is not null )
@@ -1784,7 +1784,7 @@ public partial class Scene
         UUID itemID = itemInfo.ItemID;
         if (itemID.IsZero())
         {
-            m_log.Error($"[PRIM INVENTORY]: UpdateTaskInventory called with item ID Zero on update for {remoteClient.Name}");
+            m_log.LogError($"[PRIM INVENTORY]: UpdateTaskInventory called with item ID Zero on update for {remoteClient.Name}");
             return;
         }
 
@@ -1792,7 +1792,7 @@ public partial class Scene
         SceneObjectPart part = GetSceneObjectPart(primLocalID);
         if(part is null)
         {
-            m_log.Warn(
+            m_log.LogWarning(
                 $"[PRIM INVENTORY]: Update prim {primLocalID} with item {itemID} by {remoteClient.Name} but prim not found");
                 return;
         }
@@ -1809,7 +1809,7 @@ public partial class Scene
 
             if(item is null)
             {
-                m_log.Error(
+                m_log.LogError(
                         $"[PRIM INVENTORY]: Could not find inventory item {itemID} to update for {remoteClient.Name}");
                 return;
             }
@@ -1819,7 +1819,7 @@ public partial class Scene
 
             bool modrights = Permissions.CanEditObject(part.ParentGroup, remoteClient);
             part.ParentGroup.AddInventoryItem(remoteClient.AgentId, primLocalID, item, UUID.Random(), modrights);
-            m_log.Info(
+            m_log.LogInformation(
                 $"[PRIM INVENTORY]: Update prim {primLocalID} with item {item.Name} requested by {remoteClient.Name}");
 
             IInventoryAccessModule invAccess = RequestModuleInterface<IInventoryAccessModule>();
@@ -1834,7 +1834,7 @@ public partial class Scene
         }
         else // Updating existing item with new perms etc
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[PRIM INVENTORY]: Updating item {0} in {1} for UpdateTaskInventory()",
             //    currentItem.Name, part.Name);
 
@@ -1988,7 +1988,7 @@ public partial class Scene
                 // tell anyone watching that there is a new script in town
                 EventManager.TriggerNewScript(agentID, part, copyID);
 
-                //m_log.InfoFormat("[PRIMINVENTORY]: " +
+                //m_log.LogInformation("[PRIMINVENTORY]: " +
                 //   "Rezzed script {0} into prim local ID {1} for user {2}",
                 //   item.inventoryName, localID, remoteClient.Name);
 
@@ -1998,7 +1998,7 @@ public partial class Scene
             }
             else
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[PRIM INVENTORY]: " +
                     "Could not rez script {0} into prim local ID {1} for user {2}"
                     + " because the prim could not be found in the region!",
@@ -2007,7 +2007,7 @@ public partial class Scene
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Could not find script inventory item {0} to rez for {1}!",
                 fromItemID, agentID);
         }
@@ -2039,7 +2039,7 @@ public partial class Scene
         SceneObjectPart part = GetSceneObjectPart(itemBase.Folder);
         if (part is null)
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[SCENE INVENTORY]: Could not find part with id {0} for {1} to rez new script",
             //    itemBase.Folder, agentID);
 
@@ -2048,7 +2048,7 @@ public partial class Scene
 
         if (!Permissions.CanCreateObjectInventory(itemBase.InvType, part.UUID, agentID))
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[SCENE INVENTORY]: No permission to create new script in {0} for {1}", part.Name, agentID);
 
             return null;
@@ -2123,7 +2123,7 @@ public partial class Scene
         TaskInventoryItem srcTaskItem = srcPart.Inventory.GetInventoryItem(srcId);
         if (srcTaskItem is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Tried to retrieve item ID {0} from prim {1}, {2} for rezzing a script but the "
                     + " item does not exist in this inventory",
                 srcId, srcPart.Name, srcPart.UUID);
@@ -2134,7 +2134,7 @@ public partial class Scene
         SceneObjectPart destPart = GetSceneObjectPart(destId);
         if (destPart is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Could not find part {0} to insert script item {1} from {2} {3} in {4}",
                 destId, srcId, srcPart.Name, srcPart.UUID, Name);
             return;
@@ -2158,7 +2158,7 @@ public partial class Scene
 
         if (destPart.ScriptAccessPin == 0 || destPart.ScriptAccessPin != pin)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                     "[PRIM INVENTORY]: " +
                     "Script in object {0} : {1}, attempted to load script {2} : {3} into object {4} : {5} with invalid pin {6}",
                     srcPart.Name, srcId, srcTaskItem.Name, srcTaskItem.ItemID, destPart.Name, destId, pin);
@@ -2529,7 +2529,7 @@ public partial class Scene
                         }
                         catch (Exception e)
                         {
-                            m_log.Error("[AGENT INVENTORY]: Deserialization of xml failed ", e);
+                            m_log.LogError(e, "[AGENT INVENTORY]: Deserialization of xml failed ");
                             Util.LogFailedXML("[AGENT INVENTORY]:", xmlData);
                             g = null;
                         }
@@ -2582,7 +2582,7 @@ public partial class Scene
         }
         catch (Exception e)
         {
-            m_log.Error("[AGENT INVENTORY]: Deserialization of xml failed when looking for CoalescedObject tag ", e);
+            m_log.LogError(e, "[AGENT INVENTORY]: Deserialization of xml failed when looking for CoalescedObject tag ");
             Util.LogFailedXML("[AGENT INVENTORY]:", xmlData);
         }
 
@@ -2607,7 +2607,7 @@ public partial class Scene
         }
         catch (Exception e)
         {
-            m_log.Error("[AGENT INVENTORY]: single object xml deserialization failed" + e.Message);
+            m_log.LogError("[AGENT INVENTORY]: single object xml deserialization failed" + e.Message);
             Util.LogFailedXML("[AGENT INVENTORY]:", xmlData);
         }
 
@@ -2636,7 +2636,7 @@ public partial class Scene
                                 UUID RayTargetID, byte BypassRayCast, bool RayEndIsIntersection,
                                 bool RezSelected, bool RemoveItem, UUID fromTaskID)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[PRIM INVENTORY]: RezObject from {0} for item {1} from task id {2}",
         //    remoteClient.Name, itemID, fromTaskID);
 
@@ -2654,7 +2654,7 @@ public partial class Scene
         SceneObjectPart part = GetSceneObjectPart(fromTaskID);
         if (part is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[TASK INVENTORY]: {0} tried to rez item id {1} from object id {2} but there is no such scene object",
                 remoteClient.Name, itemID, fromTaskID);
 
@@ -2664,7 +2664,7 @@ public partial class Scene
         TaskInventoryItem item = part.Inventory.GetInventoryItem(itemID);
         if (item is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[TASK INVENTORY]: {0} tried to rez item id {1} from object id {2} but there is no such item",
                 remoteClient.Name, itemID, fromTaskID);
             return;
@@ -2672,7 +2672,7 @@ public partial class Scene
 
         if(item.InvType != (int)InventoryType.Object)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[TASK INVENTORY]: {0} tried to rez item id {1} from object id {2} but item is not a object",
                 remoteClient.Name, itemID, fromTaskID);
             return;
@@ -3051,13 +3051,13 @@ public partial class Scene
 
         if (root is null)
         {
-            m_log.DebugFormat("[LINK]: Can't find linkset root prim {0}", parentPrimId);
+            m_log.LogDebug("[LINK]: Can't find linkset root prim {0}", parentPrimId);
             return;
         }
 
         if (!Permissions.CanLinkObject(agentId, root.ParentGroup.RootPart.UUID))
         {
-            m_log.DebugFormat("[LINK]: Refusing link. No permissions on root prim");
+            m_log.LogDebug("[LINK]: Refusing link. No permissions on root prim");
             return;
         }
 
@@ -3079,13 +3079,13 @@ public partial class Scene
         //
         if (owners.Count > 1)
         {
-            m_log.DebugFormat("[LINK]: Refusing link. Too many owners");
+            m_log.LogDebug("[LINK]: Refusing link. Too many owners");
             return;
         }
 
         if (children.Count == 0)
         {
-            m_log.DebugFormat("[LINK]: Refusing link. No permissions to link any of the children");
+            m_log.LogDebug("[LINK]: Refusing link. No permissions to link any of the children");
             return;
         }
 

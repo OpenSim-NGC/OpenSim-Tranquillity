@@ -1,4 +1,3 @@
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Server.Base;
@@ -7,12 +6,14 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Experience;
 
 public class LocalExperienceServicesConnector : ISharedRegionModule, IExperienceService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private List<Scene> m_Scenes = new List<Scene>();
@@ -46,7 +47,7 @@ public class LocalExperienceServicesConnector : ISharedRegionModule, IExperience
         IConfig userConfig = source.Configs["ExperienceService"];
         if (userConfig == null)
         {
-            m_log.Error("[EXPERIENCE LOCALCONNECTOR]: ExperienceService missing from configuration");
+            m_log.LogError("[EXPERIENCE LOCALCONNECTOR]: ExperienceService missing from configuration");
             return;
         }
 
@@ -55,7 +56,7 @@ public class LocalExperienceServicesConnector : ISharedRegionModule, IExperience
 
         if (serviceDll == String.Empty)
         {
-            m_log.Error("[EXPERIENCE LOCALCONNECTOR]: No ExperienceModule named in section ExperienceService");
+            m_log.LogError("[EXPERIENCE LOCALCONNECTOR]: No ExperienceModule named in section ExperienceService");
             return;
         }
 
@@ -66,18 +67,18 @@ public class LocalExperienceServicesConnector : ISharedRegionModule, IExperience
         }
         catch
         {
-            m_log.Error("[EXPERIENCE LOCALCONNECTOR]: Failed to load experience service");
+            m_log.LogError("[EXPERIENCE LOCALCONNECTOR]: Failed to load experience service");
             return;
         }
 
         if (m_service == null)
         {
-            m_log.Error("[EXPERIENCE LOCALCONNECTOR]: Can't load experience service");
+            m_log.LogError("[EXPERIENCE LOCALCONNECTOR]: Can't load experience service");
             return;
         }
 
         m_Enabled = true;
-        m_log.Info("[EXPERIENCE LOCALCONNECTOR]: Enabled!");
+        m_log.LogInformation("[EXPERIENCE LOCALCONNECTOR]: Enabled!");
     }
 
     public void Close()

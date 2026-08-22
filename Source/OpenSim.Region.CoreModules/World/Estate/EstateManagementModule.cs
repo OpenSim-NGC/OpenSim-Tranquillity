@@ -29,7 +29,6 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Security;
 using System.Timers;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -38,6 +37,7 @@ using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using RegionFlags = OpenMetaverse.RegionFlags;
 using Timer = System.Timers.Timer;
 
@@ -45,7 +45,7 @@ namespace OpenSim.Region.CoreModules.World.Estate;
 
 public class EstateManagementModule : IEstateModule, INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Timer m_regionChangeTimer = new Timer();
     public Scene Scene { get; private set; }
@@ -359,7 +359,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             response = String.Empty;
 
             // make sure there's a log entry to document the change
-            m_log.InfoFormat("[ESTATE]: Estate Owner for {0} changed to {1} ({2} {3})", dbSettings.EstateName,
+            m_log.LogInformation("[ESTATE]: Estate Owner for {0} changed to {1} ({2} {3})", dbSettings.EstateName,
                              account.PrincipalID, account.FirstName, account.LastName);
 
             // propagate the change
@@ -404,7 +404,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                 response = String.Empty;
 
                 // make sure there's a log entry to document the change
-                m_log.InfoFormat("[ESTATE]: Estate {0} renamed from \"{1}\" to \"{2}\"", estateID, oldName, newName);
+                m_log.LogInformation("[ESTATE]: Estate {0} renamed from \"{1}\" to \"{2}\"", estateID, oldName, newName);
 
                // propagate the change
                 List<UUID> regions = Scene.GetEstateRegions(estateID);
@@ -437,7 +437,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             else if (Scene.EstateDataService.LinkRegion(regionInfo.RegionID, estateID))
             {
                 // make sure there's a log entry to document the change
-                m_log.InfoFormat("[ESTATE]: Region {0} ({1}) moved to Estate {2} ({3}).", regionInfo.RegionID, regionInfo.RegionName, estateID, dbSettings.EstateName);
+                m_log.LogInformation("[ESTATE]: Region {0} ({1}) moved to Estate {2} ({3}).", regionInfo.RegionID, regionInfo.RegionName, estateID, dbSettings.EstateName);
 
                 // propagate the change
                 OnEstateInfoChange?.Invoke(regionInfo.RegionID);
@@ -733,8 +733,8 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         if (Scene.PhysicsEnabled && Scene.PhysicsScene != null && lastwaterlevel != WaterHeight)
             Scene.PhysicsScene.SetWaterLevel(WaterHeight);
 
-        //m_log.Debug("[ESTATE]: UFS: " + UseFixedSun.ToString());
-        //m_log.Debug("[ESTATE]: SunHour: " + SunHour.ToString());
+        //m_log.LogDebug("[ESTATE]: UFS: " + UseFixedSun.ToString());
+        //m_log.LogDebug("[ESTATE]: SunHour: " + SunHour.ToString());
 
         SendRegionInfoPacketToAll();
         Scene.RegionInfo.RegionSettings.Save();
@@ -776,7 +776,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
 
             restartModule.ScheduleRestart(UUID.Zero, "Region will restart in {0}", times.ToArray(), false);
 
-            m_log.InfoFormat(
+            m_log.LogInformation(
                 "User {0} requested restart of region {1} in {2} seconds",
                 remoteClient.Name, Scene.Name, times.Count != 0 ? times[0] : 0);
         }
@@ -784,7 +784,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
 
     private void HandleChangeEstateCovenantRequest(IClientAPI remoteClient, UUID estateCovenantID)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ESTATE MANAGEMENT MODULE]: Handling request from {0} to change estate covenant to {1}",
 //                remoteClient.Name, estateCovenantID);
 
@@ -1731,7 +1731,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             TerrainUploader = null;
         }
 
-        m_log.DebugFormat("[CLIENT]: Terrain upload from {0} to {1} complete.", remoteClient.Name, Scene.Name);
+        m_log.LogDebug("[CLIENT]: Terrain upload from {0} to {1} complete.", remoteClient.Name, Scene.Name);
         remoteClient.SendAlertMessage("Terrain Upload Complete. Loading....");
 
         ITerrainModule terr = Scene.RequestModuleInterface<ITerrainModule>();
@@ -1748,28 +1748,28 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             }
             catch (IOException e)
             {
-                m_log.ErrorFormat("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
+                m_log.LogError("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
                 remoteClient.SendAlertMessage("There was an IO Exception loading your terrain.  Please check free space.");
 
                 return;
             }
             catch (SecurityException e)
             {
-                m_log.ErrorFormat("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
+                m_log.LogError("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
                 remoteClient.SendAlertMessage("There was a security Exception loading your terrain.  Please check the security on the simulator drive");
 
                 return;
             }
             catch (UnauthorizedAccessException e)
             {
-                m_log.ErrorFormat("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
+                m_log.LogError("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
                 remoteClient.SendAlertMessage("There was a security Exception loading your terrain.  Please check the security on the simulator drive");
 
                 return;
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[TERRAIN]: Error loading a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
+                m_log.LogError("[TERRAIN]: Error loading a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
                 remoteClient.SendAlertMessage("There was a general error loading your terrain.  Please fix the terrain file and try again");
             }
         }
@@ -1785,7 +1785,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         {
             if (TerrainUploader == null)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[TERRAIN]: Started receiving terrain upload for region {0} from {1}",
                     Scene.Name, remote_client.Name);
 
@@ -1809,7 +1809,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
 
         if (terr != null)
         {
-//                m_log.Warn("[CLIENT]: Got Request to Send Terrain in region " + Scene.RegionInfo.RegionName);
+//                m_log.LogWarning("[CLIENT]: Got Request to Send Terrain in region " + Scene.RegionInfo.RegionName);
             if (File.Exists(Util.dataDir() + "/terrain.raw"))
             {
                 File.Delete(Util.dataDir() + "/terrain.raw");
@@ -1832,7 +1832,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             string xfername = (UUID.Random()).ToString();
             Scene.XferManager.AddNewFile(xfername, bdata);
 
-            m_log.DebugFormat("[CLIENT]: Sending terrain for region {0} to {1}", Scene.Name, remote_client.Name);
+            m_log.LogDebug("[CLIENT]: Sending terrain for region {0} to {1}", Scene.Name, remote_client.Name);
             remote_client.SendInitiateDownload(xfername, clientFileName);
         }
     }

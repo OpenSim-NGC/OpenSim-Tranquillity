@@ -28,7 +28,6 @@
 using System.Reflection;
 using System.Runtime;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
@@ -36,6 +35,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using System.IO.Compression;
 using OpenSim.Framework.Serialization.External;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.CoreModules.World.Archiver;
@@ -45,7 +45,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver;
 /// </summary>
 public class ArchiveWriteRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// The minimum major version of OAR that we can write.
@@ -96,10 +96,10 @@ public class ArchiveWriteRequest
         }
         catch (EntryPointNotFoundException e)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                     + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-            m_log.ErrorFormat("{0} {1}", e.Message, e.StackTrace);
+            m_log.LogError("{0} {1}", e.Message, e.StackTrace);
         }
     }
 
@@ -149,7 +149,7 @@ public class ArchiveWriteRequest
         ArchiveScenesGroup scenesGroup = new ArchiveScenesGroup();
         if (MultiRegionFormat)
         {
-            m_log.InfoFormat("[ARCHIVER]: Saving {0} regions", SceneManager.Instance.Scenes.Count);
+            m_log.LogInformation("[ARCHIVER]: Saving {0} regions", SceneManager.Instance.Scenes.Count);
             SceneManager.Instance.ForEachScene(delegate(Scene scene)
             {
                 scenesGroup.AddScene(scene);
@@ -167,7 +167,7 @@ public class ArchiveWriteRequest
         {
             // Write out control file. It should be first so that it will be found ASAP when loading the file.
             m_archiveWriter.WriteFile(ArchiveConstants.CONTROL_FILE_PATH, CreateControlFile(scenesGroup));
-            m_log.InfoFormat("[ARCHIVER]: Added control file to archive.");
+            m_log.LogInformation("[ARCHIVER]: Added control file to archive.");
 
             // Archive the regions
 
@@ -185,7 +185,7 @@ public class ArchiveWriteRequest
 
             if (SaveAssets)
             {
-                m_log.DebugFormat("[ARCHIVER]: Saving {0} assets", assetUuids.Count);
+                m_log.LogDebug("[ARCHIVER]: Saving {0} assets", assetUuids.Count);
                 
                 AssetsRequest ar = new AssetsRequest(
                         new AssetsArchiver(m_archiveWriter), assetUuids,
@@ -197,7 +197,7 @@ public class ArchiveWriteRequest
             }
             else
             {
-                m_log.DebugFormat("[ARCHIVER]: Not saving assets since --noassets was specified");
+                m_log.LogDebug("[ARCHIVER]: Not saving assets since --noassets was specified");
 //                    CloseArchive(string.Empty);
             }
             CloseArchive(string.Empty);
@@ -218,7 +218,7 @@ public class ArchiveWriteRequest
     private void ArchiveOneRegion(Scene scene, string regionDir, Dictionary<UUID, sbyte> assetUuids,
         HashSet<UUID> failedIDs, HashSet<UUID>  uncertainAssetsUUIDs)
     {
-        m_log.InfoFormat("[ARCHIVER]: Writing region {0}", scene.Name);
+        m_log.LogInformation("[ARCHIVER]: Writing region {0}", scene.Name);
 
         EntityBase[] entities = scene.GetEntities();
         List<SceneObjectGroup> sceneObjects = new List<SceneObjectGroup>();
@@ -265,14 +265,14 @@ public class ArchiveWriteRequest
                 possible = assetGatherer.possibleNotAssetCount - possible;
                 if(curErrorCntr > 0)
                 {
-                    m_log.ErrorFormat("[ARCHIVER]: object {0} '{1}', at {2}, contains {3} references to missing or damaged assets",
+                    m_log.LogError("[ARCHIVER]: object {0} '{1}', at {2}, contains {3} references to missing or damaged assets",
                         sceneObject.UUID, sceneObject.Name ,sceneObject.AbsolutePosition.ToString(), curErrorCntr);
                     if(possible > 0)
-                        m_log.WarnFormat("[ARCHIVER Warning]: object also contains {0} references that may not be assets or are missing", possible);
+                        m_log.LogWarning("[ARCHIVER Warning]: object also contains {0} references that may not be assets or are missing", possible);
                 }
                 else if(possible > 0)
                 {
-                    m_log.WarnFormat("[ARCHIVER Warning]: object {0} '{1}', at {2}, contains {3} references that may not be assets or are missing",
+                    m_log.LogWarning("[ARCHIVER Warning]: object {0} '{1}', at {2}, contains {3} references that may not be assets or are missing",
                         sceneObject.UUID, sceneObject.Name ,sceneObject.AbsolutePosition.ToString(), possible);
                 }
             }
@@ -282,16 +282,16 @@ public class ArchiveWriteRequest
             GC.Collect();
 
             int errors = assetGatherer.FailedUUIDs.Count;
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ARCHIVER]: {0} region scene objects to save reference {1} possible assets",
                 sceneObjects.Count, assetUuids.Count - prevAssets + errors);
             if(errors > 0)
-                m_log.DebugFormat("[ARCHIVER]: {0} of these have problems or are not assets and will be ignored", errors);
+                m_log.LogDebug("[ARCHIVER]: {0} of these have problems or are not assets and will be ignored", errors);
         }
 
         if (numObjectsSkippedPermissions > 0)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[ARCHIVER]: {0} scene objects skipped due to lack of permissions",
                 numObjectsSkippedPermissions);
         }
@@ -404,7 +404,7 @@ public class ArchiveWriteRequest
                 partPermitted = true;
 
             //string name = (objGroup.PrimCount == 1) ? objGroup.Name : string.Format("{0} ({1}/{2})", obj.Name, primNumber, objGroup.PrimCount);
-            //m_log.DebugFormat("[ARCHIVER]: Object permissions: {0}: Base={1:X4}, Owner={2:X4}, Everyone={3:X4}, permissionClass={4}, checkPermissions={5}, canCopy={6}, canTransfer={7}, creator={8}, permitted={9}",
+            //m_log.LogDebug("[ARCHIVER]: Object permissions: {0}: Base={1:X4}, Owner={2:X4}, Everyone={3:X4}, permissionClass={4}, checkPermissions={5}, canCopy={6}, canTransfer={7}, creator={8}, permitted={9}",
             //    name, obj.BaseMask, obj.OwnerMask, obj.EveryoneMask,
             //    permissionClass, checkPermissions, canCopy, canTransfer, creator, partPermitted);
 
@@ -472,10 +472,10 @@ public class ArchiveWriteRequest
 //                minorVersion = 4;
 //            }
 
-        m_log.InfoFormat("[ARCHIVER]: Creating version {0}.{1} OAR", majorVersion, minorVersion);
+        m_log.LogInformation("[ARCHIVER]: Creating version {0}.{1} OAR", majorVersion, minorVersion);
         if (majorVersion == 1)
         {
-            m_log.WarnFormat("[ARCHIVER]: Please be aware that version 1.0 OARs are not compatible with OpenSim versions prior to 0.7.4. Do not use the --all option if you want to produce a compatible OAR");
+            m_log.LogWarning("[ARCHIVER]: Please be aware that version 1.0 OARs are not compatible with OpenSim versions prior to 0.7.4. Do not use the --all option if you want to produce a compatible OAR");
         }
 
         String s;
@@ -581,14 +581,14 @@ public class ArchiveWriteRequest
         if (regionDir != string.Empty)
             regionDir = ArchiveConstants.REGIONS_PATH + regionDir + "/";
 
-        m_log.InfoFormat("[ARCHIVER]: Adding region settings to archive.");
+        m_log.LogInformation("[ARCHIVER]: Adding region settings to archive.");
 
         // Write out region settings
         string settingsPath = String.Format("{0}{1}{2}.xml",
             regionDir, ArchiveConstants.SETTINGS_PATH, scene.RegionInfo.RegionName);
         m_archiveWriter.WriteFile(settingsPath, RegionSettingsSerializer.Serialize(scene.RegionInfo.RegionSettings, scene.RegionEnvironment, scene.RegionInfo.EstateSettings));
 
-        m_log.InfoFormat("[ARCHIVER]: Adding parcel settings to archive.");
+        m_log.LogInformation("[ARCHIVER]: Adding parcel settings to archive.");
 
         // Write out land data (aka parcel) settings
         List<ILandObject> landObjects = scene.LandChannel.AllParcels();
@@ -600,7 +600,7 @@ public class ArchiveWriteRequest
             m_archiveWriter.WriteFile(landDataPath, LandDataSerializer.Serialize(landData, m_options));
         }
 
-        m_log.InfoFormat("[ARCHIVER]: Adding terrain information to archive.");
+        m_log.LogInformation("[ARCHIVER]: Adding terrain information to archive.");
 
         // Write out terrain
         string terrainPath = String.Format("{0}{1}{2}.r32",
@@ -612,13 +612,13 @@ public class ArchiveWriteRequest
             m_archiveWriter.WriteFile(terrainPath, ms.ToArray());
         }
 
-        m_log.InfoFormat("[ARCHIVER]: Adding scene objects to archive.");
+        m_log.LogInformation("[ARCHIVER]: Adding scene objects to archive.");
 
         // Write out scene object metadata
         IRegionSerialiserModule serializer = scene.RequestModuleInterface<IRegionSerialiserModule>();
         foreach (SceneObjectGroup sceneObject in sceneObjects)
         {
-            //m_log.DebugFormat("[ARCHIVER]: Saving {0} {1}, {2}", entity.Name, entity.UUID, entity.GetType());
+            //m_log.LogDebug("[ARCHIVER]: Saving {0} {1}, {2}", entity.Name, entity.UUID, entity.GetType());
             if(sceneObject.IsDeleted || sceneObject.inTransit)
                 continue;
             string serializedObject = serializer.SerializeGroupToXml2(sceneObject, m_options);
@@ -639,10 +639,10 @@ public class ArchiveWriteRequest
         {
             foreach (UUID uuid in assetsNotFoundUuids)
             {
-                m_log.DebugFormat("[ARCHIVER]: Could not find asset {0}", uuid);
+                m_log.LogDebug("[ARCHIVER]: Could not find asset {0}", uuid);
             }
 
-            //            m_log.InfoFormat(
+            //            m_log.LogInformation(
             //                "[ARCHIVER]: Received {0} of {1} assets requested",
             //                assetsFoundUuids.Count, assetsFoundUuids.Count + assetsNotFoundUuids.Count);
 
@@ -666,12 +666,12 @@ public class ArchiveWriteRequest
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[ARCHIVER]: Error closing archive: {0} ", e.Message), e);
+            m_log.LogError(e, string.Format("[ARCHIVER]: Error closing archive: {0} ", e.Message));
             if (errorMessage.Length == 0)
                 errorMessage = e.Message;
         }
 
-        m_log.InfoFormat("[ARCHIVER]: Finished writing out OAR for {0}", m_rootScene.RegionInfo.RegionName);
+        m_log.LogInformation("[ARCHIVER]: Finished writing out OAR for {0}", m_rootScene.RegionInfo.RegionName);
 
         m_rootScene.EventManager.TriggerOarFileSaved(m_requestId, errorMessage);
     }

@@ -25,10 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenSim.Region.PhysicsModules.SharedBase;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes;
 
@@ -40,7 +41,7 @@ public enum UpdatePrioritizationSchemes
 
 public class Prioritizer
 {
-    private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
 
@@ -57,7 +58,7 @@ public class Prioritizer
         // If entity is null we have a serious problem
         if (entity == null)
         {
-            m_log.WarnFormat("[PRIORITIZER] attempt to prioritize null entity");
+            m_log.LogWarning("[PRIORITIZER] attempt to prioritize null entity");
             throw new InvalidOperationException("Prioritization entity not defined");
         }
 
@@ -129,7 +130,7 @@ public class Prioritizer
             // updates to send to a client that doesn't have a presence in the scene
             // seems like there's race condition here...
 
-            // m_log.WarnFormat("[PRIORITIZER] attempt to use agent {0} not in the scene",client.AgentId);
+            // m_log.LogWarning("[PRIORITIZER] attempt to use agent {0} not in the scene",client.AgentId);
             // throw new InvalidOperationException("Prioritization agent not defined");
             return PriorityQueue.NumberOfQueues - 1;
         }

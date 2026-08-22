@@ -26,7 +26,7 @@
  */
 
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -77,8 +77,7 @@ public class PluginLoader<T> : IDisposable where T : IPlugin
     private Dictionary<string, IPluginFilter> filters
         = new Dictionary<string, IPluginFilter>();
 
-    private static readonly ILog log
-        = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public PluginInitialiserBase Initialiser
     {
@@ -164,10 +163,10 @@ public class PluginLoader<T> : IDisposable where T : IPlugin
     {
         foreach (string ext in extpoints)
         {
-            log.Info("[PLUGINS]: Loading extension point " + ext);
+            log.LogInformation("[PLUGINS]: Loading extension point " + ext);
 
             IReadOnlyList<PluginExtensionNode> discoveredNodes = discovery.GetExtensionNodes(ext, typeof(T));
-            log.InfoFormat(
+            log.LogInformation(
                 "[PLUGINS]: Extension point {0} discovered {1} candidate plugin(s) using {2}",
                 ext,
                 discoveredNodes.Count,
@@ -176,7 +175,7 @@ public class PluginLoader<T> : IDisposable where T : IPlugin
             if (constraints.TryGetValue(ext , out IPluginConstraint cons))
             {
                 if (cons.Apply(ext, typeof(T), discovery))
-                    log.Error("[PLUGINS]: " + ext + " failed constraint: " + cons.Message);
+                    log.LogError("[PLUGINS]: " + ext + " failed constraint: " + cons.Message);
             }
 
             filters.TryGetValue(ext, out IPluginFilter filter);
@@ -184,7 +183,7 @@ public class PluginLoader<T> : IDisposable where T : IPlugin
             List<T> loadedPlugins = new List<T>();
             foreach (PluginExtensionNode node in discoveredNodes)
             {
-                log.Info("[PLUGINS]: Trying plugin " + node.Path);
+                log.LogInformation("[PLUGINS]: Trying plugin " + node.Path);
 
                 if ((filter != null) && (filter.Apply(node) == false))
                     continue;
@@ -216,7 +215,7 @@ public class PluginLoader<T> : IDisposable where T : IPlugin
 
     private void initialise_plugin_dir(string dir)
     {
-        log.Info("[PLUGINS]: Initializing addin manager");
+        log.LogInformation("[PLUGINS]: Initializing addin manager");
         discovery.Initialize(dir);
     }
 }

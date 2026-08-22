@@ -29,7 +29,7 @@ using System.Net.Sockets;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -44,7 +44,7 @@ namespace OpenSim.Framework;
 public static class NetworkUtil
 {
     // Logger
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static bool m_disabled = true;
 
@@ -67,7 +67,7 @@ public static class NetworkUtil
         {
             if (host.Equals(user) && host.AddressFamily == AddressFamily.InterNetwork)
             {
-                m_log.Info("[NetworkUtil] Localhost user detected, sending them '" + host + "' instead of '" + simulator + "'");
+                m_log.LogInformation("[NetworkUtil] Localhost user detected, sending them '" + host + "' instead of '" + simulator + "'");
                 return host;
             }
         }
@@ -98,7 +98,7 @@ public static class NetworkUtil
 
             if (valid)
             {
-                m_log.Info("[NetworkUtil] Local LAN user detected, sending them '" + subnet.Key + "' instead of '" + simulator + "'");
+                m_log.LogInformation("[NetworkUtil] Local LAN user detected, sending them '" + subnet.Key + "' instead of '" + simulator + "'");
                 return subnet.Key;
             }
         }
@@ -116,7 +116,7 @@ public static class NetworkUtil
             {
                 if (host.AddressFamily == AddressFamily.InterNetworkV6)
                 {
-                    m_log.Info("[NetworkUtil] Localhost user detected, sending them '" + host + "' instead of '" + defaultHostname + "'");
+                    m_log.LogInformation("[NetworkUtil] Localhost user detected, sending them '" + host + "' instead of '" + defaultHostname + "'");
                     return host;
                 }
             }
@@ -131,7 +131,7 @@ public static class NetworkUtil
             IPAddress host = pair.Value;
             if (host.Equals(destination) && host.AddressFamily == AddressFamily.InterNetwork)
             {
-                m_log.Info("[NATROUTING] Localhost user detected, sending them '" + host + "' instead of '" + defaultHostname + "'");
+                m_log.LogInformation("[NATROUTING] Localhost user detected, sending them '" + host + "' instead of '" + defaultHostname + "'");
                 return destination;
             }
         }
@@ -162,7 +162,7 @@ public static class NetworkUtil
 
             if (valid)
             {
-                m_log.Info("[NetworkUtil] Local LAN user detected, sending them '" + subnet.Key + "' instead of '" + defaultHostname + "'");
+                m_log.LogInformation("[NetworkUtil] Local LAN user detected, sending them '" + subnet.Key + "' instead of '" + defaultHostname + "'");
                 return subnet.Key;
             }
         }

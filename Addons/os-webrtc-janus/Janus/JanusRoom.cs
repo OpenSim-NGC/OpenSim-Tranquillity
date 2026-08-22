@@ -26,14 +26,15 @@
  */
 
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace osWebRtcVoice;
 
 // Encapsulization of a Session to the Janus server
 public class JanusRoom : IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[JANUS ROOM]";
 
     public int RoomId { get; private set; }
@@ -57,7 +58,7 @@ public class JanusRoom : IDisposable
         bool ret = false;
         try
         {
-            // m_log.DebugFormat("{0} JoinRoom. New joinReq for room {1}", LogHeader, RoomId);
+            // m_log.LogDebug("{0} JoinRoom. New joinReq for room {1}", LogHeader, RoomId);
 
             // Discovered that AudioBridge doesn't care if the data portion is present
             //    and, if removed, the viewer complains that the "m=" sections are
@@ -75,16 +76,16 @@ public class JanusRoom : IDisposable
                 pVSession.ParticipantId = joinResp.ParticipantId;
                 pVSession.Answer = joinResp.Jsep;
                 ret = true;
-                m_log.DebugFormat("{0} JoinRoom. Joined room {1}. Participant={2}", LogHeader, RoomId, pVSession.ParticipantId);
+                m_log.LogDebug("{0} JoinRoom. Joined room {1}. Participant={2}", LogHeader, RoomId, pVSession.ParticipantId);
             }
             else
             {
-                m_log.ErrorFormat("{0} JoinRoom. Failed to join room {1}. Resp={2}", LogHeader, RoomId, joinResp.ToString());
+                m_log.LogError("{0} JoinRoom. Failed to join room {1}. Resp={2}", LogHeader, RoomId, joinResp.ToString());
             }
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} JoinRoom. Exception {1}", LogHeader, e);
+            m_log.LogError("{0} JoinRoom. Exception {1}", LogHeader, e);
         }
         return ret;
     }
@@ -100,7 +101,7 @@ public class JanusRoom : IDisposable
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} LeaveRoom. Exception {1}", LogHeader, e);
+            m_log.LogError("{0} LeaveRoom. Exception {1}", LogHeader, e);
         }
         return ret;
     }
@@ -116,7 +117,7 @@ public class JanusRoom : IDisposable
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} LeaveRoom. Exception {1}", LogHeader, e);
+            m_log.LogError("{0} LeaveRoom. Exception {1}", LogHeader, e);
         }
         return ret;
     }

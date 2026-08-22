@@ -25,18 +25,18 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.OptionalModules.Scripting.JsonStore;
 
 public class JsonStoreCommandsModule  : INonSharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IConfig m_config = null;
     private bool m_enabled = false;
@@ -71,7 +71,7 @@ public class JsonStoreCommandsModule  : INonSharedRegionModule
             if ((m_config = config.Configs["JsonStore"]) == null)
             {
                 // There is no configuration, the module is disabled
-                // m_log.InfoFormat("[JsonStore] no configuration info");
+                // m_log.LogInformation("[JsonStore] no configuration info");
                 return;
             }
 
@@ -79,12 +79,12 @@ public class JsonStoreCommandsModule  : INonSharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.Error("[JsonStore]: initialization error: {0}", e);
+            m_log.LogError(e, "[JsonStore]: initialization error: {0}");
             return;
         }
 
         if (m_enabled)
-            m_log.DebugFormat("[JsonStore]: module is enabled");
+            m_log.LogDebug("[JsonStore]: module is enabled");
     }
 
     // -----------------------------------------------------------------
@@ -143,7 +143,7 @@ public class JsonStoreCommandsModule  : INonSharedRegionModule
             m_store = (JsonStoreModule) m_scene.RequestModuleInterface<IJsonStoreModule>();
             if (m_store == null)
             {
-                m_log.ErrorFormat("[JsonStoreCommands]: JsonModule interface not defined");
+                m_log.LogError("[JsonStoreCommands]: JsonModule interface not defined");
                 m_enabled = false;
                 return;
             }

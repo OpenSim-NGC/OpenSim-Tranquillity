@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Collections;
 using System.Reflection;
 using OpenSim.Framework;
@@ -33,14 +32,14 @@ using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 using Nwc.XmlRpc;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Services.Connectors;
 
 public class LandServicesConnector : ILandService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     protected IGridService m_GridService = null;
@@ -92,7 +91,7 @@ public class LandServicesConnector : ILandService
                 XmlRpcResponse response = request.Send(info.ServerURI, hclient);
                 if (response.IsFault)
                 {
-                    m_log.ErrorFormat("[LAND CONNECTOR]: remote call returned an error: {0}", response.FaultString);
+                    m_log.LogError("[LAND CONNECTOR]: remote call returned an error: {0}", response.FaultString);
                 }
                 else
                 {
@@ -116,22 +115,22 @@ public class LandServicesConnector : ILandService
                             regionAccess = (byte)Convert.ToInt32((string)hash["RegionAccess"]);
                         if(hash["Dwell"] != null)
                             landData.Dwell = Convert.ToSingle((string)hash["Dwell"]);
-                        //m_log.DebugFormat("[LAND CONNECTOR]: Got land data for parcel {0}", landData.Name);
+                        //m_log.LogDebug("[LAND CONNECTOR]: Got land data for parcel {0}", landData.Name);
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[LAND CONNECTOR]: Got exception while parsing land-data: {0} {1}",
                             e.Message, e.StackTrace);
                     }
                 }
             }
             else
-                m_log.WarnFormat("[LAND CONNECTOR]: Couldn't find region with handle {0}", regionHandle);
+                m_log.LogWarning("[LAND CONNECTOR]: Couldn't find region with handle {0}", regionHandle);
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[LAND CONNECTOR]: Couldn't contact region {0}: {1}", regionHandle, e.Message);
+            m_log.LogError("[LAND CONNECTOR]: Couldn't contact region {0}: {1}", regionHandle, e.Message);
         }
 
         return landData;

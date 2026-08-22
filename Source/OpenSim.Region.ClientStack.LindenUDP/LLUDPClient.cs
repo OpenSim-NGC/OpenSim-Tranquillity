@@ -26,9 +26,10 @@
  */
 
 using System.Net;
-using log4net;
 using OpenSim.Framework;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.ClientStack.LindenUDP;
 
@@ -58,7 +59,7 @@ public delegate void QueueEmpty(ThrottleOutPacketTypeFlags categories);
 /// </summary>
 public sealed class LLUDPClient
 {
-    private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>The number of packet categories to throttle on. If a throttle category is added
     /// or removed, this number must also change</summary>
@@ -415,13 +416,13 @@ public sealed class LLUDPClient
             texture *= scale;
             asset *= scale;
             float ntotal = total * scale;
-            m_log.Debug($"[LLUDPCLIENT]: limiting {AgentID} bandwith from {total} to {ntotal}");
+            m_log.LogDebug($"[LLUDPCLIENT]: limiting {AgentID} bandwith from {total} to {ntotal}");
             total = ntotal;
         }
         
         if (ThrottleDebugLevel > 0)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[LLUDPCLIENT]: {0} is setting throttles in {1} to Resend={2}, Land={3}, Wind={4}, Cloud={5}, Task={6}, Texture={7}, Asset={8}, TOTAL = {9}",
                 AgentID, m_udpServer.Scene.Name, resend, land, wind, cloud, task, texture, asset, total);
         }
@@ -674,7 +675,7 @@ public sealed class LLUDPClient
         if (emptyCategories != 0)
             BeginFireQueueEmpty(emptyCategories);
 
-        //m_log.Info("[LLUDPCLIENT]: Queues: " + queueDebugOutput); // Serious debug business
+        //m_log.LogInformation("[LLUDPCLIENT]: Queues: " + queueDebugOutput); // Serious debug business
         return packetSent;
     }
 
@@ -755,7 +756,7 @@ public sealed class LLUDPClient
         {
             ThrottleOutPacketTypeFlags categories = (ThrottleOutPacketTypeFlags)o;
             try { callback(categories); }
-            catch (Exception e) { m_log.Error("[LLUDPCLIENT]: OnQueueEmpty(" + categories + ") threw an exception: " + e.Message, e); }
+            catch (Exception e) { m_log.LogError(e, "[LLUDPCLIENT]: OnQueueEmpty(" + categories + ") threw an exception: " + e.Message); }
         }
 
         QueueEmptyRunning = false;

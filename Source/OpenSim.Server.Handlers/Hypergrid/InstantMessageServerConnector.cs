@@ -36,15 +36,16 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
-using log4net;
 using Nwc.XmlRpc;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Hypergrid;
 
 public class InstantMessageServerConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInstantMessage m_IMService;
 
@@ -105,7 +106,7 @@ public class InstantMessageServerConnector : ServiceConnector
             float pos_x = 0;
             float pos_y = 0;
             float pos_z = 0;
-            //m_log.Info("Processing IM");
+            //m_log.LogInformation("Processing IM");
 
 
             Hashtable requestData = (Hashtable)request.Params[0];
@@ -222,7 +223,7 @@ public class InstantMessageServerConnector : ServiceConnector
         }
         catch (Exception e)
         {
-            m_log.Error("[INSTANT MESSAGE]: Caught unexpected exception:", e);
+            m_log.LogError(e, "[INSTANT MESSAGE]: Caught unexpected exception:");
             successful = false;
         }
 

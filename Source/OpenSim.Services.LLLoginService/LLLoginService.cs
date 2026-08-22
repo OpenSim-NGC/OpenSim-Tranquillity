@@ -30,7 +30,6 @@ using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 
@@ -42,11 +41,13 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using OpenSim.Services.Connectors.Hypergrid;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.LLLoginService;
 
 public class LLLoginService : ILoginService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[LLOGIN SERVICE]";
 
     private static bool Initialized = false;
@@ -142,7 +143,7 @@ public class LLLoginService : ILoginService
             catch
             {
                 m_AllowedClientsRegex = null;
-                m_log.Error("[GATEKEEPER SERVICE]: failed to parse AllowedClients");
+                m_log.LogError("[GATEKEEPER SERVICE]: failed to parse AllowedClients");
             }
         }
 
@@ -156,7 +157,7 @@ public class LLLoginService : ILoginService
             catch
             {
                 m_DeniedClientsRegex = null;
-                m_log.Error("[GATEKEEPER SERVICE]: failed to parse DeniedClients");
+                m_log.LogError("[GATEKEEPER SERVICE]: failed to parse DeniedClients");
             }
         }
 
@@ -250,12 +251,12 @@ public class LLLoginService : ILoginService
         m_LocalSimulationService = simService;
         if (libraryService is not null)
         {
-            m_log.DebugFormat("[LLOGIN SERVICE]: Using LibraryService given as argument");
+            m_log.LogDebug("[LLOGIN SERVICE]: Using LibraryService given as argument");
             m_LibraryService = libraryService;
         }
         else if (!string.IsNullOrWhiteSpace(libService))
         {
-            m_log.DebugFormat("[LLOGIN SERVICE]: Using instantiated LibraryService");
+            m_log.LogDebug("[LLOGIN SERVICE]: Using instantiated LibraryService");
             m_LibraryService = ServerUtils.LoadPlugin<ILibraryService>(libService, args);
         }
 
@@ -267,7 +268,7 @@ public class LLLoginService : ILoginService
             RegisterCommands();
         }
 
-        m_log.DebugFormat("[LLOGIN SERVICE]: Starting...");
+        m_log.LogDebug("[LLOGIN SERVICE]: Starting...");
 
     }
 
@@ -290,13 +291,13 @@ public class LLLoginService : ILoginService
             UserAccount account = m_UserAccountService.GetUserAccount(UUID.Zero, firstName, lastName);
             if (account is null)
             {
-                m_log.InfoFormat("[LLOGIN SERVICE]: Set Level failed, user {0} {1} not found", firstName, lastName);
+                m_log.LogInformation("[LLOGIN SERVICE]: Set Level failed, user {0} {1} not found", firstName, lastName);
                 return response;
             }
 
             if (account.UserLevel < 200)
             {
-                m_log.InfoFormat("[LLOGIN SERVICE]: Set Level failed, reason: user level too low");
+                m_log.LogInformation("[LLOGIN SERVICE]: Set Level failed, reason: user level too low");
                 return response;
             }
 
@@ -309,18 +310,18 @@ public class LLLoginService : ILoginService
             UUID secureSession = UUID.Zero;
             if ((token.Length == 0) || (!UUID.TryParse(token, out secureSession)))
             {
-                m_log.InfoFormat("[LLOGIN SERVICE]: SetLevel failed, reason: authentication failed");
+                m_log.LogInformation("[LLOGIN SERVICE]: SetLevel failed, reason: authentication failed");
                 return response;
             }
         }
         catch (Exception e)
         {
-            m_log.Error("[LLOGIN SERVICE]: SetLevel failed, exception " + e.ToString());
+            m_log.LogError("[LLOGIN SERVICE]: SetLevel failed, exception " + e.ToString());
             return response;
         }
 
         m_MinLoginLevel = level;
-        m_log.InfoFormat("[LLOGIN SERVICE]: Login level set to {0} by {1} {2}", level, firstName, lastName);
+        m_log.LogInformation("[LLOGIN SERVICE]: Login level set to {0} by {1} {2}", level, firstName, lastName);
 
         response["success"] = true;
         return response;
@@ -334,7 +335,7 @@ public class LLLoginService : ILoginService
 
         string processedMessage;
 
-        m_log.InfoFormat("[LLOGIN SERVICE]: Login request for {0} {1} at {2} using viewer {3}, channel {4}, IP {5}, Mac {6}, Id0 {7} ",
+        m_log.LogInformation("[LLOGIN SERVICE]: Login request for {0} {1} at {2} using viewer {3}, channel {4}, IP {5}, Mac {6}, Id0 {7} ",
             firstName, lastName, startLocation, clientVersion, channel, clientIP.Address.ToString(), mac, id0);
 
         string curMac = mac.ToString();
@@ -358,7 +359,7 @@ public class LLLoginService : ILoginService
 
                     if (!am.Success)
                     {
-                        m_log.InfoFormat(
+                        m_log.LogInformation(
                             "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: client {2} is not allowed",
                             firstName, lastName, clientNameToCheck);
                         return LLFailedLoginResponse.LoginBlockedProblem;
@@ -374,7 +375,7 @@ public class LLLoginService : ILoginService
 
                     if (dm.Success)
                     {
-                        m_log.InfoFormat(
+                        m_log.LogInformation(
                             "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: client {2} is denied",
                             firstName, lastName, clientNameToCheck);
                         return LLFailedLoginResponse.LoginBlockedProblem;
@@ -384,20 +385,20 @@ public class LLLoginService : ILoginService
 
             if (!string.IsNullOrWhiteSpace(m_DeniedMacs))
             {
-                //m_log.InfoFormat("[LLOGIN SERVICE]: Checking users Mac {0} against list of denied macs {1} ...", curMac, m_DeniedMacs);
+                //m_log.LogInformation("[LLOGIN SERVICE]: Checking users Mac {0} against list of denied macs {1} ...", curMac, m_DeniedMacs);
                 if (m_DeniedMacs.Contains(curMac))
                 {
-                    m_log.InfoFormat("[LLOGIN SERVICE]: Login failed, reason: client with mac {0} is denied", curMac);
+                    m_log.LogInformation("[LLOGIN SERVICE]: Login failed, reason: client with mac {0} is denied", curMac);
                     return LLFailedLoginResponse.LoginBlockedProblem;
                 }
             }
 
             if (!string.IsNullOrWhiteSpace(m_DeniedID0s))
             {
-                //m_log.InfoFormat("[LLOGIN SERVICE]: Checking users Mac {0} against list of denied macs {1} ...", curMac, m_DeniedMacs);
+                //m_log.LogInformation("[LLOGIN SERVICE]: Checking users Mac {0} against list of denied macs {1} ...", curMac, m_DeniedMacs);
                 if (m_DeniedID0s.Contains(id0))
                 {
-                    m_log.InfoFormat("[LLOGIN SERVICE]: Login failed, reason: client with ido {0} is denied", id0);
+                    m_log.LogInformation("[LLOGIN SERVICE]: Login failed, reason: client with ido {0} is denied", id0);
                     return LLFailedLoginResponse.LoginBlockedProblem;
                 }
             }
@@ -408,14 +409,14 @@ public class LLLoginService : ILoginService
             UserAccount account = m_UserAccountService.GetUserAccount(scopeID, firstName, lastName);
             if (account is null)
             {
-                m_log.InfoFormat(
+                m_log.LogInformation(
                     "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: user not found", firstName, lastName);
                 return LLFailedLoginResponse.UserProblem;
             }
 
             if (account.UserLevel < m_MinLoginLevel)
             {
-                m_log.InfoFormat(
+                m_log.LogInformation(
                     "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: user level is {2} but minimum login level is {3}",
                     firstName, lastName, account.UserLevel, m_MinLoginLevel);
                 return LLFailedLoginResponse.LoginBlockedProblem;
@@ -438,7 +439,7 @@ public class LLLoginService : ILoginService
             {
                 if (account.ScopeID.NotEqual(scopeID) && !account.ScopeID.IsZero())
                 {
-                    m_log.InfoFormat(
+                    m_log.LogInformation(
                         "[LLOGIN SERVICE]: Login failed, reason: user {0} {1} not found", firstName, lastName);
                     return LLFailedLoginResponse.UserProblem;
                 }
@@ -454,7 +455,7 @@ public class LLLoginService : ILoginService
             UUID secureSession = UUID.Zero;
             if (string.IsNullOrWhiteSpace(token) || !UUID.TryParse(token, out secureSession))
             {
-                m_log.InfoFormat(
+                m_log.LogInformation(
                     "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: authentication failed",
                     firstName, lastName);
                 return LLFailedLoginResponse.UserProblem;
@@ -469,7 +470,7 @@ public class LLLoginService : ILoginService
                 {
                     if(SendAgentGodKillToRegion(scopeID, account.PrincipalID, guinfo))
                     {
-                        m_log.InfoFormat(
+                        m_log.LogInformation(
                             "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: already logged in",
                             firstName, lastName);
                     }
@@ -483,7 +484,7 @@ public class LLLoginService : ILoginService
             //
             if (m_RequireInventory && m_InventoryService == null)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: inventory service not set up",
                     firstName, lastName);
                 return LLFailedLoginResponse.InventoryProblem;
@@ -496,7 +497,7 @@ public class LLLoginService : ILoginService
             List<InventoryFolderBase> inventorySkel = m_InventoryService.GetInventorySkeleton(account.PrincipalID);
             if (m_RequireInventory && inventorySkel is null || inventorySkel.Count == 0)
             {
-                m_log.InfoFormat(
+                m_log.LogInformation(
                     "[LLOGIN SERVICE]: Login failed, for {0} {1}, reason: unable to retrieve user inventory",
                     firstName, lastName);
                 return LLFailedLoginResponse.InventoryProblem;
@@ -511,7 +512,7 @@ public class LLLoginService : ILoginService
 
                 if (!success)
                 {
-                    m_log.InfoFormat(
+                    m_log.LogInformation(
                         "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: could not login presence",
                         firstName, lastName);
                     return LLFailedLoginResponse.GridProblem;
@@ -530,7 +531,7 @@ public class LLLoginService : ILoginService
                 if (guinfo.HomeRegionID.IsZero())
                 {
                     if(startLocation == "home")
-                        m_log.WarnFormat(
+                        m_log.LogWarning(
                             "[LLOGIN SERVICE]: User {0} tried to login to a 'home' start location but they have none set",
                             account.Name);
                 }
@@ -540,7 +541,7 @@ public class LLLoginService : ILoginService
                     if (home is null)
                     {
                         if (startLocation.Equals("home"))
-                        m_log.WarnFormat(
+                        m_log.LogWarning(
                             "[LLOGIN SERVICE]: User {0} tried to login to a 'home' start location with ID {1} but this was not found.",
                             account.Name, guinfo.HomeRegionID);
                     }
@@ -549,7 +550,7 @@ public class LLLoginService : ILoginService
             else
             {
                 // something went wrong, make something up, so that we don't have to test this anywhere else
-                m_log.DebugFormat("{0} Failed to fetch GridUserInfo. Creating empty GridUserInfo as home", LogHeader);
+                m_log.LogDebug("{0} Failed to fetch GridUserInfo. Creating empty GridUserInfo as home", LogHeader);
                 guinfo = new GridUserInfo();
                 guinfo.LastPosition = guinfo.HomePosition = new Vector3(128, 128, 30);
             }
@@ -565,14 +566,14 @@ public class LLLoginService : ILoginService
             {
                 m_PresenceService.LogoutAgent(session);
 
-                m_log.InfoFormat(
+                m_log.LogInformation(
                     "[LLOGIN SERVICE]: Login failed for {0} {1}, reason: destination not found",
                     firstName, lastName);
                 return LLFailedLoginResponse.GridProblem;
             }
             else
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[LLOGIN SERVICE]: Found destination {0}, endpoint {1} for {2} {3}",
                     destination.RegionName, destination.ExternalEndPoint, firstName, lastName);
             }
@@ -598,7 +599,7 @@ public class LLLoginService : ILoginService
             if (aCircuit == null)
             {
                 m_PresenceService.LogoutAgent(session);
-                m_log.InfoFormat("[LLOGIN SERVICE]: Login failed for {0} {1}, reason: {2}", firstName, lastName, reason);
+                m_log.LogInformation("[LLOGIN SERVICE]: Login failed for {0} {1}, reason: {2}", firstName, lastName, reason);
                 return new LLFailedLoginResponse("key", reason, "false");
 
             }
@@ -611,7 +612,7 @@ public class LLLoginService : ILoginService
             if (m_FriendsService is not null)
             {
                 friendsList = m_FriendsService.GetFriends(account.PrincipalID);
-                //m_log.DebugFormat("[LLOGIN SERVICE]: Retrieved {0} friends", friendsList.Length);
+                //m_log.LogDebug("[LLOGIN SERVICE]: Retrieved {0} friends", friendsList.Length);
             }
 
             //
@@ -621,7 +622,7 @@ public class LLLoginService : ILoginService
 
             // Get active gestures
             List<InventoryItemBase> gestures = m_InventoryService.GetActiveGestures(account.PrincipalID);
-            //m_log.DebugFormat("[LLOGIN SERVICE]: {0} active gestures", gestures.Count);
+            //m_log.LogDebug("[LLOGIN SERVICE]: {0} active gestures", gestures.Count);
 
             LLLoginResponse response = new(
                     account, aCircuit, guinfo, destination, inventorySkel, friendsList, m_LibraryService,
@@ -629,13 +630,13 @@ public class LLLoginService : ILoginService
                     m_MapTileURL, m_ProfileURL, m_OpenIDURL, m_SearchURL, m_Currency, m_DSTZone,
                     m_DestinationGuide, m_AvatarPicker, realID, m_ClassifiedFee,m_MaxAgentGroups);
 
-                m_log.DebugFormat("[LLOGIN SERVICE]: All clear. Sending login response to {0} {1}", firstName, lastName);
+                m_log.LogDebug("[LLOGIN SERVICE]: All clear. Sending login response to {0} {1}", firstName, lastName);
 
                 return response;
            }
         catch (Exception e)
         {
-            m_log.WarnFormat("[LLOGIN SERVICE]: Exception processing login for {0} {1}: {2} {3}", firstName, lastName, e.ToString(), e.StackTrace);
+            m_log.LogWarning("[LLOGIN SERVICE]: Exception processing login for {0} {1}: {2} {3}", firstName, lastName, e.ToString(), e.StackTrace);
             m_PresenceService?.LogoutAgent(session);
             return LLFailedLoginResponse.InternalError;
         }
@@ -650,7 +651,7 @@ public class LLLoginService : ILoginService
     {
         flags = TeleportFlags.ViaLogin;
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[LLOGIN SERVICE]: Finding destination matching start location {0} for {1}",
             startLocation, account.Name);
 
@@ -684,7 +685,7 @@ public class LLLoginService : ILoginService
                 return defaults[0];
             }
 
-            m_log.WarnFormat("[LLOGIN SERVICE]: User {0} {1} does not have a valid home and this grid does not have default locations. Attempting to find random region",
+            m_log.LogWarning("[LLOGIN SERVICE]: User {0} {1} does not have a valid home and this grid does not have default locations. Attempting to find random region",
                 account.FirstName, account.LastName);
             GridRegion region = FindAlternativeRegion(scopeID);
             if (region is not null)
@@ -716,7 +717,7 @@ public class LLLoginService : ILoginService
                 }
                 else
                 {
-                    m_log.Info("[LLOGIN SERVICE]: Last Region Not Found Attempting to find random region");
+                    m_log.LogInformation("[LLOGIN SERVICE]: Last Region Not Found Attempting to find random region");
                     region = FindAlternativeRegion(scopeID);
                     if (region is not null)
                     {
@@ -748,7 +749,7 @@ public class LLLoginService : ILoginService
                 uriMatch = URIRegex.Match(startLocation);
             if (uriMatch is null)
             {
-                m_log.InfoFormat("[LLLOGIN SERVICE]: Got Custom Login URI {0}, but can't process it", startLocation);
+                m_log.LogInformation("[LLLOGIN SERVICE]: Got Custom Login URI {0}, but can't process it", startLocation);
                 return null;
             }
             else
@@ -766,7 +767,7 @@ public class LLLoginService : ILoginService
                         if(region is not null)
                             return region;
 
-                        m_log.InfoFormat("[LLLOGIN SERVICE]: Got Custom Login URI {0}, can't locate region {1}. Trying defaults.", startLocation, regionName);
+                        m_log.LogInformation("[LLLOGIN SERVICE]: Got Custom Login URI {0}, can't locate region {1}. Trying defaults.", startLocation, regionName);
                         List<GridRegion> regions = m_GridService.GetDefaultRegions(scopeID);
                         if (regions is not null && regions.Count > 0)
                         {
@@ -775,7 +776,7 @@ public class LLLoginService : ILoginService
                         }
                         else
                         {
-                            m_log.Info("[LLOGIN SERVICE]: Last Region Not Found Attempting to find random region");
+                            m_log.LogInformation("[LLOGIN SERVICE]: Last Region Not Found Attempting to find random region");
                             region = FindAlternativeRegion(scopeID);
                             if (region is not null)
                             {
@@ -784,14 +785,14 @@ public class LLLoginService : ILoginService
                             }
                             else
                             {
-                                m_log.InfoFormat("[LLLOGIN SERVICE]: Got Custom Login URI {0}, Grid does not provide default regions and no alternative found.", startLocation);
+                                m_log.LogInformation("[LLLOGIN SERVICE]: Got Custom Login URI {0}, Grid does not provide default regions and no alternative found.", startLocation);
                                 return null;
                             }
                         }
                     }
                     else
                     {
-                        m_log.Info("[LLLOGIN SERVICE]: Got Custom direct HG Login URI no longer supported");
+                        m_log.LogInformation("[LLLOGIN SERVICE]: Got Custom direct HG Login URI no longer supported");
                         return null;
                         /*
                          *direct HG tp no longer works due to current use of tp flags
@@ -799,13 +800,13 @@ public class LLLoginService : ILoginService
 
                         if (m_UserAgentService == null)
                         {
-                            m_log.WarnFormat("[LLLOGIN SERVICE]: This llogin service is not running a user agent service, as such it can't lauch agents at foreign grids");
+                            m_log.LogWarning("[LLLOGIN SERVICE]: This llogin service is not running a user agent service, as such it can't lauch agents at foreign grids");
                             return null;
                         }
                         string[] parts = regionName.Split(new char[] { '@' });
                         if (parts.Length < 2)
                         {
-                            m_log.InfoFormat("[LLLOGIN SERVICE]: Got Custom Login URI {0}, can't locate region {1}", startLocation, regionName);
+                            m_log.LogInformation("[LLLOGIN SERVICE]: Got Custom Login URI {0}, can't locate region {1}", startLocation, regionName);
                             return null;
                         }
                         // Valid specification of a remote grid
@@ -861,7 +862,7 @@ public class LLLoginService : ILoginService
     /*
     private GridRegion FindForeignRegion(string domainName, uint port, string regionName, UserAccount account, out GridRegion gatekeeper)
     {
-        m_log.Debug("[LLLOGIN SERVICE]: attempting to findforeignregion " + domainName + ":" + port.ToString() + ":" + regionName);
+        m_log.LogDebug("[LLLOGIN SERVICE]: attempting to findforeignregion " + domainName + ":" + port.ToString() + ":" + regionName);
         gatekeeper = new GridRegion();
         gatekeeper.ExternalHostName = domainName;
         gatekeeper.HttpPort = port;
@@ -902,7 +903,7 @@ public class LLLoginService : ILoginService
         }
         catch
         {
-            m_log.WarnFormat("[LLLogin SERVICE]: Unable to parse GatekeeperURL {0}", url);
+            m_log.LogWarning("[LLLogin SERVICE]: Unable to parse GatekeeperURL {0}", url);
         }
     }
 
@@ -1077,12 +1078,12 @@ public class LLLoginService : ILoginService
                 }
                 aCircuit.ServiceURLs[keyName] = keyValue;
 
-//                    m_log.DebugFormat("[LLLOGIN SERVICE]: found new key {0} {1}", keyName, aCircuit.ServiceURLs[keyName]);
+//                    m_log.LogDebug("[LLLOGIN SERVICE]: found new key {0} {1}", keyName, aCircuit.ServiceURLs[keyName]);
             }
 
             if (!account.ServiceURLs.ContainsKey("GatekeeperURI") && !string.IsNullOrEmpty(m_GatekeeperURL))
             {
-                m_log.DebugFormat("[LLLOGIN SERVICE]: adding gatekeeper uri {0}", m_GatekeeperURL);
+                m_log.LogDebug("[LLLOGIN SERVICE]: adding gatekeeper uri {0}", m_GatekeeperURL);
                 account.ServiceURLs["GatekeeperURI"] = m_GatekeeperURL;
                 newUrls = true;
             }
@@ -1108,7 +1109,7 @@ public class LLLoginService : ILoginService
 
     private bool LaunchAgentIndirectly(GridRegion gatekeeper, GridRegion destination, AgentCircuitData aCircuit, IPEndPoint clientIP, out string reason)
     {
-        m_log.Debug("[LLOGIN SERVICE]: Launching agent at " + destination.RegionName);
+        m_log.LogDebug("[LLOGIN SERVICE]: Launching agent at " + destination.RegionName);
 
         if (m_UserAgentService.LoginAgentToGrid(null, aCircuit, gatekeeper, destination, true, out reason))
             return true;

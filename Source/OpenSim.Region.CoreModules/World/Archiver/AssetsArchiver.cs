@@ -26,9 +26,10 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.Archiver;
 
@@ -37,7 +38,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver;
 /// </summary>
 public class AssetsArchiver
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <value>
     /// Post a message to the log every x assets as a progress bar
@@ -127,7 +128,7 @@ public class AssetsArchiver
         }
         else
         {
-            m_log.Error(
+            m_log.LogError(
                 $"[ARCHIVER]: Unrecognized asset type {asset.Type} with uuid {asset.ID}. This asset will be saved but may not load");
             m_archiveWriter.WriteFile($"{ArchiveConstants.ASSETS_PATH}{asset.FullID}", asset.Data);
         }
@@ -135,6 +136,6 @@ public class AssetsArchiver
         m_assetsWritten++;
 
         if (m_assetsWritten % LOG_ASSET_LOAD_NOTIFICATION_INTERVAL == 0)
-            m_log.Info($"[ARCHIVER]: Added {m_assetsWritten} assets to archive");
+            m_log.LogInformation($"[ARCHIVER]: Added {m_assetsWritten} assets to archive");
     }
 }

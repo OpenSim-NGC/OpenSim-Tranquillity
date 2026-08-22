@@ -26,22 +26,23 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenSim.Framework;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.SharedBase;
 
 class NullPhysicsScene : PhysicsScene
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static int m_workIndicator;
 
     public override PhysicsActor AddAvatar(
         string avName, Vector3 position, Vector3 velocity, Vector3 size, bool isFlying)
     {
-        m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : AddAvatar({0})", position);
+        m_log.LogInformation("[PHYSICS]: NullPhysicsScene : AddAvatar({0})", position);
         return PhysicsActor.Null;
     }
 
@@ -60,7 +61,7 @@ class NullPhysicsScene : PhysicsScene
 /*
     public override PhysicsActor AddPrim(Vector3 position, Vector3 size, Quaternion rotation)
     {
-        m_log.InfoFormat("NullPhysicsScene : AddPrim({0},{1})", position, size);
+        m_log.LogInformation("NullPhysicsScene : AddPrim({0},{1})", position, size);
         return PhysicsActor.Null;
     }
 */
@@ -68,7 +69,7 @@ class NullPhysicsScene : PhysicsScene
     public override PhysicsActor AddPrimShape(string primName, PrimitiveBaseShape pbs, Vector3 position,
                                               Vector3 size, Quaternion rotation, bool isPhysical, uint localid)
     {
-        m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : AddPrim({0},{1})", position, size);
+        m_log.LogInformation("[PHYSICS]: NullPhysicsScene : AddPrim({0},{1})", position, size);
         return PhysicsActor.Null;
     }
 
@@ -81,7 +82,7 @@ class NullPhysicsScene : PhysicsScene
 
     public override void SetTerrain(float[] heightMap)
     {
-        m_log.InfoFormat("[PHYSICS]: NullPhysicsScene : SetTerrain({0} items)", heightMap.Length);
+        m_log.LogInformation("[PHYSICS]: NullPhysicsScene : SetTerrain({0} items)", heightMap.Length);
     }
 
     public override void DeleteTerrain()

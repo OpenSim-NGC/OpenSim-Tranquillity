@@ -32,7 +32,6 @@ using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
 using OpenMetaverse.StructuredData;
@@ -44,6 +43,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
 using AssetLandmark = OpenSim.Framework.AssetLandmark;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using PermissionMask = OpenSim.Framework.PermissionMask;
@@ -315,7 +315,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     // LLClientView Only
     public delegate void BinaryGenericMessage(Object sender, string method, byte[][] args);
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[LLCLIENTVIEW]";
 
     /// <summary>
@@ -499,7 +499,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     //~LLClientView()
     //{
-    //    m_log.DebugFormat("{0} Destructor called for {1}, circuit code {2}", LogHeader, Name, CircuitCode);
+    //    m_log.LogDebug("{0} Destructor called for {1}, circuit code {2}", LogHeader, Name, CircuitCode);
     //}
 
     /// <summary>
@@ -579,7 +579,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             // there is some unidentified connection problem, not where we have issues due to deadlock
             if (!IsActive && !force)
             {
-                m_log.DebugFormat( "{0} Not attempting to close inactive client {1} in {2} since force flag is not set",
+                m_log.LogDebug( "{0} Not attempting to close inactive client {1} in {2} since force flag is not set",
                     LogHeader, Name, m_scene.Name);
 
                 return;
@@ -601,7 +601,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     /// </remarks>
     public void CloseWithoutChecks(bool sendStop)
     {
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[CLIENT]: Close has been called for {0} attached to scene {1}",
             Name, m_scene.RegionInfo.RegionName);
 
@@ -1676,7 +1676,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         }
         catch (Exception e)
         {
-            m_log.Error("[CLIENT]: SendLayerData() Failed with exception: " + e.Message, e);
+            m_log.LogError(e, "[CLIENT]: SendLayerData() Failed with exception: " + e.Message);
         }
     }
 
@@ -1817,13 +1817,13 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         }
         catch (Exception e)
         {
-            m_log.Error("[CLIENT]: SendLayerData() Failed with exception: " + e.Message, e);
+            m_log.LogError(e, "[CLIENT]: SendLayerData() Failed with exception: " + e.Message);
         }
     }
 
     private static void DebugSendingPatches(string pWho, int[] pX, int[] pY)
     {
-        if (m_log.IsDebugEnabled)
+        if (m_log.IsEnabled(LogLevel.Debug))
         {
             int numPatches = pX.Length;
             string Xs = "";
@@ -1833,7 +1833,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 Xs += String.Format("{0}", (int)pX[pp]) + ",";
                 Ys += String.Format("{0}", (int)pY[pp]) + ",";
             }
-            m_log.DebugFormat("{0} {1}: numPatches={2}, X={3}, Y={4}", LogHeader, pWho, numPatches, Xs, Ys);
+            m_log.LogDebug("{0} {1}: numPatches={2}, X={3}, Y={4}", LogHeader, pWho, numPatches, Xs, Ys);
         }
     }
 
@@ -2313,7 +2313,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     public void SendKillObject(List<uint> localIDs)
     {
         // foreach (uint id in localIDs)
-        //  m_log.DebugFormat("[CLIENT]: Sending KillObjectPacket to {0} for {1} in {2}", Name, id, regionHandle);
+        //  m_log.LogDebug("[CLIENT]: Sending KillObjectPacket to {0} for {1} in {2}", Name, id, regionHandle);
 
         // remove pending entities to reduce looping chances.
         m_entityProps.Remove(localIDs);
@@ -2418,7 +2418,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 currentPacket.ItemData[itemsSent % MAX_ITEMS_PER_PACKET] = CreateItemDataBlock(items[itemsSent++]);
             else
             {
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[LLCLIENTVIEW]: Sending inventory folder details packet to {0} for folder {1}", Name, folderID);
                 OutPacket(currentPacket, ThrottleOutPacketType.Asset, false);
                 currentPacket = null;
@@ -2427,7 +2427,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
         if (currentPacket != null)
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[LLCLIENTVIEW]: Sending inventory folder details packet to {0} for folder {1}", Name, folderID);
             OutPacket(currentPacket, ThrottleOutPacketType.Asset, false);
         }
@@ -2651,7 +2651,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             bulkUpdate.FolderData = folderDataBlocks.ToArray();
             bulkUpdate.ItemData = Array.Empty<BulkUpdateInventoryPacket.ItemDataBlock>();
 
-            //m_log.Debug("SendBulkUpdateInventory :" + bulkUpdate);
+            //m_log.LogDebug("SendBulkUpdateInventory :" + bulkUpdate);
             OutPacket(bulkUpdate, ThrottleOutPacketType.Asset);
         }
     }
@@ -2696,7 +2696,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 items.RemoveAt(items.Count - 1);
             }
 
-            //m_log.Debug("SendBulkUpdateInventoryRecursive :" + bulkUpdate);
+            //m_log.LogDebug("SendBulkUpdateInventoryRecursive :" + bulkUpdate);
             OutPacket(bulkUpdate, ThrottleOutPacketType.Asset);
 
             folderDataBlocks = new List<BulkUpdateInventoryPacket.FolderDataBlock>();
@@ -2786,9 +2786,9 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         else if (node is InventoryFolderBase ftbase)
             SendBulkUpdateInventoryFolder(ftbase, transationID);
         else if (node is not null)
-            m_log.Error($"[CLIENT]: {Name} sent unknown inventory node named {node.Name}");
+            m_log.LogError($"[CLIENT]: {Name} sent unknown inventory node named {node.Name}");
         else
-            m_log.Error($"[CLIENT]: {Name} sent null inventory node");
+            m_log.LogError($"[CLIENT]: {Name} sent null inventory node");
     }
 
     protected void SendBulkUpdateInventoryItem(InventoryItemBase item, UUID? transationID = null)
@@ -3244,7 +3244,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         TransferAbortPacket abort = (TransferAbortPacket)PacketPool.Instance.GetPacket(PacketType.TransferAbort);
         abort.TransferInfo.TransferID = transferRequest.TransferInfo.TransferID;
         abort.TransferInfo.ChannelType = transferRequest.TransferInfo.ChannelType;
-        m_log.Debug("[Assets] Aborting transfer; asset request failed");
+        m_log.LogDebug("[Assets] Aborting transfer; asset request failed");
         OutPacket(abort, ThrottleOutPacketType.Task);
     }
 
@@ -3630,13 +3630,13 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     {
         if (req.AssetInf is null)
         {
-            m_log.Error($"{LogHeader} Cannot send asset, because it is null");
+            m_log.LogError($"{LogHeader} Cannot send asset, because it is null");
             return;
         }
 
         if (req.AssetInf.Data is null)
         {
-            m_log.Error($"{LogHeader} Cannot send asset {req.AssetInf.ID} ({req.AssetInf.Metadata.ContentType}), asset data is null");
+            m_log.LogError($"{LogHeader} Cannot send asset {req.AssetInf.ID} ({req.AssetInf.Metadata.ContentType}), asset data is null");
             return;
         }
 
@@ -4119,7 +4119,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     public void SendAgentGroupDataUpdate(UUID avatarID, GroupMembershipData[] data)
     {
         if(avatarID != m_agentId)
-            m_log.Debug("[CLIENT]: SendAgentGroupDataUpdate avatarID != AgentId");
+            m_log.LogDebug("[CLIENT]: SendAgentGroupDataUpdate avatarID != AgentId");
 
         IEventQueue eq = this.Scene.RequestModuleInterface<IEventQueue>();
         if(eq != null)
@@ -4479,7 +4479,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 };
                 aw.WearableData[idx++] = awb;
 
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[APPEARANCE]: Sending wearable item/asset {0} {1} (index {2}) for {3}",
                 //    awb.ItemID, awb.AssetID, i, Name);
             }
@@ -4549,7 +4549,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     public void SendAnimations(UUID[] animations, int[] seqs, UUID sourceAgentId, UUID[] objectIDs)
     {
-        //            m_log.DebugFormat("[LLCLIENTVIEW]: Sending animations for {0} to {1}", sourceAgentId, Name);
+        //            m_log.LogDebug("[LLCLIENTVIEW]: Sending animations for {0} to {1}", sourceAgentId, Name);
 
         UDPPacketBuffer buf = OpenSimUDPBase.GetNewUDPBuffer(m_udpClient.RemoteEndPoint);
         byte[] data = buf.Data;
@@ -4617,7 +4617,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     public void SendObjectAnimations(UUID[] animations, int[] seqs, UUID senderId)
     {
-        // m_log.DebugFormat("[LLCLIENTVIEW]: Sending Object animations for {0} to {1}", sourceAgentId, Name);
+        // m_log.LogDebug("[LLCLIENTVIEW]: Sending Object animations for {0} to {1}", sourceAgentId, Name);
         if(!m_SupportObjectAnimations)
             return;
 
@@ -4824,7 +4824,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     /// </summary>
     private void ResendPrimUpdates(List<EntityUpdate> updates, OutgoingPacket oPacket)
     {
-        // m_log.WarnFormat("[CLIENT] resending prim updates {0}, packet sequence number {1}", updates[0].UpdateTime, oPacket.SequenceNumber);
+        // m_log.LogWarning("[CLIENT] resending prim updates {0}, packet sequence number {1}", updates[0].UpdateTime, oPacket.SequenceNumber);
 
         // Remove the update packet from the list of packets waiting for acknowledgement
         // because we are requeuing the list of updates. They will be resent in new packets
@@ -5649,7 +5649,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 byte[] innerB = Util.UTF8NBGetbytes(inner);
                 if (innerB.Length > UDPPacketBuffer.BUFFER_SIZE - 16)
                 {
-                    m_log.Debug($"[LLCLIENTVIEW]: GenericStreamingMessage packet too large ({innerB.Length})");
+                    m_log.LogDebug($"[LLCLIENTVIEW]: GenericStreamingMessage packet too large ({innerB.Length})");
                     continue;
                 }
 
@@ -5724,7 +5724,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                     OutPacket(packet, ThrottleOutPacketType.Task, true);
                 }
 
-    //            m_log.DebugFormat(
+    //            m_log.LogDebug(
     //                "[LLCLIENTVIEW]: Sent {0} updates in ProcessEntityUpdates() for {1} {2} in {3}",
     //                updatesThisCall, Name, SceneAgent.IsChildAgent ? "child" : "root", Scene.Name);
     //
@@ -5867,7 +5867,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     public void FlushPrimUpdates()
     {
-        m_log.WarnFormat("[CLIENT]: Flushing prim updates to " + m_firstName + " " + m_lastName);
+        m_log.LogWarning("[CLIENT]: Flushing prim updates to " + m_firstName + " " + m_lastName);
 
         while (m_entityUpdates.Count > 0)
             ProcessEntityUpdates(-1);
@@ -6066,7 +6066,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     private void ResendPropertyUpdates(List<EntityUpdate> updates, OutgoingPacket oPacket)
     {
-        // m_log.WarnFormat("[CLIENT] resending object property {0}",updates[0].UpdateTime);
+        // m_log.LogWarning("[CLIENT] resending object property {0}",updates[0].UpdateTime);
 
         // Remove the update packet from the list of packets waiting for acknowledgement
         // because we are requeuing the list of updates. They will be resent in new packets
@@ -6553,7 +6553,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     public void SendEstateCovenantInformation(UUID covenant)
     {
-        //m_log.DebugFormat("[LLCLIENTVIEW]: Sending estate covenant asset id of {0} to {1}", covenant, Name);
+        //m_log.LogDebug("[LLCLIENTVIEW]: Sending estate covenant asset id of {0} to {1}", covenant, Name);
 
         EstateCovenantReplyPacket einfopack = new();
         einfopack.Data.CovenantID = covenant;
@@ -6567,7 +6567,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         UUID invoice, string estateName, uint estateID, uint parentEstate, uint estateFlags, uint sunPosition,
         UUID covenant, uint covenantChanged, string abuseEmail, UUID estateOwner)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //   "[LLCLIENTVIEW]: Sending detailed estate data to {0} with covenant asset id {1}", Name, covenant);
 
         EstateOwnerMessagePacket packet = new();
@@ -6595,7 +6595,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         returnblock[9].Parameter = Utils.StringToBytes(abuseEmail);
 
         packet.ParamList = returnblock;
-        //m_log.Debug("[ESTATE]: SIM--->" + packet.ToString());
+        //m_log.LogDebug("[ESTATE]: SIM--->" + packet.ToString());
         OutPacket(packet, ThrottleOutPacketType.Task);
     }
 
@@ -6632,12 +6632,12 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
          int sequence_id, bool snap_selection, int request_result, ILandObject lo,
          float simObjectBonusFactor, int parcelObjectCapacity, int simObjectCapacity, uint regionFlags)
     {
-        //m_log.DebugFormat("[LLCLIENTVIEW]: Sending land properties for {0} to {1}", lo.LandData.GlobalID, Name);
+        //m_log.LogDebug("[LLCLIENTVIEW]: Sending land properties for {0} to {1}", lo.LandData.GlobalID, Name);
 
         IEventQueue eq = Scene.RequestModuleInterface<IEventQueue>();
         if (eq is null)
         {
-            m_log.Warn("[LLCLIENTVIEW]: No EQ Interface when sending parcel data.");
+            m_log.LogWarning("[LLCLIENTVIEW]: No EQ Interface when sending parcel data.");
             return;
         }
 
@@ -6794,7 +6794,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     public void SendForceClientSelectObjects(List<uint> ObjectIDs)
     {
-//            m_log.DebugFormat("[LLCLIENTVIEW] sending select with {0} objects", ObjectIDs.Count);
+//            m_log.LogDebug("[LLCLIENTVIEW] sending select with {0} objects", ObjectIDs.Count);
 
         bool firstCall = true;
         const int MAX_OBJECTS_PER_PACKET = 251;
@@ -6843,7 +6843,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         {
             Plane = ConstraintPlane
         };
-        //m_log.DebugFormat("[CLIENTVIEW]: Constraint {0}", ConstraintPlane);
+        //m_log.LogDebug("[CLIENTVIEW]: Constraint {0}", ConstraintPlane);
         OutPacket(cpack, ThrottleOutPacketType.Task);
     }
 
@@ -6934,7 +6934,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             rotation.Normalize();
             angularVelocity = presence.AngularVelocity;
 
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[LLCLIENTVIEW]: Sending terse update to {0} with position {1} in {2}", Name, presence.OffsetPosition, m_scene.Name);
 
             attachPoint = presence.State;
@@ -6948,7 +6948,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
             attachPoint = part.ParentGroup.AttachmentPoint;
             attachPoint = ((attachPoint % 16) * 16 + (attachPoint / 16));
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[LLCLIENTVIEW]: Sending attachPoint {0} for {1} {2} to {3}",
             //    attachPoint, part.Name, part.LocalId, Name);
 
@@ -6979,7 +6979,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         {
             data[pos++] = 1;
 
-            //m_log.DebugFormat("CollisionPlane: {0}",collisionPlane);
+            //m_log.LogDebug("CollisionPlane: {0}",collisionPlane);
             if (collisionPlane == Vector4.Zero)
                 Vector4.UnitW.ToBytes(data, pos);
             else
@@ -7156,7 +7156,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     protected static void CreateAvatartImprovedTerseBlock(ScenePresence presence, byte[] data, ref int pos)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[LLCLIENTVIEW]: Sending terse update to {0} with position {1} in {2}", Name, presence.OffsetPosition, m_scene.Name);
 
         //object block size
@@ -7171,7 +7171,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         // Avatar/CollisionPlane
         data[pos++] = 1;
 
-        //m_log.DebugFormat("CollisionPlane: {0}",collisionPlane);
+        //m_log.LogDebug("CollisionPlane: {0}",collisionPlane);
         if (presence.CollisionPlane.IsZero())
             Vector4.UnitW.ToBytes(data, pos);
         else
@@ -7225,7 +7225,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     protected unsafe void CreateAvatartImprovedTerseBlock(ScenePresence presence, ref byte* data)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[LLCLIENTVIEW]: Sending terse update to {0} with position {1} in {2}", Name, presence.OffsetPosition, m_scene.Name);
 
         //object block size
@@ -7237,7 +7237,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
         // Avatar/CollisionPlane
         *data++ = 1;
-        //m_log.DebugFormat("CollisionPlane: {0}",collisionPlane);
+        //m_log.LogDebug("CollisionPlane: {0}",collisionPlane);
         if (presence.CollisionPlane.IsZero())
             Vector4.UnitW.ToBytes(data);
         else
@@ -8877,7 +8877,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[LLCLIENTVIEW]: Exception when handling generic message {0}{1}", e.Message, e.StackTrace);
             }
         }
@@ -8980,7 +8980,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             return;
 
         ScriptDialogReplyPacket rdialog = (ScriptDialogReplyPacket)Pack;
-        //m_log.DebugFormat("[CLIENT]: Received ScriptDialogReply from {0}", rdialog.Data.ObjectID);
+        //m_log.LogDebug("[CLIENT]: Received ScriptDialogReply from {0}", rdialog.Data.ObjectID);
         ScriptDialogReplyPacket.DataBlock rdialogData = rdialog.Data;
         OSChatMessage args = new()
         {
@@ -9160,7 +9160,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         if (modify.ParcelData.Length == 0)
             return;
 
-        //m_log.Info("[LAND]: LAND:" + modify.ToString());
+        //m_log.LogInformation("[LAND]: LAND:" + modify.ToString());
         for (int i = 0; i < modify.ParcelData.Length; i++)
         {
             c.OnModifyTerrain?.Invoke(c.m_agentId, modify.ModifyBlock.Height, modify.ModifyBlock.Seconds,
@@ -9222,7 +9222,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         }
         catch (Exception e)
         {
-            m_log.Error($"[CLIENT VIEW]: AgentSetApperance packet handler threw an exception, {e.Message}");
+            m_log.LogError($"[CLIENT VIEW]: AgentSetApperance packet handler threw an exception, {e.Message}");
         }
     }
 
@@ -9235,7 +9235,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         AvatarWearingArgs wearingArgs = new();
         for (int i = 0; i < nowWearing.WearableData.Length; i++)
         {
-            //m_log.DebugFormat("[XXX]: Wearable type {0} item {1}", nowWearing.WearableData[i].WearableType, nowWearing.WearableData[i].ItemID);
+            //m_log.LogDebug("[XXX]: Wearable type {0} item {1}", nowWearing.WearableData[i].WearableType, nowWearing.WearableData[i].ItemID);
             AvatarWearingArgs.Wearable wearable = new(nowWearing.WearableData[i].ItemID,
                                                 nowWearing.WearableData[i].WearableType);
             wearingArgs.NowWearing.Add(wearable);
@@ -9320,7 +9320,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     private static void HandleCompleteAgentMovement(LLClientView c, Packet Pack)
     {
-        //m_log.DebugFormat("[LLClientView] HandleCompleteAgentMovement");
+        //m_log.LogDebug("[LLClientView] HandleCompleteAgentMovement");
 
         CompleteAgentMovementPacket cmp = (CompleteAgentMovementPacket)Pack;
         if(cmp.AgentData.CircuitCode == c.m_circuitCode)
@@ -9394,7 +9394,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         AvatarPickerRequestPacket avRequestQuery = (AvatarPickerRequestPacket)Pack;
         AvatarPickerRequestPacket.AgentDataBlock Requestdata = avRequestQuery.AgentData;
         AvatarPickerRequestPacket.DataBlock querydata = avRequestQuery.Data;
-        //m_log.Debug("Agent Sends:" + Utils.BytesToString(querydata.Name));
+        //m_log.LogDebug("Agent Sends:" + Utils.BytesToString(querydata.Name));
 
         c.OnAvatarPickerRequest?.Invoke(c, Requestdata.AgentID, Requestdata.QueryID,
                                     Utils.BytesToString(querydata.Name));
@@ -9837,7 +9837,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     private static void HandleObjectSpinStart(LLClientView c, Packet Pack)
     {
-        //m_log.Warn("[CLIENT]: unhandled ObjectSpinStart packet");
+        //m_log.LogWarning("[CLIENT]: unhandled ObjectSpinStart packet");
         ObjectSpinStartPacket spinStart = (ObjectSpinStartPacket)Pack;
         if (spinStart.AgentData.SessionID.Equals(c.m_sessionId) && spinStart.AgentData.AgentID.Equals(c.m_agentId))
             c.OnSpinStart?.Invoke(spinStart.ObjectData.ObjectID, c);
@@ -9845,18 +9845,18 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
     private static void HandleObjectSpinUpdate(LLClientView c, Packet Pack)
     {
-        //m_log.Warn("[CLIENT]: unhandled ObjectSpinUpdate packet");
+        //m_log.LogWarning("[CLIENT]: unhandled ObjectSpinUpdate packet");
         ObjectSpinUpdatePacket spinUpdate = (ObjectSpinUpdatePacket)Pack;
 
         spinUpdate.ObjectData.Rotation.GetAxisAngle(out Vector3 axis, out float angle);
-        //m_log.Warn("[CLIENT]: ObjectSpinUpdate packet rot axis:" + axis + " angle:" + angle);
+        //m_log.LogWarning("[CLIENT]: ObjectSpinUpdate packet rot axis:" + axis + " angle:" + angle);
 
         c.OnSpinUpdate?.Invoke(spinUpdate.ObjectData.ObjectID, spinUpdate.ObjectData.Rotation, c);
     }
 
     private static void HandleObjectSpinStop(LLClientView c, Packet Pack)
     {
-        //m_log.Warn("[CLIENT]: unhandled ObjectSpinStop packet");
+        //m_log.LogWarning("[CLIENT]: unhandled ObjectSpinStop packet");
         ObjectSpinStopPacket spinStop = (ObjectSpinStopPacket)Pack;
         if (spinStop.AgentData.SessionID.Equals(c.m_sessionId) && spinStop.AgentData.AgentID.Equals(c.m_agentId))
             c.OnSpinStop?.Invoke(spinStop.ObjectData.ObjectID, c);
@@ -10056,7 +10056,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     /// <returns>This parameter may be ignored since we appear to return true whatever happens</returns>
     private static void HandleTransferRequest(LLClientView c, Packet Pack)
     {
-        //m_log.Debug("ClientView.ProcessPackets.cs:ProcessInPacket() - Got transfer request");
+        //m_log.LogDebug("ClientView.ProcessPackets.cs:ProcessInPacket() - Got transfer request");
 
         TransferRequestPacket transfer = (TransferRequestPacket)Pack;
         UUID taskID = UUID.Zero;
@@ -10091,11 +10091,11 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         UUID itemID = new(transfer.TransferInfo.Params, 64);
         UUID requestID = new(transfer.TransferInfo.Params, 80);
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[CLIENT]: Got request for asset {0} from item {1} in prim {2} by {3}",
         //    requestID, itemID, taskID, Name);
 
-        //m_log.Debug("Transfer Request: " + transfer.ToString());
+        //m_log.LogDebug("Transfer Request: " + transfer.ToString());
         // Validate inventory transfers
         // Has to be done here, because AssetCache can't do it
         //
@@ -10105,7 +10105,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
             if (part is null)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[CLIENT]: {0} requested asset {1} from item {2} in prim {3} but prim does not exist",
                     Name, requestID, itemID, taskID);
                 return;
@@ -10114,7 +10114,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             TaskInventoryItem tii = part.Inventory.GetInventoryItem(itemID);
             if (tii is null)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[CLIENT]: {0} requested asset {1} from item {2} in prim {3} but item does not exist",
                     Name, requestID, itemID, taskID);
                 return;
@@ -10136,7 +10136,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 // shared with group.  In fact, this whole block of permissions checking should move to an IPermissionsModule
                 if (part.OwnerID != m_agentId)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[CLIENT]: {0} requested asset {1} from item {2} in prim {3} but the prim is owned by {4}",
                         Name, requestID, itemID, taskID, part.OwnerID);
                     return;
@@ -10144,7 +10144,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
                 if ((part.OwnerMask & (uint)PermissionMask.Modify) == 0)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[CLIENT]: {0} requested asset {1} from item {2} in prim {3} but modify permissions are not set",
                         Name, requestID, itemID, taskID);
                     return;
@@ -10152,7 +10152,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
                 if (tii.OwnerID != m_agentId)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[CLIENT]: {0} requested asset {1} from item {2} in prim {3} but the item is owned by {4}",
                         Name, requestID, itemID, taskID, tii.OwnerID);
                     return;
@@ -10162,7 +10162,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                     tii.CurrentPermissions & ((uint)PermissionMask.Modify | (uint)PermissionMask.Copy | (uint)PermissionMask.Transfer))
                         != ((uint)PermissionMask.Modify | (uint)PermissionMask.Copy | (uint)PermissionMask.Transfer))
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[CLIENT]: {0} requested asset {1} from item {2} in prim {3} but item permissions are not modify/copy/transfer",
                         Name, requestID, itemID, taskID);
                     return;
@@ -10170,7 +10170,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
                 if (tii.AssetID != requestID)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[CLIENT]: {0} requested asset {1} from item {2} in prim {3} but this does not match item's asset {4}",
                         Name, requestID, itemID, taskID, tii.AssetID);
                     return;
@@ -10200,8 +10200,8 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     {
         AssetUploadRequestPacket request = (AssetUploadRequestPacket)Pack;
 
-        // m_log.Debug("upload request " + request.ToString());
-        // m_log.Debug("upload request was for assetid: " + request.AssetBlock.TransactionID.Combine(this.SecureSessionId).ToString());
+        // m_log.LogDebug("upload request " + request.ToString());
+        // m_log.LogDebug("upload request was for assetid: " + request.AssetBlock.TransactionID.Combine(this.SecureSessionId).ToString());
         UUID temp = UUID.Combine(request.AssetBlock.TransactionID, c.SecureSessionId);
 
         c.OnAssetUploadRequest?.Invoke(c, temp,
@@ -10403,7 +10403,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 Name = Util.FieldToString(datablock.NewName)
             };
             // weird, comes out as empty string
-            //m_log.DebugFormat("[XXX] new name: {0}", itm.Name);
+            //m_log.LogDebug("[XXX] new name: {0}", itm.Name);
             items.Add(itm);
         }
         c.OnMoveInventoryItem?.Invoke(c, items);
@@ -10519,7 +10519,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         if(c.OnRezScript is null)
             return;
 
-        //m_log.Debug(Pack.ToString());
+        //m_log.LogDebug(Pack.ToString());
         RezScriptPacket rezScriptx = (RezScriptPacket)Pack;
         if (rezScriptx.AgentData.SessionID.NotEqual(c.m_sessionId) || rezScriptx.AgentData.AgentID.NotEqual(c.m_agentId))
             return;
@@ -10591,7 +10591,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 if (lma is null)
                 {
                     // Really doesn't exist
-                    m_log.WarnFormat("[llClient]: landmark asset {0} not found",lmid.ToString());
+                    m_log.LogWarning("[llClient]: landmark asset {0} not found",lmid.ToString());
                     c.SendTeleportFailed("Could not find the landmark asset data");
                     return;
                 }
@@ -10960,7 +10960,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 {
                     if (messagePacket.ParamList.Length != 9)
                     {
-                        m_log.Error("EstateOwnerMessage: SetRegionTerrain method has a ParamList of invalid length");
+                        m_log.LogError("EstateOwnerMessage: SetRegionTerrain method has a ParamList of invalid length");
                     }
                     else
                     {
@@ -10980,7 +10980,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                         }
                         catch (Exception ex)
                         {
-                            m_log.Error("EstateOwnerMessage: Exception while setting terrain settings: \n" + messagePacket + "\n" + ex);
+                            m_log.LogError("EstateOwnerMessage: Exception while setting terrain settings: \n" + messagePacket + "\n" + ex);
                         }
                     }
                 }
@@ -11190,7 +11190,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 return;
 
             default:
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[LLCLIENTVIEW]: EstateOwnerMessage: Unknown method {0} requested for {1} in {2}",
                     method, c.Name, c.m_scene.Name);
 
@@ -11198,7 +11198,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 {
                     EstateOwnerMessagePacket.ParamListBlock block = messagePacket.ParamList[i];
                     string data = (string)Utils.BytesToString(block.Parameter);
-                    m_log.DebugFormat("[LLCLIENTVIEW]: Param {0}={1}", i, data);
+                    m_log.LogDebug("[LLCLIENTVIEW]: Param {0}={1}", i, data);
                 }
 
                 return;
@@ -11426,14 +11426,14 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     private static void HandleViewerStats(LLClientView c, Packet Pack)
     {
         // TODO: handle this packet
-        //m_log.Warn("[CLIENT]: unhandled ViewerStats packet");
+        //m_log.LogWarning("[CLIENT]: unhandled ViewerStats packet");
     }
 
     private static void HandleMapItemRequest(LLClientView c, Packet Pack)
     {
         MapItemRequestPacket mirpk = (MapItemRequestPacket)Pack;
 
-        //m_log.Debug(mirpk.ToString());
+        //m_log.LogDebug(mirpk.ToString());
         try
         {
             c.OnMapItemRequest?.Invoke(c, mirpk.AgentData.Flags, mirpk.AgentData.EstateID,
@@ -11442,7 +11442,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         }
         catch( Exception e)
         {
-            m_log.ErrorFormat("{0} HandleMapItemRequest exception: {1} : {2}", LogHeader, e.Message, e.StackTrace);
+            m_log.LogError("{0} HandleMapItemRequest exception: {1} : {2}", LogHeader, e.Message, e.StackTrace);
         } 
     }
 
@@ -12364,7 +12364,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     protected static void HandleLogout(LLClientView c, Packet packet)
     {
         var lrp = (LogoutRequestPacket)packet;
-        m_log.Info($"[CLIENT]: Got a logout request for {c.Name} in {c.Scene.Name}");
+        m_log.LogInformation($"[CLIENT]: Got a logout request for {c.Name} in {c.Scene.Name}");
         c.OnLogout?.Invoke(c);
     }
 
@@ -12375,7 +12375,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     /// <returns></returns>
     protected virtual void Logout(IClientAPI client)
     {
-        m_log.Info($"[CLIENT]: Got a logout request for {Name} in {Scene.Name}");
+        m_log.LogInformation($"[CLIENT]: Got a logout request for {Name} in {Scene.Name}");
         OnLogout?.Invoke(client);
     }
 
@@ -12388,7 +12388,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     /// <returns></returns>
     protected static void HandleAgentTextureCached(LLClientView c, Packet packet)
     {
-        //m_log.Debug("texture cached: " + packet.ToString());
+        //m_log.LogDebug("texture cached: " + packet.ToString());
         AgentCachedTexturePacket cachedtex = (AgentCachedTexturePacket)packet;
         AgentCachedTextureResponsePacket cachedresp =
             (AgentCachedTextureResponsePacket)PacketPool.Instance.GetPacket(PacketType.AgentCachedTextureResponse);
@@ -12486,7 +12486,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
     {
         MultipleObjectUpdatePacket multipleupdate = (MultipleObjectUpdatePacket)packet;
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[CLIENT]: Incoming MultipleObjectUpdatePacket contained {0} blocks", multipleupdate.ObjectData.Length);
 
         Scene tScene = c.m_scene;
@@ -12641,7 +12641,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                                 break;
 
                             default:
-                                m_log.Debug("[CLIENT]: MultipleObjUpdate recieved an unknown packet type: " + (block.Type));
+                                m_log.LogDebug("[CLIENT]: MultipleObjUpdate recieved an unknown packet type: " + (block.Type));
                                 break;
                         }
                     }
@@ -12825,7 +12825,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 logPacket = false;
 
             if (logPacket)
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[CLIENT]: PACKET OUT to   {0} ({1}) in {2} - {3}",
                     Name, SceneAgent.IsChildAgent ? "child" : "root ", m_scene.RegionInfo.RegionName, packet.Type);
         }
@@ -12873,12 +12873,12 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 logPacket = false;
 
             if (logPacket)
-                m_log.Debug(
+                m_log.LogDebug(
                     $"[CLIENT]: PACKET IN  from {Name} ({(SceneAgent.IsChildAgent ? "child" : "root")}) in {Scene.Name} - {packet.Type}");
         }
 
         if (!ProcessPacketMethod(packet))
-            m_log.Warn($"[CLIENT]: ignoring unhandled packet {packet.Type} from {Name} ({(SceneAgent.IsChildAgent ? "child" : "root")}) in {m_scene.Name}");
+            m_log.LogWarning($"[CLIENT]: ignoring unhandled packet {packet.Type} from {Name} ({(SceneAgent.IsChildAgent ? "child" : "root")}) in {m_scene.Name}");
     }
 
     private static PrimitiveBaseShape GetShapeFromAddPacket(ObjectAddPacket addPacket)
@@ -13162,7 +13162,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             (int)SourceType.SimEstate => taskID,
             _ => UUID.Zero,
         };
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[LLCLIENTVIEW]: Received transfer request for {0} in {1} type {2} by {3}",
         //    requestID, taskID, (SourceType)sourceType, Name);
 
@@ -13193,7 +13193,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 if (!assetServerURL.EndsWith('/') && !assetServerURL.EndsWith('='))
                     assetServerURL += "/";
 
-                //m_log.DebugFormat("[LLCLIENTVIEW]: asset {0} not found in local storage. Trying user's storage.", assetServerURL + id);
+                //m_log.LogDebug("[LLCLIENTVIEW]: asset {0} not found in local storage. Trying user's storage.", assetServerURL + id);
                 asset = m_scene.AssetService.Get(assetServerURL + id);
             }
 
@@ -13221,7 +13221,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         {
             requestID = new UUID(transferRequest.TransferInfo.Params, 80);
             source = (byte)SourceType.SimInventoryItem;
-            //m_log.Debug("asset request " + requestID);
+            //m_log.LogDebug("asset request " + requestID);
         }
 
         // Scripts cannot be retrieved by direct request
@@ -13426,7 +13426,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         IEventQueue eq = Scene.RequestModuleInterface<IEventQueue>();
         if (eq is null)
         {
-            m_log.DebugFormat("[LLCLIENT]: Null event queue");
+            m_log.LogDebug("[LLCLIENT]: Null event queue");
             return;
         }
 
@@ -13455,7 +13455,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
         if (eq is null)
         {
-            m_log.DebugFormat("[LLCLIENT]: Null event queue");
+            m_log.LogDebug("[LLCLIENT]: Null event queue");
             return;
         }
 
@@ -13484,7 +13484,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
         if (eq is null)
         {
-            m_log.DebugFormat("[LLCLIENT]: Null event queue");
+            m_log.LogDebug("[LLCLIENT]: Null event queue");
             return;
         }
 

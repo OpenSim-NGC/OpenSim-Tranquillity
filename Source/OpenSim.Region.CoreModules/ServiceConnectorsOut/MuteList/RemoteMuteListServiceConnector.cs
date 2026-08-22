@@ -32,14 +32,15 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MuteList;
 
 public class RemoteMuteListServicesConnector : ISharedRegionModule, IMuteListService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     #region ISharedRegionModule
 
@@ -93,7 +94,7 @@ public class RemoteMuteListServicesConnector : ISharedRegionModule, IMuteListSer
             return;
 
         scene.RegisterModuleInterface<IMuteListService>(this);
-        m_log.InfoFormat("[MUTELIST CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[MUTELIST CONNECTOR]: Enabled for region {0}", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)

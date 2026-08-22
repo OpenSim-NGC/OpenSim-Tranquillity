@@ -28,7 +28,6 @@
 
 using CoreJ2K;
 using CoreJ2K.Configuration;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -42,11 +41,13 @@ using SkiaSharp;
 using System.IO.Compression;
 using System.Reflection;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.ubODEMeshing;
 
 public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Setting baseDir to a path will enable the dumping of raw files
     // raw files can be imported by blender so a visual inspection of the results can be done
@@ -158,9 +159,9 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
 
     private void ReportPrimError(string message, string primName, PrimMesh primMesh)
     {
-        m_log.Error(message);
-        m_log.Error("\nPrim Name: " + primName);
-        m_log.Error("****** PrimMesh Parameters ******\n" + primMesh.ParamsToDisplayString());
+        m_log.LogError(message);
+        m_log.LogError("\nPrim Name: " + primName);
+        m_log.LogError("****** PrimMesh Parameters ******\n" + primMesh.ParamsToDisplayString());
     }
 
     /// <summary>
@@ -254,7 +255,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
     /// <returns></returns>
     private Mesh CreateMeshFromPrimMesher(string primName, PrimitiveBaseShape primShape, float lod, bool convex)
     {
-        //            m_log.DebugFormat(
+        //            m_log.LogDebug(
         //                "[MESH]: Creating physics proxy for {0}, shape {1}",
         //                primName, (OpenMetaverse.SculptType)primShape.SculptType);
 
@@ -277,7 +278,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
                 }
                 catch
                 {
-                    m_log.ErrorFormat("[MESH]: fail to process mesh asset for prim {0}", primName);
+                    m_log.LogError("[MESH]: fail to process mesh asset for prim {0}", primName);
                     return null;
                 }
             }
@@ -291,7 +292,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
                 }
                 catch
                 {
-                    m_log.ErrorFormat("[MESH]: fail to process sculpt map for prim {0}", primName);
+                    m_log.LogError("[MESH]: fail to process sculpt map for prim {0}", primName);
                     return null;
                 }
             }
@@ -307,7 +308,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             }
             catch
             {
-                m_log.ErrorFormat("[MESH]: fail to process shape parameters for prim {0}", primName);
+                m_log.LogError("[MESH]: fail to process shape parameters for prim {0}", primName);
                 return null;
             }
         }
@@ -317,7 +318,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
 
         if (numCoords < 3 || (!needsConvexProcessing && numFaces < 1))
         {
-            m_log.ErrorFormat("[ubODEMesh]: invalid degenerated mesh for prim {0} ignored", primName);
+            m_log.LogError("[ubODEMesh]: invalid degenerated mesh for prim {0} ignored", primName);
             return null;
         }
 
@@ -334,7 +335,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             }
             else
             {
-                m_log.ErrorFormat("[ubMESH]: failed to create convex for {0} using normal mesh", primName);
+                m_log.LogError("[ubMESH]: failed to create convex for {0} using normal mesh", primName);
             }
         }
 
@@ -353,7 +354,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
 
         if (mesh.numberVertices() < 3 || mesh.numberTriangles() < 1)
         {
-            m_log.ErrorFormat("[ubODEMesh]: invalid degenerated mesh for prim {0} ignored", primName);
+            m_log.LogError("[ubODEMesh]: invalid degenerated mesh for prim {0} ignored", primName);
             return null;
         }
 
@@ -374,7 +375,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
     private unsafe bool GenerateCoordsAndFacesFromPrimMeshData(
         string primName, PrimitiveBaseShape primShape, out List<Vector3> coords, out List<Face> faces, bool convex)
     {
-        //            m_log.DebugFormat("[MESH]: experimental mesh proxy generation for {0}", primName);
+        //            m_log.LogDebug("[MESH]: experimental mesh proxy generation for {0}", primName);
 
 
         // for ubODE we have a diferent mesh use priority
@@ -387,7 +388,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
 
         if (primShape.SculptData == null || primShape.SculptData.Length <= 0)
         {
-            // m_log.InfoFormat("[MESH]: asset data for {0} is zero length", primName);
+            // m_log.LogInformation("[MESH]: asset data for {0} is zero length", primName);
             return false;
         }
 
@@ -401,7 +402,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             }
             catch (Exception e)
             {
-                m_log.Error($"[MESH]: Error deserializing mesh asset header: {e.Message} in Prim '{primName}' asset {primShape.SculptTexture}");
+                m_log.LogError($"[MESH]: Error deserializing mesh asset header: {e.Message} in Prim '{primName}' asset {primShape.SculptTexture}");
                 return false;
             }
 
@@ -410,7 +411,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
 
         if (osd is not OSDMap map)
         {
-            m_log.Warn($"[Mesh]: unable to cast mesh asset to OSDMap prim: {primName} asset {primShape.SculptTexture}");
+            m_log.LogWarning($"[Mesh]: unable to cast mesh asset to OSDMap prim: {primName} asset {primShape.SculptTexture}");
             return false;
         }
 
@@ -432,7 +433,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
 
         if (physicsParms == null)
         {
-            //m_log.WarnFormat("[MESH]: unknown mesh type for prim {0}",primName);
+            //m_log.LogWarning("[MESH]: unknown mesh type for prim {0}",primName);
             return false;
         }
 
@@ -458,7 +459,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.Error("[MESH]: exception decoding physical mesh prim " + primName + " : " + e.ToString());
+            m_log.LogError("[MESH]: exception decoding physical mesh prim " + primName + " : " + e.ToString());
             return false;
         }
 
@@ -610,7 +611,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
                 else
                 {
                     // if neither mesh or decomposition present, warn and use convex
-                    //m_log.WarnFormat("[MESH]: Data for PRIM shape type ( mesh or decomposition) not found for prim {0}",primName);
+                    //m_log.LogWarning("[MESH]: Data for PRIM shape type ( mesh or decomposition) not found for prim {0}",primName);
                 }
             }
             vs.Clear();
@@ -720,7 +721,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
         }
         catch (Exception ex)
         {
-            m_log.Error("[PHYSICS]: Unable to generate a Sculpty physics proxy. Sculpty texture decode failed: " + ex.Message);
+            m_log.LogError("[PHYSICS]: Unable to generate a Sculpty physics proxy. Sculpty texture decode failed: " + ex.Message);
             return false;
         }
 
@@ -853,7 +854,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
 
         if (primMesh.errorMessage != null)
             if (primMesh.errorMessage.Length > 0)
-                m_log.Error("[ERROR] " + primMesh.errorMessage);
+                m_log.LogError("[ERROR] " + primMesh.errorMessage);
 
         primMesh.topShearX = pathShearX;
         primMesh.topShearY = pathShearY;
@@ -868,7 +869,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             primMesh.taperY = pathScaleY;
 
 #if SPAM
-        m_log.Debug("****** PrimMesh Parameters (Linear) ******\n" + primMesh.ParamsToDisplayString());
+        m_log.LogDebug("****** PrimMesh Parameters (Linear) ******\n" + primMesh.ParamsToDisplayString());
 #endif
             try
             {
@@ -901,7 +902,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             }
 
 #if SPAM
-        m_log.Debug("****** PrimMesh Parameters (Circular) ******\n" + primMesh.ParamsToDisplayString());
+        m_log.LogDebug("****** PrimMesh Parameters (Circular) ******\n" + primMesh.ParamsToDisplayString());
 #endif
             try
             {
@@ -1068,7 +1069,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
     public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool convex, bool forOde)
     {
 #if SPAM
-        m_log.DebugFormat("[MESH]: Creating mesh for {0}", primName);
+        m_log.LogDebug("[MESH]: Creating mesh for {0}", primName);
 #endif
 
         Mesh mesh = null;
@@ -1270,7 +1271,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
                 catch (Exception e)
                 {
                     ok = false;
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[MESH CACHE]: Failed to get file {0}.  Exception {1} {2}",
                         filename, e.Message, e.StackTrace);
                 }
@@ -1314,7 +1315,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             }
             catch (IOException e)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[MESH CACHE]: Failed to write file {0}.  Exception {1} {2}.",
                     filename, e.Message, e.StackTrace);
                 ok = false;
@@ -1333,7 +1334,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
                 }
                 catch (IOException)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                    "[MESH CACHE]: Failed to delete file {0}", filename);
                 }
             }
@@ -1386,15 +1387,15 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
                     }
 
                     if (ndeleted == 0)
-                        m_log.InfoFormat("[MESH CACHE]: {0} Files in {1} cache folders, no expires",
+                        m_log.LogInformation("[MESH CACHE]: {0} Files in {1} cache folders, no expires",
                             totalfiles, ndirs);
                     else
-                        m_log.InfoFormat("[MESH CACHE]: {0} Files in {1} cache folders, expired {2} files accessed before {3}",
+                        m_log.LogInformation("[MESH CACHE]: {0} Files in {1} cache folders, expired {2} files accessed before {3}",
                             totalfiles, ndirs, ndeleted, OlderTime.ToString());
                 }
                 else
                 {
-                    m_log.Info("[MESH CACHE]: Expire delayed to next startup");
+                    m_log.LogInformation("[MESH CACHE]: Expire delayed to next startup");
                     FileStream fs = File.Create(controlfile, 4096, FileOptions.WriteThrough);
                     fs.Close();
                 }
@@ -1438,7 +1439,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             }
             catch (Exception e)
             {
-                m_log.Error("[MESH CACHE]: failed to delete old version of the cache: " + e.Message);
+                m_log.LogError("[MESH CACHE]: failed to delete old version of the cache: " + e.Message);
                 doMeshFileCache = false;
                 doCacheExpire = false;
                 return false;
@@ -1452,7 +1453,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             }
             catch (Exception e)
             {
-                m_log.Error("[MESH CACHE]: failed to create new cache folder: " + e.Message);
+                m_log.LogError("[MESH CACHE]: failed to create new cache folder: " + e.Message);
                 doMeshFileCache = false;
                 doCacheExpire = false;
                 return false;
@@ -1466,7 +1467,7 @@ public class ubODEMeshmerizer : IMesher, INonSharedRegionModule
             }
             catch (Exception e)
             {
-                m_log.Error("[MESH CACHE]: failed to create new control file: " + e.Message);
+                m_log.LogError("[MESH CACHE]: failed to create new control file: " + e.Message);
                 doMeshFileCache = false;
                 doCacheExpire = false;
                 return false;

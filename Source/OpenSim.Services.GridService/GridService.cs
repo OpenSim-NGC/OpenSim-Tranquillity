@@ -28,7 +28,6 @@
 using System.Reflection;
 using System.Text;
 using Nini.Config;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
 using OpenSim.Data;
@@ -37,11 +36,13 @@ using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.GridService;
 
 public class GridService : GridServiceBase, IGridService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private string LogHeader = "[GRID SERVICE]";
 
     private bool m_DeleteOnUnregister = true;
@@ -58,7 +59,7 @@ public class GridService : GridServiceBase, IGridService
     public GridService(IConfigSource config)
         : base(config)
     {
-        m_log.DebugFormat("[GRID SERVICE]: Starting...");
+        m_log.LogDebug("[GRID SERVICE]: Starting...");
 
         m_config = config;
         IConfig gridConfig = config.Configs["GridService"];
@@ -253,7 +254,7 @@ public class GridService : GridServiceBase, IGridService
         RegionData region = null;
         if(rdatas.Count > 1)
         {
-            m_log.WarnFormat("{0} Register region overlaps with {1} regions", LogHeader, scopeID, rdatas.Count);
+            m_log.LogWarning("{0} Register region overlaps with {1} regions", LogHeader, scopeID, rdatas.Count);
             return reason;
         }
         else if(rdatas.Count == 1)
@@ -262,7 +263,7 @@ public class GridService : GridServiceBase, IGridService
         if ((region != null) && (region.RegionID != regionInfos.RegionID))
         {
             // If not same ID and same coordinates, this new region has conflicts and can't be registered.
-            m_log.WarnFormat("{0} Register region conflict in scope {1}. {2}", LogHeader, scopeID, reason);
+            m_log.LogWarning("{0} Register region conflict in scope {1}. {2}", LogHeader, scopeID, reason);
             return reason;
         }
 
@@ -313,7 +314,7 @@ public class GridService : GridServiceBase, IGridService
                 {
                     if (d.RegionID != regionInfos.RegionID)
                     {
-                        m_log.WarnFormat("[GRID SERVICE]: Region tried to register using a duplicate name. New region: {0} ({1}), existing region: {2} ({3}).",
+                        m_log.LogWarning("[GRID SERVICE]: Region tried to register using a duplicate name. New region: {0} ({1}), existing region: {2} ({3}).",
                             regionInfos.RegionName, regionInfos.RegionID, d.RegionName, d.RegionID);
                         return "Duplicate region name";
                     }
@@ -333,7 +334,7 @@ public class GridService : GridServiceBase, IGridService
                 return "Region locked out";
 
             // Region reregistering in other coordinates. Delete the old entry
-            m_log.DebugFormat("[GRID SERVICE]: Region {0} ({1}) was previously registered at {2}-{3}. Deleting old entry.",
+            m_log.LogDebug("[GRID SERVICE]: Region {0} ({1}) was previously registered at {2}-{3}. Deleting old entry.",
                 regionInfos.RegionName, regionInfos.RegionID, regionInfos.RegionCoordX, regionInfos.RegionCoordY);
 
             try
@@ -342,7 +343,7 @@ public class GridService : GridServiceBase, IGridService
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[GRID SERVICE]: Database exception: {0}", e);
+                m_log.LogDebug("[GRID SERVICE]: Database exception: {0}", e);
             }
         }
 
@@ -378,11 +379,10 @@ public class GridService : GridServiceBase, IGridService
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[GRID SERVICE]: Database exception: {0}", e);
+            m_log.LogDebug("[GRID SERVICE]: Database exception: {0}", e);
         }
 
-        m_log.DebugFormat
-            ("[GRID SERVICE]: Region {0} ({1}, {2}x{3}) registered at {4},{5} with flags {6}",
+        m_log.LogDebug("[GRID SERVICE]: Region {0} ({1}, {2}x{3}) registered at {4},{5} with flags {6}",
             regionInfos.RegionName, regionInfos.RegionID, regionInfos.RegionSizeX, regionInfos.RegionSizeY,
             regionInfos.RegionCoordX, regionInfos.RegionCoordY,
             (OpenSim.Framework.RegionFlags)regionFlags);
@@ -410,7 +410,7 @@ public class GridService : GridServiceBase, IGridService
         if (region == null)
             return false;
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[GRID SERVICE]: Deregistering region {0} ({1}) at {2}-{3}",
             region.RegionName, region.RegionID, region.coordX, region.coordY);
 
@@ -427,7 +427,7 @@ public class GridService : GridServiceBase, IGridService
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[GRID SERVICE]: Database exception: {0}", e);
+                m_log.LogDebug("[GRID SERVICE]: Database exception: {0}", e);
             }
 
             return true;
@@ -460,12 +460,12 @@ public class GridService : GridServiceBase, IGridService
             // string rNames = "";
             // foreach (GridRegion gr in rinfos)
             //     rNames += gr.RegionName + ",";
-            // m_log.DebugFormat("{0} region {1} has {2} neighbours ({3})",
+            // m_log.LogDebug("{0} region {1} has {2} neighbours ({3})",
             //             LogHeader, region.RegionName, rinfos.Count, rNames);
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[GRID SERVICE]: GetNeighbours() called for scope {0}, region {1} but no such region found",
                 scopeID, regionID);
         }
@@ -505,13 +505,13 @@ public class GridService : GridServiceBase, IGridService
         RegionData rdata = m_Database.Get(snapX, snapY, scopeID);
         if (rdata != null)
         {
-            m_log.DebugFormat("{0} GetRegionByPosition. Found region {1} in database. Pos=<{2},{3}>",
+            m_log.LogDebug("{0} GetRegionByPosition. Found region {1} in database. Pos=<{2},{3}>",
                              LogHeader, rdata.RegionName, regionX, regionY);
             return RegionData2RegionInfo(rdata);
         }
         else
         {
-//                m_log.DebugFormat("{0} GetRegionByPosition. Did not find region in database. Pos=<{1},{2}>",
+//                m_log.LogDebug("{0} GetRegionByPosition. Did not find region in database. Pos=<{1},{2}>",
 //                                 LogHeader, regionX, regionY);
             return null;
         }
@@ -614,7 +614,7 @@ public class GridService : GridServiceBase, IGridService
 
     public List<GridRegion> GetRegionsByName(UUID scopeID, string name, int maxNumber)
     {
-        // m_log.DebugFormat("[GRID SERVICE]: GetRegionsByName {0}", name);
+        // m_log.LogDebug("[GRID SERVICE]: GetRegionsByName {0}", name);
 
         var nameURI = new RegionURI(name);
         if (!nameURI.IsValid)
@@ -625,7 +625,7 @@ public class GridService : GridServiceBase, IGridService
 
     public List<GridRegion> GetRegionsByURI(UUID scopeID, RegionURI nameURI, int maxNumber)
     {
-        // m_log.DebugFormat("[GRID SERVICE]: GetRegionsByName {0}", name);
+        // m_log.LogDebug("[GRID SERVICE]: GetRegionsByName {0}", name);
         if (!nameURI.IsValid)
             return new List<GridRegion>();
 
@@ -661,7 +661,7 @@ public class GridService : GridServiceBase, IGridService
                 string name = nameURI.RegionName;
                 if (rdatas != null && (rdatas.Count > 0))
                 {
-                    //m_log.DebugFormat("[GRID SERVICE]: Found {0} regions", rdatas.Count);
+                    //m_log.LogDebug("[GRID SERVICE]: Found {0} regions", rdatas.Count);
                     foreach (RegionData rdata in rdatas)
                     {
                         if (name.Equals(rdata.RegionName, StringComparison.InvariantCultureIgnoreCase))
@@ -684,7 +684,7 @@ public class GridService : GridServiceBase, IGridService
         if (rdatas != null && (rdatas.Count > 0))
         {
             bool haveMatch = false;
-            // m_log.DebugFormat("[GRID SERVICE]: Found {0} regions", rdatas.Count);
+            // m_log.LogDebug("[GRID SERVICE]: Found {0} regions", rdatas.Count);
             foreach (RegionData rdata in rdatas)
             {
                 int indx = rdata.RegionName.IndexOf("://");
@@ -778,7 +778,7 @@ public class GridService : GridServiceBase, IGridService
                 ret.Add(RegionData2RegionInfo(r));
         }
 
-        m_log.DebugFormat("[GRID SERVICE]: GetDefaultRegions returning {0} regions", ret.Count);
+        m_log.LogDebug("[GRID SERVICE]: GetDefaultRegions returning {0} regions", ret.Count);
         return ret;
     }
 
@@ -802,7 +802,7 @@ public class GridService : GridServiceBase, IGridService
 
         int normalDefaultRegionsFoundOnline = ret.Count - hgDefaultRegionsFoundOnline;
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[GRID SERVICE]: GetDefaultHypergridRegions returning {0} hypergrid default and {1} normal default regions",
             hgDefaultRegionsFoundOnline, normalDefaultRegionsFoundOnline);
 
@@ -831,7 +831,7 @@ public class GridService : GridServiceBase, IGridService
             }
         }
 
-        m_log.DebugFormat("[GRID SERVICE]: Fallback returned {0} regions", ret.Count);
+        m_log.LogDebug("[GRID SERVICE]: Fallback returned {0} regions", ret.Count);
         return ret;
     }
 
@@ -858,7 +858,7 @@ public class GridService : GridServiceBase, IGridService
             }
         }
 
-        m_log.DebugFormat("[GRID SERVICE]: online returned {0} regions", ret.Count);
+        m_log.LogDebug("[GRID SERVICE]: online returned {0} regions", ret.Count);
         return ret;
     }
 
@@ -874,7 +874,7 @@ public class GridService : GridServiceBase, IGridService
                 ret.Add(RegionData2RegionInfo(r));
         }
 
-        m_log.DebugFormat("[GRID SERVICE]: Hyperlinks returned {0} regions", ret.Count);
+        m_log.LogDebug("[GRID SERVICE]: Hyperlinks returned {0} regions", ret.Count);
         return ret;
     }
 
@@ -885,7 +885,7 @@ public class GridService : GridServiceBase, IGridService
         if (region != null)
         {
             int flags = Convert.ToInt32(region.Data["flags"]);
-            //m_log.DebugFormat("[GRID SERVICE]: Request for flags of {0}: {1}", regionID, flags);
+            //m_log.LogDebug("[GRID SERVICE]: Request for flags of {0}: {1}", regionID, flags);
             return flags;
         }
         else

@@ -26,21 +26,23 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Data;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Services.UserAccountService;
 
 public class AgentPreferencesService : AgentPreferencesServiceBase, IAgentPreferencesService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public AgentPreferencesService(IConfigSource config) : base(config)
     {
-        m_log.Debug("[AGENT PREFERENCES SERVICE]: Starting agent preferences service");
+        m_log.LogDebug("[AGENT PREFERENCES SERVICE]: Starting agent preferences service");
     }
 
     public AgentPrefs GetAgentPreferences(UUID principalID)

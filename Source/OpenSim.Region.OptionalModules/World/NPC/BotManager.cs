@@ -13,7 +13,6 @@ using System.Timers;
 // Tranquillity has ImplicitUsings=enable (auto-imports System.Threading), so alias
 // Timer to System.Timers.Timer to resolve the System.Threading.Timer ambiguity.
 using Timer = System.Timers.Timer;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -22,6 +21,8 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Services.Interfaces;
 using System.IO;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.World.NPC
 {
@@ -86,7 +87,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
     // same as NPCModule.
     public class BotManager : IBotManager, ISharedRegionModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private readonly Dictionary<UUID, BotData> m_bots = new Dictionary<UUID, BotData>();
         private readonly Dictionary<string, Dictionary<UUID, AvatarAppearance>> m_savedOutfits
@@ -154,7 +155,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             m_npcModule = scene.RequestModuleInterface<INPCModule>();
             if (m_npcModule == null)
             {
-                m_log.Warn("[BotManager] INPCModule not found -- bot functions will be unavailable.");
+                m_log.LogWarning("[BotManager] INPCModule not found -- bot functions will be unavailable.");
                 m_enabled = false;
                 return;
             }
@@ -394,7 +395,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             lock (m_bots)
                 m_bots[botID] = data;
 
-            m_log.InfoFormat("[BotManager] Created bot {0} {1} ({2}) for owner {3} in {4}",
+            m_log.LogInformation("[BotManager] Created bot {0} {1} ({2}) for owner {3} in {4}",
                 firstName, lastName, botID, ownerID, ownerScene.RegionInfo.RegionName);
 
             return botID;
@@ -570,7 +571,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 catch (Exception ex)
                 {
                     data.NavInFlight = false;
-                    m_log.WarnFormat("[BotManager]: nav advance for bot {0} failed: {1}", data.BotID, ex.Message);
+                    m_log.LogWarning("[BotManager]: nav advance for bot {0} failed: {1}", data.BotID, ex.Message);
                 }
             }
 
@@ -724,7 +725,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[BotManager]: bot {0} collision delivery to host {1} failed: {2}",
+                m_log.LogWarning("[BotManager]: bot {0} collision delivery to host {1} failed: {2}",
                     data.BotID, host.UUID, ex.Message);
             }
         }
@@ -1186,7 +1187,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 m_outfitNames[ownerKey][oKey] = outfitName;
             }
 
-            m_log.InfoFormat("[BotManager] Saved outfit '{0}' for {1}", outfitName, ownerID);
+            m_log.LogInformation("[BotManager] Saved outfit '{0}' for {1}", outfitName, ownerID);
         }
 
         public void RemoveOutfitFromDatabase(UUID ownerID, string outfitName)

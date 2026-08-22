@@ -26,9 +26,10 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -38,7 +39,7 @@ namespace OpenSim.Framework;
 /// </summary>
 public class AgentCircuitData
 {
-    private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Avatar Unique Agent Identifier
@@ -336,7 +337,7 @@ public class AgentCircuitData
         if(args.TryGetValue("far", out tmpOSD))
             startfar = (float)tmpOSD.AsReal();
 
-        //m_log.InfoFormat("[AGENTCIRCUITDATA]: agentid={0}, child={1}, startpos={2}", AgentID, child, startpos);
+        //m_log.LogInformation("[AGENTCIRCUITDATA]: agentid={0}, child={1}, startpos={2}", AgentID, child, startpos);
 
         try
         {
@@ -351,16 +352,16 @@ public class AgentCircuitData
             if (args.TryGetValue("packed_appearance", out tmpOSD) && (tmpOSD is OSDMap))
             {
                 Appearance.Unpack((OSDMap)tmpOSD);
-//                    m_log.InfoFormat("[AGENTCIRCUITDATA] unpacked appearance");
+//                    m_log.LogInformation("[AGENTCIRCUITDATA] unpacked appearance");
             }
             else
             {
-                m_log.Warn("[AGENTCIRCUITDATA]: failed to find a valid packed_appearance");
+                m_log.LogWarning("[AGENTCIRCUITDATA]: failed to find a valid packed_appearance");
             }
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[AGENTCIRCUITDATA] failed to unpack appearance; {0}",e.Message);
+            m_log.LogError("[AGENTCIRCUITDATA] failed to unpack appearance; {0}",e.Message);
         }
 
         ServiceURLs = new Dictionary<string, object>();

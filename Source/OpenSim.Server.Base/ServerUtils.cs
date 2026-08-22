@@ -29,12 +29,13 @@ using System.Reflection;
 using System.Xml;
 using System.Xml.Serialization;
 using System.Text;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Base;
 
@@ -63,7 +64,7 @@ public interface IRobustConnector
 
 public class PluginLoader
 {
-    static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private readonly IPluginDiscovery m_pluginDiscovery;
 
     public IConfigSource Config
@@ -98,7 +99,7 @@ public class PluginLoader
             loadedConnectorCount++;
         }
 
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[SERVER UTILS]: Discovery summary path=/Robust/Connector backend={0} discovered={1} loaded={2}",
             m_pluginDiscovery.GetType().Name,
             discoveredNodes.Count,
@@ -114,7 +115,7 @@ public class PluginLoader
                 return assemblyLocation;
         }
 
-        m_log.WarnFormat(
+        m_log.LogWarning(
             "[SERVER UTILS]: Unable to resolve plugin path for connector {0}",
             node.ID);
         return string.Empty;
@@ -132,13 +133,13 @@ public class PluginLoader
         }
         else
         {
-            m_log.InfoFormat("[SERVER UTILS]: {0} Disabled.", connector.ConfigName);
+            m_log.LogInformation("[SERVER UTILS]: {0} Disabled.", connector.ConfigName);
         }
     }
 
     private void UnloadPlugin(IRobustConnector connector)
     {
-        m_log.InfoFormat("[SERVER UTILS]: Unloading {0}", connector.ConfigName);
+        m_log.LogInformation("[SERVER UTILS]: Unloading {0}", connector.ConfigName);
 
         connector.Unload();
     }
@@ -158,7 +159,7 @@ public class PluginLoader
 
 public static class ServerUtils
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static  byte[] SerializeResult(XmlSerializer xs, object data)
     {
@@ -260,13 +261,12 @@ public static class ServerUtils
                         {
                             if (!(e is System.MissingMethodException))
                             {
-                                m_log.Error(string.Format("[SERVER UTILS]: Error loading plugin {0} from {1}. Exception: {2}",
+                                m_log.LogError(e, string.Format("[SERVER UTILS]: Error loading plugin {0} from {1}. Exception: {2}",
                                     interfaceName,
                                     dllName,
-                                    e.InnerException == null ? e.Message : e.InnerException.Message),
-                                        e);
+                                    e.InnerException == null ? e.Message : e.InnerException.Message));
                             }
-                            m_log.ErrorFormat("[SERVER UTILS]: Error loading plugin {0}: {1} args.Length {2}", dllName, e.Message, args.Length);
+                            m_log.LogError("[SERVER UTILS]: Error loading plugin {0}: {1} args.Length {2}", dllName, e.Message, args.Length);
                             return null;
                         }
 
@@ -279,14 +279,13 @@ public static class ServerUtils
         }
         catch (ReflectionTypeLoadException rtle)
         {
-            m_log.Error(string.Format("[SERVER UTILS]: Error loading plugin from {0}:\n{1}", dllName,
-                String.Join("\n", Array.ConvertAll(rtle.LoaderExceptions, e => e.ToString()))),
-                rtle);
+            m_log.LogError(rtle, string.Format("[SERVER UTILS]: Error loading plugin from {0}:\n{1}", dllName,
+                String.Join("\n", Array.ConvertAll(rtle.LoaderExceptions, e => e.ToString()))));
             return null;
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[SERVER UTILS]: Error loading plugin from {0}", dllName), e);
+            m_log.LogError(e, string.Format("[SERVER UTILS]: Error loading plugin from {0}", dllName));
             return null;
         }
     }
@@ -520,7 +519,7 @@ public static class ServerUtils
             }
         catch (Exception e)
         {
-                m_log.Debug($"[serverUtils.ParseXmlResponse]: failed error: {e.Message}\n --string:\n{data}\n");
+                m_log.LogDebug($"[serverUtils.ParseXmlResponse]: failed error: {e.Message}\n --string:\n{data}\n");
         }
         }
         return [];
@@ -562,7 +561,7 @@ public static class ServerUtils
     public static IConfigSource LoadInitialConfig(string url)
     {
         IConfigSource source = new XmlConfigSource();
-        m_log.InfoFormat("[SERVER UTILS]: {0} is a http:// URI, fetching ...", url);
+        m_log.LogInformation("[SERVER UTILS]: {0} is a http:// URI, fetching ...", url);
 
         // The ini file path is a http URI
         // Try to read it
@@ -577,7 +576,7 @@ public static class ServerUtils
         }
         catch (Exception e)
         {
-            m_log.FatalFormat("[SERVER UTILS]: Exception reading config from URI {0}\n" + e.ToString(), url);
+            m_log.LogCritical("[SERVER UTILS]: Exception reading config from URI {0}\n" + e.ToString(), url);
             Environment.Exit(1);
         }
 

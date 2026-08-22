@@ -29,12 +29,14 @@ using System.Reflection;
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Framework.Servers.HttpServer;
 using Nini.Config;
 using System.Runtime.InteropServices;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Servers;
 
@@ -43,7 +45,7 @@ namespace OpenSim.Framework.Servers;
 /// </summary>
 public abstract class BaseOpenSimServer : ServerBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Used by tests to suppress Environment.Exit(0) so that post-run operations are possible.
@@ -115,7 +117,7 @@ public abstract class BaseOpenSimServer : ServerBase
 
         RemovePIDFile();
 
-        m_log.Info("[SHUTDOWN]: Shutdown processing on main thread complete.  Exiting...");
+        m_log.LogInformation("[SHUTDOWN]: Shutdown processing on main thread complete.  Exiting...");
 
        if (!SuppressExit)
             Environment.Exit(0);
@@ -136,18 +138,18 @@ public abstract class BaseOpenSimServer : ServerBase
     /// </summary>
     public virtual void Startup()
     {
-        m_log.Info("[STARTUP]: Beginning startup processing");
+        m_log.LogInformation("[STARTUP]: Beginning startup processing");
 
-        m_log.Info("[STARTUP]: Version: " + m_version);
-        m_log.Info($"[STARTUP]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, Runtime {Environment.Version}");
-        m_log.Info($"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
+        m_log.LogInformation("[STARTUP]: Version: " + m_version);
+        m_log.LogInformation($"[STARTUP]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, Runtime {Environment.Version}");
+        m_log.LogInformation($"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
         try
         {
             StartupSpecific();
         }
         catch(Exception e)
         {
-            m_log.Fatal("Fatal error: " + e.ToString());
+            m_log.LogCritical("Fatal error: " + e.ToString());
             Environment.Exit(1);
         }
     }

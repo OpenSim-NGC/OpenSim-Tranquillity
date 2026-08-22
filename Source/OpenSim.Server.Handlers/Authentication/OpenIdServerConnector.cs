@@ -27,18 +27,19 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Server.Handlers.Authentication;
 
 public class OpenIdServerConnector : ServiceConnector
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAuthenticationService m_AuthenticationService;
@@ -70,6 +71,6 @@ public class OpenIdServerConnector : ServiceConnector
         server.AddStreamHandler(new OpenIdStreamHandler("POST", "/openid/server", m_UserAccountService, m_AuthenticationService));
         server.AddStreamHandler(new OpenIdStreamHandler("GET", "/openid/server", m_UserAccountService, m_AuthenticationService));
 
-        m_log.Info("[OPENID]: OpenId service enabled");
+        m_log.LogInformation("[OPENID]: OpenId service enabled");
     }
 }

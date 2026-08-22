@@ -34,8 +34,9 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.HypergridService;
 
@@ -44,7 +45,7 @@ namespace OpenSim.Services.HypergridService;
 /// </summary>
 public class HGInstantMessageService : IInstantMessage
 {
-    private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
     static bool m_Initialized = false;
 
@@ -86,7 +87,7 @@ public class HGInstantMessageService : IInstantMessage
                 throw new Exception("[HG IM SERVICE]: PresenceService not set in [HGInstantMessageService]");
             string userAgentService = serverConfig.GetString("UserAgentService", string.Empty);
             if (string.IsNullOrEmpty(userAgentService))
-                m_log.WarnFormat("[HG IM SERVICE]: UserAgentService not set in [HGInstantMessageService]");
+                m_log.LogWarning("[HG IM SERVICE]: UserAgentService not set in [HGInstantMessageService]");
 
             object[] args = [ config ];
             try
@@ -113,7 +114,7 @@ public class HGInstantMessageService : IInstantMessage
             }
             catch
             {
-                m_log.WarnFormat("[HG IM SERVICE]: Unable to load PresenceService");
+                m_log.LogWarning("[HG IM SERVICE]: Unable to load PresenceService");
             }
 
             m_InGatekeeper = serverConfig.GetBoolean("InGatekeeper", false);
@@ -121,7 +122,7 @@ public class HGInstantMessageService : IInstantMessage
             IConfig cnf = config.Configs["Messaging"];
             if (cnf == null)
             {
-                m_log.Debug("[HG IM SERVICE]: Starting (without [MEssaging])");
+                m_log.LogDebug("[HG IM SERVICE]: Starting (without [MEssaging])");
                 return;
             }
 
@@ -130,26 +131,26 @@ public class HGInstantMessageService : IInstantMessage
 
             if (m_InGatekeeper)
             {
-                m_log.Debug("[HG IM SERVICE]: Starting In Robust GateKeeper");
+                m_log.LogDebug("[HG IM SERVICE]: Starting In Robust GateKeeper");
 
                 string offlineIMService = cnf.GetString("OfflineIMService", string.Empty);
                 if (offlineIMService != string.Empty)
                     m_OfflineIMService = ServerUtils.LoadPlugin<IOfflineIMService>(offlineIMService, args);
             }
             else
-                m_log.Debug("[HG IM SERVICE]: Starting");
+                m_log.LogDebug("[HG IM SERVICE]: Starting");
         }
     }
 
     public bool IncomingInstantMessage(GridInstantMessage im)
     {
-        //m_log.DebugFormat("[HG IM SERVICE]: Received message from {0} to {1}", im.fromAgentID, im.toAgentID);
+        //m_log.LogDebug("[HG IM SERVICE]: Received message from {0} to {1}", im.fromAgentID, im.toAgentID);
         //UUID toAgentID = new UUID(im.toAgentID);
 
         bool success = false;
         if (m_IMSimConnector != null)
         {
-            //m_log.DebugFormat("[XXX] SendIMToRegion local im connector");
+            //m_log.LogDebug("[XXX] SendIMToRegion local im connector");
             success = m_IMSimConnector.SendInstantMessage(im);
         }
         else
@@ -165,7 +166,7 @@ public class HGInstantMessageService : IInstantMessage
 
     public bool OutgoingInstantMessage(GridInstantMessage im, string url, bool foreigner)
     {
-        //m_log.DebugFormat("[HG IM SERVICE]: Sending message from {0} to {1}@{2}", im.fromAgentID, im.toAgentID, url);
+        //m_log.LogDebug("[HG IM SERVICE]: Sending message from {0} to {1}@{2}", im.fromAgentID, im.toAgentID, url);
         return TrySendInstantMessage(im, url, true, foreigner);
     }
 
@@ -196,7 +197,7 @@ public class HGInstantMessageService : IInstantMessage
             {
                 if (!p.RegionID.IsZero())
                 {
-                    //m_log.DebugFormat("[XXX]: Found presence in {0}", p.RegionID);
+                    //m_log.LogDebug("[XXX]: Found presence in {0}", p.RegionID);
                     // stupid service does not cache region, even in region code
                     if(m_RegionsCache.TryGetValue(p.RegionID, out url))
                         break;
@@ -215,29 +216,29 @@ public class HGInstantMessageService : IInstantMessage
         if (string.IsNullOrEmpty(url) && !foreigner && m_UserAgentService != null)
         {
             // Let's check with the UAS if the user is elsewhere in HG
-            m_log.DebugFormat("[HG IM SERVICE]: User is not present. Checking location with User Agent service");
+            m_log.LogDebug("[HG IM SERVICE]: User is not present. Checking location with User Agent service");
             try
             {
                 url = m_UserAgentService.LocateUser(toAgentID);
             }
             catch (Exception e)
             {
-                m_log.Warn("[HG IM SERVICE]: LocateUser call failed ", e);
+                m_log.LogWarning(e, "[HG IM SERVICE]: LocateUser call failed ");
                 url = string.Empty;
             }
         }
 
         if (string.IsNullOrEmpty(url))
         {
-            m_log.DebugFormat("[HG IM SERVICE]: Unable to locate user {0}", toAgentID);
+            m_log.LogDebug("[HG IM SERVICE]: Unable to locate user {0}", toAgentID);
             return false;
         }
 
         // check if we've tried this before..
         if (!string.IsNullOrEmpty(foreignerkurl) && url.Equals(foreignerkurl, StringComparison.InvariantCultureIgnoreCase))
         {
-            // m_log.Error("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
-            m_log.DebugFormat("[HG IM SERVICE]: Unable to send to user {0}, at {1}", toAgentID, foreignerkurl);
+            // m_log.LogError("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
+            m_log.LogDebug("[HG IM SERVICE]: Unable to send to user {0}, at {1}", toAgentID, foreignerkurl);
             return false;
         }
 
@@ -293,7 +294,7 @@ public class HGInstantMessageService : IInstantMessage
             }
         }
 
-        //m_log.DebugFormat("[HG IM SERVICE]: Message saved");
+        //m_log.LogDebug("[HG IM SERVICE]: Message saved");
         return m_OfflineIMService.StoreMessage(im, out string reason);
     }
 }

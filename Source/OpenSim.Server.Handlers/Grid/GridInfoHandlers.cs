@@ -29,7 +29,6 @@ using System.Collections;
 using System.Net;
 using System.Reflection;
 using System.Security;
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenSim.Framework;
@@ -42,13 +41,14 @@ using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Data;
 
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Server.Handlers.Grid;
 
 public class GridInfoHandlers
 {
-    private static readonly ILog _log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger _log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private IConfigSource m_Config;
     private Dictionary<string, string> _info = [];
     private Dictionary<string, string> _stats = [];
@@ -106,7 +106,7 @@ public class GridInfoHandlers
                             if (m_Database_griduser != null)
                             {
                                 stats_available = true;
-                                _log.Debug("[GRID INFO SERVICE]: Grid Stats enabled");
+                                _log.LogDebug("[GRID INFO SERVICE]: Grid Stats enabled");
                             }
                         }
                     }
@@ -114,7 +114,7 @@ public class GridInfoHandlers
             }
             if (!stats_available)
             {
-                _log.Warn("[GRID INFO SERVICE]: Could not initialize. Grid stats will be unavailable!");
+                _log.LogWarning("[GRID INFO SERVICE]: Could not initialize. Grid stats will be unavailable!");
             }
         }
 
@@ -170,20 +170,20 @@ public class GridInfoHandlers
         }
         catch (Exception)
         {
-            _log.Warn("[GRID INFO SERVICE]: Cannot get grid info from config source, using minimal defaults");
+            _log.LogWarning("[GRID INFO SERVICE]: Cannot get grid info from config source, using minimal defaults");
         }
 
-        _log.DebugFormat("[GRID INFO SERVICE]: Grid info service initialized with {0} keys", _info.Count);
+        _log.LogDebug("[GRID INFO SERVICE]: Grid info service initialized with {0} keys", _info.Count);
     }
 
     private void IssueWarning()
     {
-        _log.Warn("[GRID INFO SERVICE]: found no [GridInfoService] section in your configuration files");
-        _log.Warn("[GRID INFO SERVICE]: trying to guess sensible defaults, you might want to provide better ones:");
+        _log.LogWarning("[GRID INFO SERVICE]: found no [GridInfoService] section in your configuration files");
+        _log.LogWarning("[GRID INFO SERVICE]: trying to guess sensible defaults, you might want to provide better ones:");
 
         foreach (KeyValuePair<string, string> k in _info)
         {
-            _log.Warn($"[GRID INFO SERVICE]: {k.Key}: {k.Value}");
+            _log.LogWarning($"[GRID INFO SERVICE]: {k.Key}: {k.Value}");
         }
     }
 
@@ -192,7 +192,7 @@ public class GridInfoHandlers
         XmlRpcResponse response = new XmlRpcResponse();
         Hashtable responseData = [];
 
-        _log.Debug("[GRID INFO SERVICE]: Request for grid info");
+        _log.LogDebug("[GRID INFO SERVICE]: Request for grid info");
 
         foreach (KeyValuePair<string, string>  k in _info)
         {
@@ -317,7 +317,7 @@ public class GridInfoHandlers
         }
         catch (Exception ex)
         {
-            _log.Error($"[GRID INFO SERVICE]: Could not fetch grid stats: {ex.Message}");
+            _log.LogError($"[GRID INFO SERVICE]: Could not fetch grid stats: {ex.Message}");
         }
 
         _stats["residents"] = residents.ToString();

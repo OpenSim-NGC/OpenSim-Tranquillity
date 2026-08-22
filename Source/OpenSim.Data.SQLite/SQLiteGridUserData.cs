@@ -1,3 +1,6 @@
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 /*
  * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
@@ -32,7 +35,7 @@ namespace OpenSim.Data.SQLite;
 /// </summary>
 public class SQLiteGridUserData : SQLiteGenericTableHandler<GridUserData>, IGridUserData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public SQLiteGridUserData(string connectionString, string realm)
         : base(connectionString, realm, "GridUserStore") {}

@@ -29,7 +29,6 @@ using System.Net;
 using System.Xml;
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 
@@ -38,6 +37,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenMetaverse.StructuredData;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Voice.VivoxVoice;
 
@@ -74,8 +75,7 @@ public class VivoxVoiceModule : ISharedRegionModule
     public const int    CHAN_CLAMPING_DISTANCE_MAX       = 160;
 
     // Infrastructure
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly Object vlock  = new Object();
 
     // Control info, e.g. vivox server, admin user, admin password
@@ -137,14 +137,14 @@ public class VivoxVoiceModule : ISharedRegionModule
             // Validate against constraints and default if necessary
             if (m_vivoxChannelRollOff < CHAN_ROLL_OFF_MIN || m_vivoxChannelRollOff > CHAN_ROLL_OFF_MAX)
             {
-                m_log.WarnFormat("[VivoxVoice] Invalid value for roll off ({0}), reset to {1}.",
+                m_log.LogWarning("[VivoxVoice] Invalid value for roll off ({0}), reset to {1}.",
                                           m_vivoxChannelRollOff, CHAN_ROLL_OFF_DEFAULT);
                 m_vivoxChannelRollOff = CHAN_ROLL_OFF_DEFAULT;
             }
 
             if (m_vivoxChannelMaximumRange < CHAN_MAX_RANGE_MIN || m_vivoxChannelMaximumRange > CHAN_MAX_RANGE_MAX)
             {
-                m_log.WarnFormat("[VivoxVoice] Invalid value for maximum range ({0}), reset to {1}.",
+                m_log.LogWarning("[VivoxVoice] Invalid value for maximum range ({0}), reset to {1}.",
                                           m_vivoxChannelMaximumRange, CHAN_MAX_RANGE_DEFAULT);
                 m_vivoxChannelMaximumRange = CHAN_MAX_RANGE_DEFAULT;
             }
@@ -152,7 +152,7 @@ public class VivoxVoiceModule : ISharedRegionModule
             if (m_vivoxChannelClampingDistance < CHAN_CLAMPING_DISTANCE_MIN ||
                                         m_vivoxChannelClampingDistance > CHAN_CLAMPING_DISTANCE_MAX)
             {
-                m_log.WarnFormat("[VivoxVoice] Invalid value for clamping distance ({0}), reset to {1}.",
+                m_log.LogWarning("[VivoxVoice] Invalid value for clamping distance ({0}), reset to {1}.",
                                           m_vivoxChannelClampingDistance, CHAN_CLAMPING_DISTANCE_DEFAULT);
                 m_vivoxChannelClampingDistance = CHAN_CLAMPING_DISTANCE_DEFAULT;
             }
@@ -164,7 +164,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                 case "presentation" : break;
                 case "auditorium" : break;
                 default :
-                    m_log.WarnFormat("[VivoxVoice] Invalid value for channel mode ({0}), reset to {1}.",
+                    m_log.LogWarning("[VivoxVoice] Invalid value for channel mode ({0}), reset to {1}.",
                                               m_vivoxChannelMode, CHAN_MODE_DEFAULT);
                     m_vivoxChannelMode = CHAN_MODE_DEFAULT;
                     break;
@@ -175,7 +175,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                 case "positional" : break;
                 case "channel" : break;
                 default :
-                    m_log.WarnFormat("[VivoxVoice] Invalid value for channel type ({0}), reset to {1}.",
+                    m_log.LogWarning("[VivoxVoice] Invalid value for channel type ({0}), reset to {1}.",
                                               m_vivoxChannelType, CHAN_TYPE_DEFAULT);
                     m_vivoxChannelType = CHAN_TYPE_DEFAULT;
                     break;
@@ -188,8 +188,8 @@ public class VivoxVoiceModule : ISharedRegionModule
                 String.IsNullOrEmpty(m_vivoxAdminUser) ||
                 String.IsNullOrEmpty(m_vivoxAdminPassword))
             {
-                m_log.Error("[VivoxVoice] plugin mis-configured");
-                m_log.Info("[VivoxVoice] plugin disabled: incomplete configuration");
+                m_log.LogError("[VivoxVoice] plugin mis-configured");
+                m_log.LogInformation("[VivoxVoice] plugin disabled: incomplete configuration");
                 return;
             }
 
@@ -197,17 +197,17 @@ public class VivoxVoiceModule : ISharedRegionModule
             m_vivoxVoiceAccountApi = String.Format("http://{0}/api2", m_vivoxServer); // fs <6.3 seems to not like https here
             if (!Uri.TryCreate(m_vivoxVoiceAccountApi, UriKind.Absolute, out Uri accoutURI))
             {
-                m_log.Error("[VivoxVoice] invalid vivox server");
+                m_log.LogError("[VivoxVoice] invalid vivox server");
                 return;
             }
 
             if (!Uri.TryCreate("http://" + m_vivoxSipUri, UriKind.Absolute, out Uri spiURI))
             {
-                m_log.Error("[VivoxVoice] invalid vivox sip server");
+                m_log.LogError("[VivoxVoice] invalid vivox sip server");
                 return;
             }
 
-            m_log.InfoFormat("[VivoxVoice] using vivox server {0}", m_vivoxServer);
+            m_log.LogInformation("[VivoxVoice] using vivox server {0}", m_vivoxServer);
 
             // Get admin rights and cleanup any residual channel definition
 
@@ -215,12 +215,12 @@ public class VivoxVoiceModule : ISharedRegionModule
 
             m_pluginEnabled = true;
 
-            m_log.Info("[VivoxVoice] plugin enabled");
+            m_log.LogInformation("[VivoxVoice] plugin enabled");
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[VivoxVoice] plugin initialization failed: {0}", e.Message);
-            m_log.DebugFormat("[VivoxVoice] plugin initialization failed: {0}", e.ToString());
+            m_log.LogError("[VivoxVoice] plugin initialization failed: {0}", e.Message);
+            m_log.LogDebug("[VivoxVoice] plugin initialization failed: {0}", e.ToString());
             return;
         }
     }
@@ -246,7 +246,7 @@ public class VivoxVoiceModule : ISharedRegionModule
 
                 if (VivoxTryGetDirectory(sceneUUID + "D", out channelId))
                 {
-                    m_log.DebugFormat("[VivoxVoice]: region {0}: uuid {1}: located directory id {2}",
+                    m_log.LogDebug("[VivoxVoice]: region {0}: uuid {1}: located directory id {2}",
                                       sceneName, sceneUUID, channelId);
 
                     XmlElement children = VivoxListChildren(channelId);
@@ -261,7 +261,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                             if (XmlFind(children, "response.level0.channel-search.channels.channels.level4.id", i, out id))
                             {
                                 if (!IsOK(VivoxDeleteChannel(channelId, id)))
-                                    m_log.WarnFormat("[VivoxVoice] Channel delete failed {0}:{1}:{2}", i, channelId, id);
+                                    m_log.LogWarning("[VivoxVoice] Channel delete failed {0}:{1}:{2}", i, channelId, id);
                             }
                         }
                     }
@@ -270,7 +270,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                 {
                     if (!VivoxTryCreateDirectory(sceneUUID + "D", sceneName, out channelId))
                     {
-                        m_log.WarnFormat("[VivoxVoice] Create failed <{0}:{1}:{2}>",
+                        m_log.LogWarning("[VivoxVoice] Create failed <{0}:{1}:{2}>",
                                          "*", sceneUUID, sceneName);
                         channelId = String.Empty;
                     }
@@ -327,7 +327,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                 // region.
                 if (VivoxTryGetDirectory(sceneUUID + "D", out channelId))
                 {
-                    m_log.DebugFormat("[VivoxVoice]: region {0}: uuid {1}: located directory id {2}",
+                    m_log.LogDebug("[VivoxVoice]: region {0}: uuid {1}: located directory id {2}",
                                       sceneName, sceneUUID, channelId);
 
                     XmlElement children = VivoxListChildren(channelId);
@@ -342,12 +342,12 @@ public class VivoxVoiceModule : ISharedRegionModule
                             if (XmlFind(children, "response.level0.channel-search.channels.channels.level4.id", i, out id))
                             {
                                 if (!IsOK(VivoxDeleteChannel(channelId, id)))
-                                    m_log.WarnFormat("[VivoxVoice] Channel delete failed {0}:{1}:{2}", i, channelId, id);
+                                    m_log.LogWarning("[VivoxVoice] Channel delete failed {0}:{1}:{2}", i, channelId, id);
                             }
                         }
                     }
                     if (!IsOK(VivoxDeleteChannel(null, channelId)))
-                        m_log.WarnFormat("[VivoxVoice] Parent channel delete failed {0}:{1}:{2}", sceneName, sceneUUID, channelId);
+                        m_log.LogWarning("[VivoxVoice] Parent channel delete failed {0}:{1}:{2}", sceneName, sceneUUID, channelId);
                 }
 
                 // Remove the channel umbrella entry
@@ -409,7 +409,7 @@ public class VivoxVoiceModule : ISharedRegionModule
     // </summary>
     public void OnRegisterCaps(Scene scene, UUID agentID, Caps caps)
     {
-        m_log.DebugFormat("[VivoxVoice] OnRegisterCaps: agentID {0} caps {1}", agentID, caps);
+        m_log.LogDebug("[VivoxVoice] OnRegisterCaps: agentID {0} caps {1}", agentID, caps);
 
         caps.RegisterSimpleHandler("ProvisionVoiceAccountRequest",
                 new SimpleStreamHandler("/" + UUID.Random(), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
@@ -495,8 +495,8 @@ public class VivoxVoiceModule : ISharedRegionModule
 
             avatarName = avatar.Name;
 
-            m_log.DebugFormat("[VivoxVoice][PROVISIONVOICE]: scene = {0}, agentID = {1}", scene.Name, agentID);
-//                    m_log.DebugFormat("[VivoxVoice][PROVISIONVOICE]: request: {0}, path: {1}, param: {2}",
+            m_log.LogDebug("[VivoxVoice][PROVISIONVOICE]: scene = {0}, agentID = {1}", scene.Name, agentID);
+//                    m_log.LogDebug("[VivoxVoice][PROVISIONVOICE]: request: {0}, path: {1}, param: {2}",
 //                                      request, path, param);
 
             XmlElement    resp;
@@ -521,24 +521,24 @@ public class VivoxVoiceModule : ISharedRegionModule
                             switch (code)
                             {
                                 case "201" : // Account expired
-                                    m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Get account information failed : expired credentials",
+                                    m_log.LogError("[VivoxVoice]: avatar \"{0}\": Get account information failed : expired credentials",
                                                       avatarName);
                                     m_adminConnected = false;
                                     retry = DoAdminLogin();
                                     break;
 
                                 case "202" : // Missing credentials
-                                    m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Get account information failed : missing credentials",
+                                    m_log.LogError("[VivoxVoice]: avatar \"{0}\": Get account information failed : missing credentials",
                                                       avatarName);
                                     break;
 
                                 case "212" : // Not authorized
-                                    m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Get account information failed : not authorized",
+                                    m_log.LogError("[VivoxVoice]: avatar \"{0}\": Get account information failed : not authorized",
                                                       avatarName);
                                     break;
 
                                 case "300" : // Required parameter missing
-                                    m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Get account information failed : parameter missing",
+                                    m_log.LogError("[VivoxVoice]: avatar \"{0}\": Get account information failed : parameter missing",
                                                       avatarName);
                                     break;
 
@@ -550,29 +550,29 @@ public class VivoxVoiceModule : ISharedRegionModule
                                         switch (code)
                                         {
                                             case "201" : // Account expired
-                                                m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Create account information failed : expired credentials",
+                                                m_log.LogError("[VivoxVoice]: avatar \"{0}\": Create account information failed : expired credentials",
                                                                   avatarName);
                                                 m_adminConnected = false;
                                                 retry = DoAdminLogin();
                                                 break;
 
                                             case "202" : // Missing credentials
-                                                m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Create account information failed : missing credentials",
+                                                m_log.LogError("[VivoxVoice]: avatar \"{0}\": Create account information failed : missing credentials",
                                                                   avatarName);
                                                 break;
 
                                             case "212" : // Not authorized
-                                                m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Create account information failed : not authorized",
+                                                m_log.LogError("[VivoxVoice]: avatar \"{0}\": Create account information failed : not authorized",
                                                                   avatarName);
                                                 break;
 
                                             case "300" : // Required parameter missing
-                                                m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Create account information failed : parameter missing",
+                                                m_log.LogError("[VivoxVoice]: avatar \"{0}\": Create account information failed : parameter missing",
                                                                   avatarName);
                                                 break;
 
                                             case "400" : // Create failed
-                                                m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Create account information failed : create failed",
+                                                m_log.LogError("[VivoxVoice]: avatar \"{0}\": Create account information failed : create failed",
                                                                   avatarName);
                                                 break;
                                         }
@@ -580,7 +580,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                                     break;
 
                                 case "404" : // Failed to retrieve account
-                                    m_log.ErrorFormat("[VivoxVoice]: avatar \"{0}\": Get account information failed : retrieve failed");
+                                    m_log.LogError("[VivoxVoice]: avatar \"{0}\": Get account information failed : retrieve failed");
                                     // [AMW] Sleep and retry for a fixed period? Or just abandon?
                                     break;
                             }
@@ -592,7 +592,7 @@ public class VivoxVoiceModule : ISharedRegionModule
 
             if (code != "OK")
             {
-                m_log.DebugFormat("[VivoxVoice][PROVISIONVOICE]: Get Account Request failed for \"{0}\"", avatarName);
+                m_log.LogDebug("[VivoxVoice][PROVISIONVOICE]: Get Account Request failed for \"{0}\"", avatarName);
                 response.RawBuffer = Util.UTF8.GetBytes("<llsd><undef /></llsd>");
                 return;
             }
@@ -614,7 +614,7 @@ public class VivoxVoiceModule : ISharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[VivoxVoice][PROVISIONVOICE]: : {0} failed", e.ToString());
+            m_log.LogDebug("[VivoxVoice][PROVISIONVOICE]: : {0} failed", e.ToString());
         }
         response.RawBuffer = osUTF8.GetASCIIBytes("<llsd><undef /></llsd>");
     }
@@ -659,7 +659,7 @@ public class VivoxVoiceModule : ISharedRegionModule
 
             if (scene.LandChannel == null)
             {
-                m_log.ErrorFormat("region \"{0}\": avatar \"{1}\": land data not yet available",
+                m_log.LogError("region \"{0}\": avatar \"{1}\": land data not yet available",
                                                   scene.RegionInfo.RegionName, avatarName);
                 response.RawBuffer = Util.UTF8.GetBytes("<llsd><undef /></llsd>");
                 return;
@@ -676,20 +676,20 @@ public class VivoxVoiceModule : ISharedRegionModule
                 return;
             }
 
-            // m_log.DebugFormat("[VivoxVoice][PARCELVOICE]: region \"{0}\": Parcel \"{1}\" ({2}): avatar \"{3}\": request: {4}, path: {5}, param: {6}",
+            // m_log.LogDebug("[VivoxVoice][PARCELVOICE]: region \"{0}\": Parcel \"{1}\" ({2}): avatar \"{3}\": request: {4}, path: {5}, param: {6}",
             //     scene.RegionInfo.RegionName, land.Name, land.LocalID, avatarName, request, path, param);
-            // m_log.DebugFormat("[VivoxVoice][PARCELVOICE]: avatar \"{0}\": location: {1} {2} {3}",
+            // m_log.LogDebug("[VivoxVoice][PARCELVOICE]: avatar \"{0}\": location: {1} {2} {3}",
             //                   avatarName, avatar.AbsolutePosition.X, avatar.AbsolutePosition.Y, avatar.AbsolutePosition.Z);
 
             if (!scene.RegionInfo.EstateSettings.AllowVoice)
             {
-                //m_log.DebugFormat("[VivoxVoice][PARCELVOICE]: region \"{0}\": voice not enabled in estate settings",
+                //m_log.LogDebug("[VivoxVoice][PARCELVOICE]: region \"{0}\": voice not enabled in estate settings",
                 //                  scene.RegionInfo.RegionName);
                 channel_uri = String.Empty;
             }
             else if (!scene.RegionInfo.EstateSettings.TaxFree && (land.Flags & (uint)ParcelFlags.AllowVoiceChat) == 0)
             {
-                //m_log.DebugFormat("[VivoxVoice][PARCELVOICE]: region \"{0}\": Parcel \"{1}\" ({2}): avatar \"{3}\": voice not enabled for parcel",
+                //m_log.LogDebug("[VivoxVoice][PARCELVOICE]: region \"{0}\": Parcel \"{1}\" ({2}): avatar \"{3}\": voice not enabled for parcel",
                 //                  scene.RegionInfo.RegionName, land.Name, land.LocalID, avatarName);
                 channel_uri = String.Empty;
             }
@@ -698,7 +698,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                 channel_uri = RegionGetOrCreateChannel(scene, land);
             }
 
-            // m_log.DebugFormat("[VivoxVoice][PARCELVOICE]: region \"{0}\": Parcel \"{1}\" ({2}): avatar \"{3}\": {4}",
+            // m_log.LogDebug("[VivoxVoice][PARCELVOICE]: region \"{0}\": Parcel \"{1}\" ({2}): avatar \"{3}\": {4}",
             //      scene.RegionInfo.RegionName, land.Name, land.LocalID, avatarName, r);
             // fast foward encode
             osUTF8 lsl = LLSDxmlEncode2.Start();
@@ -716,7 +716,7 @@ public class VivoxVoiceModule : ISharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[VivoxVoice][PARCELVOICE]: region \"{0}\": avatar \"{1}\": {2}, retry later",
+            m_log.LogError("[VivoxVoice][PARCELVOICE]: region \"{0}\": avatar \"{1}\": {2}, retry later",
                               scene.RegionInfo.RegionName, avatarName, e.Message);
         }
         response.RawBuffer = Util.UTF8.GetBytes("<llsd><undef /></llsd>");
@@ -743,7 +743,7 @@ public class VivoxVoiceModule : ISharedRegionModule
         //            ScenePresence avatar = scene.GetScenePresence(agentID);
         //            string        avatarName = avatar.Name;
 
-        //            m_log.DebugFormat("[VivoxVoice][CHATSESSION]: avatar \"{0}\": request: {1}, path: {2}, param: {3}",
+        //            m_log.LogDebug("[VivoxVoice][CHATSESSION]: avatar \"{0}\": request: {1}, path: {2}, param: {3}",
         //                              avatarName, request, path, param);
         response.RawBuffer = Util.UTF8.GetBytes("<llsd>true</llsd>");
         response.StatusCode = (int)HttpStatusCode.OK;
@@ -768,14 +768,14 @@ public class VivoxVoiceModule : ISharedRegionModule
         {
             landName = String.Format("{0}:{1}", scene.RegionInfo.RegionName, land.Name);
             landUUID = land.GlobalID.ToString();
-            m_log.DebugFormat("[VivoxVoice]: Region:Parcel \"{0}\": parcel id {1}: using channel name {2}",
+            m_log.LogDebug("[VivoxVoice]: Region:Parcel \"{0}\": parcel id {1}: using channel name {2}",
                               landName, land.LocalID, landUUID);
         }
         else
         {
             landName = String.Format("{0}:{1}", scene.RegionInfo.RegionName, scene.RegionInfo.RegionName);
             landUUID = scene.RegionInfo.RegionID.ToString();
-            m_log.DebugFormat("[VivoxVoice]: Region:Parcel \"{0}\": parcel id {1}: using channel name {2}",
+            m_log.LogDebug("[VivoxVoice]: Region:Parcel \"{0}\": parcel id {1}: using channel name {2}",
                               landName, land.LocalID, landUUID);
         }
 
@@ -783,13 +783,13 @@ public class VivoxVoiceModule : ISharedRegionModule
         {
             // Added by Adam to help debug channel not availible errors.
             if (VivoxTryGetChannel(parentId, landUUID, out channelId, out channelUri))
-                m_log.DebugFormat("[VivoxVoice] Found existing channel at " + channelUri);
+                m_log.LogDebug("[VivoxVoice] Found existing channel at " + channelUri);
             else if (VivoxTryCreateChannel(parentId, landUUID, landName, out channelUri))
-                m_log.DebugFormat("[VivoxVoice] Created new channel at " + channelUri);
+                m_log.LogDebug("[VivoxVoice] Created new channel at " + channelUri);
             else
                 throw new Exception("vivox channel uri not available");
 
-            m_log.DebugFormat("[VivoxVoice]: Region:Parcel \"{0}\": parent channel id {1}: retrieved parcel channel_uri {2} ",
+            m_log.LogDebug("[VivoxVoice]: Region:Parcel \"{0}\": parent channel id {1}: retrieved parcel channel_uri {2} ",
                               landName, parentId, channelUri);
         }
 
@@ -985,7 +985,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                 if (!XmlFind(resp, "response.level0.channel-search.channels.channels.level4.type", i, out type) ||
                     (type != "channel" && type != "positional_M"))
                 {
-                    m_log.Debug("[VivoxVoice] Skipping Channel " + i + " as it's not a channel.");
+                    m_log.LogDebug("[VivoxVoice] Skipping Channel " + i + " as it's not a channel.");
                     continue;
                 }
 
@@ -993,28 +993,28 @@ public class VivoxVoiceModule : ISharedRegionModule
                 if (!XmlFind(resp, "response.level0.channel-search.channels.channels.level4.name", i, out name) ||
                     name != channelName)
                 {
-                    m_log.Debug("[VivoxVoice] Skipping Channel " + i + " as it has no name.");
+                    m_log.LogDebug("[VivoxVoice] Skipping Channel " + i + " as it has no name.");
                     continue;
                 }
 
                 // skip if parent does not match
                 if (channelParent != null && !XmlFind(resp, "response.level0.channel-search.channels.channels.level4.parent", i, out parent))
                 {
-                    m_log.Debug("[VivoxVoice] Skipping Channel " + i + "/" + name + " as it's parent doesnt match");
+                    m_log.LogDebug("[VivoxVoice] Skipping Channel " + i + "/" + name + " as it's parent doesnt match");
                     continue;
                 }
 
                 // skip if no channel id available
                 if (!XmlFind(resp, "response.level0.channel-search.channels.channels.level4.id", i, out id))
                 {
-                    m_log.Debug("[VivoxVoice] Skipping Channel " + i + "/" + name + " as it has no channel ID");
+                    m_log.LogDebug("[VivoxVoice] Skipping Channel " + i + "/" + name + " as it has no channel ID");
                     continue;
                 }
 
                 // skip if no channel uri available
                 if (!XmlFind(resp, "response.level0.channel-search.channels.channels.level4.uri", i, out uri))
                 {
-                    m_log.Debug("[VivoxVoice] Skipping Channel " + i + "/" + name + " as it has no channel URI");
+                    m_log.LogDebug("[VivoxVoice] Skipping Channel " + i + "/" + name + " as it has no channel URI");
                     continue;
                 }
 
@@ -1026,14 +1026,14 @@ public class VivoxVoiceModule : ISharedRegionModule
         }
         else
         {
-            m_log.Debug("[VivoxVoice] No count element?");
+            m_log.LogDebug("[VivoxVoice] No count element?");
         }
 
         channelId = String.Empty;
         channelUri = String.Empty;
 
         // Useful incase something goes wrong.
-        //m_log.Debug("[VivoxVoice] Could not find channel in XMLRESP: " + resp.InnerXml);
+        //m_log.LogDebug("[VivoxVoice] Could not find channel in XMLRESP: " + resp.InnerXml);
 
         return false;
     }
@@ -1184,7 +1184,7 @@ public class VivoxVoiceModule : ISharedRegionModule
             try
             {
                 // Otherwise prepare the request
-                //m_log.DebugFormat("[VivoxVoice] Sending request <{0}>", requrl);
+                //m_log.LogDebug("[VivoxVoice] Sending request <{0}>", requrl);
 
                 HttpWebRequest req = (HttpWebRequest)WebRequest.Create(requrl);
                 req.ServerCertificateValidationCallback = WebUtil.ValidateServerCertificateNoChecks; // vivox servers have invalid certs
@@ -1203,7 +1203,7 @@ public class VivoxVoiceModule : ISharedRegionModule
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[VivoxVoice] Error in admin call : {0}", e.Message);
+                m_log.LogError("[VivoxVoice] Error in admin call : {0}", e.Message);
             }
         }
 
@@ -1231,7 +1231,7 @@ public class VivoxVoiceModule : ISharedRegionModule
     /// </summary>
     private bool DoAdminLogin()
     {
-        m_log.Debug("[VivoxVoice] Establishing admin connection");
+        m_log.LogDebug("[VivoxVoice] Establishing admin connection");
 
         lock (vlock)
         {
@@ -1246,17 +1246,17 @@ public class VivoxVoiceModule : ISharedRegionModule
                 {
                     if (status == "Ok")
                     {
-                        m_log.Info("[VivoxVoice] Admin connection established");
+                        m_log.LogInformation("[VivoxVoice] Admin connection established");
                         if (XmlFind(resp, "response.level0.body.auth_token", out m_authToken))
                         {
-                            if (m_dumpXml) m_log.DebugFormat("[VivoxVoice] Auth Token <{0}>",
+                            if (m_dumpXml) m_log.LogDebug("[VivoxVoice] Auth Token <{0}>",
                                                         m_authToken);
                             m_adminConnected = true;
                         }
                     }
                     else
                     {
-                        m_log.WarnFormat("[VivoxVoice] Admin connection failed, status = {0}",
+                        m_log.LogWarning("[VivoxVoice] Admin connection failed, status = {0}",
                               status);
                     }
                 }
@@ -1277,7 +1277,7 @@ public class VivoxVoiceModule : ISharedRegionModule
     {
         if (e.HasChildNodes)
         {
-            m_log.DebugFormat("<{0}>".PadLeft(index+5), e.Name);
+            m_log.LogDebug("<{0}>".PadLeft(index+5), e.Name);
             XmlNodeList children = e.ChildNodes;
             foreach (XmlNode node in children)
                switch (node.NodeType)
@@ -1286,16 +1286,16 @@ public class VivoxVoiceModule : ISharedRegionModule
                         XmlScanl((XmlElement)node, index+1);
                         break;
                     case XmlNodeType.Text :
-                        m_log.DebugFormat("\"{0}\"".PadLeft(index+5), node.Value);
+                        m_log.LogDebug("\"{0}\"".PadLeft(index+5), node.Value);
                         break;
                     default :
                         break;
                }
-            m_log.DebugFormat("</{0}>".PadLeft(index+6), e.Name);
+            m_log.LogDebug("</{0}>".PadLeft(index+6), e.Name);
         }
         else
         {
-            m_log.DebugFormat("<{0}/>".PadLeft(index+6), e.Name);
+            m_log.LogDebug("<{0}/>".PadLeft(index+6), e.Name);
         }
     }
 

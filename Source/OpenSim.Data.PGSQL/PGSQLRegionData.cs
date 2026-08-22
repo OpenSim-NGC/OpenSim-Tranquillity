@@ -27,11 +27,12 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using RegionFlags = OpenSim.Framework.RegionFlags;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
@@ -44,7 +45,7 @@ public class PGSQLRegionData : IRegionData
     private List<string> m_ColumnNames = null;
     private string m_ConnectionString;
     private PGSQLManager m_database;
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Dictionary<string, string> m_FieldTypes = new Dictionary<string, string>();
 
@@ -353,13 +354,13 @@ public class PGSQLRegionData : IRegionData
                     }
                     catch (Exception ex)
                     {
-                        m_log.Warn("[PGSQL Grid]: Error inserting into Regions table: " + ex.Message + ", INSERT sql: " + insert);
+                        m_log.LogWarning("[PGSQL Grid]: Error inserting into Regions table: " + ex.Message + ", INSERT sql: " + insert);
                     }
                 }
             }
             catch (Exception ex)
             {
-                m_log.Warn("[PGSQL Grid]: Error updating Regions table: " + ex.Message + ", UPDATE sql: " + update);
+                m_log.LogWarning("[PGSQL Grid]: Error updating Regions table: " + ex.Message + ", UPDATE sql: " + update);
             }
         }
 

@@ -19,18 +19,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 using System.Threading;
-using log4net;
 using System.Data.SQLite;
 using OpenMetaverse;
 using InWorldz.Phlox.VM;
 using InWorldz.Phlox.Serialization;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace Phlox.ScriptEngine
 {
     internal class StateManager : IDisposable
     {
-        private static readonly ILog m_log =
-            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         private const string DB_DIR  = "ScriptEngines/Phlox/state";
         private const string DB_FILE = "ScriptEngines/Phlox/state/script_state.db";
@@ -136,7 +137,7 @@ namespace Phlox.ScriptEngine
                 string savedAssetId = reader.GetString(0);
                 if (savedAssetId != assetId.ToString())
                 {
-                    m_log.DebugFormat("[PhloxState]: Discarding stale state for {0} (saved asset {1}, current {2})",
+                    m_log.LogDebug("[PhloxState]: Discarding stale state for {0} (saved asset {1}, current {2})",
                         itemId, savedAssetId, assetId);
                     return null;
                 }
@@ -147,7 +148,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxState]: Failed to load state for {0}: {1}", itemId, e.Message);
+                m_log.LogWarning("[PhloxState]: Failed to load state for {0}: {1}", itemId, e.Message);
                 return null;
             }
         }
@@ -170,7 +171,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxState]: Failed to delete state for {0}: {1}", itemId, e.Message);
+                m_log.LogWarning("[PhloxState]: Failed to delete state for {0}: {1}", itemId, e.Message);
             }
         }
 
@@ -202,14 +203,14 @@ namespace Phlox.ScriptEngine
                     try { SaveSingleInTransaction(conn, entry.Script); }
                     catch (Exception e)
                     {
-                        m_log.WarnFormat("[PhloxState]: Failed to save {0}: {1}", entry.Script.ItemId, e.Message);
+                        m_log.LogWarning("[PhloxState]: Failed to save {0}: {1}", entry.Script.ItemId, e.Message);
                     }
                 }
                 tx.Commit();
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PhloxState]: Batch flush failed: {0}", e.Message);
+                m_log.LogError("[PhloxState]: Batch flush failed: {0}", e.Message);
             }
             
         }
@@ -225,7 +226,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PhloxState]: Failed to save state for {0}: {1}", interp.ItemId, e.Message);
+                m_log.LogWarning("[PhloxState]: Failed to save state for {0}: {1}", interp.ItemId, e.Message);
             }
         }
 
@@ -273,7 +274,7 @@ namespace Phlox.ScriptEngine
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PhloxState]: Failed to initialize state database: {0}", e.Message);
+                m_log.LogError("[PhloxState]: Failed to initialize state database: {0}", e.Message);
             }
         }
 

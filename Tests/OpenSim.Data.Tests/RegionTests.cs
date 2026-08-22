@@ -45,6 +45,8 @@ using System.Data.SQLite;
 using OpenSim.Data.SQLite;
 using MySqlConnector;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Data.Tests
 {
     [TestFixture(Description = "Region store tests (SQLite)")]
@@ -171,7 +173,7 @@ namespace OpenSim.Data.Tests
             }
             catch (Exception e)
             {
-                m_log.Error(e.ToString());
+                m_log.LogError(e.ToString());
                 Assert.Fail();
             }
 
@@ -181,7 +183,7 @@ namespace OpenSim.Data.Tests
             }
             catch (Exception e)
             {
-                m_log.Error(e.ToString());
+                m_log.LogError(e.ToString());
                 Assert.Fail();
             }
 

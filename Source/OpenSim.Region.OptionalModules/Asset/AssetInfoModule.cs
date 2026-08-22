@@ -32,6 +32,8 @@ using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.OptionalModules.Asset;
 
 /// <summary>
@@ -39,7 +41,7 @@ namespace OpenSim.Region.OptionalModules.Asset;
 /// </summary>
 public class AssetInfoModule : ISharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
 
@@ -49,32 +51,32 @@ public class AssetInfoModule : ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-//            m_log.DebugFormat("[ASSET INFO MODULE]: INITIALIZED MODULE");
+//            m_log.LogDebug("[ASSET INFO MODULE]: INITIALIZED MODULE");
     }
 
     public void PostInitialise()
     {
-//            m_log.DebugFormat("[ASSET INFO MODULE]: POST INITIALIZED MODULE");
+//            m_log.LogDebug("[ASSET INFO MODULE]: POST INITIALIZED MODULE");
     }
 
     public void Close()
     {
-//            m_log.DebugFormat("[ASSET INFO MODULE]: CLOSED MODULE");
+//            m_log.LogDebug("[ASSET INFO MODULE]: CLOSED MODULE");
     }
 
     public void AddRegion(Scene scene)
     {
-//            m_log.DebugFormat("[ASSET INFO MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[ASSET INFO MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)
     {
-//            m_log.DebugFormat("[ASSET INFO MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[ASSET INFO MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
     }
 
     public void RegionLoaded(Scene scene)
     {
-//            m_log.DebugFormat("[ASSET INFO MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[ASSET INFO MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
 
         if (m_scene == null)
             m_scene = scene;

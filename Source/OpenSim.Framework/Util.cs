@@ -48,6 +48,8 @@ using OpenMetaverse.StructuredData;
 using System.Collections.Concurrent;
 using System.Security.Cryptography.X509Certificates;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework;
 
 [Flags]
@@ -130,7 +132,7 @@ public class STPInfo
 /// </summary>
 public static class Util
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Log-level for the thread pool:
@@ -153,7 +155,7 @@ public static class Util
         LogOverloads = true;
         TimeStampClockPeriod = 1.0D / (double)Stopwatch.Frequency;
         TimeStampClockPeriodMS = 1e3 * TimeStampClockPeriod;
-        m_log.Info($"[UTIL] TimeStamp clock with period of {Math.Round(TimeStampClockPeriodMS, 6, MidpointRounding.AwayFromZero)}ms");
+        m_log.LogInformation($"[UTIL] TimeStamp clock with period of {Math.Round(TimeStampClockPeriodMS, 6, MidpointRounding.AwayFromZero)}ms");
     }
 
     private static uint nextXferID = 5000;
@@ -1112,11 +1114,11 @@ public static class Util
         else
             nativeLibraryPath = Path.Combine(Path.Combine(path, "lib32"), libraryName);
 
-        m_log.Debug($"[UTIL]: Loading native Windows library at {nativeLibraryPath}");
+        m_log.LogDebug($"[UTIL]: Loading native Windows library at {nativeLibraryPath}");
 
         if (!NativeLibrary.TryLoad(nativeLibraryPath, out _))
         {
-            m_log.Error($"[UTIL]: Couldn't find native Windows library at {nativeLibraryPath}");
+            m_log.LogError($"[UTIL]: Couldn't find native Windows library at {nativeLibraryPath}");
             return false;
         }
         return true;
@@ -1568,7 +1570,7 @@ public static class Util
     private static void ConvertPemToPKCS12Certificate(string certFileName, string certPath, string keyPath, string outputPassword)
     {
         if(string.IsNullOrEmpty(certPath) || string.IsNullOrEmpty(keyPath)){
-            m_log.Error($"[UTIL PemToPKCS12]: Missing fullchain.pem or privkey.pem path!.");
+            m_log.LogError($"[UTIL PemToPKCS12]: Missing fullchain.pem or privkey.pem path!.");
             return;
         }
 
@@ -1580,7 +1582,7 @@ public static class Util
         }
         catch(CryptographicException e)
         {
-            m_log.Error($"[UTIL PemToPKCS12]: {e.Message}" );
+            m_log.LogError($"[UTIL PemToPKCS12]: {e.Message}" );
             return;
         }
 
@@ -2184,7 +2186,7 @@ public static class Util
             else if (typeof(T) == typeof(float))
                 val = cnf.GetFloat(varname, (float)val);
             else
-                m_log.ErrorFormat("[UTIL]: Unhandled type {0}", typeof(T));
+                m_log.LogError("[UTIL]: Unhandled type {0}", typeof(T));
         }
         return (T)val;
     }
@@ -2286,7 +2288,7 @@ public static class Util
         IConfig cnf = config.Configs["Startup"];
         if (cnf == null)
         {
-            m_log.Warn("[UTILS]: Startup section doesn't exist");
+            m_log.LogWarning("[UTILS]: Startup section doesn't exist");
             return false;
         }
 
@@ -2307,7 +2309,7 @@ public static class Util
             }
             catch (Exception e)
             {
-                m_log.Warn($"[UTILS]: Exception copying configuration file {configFile} to {exampleConfigFile}: {e.Message}");
+                m_log.LogWarning($"[UTILS]: Exception copying configuration file {configFile} to {exampleConfigFile}: {e.Message}");
                 return false;
             }
         }
@@ -2730,13 +2732,13 @@ public static class Util
             else
             {
                 // uh?
-                m_log.Debug($"[UTILS]: Got OSD of unexpected type {buffer.Type}");
+                m_log.LogDebug($"[UTILS]: Got OSD of unexpected type {buffer.Type}");
                 return null;
             }
         }
         catch (Exception ex)
         {
-            m_log.Debug($"[UTILS]: exception on GetOSDMap {ex.Message}");
+            m_log.LogDebug($"[UTILS]: exception on GetOSDMap {ex.Message}");
             return null;
         }
     }
@@ -3323,7 +3325,7 @@ public static class Util
             ThreadInfo t = entry.Value;
             if (t.DoTimeout && t.Running && !t.Aborted && (t.Elapsed() >= THREAD_TIMEOUT))
             {
-                m_log.Warn($"Timeout in threadfunc {t.ThreadFuncNum} ({t.Thread.Name}) {t.GetStackTrace()}");
+                m_log.LogWarning($"Timeout in threadfunc {t.ThreadFuncNum} ({t.Thread.Name}) {t.GetStackTrace()}");
                 t.Abort();
                 activeThreads.TryRemove(entry.Key, out _);
 
@@ -3397,7 +3399,7 @@ public static class Util
                 try
                 {
                     if (loggingEnabled && threadInfo.LogThread)
-                        m_log.DebugFormat("Run threadfunc {0} (Queued {1}, Running {2})", threadFuncNum, numQueued1, numRunning1);
+                        m_log.LogDebug("Run threadfunc {0} (Queued {1}, Running {2})", threadFuncNum, numQueued1, numRunning1);
 
                     Culture.SetCurrentCulture();
                     callback(o);
@@ -3407,14 +3409,14 @@ public static class Util
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"[UTIL]: Util STP threadfunc {threadFuncNum} terminated with error {e.Message}");
+                    m_log.LogError($"[UTIL]: Util STP threadfunc {threadFuncNum} terminated with error {e.Message}");
                 }
                 finally
                 {
                     Interlocked.Decrement(ref numRunningThreadFuncs);
                     activeThreads.TryRemove(threadFuncNum, out _);
                     if (loggingEnabled && threadInfo.LogThread)
-                        m_log.Debug($"Exit threadfunc {threadFuncNum} ({FormatDuration(threadInfo.Elapsed())}");
+                        m_log.LogDebug($"Exit threadfunc {threadFuncNum} ({FormatDuration(threadInfo.Elapsed())}");
                     callback = null;
                     o = null;
                     threadInfo = null;
@@ -3760,7 +3762,7 @@ public static class Util
     /// </summary>
     public static void PrintCallStack()
     {
-        PrintCallStack(m_log.DebugFormat);
+        PrintCallStack(m_log.LogDebug);
     }
 
     public delegate void DebugPrinter(string msg, params Object[] parm);
@@ -3796,7 +3798,7 @@ public static class Util
             }
             catch (Exception e)
             {
-                m_log.Warn($"[UTIL]: Exception parsing XFF header {xff}: {e.Message}");
+                m_log.LogWarning($"[UTIL]: Exception parsing XFF header {xff}: {e.Message}");
             }
         }
 
@@ -3815,7 +3817,7 @@ public static class Util
             }
             catch (Exception e)
             {
-                m_log.Warn($"[UTIL]: exception in GetCallerIP: {e.Message}");
+                m_log.LogWarning($"[UTIL]: exception in GetCallerIP: {e.Message}");
             }
         }
         return string.Empty;
@@ -4572,7 +4574,7 @@ public static class Util
             }
         }
 
-        m_log.Error($"{message} Failed XML ({length} bytes) = {xml}");
+        m_log.LogError($"{message} Failed XML ({length} bytes) = {xml}");
     }
 
     public static void SaveAssetToFile(string filename, byte[] data)

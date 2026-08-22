@@ -31,15 +31,15 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using Nini.Config;
-using log4net;
-
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport;
 
 public class SpecialUIModule : INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private const string VIEWER_SUPPORT_DIR = "ViewerSupport";
 
@@ -67,7 +67,7 @@ public class SpecialUIModule : INonSharedRegionModule
             if (m_Enabled)
             {
                 m_UserLevel = moduleConfig.GetInt("UserLevel", 0);
-                m_log.Info("[SPECIAL UI]: SpecialUIModule enabled");
+                m_log.LogInformation("[SPECIAL UI]: SpecialUIModule enabled");
             }
 
         }
@@ -103,7 +103,7 @@ public class SpecialUIModule : INonSharedRegionModule
 
     private void OnSimulatorFeaturesRequest(UUID agentID, ref OSDMap features)
     {
-        m_log.DebugFormat("[SPECIAL UI]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
+        m_log.LogDebug("[SPECIAL UI]: OnSimulatorFeaturesRequest in {0}", m_scene.RegionInfo.RegionName);
         if (m_Helper.UserLevel(agentID) <= m_UserLevel)
         {
             OSD extrasMap;
@@ -119,7 +119,7 @@ public class SpecialUIModule : INonSharedRegionModule
                 specialUI["toolbar"] = OSDMap.FromString(s.ReadToEnd());
                 ((OSDMap)extrasMap)["special-ui"] = specialUI;
             }
-            m_log.DebugFormat("[SPECIAL UI]: Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
+            m_log.LogDebug("[SPECIAL UI]: Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
 
             if (Directory.Exists(Path.Combine(VIEWER_SUPPORT_DIR, "Floaters")))
             {
@@ -136,11 +136,11 @@ public class SpecialUIModule : INonSharedRegionModule
                     }
                 }
                 specialUI["floaters"] = floaters;
-                m_log.DebugFormat("[SPECIAL UI]: Sending {0} floaters", n);
+                m_log.LogDebug("[SPECIAL UI]: Sending {0} floaters", n);
             }
         }
         else
-            m_log.DebugFormat("[SPECIAL UI]: NOT Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
+            m_log.LogDebug("[SPECIAL UI]: NOT Sending panel_toolbar.xml in {0}", m_scene.RegionInfo.RegionName);
 
     }
 

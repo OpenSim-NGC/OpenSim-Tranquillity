@@ -27,8 +27,8 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
+using Microsoft.Extensions.Logging;
 using IPNetwork = LukeSkywalker.IPNetwork.IPNetwork;
 
 
@@ -36,7 +36,7 @@ namespace OpenSim.Framework;
 
 public class OutboundUrlFilter
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public string Name { get; private set; }
 
@@ -81,9 +81,9 @@ public class OutboundUrlFilter
                 = networkConfig.GetString("OutboundDisallowForUserScriptsExcept", configBlacklistExceptions);
         }
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[OUTBOUND URL FILTER]: OutboundDisallowForUserScripts for {0} is [{1}]", Name, configBlacklist);
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[OUTBOUND URL FILTER]: OutboundDisallowForUserScriptsExcept for {0} is [{1}]", Name, configBlacklistExceptions);
 
         OutboundUrlFilter.ParseConfigList(
@@ -112,7 +112,7 @@ public class OutboundUrlFilter
 
                 if (!IPNetwork.TryParse(configEntry, out network))
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[OUTBOUND URL FILTER]: Entry [{0}] is invalid network for {1}", configEntry, filterName);
 
                     continue;
@@ -126,7 +126,7 @@ public class OutboundUrlFilter
 
                 if (!Uri.TryCreate("http://" + configEntry, UriKind.Absolute, out configEntryUri))
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[OUTBOUND URL FILTER]: EndPoint entry [{0}] is invalid endpoint for {1}",
                         configEntry, filterName);
 
@@ -139,12 +139,12 @@ public class OutboundUrlFilter
                 {
                     if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                     {
-                        //                        m_log.DebugFormat("[OUTBOUND URL FILTER]: Found address [{0}] in config", addr);
+                        //                        m_log.LogDebug("[OUTBOUND URL FILTER]: Found address [{0}] in config", addr);
 
                         IPEndPoint configEntryEp = new IPEndPoint(addr, configEntryUri.Port);
                         endPoints.Add(configEntryEp);
 
-                        //                        m_log.DebugFormat("[OUTBOUND URL FILTER]: Added blacklist exception [{0}]", configEntryEp);
+                        //                        m_log.LogDebug("[OUTBOUND URL FILTER]: Added blacklist exception [{0}]", configEntryEp);
                     }
                 }
             }
@@ -165,36 +165,36 @@ public class OutboundUrlFilter
     {
         foreach (IPNetwork ipn in networks)
         {
-//                                            m_log.DebugFormat(
+//                                            m_log.LogDebug(
 //                                                "[OUTBOUND URL FILTER]: Checking [{0}] against network [{1}]", addr, ipn);
 
             if (IPNetwork.Contains(ipn, addr))
             {
-//                                                    m_log.DebugFormat(
+//                                                    m_log.LogDebug(
 //                                                        "[OUTBOUND URL FILTER]: Found [{0}] in network [{1}]", addr, ipn);
 
                 return true;
             }
         }
 
-        //                    m_log.DebugFormat("[OUTBOUND URL FILTER]: Found address [{0}]", addr);
+        //                    m_log.LogDebug("[OUTBOUND URL FILTER]: Found address [{0}]", addr);
 
         foreach (IPEndPoint ep in endPoints)
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[OUTBOUND URL FILTER]: Checking [{0}:{1}] against endpoint [{2}]",
 //                    addr, port, ep);
 
             if (addr.Equals(ep.Address) && port == ep.Port)
             {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[OUTBOUND URL FILTER]: Found [{0}:{1}] in endpoint [{2}]", addr, port, ep);
 
                 return true;
             }
         }
 
-//            m_log.DebugFormat("[OUTBOUND URL FILTER]: Did not find [{0}:{1}] in list", addr, port);
+//            m_log.LogDebug("[OUTBOUND URL FILTER]: Did not find [{0}:{1}] in list", addr, port);
 
         return false;
     }
@@ -226,14 +226,14 @@ public class OutboundUrlFilter
         {
             if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
             {
-//                    m_log.DebugFormat("[OUTBOUND URL FILTER]: Found address [{0}]", addr);
+//                    m_log.LogDebug("[OUTBOUND URL FILTER]: Found address [{0}]", addr);
 
                 foundIpv4Address = true;
 
                 // Check blacklist
                 if (OutboundUrlFilter.IsInNetwork(addr, url.Port, m_blacklistNetworks, m_blacklistEndPoints, Name))
                 {
-//                        m_log.DebugFormat("[OUTBOUND URL FILTER]: Found [{0}] in blacklist for {1}", url, Name);
+//                        m_log.LogDebug("[OUTBOUND URL FILTER]: Found [{0}] in blacklist for {1}", url, Name);
 
                     // Check blacklist exceptions
                     allowed
@@ -241,7 +241,7 @@ public class OutboundUrlFilter
                             addr, url.Port, m_blacklistExceptionNetworks, m_blacklistExceptionEndPoints, Name);
 
 //                        if (allowed)
-//                            m_log.DebugFormat("[OUTBOUND URL FILTER]: Found [{0}] in whitelist for {1}", url, Name);
+//                            m_log.LogDebug("[OUTBOUND URL FILTER]: Found [{0}] in whitelist for {1}", url, Name);
                 }
             }
 
@@ -249,14 +249,14 @@ public class OutboundUrlFilter
             if (!allowed)
                 return false;
 //                else
-//                    m_log.DebugFormat("[OUTBOUND URL FILTER]: URL [{0}] not in blacklist for {1}", url, Name);
+//                    m_log.LogDebug("[OUTBOUND URL FILTER]: URL [{0}] not in blacklist for {1}", url, Name);
         }
 
         // We do not know how to handle IPv6 securely yet.
         if (!foundIpv4Address)
             return false;
 
-//            m_log.DebugFormat("[OUTBOUND URL FILTER]: Allowing request [{0}]", url);
+//            m_log.LogDebug("[OUTBOUND URL FILTER]: Allowing request [{0}]", url);
 
         return allowed;
     }

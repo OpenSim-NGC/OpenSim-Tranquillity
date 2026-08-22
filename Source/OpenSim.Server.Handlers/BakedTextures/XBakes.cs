@@ -30,13 +30,13 @@ using OpenSim.Framework;
 using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.BakedTextures;
 
 public class XBakes : ServiceBase, IBakedTextureService
 {
-    private static readonly ILog m_log = LogManager.GetLogger( MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger( MethodBase.GetCurrentMethod().DeclaringType);
 
     protected string m_FSBase;
 
@@ -56,11 +56,11 @@ public class XBakes : ServiceBase, IBakedTextureService
         m_FSBase = assetConfig.GetString("BaseDirectory", string.Empty);
         if (m_FSBase.Length == 0)
         {
-            m_log.ErrorFormat("[BAKES]: BaseDirectory not specified");
+            m_log.LogError("[BAKES]: BaseDirectory not specified");
             throw new Exception("Configuration error");
         }
 
-        m_log.Info("[BAKES]: XBakes service enabled");
+        m_log.LogInformation("[BAKES]: XBakes service enabled");
     }
 
     public byte[] Get(string id)

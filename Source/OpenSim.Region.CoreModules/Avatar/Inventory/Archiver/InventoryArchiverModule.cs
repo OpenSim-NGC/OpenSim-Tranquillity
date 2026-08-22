@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using NDesk.Options;
 using Nini.Config;
 using OpenMetaverse;
@@ -35,6 +34,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
 
 /// <summary>
@@ -42,7 +43,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
 /// </summary>
 public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <value>
     /// Enable or disable checking whether the iar user is actually logged in
@@ -218,10 +219,10 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
                     }
                     catch (EntryPointNotFoundException e)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[INVENTORY ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                                 + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-                        m_log.Error(e);
+                        m_log.LogError(e, e.Message);
 
                         return false;
                     }
@@ -230,7 +231,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
 //                    }
 //                    else
 //                    {
-//                        m_log.ErrorFormat(
+//                        m_log.LogError(
 //                            "[INVENTORY ARCHIVER]: User {0} {1} {2} not logged in to this region simulator",
 //                            userInfo.FirstName, userInfo.LastName, userInfo.PrincipalID);
 //                    }
@@ -262,10 +263,10 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
                     }
                     catch (EntryPointNotFoundException e)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[INVENTORY ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                                 + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-                        m_log.Error(e);
+                        m_log.LogError(e, e.Message);
 
                         return false;
                     }
@@ -274,7 +275,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
 //                    }
 //                    else
 //                    {
-//                        m_log.ErrorFormat(
+//                        m_log.LogError(
 //                            "[INVENTORY ARCHIVER]: User {0} {1} {2} not logged in to this region simulator",
 //                            userInfo.FirstName, userInfo.LastName, userInfo.PrincipalID);
 //                    }
@@ -310,10 +311,10 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
                     }
                     catch (EntryPointNotFoundException e)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[INVENTORY ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                                 + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-                        m_log.Error(e);
+                        m_log.LogError(e, e.Message);
 
                         return false;
                     }
@@ -324,13 +325,13 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
 //                    }
 //                    else
 //                    {
-//                        m_log.ErrorFormat(
+//                        m_log.LogError(
 //                            "[INVENTORY ARCHIVER]: User {0} {1} {2} not logged in to this region simulator",
 //                            userInfo.FirstName, userInfo.LastName, userInfo.PrincipalID);
 //                    }
             }
             else
-                m_log.ErrorFormat("[INVENTORY ARCHIVER]: User {0} {1} not found",
+                m_log.LogError("[INVENTORY ARCHIVER]: User {0} {1} not found",
                         firstName, lastName);
         }
 
@@ -358,10 +359,10 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
                     }
                     catch (EntryPointNotFoundException e)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[INVENTORY ARCHIVER]: Mismatch between Mono and zlib1g library version when trying to create compression stream."
                                 + "If you've manually installed Mono, have you appropriately updated zlib1g as well?");
-                        m_log.Error(e);
+                        m_log.LogError(e, e.Message);
 
                         return false;
                     }
@@ -372,7 +373,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
 //                    }
 //                    else
 //                    {
-//                        m_log.ErrorFormat(
+//                        m_log.LogError(
 //                            "[INVENTORY ARCHIVER]: User {0} {1} {2} not logged in to this region simulator",
 //                            userInfo.FirstName, userInfo.LastName, userInfo.PrincipalID);
 //                    }
@@ -399,7 +400,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
 
             if (mainParams.Count < 6)
             {
-                m_log.Error(
+                m_log.LogError(
                     "[INVENTORY ARCHIVER]: usage is load iar [-m|--merge] <first name> <last name> <inventory path> <user password> [<load file path>]");
                 return;
             }
@@ -410,7 +411,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
             string pass = mainParams[5];
             string loadPath = (mainParams.Count > 6 ? mainParams[6] : DEFAULT_INV_BACKUP_FILENAME);
 
-            m_log.InfoFormat(
+            m_log.LogInformation(
                 "[INVENTORY ARCHIVER]: Loading archive {0} to inventory path {1} for {2} {3}",
                 loadPath, invPath, firstName, lastName);
 
@@ -421,7 +422,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
         }
         catch (InventoryArchiverException e)
         {
-            m_log.ErrorFormat("[INVENTORY ARCHIVER]: {0}", e.Message);
+            m_log.LogError("[INVENTORY ARCHIVER]: {0}", e.Message);
         }
     }
 
@@ -462,13 +463,13 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
         {
             if (mainParams.Count < 6)
             {
-                m_log.Error(
+                m_log.LogError(
                     "[INVENTORY ARCHIVER]: save iar [-h|--home=<url>] [--noassets | --skipbadassets] <first> <last> <inventory path> <password> [<IAR path>] [-c|--creators] [-e|--exclude=<name/uuid>] [-f|--excludefolder=<foldername/uuid>] [-v|--verbose]");
                 return;
             }
 
             if (options.ContainsKey("home"))
-                m_log.WarnFormat("[INVENTORY ARCHIVER]: Please be aware that inventory archives with creator information are not compatible with OpenSim 0.7.0.2 and earlier.  Do not use the -home option if you want to produce a compatible IAR");
+                m_log.LogWarning("[INVENTORY ARCHIVER]: Please be aware that inventory archives with creator information are not compatible with OpenSim 0.7.0.2 and earlier.  Do not use the -home option if you want to produce a compatible IAR");
 
             string firstName = mainParams[2];
             string lastName = mainParams[3];
@@ -476,7 +477,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
             string pass = mainParams[5];
             string savePath = (mainParams.Count > 6 ? mainParams[6] : DEFAULT_INV_BACKUP_FILENAME);
 
-            m_log.InfoFormat(
+            m_log.LogInformation(
                 "[INVENTORY ARCHIVER]: Saving archive {0} using inventory path {1} for {2} {3}",
                 savePath, invPath, firstName, lastName);
 
@@ -487,7 +488,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
         }
         catch (InventoryArchiverException e)
         {
-            m_log.ErrorFormat("[INVENTORY ARCHIVER]: {0}", e.Message);
+            m_log.LogError("[INVENTORY ARCHIVER]: {0}", e.Message);
         }
     }
 
@@ -507,13 +508,13 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
         {
             // Report success and include item count and filter count (Skipped items due to --perm or --exclude switches)
             if(FilterCount == 0)
-                m_log.InfoFormat("[INVENTORY ARCHIVER]: Saved archive with {0} items for {1} {2}", SaveCount, userInfo.FirstName, userInfo.LastName);
+                m_log.LogInformation("[INVENTORY ARCHIVER]: Saved archive with {0} items for {1} {2}", SaveCount, userInfo.FirstName, userInfo.LastName);
             else
-                m_log.InfoFormat("[INVENTORY ARCHIVER]: Saved archive with {0} items for {1} {2}. Skipped {3} items due to exclude and/or perm switches", SaveCount, userInfo.FirstName, userInfo.LastName, FilterCount);
+                m_log.LogInformation("[INVENTORY ARCHIVER]: Saved archive with {0} items for {1} {2}. Skipped {3} items due to exclude and/or perm switches", SaveCount, userInfo.FirstName, userInfo.LastName, FilterCount);
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[INVENTORY ARCHIVER]: Archive save for {0} {1} failed - {2}",
                 userInfo.FirstName, userInfo.LastName, reportedException.Message);
         }
@@ -533,11 +534,11 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
 
         if (succeeded)
         {
-            m_log.InfoFormat("[INVENTORY ARCHIVER]: Loaded {0} items from archive {1} for {2} {3}", LoadCount, invPath, userInfo.FirstName, userInfo.LastName);
+            m_log.LogInformation("[INVENTORY ARCHIVER]: Loaded {0} items from archive {1} for {2} {3}", LoadCount, invPath, userInfo.FirstName, userInfo.LastName);
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[INVENTORY ARCHIVER]: Archive load for {0} {1} failed - {2}",
                 userInfo.FirstName, userInfo.LastName, reportedException.Message);
         }
@@ -557,7 +558,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
 
         if (null == account)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[INVENTORY ARCHIVER]: Failed to find user info for {0} {1}",
                 firstName, lastName);
             return null;
@@ -572,7 +573,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
             }
             else
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[INVENTORY ARCHIVER]: Password for user {0} {1} incorrect.  Please try again.",
                     firstName, lastName);
                 return null;
@@ -580,7 +581,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[INVENTORY ARCHIVER]: Could not authenticate password, {0}", e);
+            m_log.LogError("[INVENTORY ARCHIVER]: Could not authenticate password, {0}", e);
             return null;
         }
     }
@@ -602,7 +603,7 @@ public class InventoryArchiverModule : ISharedRegionModule, IInventoryArchiverMo
             {
                 foreach (InventoryNodeBase node in loadedNodes.Values)
                 {
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[INVENTORY ARCHIVER]: Notifying {0} of loaded inventory node {1}",
 //                            user.Name, node.Name);
 

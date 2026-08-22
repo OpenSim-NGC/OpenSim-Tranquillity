@@ -27,6 +27,9 @@
 
 using System.Text;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.Serialization;
 
 /// <summary>
@@ -34,7 +37,7 @@ namespace OpenSim.Framework.Serialization;
 /// </summary>
 public class TarArchiveWriter
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Binary writer for the underlying stream
@@ -100,7 +103,7 @@ public class TarArchiveWriter
     /// <returns></returns>
     public void Close()
     {
-        //m_log.Debug("[TAR ARCHIVE WRITER]: Writing final consecutive 0 blocks");
+        //m_log.LogDebug("[TAR ARCHIVE WRITER]: Writing final consecutive 0 blocks");
 
         // Write two consecutive 0 blocks to end the archive
         byte[] finalZeroPadding = new byte[1024];
@@ -142,7 +145,7 @@ public class TarArchiveWriter
     /// <param name="fileType"></param>
     protected void WriteEntry(string filePath, byte[] data, char fileType)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[TAR ARCHIVE WRITER]: Data for {0} is {1} bytes", filePath, (null == data ? "null" : data.Length.ToString()));
 
         byte[] header = new byte[512];
@@ -166,7 +169,7 @@ public class TarArchiveWriter
 
         // file size in bytes (12)
         int fileSize = data.Length;
-        //m_log.DebugFormat("[TAR ARCHIVE WRITER]: File size of {0} is {1}", filePath, fileSize);
+        //m_log.LogDebug("[TAR ARCHIVE WRITER]: File size of {0} is {1}", filePath, fileSize);
 
         byte[] fileSizeBytes = ConvertDecimalToPaddedOctalBytes(fileSize, 11);
 
@@ -191,7 +194,7 @@ public class TarArchiveWriter
             checksum += b;
         }
 
-        //m_log.DebugFormat("[TAR ARCHIVE WRITER]: Decimal header checksum is {0}", checksum);
+        //m_log.LogDebug("[TAR ARCHIVE WRITER]: Decimal header checksum is {0}", checksum);
 
         byte[] checkSumBytes = ConvertDecimalToPaddedOctalBytes(checksum, 6);
 
@@ -213,7 +216,7 @@ public class TarArchiveWriter
             {
                 int paddingRequired = 512 - (data.Length % 512);
 
-                //m_log.DebugFormat("[TAR ARCHIVE WRITER]: Padding data with {0} bytes", paddingRequired);
+                //m_log.LogDebug("[TAR ARCHIVE WRITER]: Padding data with {0} bytes", paddingRequired);
 
                 byte[] padding = new byte[paddingRequired];
                 m_bw.Write(padding);

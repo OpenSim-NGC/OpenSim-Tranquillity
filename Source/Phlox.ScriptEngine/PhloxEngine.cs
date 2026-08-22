@@ -9,7 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -20,6 +19,8 @@ using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace Phlox.ScriptEngine
 {
     public delegate void WorkArrivedDelegate();
@@ -29,7 +30,7 @@ namespace Phlox.ScriptEngine
     // INonSharedRegionModule implementers), same as the other engine modules.
     public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule
     {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         public const ThreadPriority SUBTASK_PRIORITY = ThreadPriority.Lowest;
 
@@ -58,18 +59,18 @@ namespace Phlox.ScriptEngine
             m_Config = config.Configs["InWorldz.Phlox"];
             if (m_Config == null)
             {
-                m_log.Info("[PhloxEngine]: No config section [InWorldz.Phlox] found, disabled");
+                m_log.LogInformation("[PhloxEngine]: No config section [InWorldz.Phlox] found, disabled");
                 return;
             }
             m_Enabled = m_Config.GetBoolean("Enabled", false);
-            m_log.InfoFormat("[PhloxEngine]: Enabled = {0}", m_Enabled);
+            m_log.LogInformation("[PhloxEngine]: Enabled = {0}", m_Enabled);
 
             // Deploy-hygiene guard: Phlox is compiled against the tree's Library/C5.dll
             // (1.1 identity). If the runtime resolves a different C5 (e.g. a NuGet 3.x
             // copy leaks into the bin dir), scripts die at first timer use with
             // MissingMethodException. Surface the loaded identity loudly at startup so a
             // compile/runtime C5 split is caught here, not by script autopsies.
-            m_log.InfoFormat("[PhloxEngine]: C5 loaded: version {0} from {1}",
+            m_log.LogInformation("[PhloxEngine]: C5 loaded: version {0} from {1}",
                 typeof(C5.IntervalHeap<int>).Assembly.GetName().Version,
                 typeof(C5.IntervalHeap<int>).Assembly.Location);
 
@@ -100,7 +101,7 @@ namespace Phlox.ScriptEngine
             m_Scene = scene;
             m_Scene.RegisterModuleInterface<IScriptModule>(this);
             m_Scene.StackModuleInterface<IScriptModule>(this);
-            m_log.InfoFormat("[PhloxEngine]: Added to region {0}", scene.RegionInfo.RegionName);
+            m_log.LogInformation("[PhloxEngine]: Added to region {0}", scene.RegionInfo.RegionName);
         }
 
         public void RegionLoaded(Scene scene)
@@ -112,7 +113,7 @@ namespace Phlox.ScriptEngine
             IWorldComm worldComm = scene.RequestModuleInterface<IWorldComm>();
             if (worldComm == null)
             {
-                m_log.Error("[PhloxEngine]: No IWorldComm module found, script engine disabled");
+                m_log.LogError("[PhloxEngine]: No IWorldComm module found, script engine disabled");
                 m_Enabled = false;
                 return;
             }
@@ -177,7 +178,7 @@ namespace Phlox.ScriptEngine
                     HandleResumeCommand);
             }
 
-            m_log.InfoFormat("[PhloxEngine]: Region loaded {0}", scene.RegionInfo.RegionName);
+            m_log.LogInformation("[PhloxEngine]: Region loaded {0}", scene.RegionInfo.RegionName);
         }
 
         // Matches the stock LandManagementModule / ExperienceModule guard: proceed only when
@@ -313,11 +314,11 @@ namespace Phlox.ScriptEngine
             SceneObjectPart part = m_Scene.GetSceneObjectPart(localID);
             if (part == null)
             {
-                m_log.ErrorFormat("[PhloxEngine]: OnRezScript: prim {0} not found for script {1}", localID, itemID);
+                m_log.LogError("[PhloxEngine]: OnRezScript: prim {0} not found for script {1}", localID, itemID);
                 return;
             }
 
-            m_log.DebugFormat("[PhloxEngine]: OnRezScript {0} in prim {1}", itemID, localID);
+            m_log.LogDebug("[PhloxEngine]: OnRezScript {0} in prim {1}", itemID, localID);
 
             m_ScriptLoader.PostLoadRequest(new PhloxLoadRequest
             {
@@ -333,7 +334,7 @@ namespace Phlox.ScriptEngine
 
         private void OnRemoveScript(uint localID, UUID itemID)
         {
-            m_log.DebugFormat("[PhloxEngine]: OnRemoveScript {0}", itemID);
+            m_log.LogDebug("[PhloxEngine]: OnRemoveScript {0}", itemID);
             m_ScriptLoader.PostUnloadRequest(localID, itemID);
             OnScriptRemoved?.Invoke(itemID);
         }
@@ -345,7 +346,7 @@ namespace Phlox.ScriptEngine
 
 		private void OnShutdown()
         {
-            m_log.Info("[PhloxEngine]: Shutdown event, flushing script state");
+            m_log.LogInformation("[PhloxEngine]: Shutdown event, flushing script state");
             StateManager?.Stop();
             StateManager = null;
         }
@@ -793,7 +794,7 @@ namespace Phlox.ScriptEngine
                 {
                     // Unhandled exceptions in ThreadPool work items terminate the
                     // process on .NET Core/5+. Swallow and log instead.
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[PhloxEngine]: PostObjectEvent deferred dispatch failed for localID {0}: {1}",
                         localID, e);
                 }
@@ -845,7 +846,7 @@ namespace Phlox.ScriptEngine
                 return;
 
             m_Scene.EventManager.TriggerEmptyScriptCompileQueue(0, string.Empty);
-            m_log.Info("[PhloxEngine]: StartProcessing fired TriggerEmptyScriptCompileQueue(0) — RegionReady LoginLock release signal");
+            m_log.LogInformation("[PhloxEngine]: StartProcessing fired TriggerEmptyScriptCompileQueue(0) — RegionReady LoginLock release signal");
         }
         public float GetScriptExecutionTime(List<UUID> itemIDs)
         {

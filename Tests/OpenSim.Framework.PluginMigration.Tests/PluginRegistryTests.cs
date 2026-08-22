@@ -28,10 +28,10 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using log4net;
-using log4net.Appender;
-using log4net.Config;
 using Xunit;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.PluginMigration.Tests;
 
@@ -906,13 +906,13 @@ public class DotNetCorePluginLoaderTests
     [Fact]
     public void TestPluginDiscoveryFactoryDefaultsToDotNetCoreBackend()
     {
-        (ILog log, MemoryAppender appender) = CreateMemoryLogger();
+        (ILogger log, RecordingLogger recorder) = CreateMemoryLogger();
 
         using IPluginDiscovery discovery = PluginDiscoveryFactory.Create(log);
 
         Assert.IsType<DotNetCorePluginsDiscovery>(discovery);
         Assert.Contains(
-            appender.GetEvents().Select(e => e.RenderedMessage),
+            recorder.Messages,
             message => message.Contains("Using DotNetCorePlugins discovery backend", StringComparison.Ordinal));
     }
 
@@ -931,14 +931,23 @@ public class DotNetCorePluginLoaderTests
         Assert.Equal(2, m_loader.LoadedPlugins.Count);
     }
 
-    private static (ILog Log, MemoryAppender Appender) CreateMemoryLogger()
+    private static (ILogger Log, RecordingLogger Recorder) CreateMemoryLogger()
     {
-        string repositoryName = $"PluginMigrationTests-{Guid.NewGuid():N}";
-        MemoryAppender appender = new MemoryAppender();
+        RecordingLogger recorder = new RecordingLogger();
+        return (recorder, recorder);
+    }
 
-        BasicConfigurator.Configure(LogManager.CreateRepository(repositoryName), appender);
-        ILog log = LogManager.GetLogger(repositoryName, repositoryName);
-        return (log, appender);
+    private sealed class RecordingLogger : ILogger
+    {
+        public List<string> Messages { get; } = new List<string>();
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            => Messages.Add(formatter(state, exception));
     }
 }
 

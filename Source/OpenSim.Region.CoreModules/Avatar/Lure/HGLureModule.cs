@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 
@@ -35,13 +34,14 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Connectors.Hypergrid;
 
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.Avatar.Lure;
 
 public class HGLureModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly List<Scene> m_scenes = [];
 
@@ -88,7 +88,7 @@ public class HGLureModule : ISharedRegionModule
             m_TransferModule = scene.RequestModuleInterface<IMessageTransferModule>();
             if (m_TransferModule == null)
             {
-                m_log.Error("[LURE MODULE]: No message transfer module, lures will not work!");
+                m_log.LogError("[LURE MODULE]: No message transfer module, lures will not work!");
 
                 m_Enabled = false;
                 m_scenes.Clear();
@@ -154,7 +154,7 @@ public class HGLureModule : ISharedRegionModule
 
             if (!m_PendingLures.Contains(sessionID))
             {
-                m_log.DebugFormat("[HG LURE MODULE]: RequestTeleport sessionID={0}, regionID={1}, message={2}", im.imSessionID, im.RegionID, im.message);
+                m_log.LogDebug("[HG LURE MODULE]: RequestTeleport sessionID={0}, regionID={1}, message={2}", im.imSessionID, im.RegionID, im.message);
                 m_PendingLures.Add(sessionID, im, 7200000); // 2 hours
             }
 
@@ -177,7 +177,7 @@ public class HGLureModule : ISharedRegionModule
 
         message += "@" + m_thisGridInfo.GateKeeperURLNoEndSlash;
 
-        m_log.DebugFormat("[HG LURE MODULE]: TP invite with message {0}", message);
+        m_log.LogDebug("[HG LURE MODULE]: TP invite with message {0}", message);
 
         UUID sessionID = UUID.Random();
 
@@ -188,7 +188,7 @@ public class HGLureModule : ISharedRegionModule
                 [], true);
         m.RegionID = client.Scene.RegionInfo.RegionID.Guid;
 
-        m_log.Debug($"[HG LURE MODULE]: RequestTeleport sessionID={m.imSessionID}, regionID={m.RegionID}, message={m.message}");
+        m_log.LogDebug($"[HG LURE MODULE]: RequestTeleport sessionID={m.imSessionID}, regionID={m.RegionID}, message={m.message}");
         m_PendingLures.Add(sessionID, m, 7200000); // 2 hours
 
         m_TransferModule?.SendInstantMessage(m, delegate(bool success) { }, true);
@@ -205,7 +205,7 @@ public class HGLureModule : ISharedRegionModule
             Lure(client, teleportFlags, im);
         }
         else
-            m_log.DebugFormat("[HG LURE MODULE]: pending lure {0} not found", lureID);
+            m_log.LogDebug("[HG LURE MODULE]: pending lure {0} not found", lureID);
 
     }
 
@@ -224,7 +224,7 @@ public class HGLureModule : ISharedRegionModule
                 string url = parts[parts.Length - 1]; // the last part
                 if (m_thisGridInfo.IsLocalGrid(url, true) == 0)
                 {
-                    m_log.Debug($"[HG LURE MODULE]: Luring agent to grid {url} region {im.RegionID} position {im.Position}");
+                    m_log.LogDebug($"[HG LURE MODULE]: Luring agent to grid {url} region {im.RegionID} position {im.Position}");
                     GatekeeperServiceConnector gConn = new GatekeeperServiceConnector();
                     GridRegion gatekeeper = new GridRegion { ServerURI = url };
                     string homeURI = scene.GetAgentHomeURI(client.AgentId);
@@ -247,7 +247,7 @@ public class HGLureModule : ISharedRegionModule
                     }
                     else
                     {
-                        m_log.Info("$[HG LURE MODULE]: Lure failed: {message}");
+                        m_log.LogInformation("$[HG LURE MODULE]: Lure failed: {message}");
                         client.SendAgentAlertMessage(message, true);
                     }
                 }

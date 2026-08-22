@@ -34,9 +34,10 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Hypergrid;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Framework.UserManagement;
 
@@ -49,7 +50,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
     private const int BADEXPIRE = 3600000;
     private const int BADHGEXPIRE =600000;
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected bool m_Enabled;
     protected List<Scene> m_Scenes = new List<Scene>();
@@ -98,7 +99,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
         {
             m_Enabled = true;
             Init(config);
-            m_log.DebugFormat("[USER MANAGEMENT MODULE]: {0} is enabled", Name);
+            m_log.LogDebug("[USER MANAGEMENT MODULE]: {0} is enabled", Name);
         }
     }
 
@@ -182,7 +183,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
     protected virtual void EventManager_OnPrimsLoaded(Scene s)
     {
         // let's sniff all the user names referenced by objects in the scene
-        m_log.DebugFormat("[USER MANAGEMENT MODULE]: Caching creators' data from {0} ({1} objects)...", s.RegionInfo.RegionName, s.GetEntities().Length);
+        m_log.LogDebug("[USER MANAGEMENT MODULE]: Caching creators' data from {0} ({1} objects)...", s.RegionInfo.RegionName, s.GetEntities().Length);
         s.ForEachSOG(delegate(SceneObjectGroup sog) { CacheCreators(sog); });
     }
 
@@ -202,7 +203,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
 
     protected virtual void HandleUUIDNameRequest(UUID uuid, IClientAPI client)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[USER MANAGEMENT MODULE]: Handling request for name binding of UUID {0} from {1}",
 //                uuid, remote_client.Name);
         if(!m_Enabled || m_Scenes.Count <= 0)
@@ -240,7 +241,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
     {
         //EventManager.TriggerAvatarPickerRequest();
 
-        m_log.DebugFormat("[USER MANAGEMENT MODULE]: HandleAvatarPickerRequest for {0}", query);
+        m_log.LogDebug("[USER MANAGEMENT MODULE]: HandleAvatarPickerRequest for {0}", query);
         List<UserData> users = GetUserData(query, 500, 1);
         client.SendAvatarPickerReply(RequestID, users);
     }
@@ -325,7 +326,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
 
     protected virtual void CacheCreators(SceneObjectGroup sog)
     {
-        //m_log.DebugFormat("[USER MANAGEMENT MODULE]: processing {0} {1}; {2}", sog.RootPart.Name, sog.RootPart.CreatorData, sog.RootPart.CreatorIdentification);
+        //m_log.LogDebug("[USER MANAGEMENT MODULE]: processing {0} {1}; {2}", sog.RootPart.Name, sog.RootPart.CreatorData, sog.RootPart.CreatorIdentification);
         AddCreatorUser(sog.RootPart.CreatorID, sog.RootPart.CreatorData);
 
         foreach (SceneObjectPart sop in sog.Parts)
@@ -515,7 +516,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                         }
                     }
                     else
-                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: Unable to parse UUI {0}", uInfo.UserID);
+                        m_log.LogDebug("[USER MANAGEMENT MODULE]: Unable to parse UUI {0}", uInfo.UserID);
                 }
             }
         }
@@ -650,7 +651,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                         }
                     }
                     else
-                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: Unable to parse UUI {0}", uInfo.UserID);
+                        m_log.LogDebug("[USER MANAGEMENT MODULE]: Unable to parse UUI {0}", uInfo.UserID);
                 }
             }
         }
@@ -768,7 +769,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                         }
                     }
                     else
-                        m_log.DebugFormat("[USER MANAGEMENT MODULE]: Unable to parse UUI {0}", uInfo.UserID);
+                        m_log.LogDebug("[USER MANAGEMENT MODULE]: Unable to parse UUI {0}", uInfo.UserID);
                 }
             }
         }
@@ -844,7 +845,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
             string homeuri = userdata.HomeURL.ToLower();
             if (!WebUtil.GlobalExpiringBadURLs.ContainsKey(homeuri))
             {
-                //m_log.DebugFormat("[USER MANAGEMENT MODULE]: Requested url type {0} for {1}", serverType, userID);
+                //m_log.LogDebug("[USER MANAGEMENT MODULE]: Requested url type {0} for {1}", serverType, userID);
                 UserAgentServiceConnector uConn = new UserAgentServiceConnector(homeuri);
                 try
                 {
@@ -852,13 +853,13 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                 }
                 catch (System.Net.Http.HttpRequestException e)
                 {
-                    m_log.DebugFormat("[USER MANAGEMENT MODULE]: GetServerURLs call failed {0}", e.Message);
+                    m_log.LogDebug("[USER MANAGEMENT MODULE]: GetServerURLs call failed {0}", e.Message);
                     WebUtil.GlobalExpiringBadURLs.Add(homeuri, BADURLEXPIRE * 1000);
                     userdata.ServerURLs = new Dictionary<string, object>();
                 }
                 catch (Exception e)
                 {
-                    m_log.Debug($"[USER MANAGEMENT MODULE]: GetServerURLs call failed {e.Message}");
+                    m_log.LogDebug($"[USER MANAGEMENT MODULE]: GetServerURLs call failed {e.Message}");
                     userdata.ServerURLs = new Dictionary<string, object>();
                 }
 
@@ -914,7 +915,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
             string homeurl = userdata.HomeURL.ToLower();
             if(!WebUtil.GlobalExpiringBadURLs.ContainsKey(homeurl))
             {
-                //m_log.DebugFormat("[USER MANAGEMENT MODULE]: Requested url type {0} for {1}", serverType, userID);
+                //m_log.LogDebug("[USER MANAGEMENT MODULE]: Requested url type {0} for {1}", serverType, userID);
                 UserAgentServiceConnector uConn = new UserAgentServiceConnector(homeurl);
                 try
                 {
@@ -922,7 +923,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                 }
                 catch (System.Net.Http.HttpRequestException e)
                 {
-                    m_log.DebugFormat("[USER MANAGEMENT MODULE]: GetServerURLs call failed {0}", e.Message);
+                    m_log.LogDebug("[USER MANAGEMENT MODULE]: GetServerURLs call failed {0}", e.Message);
                     userdata.ServerURLs = new Dictionary<string, object>();
                     userdata.LastWebFail = Util.GetTimeStamp();
                     WebUtil.GlobalExpiringBadURLs.Add(homeurl, BADURLEXPIRE * 1000);
@@ -930,7 +931,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                 }
                 catch (Exception e)
                 {
-                    m_log.Debug($"[USER MANAGEMENT MODULE]: GetServerURLs call failed {e.Message}");
+                    m_log.LogDebug($"[USER MANAGEMENT MODULE]: GetServerURLs call failed {e.Message}");
                     userdata.ServerURLs = new Dictionary<string, object>();
                     userdata.LastWebFail = Util.GetTimeStamp();
                     recentFail = true;
@@ -1059,7 +1060,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
                     }
                 }
                 else
-                    m_log.DebugFormat("[USER MANAGEMENT MODULE]: Unable to parse UUI {0}", uInfo.UserID);
+                    m_log.LogDebug("[USER MANAGEMENT MODULE]: Unable to parse UUI {0}", uInfo.UserID);
             }
             userdata.HasGridUserTried = true;
         }
@@ -1117,7 +1118,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
 
     public virtual void AddUser(UUID uuid, string first, string last, string homeURL)
     {
-        //m_log.DebugFormat("[USER MANAGEMENT MODULE]: Adding user with id {0}, first {1}, last {2}, url {3}", uuid, first, last, homeURL);
+        //m_log.LogDebug("[USER MANAGEMENT MODULE]: Adding user with id {0}, first {1}, last {2}, url {3}", uuid, first, last, homeURL);
 
         UserData oldUser;
         if (m_userCacheByID.TryGetValue(uuid, out oldUser))
@@ -1126,7 +1127,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
             {
                 if (!homeURL.Equals(oldUser.HomeURL) && m_DisplayChangingHomeURI)
                 {
-                    m_log.DebugFormat("[USER MANAGEMENT MODULE]: Different HomeURI for {0} {1} ({2}): {3} and {4}",
+                    m_log.LogDebug("[USER MANAGEMENT MODULE]: Different HomeURI for {0} {1} ({2}): {3} and {4}",
                         first, last, uuid.ToString(), homeURL, oldUser.HomeURL);
                 }
                 /* no update needed */
@@ -1174,7 +1175,7 @@ public class UserManagementModule : ISharedRegionModule, IUserManagement, IPeopl
 
     public virtual void AddCreatorUser(UUID id, string creatorData)
     {
-        // m_log.InfoFormat("[USER MANAGEMENT MODULE]: Adding user with id {0}, creatorData {1}", id, creatorData);
+        // m_log.LogInformation("[USER MANAGEMENT MODULE]: Adding user with id {0}, creatorData {1}", id, creatorData);
 
         if(string.IsNullOrEmpty(creatorData))
             return;

@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Client;
@@ -36,6 +35,7 @@ using OpenSim.Region.Framework.Scenes.Animation;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using TeleportFlags = OpenSim.Framework.Constants.TeleportFlags;
 
 using ACFlags = OpenMetaverse.AgentManager.ControlFlags;
@@ -78,11 +78,11 @@ public delegate void SendCoarseLocationsMethod(UUID scene, ScenePresence presenc
 
 public class ScenePresence : EntityBase, IScenePresence, IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     //~ScenePresence()
     //{
-    //    m_log.DebugFormat("[SCENE PRESENCE]: Destructor called on {0}", Name);
+    //    m_log.LogDebug("[SCENE PRESENCE]: Destructor called on {0}", Name);
     //}
 
     public bool GotAttachmentsData = false;
@@ -482,7 +482,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         set
         {
             m_appearance = value;
-//                m_log.DebugFormat("[SCENE PRESENCE]: Set appearance for {0} to {1}", Name, value);
+//                m_log.LogDebug("[SCENE PRESENCE]: Set appearance for {0} to {1}", Name, value);
         }
     }
 
@@ -737,13 +737,13 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             {
                 m_pos = PhysicsActor.Position;
 
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[SCENE PRESENCE]: Set position of {0} in {1} to {2} via getting AbsolutePosition!",
 //                        Name, Scene.Name, m_pos);
             }
             else
             {
-//                    m_log.DebugFormat("[SCENE PRESENCE]: Fetching abs pos where PhysicsActor == null and parent part {0} for {1}", Name, Scene.Name);
+//                    m_log.LogDebug("[SCENE PRESENCE]: Fetching abs pos where PhysicsActor == null and parent part {0} for {1}", Name, Scene.Name);
                 // Obtain the correct position of a seated avatar.
                 // In addition to providing the correct position while
                 // the avatar is seated, this value will also
@@ -771,7 +771,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         }
         set
         {
-//                m_log.DebugFormat("[SCENE PRESENCE]: Setting position of {0} to {1} in {2}", Name, value, Scene.Name);
+//                m_log.LogDebug("[SCENE PRESENCE]: Setting position of {0} to {1} in {2}", Name, value, Scene.Name);
 //                Util.PrintCallStack();
 
             if (PhysicsActor != null)
@@ -782,7 +782,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[SCENE PRESENCE]: ABSOLUTE POSITION " + e.Message);
+                    m_log.LogError("[SCENE PRESENCE]: ABSOLUTE POSITION " + e.Message);
                 }
             }
 
@@ -790,7 +790,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             if (ParentID == 0)
                 m_pos = value;
 
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[ENTITY BASE]: In {0} set AbsolutePosition of {1} to {2}",
             //    Scene.RegionInfo.RegionName, Name, m_pos);
             TriggerScenePresenceUpdated();
@@ -828,7 +828,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             {
                 m_velocity = PhysicsActor.Velocity;
 
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[SCENE PRESENCE]: Set velocity {0} for {1} in {2} via getting Velocity!",
 //                        m_velocity, Name, Scene.RegionInfo.RegionName);
             }
@@ -846,13 +846,13 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[SCENE PRESENCE]: VELOCITY " + e.Message);
+                    m_log.LogError("[SCENE PRESENCE]: VELOCITY " + e.Message);
                 }
             }
 
             m_velocity = value;
 
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[SCENE PRESENCE]: In {0} set velocity of {1} to {2}",
 //                    Scene.RegionInfo.RegionName, Name, m_velocity);
         }
@@ -880,7 +880,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[SCENE PRESENCE]: TARGETVELOCITY " + e.Message);
+                    m_log.LogError("[SCENE PRESENCE]: TARGETVELOCITY " + e.Message);
                 }
             }
         }
@@ -915,10 +915,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[SCENE PRESENCE]: Orientation " + e.Message);
+                    m_log.LogError("[SCENE PRESENCE]: Orientation " + e.Message);
                 }
             }
-//                m_log.DebugFormat("[SCENE PRESENCE]: Body rot for {0} set to {1}", Name, m_bodyRot);
+//                m_log.LogDebug("[SCENE PRESENCE]: Body rot for {0} set to {1}", Name, m_bodyRot);
         }
     }
 
@@ -1030,11 +1030,11 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
     public void DumpKnownRegions()
     {
-        m_log.Info("================ KnownRegions "+Scene.RegionInfo.RegionName+" ================");
+        m_log.LogInformation("================ KnownRegions "+Scene.RegionInfo.RegionName+" ================");
         foreach (KeyValuePair<ulong, string> kvp in KnownRegions)
         {
             Util.RegionHandleToRegionLoc(kvp.Key, out uint x, out uint y);
-            m_log.Info(" >> "+x+", "+y+": "+kvp.Value);
+            m_log.LogInformation(" >> "+x+", "+y+": "+kvp.Value);
         }
     }
 
@@ -1361,20 +1361,20 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             if (!IsChildAgent)
                 return false;
 
-            //m_log.DebugFormat("[MakeRootAgent] enter lock: {0}ms", Util.EnvironmentTickCountSubtract(ts));
-            //m_log.DebugFormat("[SCENE]: known regions in {0}: {1}", Scene.RegionInfo.RegionName, KnownChildRegionHandles.Count);
+            //m_log.LogDebug("[MakeRootAgent] enter lock: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+            //m_log.LogDebug("[SCENE]: known regions in {0}: {1}", Scene.RegionInfo.RegionName, KnownChildRegionHandles.Count);
 
-            //            m_log.InfoFormat(
+            //            m_log.LogInformation(
             //                "[SCENE]: Upgrading child to root agent for {0} in {1}",
             //                Name, m_scene.RegionInfo.RegionName);
 
             if (!ParentUUID.IsZero())
             {
-                m_log.DebugFormat("[SCENE PRESENCE]: Sitting avatar back on prim {0}", ParentUUID);
+                m_log.LogDebug("[SCENE PRESENCE]: Sitting avatar back on prim {0}", ParentUUID);
                 SceneObjectPart part = m_scene.GetSceneObjectPart(ParentUUID);
                 if (part == null)
                 {
-                    m_log.ErrorFormat("[SCENE PRESENCE]: Can't find prim {0} to sit on", ParentUUID);
+                    m_log.LogError("[SCENE PRESENCE]: Can't find prim {0} to sit on", ParentUUID);
                     ParentID = 0;
                     ParentPart = null;
                     PrevSitOffset = Vector3.Zero;
@@ -1404,7 +1404,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             IsChildAgent = false;
         }
 
-        //m_log.DebugFormat("[MakeRootAgent] out lock: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+        //m_log.LogDebug("[MakeRootAgent] out lock: {0}ms", Util.EnvironmentTickCountSubtract(ts));
 
         // Must reset this here so that a teleport to a region next to an existing region does not keep the flag
         // set and prevent the close of the connection on a subsequent re-teleport.
@@ -1414,7 +1414,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         RegionHandle = m_scene.RegionInfo.RegionHandle;
 
         m_scene.EventManager.TriggerSetRootAgentScene(m_uuid, m_scene);
-        //m_log.DebugFormat("[MakeRootAgent] TriggerSetRootAgentScene: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+        //m_log.LogDebug("[MakeRootAgent] TriggerSetRootAgentScene: {0}ms", Util.EnvironmentTickCountSubtract(ts));
 
         if (ParentID == 0)
         {
@@ -1426,13 +1426,13 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 success = CheckAndAdjustLandingPoint_SL(ref pos, ref lookat, ref positionChanged);
 
             if (!success)
-                m_log.DebugFormat("[SCENE PRESENCE MakeRootAgent]: houston we have a problem.. {0} ({1} got banned)", Name, UUID);
+                m_log.LogDebug("[SCENE PRESENCE MakeRootAgent]: houston we have a problem.. {0} ({1} got banned)", Name, UUID);
 
             if (pos.X < 0f || pos.Y < 0f
                       || pos.X >= m_scene.RegionInfo.RegionSizeX
                       || pos.Y >= m_scene.RegionInfo.RegionSizeY)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[SCENE PRESENCE]: MakeRootAgent() was given an illegal position of {0} for avatar {1}, {2}. Clamping",
                     pos, Name, UUID);
 
@@ -1527,7 +1527,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
             AbsolutePosition = pos;
 
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "Set pos {0}, vel {1} in {1} to {2} from input position of {3} on MakeRootAgent",
 //                    Name, Scene.Name, AbsolutePosition, pos);
 //
@@ -1555,7 +1555,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             }
         }
 
-        //m_log.DebugFormat("[MakeRootAgent] position and physical: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+        //m_log.LogDebug("[MakeRootAgent] position and physical: {0}ms", Util.EnvironmentTickCountSubtract(ts));
         m_scene.SwapRootAgentCount(false, IsNPC);
 
         // If we don't reset the movement flag here, an avatar that crosses to a neighbouring sim and returns will
@@ -1566,7 +1566,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         m_scene.AuthenticateHandler.UpdateAgentChildStatus(ControllingClient.CircuitCode, false);
 
         m_scene.EventManager.TriggerOnMakeRootAgent(this);
-        //m_log.DebugFormat("[MakeRootAgent] TriggerOnMakeRootAgent and done: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+        //m_log.LogDebug("[MakeRootAgent] TriggerOnMakeRootAgent and done: {0}ms", Util.EnvironmentTickCountSubtract(ts));
 
         return true;
     }
@@ -1588,7 +1588,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         // script is rezzed.  This means the ResumeScripts() does absolutely nothing when using XEngine.
         List<SceneObjectGroup> attachments = GetAttachments();
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[SCENE PRESENCE]: Restarting scripts in {0} attachments for {1} in {2}", attachments.Count, Name, Scene.Name);
 
         // Resume scripts
@@ -1618,7 +1618,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 /*
     public void ForceViewersUpdateName()
     {
-        m_log.DebugFormat("[SCENE PRESENCE]: Forcing viewers to update the avatar name for " + Name);
+        m_log.LogDebug("[SCENE PRESENCE]: Forcing viewers to update the avatar name for " + Name);
 
         UseFakeGroupTitle = true;
 
@@ -1660,7 +1660,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         RegionHandle = newRegionHandle;
 
-        m_log.DebugFormat("[SCENE PRESENCE]: Making {0} a child agent in {1} from root region {2}",
+        m_log.LogDebug("[SCENE PRESENCE]: Making {0} a child agent in {1} from root region {2}",
             Name, Scene.RegionInfo.RegionName, newRegionHandle);
 
         if(disposed)
@@ -1687,7 +1687,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         Environment = null;
 
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                 "[SCENE PRESENCE]: Downgrading root agent {0}, {1} to a child agent in {2}",
 //                 Name, UUID, m_scene.RegionInfo.RegionName);
 
@@ -2021,7 +2021,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             // Checking ContainsKey is redundant as Remove works either way and returns a bool
             // This is here to allow the Debug output to be conditional on removal
             //if (m_knownChildRegions.ContainsKey(regionHandle))
-            //    m_log.DebugFormat(" !!! removing known region {0} in {1}. Count = {2}", regionHandle, Scene.RegionInfo.RegionName, m_knownChildRegions.Count);
+            //    m_log.LogDebug(" !!! removing known region {0} in {1}. Count = {2}", regionHandle, Scene.RegionInfo.RegionName, m_knownChildRegions.Count);
             m_knownChildRegions.Remove(regionHandle);
             m_knownChildRegionsSizeInfo.Remove(regionHandle);
         }
@@ -2121,14 +2121,14 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 if (originID.Equals(UUID.Zero))
                 {
                     // Movement into region will fail
-                    m_log.WarnFormat("[SCENE PRESENCE]: Update agent {0} at {1} got invalid origin region id ", client.Name, Scene.Name);
+                    m_log.LogWarning("[SCENE PRESENCE]: Update agent {0} at {1} got invalid origin region id ", client.Name, Scene.Name);
                     return false;
                 }
                 return true;
            }
            else
            {
-               m_log.WarnFormat("[SCENE PRESENCE]: Update agent {0} at {1} did not receive agent update ", client.Name, Scene.Name);
+               m_log.LogWarning("[SCENE PRESENCE]: Update agent {0} at {1} did not receive agent update ", client.Name, Scene.Name);
                return false;
            }
         }
@@ -2172,7 +2172,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     {
         int ts = Util.EnvironmentTickCount();
 
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[SCENE PRESENCE]: Complete movement of {0} into {1} {2}",
             client.Name, Scene.Name, AbsolutePosition);
 
@@ -2189,7 +2189,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                     return;
             }
 
-            //m_log.DebugFormat("[CompleteMovement] WaitForUpdateAgent: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+            //m_log.LogDebug("[CompleteMovement] WaitForUpdateAgent: {0}ms", Util.EnvironmentTickCountSubtract(ts));
 
             bool flying = ((m_AgentControlFlags & ACFlags.AGENT_CONTROL_FLY) != 0);
 
@@ -2211,7 +2211,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
             if (!MakeRootAgent(AbsolutePosition, flying, ref look))
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[SCENE PRESENCE]: Aborting CompleteMovement call for {0} in {1} as they are already root",
                     Name, Scene.Name);
                 return;
@@ -2222,7 +2222,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 return; // how?
             }
 
-            //m_log.DebugFormat("[CompleteMovement] MakeRootAgent: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+            //m_log.LogDebug("[CompleteMovement] MakeRootAgent: {0}ms", Util.EnvironmentTickCountSubtract(ts));
 
             if (!IsNPC)
             {
@@ -2232,7 +2232,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                     if (gm != null)
                         Grouptitle = gm.GetGroupTitle(m_uuid);
 
-                    //m_log.DebugFormat("[CompleteMovement] Missing Grouptitle: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+                    //m_log.LogDebug("[CompleteMovement] Missing Grouptitle: {0}ms", Util.EnvironmentTickCountSubtract(ts));
                     /*
                     InventoryFolderBase cof = m_scene.InventoryService.GetFolderForType(client.AgentId, (FolderType)46);
                     if (cof == null)
@@ -2240,7 +2240,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                     else
                         COF = cof.ID;
 
-                    m_log.DebugFormat("[CompleteMovement]: Missing COF for {0} is {1}", client.AgentId, COF);
+                    m_log.LogDebug("[CompleteMovement]: Missing COF for {0} is {1}", client.AgentId, COF);
                     */
                 }
             }
@@ -2298,7 +2298,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             if(isHGTP)
             {
 //                    ControllingClient.SendNameReply(m_uuid, Firstname, Lastname);
-                m_log.DebugFormat("[CompleteMovement] HG");
+                m_log.LogDebug("[CompleteMovement] HG");
             }
 
             if (!IsNPC)
@@ -2440,7 +2440,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                         else
                             friendsModule.SendFriendsOnlineIfNeeded(ControllingClient);
                     }
-                    //m_log.DebugFormat("[CompleteMovement] friendsModule: {0}ms",    Util.EnvironmentTickCountSubtract(ts));
+                    //m_log.LogDebug("[CompleteMovement] friendsModule: {0}ms",    Util.EnvironmentTickCountSubtract(ts));
                 }
             }
             else
@@ -2456,7 +2456,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         m_scene.EventManager.OnRegionHeartbeatEnd += RegionHeartbeatEnd;
 
-        m_log.DebugFormat("[CompleteMovement] end: {0}ms", Util.EnvironmentTickCountSubtract(ts));
+        m_log.LogDebug("[CompleteMovement] end: {0}ms", Util.EnvironmentTickCountSubtract(ts));
     }
 
     /// <summary>
@@ -2577,13 +2577,13 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// </summary>
     public void HandleAgentUpdate(IClientAPI remoteClient, AgentUpdateArgs agentData)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PRESENCE]: In {0} received agent update from {1}, flags {2}",
         //    Scene.Name, remoteClient.Name, (ACFlags)agentData.ControlFlags);
 
         if (IsChildAgent || IsInTransit)
         {
-            //m_log.DebugFormat("DEBUG: HandleAgentUpdate: child agent in {0}", Scene.Name);
+            //m_log.LogDebug("DEBUG: HandleAgentUpdate: child agent in {0}", Scene.Name);
             return;
         }
 
@@ -2595,7 +2595,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             bool isphysical = PhysicsActor != null;
             if(isphysical)
                 RemoveFromPhysicalScene();
-            m_log.Error("[AVATAR]: NonFinite Avatar position detected... Reset Position. Mantis this please. Error #9999902");
+            m_log.LogError("[AVATAR]: NonFinite Avatar position detected... Reset Position. Mantis this please. Error #9999902");
 
             m_pos = m_LastFinitePos;
             if (!m_pos.IsFinite())
@@ -2603,7 +2603,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 m_pos.X = 127f;
                 m_pos.Y = 127f;
                 m_pos.Z = 127f;
-                m_log.Error("[AVATAR]: NonFinite Avatar on lastFiniteposition also. Reset Position. Mantis this please. Error #9999903");
+                m_log.LogError("[AVATAR]: NonFinite Avatar on lastFiniteposition also. Reset Position. Mantis this please. Error #9999903");
             }
 
             if(isphysical)
@@ -2689,7 +2689,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         {
             Rotation = agentData.BodyRotation;
 
-            //m_log.DebugFormat("[SCENE PRESENCE]: Initial body rotation {0} for {1}", agentData.BodyRotation, Name);
+            //m_log.LogDebug("[SCENE PRESENCE]: Initial body rotation {0} for {1}", agentData.BodyRotation, Name);
             bool update_movementflag = false;
             bool DCFlagKeyPressed = false;
 
@@ -2777,7 +2777,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             // Only do this if we're flying
             if (Flying && !ForceFly)
             {
-                 //m_log.Debug("[CONTROL]: " +flags);
+                 //m_log.LogDebug("[CONTROL]: " +flags);
                 // Applies a satisfying roll effect to the avatar when flying.
                 const ACFlags flagsLeft = ACFlags.AGENT_CONTROL_TURN_LEFT | ACFlags.AGENT_CONTROL_YAW_POS;
                 const ACFlags flagsRight = ACFlags.AGENT_CONTROL_TURN_RIGHT | ACFlags.AGENT_CONTROL_YAW_NEG;
@@ -2804,7 +2804,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             else if (IsColliding && agent_control_v3.Z < 0f)
                 agent_control_v3.Z = 0;
 
-            //m_log.DebugFormat("[SCENE PRESENCE]: MovementFlag {0} for {1}", MovementFlag, Name);
+            //m_log.LogDebug("[SCENE PRESENCE]: MovementFlag {0} for {1}", MovementFlag, Name);
 
             // If the agent update does move the avatar, then calculate the force ready for the velocity update,
             // which occurs later in the main scene loop
@@ -2857,7 +2857,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// </summary>
     private void HandleAgentCamerasUpdate(IClientAPI remoteClient, AgentUpdateArgs agentData)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PRESENCE]: In {0} received agent camera update from {1}, flags {2}",
         //    Scene.RegionInfo.RegionName, remoteClient.Name, (ACFlags)agentData.ControlFlags);
 
@@ -2895,13 +2895,13 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// <returns>True if movement has been updated in some way.  False otherwise.</returns>
     public bool HandleMoveToTargetUpdate(float tolerance, ref Vector3 agent_control_v3)
     {
-        //m_log.DebugFormat("[SCENE PRESENCE]: Called HandleMoveToTargetUpdate() for {0}", Name);
+        //m_log.LogDebug("[SCENE PRESENCE]: Called HandleMoveToTargetUpdate() for {0}", Name);
 
         bool updated = false;
 
         Vector3 LocalVectorToTarget3D = m_moveToPositionTarget - AbsolutePosition;
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PRESENCE]: bAllowUpdateMoveToPosition {0}, m_moveToPositionInProgress {1}, m_autopilotMoving {2}",
         //    allowUpdate, m_moveToPositionInProgress, m_autopilotMoving);
 
@@ -2911,7 +2911,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         //else
             distanceToTarget = (LocalVectorToTarget3D.X * LocalVectorToTarget3D.X) + (LocalVectorToTarget3D.Y * LocalVectorToTarget3D.Y);
 
-        // m_log.DebugFormat(
+        // m_log.LogDebug(
         //      "[SCENE PRESENCE]: Abs pos of {0} is {1}, target {2}, distance {3}",
         //           Name, AbsolutePosition, MoveToPositionTarget, distanceToTarget);
 
@@ -3003,7 +3003,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             updated = LocalVectorToTarget3D.Z != 0;
             updated |= tmpAgentControlFlags != 0;
 
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[SCENE PRESENCE]: HandleMoveToTargetUpdate adding {0} to move vector {1} for {2}",
             //        LocalVectorToTarget3D, agent_control_v3, Name);
 
@@ -3021,7 +3021,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         catch (Exception e)
         {
             //Avoid system crash, can be slower but...
-            m_log.DebugFormat("Crash! {0}", e.ToString());
+            m_log.LogDebug("Crash! {0}", e.ToString());
         }
 
         return updated;
@@ -3052,7 +3052,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if (IsSitting)
             StandUp();
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PRESENCE]: Avatar {0} received request to move to position {1} in {2}",
         //    Name, pos, m_scene.RegionInfo.RegionName);
 
@@ -3078,7 +3078,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if(terrainHeight > pos.Z)
             pos.Z = terrainHeight;
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PRESENCE]: Avatar {0} set move to target {1} (terrain height {2}) in {3}",
         //    Name, pos, terrainHeight, m_scene.RegionInfo.RegionName);
 
@@ -3096,7 +3096,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             LandAtTarget = false;
         }
 
-        // m_log.DebugFormat("[SCENE PRESENCE]: Local vector to target is {0},[1}", localVectorToTarget3D.X,localVectorToTarget3D.Y);
+        // m_log.LogDebug("[SCENE PRESENCE]: Local vector to target is {0},[1}", localVectorToTarget3D.X,localVectorToTarget3D.Y);
 
         if(tau > 0)
         {
@@ -3129,7 +3129,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// </summary>
     public void ResetMoveToTarget()
     {
-        //m_log.DebugFormat("[SCENE PRESENCE]: Resetting move to target for {0}", Name);
+        //m_log.LogDebug("[SCENE PRESENCE]: Resetting move to target for {0}", Name);
 
         m_movingToTarget = false;
         m_moveToSpeed = -1f;
@@ -3152,7 +3152,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// </summary>
     public void StandUp(bool addPhys = true)
     {
-        //m_log.DebugFormat("[SCENE PRESENCE]: StandUp() for {0}", Name);
+        //m_log.LogDebug("[SCENE PRESENCE]: StandUp() for {0}", Name);
 
         bool satOnObject = IsSatOnObject;
         SceneObjectPart part = ParentPart;
@@ -3583,7 +3583,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         {
             if (part.ParentGroup.IsAttachment)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[SCENE PRESENCE]: Avatar {0} tried to sit on part {1} from object {2} in {3} but this is an attachment for avatar id {4}",
                     Name, part.Name, part.ParentGroup.Name, Scene.Name, part.ParentGroup.AttachedAvatar);
 
@@ -3597,7 +3597,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 Vector3 sitTargetPos = part.SitTargetPosition;
                 Quaternion sitTargetOrient = part.SitTargetOrientation;
 
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[SCENE PRESENCE]: Sitting {0} at sit target {1}, {2} on {3} {4}",
                 //    Name, sitTargetPos, sitTargetOrient, part.Name, part.LocalId);
 
@@ -3772,7 +3772,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// Optional additional speed modifier for this particular add.  Default is 1</param>
     public void AddNewMovement(Vector3 vec, float thisAddSpeedModifier, bool breaking = false)
     {
-        // m_log.DebugFormat(
+        // m_log.LogDebug(
         //    "[SCENE PRESENCE]: Adding new movement {0} with rotation {1}, thisAddSpeedModifier {2} for {3}",
         //        vec, Rotation, thisAddSpeedModifier, Name);
         m_delayedStop = -1;
@@ -3799,7 +3799,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         else
             direc *= m_moveToSpeed;
 
-        //m_log.DebugFormat("[SCENE PRESENCE]: Force to apply before modification was {0} for {1}", direc, Name);
+        //m_log.LogDebug("[SCENE PRESENCE]: Force to apply before modification was {0} for {1}", direc, Name);
 
         if (Animator.currentControlState == ScenePresenceAnimator.motionControlStates.falling
                 && (PhysicsActor == null || !PhysicsActor.PIDHoverActive))
@@ -3928,7 +3928,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         if (remoteClient.IsActive)
         {
-            //m_log.DebugFormat("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
+            //m_log.LogDebug("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
             remoteClient.SendEntityUpdate(this, PrimUpdateFlags.FullUpdate);
             m_scene.StatsReporter.AddAgentUpdates(1);
         }
@@ -3938,7 +3938,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     {
         if (remoteClient.IsActive)
         {
-            //m_log.DebugFormat("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
+            //m_log.LogDebug("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
             remoteClient.SendEntityUpdate(this, PrimUpdateFlags.FullUpdate);
             m_scene.StatsReporter.AddAgentUpdates(1);
         }
@@ -3962,7 +3962,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         // server.
         if (remoteClient.IsActive)
         {
-            //m_log.DebugFormat("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
+            //m_log.LogDebug("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
             remoteClient.SendEntityUpdate(
                 this,
                 PrimUpdateFlags.Position | PrimUpdateFlags.Rotation | PrimUpdateFlags.Velocity
@@ -3982,7 +3982,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if (ParcelHideThisAvatar && p.currentParcelUUID.NotEqual(currentParcelUUID )&& !p.IsViewerUIGod)
             return;
 
-        //m_log.DebugFormat("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
+        //m_log.LogDebug("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
         remoteClient.SendEntityUpdate(
             this,
             PrimUpdateFlags.Position | PrimUpdateFlags.Rotation | PrimUpdateFlags.Velocity
@@ -3996,7 +3996,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         IClientAPI remoteClient = p.ControllingClient;
         if (remoteClient.IsActive)
         {
-            //m_log.DebugFormat("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
+            //m_log.LogDebug("[SCENE PRESENCE]: " + Name + " sending TerseUpdate to " + remoteClient.Name + " : Pos={0} Rot={1} Vel={2}", m_pos, Rotation, m_velocity);
             remoteClient.SendEntityUpdate(this,
                 PrimUpdateFlags.Position | PrimUpdateFlags.Rotation | PrimUpdateFlags.Velocity
                 | PrimUpdateFlags.Acceleration | PrimUpdateFlags.AngularVelocity);
@@ -4067,10 +4067,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if(!GotAttachmentsData)
         {
             if(++NeedInitialData == 300) // 30s in current heartbeat
-                m_log.WarnFormat("[ScenePresence({0}] slow attachment assets transfer for {1}", Scene.Name, Name);
+                m_log.LogWarning("[ScenePresence({0}] slow attachment assets transfer for {1}", Scene.Name, Name);
         }
         else if((m_teleportFlags & TeleportFlags.ViaHGLogin) != 0)
-            m_log.WarnFormat("[ScenePresence({0}] got hg attachment assets transfer for {1}, cntr = {2}", Scene.Name, Name, NeedInitialData);
+            m_log.LogWarning("[ScenePresence({0}] got hg attachment assets transfer for {1}, cntr = {2}", Scene.Name, Name, NeedInitialData);
         */
 
         NeedInitialData = -1;
@@ -4085,7 +4085,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 // close v1 sender region obsolete
                 if (!string.IsNullOrEmpty(m_callbackURI))
                 {
-                    m_log.DebugFormat(
+                    m_log.LogDebug(
                         "[SCENE PRESENCE({0})]: Releasing {1} {2} with old callback to {3}",
                         Scene.RegionInfo.RegionName, Name, UUID, m_callbackURI);
 
@@ -4100,7 +4100,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 // v0.7 close HG sender region
                 else if (!string.IsNullOrEmpty(m_newCallbackURI))
                 {
-                    m_log.DebugFormat(
+                    m_log.LogDebug(
                         "[SCENE PRESENCE({0})]: Releasing {1} {2} with callback to {3}",
                         Scene.RegionInfo.RegionName, Name, UUID, m_newCallbackURI);
 
@@ -4120,7 +4120,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             if ((flags & (uint)(ViewerFlags.TPBR | ViewerFlags.SentTPBR)) == (uint)ViewerFlags.TPBR)
                 ControllingClient.SendRegionHandshake();
 
-            m_log.DebugFormat("[SCENE PRESENCE({0})]: SendInitialData for {1}", m_scene.RegionInfo.RegionName, UUID);
+            m_log.LogDebug("[SCENE PRESENCE({0})]: SendInitialData for {1}", m_scene.RegionInfo.RegionName, UUID);
             if (m_teleportFlags <= 0)
             {
                 m_scene.SendLayerData(ControllingClient);
@@ -4129,7 +4129,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 landch?.sendClientInitialLandInfo(ControllingClient, true);
             }
 
-            m_log.DebugFormat("[SCENE PRESENCE({0})]: SendInitialData at parcel {1}", m_scene.RegionInfo.RegionName, currentParcelUUID);
+            m_log.LogDebug("[SCENE PRESENCE({0})]: SendInitialData at parcel {1}", m_scene.RegionInfo.RegionName, currentParcelUUID);
             SendOtherAgentsAvatarFullToMe();
 
             if (m_scene.ObjectsCullingByDistance)
@@ -4230,7 +4230,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// </summary>
     public void SendAvatarDataToAllAgents()
     {
-        //m_log.DebugFormat("[SCENE PRESENCE] SendAvatarDataToAllAgents: {0} ({1})", Name, UUID);
+        //m_log.LogDebug("[SCENE PRESENCE] SendAvatarDataToAllAgents: {0} ({1})", Name, UUID);
         // only send update from root agents to other clients; children are only "listening posts"
         if (IsChildAgent)
             return;
@@ -4297,7 +4297,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// <param name="avatar"></param>
     public void SendAvatarDataToAgent(ScenePresence avatar)
     {
-        //m_log.DebugFormat("[SCENE PRESENCE] SendAvatarDataToAgent from {0} ({1}) to {2} ({3})", Name, UUID, avatar.Name, avatar.UUID);
+        //m_log.LogDebug("[SCENE PRESENCE] SendAvatarDataToAgent from {0} ({1}) to {2} ({3})", Name, UUID, avatar.Name, avatar.UUID);
         if (ParcelHideThisAvatar && currentParcelUUID != avatar.currentParcelUUID && !avatar.IsViewerUIGod)
             return;
         avatar.ControllingClient.SendEntityFullUpdateImmediate(this);
@@ -4314,7 +4314,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// </summary>
     public void SendAppearanceToAllOtherAgents()
     {
-        //m_log.DebugFormat("[SCENE PRESENCE] SendAppearanceToAllOtherAgents: {0} {1}", Name, UUID);
+        //m_log.LogDebug("[SCENE PRESENCE] SendAppearanceToAllOtherAgents: {0} {1}", Name, UUID);
         // only send update from root agents to other clients; children are only "listening posts"
         if (IsChildAgent)
             return;
@@ -4337,7 +4337,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
     public void SendAppearanceToAgent(ScenePresence avatar)
     {
-        //            m_log.DebugFormat(
+        //            m_log.LogDebug(
         //                "[SCENE PRESENCE]: Sending appearance data from {0} {1} to {2} {3}", Name, m_uuid, avatar.Name, avatar.UUID);
         if (ParcelHideThisAvatar && currentParcelUUID != avatar.currentParcelUUID && !avatar.IsViewerUIGod)
             return;
@@ -4613,7 +4613,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 return;
         }
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PRESENCE]: Testing border check for projected position {0} of {1} in {2}",
         //       pos2, Name, Scene.Name);
 
@@ -4705,7 +4705,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             return byebyeRegions;
 
         List<ulong> knownRegions = KnownRegionHandles;
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[SCENE PRESENCE]: Closing child agents. Checking {0} regions in {1}",
             knownRegions.Count, Scene.RegionInfo.RegionName);
 
@@ -4759,7 +4759,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         byebyeRegions.Remove(Scene.RegionInfo.RegionHandle);
         if (byebyeRegions.Count > 0)
         {
-            m_log.Debug("[SCENE PRESENCE]: Closing " + byebyeRegions.Count + " child agents");
+            m_log.LogDebug("[SCENE PRESENCE]: Closing " + byebyeRegions.Count + " child agents");
 
             AgentCircuitData acd = Scene.AuthenticateHandler.GetAgentCircuitData(UUID);
             string auth = string.Empty;
@@ -4791,7 +4791,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         if (byebyeRegions.Count > 0)
         {
-            m_log.Debug("[SCENE PRESENCE]: Closing " + byebyeRegions.Count + " child agents");
+            m_log.LogDebug("[SCENE PRESENCE]: Closing " + byebyeRegions.Count + " child agents");
 
             AgentCircuitData acd = Scene.AuthenticateHandler.GetAgentCircuitData(UUID);
             string auth = string.Empty;
@@ -4821,7 +4821,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
     public void UpdateChildAgent(AgentData cAgentData)
     {
-//            m_log.Debug("   >>> ChildAgentDataUpdate <<< " + Scene.RegionInfo.RegionName);
+//            m_log.LogDebug("   >>> ChildAgentDataUpdate <<< " + Scene.RegionInfo.RegionName);
         if (!IsChildAgent)
             return;
 
@@ -4848,7 +4848,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         uint tRegionX = m_scene.RegionInfo.RegionLocX;
         uint tRegionY = m_scene.RegionInfo.RegionLocY;
 
-        //m_log.Debug("   >>> ChildAgentPositionUpdate <<< " + rRegionX + "-" + rRegionY);
+        //m_log.LogDebug("   >>> ChildAgentPositionUpdate <<< " + rRegionX + "-" + rRegionY);
         int shiftx = ((int)rRegionX - (int)tRegionX) * (int)Constants.RegionSize;
         int shifty = ((int)rRegionY - (int)tRegionY) * (int)Constants.RegionSize;
 
@@ -4984,7 +4984,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     {
         m_callbackURI = cAgent.CallbackURI;
         m_newCallbackURI = cAgent.NewCallbackURI;
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PRESENCE]: Set callback for {0} in {1} to {2} in CopyFrom()",
         //    Name, m_scene.RegionInfo.RegionName, m_callbackURI);
 
@@ -5178,13 +5178,13 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// </summary>
     public void AddToPhysicalScene(bool isFlying)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE PRESENCE]: Adding physics actor for {0}, ifFlying = {1} in {2}",
 //                Name, isFlying, Scene.RegionInfo.RegionName);
 
         if (PhysicsActor != null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[SCENE PRESENCE]: Adding physics actor for {0} to {1} but this scene presence already has a physics actor",
                 Name, Scene.RegionInfo.RegionName);
         }
@@ -5505,14 +5505,14 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             {
                 if (gobj == null)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[SCENE PRESENCE]: Failed to validate an attachment for {0} since it was null.  Continuing", Name);
 
                     validated = false;
                 }
                 else if (gobj.IsDeleted)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[SCENE PRESENCE]: Failed to validate attachment {0} {1} for {2} since it had been deleted.  Continuing",
                         gobj.Name, gobj.UUID, Name);
 
@@ -6651,7 +6651,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if((m_teleportFlags & TeleportFlags.ViaHGLogin) == TeleportFlags.ViaHGLogin)
             HG = true;
 
-        m_log.InfoFormat("[SCENE PRESENCE]: TELEPORT ******************");
+        m_log.LogInformation("[SCENE PRESENCE]: TELEPORT ******************");
 
         uint i;
         for (int x = 0; x <= 30 ; x++)
@@ -6660,13 +6660,13 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             if((m_teleportFlags & (TeleportFlags)i) != 0)
             {
                 if (HG == false)
-                    m_log.InfoFormat("[SCENE PRESENCE]: Teleport Flags include {0}", ((TeleportFlags) i).ToString());
+                    m_log.LogInformation("[SCENE PRESENCE]: Teleport Flags include {0}", ((TeleportFlags) i).ToString());
                 else
-                    m_log.InfoFormat("[SCENE PRESENCE]: HG Teleport Flags include {0}", ((TeleportFlags)i).ToString());
+                    m_log.LogInformation("[SCENE PRESENCE]: HG Teleport Flags include {0}", ((TeleportFlags)i).ToString());
             }
         }
 
-        m_log.InfoFormat("[SCENE PRESENCE]: TELEPORT ******************");
+        m_log.LogInformation("[SCENE PRESENCE]: TELEPORT ******************");
 
     }
 
@@ -6826,7 +6826,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         {
             foreach (ScenePresence p in killsToSendto)
             {
-//                    m_log.Debug("[AVATAR]: killTo: " + Lastname + " " + p.Lastname);
+//                    m_log.LogDebug("[AVATAR]: killTo: " + Lastname + " " + p.Lastname);
                 SendKillTo(p);
             }
         }
@@ -6835,7 +6835,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         {
             foreach (ScenePresence p in killsToSendme)
             {
-//                    m_log.Debug("[AVATAR]: killToMe: " + Lastname + " " + p.Lastname);
+//                    m_log.LogDebug("[AVATAR]: killToMe: " + Lastname + " " + p.Lastname);
                 p.SendKillTo(this);
             }
         }
@@ -6854,7 +6854,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             {
                 if (p.IsChildAgent)
                     continue;
-//                   m_log.Debug("[AVATAR]: viewMe: " + Lastname + "<-" + p.Lastname);
+//                   m_log.LogDebug("[AVATAR]: viewMe: " + Lastname + "<-" + p.Lastname);
                 p.SendViewTo(this);
             }
         }

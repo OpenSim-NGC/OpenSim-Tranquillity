@@ -30,6 +30,8 @@ using System.Net;
 using OpenSim.Framework;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Interfaces;
 
 public interface IGridService
@@ -131,7 +133,7 @@ public interface IHypergridLinker
 
 public class GridRegion
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 #pragma warning disable 414
     private static readonly string LogHeader = "[GRID REGION]";
@@ -395,7 +397,7 @@ public class GridRegion
         if (kvp.ContainsKey("Token"))
             Token = kvp["Token"].ToString();
 
-        // m_log.DebugFormat("{0} New GridRegion. id={1}, loc=<{2},{3}>, size=<{4},{5}>",
+        // m_log.LogDebug("{0} New GridRegion. id={1}, loc=<{2},{3}>, size=<{4},{5}>",
         //                         LogHeader, RegionID, RegionLocX, RegionLocY, RegionSizeX, RegionSizeY);
     }
 

@@ -8,10 +8,11 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using OpenSim.Framework.Servers.HttpServer;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.RegionServer;
 
@@ -23,7 +24,7 @@ namespace OpenSim.Server.RegionServer;
 /// </summary>
 public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public BaseHttpServer CreateAndStart(NetworkServersInfo serversInfo)
     {
@@ -32,7 +33,7 @@ public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
 
         if (serversInfo.HttpUsesSSL && (mainport == mainSSLport))
         {
-            m_log.Error("[REGION SERVER]: HTTP Server config failed.   HTTP Server and HTTPS server must be on different ports");
+            m_log.LogError("[REGION SERVER]: HTTP Server config failed.   HTTP Server and HTTPS server must be on different ports");
         }
 
         BaseHttpServer mainHttpServer = null;
@@ -71,7 +72,7 @@ public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
                     serversInfo.cert_path,
                     serversInfo.cert_pass);
 
-                m_log.InfoFormat("[REGION SERVER]: Starting OOB HTTPS server on port {0}", server.SSLPort);
+                m_log.LogInformation("[REGION SERVER]: Starting OOB HTTPS server on port {0}", server.SSLPort);
                 server.Start();
                 MainServer.Instance.AddHttpServer(server);
             }
@@ -79,7 +80,7 @@ public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
             {
                 server = new BaseHttpServer(serversInfo.https_port);
 
-                m_log.InfoFormat("[REGION SERVER]: Starting HTTP server on port {0} for external HTTPS", server.Port);
+                m_log.LogInformation("[REGION SERVER]: Starting HTTP server on port {0} for external HTTPS", server.Port);
                 server.Start();
                 MainServer.Instance.AddHttpServer(server);
             }

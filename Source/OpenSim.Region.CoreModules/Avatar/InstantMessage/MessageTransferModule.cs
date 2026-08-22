@@ -27,7 +27,6 @@
 using System.Collections;
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -39,11 +38,13 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 
 public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
     protected string m_MessageKey = string.Empty;
@@ -76,7 +77,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
 
             m_MessageKey = cnf.GetString("MessageKey", string.Empty);
         }
-        m_log.Debug("[MESSAGE TRANSFER]: Module enabled");
+        m_log.LogDebug("[MESSAGE TRANSFER]: Module enabled");
         m_Enabled = true;
 
         IMXMLRPCSendWorkers = new ObjectJobEngine(DoSendIMviaXMLRPC, "IMXMLRPCSendWorkers", 1000, 3);
@@ -89,7 +90,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
 
         lock (m_Scenes)
         {
-            m_log.Debug("[MESSAGE TRANSFER]: Message transfer module active");
+            m_log.LogDebug("[MESSAGE TRANSFER]: Message transfer module active");
             scene.RegisterModuleInterface<IMessageTransferModule>(this);
             m_Scenes.Add(scene);
         }
@@ -142,7 +143,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
         // Try root avatar first
         foreach (Scene scene in m_Scenes)
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[HG INSTANT MESSAGE]: Looking for root agent {0} in {1}",
             //     toAgentID.ToString(), scene.RegionInfo.RegionName);
             ScenePresence sp = scene.GetScenePresence(toAgentID);
@@ -152,7 +153,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
                     achildsp = sp;
                 else
                 {
-                    // m_log.DebugFormat("[HG INSTANT MESSAGE]: Delivering IM to root agent {0} {1}", sp.Name, toAgentID);
+                    // m_log.LogDebug("[HG INSTANT MESSAGE]: Delivering IM to root agent {0} {1}", sp.Name, toAgentID);
                     sp.ControllingClient.SendInstantMessage(im);
                     result(true);
                     return;
@@ -161,12 +162,12 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
         }
         if (!ToRootOnly && achildsp != null)
         {
-            // m_log.DebugFormat("[HG INSTANT MESSAGE]: Delivering IM to child agent {0} {1}", sp.Name, toAgentID);
+            // m_log.LogDebug("[HG INSTANT MESSAGE]: Delivering IM to child agent {0} {1}", sp.Name, toAgentID);
             achildsp.ControllingClient.SendInstantMessage(im);
             result(true);
             return;
         }
-        //m_log.DebugFormat("[INSTANT MESSAGE]: Delivering IM to {0} via XMLRPC", im.toAgentID);
+        //m_log.LogDebug("[INSTANT MESSAGE]: Delivering IM to {0} via XMLRPC", im.toAgentID);
 
         SendGridInstantMessageViaXMLRPC(im, result);
     }
@@ -188,7 +189,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
             return;
         }
 
-        //m_log.DebugFormat("[INSTANT MESSAGE]: Undeliverable");
+        //m_log.LogDebug("[INSTANT MESSAGE]: Undeliverable");
         result(false);
     }
 
@@ -224,7 +225,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
             float pos_x = 0;
             float pos_y = 0;
             float pos_z = 0;
-            //m_log.Info("Processing IM");
+            //m_log.LogInformation("Processing IM");
 
             Hashtable requestData = (Hashtable)request.Params[0];
             // Check if it's got all the data
@@ -409,7 +410,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
         }
         catch (Exception e)
         {
-            m_log.Error("[INSTANT MESSAGE]: Caught unexpected exception:", e);
+            m_log.LogError(e, "[INSTANT MESSAGE]: Caught unexpected exception:");
             successful = false;
         }
 
@@ -453,7 +454,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
         }
         catch (Exception e)
         {
-            m_log.Error("[SendGridInstantMessageViaXMLRPC]: exception " + e.Message);
+            m_log.LogError("[SendGridInstantMessageViaXMLRPC]: exception " + e.Message);
         }
     }
 
@@ -515,14 +516,14 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
                 //
                 if (upd.RegionID == prevRegionID)
                 {
-                    // m_log.Error("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
+                    // m_log.LogError("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
                     HandleUndeliverableMessage(im, result);
                     return;
                 }
             }
             else
             {
-                // m_log.Error("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
+                // m_log.LogError("[GRID INSTANT MESSAGE]: Unable to deliver an instant message");
                 HandleUndeliverableMessage(im, result);
                 return;
             }
@@ -570,7 +571,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
             }
             else
             {
-                m_log.WarnFormat("[GRID INSTANT MESSAGE]: Unable to find region {0}", upd.RegionID);
+                m_log.LogWarning("[GRID INSTANT MESSAGE]: Unable to find region {0}", upd.RegionID);
                 HandleUndeliverableMessage(im, result);
             }
         }
@@ -615,7 +616,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[GRID INSTANT MESSAGE]: Error sending message to {0} : {1}",  reginfo.ServerURI.ToString(), e.Message);
+            m_log.LogError("[GRID INSTANT MESSAGE]: Error sending message to {0} : {1}",  reginfo.ServerURI.ToString(), e.Message);
         }
         finally
         {

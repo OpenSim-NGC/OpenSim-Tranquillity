@@ -33,6 +33,8 @@ using OpenSim.Framework.Console;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.OptionalModules.Avatar.Appearance;
 
 /// <summary>
@@ -40,7 +42,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Appearance;
 /// </summary>
 public class AppearanceInfoModule : ISharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private List<Scene> m_scenes = new List<Scene>();
 
@@ -52,27 +54,27 @@ public class AppearanceInfoModule : ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-//            m_log.DebugFormat("[APPEARANCE INFO MODULE]: INITIALIZED MODULE");
+//            m_log.LogDebug("[APPEARANCE INFO MODULE]: INITIALIZED MODULE");
     }
 
     public void PostInitialise()
     {
-//            m_log.DebugFormat("[APPEARANCE INFO MODULE]: POST INITIALIZED MODULE");
+//            m_log.LogDebug("[APPEARANCE INFO MODULE]: POST INITIALIZED MODULE");
     }
 
     public void Close()
     {
-//            m_log.DebugFormat("[APPEARANCE INFO MODULE]: CLOSED MODULE");
+//            m_log.LogDebug("[APPEARANCE INFO MODULE]: CLOSED MODULE");
     }
 
     public void AddRegion(Scene scene)
     {
-//            m_log.DebugFormat("[APPEARANCE INFO MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[APPEARANCE INFO MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)
     {
-//            m_log.DebugFormat("[APPEARANCE INFO MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[APPEARANCE INFO MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
 
         lock (m_scenes)
             m_scenes.Remove(scene);
@@ -80,7 +82,7 @@ public class AppearanceInfoModule : ISharedRegionModule
 
     public void RegionLoaded(Scene scene)
     {
-//            m_log.DebugFormat("[APPEARANCE INFO MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[APPEARANCE INFO MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
 
         lock (m_scenes)
             m_scenes.Add(scene);

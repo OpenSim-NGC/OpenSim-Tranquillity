@@ -28,7 +28,6 @@
 using System.Collections;
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -39,6 +38,8 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.World.MoneyModule;
 
@@ -54,7 +55,7 @@ namespace OpenSim.Region.OptionalModules.World.MoneyModule;
 /// </summary>
 public class SampleMoneyModule : IMoneyModule, ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Where Stipends come from and Fees go to.
@@ -384,7 +385,7 @@ public class SampleMoneyModule : IMoneyModule, ISharedRegionModule
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[MONEY]: Could not resolve user {0}",
                 agentID);
         }
@@ -767,7 +768,7 @@ public class SampleMoneyModule : IMoneyModule, ISharedRegionModule
     private void AvatarEnteringParcel(ScenePresence avatar, int localLandID, UUID regionID)
     {
 
-        //m_log.Info("[FRIEND]: " + avatar.Name + " status:" + (!avatar.IsChildAgent).ToString());
+        //m_log.LogInformation("[FRIEND]: " + avatar.Name + " status:" + (!avatar.IsChildAgent).ToString());
     }
 
     public int GetBalance(UUID agentID)

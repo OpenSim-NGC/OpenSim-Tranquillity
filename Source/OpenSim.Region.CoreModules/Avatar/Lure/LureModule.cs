@@ -26,18 +26,19 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.Lure;
 
 public class LureModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly List<Scene> m_scenes = [];
 
@@ -51,7 +52,7 @@ public class LureModule : ISharedRegionModule
             if (config.Configs["Messaging"].GetString("LureModule", "LureModule") == Name)
             {
                 m_Enabled = true;
-                m_log.DebugFormat("[LURE MODULE]: {0} enabled", Name);
+                m_log.LogDebug("[LURE MODULE]: {0} enabled", Name);
             }
         }
     }
@@ -82,7 +83,7 @@ public class LureModule : ISharedRegionModule
 
             if (m_TransferModule == null)
             {
-                m_log.Error("[INSTANT MESSAGE]: No message transfer module, "+
+                m_log.LogError("[INSTANT MESSAGE]: No message transfer module, "+
                 "lures will not work!");
 
                 m_Enabled = false;
@@ -160,7 +161,7 @@ public class LureModule : ISharedRegionModule
                 (uint)presence.AbsolutePosition.Y,
                 (uint)presence.AbsolutePosition.Z + 2);
 
-        m_log.Debug($"[LURE MODULE]: TP invite with message {message}, type {lureType}");
+        m_log.LogDebug($"[LURE MODULE]: TP invite with message {message}, type {lureType}");
 
         GridInstantMessage m;
 

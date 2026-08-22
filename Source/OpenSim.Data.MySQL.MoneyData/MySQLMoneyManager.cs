@@ -28,15 +28,17 @@
 using System.Data;
 using System.Reflection;
 using System.Text.RegularExpressions;
-using log4net;
 using OpenMetaverse;
 using MySqlConnector;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Data.MySQL.MoneyData;
 
 public class MySQLMoneyManager : IMoneyManager
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string Table_of_Balances = "balances";
     private string Table_of_Transactions = "transactions";
@@ -75,7 +77,7 @@ public class MySQLMoneyManager : IMoneyManager
             {
                 throw new Exception("[MONEY MANAGER]: Connection error while using connection string [" + connectString + "]", e);
             }
-            //m_log.Info("[MONEY MANAGER]: Connection established");
+            //m_log.LogInformation("[MONEY MANAGER]: Connection established");
         }
 
         catch (Exception e)
@@ -282,7 +284,7 @@ public class MySQLMoneyManager : IMoneyManager
         }
         catch (Exception e)
         {
-            m_log.Error("[MONEY MANAGER]: Error checking or creating tables: " + e.ToString());
+            m_log.LogError("[MONEY MANAGER]: Error checking or creating tables: " + e.ToString());
             throw new Exception("[MONEY MANAGER]: Error checking or creating tables: " + e.ToString());
         }
     }
@@ -409,7 +411,7 @@ public class MySQLMoneyManager : IMoneyManager
 
     private void UpdateBalancesTable1()
     {
-        m_log.Info("[MONEY MANAGER]: Converting Balance Table...");
+        m_log.LogInformation("[MONEY MANAGER]: Converting Balance Table...");
         string sql = string.Empty;
 
         sql = "SELECT COUNT(*) FROM " + Table_of_Balances;
@@ -519,7 +521,7 @@ public class MySQLMoneyManager : IMoneyManager
 
     private void UpdateUserInfoTable1()
     {
-        //m_log.Info("[MONEY MANAGER]: Converting UserInfo Table...");
+        //m_log.LogInformation("[MONEY MANAGER]: Converting UserInfo Table...");
         string sql = string.Empty;
 
         sql = "SELECT COUNT(*) FROM " + Table_of_UserInfo;
@@ -691,7 +693,7 @@ public class MySQLMoneyManager : IMoneyManager
     /// </summary>
     private void UpdateTransactionsTable6()
     {
-        //m_log.Info("[MONEY MANAGER]: Converting Transaction Table...");
+        //m_log.LogInformation("[MONEY MANAGER]: Converting Transaction Table...");
         string sql = string.Empty;
 
         sql = "SELECT COUNT(*) FROM " + Table_of_Transactions;
@@ -801,7 +803,7 @@ public class MySQLMoneyManager : IMoneyManager
     /// </summary>
     private void UpdateTransactionsTable10()
     {
-        //m_log.Info("[MONEY MANAGER]: Converting Transaction Table...");
+        //m_log.LogInformation("[MONEY MANAGER]: Converting Transaction Table...");
         string sql = string.Empty;
 
         sql = "SELECT COUNT(*) FROM `" + Table_of_Transactions + "` WHERE type=1000";
@@ -946,7 +948,7 @@ public class MySQLMoneyManager : IMoneyManager
     /// </summary>
     public void Reconnect()
     {
-        m_log.Info("[MONEY MANAGER]: Reconnecting database");
+        m_log.LogInformation("[MONEY MANAGER]: Reconnecting database");
         lock (dbcon)
         {
             try
@@ -954,11 +956,11 @@ public class MySQLMoneyManager : IMoneyManager
                 dbcon.Close();
                 dbcon = new MySqlConnection(connectString);
                 dbcon.Open();
-                m_log.Info("[MONEY MANAGER]: Reconnected  database");
+                m_log.LogInformation("[MONEY MANAGER]: Reconnected  database");
             }
             catch (Exception e)
             {
-                m_log.Error("[MONEY MANAGER]: Unable to reconnect to database: " + e.ToString());
+                m_log.LogError("[MONEY MANAGER]: Unable to reconnect to database: " + e.ToString());
             }
         }
     }
@@ -999,7 +1001,7 @@ public class MySQLMoneyManager : IMoneyManager
 #pragma warning disable CA1031 // Do not catch general exception types
             catch (Exception e)
             {
-                m_log.ErrorFormat("[MoneyDB]: MySql failed to fetch balance {0}.", userID);
+                m_log.LogError("[MoneyDB]: MySql failed to fetch balance {0}.", userID);
                 retValue = -2;
             }
 #pragma warning restore CA1031 // Do not catch general exception types
@@ -1167,7 +1169,7 @@ public class MySQLMoneyManager : IMoneyManager
     //
     private void initTotalSalesTable()
     {
-        m_log.Info("[MONEY MANAGER]: Initailising TotalSales Table...");
+        m_log.LogInformation("[MONEY MANAGER]: Initailising TotalSales Table...");
         string sql = string.Empty;
 
         sql = "SELECT SQL_CALC_FOUND_ROWS receiver,objectUUID,type,COUNT(*),SUM(amount),MIN(time) FROM " + Table_of_Transactions;
@@ -1219,7 +1221,7 @@ public class MySQLMoneyManager : IMoneyManager
 
     private void deleteTotalSalesTable()
     {
-        //m_log.Info("[MONEY MANAGER]: Deleting TotalSales Table...");
+        //m_log.LogInformation("[MONEY MANAGER]: Deleting TotalSales Table...");
         string sql = string.Empty;
 
         sql = "DELETE FROM " + Table_of_TotalSales;
@@ -1311,7 +1313,7 @@ public class MySQLMoneyManager : IMoneyManager
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[MONEY MANAGER]: Get sale data from DB failed: " + e.ToString());
+                    m_log.LogError("[MONEY MANAGER]: Get sale data from DB failed: " + e.ToString());
                     r.Close();
                     cmd.Dispose();
                     return false;
@@ -1445,7 +1447,7 @@ public class MySQLMoneyManager : IMoneyManager
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[MONEY MANAGER]: Get transaction from DB failed: " + e.ToString());
+                    m_log.LogError("[MONEY MANAGER]: Get transaction from DB failed: " + e.ToString());
                 }
                 if (secureCode == secure) bRet = true;
                 else bRet = false;
@@ -1495,7 +1497,7 @@ public class MySQLMoneyManager : IMoneyManager
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[MONEY MANAGER]: Fetching transaction failed 1: " + e.ToString());
+                    m_log.LogError("[MONEY MANAGER]: Fetching transaction failed 1: " + e.ToString());
                     r.Close();
                     cmd.Dispose();
                     return null;
@@ -1562,7 +1564,7 @@ public class MySQLMoneyManager : IMoneyManager
                     }
                     catch (Exception e)
                     {
-                        m_log.Error("[MONEY MANAGER]: Fetching transaction failed 2: " + e.ToString());
+                        m_log.LogError("[MONEY MANAGER]: Fetching transaction failed 2: " + e.ToString());
                         r.Close();
                         cmd.Dispose();
                         return null;
@@ -1600,7 +1602,7 @@ public class MySQLMoneyManager : IMoneyManager
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[MONEY MANAGER]: Unable to get transaction info: " + e.ToString());
+                    m_log.LogError("[MONEY MANAGER]: Unable to get transaction info: " + e.ToString());
                 }
             }
             r.Close();
@@ -1618,7 +1620,7 @@ public class MySQLMoneyManager : IMoneyManager
     //
     public bool addUserInfo(UserInfo userInfo)
     {
-        //m_log.Error("[MONEY MANAGER]: Adding UserInfo: " + userInfo.UserID);
+        //m_log.LogError("[MONEY MANAGER]: Adding UserInfo: " + userInfo.UserID);
 
         bool bRet = false;
         string sql = string.Empty;
@@ -1657,7 +1659,7 @@ public class MySQLMoneyManager : IMoneyManager
 
     public UserInfo fetchUserInfo(string userID)
     {
-        //m_log.Error("[MONEY MANAGER]: Fetching UserInfo: " + userID);
+        //m_log.LogError("[MONEY MANAGER]: Fetching UserInfo: " + userID);
 
         UserInfo userInfo = new UserInfo();
         userInfo.UserID = null;
@@ -1683,7 +1685,7 @@ public class MySQLMoneyManager : IMoneyManager
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[MONEY MANAGER]: Fetching UserInfo failed: " + e.ToString());
+                    m_log.LogError("[MONEY MANAGER]: Fetching UserInfo failed: " + e.ToString());
                     r.Close();
                     cmd.Dispose();
                     return null;
@@ -1700,7 +1702,7 @@ public class MySQLMoneyManager : IMoneyManager
 
     public bool updateUserInfo(UserInfo userInfo)
     {
-        //m_log.Error("[MONEY MANAGER]: Updating UserInfo: " + userInfo.UserID);
+        //m_log.LogError("[MONEY MANAGER]: Updating UserInfo: " + userInfo.UserID);
 
         bool bRet = false;
         string sql = string.Empty;

@@ -27,7 +27,6 @@
     <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
     <PackageReference Include="System.Data.SQLite" Version="2.0.4" />
     <PackageReference Include="SQLite" Version="3.53.4" />
-    <PackageReference Include="log4net" Version="3.3.2" />
   </ItemGroup>
 
   <!-- C5 via develop's Library/C5.dll (single identity — avoids the dual-C5 TypeLoadException). -->

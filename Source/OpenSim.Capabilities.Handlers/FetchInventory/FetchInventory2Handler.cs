@@ -32,16 +32,15 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
-
-using log4net;
 
 namespace OpenSim.Capabilities.Handlers;
 
 public class FetchInventory2Handler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInventoryService m_inventoryService;
     private UUID m_agentID;
@@ -54,7 +53,7 @@ public class FetchInventory2Handler
 
     public string FetchInventoryRequest(string request, string path, string param, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.DebugFormat("[FETCH INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
+        //m_log.LogDebug("[FETCH INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
 
         OSDMap requestmap = (OSDMap)OSDParser.DeserializeLLSDXml(Utils.StringToBytes(request));
         OSDArray itemsRequested = (OSDArray)requestmap["items"];
@@ -109,7 +108,7 @@ public class FetchInventory2Handler
 
     public void FetchInventorySimpleRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap requestmap, ExpiringKey<UUID> BadRequests)
     {
-        //m_log.DebugFormat("[FETCH INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
+        //m_log.LogDebug("[FETCH INVENTORY HANDLER]: Received FetchInventory capability request {0}", request);
 
         if(BadRequests == null)
         {

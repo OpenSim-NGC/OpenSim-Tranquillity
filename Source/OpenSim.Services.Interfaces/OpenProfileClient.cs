@@ -29,6 +29,8 @@ using System.Collections;
 using OpenMetaverse;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.UserProfilesService;
 
 /// <summary>
@@ -40,7 +42,7 @@ namespace OpenSim.Services.UserProfilesService;
 /// </remarks>
 public class OpenProfileClient
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_serverURI;
 

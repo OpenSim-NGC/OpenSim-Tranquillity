@@ -30,14 +30,15 @@ using System.Reflection;
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
 public class UserProfilesData : IProfilesData
 {
-    static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected PGSQLManager m_database;
 
@@ -113,7 +114,7 @@ public class UserProfilesData : IProfilesData
                             }
                             catch (Exception e)
                             {
-                                m_log.Error("[PROFILES_DATA]: UserAccount exception ", e);
+                                m_log.LogError(e, "[PROFILES_DATA]: UserAccount exception ");
                             }
 
                             n.Add("classifieduuid", OSD.FromUUID(Id));
@@ -204,7 +205,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: ClassifiedsUpdate exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: ClassifiedsUpdate exception ");
             result = e.Message;
             return false;
         }
@@ -233,7 +234,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: DeleteClassifiedRecord exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: DeleteClassifiedRecord exception ");
             return false;
         }
 
@@ -282,7 +283,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: GetClassifiedInfo exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: GetClassifiedInfo exception ");
         }
 
         return true;
@@ -337,7 +338,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: GetAvatarPicks exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: GetAvatarPicks exception ");
         }
 
         return data;
@@ -394,7 +395,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: GetPickInfo exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: GetPickInfo exception ");
         }
 
         return pick;
@@ -447,7 +448,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: UpdateAvatarNotes exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: UpdateAvatarNotes exception ");
             return false;
         }
 
@@ -477,7 +478,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: DeleteUserPickRecord exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: DeleteUserPickRecord exception ");
             return false;
         }
 
@@ -520,7 +521,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: GetAvatarNotes exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: GetAvatarNotes exception ");
         }
 
         return true;
@@ -570,7 +571,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: UpdateAvatarNotes exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: UpdateAvatarNotes exception ");
             return false;
         }
 
@@ -601,7 +602,7 @@ public class UserProfilesData : IProfilesData
                     {
                         if (reader.HasRows)
                         {
-                            // m_log.DebugFormat("[PROFILES_DATA]" +
+                            // m_log.LogDebug("[PROFILES_DATA]" +
                             //                  ": Getting data for {0}.", props.UserId);
                             reader.Read();
                             props.WebUrl = (string)reader["profileURL"].ToString();
@@ -618,7 +619,7 @@ public class UserProfilesData : IProfilesData
                         }
                         else
                         {
-                            //m_log.DebugFormat("[PROFILES_DATA]" +
+                            //m_log.LogDebug("[PROFILES_DATA]" +
                             //                 ": No data for {0}", props.UserId);
 
                             props.WebUrl = string.Empty;
@@ -670,7 +671,7 @@ public class UserProfilesData : IProfilesData
 
                             using (NpgsqlCommand put = new NpgsqlCommand(query, dbcon))
                             {
-                                //m_log.DebugFormat("[PROFILES_DATA]" +
+                                //m_log.LogDebug("[PROFILES_DATA]" +
                                 //                  ": Adding new data for {0}", props.UserId);
 
                                 put.Parameters.Add(m_database.CreateParameter("userId", props.UserId));
@@ -697,7 +698,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: GetAvatarProperties exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: GetAvatarProperties exception ");
             result = e.Message;
             return false;
         }
@@ -737,7 +738,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: AgentPropertiesUpdate exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: AgentPropertiesUpdate exception ");
             return false;
         }
 
@@ -780,7 +781,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: UpdateAvatarInterests exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: UpdateAvatarInterests exception ");
             result = e.Message;
             return false;
         }
@@ -861,7 +862,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: GetUserImageAssets exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: GetUserImageAssets exception ");
         }
 
         return data;
@@ -914,7 +915,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: GetUserPreferences exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: GetUserPreferences exception ");
             result = e.Message;
         }
 
@@ -949,7 +950,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: UpdateUserPreferences exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: UpdateUserPreferences exception ");
             result = e.Message;
             return false;
         }
@@ -1011,7 +1012,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: GetUserAppData exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: GetUserAppData exception ");
             result = e.Message;
             return false;
         }
@@ -1048,7 +1049,7 @@ public class UserProfilesData : IProfilesData
         }
         catch (Exception e)
         {
-            m_log.Error("[PROFILES_DATA]: SetUserData exception ", e);
+            m_log.LogError(e, "[PROFILES_DATA]: SetUserData exception ");
             return false;
         }
 

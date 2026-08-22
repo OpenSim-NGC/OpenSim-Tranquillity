@@ -25,18 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authorization;
 
 public class LocalAuthorizationServicesConnector : INonSharedRegionModule, IAuthorizationService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAuthorizationService m_AuthorizationService;
     private Scene m_Scene;
@@ -56,7 +58,7 @@ public class LocalAuthorizationServicesConnector : INonSharedRegionModule, IAuth
 
     public void Initialise(IConfigSource source)
     {
-        m_log.Info("[AUTHORIZATION CONNECTOR]: Initialise");
+        m_log.LogInformation("[AUTHORIZATION CONNECTOR]: Initialise");
 
         IConfig moduleConfig = source.Configs["Modules"];
         if (moduleConfig != null)
@@ -66,7 +68,7 @@ public class LocalAuthorizationServicesConnector : INonSharedRegionModule, IAuth
             {
                 m_Enabled = true;
                 m_AuthorizationConfig = source.Configs["AuthorizationService"];
-                m_log.Info("[AUTHORIZATION CONNECTOR]: Local authorization connector enabled");
+                m_log.LogInformation("[AUTHORIZATION CONNECTOR]: Local authorization connector enabled");
             }
         }
     }
@@ -99,7 +101,7 @@ public class LocalAuthorizationServicesConnector : INonSharedRegionModule, IAuth
 
         m_AuthorizationService = new AuthorizationService(m_AuthorizationConfig, scene);
 
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[AUTHORIZATION CONNECTOR]: Enabled local authorization for region {0}",
             scene.RegionInfo.RegionName);
     }

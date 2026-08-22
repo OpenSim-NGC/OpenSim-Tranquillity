@@ -27,7 +27,6 @@
 
 using System.Reflection;
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 
@@ -35,11 +34,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.OptionalModules.World.NPC;
 
 public class NPCModule : INPCModule, ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly Dictionary<UUID, NPCAvatar> m_avatars = new Dictionary<UUID, NPCAvatar>();
     private NPCOptionsFlags m_NPCOptionFlags;
@@ -178,7 +179,7 @@ public class NPCModule : INPCModule, ISharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.Info("[NPC MODULE]: exception creating NPC avatar: " + e.ToString());
+            m_log.LogInformation("[NPC MODULE]: exception creating NPC avatar: " + e.ToString());
             return UUID.Zero;
         }
 
@@ -186,7 +187,7 @@ public class NPCModule : INPCModule, ISharedRegionModule
         uint circuit = (uint)Random.Shared.Next(0, int.MaxValue);
         npcAvatar.CircuitCode = circuit;
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[NPC MODULE]: Creating NPC {0} {1} {2}, owner={3}, senseAsAgent={4} at {5} in {6}",
         //    firstname, lastname, npcAvatar.AgentId, owner, senseAsAgent, position, scene.RegionInfo.RegionName);
 
@@ -204,7 +205,7 @@ public class NPCModule : INPCModule, ISharedRegionModule
         for (int i = 0;
                 i < acd.Appearance.Texture.FaceTextures.Length; i++)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                     "[NPC MODULE]: NPC avatar {0} has texture id {1} : {2}",
                     acd.AgentID, i,
                     acd.Appearance.Texture.FaceTextures[i]);
@@ -223,11 +224,11 @@ public class NPCModule : INPCModule, ISharedRegionModule
                 sp.CompleteMovement(npcAvatar, false);
                 sp.Grouptitle = groupTitle;
                 m_avatars.Add(agentID, npcAvatar);
-                //m_log.DebugFormat("[NPC MODULE]: Created NPC {0} {1}", npcAvatar.AgentId, sp.Name);
+                //m_log.LogDebug("[NPC MODULE]: Created NPC {0} {1}", npcAvatar.AgentId, sp.Name);
             }
         }
 
-//            m_log.DebugFormat("[NPC MODULE]: Created NPC with id {0}", npcAvatar.AgentId);
+//            m_log.LogDebug("[NPC MODULE]: Created NPC with id {0}", npcAvatar.AgentId);
 
         return agentID;
     }
@@ -245,7 +246,7 @@ public class NPCModule : INPCModule, ISharedRegionModule
                     if (sp.IsSatOnObject || sp.SitGround)
                         return false;
 
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //        "[NPC MODULE]: Moving {0} to {1} in {2}, noFly {3}, landAtTarget {4}",
                 //        sp.Name, pos, scene.RegionInfo.RegionName,
                 //        noFly, landAtTarget);
@@ -412,7 +413,7 @@ public class NPCModule : INPCModule, ISharedRegionModule
             if (m_avatars.TryGetValue(agentID, out av))
             {
                 /*
-                m_log.DebugFormat("[NPC MODULE]: Found {0} {1} to remove",
+                m_log.LogDebug("[NPC MODULE]: Found {0} {1} to remove",
                         agentID, av.Name);
                 */
                 doRemove = true;
@@ -426,12 +427,12 @@ public class NPCModule : INPCModule, ISharedRegionModule
             {
                 m_avatars.Remove(agentID);
             }
-            m_log.DebugFormat("[NPC MODULE]: Removed NPC {0} {1}",
+            m_log.LogDebug("[NPC MODULE]: Removed NPC {0} {1}",
                     agentID, av.Name);
             return true;
         }
         /*
-        m_log.DebugFormat("[NPC MODULE]: Could not find {0} to remove",
+        m_log.LogDebug("[NPC MODULE]: Could not find {0} to remove",
                 agentID);
         */
         return false;

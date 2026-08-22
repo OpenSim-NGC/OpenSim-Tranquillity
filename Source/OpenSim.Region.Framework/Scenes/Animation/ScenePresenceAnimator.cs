@@ -26,10 +26,11 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes.Animation;
 
@@ -38,7 +39,7 @@ namespace OpenSim.Region.Framework.Scenes.Animation;
 /// </summary>
 public class ScenePresenceAnimator
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public AnimationSet Animations
     {
@@ -82,9 +83,9 @@ public class ScenePresenceAnimator
         if (m_scenePresence.IsChildAgent)
             return;
 
-        // m_log.DebugFormat("[SCENE PRESENCE ANIMATOR]: Adding animation {0} for {1}", animID, m_scenePresence.Name);
+        // m_log.LogDebug("[SCENE PRESENCE ANIMATOR]: Adding animation {0} for {1}", animID, m_scenePresence.Name);
         if (m_scenePresence.Scene.DebugAnimations)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SCENE PRESENCE ANIMATOR]: Adding animation {0} {1} for {2}",
                 GetAnimName(animID), animID, m_scenePresence.Name);
 
@@ -105,7 +106,7 @@ public class ScenePresenceAnimator
         if (animID.IsZero())
             return;
 
-        // m_log.DebugFormat("[SCENE PRESENCE ANIMATOR]: Adding animation {0} {1} for {2}", animID, name, m_scenePresence.Name);
+        // m_log.LogDebug("[SCENE PRESENCE ANIMATOR]: Adding animation {0} {1} for {2}", animID, name, m_scenePresence.Name);
 
         AddAnimation(animID, objectID);
     }
@@ -124,7 +125,7 @@ public class ScenePresenceAnimator
             return;
 
         if (m_scenePresence.Scene.DebugAnimations)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SCENE PRESENCE ANIMATOR]: Removing animation {0} {1} for {2}",
                 GetAnimName(animID), animID, m_scenePresence.Name);
 
@@ -167,7 +168,7 @@ public class ScenePresenceAnimator
     public void ResetAnimations()
     {
         if (m_scenePresence.Scene.DebugAnimations)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SCENE PRESENCE ANIMATOR]: Resetting animations for {0} in {1}",
                 m_scenePresence.Name, m_scenePresence.Scene.RegionInfo.RegionName);
 
@@ -187,13 +188,13 @@ public class ScenePresenceAnimator
     {
         if (m_scenePresence.IsChildAgent)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[SCENE PRESENCE ANIMATOR]: Tried to set movement animation {0} on child presence {1}",
                 anim, m_scenePresence.Name);
             return false;
         }
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[SCENE PRESENCE ANIMATOR]: Setting movement animation {0} for {1}",
         //        anim, m_scenePresence.Name);
 
@@ -229,7 +230,7 @@ public class ScenePresenceAnimator
 
         if (m_animations.TrySetDefaultAnimation(anim, m_scenePresence.ControllingClient.NextAnimationSequenceNumber, m_scenePresence.UUID))
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[SCENE PRESENCE ANIMATOR]: Updating movement animation to {0} for {1}",
             //       anim, m_scenePresence.Name);
 
@@ -574,7 +575,7 @@ public class ScenePresenceAnimator
     /// <returns>'true' if the animation was changed</returns>
     public bool UpdateMovementAnimations()
     {
-        // m_log.DebugFormat("[SCENE PRESENCE ANIMATOR]: Updating movement animations for {0}", m_scenePresence.Name);
+        // m_log.LogDebug("[SCENE PRESENCE ANIMATOR]: Updating movement animations for {0}", m_scenePresence.Name);
         lock (m_animations)
         {
             string newMovementAnimation = DetermineMovementAnimation();
@@ -582,7 +583,7 @@ public class ScenePresenceAnimator
                 return false;
 
             CurrentMovementAnimation = newMovementAnimation;
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //    "[SCENE PRESENCE ANIMATOR]: Determined animation {0} for {1} {2} {3} in UpdateMovementAnimations()",
             //    CurrentMovementAnimation, m_scenePresence.Name, isJumping, Falling);
 
@@ -852,7 +853,7 @@ public class ScenePresenceAnimator
     /// </summary>
     public void SendAnimPack()
     {
-        //m_log.Debug("Sending animation pack to all");
+        //m_log.LogDebug("Sending animation pack to all");
 
         if (m_scenePresence.IsChildAgent)
             return;

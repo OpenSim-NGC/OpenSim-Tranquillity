@@ -27,20 +27,21 @@
 
 using System.Reflection;
 
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace osWebRtcVoice;
 
 // Encapsulization of a Session to the Janus server
 public class JanusAudioBridge : JanusPlugin
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[JANUS AUDIO BRIDGE]";
 
     // Wrapper around the session connection to Janus-gateway
     public JanusAudioBridge(JanusSession pSession) : base(pSession, "janus.plugin.audiobridge")
     {
-        // m_log.DebugFormat("{0} JanusAudioBridge constructor", LogHeader);
+        // m_log.LogDebug("{0} JanusAudioBridge constructor", LogHeader);
     }
 
     public override void Dispose()
@@ -62,7 +63,7 @@ public class JanusAudioBridge : JanusPlugin
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} SendPluginMsg. Exception {1}", LogHeader, e);
+            m_log.LogError("{0} SendPluginMsg. Exception {1}", LogHeader, e);
         }
         return ret;
     }
@@ -85,7 +86,7 @@ public class JanusAudioBridge : JanusPlugin
             JanusMessageResp resp = await SendPluginMsg(new AudioBridgeCreateRoomReq(pRoomId, pSpatial, pRoomDesc));
             AudioBridgeResp abResp = new AudioBridgeResp(resp);
 
-            m_log.DebugFormat("{0} CreateRoom. ReturnCode: {1}", LogHeader, abResp.AudioBridgeReturnCode);
+            m_log.LogDebug("{0} CreateRoom. ReturnCode: {1}", LogHeader, abResp.AudioBridgeReturnCode);
             switch (abResp.AudioBridgeReturnCode)
             {
                 case "created":
@@ -94,23 +95,23 @@ public class JanusAudioBridge : JanusPlugin
                 case "event":
                     if (abResp.AudioBridgeErrorCode == 486)
                     {
-                        m_log.WarnFormat("{0} CreateRoom. Room {1} already exists. Reusing! {2}", LogHeader, pRoomId, abResp.ToString());
+                        m_log.LogWarning("{0} CreateRoom. Room {1} already exists. Reusing! {2}", LogHeader, pRoomId, abResp.ToString());
                         // if room already exists, just use it
                         ret = new JanusRoom(this, pRoomId);
                     }
                     else
                     {
-                        m_log.ErrorFormat("{0} CreateRoom. XX Room creation failed: {1}", LogHeader, abResp.ToString());
+                        m_log.LogError("{0} CreateRoom. XX Room creation failed: {1}", LogHeader, abResp.ToString());
                     }
                     break;
                 default:
-                    m_log.ErrorFormat("{0} CreateRoom. YY Room creation failed: {1}", LogHeader, abResp.ToString());
+                    m_log.LogError("{0} CreateRoom. YY Room creation failed: {1}", LogHeader, abResp.ToString());
                     break;
             }   
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} CreateRoom. Exception {1}", LogHeader, e);
+            m_log.LogError("{0} CreateRoom. Exception {1}", LogHeader, e);
         }
         return ret;
     }
@@ -125,7 +126,7 @@ public class JanusAudioBridge : JanusPlugin
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} DestroyRoom. Exception {1}", LogHeader, e);
+            m_log.LogError("{0} DestroyRoom. Exception {1}", LogHeader, e);
         }
         return ret;
     }
@@ -170,7 +171,7 @@ public class JanusAudioBridge : JanusPlugin
         int roomNumber = CalcRoomNumber(pRegionId, pChannelType, pParcelLocalID, pChannelID);
 
         // Should be unique for the given use and channel type
-        m_log.DebugFormat("{0} SelectRoom: roomNumber={1}", LogHeader, roomNumber);
+        m_log.LogDebug("{0} SelectRoom: roomNumber={1}", LogHeader, roomNumber);
 
         // Check to see if the room has already been created
         lock (_rooms)
@@ -229,7 +230,7 @@ public class JanusAudioBridge : JanusPlugin
         if (abResp is not null && abResp.AudioBridgeReturnCode == "event")
         {
             // An audio bridge event!
-            m_log.DebugFormat("{0} Handle_Event. {1}", LogHeader, abResp.ToString());
+            m_log.LogDebug("{0} Handle_Event. {1}", LogHeader, abResp.ToString());
         }
 
     }
@@ -240,7 +241,7 @@ public class JanusAudioBridge : JanusPlugin
         if (abResp is not null && abResp.AudioBridgeReturnCode == "event")
         {
             // An audio bridge event!
-            m_log.DebugFormat("{0} Handle_Event. {1}", LogHeader, abResp.ToString());
+            m_log.LogDebug("{0} Handle_Event. {1}", LogHeader, abResp.ToString());
         }
 
     }

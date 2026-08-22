@@ -37,7 +37,6 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.2" />
     <PackageReference Include="Npgsql" Version="10.0.3" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
   </ItemGroup>

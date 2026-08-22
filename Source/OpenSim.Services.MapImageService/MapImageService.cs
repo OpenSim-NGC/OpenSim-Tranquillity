@@ -29,7 +29,6 @@
  * https://github.com/openmetaversefoundation/simiangrid/
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -38,12 +37,14 @@ using System.Reflection;
 using SkiaSharp;
 using System.Timers;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.MapImageService;
 
 public class MapImageService : IMapImageService
 {
     // Logging.
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[MAP IMAGE SERVICE]";
 
     // Image standards.
@@ -105,7 +106,7 @@ public class MapImageService : IMapImageService
             && !SkiaImageUtils.TryDecodeFromJ2K(imageData, out inputImage))
         {
             reason = $"The submitted data is not an image file";
-            m_log.Warn($"{LogHeader}: Add map tile at {x},{y} failed: {reason}");
+            m_log.LogWarning($"{LogHeader}: Add map tile at {x},{y} failed: {reason}");
             return false;
         }
 
@@ -115,7 +116,7 @@ public class MapImageService : IMapImageService
             if (inputImage.Width != IMAGE_WIDTH || inputImage.Height != IMAGE_WIDTH)
             {
                 reason = $"The image is not 256x256. It is {inputImage.Width}x{inputImage.Height}";
-                m_log.Warn($"{LogHeader}: Add map tile at {x},{y} failed: {reason}");
+                m_log.LogWarning($"{LogHeader}: Add map tile at {x},{y} failed: {reason}");
                 return false;
             }
 
@@ -123,7 +124,7 @@ public class MapImageService : IMapImageService
             if (!SkiaImageUtils.TryEncodeToJpeg(inputImage, JPEG_QUALITY, out jpegBytes))
             {
                 reason = $"Failed to re-encode the submitted data as JPEG.";
-                m_log.Warn($"{LogHeader}: Add map tile at {x},{y} failed: {reason}");
+                m_log.LogWarning($"{LogHeader}: Add map tile at {x},{y} failed: {reason}");
                 return false;
             }
         }
@@ -141,7 +142,7 @@ public class MapImageService : IMapImageService
         catch (Exception e)
         {
             reason = e.Message;
-            m_log.Warn($"{LogHeader}: Unable to save incoming image to {fileName}. Message: {reason}");
+            m_log.LogWarning($"{LogHeader}: Unable to save incoming image to {fileName}. Message: {reason}");
             return false;
         }
 
@@ -165,7 +166,7 @@ public class MapImageService : IMapImageService
         catch (Exception e)
         {
             reason = e.Message;
-            m_log.Warn($"{LogHeader}: Unable to delete file {fileName}. Reason: {reason}");
+            m_log.LogWarning($"{LogHeader}: Unable to delete file {fileName}. Reason: {reason}");
             return false;
         }
 
@@ -484,7 +485,7 @@ public class MapImageService : IMapImageService
                         }
                         catch (Exception e)
                         {
-                            m_log.Warn($"{LogHeader}: Unable to save new zoom map tile {parentFile}. Reason: {e.Message}");
+                            m_log.LogWarning($"{LogHeader}: Unable to save new zoom map tile {parentFile}. Reason: {e.Message}");
                         }
                     }
                     else
@@ -500,7 +501,7 @@ public class MapImageService : IMapImageService
                         }
                         catch (Exception e)
                         {
-                            m_log.Warn($"{LogHeader}: Unable to delete all-water tile {parentFile}. Reason: {e.Message}");
+                            m_log.LogWarning($"{LogHeader}: Unable to delete all-water tile {parentFile}. Reason: {e.Message}");
                         }
                     }
                 }
@@ -535,7 +536,7 @@ public class MapImageService : IMapImageService
                             SKBitmap output = SKBitmap.Decode(fs);
                             if (output is null)
                             {
-                                m_log.Error($"{LogHeader}: Failed to decode map tile {fileName}");
+                                m_log.LogError($"{LogHeader}: Failed to decode map tile {fileName}");
                                 return null;
                             }
 
@@ -547,7 +548,7 @@ public class MapImageService : IMapImageService
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"{LogHeader}: Unable to read map tile from {fileName}", e);
+                    m_log.LogError(e, $"{LogHeader}: Unable to read map tile from {fileName}");
                 }
             }
 

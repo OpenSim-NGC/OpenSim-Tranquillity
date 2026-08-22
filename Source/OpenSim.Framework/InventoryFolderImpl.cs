@@ -27,11 +27,13 @@
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework;
 
 public class InventoryFolderImpl : InventoryFolderBase
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static readonly string PATH_DELIMITER = "/";
 
@@ -374,7 +376,7 @@ public class InventoryFolderImpl : InventoryFolderBase
         {
             foreach (InventoryItemBase item in Items.Values)
             {
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[INVENTORY FOLDER IMPL]: Returning item {0} {1}, OwnerPermissions {2:X}",
                 //    item.Name, item.ID, item.CurrentPermissions);
 
@@ -382,7 +384,7 @@ public class InventoryFolderImpl : InventoryFolderBase
             }
         }
 
-        //m_log.DebugFormat("[INVENTORY FOLDER IMPL]: Found {0} items", itemList.Count);
+        //m_log.LogDebug("[INVENTORY FOLDER IMPL]: Found {0} items", itemList.Count);
 
         return itemList;
     }

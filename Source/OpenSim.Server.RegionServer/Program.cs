@@ -43,11 +43,6 @@ public static class Program
 
     public static int Main(string[] args)
     {
-        var logconfigOption = new Option<string>("--logconfig")
-        {
-            Description = "Instruct log4net to use this file as configuration file.",
-            DefaultValueFactory = ParseResult => "OpenSim.Server.RegionServer.dll.config",
-        };
         var inifileOption = new Option<List<string>>("--inifile")
         {
             Description = "Specify the location of zero or more .ini file(s) to read."
@@ -79,7 +74,6 @@ public static class Program
 
         RootCommand rootCommand = new RootCommand("Launch the OpenSim Region Server");
 
-        rootCommand.Options.Add(logconfigOption);
         rootCommand.Options.Add(inifileOption);
         rootCommand.Options.Add(inimasterOption);
         rootCommand.Options.Add(inidirectoryOption);
@@ -101,7 +95,6 @@ public static class Program
         {
             rootCommand.SetAction(parseResult => Configure(
                 args: args,
-                logConfig: parseResult.GetValue(logconfigOption),
                 iniFile: parseResult.GetValue(inifileOption),
                 iniMaster: parseResult.GetValue(inimasterOption),
                 iniDirectory: parseResult.GetValue(inidirectoryOption),
@@ -119,7 +112,6 @@ public static class Program
 
     static void Configure(
         string[] args,
-        string logConfig,
         List<string> iniFile,
         string iniMaster,
         string iniDirectory,
@@ -130,13 +122,9 @@ public static class Program
         // Hook the appdomain to the crash reporter before anything else runs.
         Application.RegisterCrashDumpHandler();
 
-        // Configure log4net up front so that early startup output is captured.
-        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
-        var logPath = Environment.GetEnvironmentVariable("LOGDIR");
-        if (string.IsNullOrWhiteSpace(logPath) is false)
-            log4NetBootstrapper.LogPath = logPath;
-        string effectiveLogConfig = 
-            log4NetBootstrapper.Configure(logConfig, "OpenSim.Server.RegionServer.dll.config");
+        string logPath = Environment.GetEnvironmentVariable("LOGDIR");
+        if (string.IsNullOrWhiteSpace(logPath))
+            logPath = ".";
 
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
@@ -179,19 +167,13 @@ public static class Program
         .ConfigureLogging(loggingBuilder =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
-            loggingBuilder.AddSimpleConsole(options =>
-            {
-                options.TimestampFormat = "[yyyy-MM-dd HH:mm:ss] "; // Custom timestamp
-                options.SingleLine = true; // Single-line output
-                options.IncludeScopes = true; // Enable scopes if needed
-            });
-                        
+            loggingBuilder.AddOpenSimLogging("OpenSim.Server.RegionServer", logPath);
+
             LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })
         .ConfigureServices(services =>
         {
-            services.AddSingleton(new RegionHostOptions(iniFile, iniMaster, iniDirectory, consoleType, logConfig, background));
+            services.AddSingleton(new RegionHostOptions(iniFile, iniMaster, iniDirectory, consoleType, background));
             services.AddSingleton<IProcessSetupService, ProcessSetupService>();
             services.AddSingleton<IStartupFailureCoordinator, StartupFailureCoordinator>();
             services.AddSingleton<IRuntimeMonitoringController, RuntimeMonitoringController>();

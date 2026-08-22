@@ -33,6 +33,7 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
@@ -123,7 +124,7 @@ public class MeshUploadFlagModule : INonSharedRegionModule
     //private void MeshUploadFlag(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agentID)
     private void MeshUploadFlag(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-//            m_log.DebugFormat("[MESH UPLOAD FLAG MODULE]: MeshUploadFlag request");
+//            m_log.LogDebug("[MESH UPLOAD FLAG MODULE]: MeshUploadFlag request");
         if(httpRequest.HttpMethod != "GET")
         {
             httpResponse.StatusCode = (int)HttpStatusCode.NotFound;

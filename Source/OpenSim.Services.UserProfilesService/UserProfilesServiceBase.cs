@@ -27,16 +27,17 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Services.Base;
 using OpenSim.Data;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Services.ProfilesService;
 
 public class UserProfilesServiceBase: ServiceBase
 {
-    static readonly ILog m_log =
-        LogManager.GetLogger(
+    static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     public IProfilesData ProfilesData;
@@ -51,7 +52,7 @@ public class UserProfilesServiceBase: ServiceBase
     {
         if(string.IsNullOrEmpty(configName))
         {
-            m_log.WarnFormat("[PROFILES SERVICE]: Configuration section not given!");
+            m_log.LogWarning("[PROFILES SERVICE]: Configuration section not given!");
             return;
         }
 

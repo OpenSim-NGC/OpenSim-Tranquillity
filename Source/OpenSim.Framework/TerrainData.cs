@@ -29,7 +29,7 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -64,7 +64,7 @@ public enum DBTerrainRevision
 
 public class TerrainData
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static string LogHeader = "[TERRAIN DATA]";
 
     private float[,] m_heightmap;
@@ -471,7 +471,7 @@ public class TerrainData
                 m_heightmap[ii, jj] = (float)pTerrain[ii, jj];
             }
         }
-        // m_log.DebugFormat("{0} new by doubles. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
+        // m_log.LogDebug("{0} new by doubles. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
 
         m_taints = new TerrainTaintsArray(m_taintSizeX * m_taintSizeY);
     }
@@ -490,7 +490,7 @@ public class TerrainData
         m_heightmap = new float[SizeX, SizeY];
         m_taints = new TerrainTaintsArray(m_taintSizeX * m_taintSizeY);
 
-        // m_log.DebugFormat("{0} new by dimensions. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
+        // m_log.LogDebug("{0} new by dimensions. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
         ClearLand(0f);
     }
 
@@ -502,7 +502,7 @@ public class TerrainData
         for (int xx = 0; xx < SizeX; xx++)
             for (int yy = 0; yy < SizeY; yy++)
                 m_heightmap[xx, yy] = cmap[ind++];
-        // m_log.DebugFormat("{0} new by compressed map. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
+        // m_log.LogDebug("{0} new by compressed map. sizeX={1}, sizeY={2}, sizeZ={3}", LogHeader, SizeX, SizeY, SizeZ);
     }
 
     // Create a heighmap from a database blob
@@ -513,20 +513,20 @@ public class TerrainData
         {
             case DBTerrainRevision.Variable2DGzip:
                 FromCompressedTerrainSerializationV2DGZip(pBlob);
-                m_log.DebugFormat("{0} HeightmapTerrainData create from Variable2DGzip serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
+                m_log.LogDebug("{0} HeightmapTerrainData create from Variable2DGzip serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
                 break;
 
             case DBTerrainRevision.Variable2D:
                 FromCompressedTerrainSerializationV2D(pBlob);
-                m_log.DebugFormat("{0} HeightmapTerrainData create from Variable2D serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
+                m_log.LogDebug("{0} HeightmapTerrainData create from Variable2D serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
                 break;
             case DBTerrainRevision.Compressed2D:
                 FromCompressedTerrainSerialization2D(pBlob);
-                m_log.DebugFormat("{0} HeightmapTerrainData create from Compressed2D serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
+                m_log.LogDebug("{0} HeightmapTerrainData create from Compressed2D serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
                 break;
             default:
                 FromLegacyTerrainSerialization(pBlob);
-                m_log.DebugFormat("{0} HeightmapTerrainData create from legacy serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
+                m_log.LogDebug("{0} HeightmapTerrainData create from legacy serialization. Size=<{1},{2}>", LogHeader, SizeX, SizeY);
                 break;
         }
     }
@@ -618,7 +618,7 @@ public class TerrainData
         }
         catch {}
 
-        m_log.DebugFormat("{0} V2D {1} bytes", LogHeader, ret.Length);
+        m_log.LogDebug("{0} V2D {1} bytes", LogHeader, ret.Length);
 
         return ret;
     }
@@ -651,11 +651,11 @@ public class TerrainData
                     ret = outputStream.ToArray();
                 }
             }
-            m_log.Debug($"{LogHeader} V2DGzip {ret.Length} bytes");
+            m_log.LogDebug($"{LogHeader} V2DGzip {ret.Length} bytes");
         }
         catch (Exception ex)
         {
-            m_log.Error($"{LogHeader} V2DGzip error: {ex.Message}");
+            m_log.LogError($"{LogHeader} V2DGzip error: {ex.Message}");
         }
         return ret;
     }
@@ -707,7 +707,7 @@ public class TerrainData
             }
             ClearTaint();
 
-            m_log.DebugFormat("{0} Read (compressed2D) heightmap. Heightmap size=<{1},{2}>. Region size=<{3},{4}>. CompFact={5}",
+            m_log.LogDebug("{0} Read (compressed2D) heightmap. Heightmap size=<{1},{2}>. Region size=<{3},{4}>. CompFact={5}",
                             LogHeader, hmSizeX, hmSizeY, SizeX, SizeY, hmCompressionFactor);
         }
     }
@@ -757,13 +757,13 @@ public class TerrainData
         catch (Exception e)
         {
             ClearTaint();
-            m_log.ErrorFormat("{0} 2D error: {1} - terrain may be damaged",
+            m_log.LogError("{0} 2D error: {1} - terrain may be damaged",
                             LogHeader, e.Message);
             return;
         }
         ClearTaint();
 
-        m_log.DebugFormat("{0} V2D Heightmap size=<{1},{2}>. Region size=<{3},{4}>",
+        m_log.LogDebug("{0} V2D Heightmap size=<{1},{2}>. Region size=<{3},{4}>",
                         LogHeader, hmSizeX, hmSizeY, SizeX, SizeY);
 
     }
@@ -771,7 +771,7 @@ public class TerrainData
     // as above but Gzip compressed
     public void FromCompressedTerrainSerializationV2DGZip(byte[] pBlob)
     {
-        m_log.InfoFormat("{0} VD2Gzip {1} bytes input",
+        m_log.LogInformation("{0} VD2Gzip {1} bytes input",
                         LogHeader, pBlob.Length);
         int hmSizeX, hmSizeY;
 
@@ -822,13 +822,13 @@ public class TerrainData
         catch( Exception e)
         {
             ClearTaint();
-            m_log.ErrorFormat("{0} V2DGzip error: {1} - terrain may be damaged",
+            m_log.LogError("{0} V2DGzip error: {1} - terrain may be damaged",
                             LogHeader, e.Message);
             return;
         }
 
         ClearTaint();
-        m_log.DebugFormat("{0} V2DGzip. Heightmap size=<{1},{2}>. Region size=<{3},{4}>",
+        m_log.LogDebug("{0} V2DGzip. Heightmap size=<{1},{2}>. Region size=<{3},{4}>",
                         LogHeader, hmSizeX, hmSizeY, SizeX, SizeY);
 
     }

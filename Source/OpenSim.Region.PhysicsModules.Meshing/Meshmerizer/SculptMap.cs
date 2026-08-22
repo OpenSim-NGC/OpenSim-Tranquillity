@@ -26,6 +26,7 @@
  */
 
 using SkiaSharp;
+
 namespace PrimMesher;
 
 public class SculptMap

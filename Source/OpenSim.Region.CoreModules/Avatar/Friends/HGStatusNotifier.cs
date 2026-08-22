@@ -5,13 +5,13 @@ using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 
 using OpenMetaverse;
 
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends;
 
 public class HGStatusNotifier
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private HGFriendsModule m_FriendsModule;
 
@@ -35,7 +35,7 @@ public class HGStatusNotifier
             if (ids.Count == 0)
                 continue; // no one to notify. caller don't do this
 
-            //m_log.DebugFormat("[HG STATUS NOTIFIER]: Notifying {0} friends in {1}", ids.Count, kvp.Key);
+            //m_log.LogDebug("[HG STATUS NOTIFIER]: Notifying {0} friends in {1}", ids.Count, kvp.Key);
             // ASSUMPTION: we assume that all users for one home domain
             // have exactly the same set of service URLs.
             // If this is ever not true, we need to change this.

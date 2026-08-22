@@ -28,11 +28,12 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes;
 
@@ -47,7 +48,7 @@ namespace OpenSim.Region.Framework.Scenes;
 /// </remarks>
 public class UuidGatherer
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly HashSet<UUID> ToSkip = new()
     {
@@ -310,7 +311,7 @@ public class UuidGatherer
         if (m_assetUuidsToInspect.Contains(uuid))
             return false;
 
-        //m_log.DebugFormat("[UUID GATHERER]: Adding asset {0} for inspection", uuid);
+        //m_log.LogDebug("[UUID GATHERER]: Adding asset {0} for inspection", uuid);
 
         GatheredUuids[uuid] = type; 
         return true;
@@ -342,7 +343,7 @@ public class UuidGatherer
         if (m_assetUuidsToInspect.Contains(uuid))
             return false;
 
-        //m_log.DebugFormat("[UUID GATHERER]: Adding asset {0} for inspection", uuid);
+        //m_log.LogDebug("[UUID GATHERER]: Adding asset {0} for inspection", uuid);
 
         m_assetUuidsToInspect.Enqueue(uuid);
         return true;
@@ -359,7 +360,7 @@ public class UuidGatherer
     /// <param name="sceneObject">The scene object for which to gather assets</param>
     public void AddForInspection(SceneObjectGroup sceneObject)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[UUID GATHERER]: Getting assets for object {0}, {1}", sceneObject.Name, sceneObject.UUID);
         if(sceneObject.IsDeleted)
             return;
@@ -369,7 +370,7 @@ public class UuidGatherer
         {
             SceneObjectPart part = parts[i];
 
-            // m_log.DebugFormat(
+            // m_log.LogDebug(
             // "[UUID GATHERER]: Getting part {0}, {1} for object {2}", part.Name, part.UUID, sceneObject.UUID);
 
             try
@@ -438,7 +439,7 @@ public class UuidGatherer
                     }
                     catch (Exception)
                     {
-                        m_log.WarnFormat(
+                        m_log.LogWarning(
                             "[UUID GATHERER]: Could not check particle system for part {0} {1} in object {2} {3} since it is corrupt.  Continuing.",
                             part.Name, part.UUID, sceneObject.Name, sceneObject.UUID);
                     }
@@ -467,7 +468,7 @@ public class UuidGatherer
             }
             catch (Exception e)
             {
-                m_log.Error($"[UUID GATHERER]: Failed to get part - {e.Message}");
+                m_log.LogError($"[UUID GATHERER]: Failed to get part - {e.Message}");
             }
         }
         if(sceneObject.TemporaryInstance)
@@ -485,7 +486,7 @@ public class UuidGatherer
 
         UUID nextToInspect = m_assetUuidsToInspect.Dequeue();
 
-//            m_log.DebugFormat("[UUID GATHERER]: Inspecting asset {0}", nextToInspect);
+//            m_log.LogDebug("[UUID GATHERER]: Inspecting asset {0}", nextToInspect);
 
         GetAssetUuids(nextToInspect);
 
@@ -516,7 +517,7 @@ public class UuidGatherer
                 if (--i > 0)
                     sb.Append(',');
             }
-            m_log.Debug(sb.ToString());
+            m_log.LogDebug(sb.ToString());
         }
 
         return true;
@@ -559,7 +560,7 @@ public class UuidGatherer
         catch (Exception e)
         {
             if(verbose)
-                m_log.Error($"[UUID GATHERER]: Failed to get asset {assetUuid} : {e.Message}");
+                m_log.LogError($"[UUID GATHERER]: Failed to get asset {assetUuid} : {e.Message}");
             ErrorCount++;
             FailedUUIDs.Add(assetUuid);
             return;
@@ -567,7 +568,7 @@ public class UuidGatherer
 
         if(assetBase == null)
         {
-//                m_log.ErrorFormat("[UUID GATHERER]: asset {0} not found", assetUuid);
+//                m_log.LogError("[UUID GATHERER]: asset {0} not found", assetUuid);
             FailedUUIDs.Add(assetUuid);
             if(UncertainAssetsUUIDs.Contains(assetUuid))
                 possibleNotAssetCount++;
@@ -584,7 +585,7 @@ public class UuidGatherer
 
         if(assetBase.Data == null || assetBase.Data.Length == 0)
         {
-//                m_log.ErrorFormat("[UUID GATHERER]: asset {0}, type {1} has no data", assetUuid, assetType);
+//                m_log.LogError("[UUID GATHERER]: asset {0}, type {1} has no data", assetUuid, assetType);
             ErrorCount++;
             FailedUUIDs.Add(assetUuid);
             return;
@@ -633,7 +634,7 @@ public class UuidGatherer
         catch (Exception e)
         {
             if(verbose)
-                m_log.Error($"[UUID GATHERER]: Failed to gather uuids for asset with id {assetUuid} type {assetType}: {e.Message}");
+                m_log.LogError($"[UUID GATHERER]: Failed to gather uuids for asset with id {assetUuid} type {assetType}: {e.Message}");
             GatheredUuids.Remove(assetUuid);
             ErrorCount++;
             FailedUUIDs.Add(assetUuid);
@@ -679,7 +680,7 @@ public class UuidGatherer
         }
         catch (Exception)
         {
-            m_log.Error(
+            m_log.LogError(
                 $"[UUID GATHERER]: Failed to gather uuids for asset id {assetUuid}, type {assetType}");
             throw;
         }
@@ -725,7 +726,7 @@ public class UuidGatherer
 
             if (osdMaterials is OSDArray matsArr)
             {
-                //m_log.Info("[UUID Gatherer]: found Materials: " + OSDParser.SerializeJsonString(osd));
+                //m_log.LogInformation("[UUID Gatherer]: found Materials: " + OSDParser.SerializeJsonString(osd));
 
                 foreach (OSDMap matMap in matsArr)
                 {
@@ -740,7 +741,7 @@ public class UuidGatherer
                                 if (normalMapId.IsNotZero())
                                 {
                                     GatheredUuids[normalMapId] = (sbyte)AssetType.Texture;
-                                    //m_log.Info("[UUID Gatherer]: found normal map ID: " + normalMapId.ToString());
+                                    //m_log.LogInformation("[UUID Gatherer]: found normal map ID: " + normalMapId.ToString());
                                 }
                             }
                             if (mat.TryGetValue("SpecMap", out OSD tsmap))
@@ -749,7 +750,7 @@ public class UuidGatherer
                                 if (specularMapId.IsNotZero())
                                 {
                                     GatheredUuids[specularMapId] = (sbyte)AssetType.Texture;
-                                    //m_log.Info("[UUID Gatherer]: found specular map ID: " + specularMapId.ToString());
+                                    //m_log.LogInformation("[UUID Gatherer]: found specular map ID: " + specularMapId.ToString());
                                 }
                             }
                         }
@@ -757,7 +758,7 @@ public class UuidGatherer
                     }
                     catch (Exception e)
                     {
-                        m_log.Warn($"[UUID Gatherer]: exception getting materials: {e.Message}");
+                        m_log.LogWarning($"[UUID Gatherer]: exception getting materials: {e.Message}");
                     }
                 }
             }
@@ -1310,7 +1311,7 @@ public class UuidGatherer
 
 public class HGUuidGatherer : UuidGatherer
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected string m_assetServerURL;
 
@@ -1336,9 +1337,9 @@ public class HGUuidGatherer : UuidGatherer
         string IDstr = assetID.ToString();
         AssetBase asset = m_assetService.Get(IDstr, m_assetServerURL, true);
         if (asset is null)
-            m_log.Debug($"[HGUUIDGatherer]: Failed to fetch asset {IDstr} from {m_assetServerURL}");
+            m_log.LogDebug($"[HGUUIDGatherer]: Failed to fetch asset {IDstr} from {m_assetServerURL}");
         else
-            m_log.Debug($"[HGUUIDGatherer]: Copied asset {IDstr} from {m_assetServerURL} to local asset server");
+            m_log.LogDebug($"[HGUUIDGatherer]: Copied asset {IDstr} from {m_assetServerURL} to local asset server");
 
         return asset;
     }

@@ -31,7 +31,6 @@ using System.Collections;
 using SkiaSharp;
 using CoreJ2K;
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -44,6 +43,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.CoreModules.World.Land;
 
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
@@ -53,7 +53,7 @@ namespace OpenSim.Region.CoreModules.World.WorldMap;
 
 public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private const string LogHeader = "[WORLD MAP]";
 
     private static readonly string DEFAULT_WORLD_MAP_EXPORT_PATH = "exportmap.jpg";
@@ -230,7 +230,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
 
         string regionimage = "regionImage" + m_scene.RegionInfo.RegionID.ToString();
         regionimage = regionimage.Replace("-", "");
-        m_log.Info("[WORLD MAP]: JPEG Map location: " + m_scene.RegionInfo.ServerURI + "index.php?method=" + regionimage);
+        m_log.LogInformation("[WORLD MAP]: JPEG Map location: " + m_scene.RegionInfo.ServerURI + "index.php?method=" + regionimage);
 
         MainServer.Instance.DefaultServer.AddIndexPHPMethodHandler(regionimage, OnHTTPGetMapImage);
         MainServer.Instance.DefaultServer.AddSimpleStreamHandler(
@@ -268,7 +268,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
 
     public void OnRegisterCaps(UUID agentID, Caps caps)
     {
-        //m_log.DebugFormat("[WORLD MAP]: OnRegisterCaps: agentID {0} caps {1}", agentID, caps);
+        //m_log.LogDebug("[WORLD MAP]: OnRegisterCaps: agentID {0} caps {1}", agentID, caps);
         caps.RegisterSimpleHandler("MapLayer", new SimpleStreamHandler("/" + UUID.Random(), MapLayerRequest));
     }
 
@@ -369,7 +369,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
     public virtual void HandleMapItemRequest(IClientAPI remoteClient, uint flags,
         uint EstateID, bool godlike, uint itemtype, ulong regionhandle)
     {
-        // m_log.DebugFormat("[WORLD MAP]: Handle MapItem request {0} {1}", regionhandle, itemtype);
+        // m_log.LogDebug("[WORLD MAP]: Handle MapItem request {0} {1}", regionhandle, itemtype);
 
         lock (m_rootAgents)
         {
@@ -524,7 +524,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
 
                 default:
                     // unkown map item type
-                    m_log.DebugFormat("[WORLD MAP]: Unknown MapItem type {0}", itemtype);
+                    m_log.LogDebug("[WORLD MAP]: Unknown MapItem type {0}", itemtype);
                     break;
             }
         }
@@ -748,7 +748,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
     /// <returns></returns>
     private void RequestMapItemsAsync(MapRequestState requestState)
     {
-        // m_log.DebugFormat("[WORLDMAP]: RequestMapItemsAsync; region handle: {0} {1}", regionhandle, itemtype);
+        // m_log.LogDebug("[WORLDMAP]: RequestMapItemsAsync; region handle: {0} {1}", regionhandle, itemtype);
 
         ulong regionhandle = requestState.regionhandle;
         if (m_blacklistedregions.ContainsKey(regionhandle))
@@ -827,13 +827,13 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
             m_blacklistedregions.Add(regionhandle, expireBlackListTime);
             m_cachedRegionMapItemsResponses.Remove(regionhandle);
 
-            m_log.WarnFormat("[WORLD MAP]: Blacklisted url {0}", httpserver);
+            m_log.LogWarning("[WORLD MAP]: Blacklisted url {0}", httpserver);
             Interlocked.Decrement(ref nAsyncRequests);
             return;
         }
         catch
         {
-            m_log.DebugFormat("[WORLD MAP]: RequestMapItems failed for {0}", httpserver);
+            m_log.LogDebug("[WORLD MAP]: RequestMapItems failed for {0}", httpserver);
             m_blacklistedregions.Add(regionhandle, expireBlackListTime);
             m_cachedRegionMapItemsResponses.Remove(regionhandle);
             Interlocked.Decrement(ref nAsyncRequests);
@@ -850,7 +850,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
         }
         catch (Exception ex)
         {
-            m_log.InfoFormat("[WORLD MAP]: exception on parse of RequestMapItems reply from {0}: {1}", httpserver, ex.Message);
+            m_log.LogInformation("[WORLD MAP]: exception on parse of RequestMapItems reply from {0}: {1}", httpserver, ex.Message);
             m_blacklistedregions.Add(regionhandle, expireBlackListTime);
             m_cachedRegionMapItemsResponses.Remove(regionhandle);
 
@@ -925,7 +925,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                         m_mapBlockRequests[agentID].Count == 0 ))
                 {
                     spamBlocked.Remove(agentID);
-                    m_log.DebugFormat("[WoldMapModule] RequestMapBlocks release spammer {0}", agentID);
+                    m_log.LogDebug("[WoldMapModule] RequestMapBlocks release spammer {0}", agentID);
                 }
                 else
                     return;
@@ -943,7 +943,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                             (!m_mapBlockRequests.ContainsKey(k2) ||
                             m_mapBlockRequests[k2].Count == 0 ))
                         {
-                            m_log.DebugFormat("[WoldMapModule] RequestMapBlocks release spammer {0}", k2);
+                            m_log.LogDebug("[WoldMapModule] RequestMapBlocks release spammer {0}", k2);
                             k = k2;
                             expireone = true;
                         }
@@ -954,7 +954,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                 }
             }
 
-//                m_log.DebugFormat("[WoldMapModule] RequestMapBlocks {0}={1}={2}={3} {4}", minX, minY, maxX, maxY, flag);
+//                m_log.LogDebug("[WoldMapModule] RequestMapBlocks {0}={1}={2}={3} {4}", minX, minY, maxX, maxY, flag);
 
             MapBlockRequestData req = new MapBlockRequestData()
             {
@@ -977,7 +977,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
             else
             {
                 spamBlocked[agentID] = now + SPAMBLOCKTIMEms;
-                m_log.DebugFormat("[WoldMapModule] RequestMapBlocks blocking spammer {0} for {1} s",agentID, SPAMBLOCKTIMEms/1000.0);
+                m_log.LogDebug("[WoldMapModule] RequestMapBlocks blocking spammer {0} for {1} s",agentID, SPAMBLOCKTIMEms/1000.0);
             }
             m_mapBlockRequestEvent.Set();
         }
@@ -1159,7 +1159,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
         }
 
         byte[] jpeg = null;
-        m_log.Debug("[WORLD MAP]: Sending map image jpeg");
+        m_log.LogDebug("[WORLD MAP]: Sending map image jpeg");
 
         if (myMapImageJPEG.Length == 0)
         {
@@ -1194,12 +1194,12 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                 }
                 catch (Exception ex)
                 {
-                    m_log.WarnFormat("[WORLD MAP]: Failed to decode terrain image with CoreJ2K: {0}", ex.Message);
+                    m_log.LogWarning("[WORLD MAP]: Failed to decode terrain image with CoreJ2K: {0}", ex.Message);
                 }
             }
             catch (Exception e)
             {
-                m_log.Warn("[WORLD MAP]: Unable to generate Map image" + e.Message);
+                m_log.LogWarning("[WORLD MAP]: Unable to generate Map image" + e.Message);
                 response.StatusCode = (int)HttpStatusCode.NotFound;
                 return;
             }
@@ -1238,7 +1238,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
             // FIXME: If console region is root then this will be printed by every module.  Currently, there is no
             // way to prevent this, short of making the entire module shared (which is complete overkill).
             // One possibility is to return a bool to signal whether the module has completely handled the command
-            m_log.InfoFormat("[WORLD MAP]: Please change to a specific region in order to export its world map");
+            m_log.LogInformation("[WORLD MAP]: Please change to a specific region in order to export its world map");
             return;
         }
 
@@ -1252,7 +1252,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
         else
             exportPath = DEFAULT_WORLD_MAP_EXPORT_PATH;
 
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[WORLD MAP]: Exporting world map for {0} to {1}", m_regionName, exportPath);
 
         // assumed this is 1m less than next grid line
@@ -1383,7 +1383,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
             }
         }
 
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[WORLD MAP]: Successfully exported world map for {0} to {1}",
             m_regionName, exportPath);
     }
@@ -1520,7 +1520,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
             Console.WriteLine("No map image generator available for {0}", m_scene.Name);
             return;
         }
-        m_log.DebugFormat("[WORLD MAP]: Generating map image for {0}", m_scene.Name);
+        m_log.LogDebug("[WORLD MAP]: Generating map image for {0}", m_scene.Name);
         // New IMapImageGenerator returns SKBitmap. Convert to Bitmap for legacy GenerateMaptile
         using (SKBitmap mapbmp = m_mapImageGenerator.CreateMapTile())
         {
@@ -1607,7 +1607,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                     asset.Flags = AssetFlags.Maptile;
 
                     // Store the new one
-                    m_log.DebugFormat("[WORLD MAP]: Storing map image {0} for {1}", asset.ID, m_regionName);
+                    m_log.LogDebug("[WORLD MAP]: Storing map image {0} for {1}", asset.ID, m_regionName);
 
                     m_scene.AssetService.Store(asset);
 
@@ -1617,7 +1617,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
             }
             catch (Exception e)
             {
-                m_log.Error("[WORLD MAP]: Failed generating terrain map: " + e);
+                m_log.LogError("[WORLD MAP]: Failed generating terrain map: " + e);
             }
         }
 
@@ -1718,11 +1718,11 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
 
         if (!landForSale)
         {
-            m_log.DebugFormat("[WORLD MAP]: Region {0} has no parcels for sale, not generating overlay", m_regionName);
+            m_log.LogDebug("[WORLD MAP]: Region {0} has no parcels for sale, not generating overlay", m_regionName);
             return null;
         }
 
-        m_log.DebugFormat("[WORLD MAP]: Region {0} has parcels for sale, generating overlay", m_regionName);
+        m_log.LogDebug("[WORLD MAP]: Region {0} has parcels for sale, generating overlay", m_regionName);
 
         using (SKBitmap overlay = new SKBitmap(regionSizeX, regionSizeY))
         {
@@ -1758,7 +1758,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
             }
             catch (Exception e)
             {
-                m_log.DebugFormat("[WORLD MAP]: Error creating parcel overlay: " + e.ToString());
+                m_log.LogDebug("[WORLD MAP]: Error creating parcel overlay: " + e.ToString());
             }
         }
 

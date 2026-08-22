@@ -34,14 +34,15 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Handlers.Base;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.OfflineIM;
 
 public class OfflineIMServiceRobustConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IOfflineIMService m_OfflineIMService;
     private string m_ConfigName = "Messaging";
@@ -52,7 +53,7 @@ public class OfflineIMServiceRobustConnector : ServiceConnector
         if (configName != String.Empty)
             m_ConfigName = configName;
 
-        m_log.DebugFormat("[OfflineIM.V2.RobustConnector]: Starting with config name {0}", m_ConfigName);
+        m_log.LogDebug("[OfflineIM.V2.RobustConnector]: Starting with config name {0}", m_ConfigName);
 
         m_OfflineIMService = new OfflineIMService(config);
 
@@ -64,7 +65,7 @@ public class OfflineIMServiceRobustConnector : ServiceConnector
 
 public class OfflineIMServicePostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IOfflineIMService m_OfflineIMService;
 
@@ -82,7 +83,7 @@ public class OfflineIMServicePostHandler : BaseStreamHandler
         sr.Close();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -104,11 +105,11 @@ public class OfflineIMServicePostHandler : BaseStreamHandler
                 case "DELETE":
                     return HandleDelete(request);
             }
-            m_log.DebugFormat("[OFFLINE IM HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[OFFLINE IM HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[OFFLINE IM HANDLER]: Exception {0} ", e.Message), e);
+            m_log.LogError(e, string.Format("[OFFLINE IM HANDLER]: Exception {0} ", e.Message));
         }
 
         return FailureResult();
@@ -130,7 +131,7 @@ public class OfflineIMServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -155,7 +156,7 @@ public class OfflineIMServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 

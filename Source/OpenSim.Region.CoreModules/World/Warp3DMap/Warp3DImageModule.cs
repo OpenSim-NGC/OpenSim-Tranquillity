@@ -31,7 +31,6 @@ using System.Runtime;
 using CoreJ2K;
 using SkiaSharp;
 using Nini.Config;
-using log4net;
 using Warp3D;
 
 using OpenSim.Framework;
@@ -42,6 +41,7 @@ using OpenMetaverse;
 using OpenMetaverse.Rendering;
 using OpenMetaverse.StructuredData;
 
+using Microsoft.Extensions.Logging;
 using WarpRenderer = Warp3D.Warp3D;
 
 namespace OpenSim.Region.CoreModules.World.Warp3DMap;
@@ -51,7 +51,7 @@ public class Warp3DImageModule : IMapImageGenerator, INonSharedRegionModule
     private static readonly Color4 WATER_COLOR = new Color4(29, 72, 96, 216);
 //        private static readonly Color4 WATER_COLOR = new Color4(29, 72, 96, 128);
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 #pragma warning disable 414
     private static string LogHeader = "[WARP 3D IMAGE MODULE]";
@@ -135,9 +135,9 @@ public class Warp3DImageModule : IMapImageGenerator, INonSharedRegionModule
 
         List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
         if (renderers.Count > 0)
-            m_log.Info("[MAPTILE]: Loaded prim mesher " + renderers[0]);
+            m_log.LogInformation("[MAPTILE]: Loaded prim mesher " + renderers[0]);
         else
-            m_log.Info("[MAPTILE]: No prim mesher loaded, prim rendering will be disabled");
+            m_log.LogInformation("[MAPTILE]: No prim mesher loaded, prim rendering will be disabled");
 
         m_scene.RegisterModuleInterface<IMapImageGenerator>(this);
     }
@@ -347,7 +347,7 @@ private SKBitmap GenImage()
         catch (Exception e)
         {
             // JPEG2000 encoder failed
-            m_log.Error("[WARP 3D IMAGE MODULE]: Failed generating terrain map: ", e);
+            m_log.LogError(e, "[WARP 3D IMAGE MODULE]: Failed generating terrain map: ");
         }
 
         return null;
@@ -492,7 +492,7 @@ private SKBitmap GenImage()
                     try { CreatePrim(renderer, child); }
                     catch (Exception e)
                     {
-                        m_log.Warn($"[Warp3D] failed to render prim {child.Name} at {child.GetWorldPosition()}: {e.Message}");
+                        m_log.LogWarning($"[Warp3D] failed to render prim {child.Name} at {child.GetWorldPosition()}: {e.Message}");
                     }
                 }
             }
@@ -577,13 +577,13 @@ private SKBitmap GenImage()
                         // Note: Sculpt mesh rendering via GenerateFacetedSculptMesh requires System.Drawing.Bitmap.
                         // Since we're migrating away from System.Drawing, sculpt rendering is temporarily disabled.
                         // TODO: Update OpenMetaverse library to accept SkiaSharp bitmaps or find alternative approach.
-                        m_log.WarnFormat("[Warp3D] Sculpt rendering for prim {0} at {1} is not supported in SkiaSharp-only mode",
+                        m_log.LogWarning("[Warp3D] Sculpt rendering for prim {0} at {1} is not supported in SkiaSharp-only mode",
                             prim.Name, prim.GetWorldPosition().ToString());
                     }
                 }
                 else
                 {
-                    m_log.WarnFormat("[Warp3D] failed to get mesh or sculpt asset {0} of prim {1} at {2}",
+                    m_log.LogWarning("[Warp3D] failed to get mesh or sculpt asset {0} of prim {1} at {2}",
                         omvPrim.Sculpt.SculptTexture.ToString(), prim.Name, prim.GetWorldPosition().ToString());
                 }
             }
@@ -821,11 +821,11 @@ private SKBitmap GenImage()
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[Warp3D]: Failed to decode texture {0} for prim {1} at {2}, exception {3}", id.ToString(), sop.Name, sop.GetWorldPosition().ToString(), e.Message);
+                m_log.LogWarning("[Warp3D]: Failed to decode texture {0} for prim {1} at {2}, exception {3}", id.ToString(), sop.Name, sop.GetWorldPosition().ToString(), e.Message);
             }
         }
         else
-            m_log.WarnFormat("[Warp3D]: missing texture {0} data for prim {1} at {2}",
+            m_log.LogWarning("[Warp3D]: missing texture {0} data for prim {1} at {2}",
                 id.ToString(), sop.Name, sop.GetWorldPosition().ToString());
 
         m_warpTextures[id] = ret;
@@ -925,7 +925,7 @@ private SKBitmap GenImage()
         }
         catch (Exception ex)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[WARP 3D IMAGE MODULE]: Error decoding JPEG2000 texture {0} ({1} bytes): {2}",
                 textureID, j2kData.Length, ex.Message);
 

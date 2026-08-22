@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
@@ -38,11 +37,13 @@ using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Land;
 
 public class LandServiceInConnectorModule : ISharedRegionModule, ILandService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Enabled = false;
     private static bool m_Registered = false;
 
@@ -61,7 +62,7 @@ public class LandServiceInConnectorModule : ISharedRegionModule, ILandService
             m_Enabled = moduleConfig.GetBoolean("LandServiceInConnector", false);
             if (m_Enabled)
             {
-                m_log.Info("[LAND IN CONNECTOR]: LandServiceInConnector enabled");
+                m_log.LogInformation("[LAND IN CONNECTOR]: LandServiceInConnector enabled");
             }
 
         }
@@ -73,7 +74,7 @@ public class LandServiceInConnectorModule : ISharedRegionModule, ILandService
         if (!m_Enabled)
             return;
 
-//            m_log.Info("[LAND IN CONNECTOR]: Starting...");
+//            m_log.LogInformation("[LAND IN CONNECTOR]: Starting...");
     }
 
     public void Close()
@@ -122,7 +123,7 @@ public class LandServiceInConnectorModule : ISharedRegionModule, ILandService
 
     public LandData GetLandData(UUID scopeID, ulong regionHandle, uint x, uint y, out byte regionAccess)
     {
-//            m_log.DebugFormat("[LAND IN CONNECTOR]: GetLandData for {0}. Count = {1}",
+//            m_log.LogDebug("[LAND IN CONNECTOR]: GetLandData for {0}. Count = {1}",
 //                regionHandle, m_Scenes.Count);
 
         uint rx = 0, ry = 0;
@@ -143,7 +144,7 @@ public class LandServiceInConnectorModule : ISharedRegionModule, ILandService
             t += s.RegionInfo.RegionSizeY;
             if( ry  < t)
             {
-//                    m_log.Debug("[LAND IN CONNECTOR]: Found region to GetLandData from");
+//                    m_log.LogDebug("[LAND IN CONNECTOR]: Found region to GetLandData from");
                 x = rx - s.RegionInfo.WorldLocX;
                 y = ry - s.RegionInfo.WorldLocY;
                 regionAccess = s.RegionInfo.AccessLevel;
@@ -154,7 +155,7 @@ public class LandServiceInConnectorModule : ISharedRegionModule, ILandService
                 return land; 
             }
         }
-        m_log.DebugFormat("[LAND IN CONNECTOR]: region handle {0} not found", regionHandle);
+        m_log.LogDebug("[LAND IN CONNECTOR]: region handle {0} not found", regionHandle);
         regionAccess = 42;
         return null;
     }

@@ -27,10 +27,12 @@
 
 using OpenMetaverse;
 using OpenSim.Services.Interfaces;
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Data;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Services.AuthenticationService;
 
@@ -43,8 +45,7 @@ namespace OpenSim.Services.AuthenticationService;
 public class WebkeyAuthenticationService :
         AuthenticationServiceBase, IAuthenticationService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     public WebkeyAuthenticationService(IConfigSource config, IUserAccountService userService) :
@@ -67,7 +68,7 @@ public class WebkeyAuthenticationService :
     {
         if (new UUID(password).IsZero())
         {
-            m_log.DebugFormat("[AUTH SERVICE]: UUID.Zero is not a valid web_login_key on PrincipalID {0}", principalID);
+            m_log.LogDebug("[AUTH SERVICE]: UUID.Zero is not a valid web_login_key on PrincipalID {0}", principalID);
         }
         else
         {
@@ -85,13 +86,13 @@ public class WebkeyAuthenticationService :
                     }
                     else
                     {
-                        m_log.DebugFormat("[AUTH SERVICE]: web login auth failed, got PrincipalID {0} gave {1} instead of {2}", principalID, password, key);
+                        m_log.LogDebug("[AUTH SERVICE]: web login auth failed, got PrincipalID {0} gave {1} instead of {2}", principalID, password, key);
                     }
                 }else{
-                    m_log.DebugFormat("[AUTH SERVICE]: no col webLoginKey in passwd.db");
+                    m_log.LogDebug("[AUTH SERVICE]: no col webLoginKey in passwd.db");
                 }
             }
-            m_log.DebugFormat("[AUTH SERVICE]: PrincipalID {0} or its data not found", principalID);
+            m_log.LogDebug("[AUTH SERVICE]: PrincipalID {0} or its data not found", principalID);
         }
         return String.Empty;
     }

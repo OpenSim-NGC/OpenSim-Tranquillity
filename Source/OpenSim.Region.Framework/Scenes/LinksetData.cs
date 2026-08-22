@@ -3,13 +3,14 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.Framework.Scenes;
 
 public class LinksetData : ICloneable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     
     public const int LINKSETDATA_MAX = 131072;
 
@@ -79,13 +80,13 @@ public class LinksetData : ICloneable
             {
                 try
                 {
-                    m_log.Debug($"Exception deserializing LinkSetData, trying original format: {jse.Message}");
+                    m_log.LogDebug($"Exception deserializing LinkSetData, trying original format: {jse.Message}");
                     var listData = JsonSerializer.Deserialize<SortedList<string, LinksetDataEntry>>(data);
                     lsd = new LinksetData { Data = listData }; 
                 }
                 catch (Exception e)
                 {
-                    m_log.Error($"Exception deserializing LinkSetData new and original format: {data}", e);
+                    m_log.LogError(e, $"Exception deserializing LinkSetData new and original format: {data}");
                 }
                 finally
                 {
@@ -106,7 +107,7 @@ public class LinksetData : ICloneable
             }
             catch (Exception e)
             {
-                m_log.Error($"General Exception deserializing LinkSetData", e);
+                m_log.LogError(e, $"General Exception deserializing LinkSetData");
             }
         }
 

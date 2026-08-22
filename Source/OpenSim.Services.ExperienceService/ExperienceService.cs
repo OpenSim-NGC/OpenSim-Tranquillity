@@ -1,16 +1,16 @@
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.ExperienceService;
 
 public class ExperienceService : ExperienceServiceBase, IExperienceService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private IUserAccountService m_UserService = null;
@@ -24,7 +24,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
     public ExperienceService(IConfigSource config)
         : base(config)
     {
-        m_log.Debug("[EXPERIENCE SERVICE]: Starting experience service");
+        m_log.LogDebug("[EXPERIENCE SERVICE]: Starting experience service");
 
         IConfig userConfig = config.Configs["ExperienceService"];
         if (userConfig == null)

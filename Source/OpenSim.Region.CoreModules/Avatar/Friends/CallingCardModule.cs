@@ -26,20 +26,20 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends;
 
 public class CallingCardModule : ISharedRegionModule, ICallingCardModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     protected List<Scene> m_Scenes = new List<Scene>();
     protected bool m_Enabled = true;
 
@@ -185,7 +185,7 @@ public class CallingCardModule : ISharedRegionModule, ICallingCardModule
             folderID = folder.ID;
         }
 
-        m_log.DebugFormat("[XCALLINGCARD]: Creating calling card for {0} in inventory of {1}", info.Name, userID);
+        m_log.LogDebug("[XCALLINGCARD]: Creating calling card for {0} in inventory of {1}", info.Name, userID);
 
         InventoryItemBase item = new InventoryItemBase();
         item.AssetID = UUID.Zero;

@@ -38,8 +38,9 @@ using OpenSim.Server.Base;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.HypergridService;
 
@@ -51,7 +52,7 @@ namespace OpenSim.Services.HypergridService;
 /// </summary>
 public class UserAgentService : UserAgentServiceBase, IUserAgentService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // This will need to go into a DB table
     //static Dictionary<UUID, TravelingAgentInfo> m_Database = new Dictionary<UUID, TravelingAgentInfo>();
@@ -96,7 +97,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         {
             m_Initialized = true;
 
-            m_log.DebugFormat("[HOME USERS SECURITY]: Starting...");
+            m_log.LogDebug("[HOME USERS SECURITY]: Starting...");
 
             m_FriendsSimConnector = new FriendsSimConnector();
 
@@ -203,7 +204,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
     {
         position = new Vector3(128, 128, 0); lookAt = Vector3.UnitY;
 
-        m_log.DebugFormat("[USER AGENT SERVICE]: Request to get home region of user {0}", userID);
+        m_log.LogDebug("[USER AGENT SERVICE]: Request to get home region of user {0}", userID);
 
         GridRegion home = null;
         GridUserInfo uinfo = m_GridUserService.GetGridUserInfo(userID.ToString());
@@ -228,7 +229,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
     public bool LoginAgentToGrid(GridRegion source, AgentCircuitData agentCircuit, GridRegion gatekeeper, GridRegion finalDestination, bool fromLogin, out string reason)
     {
-        m_log.DebugFormat("[USER AGENT SERVICE]: Request to login user {0} {1} (@{2}) to grid {3}",
+        m_log.LogDebug("[USER AGENT SERVICE]: Request to login user {0} {1} (@{2}) to grid {3}",
             agentCircuit.firstname, agentCircuit.lastname, (fromLogin ? agentCircuit.IPAddress : "stored IP"), gatekeeper.ServerURI);
 
         string gridName = gatekeeper.ServerURI.ToLowerInvariant();
@@ -236,7 +237,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         UserAccount account = m_UserAccountService.GetUserAccount(UUID.Zero, agentCircuit.AgentID);
         if (account is null)
         {
-            m_log.WarnFormat("[USER AGENT SERVICE]: Someone attempted to lauch a foreign user from here {0} {1}", agentCircuit.firstname, agentCircuit.lastname);
+            m_log.LogWarning("[USER AGENT SERVICE]: Someone attempted to lauch a foreign user from here {0} {1}", agentCircuit.firstname, agentCircuit.lastname);
             reason = "Forbidden to launch your agents from here";
             return false;
         }
@@ -257,7 +258,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
                 if (!allowed)
                 {
                     reason = "Your world does not allow you to visit the destination";
-                    m_log.InfoFormat("[USER AGENT SERVICE]: Agents not permitted to visit {0}. Refusing service.", gridName);
+                    m_log.LogInformation("[USER AGENT SERVICE]: Agents not permitted to visit {0}. Refusing service.", gridName);
                     return false;
                 }
             }
@@ -281,13 +282,13 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
         if(!fromLogin && old is not null && !string.IsNullOrEmpty(old.ClientIPAddress))
         {
-            m_log.DebugFormat("[USER AGENT SERVICE]: stored IP = {0}. Old circuit IP: {1}", old.ClientIPAddress, agentCircuit.IPAddress);
+            m_log.LogDebug("[USER AGENT SERVICE]: stored IP = {0}. Old circuit IP: {1}", old.ClientIPAddress, agentCircuit.IPAddress);
             agentCircuit.IPAddress = old.ClientIPAddress;
         }
 
         bool success;
 
-        m_log.DebugFormat("[USER AGENT SERVICE]: this grid: {0}, desired grid: {1}, desired region: {2}", m_GridName, gridName, region.RegionID);
+        m_log.LogDebug("[USER AGENT SERVICE]: this grid: {0}, desired grid: {1}, desired region: {2}", m_GridName, gridName, region.RegionID);
 
         if (m_GridName.Equals(gridName, StringComparison.InvariantCultureIgnoreCase))
         {
@@ -302,7 +303,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
         if (!success)
         {
-            m_log.DebugFormat("[USER AGENT SERVICE]: Unable to login user {0} {1} to grid {2}, reason: {3}",
+            m_log.LogDebug("[USER AGENT SERVICE]: Unable to login user {0} {1} to grid {2}, reason: {3}",
                 agentCircuit.firstname, agentCircuit.lastname, region.ServerURI, reason);
 
             if (old is not null)
@@ -357,7 +358,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
     public void LogoutAgent(UUID userID, UUID sessionID)
     {
-        m_log.DebugFormat("[USER AGENT SERVICE]: User {0} logged out", userID);
+        m_log.LogDebug("[USER AGENT SERVICE]: User {0} logged out", userID);
 
         m_Database.Delete(sessionID);
 
@@ -382,7 +383,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         if (m_BypassClientVerification)
             return true;
 
-        m_log.DebugFormat("[USER AGENT SERVICE]: Verifying Client session {0} with reported IP {1}.",
+        m_log.LogDebug("[USER AGENT SERVICE]: Verifying Client session {0} with reported IP {1}.",
             sessionID, reportedIP);
 
         HGTravelingData hgt = m_Database.Get(sessionID);
@@ -395,7 +396,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         if(!result && !string.IsNullOrEmpty(m_MyExternalIP))
             result = reportedIP == m_MyExternalIP; // NATed
 
-        m_log.DebugFormat("[USER AGENT SERVICE]: Comparing {0} with login IP {1} and MyIP {2}; result is {3}",
+        m_log.LogDebug("[USER AGENT SERVICE]: Comparing {0} with login IP {1} and MyIP {2}; result is {3}",
                             reportedIP, travel.ClientIPAddress, m_MyExternalIP, result);
 
         return result;
@@ -406,12 +407,12 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         HGTravelingData hgt = m_Database.Get(sessionID);
         if (hgt is null)
         {
-            m_log.DebugFormat("[USER AGENT SERVICE]: Token verification for session {0}: no such session", sessionID);
+            m_log.LogDebug("[USER AGENT SERVICE]: Token verification for session {0}: no such session", sessionID);
             return false;
         }
 
         TravelingAgentInfo travel = new TravelingAgentInfo(hgt);
-        m_log.DebugFormat("[USER AGENT SERVICE]: Verifying agent token {0} against {1}", token, travel.ServiceToken);
+        m_log.LogDebug("[USER AGENT SERVICE]: Verifying agent token {0} against {1}", token, travel.ServiceToken);
         return travel.ServiceToken == token;
     }
 
@@ -420,13 +421,13 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
     {
         if (m_FriendsService == null || m_PresenceService == null)
         {
-            m_log.WarnFormat("[USER AGENT SERVICE]: Unable to perform status notifications because friends or presence services are missing");
+            m_log.LogWarning("[USER AGENT SERVICE]: Unable to perform status notifications because friends or presence services are missing");
             return new List<UUID>();
         }
 
         List<UUID> localFriendsOnline = new();
 
-        m_log.DebugFormat("[USER AGENT SERVICE]: Status notification: foreign user {0} wants to notify {1} local friends", foreignUserID, friends.Count);
+        m_log.LogDebug("[USER AGENT SERVICE]: Status notification: foreign user {0} wants to notify {1} local friends", foreignUserID, friends.Count);
 
         // First, let's double check that the reported friends are, indeed, friends of that user
         // And let's check that the secret matches
@@ -448,7 +449,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         }
 
         // Now, let's send the notifications
-        m_log.DebugFormat("[USER AGENT SERVICE]: Status notification: user has {0} local friends", usersToBeNotified.Count);
+        m_log.LogDebug("[USER AGENT SERVICE]: Status notification: user has {0} local friends", usersToBeNotified.Count);
 
         // First, let's send notifications to local users who are online in the home grid
         PresenceInfo[] friendSessions = m_PresenceService.GetAgents(usersToBeNotified.ToArray());
@@ -481,7 +482,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         //    {
         //        string url = m_Database[id].GridExternalName;
         //        // forward
-        //        m_log.WarnFormat("[USER AGENT SERVICE]: User {0} is visiting {1}. HG Status notifications still not implemented.", user, url);
+        //        m_log.LogWarning("[USER AGENT SERVICE]: User {0} is visiting {1}. HG Status notifications still not implemented.", user, url);
         //    }
         //}
 
@@ -501,7 +502,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         {
             if (m_FriendsLocalSimConnector is not null)
             {
-                m_log.DebugFormat("[USER AGENT SERVICE]: Local Notify, user {0} is {1}", foreignUserID, (online ? "online" : "offline"));
+                m_log.LogDebug("[USER AGENT SERVICE]: Local Notify, user {0} is {1}", foreignUserID, (online ? "online" : "offline"));
                 m_FriendsLocalSimConnector.StatusNotify(foreignUserID, userID, online);
             }
             else
@@ -509,7 +510,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
                 GridRegion region = m_GridService.GetRegionByUUID(UUID.Zero /* !!! */, regionID);
                 if (region is not null)
                 {
-                    m_log.DebugFormat("[USER AGENT SERVICE]: Remote Notify to region {0}, user {1} is {2}", region.RegionName, foreignUserID, (online ? "online" : "offline"));
+                    m_log.LogDebug("[USER AGENT SERVICE]: Remote Notify to region {0}, user {1} is {2}", region.RegionName, foreignUserID, (online ? "online" : "offline"));
                     m_FriendsSimConnector.StatusNotify(region, foreignUserID, userID.ToString(), online);
                 }
             }
@@ -522,11 +523,11 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
         if (m_FriendsService is null || m_PresenceService is null)
         {
-            m_log.WarnFormat("[USER AGENT SERVICE]: Unable to get online friends because friends or presence services are missing");
+            m_log.LogWarning("[USER AGENT SERVICE]: Unable to get online friends because friends or presence services are missing");
             return online;
         }
 
-        m_log.DebugFormat("[USER AGENT SERVICE]: Foreign user {0} wants to know status of {1} local friends", foreignUserID, friends.Count);
+        m_log.LogDebug("[USER AGENT SERVICE]: Foreign user {0} wants to know status of {1} local friends", foreignUserID, friends.Count);
 
         // First, let's double check that the reported friends are, indeed, friends of that user
         // And let's check that the secret matches and the rights
@@ -549,7 +550,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         }
 
         // Now, let's find out their status
-        m_log.DebugFormat("[USER AGENT SERVICE]: GetOnlineFriends: user has {0} local friends with status rights", usersToBeNotified.Count);
+        m_log.LogDebug("[USER AGENT SERVICE]: GetOnlineFriends: user has {0} local friends with status rights", usersToBeNotified.Count);
 
         // First, let's send notifications to local users who are online in the home grid
         PresenceInfo[] friendSessions = m_PresenceService.GetAgents(usersToBeNotified.ToArray());
@@ -571,7 +572,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
         if (m_UserAccountService is null)
         {
-            m_log.WarnFormat("[USER AGENT SERVICE]: Unable to get user flags because user account service is missing");
+            m_log.LogWarning("[USER AGENT SERVICE]: Unable to get user flags because user account service is missing");
             info["result"] = "fail";
             info["message"] = "UserAccountService is missing!";
             return info;
@@ -606,7 +607,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
     {
         if (m_UserAccountService is null)
         {
-            m_log.WarnFormat("[USER AGENT SERVICE]: Unable to get server URLs because user account service is missing");
+            m_log.LogWarning("[USER AGENT SERVICE]: Unable to get server URLs because user account service is missing");
             return new Dictionary<string, object>();
         }
         UserAccount account = m_UserAccountService.GetUserAccount(UUID.Zero /*!!!*/, userID);

@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
@@ -35,11 +34,14 @@ using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Hypergrid;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid;
 
 public class HypergridServiceInConnectorModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Enabled = false;
 
     private IConfigSource m_Config;
@@ -59,13 +61,13 @@ public class HypergridServiceInConnectorModule : ISharedRegionModule
             m_Enabled = moduleConfig.GetBoolean("HypergridServiceInConnector", false);
             if (m_Enabled)
             {
-                m_log.Info("[HGGRID IN CONNECTOR]: Hypergrid Service In Connector enabled");
+                m_log.LogInformation("[HGGRID IN CONNECTOR]: Hypergrid Service In Connector enabled");
                 IConfig fconfig = config.Configs["FriendsService"];
                 if (fconfig != null)
                 {
                     m_LocalServiceDll = fconfig.GetString("LocalServiceModule", m_LocalServiceDll);
                     if (m_LocalServiceDll.Length == 0)
-                        m_log.WarnFormat("[HGGRID IN CONNECTOR]: Friends LocalServiceModule config missing");
+                        m_log.LogWarning("[HGGRID IN CONNECTOR]: Friends LocalServiceModule config missing");
                 }
             }
         }
@@ -110,7 +112,7 @@ public class HypergridServiceInConnectorModule : ISharedRegionModule
         {
             m_Registered = true;
 
-            m_log.Info("[HypergridService]: Starting...");
+            m_log.LogInformation("[HypergridService]: Starting...");
 
             ISimulationService simService = scene.RequestModuleInterface<ISimulationService>();
             IFriendsSimConnector friendsConn = scene.RequestModuleInterface<IFriendsSimConnector>();
