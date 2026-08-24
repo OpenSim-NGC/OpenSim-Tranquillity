@@ -10,8 +10,10 @@
       <Version>3.10.91</Version>
     </PackageReference>
     <PackageReference Include="nini-core" Version="0.9.2.16" />
-    <PackageReference Include="OpenMetaverse" Version="1.0.6" />
-    <PackageReference Include="OpenMetaverse.Types" Version="1.0.6" />
-    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.0.6" />
+    <PackageReference Include="UtopiaSkye.OpenMetaverse" Version="1.1.6-ga897ffefd7" />
+    <PackageReference Include="UtopiaSkye.OpenMetaverse.Types" Version="1.1.6-ga897ffefd7" />
+    <PackageReference Include="UtopiaSkye.OpenMetaverse.StructuredData" Version="1.1.6-ga897ffefd7" />
+    <PackageReference Include="UtopiaSkye.OpenMetaverse.Rendering.Meshmerizer" Version="1.1.6-ga897ffefd7" />
+    <PackageReference Include="UtopiaSkye.OpenMetaverse.Rendering.Simple" Version="1.1.6-ga897ffefd7" />
   </ItemGroup>
 </Project>
