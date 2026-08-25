@@ -14,7 +14,6 @@ using Autofac;
 
 using OpenSim.Server.Base;
 using OpenSim.Server.Base.Hosting;
-using OpenSim.Framework;
 using OpenSim.Framework.Servers;
 using Microsoft.AspNetCore.Hosting;
 using OpenSim.Server.MoneyServer.Models;
