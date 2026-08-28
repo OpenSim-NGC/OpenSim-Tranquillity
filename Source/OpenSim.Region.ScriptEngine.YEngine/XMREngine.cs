@@ -92,6 +92,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     private System.Timers.Timer m_MaintenanceTimer;
     private bool m_StateLoadMetricsEnabled = true;
     private bool m_StateLoadMetricsPeriodic = true;
+    public bool m_StrictStateMigrationVersion = false;
     private long m_LastReportedStateLoadFailureTotal;
     public int numThreadScriptWorkers;
 
@@ -212,6 +213,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         m_ScriptDebugSaveIL = m_Config.GetBoolean("ScriptDebugSaveIL", false);
         m_StateLoadMetricsEnabled = m_Config.GetBoolean("StateLoadMetricsEnabled", true);
         m_StateLoadMetricsPeriodic = m_Config.GetBoolean("StateLoadMetricsPeriodic", true);
+        m_StrictStateMigrationVersion = m_Config.GetBoolean("StrictStateMigrationVersion", false);
 
         m_StackSize = m_Config.GetInt("ScriptStackSize", 2048) << 10;
         m_HeapSize = m_Config.GetInt("ScriptHeapSize", 1024) << 10;
@@ -1948,6 +1950,9 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
 
         string report = XMRInstance.GetStateLoadFailureMetricsReport(resetAfterRead);
         m_log.InfoFormat("[YEngine]: state-load-failure-metrics {0}", report);
+
+        string recoveryReport = XMRInstance.GetStateLoadRecoveryMetricsReport(resetAfterRead);
+        m_log.InfoFormat("[YEngine]: state-load-recovery-metrics {0}", recoveryReport);
 
         if(resetAfterRead)
             m_LastReportedStateLoadFailureTotal = XMRInstance.GetStateLoadFailureTotalCount();
