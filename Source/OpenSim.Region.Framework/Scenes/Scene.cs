@@ -470,6 +470,9 @@ public partial class Scene : SceneBase
 
     private readonly Timer m_mapGenerationTimer = new();
     private readonly bool m_generateMaptiles;
+    // Added for Generating Maptiles if they are missing
+    // Original patch from Consortium
+    private bool m_generateMaptilesIfMissing = false;
 
     protected int m_lastHealth = -1;
     protected int m_lastUsers = -1;
@@ -1034,6 +1037,8 @@ public partial class Scene : SceneBase
 
             m_generateMaptiles
                 = Util.GetConfigVarFromSections<bool>(config, "GenerateMaptiles", possibleMapConfigSections, true);
+            m_generateMaptilesIfMissing
+                = Util.GetConfigVarFromSections<bool>(config, "OnlyGenerateIfMissing", possibleMapConfigSections, false);
 
             if (m_generateMaptiles)
             {
@@ -2295,7 +2300,11 @@ public partial class Scene : SceneBase
         //// stored in the GridService, because that's what the world map module uses
         //// to send the map image UUIDs (of other regions) to the viewer...
         if (m_generateMaptiles)
-            RegenerateMaptile();
+        {
+            var info = this.GridService.GetRegionByUUID(UUID.Zero, RegionInfo.RegionID);
+            if (!m_generateMaptilesIfMissing || (m_generateMaptilesIfMissing && info.TerrainImage == UUID.Zero))
+                RegenerateMaptile();
+        }
 
         GridRegion region = new(RegionInfo);
         string error = GridService.RegisterRegion(RegionInfo.ScopeID, region);
