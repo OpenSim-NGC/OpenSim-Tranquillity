@@ -525,6 +525,48 @@ public partial class XMRInstance
         return sb.ToString();
     }
 
+    // Counts of state loads that hit a mismatch (schema/migration version, etc.) but
+    // were nonetheless successfully restored instead of being reset to default state.
+    private static readonly object s_StateLoadRecoveryMetricsLock = new object();
+    private static readonly Dictionary<ScriptStateLoadFailureReason, long> s_StateLoadRecoveryCounts =
+        new Dictionary<ScriptStateLoadFailureReason, long>();
+    private static long s_StateLoadRecoveryTotal;
+
+    private static void RecordStateLoadRecovery(ScriptStateLoadFailureReason reason)
+    {
+        lock(s_StateLoadRecoveryMetricsLock)
+        {
+            s_StateLoadRecoveryTotal++;
+            if(!s_StateLoadRecoveryCounts.TryGetValue(reason, out long count))
+                count = 0;
+            s_StateLoadRecoveryCounts[reason] = count + 1;
+        }
+    }
+
+    internal static string GetStateLoadRecoveryMetricsReport(bool resetAfterRead)
+    {
+        StringBuilder sb = new StringBuilder(256);
+        lock(s_StateLoadRecoveryMetricsLock)
+        {
+            sb.Append("total=").Append(s_StateLoadRecoveryTotal);
+
+            foreach(ScriptStateLoadFailureReason reason in Enum.GetValues(typeof(ScriptStateLoadFailureReason)))
+            {
+                if(!s_StateLoadRecoveryCounts.TryGetValue(reason, out long count) || count <= 0)
+                    continue;
+
+                sb.Append(' ').Append(reason).Append('=').Append(count);
+            }
+
+            if(resetAfterRead)
+            {
+                s_StateLoadRecoveryTotal = 0;
+                s_StateLoadRecoveryCounts.Clear();
+            }
+        }
+        return sb.ToString();
+    }
+
     /**
      * @brief Save compilation error messages for later retrieval
      *        via GetScriptErrors().
@@ -1311,11 +1353,24 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
     private void MigrateInEventHandler(Stream stream)
     {
         int mv = stream.ReadByte();
-        if(mv != migrationVersion)
-            throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MigrationVersionMismatch,
-                "incoming migration version " + mv + " but accept only " + migrationVersion);
-
         stream.ReadByte();  // ignored
+
+        bool versionMismatch = mv != migrationVersion;
+        if(versionMismatch)
+        {
+            // The snapshot binary format is self-describing (each value is tagged),
+            // so an older/newer writer's output can very often still be parsed
+            // correctly by MigrateIn() even though the version byte differs.
+            // Rather than unconditionally discard the script state (destroying
+            // whatever the script had in progress), try the load and only give
+            // up if it actually fails or looks implausible.
+            if(m_Engine.m_StrictStateMigrationVersion)
+                throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MigrationVersionMismatch,
+                    "incoming migration version " + mv + " but accept only " + migrationVersion);
+
+            m_log.WarnFormat("[YEngine]: state snapshot migration version mismatch for {0}: incoming={1}, current={2}; attempting best-effort restore",
+                m_ItemID, mv, migrationVersion);
+        }
 
         /*
          * Restore script variables and stack and other state from stream.
@@ -1326,10 +1381,28 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
         lock(m_RunLock)
         {
             BinaryReader br = new BinaryReader(stream);
-            this.MigrateIn(br);
+            try
+            {
+                this.MigrateIn(br);
+            }
+            catch(Exception e)
+            {
+                if(versionMismatch)
+                    throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MigrationVersionMismatch,
+                        "failed to restore snapshot after migration version mismatch (incoming " + mv +
+                        ", current " + migrationVersion + "): " + e.Message, e);
+                throw;
+            }
 
             //m_RunOnePhase = "MigrateInEventHandler finished";
             //CheckRunLockInvariants(true);
+        }
+
+        if(versionMismatch)
+        {
+            RecordStateLoadRecovery(ScriptStateLoadFailureReason.MigrationVersionMismatch);
+            m_log.InfoFormat("[YEngine]: state snapshot for {0} successfully restored despite migration version mismatch (incoming={1}, current={2})",
+                m_ItemID, mv, migrationVersion);
         }
     }
 }

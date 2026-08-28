@@ -1048,6 +1048,13 @@
     ; This logs only when totals change.
     ; StateLoadMetricsPeriodic = true
 
+    ; When a saved .state file's snapshot migration version does not match the
+    ; engine's current version, attempt a best-effort restore instead of
+    ; immediately discarding the script's state and resetting to default state.
+    ; Set to true to restore the old (destructive) behaviour of always resetting
+    ; on a version mismatch.
+    ; StrictStateMigrationVersion = false
+
     ;; llSetTimerEvent minimum value. Default 0.5s, 0.05s whould be more resonable
     ; MinTimerInterval = 0.5
 
