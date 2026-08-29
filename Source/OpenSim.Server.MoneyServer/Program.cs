@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Hosting;
 using OpenSim.Server.MoneyServer.Models;
 using Microsoft.AspNetCore.Builder;
 using OpenSim.Server.MoneyServer.Controllers;
+using Microsoft.Extensions.Configuration.Json;
 
 namespace OpenSim.Server.MoneyServer;
 
@@ -120,6 +121,12 @@ class Program
 
         builder.ConfigureAppConfiguration(configuration =>
         {
+
+            foreach (var source in configuration.Sources.OfType<JsonConfigurationSource>())
+            {
+                source.ReloadOnChange = false;
+            }
+            
             configuration.AddOpenSimIniFiles(options);
         });
 
