@@ -52,10 +52,29 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     private static object thisLock = new object();
     private static SKTypeface m_typeface = null; // SkiaSharp typeface for measurements
 
-    private readonly J2KEncoderConfiguration encoderConfig = new J2KEncoderConfiguration()
-        .WithTiles(t => t.SetSize(256, 256))
-        .WithWavelet(w => w.UseIrreversible97().WithDecompositionLevels(4))
-        .WithProgression(p => p.WithOrder(ProgressionOrder.LRCP).WithQualityLayers(0.1f, 0.5f, 1.0f));
+    /// <summary>
+    /// Build the J2K encoder configuration for an image of the given size.
+    /// </summary>
+    /// <remarks>
+    /// The tile size is pinned to the image dimensions so the codestream is always a
+    /// SINGLE TILE. Second Life viewers cannot render multi-tile JPEG2000: the decoder
+    /// derives geometry from the tile grid and consumes a discard level per grid halving
+    /// (indra/llimagej2coj/llimagej2coj.cpp), so a tiled texture arrives as a blank grey
+    /// prim with no error anywhere in the pipeline. A fixed 256x256 tile size did this to
+    /// every dynamic texture larger than 256 in either dimension, while smaller ones came
+    /// out single-tile by accident and worked - which made it read as an intermittent
+    /// delivery fault rather than an encoding one.
+    ///
+    /// Pinned explicitly rather than relying on the library default, so an upstream
+    /// change to that default cannot silently reintroduce the fault.
+    /// </remarks>
+    private static J2KEncoderConfiguration BuildEncoderConfig(int width, int height)
+    {
+        return new J2KEncoderConfiguration()
+            .WithTiles(t => t.SetSize(width, height))
+            .WithWavelet(w => w.UseIrreversible97().WithDecompositionLevels(4))
+            .WithProgression(p => p.WithOrder(ProgressionOrder.LRCP).WithQualityLayers(0.1f, 0.5f, 1.0f));
+    }
 
     private Scene m_scene;
     private IDynamicTextureManager m_textureManager;
@@ -407,7 +426,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
 
             try
             {
-                imageJ2000 = J2kImage.ToBytes(bitmap, encoderConfig);
+                imageJ2000 = J2kImage.ToBytes(bitmap, BuildEncoderConfig(bitmap.Width, bitmap.Height));
             }
             catch (Exception e)
             {
