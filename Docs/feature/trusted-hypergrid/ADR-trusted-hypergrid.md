@@ -122,11 +122,27 @@ TOFU-plus-approval matches Mike's own framing that the agreements come first and
 
 ---
 
+## ADR-011 — Open tier loses nothing at v1
+
+**Status:** ACCEPTED
+
+**Decision.** Only Blocked refuses. Trusted and Open receive identical access at v1. No capability available to a stock OpenSim grid today may be withheld from an Open-tier grid.
+
+**Why.** ADR-005 exists so this module is an overlay on the Hypergrid rather than a replacement. Any capability Open loses is ordinary Hypergrid breaking for every unmodified grid on the network — which is most of it. A Trusted Hypergrid that degrades ordinary Hypergrid is not worth having, and would justify the fragmentation objection recorded in the original analysis.
+
+**Consequence.** This is the framing every future tier feature must satisfy: ask what Trusted *gains*, never what Open *loses*. Trusted-only capabilities may be added; Open must never be reduced below stock behaviour. A proposal phrased as "restrict Open to X" is out of scope by this ADR regardless of its merit; the same idea phrased as "grant Trusted Y" may be in scope.
+
+**Rejected.** Tier-graded region access at v1, as sketched in Design Brief §7. Nothing is yet wired to distinguish tiers on most transports (LEDGER D-2), and gating access on a tier that half the call paths cannot observe produces inconsistent refusals — the worst possible first impression for the module.
+
+**Revisit if.** A concrete capability exists that is additive to Trusted rather than subtractive from Open, AND the transports it depends on are wired and classified. Not before.
+
+---
+
 ## Open decisions not yet recorded
 
 These need answers before the Design Brief can freeze:
 
-- **Tier granularity.** Is tier evaluated per grid only, or per grid × per region? Region-level policy already exists via `AuthorizationService`; whether tiers compose with it or subsume it is undecided.
+- **Tier granularity.** What the tiers *mean* at v1 is now fixed by ADR-011 (only Blocked refuses; Open loses nothing relative to stock; Trusted may only gain). Still open: whether tier is evaluated per grid only or per grid × per region — region-level policy already exists via `AuthorizationService`, and whether tiers compose with it or subsume it (Design Brief D1) is undecided.
 - **Presence-oracle gating (Recon R7).** Which of `locate_user`, `get_uui`, `get_uuid`, `get_server_urls`, `status_notification`, `get_online_friends` move behind tier policy, and what breaks for stock grids when they do. Blocked on Balpien's requirements.
 - **Config surface shape.** Whether tier policy lives in `Robust.HG.ini` sections, in the database alongside the trust registry, or both.
 - **Legion tree divergence.** Whether Legion's HG paths differ from upstream, given the vendored LibOMV 1.2.13 versus the top-level NuGet `OpenMetaverse` package upstream adopted in `07006d9`.
