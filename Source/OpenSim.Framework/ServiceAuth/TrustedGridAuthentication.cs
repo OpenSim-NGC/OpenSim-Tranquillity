@@ -26,6 +26,7 @@ using System;
 using System.Collections.Specialized;
 using System.Net;
 using System.Net.Http.Headers;
+using Nini.Config;
 using OpenSim.Framework.TrustedHypergrid;
 
 namespace OpenSim.Framework.ServiceAuth;
@@ -39,12 +40,32 @@ namespace OpenSim.Framework.ServiceAuth;
 /// Because <see cref="IServiceAuth.Authenticate(NameValueCollection, AddHeaderDelegate, out HttpStatusCode)"/>
 /// returns bool where false is an HTTP rejection, it MUST NOT be used to express
 /// "unverified → Open": unsigned, malformed, unknown, replayed and expired requests all return
-/// TRUE here. In Slice 2 no grid can be Blocked, so this always returns true — byte-identical
-/// behaviour to today for every caller.
+/// TRUE here. A grid can be Blocked only by an operator running <c>hgtrust block</c> (Slice 3);
+/// the classification is published per request by <c>TrustedHypergridHooks.Classify</c> (Slice 3b)
+/// and is null — Open — for every transport that is not classified. ADR-011: Trusted and Open
+/// receive identical access; this class never distinguishes them.
 /// </summary>
 public class TrustedGridAuthentication : IServiceAuth
 {
+    /// <summary>The <c>AuthType</c> value that selects this authenticator.</summary>
+    public const string AuthTypeName = "TrustedGridAuthentication";
+
     public string Name { get { return "TrustedGrid"; } }
+
+    /// <summary>
+    /// True when <c>AuthType = TrustedGridAuthentication</c> is configured for
+    /// <paramref name="section"/> (with the usual <c>[Network]</c> fallback — the same lookup
+    /// <c>ServiceAuth.Create</c> performs). Used by handlers that cannot take a general
+    /// <see cref="IServiceAuth"/> — the HG XML-RPC gatekeeper path — so that ONLY this
+    /// authenticator, and never e.g. Basic HTTP auth, is applied there.
+    /// </summary>
+    public static bool IsConfigured(IConfigSource config, string section)
+    {
+        if (config == null)
+            return false;
+        string authType = Util.GetConfigVarFromSections<string>(config, "AuthType", new string[] { "Network", section }, "None");
+        return string.Equals(authType, AuthTypeName, StringComparison.Ordinal);
+    }
 
     /// <summary>Optional outbound signer. Null until the local keypair is operationalised, in
     /// which case <see cref="AddAuthorization(NameValueCollection)"/> is a no-op and outbound

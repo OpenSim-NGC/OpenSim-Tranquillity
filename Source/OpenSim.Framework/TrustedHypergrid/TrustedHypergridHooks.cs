@@ -109,6 +109,19 @@ public static class TrustedHypergridHooks
         => ClassifyInbound(parameters, method, null);
 
     /// <summary>
+    /// Classify an inbound XML-RPC request (as <see cref="ClassifyInbound(Hashtable, string)"/>)
+    /// and publish the result as <see cref="GridTrustContext.Current"/> for the duration of the
+    /// returned scope (Slice 3b). Wrap the whole request body in a <c>using</c> so the context is
+    /// cleared on every exit path and can never leak into the next request. When the feature is
+    /// disabled the classification is null and the scope publishes "no context" (Open), so a
+    /// disabled grid behaves exactly as one without this code.
+    /// </summary>
+    public static IDisposable Classify(Hashtable parameters, string method)
+    {
+        return GridTrustContext.Enter(ClassifyInbound(parameters, method));
+    }
+
+    /// <summary>
     /// As <see cref="ClassifyInbound(Hashtable, string)"/>, additionally recording first contact
     /// (Design Brief §3) for a signature-verified caller whose home URI is known — from
     /// <paramref name="claimedHomeUri"/> if the transport supplies one, otherwise from the advisory

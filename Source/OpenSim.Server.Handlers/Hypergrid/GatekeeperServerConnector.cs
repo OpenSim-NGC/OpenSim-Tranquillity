@@ -29,6 +29,7 @@ using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Nini.Config;
 using OpenSim.Framework;
+using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.TrustedHypergrid;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
@@ -73,7 +74,18 @@ public class GatekeeperServiceInConnector : ServiceConnector
         // verified caller resolves to its registry tier. The tier is reported, never enforced here.
         TrustedHypergridHooks.EnsureInitialized(config, LoadTrustRegistry(config));
 
-        HypergridHandlers hghandlers = new HypergridHandlers(m_GatekeeperService);
+        // Slice 3b: arm the ONE hard-refusal component (Design Brief §6, ADR-011) for the HG
+        // XML-RPC pair, and only when the operator selected it for the gatekeeper — never the
+        // general ServiceAuth chain, which Hypergrid XML-RPC has never carried. It refuses solely a
+        // Blocked-tier caller; with it unconfigured nothing on this path can be refused.
+        IServiceAuth trustAuth = null;
+        if (TrustedGridAuthentication.IsConfigured(config, "GatekeeperService"))
+        {
+            trustAuth = new TrustedGridAuthentication();
+            m_log.LogInformation("[TRUSTED HG]: TrustedGridAuthentication armed for the gatekeeper XML-RPC handlers; Blocked-tier callers will be refused link_region/get_region");
+        }
+
+        HypergridHandlers hghandlers = new HypergridHandlers(m_GatekeeperService, trustAuth);
         server.AddXmlRPCHandler("link_region", hghandlers.LinkRegionRequest, false);
         server.AddXmlRPCHandler("get_region", hghandlers.GetRegion, false);
 

@@ -22,6 +22,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System;
 using System.Threading;
 using OpenMetaverse;
 
@@ -75,5 +76,45 @@ public sealed class GridTrustContext
     {
         get => s_current.Value;
         set => s_current.Value = value;
+    }
+
+    /// <summary>
+    /// Publish <paramref name="context"/> as <see cref="Current"/> for the duration of a request and
+    /// restore the previous value when the returned scope is disposed (Slice 3b). Use in a
+    /// <c>using</c> around the request body so the context can never outlive it:
+    /// <list type="bullet">
+    /// <item>Sequential requests on one thread — including a long-lived listener thread that is
+    /// not returned to the pool — never see a predecessor's context, because the scope restores
+    /// (normally to null) in <c>finally</c> on every exit path, exception included.</item>
+    /// <item>Concurrent requests on different threads never see each other's context, because
+    /// <see cref="AsyncLocal{T}"/> is stored in the execution context that is private to each
+    /// thread / async flow; a value set on one flow is invisible to every other.</item>
+    /// </list>
+    /// Passing null publishes "no context" (Open) for the scope, which is the correct value when
+    /// the feature is disabled.
+    /// </summary>
+    public static IDisposable Enter(GridTrustContext context)
+    {
+        return new Scope(context);
+    }
+
+    private sealed class Scope : IDisposable
+    {
+        private readonly GridTrustContext m_previous;
+        private bool m_disposed;
+
+        public Scope(GridTrustContext context)
+        {
+            m_previous = s_current.Value;
+            s_current.Value = context;
+        }
+
+        public void Dispose()
+        {
+            if (m_disposed)
+                return;
+            m_disposed = true;
+            s_current.Value = m_previous;
+        }
     }
 }
