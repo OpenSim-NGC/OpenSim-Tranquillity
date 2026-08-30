@@ -154,3 +154,30 @@ Not executed here. This is the interop proof ADR-005 has asserted since day one 
 **Pass.** Every hyperlink and teleport that worked with `Enabled=false` still works. On the Tranquillity gatekeeper, DEBUG shows `[TRUSTED HG]: inbound get_region classified tier=1 outcome=Unverified` for the unsigned stock caller, and the call still returns a valid region. No 500s, no faults, no teleport failures.
 
 **Fail (revert `Enabled=false` and report).** Any previously-working hyperlink/teleport to or from the stock grid now faults, times out, or is refused (HTTP 403/Unauthorized, or `result=false` where it was true); any `[TRUSTED HG]`-tagged exception on the request path (the verifier must never throw); or an unsigned stock caller classified as anything other than tier=1 Open.
+
+---
+
+## Slice 2c — 29 Aug 2026 — logging transport (log4net → ILogger)
+
+**Why.** Live evidence, 29 Aug: `[TrustedHypergrid] Enabled = true` on the production Robust (key generated 14:44, signed HG round trip completed 14:46:49) produced **zero** `[TRUSTED HG]` output — no fingerprint at INFO on generation. Cause established, not assumed: the three TrustedHypergrid files acquired loggers through log4net (`LogManager.GetLogger`), but upstream #198 moved Robust to `Microsoft.Extensions.Logging`, and on this branch log4net is never configured — `Log4NetBootstrapper.Configure` (`Source/OpenSim.Server.Base/Hosting/Log4NetBootstrapper.cs:29`) is the only `XmlConfigurator.Configure` call in the tree and has no callers, so the log4net repository has no appenders and drops every event. `OpenSim.Framework.csproj` still references the log4net package, which is why the calls compiled. The fingerprint line was therefore **not logged anywhere** (as opposed to logged somewhere invisible); the `OpenSim.Server.GridServer.dll.config` on disk is inert.
+
+**Delivered.** Mechanical transport change, no behaviour change, no new statements. `using log4net` → `using Microsoft.Extensions.Logging`; `ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType)` → `ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType)` — the exact acquisition upstream uses in `OpenSim.Services.HypergridService/*` and in its own static classes (`NetworkUtil`, `SLUtil`, `PermissionsUtil`). `TrustedHypergridHooks` is a static class; the same static-field pattern applies unchanged, and `DeferredLogger` (`Source/OpenSim.Framework/DeferredLogger.cs:40-46`) rebinds to `LoggerProvider.LoggerFactory` on every call, so a static logger created before host logging is wired is safe. `TrustedGridAuthentication.cs` had no logging and is untouched. `LoggerProvider` lives in `OpenSim.Framework` and resolves from the child namespace without a using.
+
+**Every call converted (file · level · template · placeholders/args):**
+- `GridSignatureVerifier.cs:77` · Warning · `[TRUSTED HG]: signature material had malformed base64; classifying Open.` · 0/0
+- `GridSignatureVerifier.cs:83` · Warning · `[TRUSTED HG]: presented key was {0} bytes, not {1}; classifying Open.` · 2/2
+- `GridSignatureVerifier.cs:91` · Warning · `[TRUSTED HG]: unparseable timestamp; classifying Open.` · 0/0
+- `GridSignatureVerifier.cs:98` · Information · `[TRUSTED HG]: timestamp skew {0}s outside ±{1}s; classifying Open.` · 2/2
+- `GridSignatureVerifier.cs:114` · Information · `[TRUSTED HG]: signature did not verify; classifying Open.` · 0/0
+- `GridSignatureVerifier.cs:122` · Information · `[TRUSTED HG]: nonce replay within window; classifying Open.` · 0/0
+- `GridSignatureVerifier.cs:145` · Warning (+exception) · `[TRUSTED HG]: unexpected error during verification; classifying Open.` · 0/0 — log4net `Warn(msg, e)` → `LogWarning(e, msg)`
+- `TrustedHypergridHooks.cs:70` · Warning (+exception) · `[TRUSTED HG]: failed to initialise runtime; feature disabled for this process.` · 0/0 — same exception-first form
+- `TrustedHypergridHooks.cs:106` · Debug · `[TRUSTED HG]: inbound {0} classified tier={1} outcome={2} grid={3}` · 4/4
+- `TrustedHypergridRuntime.cs:96` · Information · `[TRUSTED HG]: loaded grid identity from {0}, fingerprint {1}` · 2/2
+- `TrustedHypergridRuntime.cs:103` · Information · `[TRUSTED HG]: generated new grid identity at {0}, fingerprint {1}` · 2/2
+
+Placeholder counts verified against `OpenSimConsoleLoggerProvider.cs:142` (formatter outside the try/catch — a mismatch would throw into the verifier/runtime): every template's `{n}` count equals its argument count; no literal braces. One rendering nuance, not a behaviour change: MEL renders a null argument as `(null)` where `string.Format` rendered empty — only `grid={3}` can be null (unsigned callers).
+
+**Verified.** `dotnet restore` bare (no `--source`; nuget.org via `nuget.config`) and `dotnet build -c Release` → 0 errors on net10.0, 0 warnings in TrustedHypergrid files. `grep -rn "log4net\|ILog \|LogManager"` over `Source/OpenSim.Framework/TrustedHypergrid/` and `ServiceAuth/TrustedGridAuthentication.cs` → empty. `dotnet test Tests/OpenSim.TrustedHypergrid.Tests --no-restore` → 25 passed, 3 skipped (unchanged). Diff surface: exactly the three files above; 3 usings, 3 logger fields, 11 call sites.
+
+**Expected production output once deployed** (Robust console/log, `[TrustedHypergrid] Enabled = true`): at startup INFO `[TRUSTED HG]: loaded grid identity from TrustedHypergridSecret.ini, fingerprint <64-hex>` (the key already generated 29 Aug 14:44 — "generated" only appears on a first run); on each inbound `link_region`/`get_region`, DEBUG `[TRUSTED HG]: inbound <method> classified tier=<n> outcome=<Verified|Unverified> grid=<id|(null)>`. Unchanged and still expected: no output at all when `Enabled=false`.

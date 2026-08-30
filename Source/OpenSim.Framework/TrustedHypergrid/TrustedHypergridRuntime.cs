@@ -24,7 +24,7 @@
 
 using System.IO;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 using Nini.Config;
 
 namespace OpenSim.Framework.TrustedHypergrid;
@@ -40,7 +40,7 @@ namespace OpenSim.Framework.TrustedHypergrid;
 /// </summary>
 public sealed class TrustedHypergridRuntime
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public const string ConfigSection = "TrustedHypergrid";
     public const string DefaultKeyFile = "TrustedHypergridSecret.ini";
@@ -93,14 +93,14 @@ public sealed class TrustedHypergridRuntime
         {
             keypair = GridKeypair.Load(path);
             generated = false;
-            m_log.InfoFormat("[TRUSTED HG]: loaded grid identity from {0}, fingerprint {1}", file, keypair.Fingerprint);
+            m_log.LogInformation("[TRUSTED HG]: loaded grid identity from {0}, fingerprint {1}", file, keypair.Fingerprint);
         }
         else
         {
             keypair = GridKeypair.Generate();
             keypair.Save(path);
             generated = true;
-            m_log.InfoFormat("[TRUSTED HG]: generated new grid identity at {0}, fingerprint {1}", file, keypair.Fingerprint);
+            m_log.LogInformation("[TRUSTED HG]: generated new grid identity at {0}, fingerprint {1}", file, keypair.Fingerprint);
         }
 
         return new TrustedHypergridRuntime(keypair, new GridSignatureVerifier(lookup), generated);

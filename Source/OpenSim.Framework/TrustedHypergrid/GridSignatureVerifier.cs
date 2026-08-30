@@ -25,7 +25,7 @@
 using System;
 using System.Collections;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using Org.BouncyCastle.Crypto.Parameters;
 using Org.BouncyCastle.Crypto.Signers;
@@ -41,7 +41,7 @@ namespace OpenSim.Framework.TrustedHypergrid;
 /// </summary>
 public sealed class GridSignatureVerifier
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly IGridTrustLookup m_lookup;
     private readonly NonceCache m_nonces;
@@ -74,13 +74,13 @@ public sealed class GridSignatureVerifier
             }
             catch (FormatException)
             {
-                m_log.Warn("[TRUSTED HG]: signature material had malformed base64; classifying Open.");
+                m_log.LogWarning("[TRUSTED HG]: signature material had malformed base64; classifying Open.");
                 return GridTrustContext.Open;
             }
 
             if (publicKey.Length != Ed25519PublicKeyParameters.KeySize)
             {
-                m_log.WarnFormat("[TRUSTED HG]: presented key was {0} bytes, not {1}; classifying Open.",
+                m_log.LogWarning("[TRUSTED HG]: presented key was {0} bytes, not {1}; classifying Open.",
                     publicKey.Length, Ed25519PublicKeyParameters.KeySize);
                 return GridTrustContext.Open;
             }
@@ -88,14 +88,14 @@ public sealed class GridSignatureVerifier
             // Freshness: timestamp must be within ±tolerance of now (§5).
             if (!HGSignatureEnvelope.TryParseTimestamp(material.Timestamp, out DateTime ts))
             {
-                m_log.Warn("[TRUSTED HG]: unparseable timestamp; classifying Open.");
+                m_log.LogWarning("[TRUSTED HG]: unparseable timestamp; classifying Open.");
                 return GridTrustContext.Open;
             }
 
             TimeSpan skew = nowUtc.ToUniversalTime() - ts;
             if (skew < -HGSignatureEnvelope.TimestampTolerance || skew > HGSignatureEnvelope.TimestampTolerance)
             {
-                m_log.InfoFormat("[TRUSTED HG]: timestamp skew {0}s outside ±{1}s; classifying Open.",
+                m_log.LogInformation("[TRUSTED HG]: timestamp skew {0}s outside ±{1}s; classifying Open.",
                     (int)skew.TotalSeconds, (int)HGSignatureEnvelope.TimestampTolerance.TotalSeconds);
                 return GridTrustContext.Open;
             }
@@ -111,7 +111,7 @@ public sealed class GridSignatureVerifier
             verifier.BlockUpdate(payload, 0, payload.Length);
             if (!verifier.VerifySignature(signature))
             {
-                m_log.Info("[TRUSTED HG]: signature did not verify; classifying Open.");
+                m_log.LogInformation("[TRUSTED HG]: signature did not verify; classifying Open.");
                 return GridTrustContext.Open;
             }
 
@@ -119,7 +119,7 @@ public sealed class GridSignatureVerifier
             // signature is otherwise valid, so a bad request cannot burn a nonce.
             if (!m_nonces.TryRegister(material.Nonce, nowUtc))
             {
-                m_log.Info("[TRUSTED HG]: nonce replay within window; classifying Open.");
+                m_log.LogInformation("[TRUSTED HG]: nonce replay within window; classifying Open.");
                 return GridTrustContext.Open;
             }
 
@@ -142,7 +142,7 @@ public sealed class GridSignatureVerifier
         catch (Exception e)
         {
             // ADR-005: verification never hard-fails. Any unexpected error is Open.
-            m_log.Warn("[TRUSTED HG]: unexpected error during verification; classifying Open.", e);
+            m_log.LogWarning(e, "[TRUSTED HG]: unexpected error during verification; classifying Open.");
             return GridTrustContext.Open;
         }
     }

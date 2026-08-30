@@ -25,7 +25,7 @@
 using System;
 using System.Collections;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 using Nini.Config;
 
 namespace OpenSim.Framework.TrustedHypergrid;
@@ -38,7 +38,7 @@ namespace OpenSim.Framework.TrustedHypergrid;
 /// </summary>
 public static class TrustedHypergridHooks
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly object s_lock = new();
     private static bool s_initialized;
@@ -67,7 +67,7 @@ public static class TrustedHypergridHooks
             catch (Exception e)
             {
                 // Never let identity setup break service startup; degrade to disabled.
-                m_log.Warn("[TRUSTED HG]: failed to initialise runtime; feature disabled for this process.", e);
+                m_log.LogWarning(e, "[TRUSTED HG]: failed to initialise runtime; feature disabled for this process.");
                 Runtime = TrustedHypergridRuntime.Disabled();
             }
 
@@ -103,7 +103,7 @@ public static class TrustedHypergridHooks
         SignatureMaterial material = SignatureMaterial.FromHashtable(parameters);
         GridTrustContext ctx = rt.Verifier.Verify(material, method, parameters, DateTime.UtcNow);
 
-        m_log.DebugFormat("[TRUSTED HG]: inbound {0} classified tier={1} outcome={2} grid={3}",
+        m_log.LogDebug("[TRUSTED HG]: inbound {0} classified tier={1} outcome={2} grid={3}",
             method, ctx.Tier, ctx.Outcome, ctx.GridId);
 
         return ctx;
