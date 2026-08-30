@@ -249,6 +249,17 @@
     ;;   Include-TrustedHypergrid = "TrustedHypergridSecret.ini"
     ; PrivateKeyFile = "TrustedHypergridSecret.ini"
 
+    ;; Trust registry (Design Brief §3/§4). When Enabled=true the gatekeeper stands up the registry
+    ;; (tables hg_trusted_grids and hg_grid_aliases, created by migration on first start) and the
+    ;; console gains: hgtrust list | show <uri|fingerprint> | approve <uri> [by] | block <uri> |
+    ;; forget <uri> | key show. A signature-verified caller is resolved to its registry tier and the
+    ;; tier is LOGGED, not enforced: nothing in the registry refuses a caller, and a grid becomes
+    ;; Trusted only through `hgtrust approve`. Storage follows every other Robust service: it
+    ;; inherits StorageProvider and ConnectionString from [DatabaseService]; uncomment to override
+    ;; (e.g. to keep the registry in a separate database).
+    ; StorageProvider = "OpenSim.Data.MySQL.dll"
+    ; ConnectionString = "Data Source=localhost;Database=trusted_hg;User ID=opensim;Password=***;Old Guids=true;"
+
 [AccessControl]
     ;# {AllowedClients} {} {Bar (|) separated list of allowed clients} {}
     ;; Bar (|) separated list of viewers which may gain access to the regions.

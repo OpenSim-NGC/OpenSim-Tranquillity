@@ -94,18 +94,45 @@ public class TrustedGridDataTests : IDisposable
     public void SQLite_Alias_RoundTrips() => RunAlias(NewSqlite());
 
     // ---- MySQL (gated) -----------------------------------------------------
-    // xUnit v2 has no runtime skip, so these carry a static Skip. To exercise the
-    // MySQL backend, point TRUSTED_HG_MYSQL_CONN at a test database and clear the Skip.
-    private const string MySqlSkip = "Requires a MySQL server; set TRUSTED_HG_MYSQL_CONN and clear Skip to run.";
+    // Gated at discovery time by [MySqlFact]: these EXECUTE when TRUSTED_HG_MYSQL_CONN points
+    // at a scratch database and are skipped (never silently passed) when it is unset. A static
+    // skip cannot fire against a live database by accident; neither can this, because the
+    // connection string is only ever taken from the environment.
 
-    [Fact(Skip = MySqlSkip)]
+    [MySqlFact]
     public void MySql_InsertLookupUpdate_RoundTrips() => RunRoundTrip(NewMySql());
 
-    [Fact(Skip = MySqlSkip)]
+    [MySqlFact]
     public void MySql_DifferentKey_IsFlaggedNotOverwritten() => RunKeyChange(NewMySql());
 
-    [Fact(Skip = MySqlSkip)]
+    [MySqlFact]
     public void MySql_Alias_RoundTrips() => RunAlias(NewMySql());
+
+    [MySqlFact]
+    public void MySql_ListDeleteAliases_RoundTrip() => RunListDeleteAliases(NewMySql());
+
+    [Fact]
+    public void SQLite_ListDeleteAliases_RoundTrip() => RunListDeleteAliases(NewSqlite());
+
+    private static void RunListDeleteAliases(ITrustedGridData store)
+    {
+        string uri = "http://list-delete-" + Guid.NewGuid().ToString("N") + ".example:8002/";
+        TrustedGridData rec = store.RecordPresentedKey(uri, NewKey(0x51), new string('5', 64), DateTime.UtcNow);
+        Assert.NotNull(rec);
+        Assert.True(store.StoreAlias(rec.Id, "HTTP://ALIAS-" + Guid.NewGuid().ToString("N") + ".example:8002"));
+
+        TrustedGridData[] all = store.GetAll();
+        Assert.Contains(all, g => g.Id == rec.Id);
+        string[] aliases = store.GetAliases(rec.Id);
+        Assert.Single(aliases);
+        Assert.StartsWith("http://alias-", aliases[0]);   // normalised by the shared normaliser
+
+        Assert.True(store.Delete(rec.Id));
+        Assert.Null(store.Get(rec.Id));
+        Assert.Empty(store.GetAliases(rec.Id));
+        Assert.DoesNotContain(store.GetAll(), g => g.Id == rec.Id);
+        Assert.False(store.Delete(rec.Id));
+    }
 
     // ---- shared bodies -----------------------------------------------------
 

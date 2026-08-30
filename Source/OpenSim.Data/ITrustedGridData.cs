@@ -80,6 +80,25 @@ public class TrustedGridData
     };
 
     /// <summary>Materialise a row from a reader positioned on it. Backend-agnostic.</summary>
+    /// <summary>
+    /// Timestamps are stored as UTC wall-clock with <see cref="DateTimeKind.Unspecified"/> so
+    /// neither provider applies a local-time conversion on the way in (System.Data.SQLite converts
+    /// a <see cref="DateTimeKind.Utc"/> value to local time by default). Unspecified input is
+    /// taken to already be UTC.
+    /// </summary>
+    public static DateTime ToDbUtc(DateTime dt)
+    {
+        DateTime utc = dt.Kind == DateTimeKind.Local ? dt.ToUniversalTime() : dt;
+        return DateTime.SpecifyKind(utc, DateTimeKind.Unspecified);
+    }
+
+    /// <summary>Read a stored UTC wall-clock back as a <see cref="DateTimeKind.Utc"/> value.</summary>
+    public static DateTime FromDbUtc(object dbValue)
+    {
+        DateTime dt = Convert.ToDateTime(dbValue);
+        return DateTime.SpecifyKind(dt.Kind == DateTimeKind.Local ? dt.ToUniversalTime() : dt, DateTimeKind.Utc);
+    }
+
     public static TrustedGridData FromReader(IDataReader r)
     {
         return new TrustedGridData
@@ -90,10 +109,10 @@ public class TrustedGridData
             KeyFingerprint = r["key_fingerprint"] is DBNull ? string.Empty : r["key_fingerprint"].ToString(),
             Tier = Convert.ToInt32(r["tier"]),
             State = Convert.ToInt32(r["state"]),
-            FirstSeen = Convert.ToDateTime(r["first_seen"]),
-            LastSeen = Convert.ToDateTime(r["last_seen"]),
+            FirstSeen = FromDbUtc(r["first_seen"]),
+            LastSeen = FromDbUtc(r["last_seen"]),
             ApprovedBy = r["approved_by"] is DBNull ? string.Empty : r["approved_by"].ToString(),
-            ApprovedAt = r["approved_at"] is DBNull ? (DateTime?)null : Convert.ToDateTime(r["approved_at"]),
+            ApprovedAt = r["approved_at"] is DBNull ? (DateTime?)null : FromDbUtc(r["approved_at"]),
             Notes = r["notes"] is DBNull ? string.Empty : r["notes"].ToString(),
         };
     }
@@ -129,6 +148,15 @@ public interface ITrustedGridData
 
     /// <summary>Record an alias URI (normalised) for an existing grid (<c>hg_grid_aliases</c>).</summary>
     bool StoreAlias(UUID gridId, string aliasUri);
+
+    /// <summary>Every registry row, ordered by home URI (operator surface, Design Brief §8).</summary>
+    TrustedGridData[] GetAll();
+
+    /// <summary>The alias URIs recorded for a grid, ordered.</summary>
+    string[] GetAliases(UUID gridId);
+
+    /// <summary>Remove a grid and all of its aliases. True if a grid row was removed.</summary>
+    bool Delete(UUID id);
 
     /// <summary>
     /// Record a public key presented by a grid at contact, implementing the Design Brief §3

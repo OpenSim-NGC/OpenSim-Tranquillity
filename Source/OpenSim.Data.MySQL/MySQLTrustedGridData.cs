@@ -121,6 +121,59 @@ public class MySQLTrustedGridData : MySqlFramework, ITrustedGridData
         }
     }
 
+    public TrustedGridData[] GetAll()
+    {
+        List<TrustedGridData> ret = new List<TrustedGridData>();
+        using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
+        {
+            dbcon.Open();
+            using (MySqlCommand cmd = new MySqlCommand($"select * from `{Realm}` order by home_uri", dbcon))
+            using (IDataReader reader = cmd.ExecuteReader())
+            {
+                while (reader.Read())
+                    ret.Add(TrustedGridData.FromReader(reader));
+            }
+            dbcon.Close();
+        }
+        return ret.ToArray();
+    }
+
+    public string[] GetAliases(UUID gridId)
+    {
+        List<string> ret = new List<string>();
+        using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
+        {
+            dbcon.Open();
+            using (MySqlCommand cmd = new MySqlCommand($"select alias_uri from `{AliasRealm}` where grid_id = ?grid_id order by alias_uri", dbcon))
+            {
+                cmd.Parameters.AddWithValue("?grid_id", gridId.ToString());
+                using (IDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                        ret.Add(reader["alias_uri"].ToString());
+                }
+            }
+            dbcon.Close();
+        }
+        return ret.ToArray();
+    }
+
+    public bool Delete(UUID id)
+    {
+        using (MySqlCommand aliases = new MySqlCommand())
+        {
+            aliases.CommandText = $"delete from `{AliasRealm}` where grid_id = ?grid_id";
+            aliases.Parameters.AddWithValue("?grid_id", id.ToString());
+            ExecuteNonQuery(aliases);
+        }
+        using (MySqlCommand cmd = new MySqlCommand())
+        {
+            cmd.CommandText = $"delete from `{Realm}` where id = ?id";
+            cmd.Parameters.AddWithValue("?id", id.ToString());
+            return ExecuteNonQuery(cmd) > 0;
+        }
+    }
+
     private static void BindRow(MySqlCommand cmd, TrustedGridData d)
     {
         cmd.Parameters.AddWithValue("?id", d.Id.ToString());
@@ -129,10 +182,10 @@ public class MySQLTrustedGridData : MySqlFramework, ITrustedGridData
         cmd.Parameters.AddWithValue("?key_fingerprint", d.KeyFingerprint ?? string.Empty);
         cmd.Parameters.AddWithValue("?tier", d.Tier);
         cmd.Parameters.AddWithValue("?state", d.State);
-        cmd.Parameters.AddWithValue("?first_seen", d.FirstSeen);
-        cmd.Parameters.AddWithValue("?last_seen", d.LastSeen);
+        cmd.Parameters.AddWithValue("?first_seen", TrustedGridData.ToDbUtc(d.FirstSeen));
+        cmd.Parameters.AddWithValue("?last_seen", TrustedGridData.ToDbUtc(d.LastSeen));
         cmd.Parameters.AddWithValue("?approved_by", d.ApprovedBy ?? string.Empty);
-        cmd.Parameters.AddWithValue("?approved_at", (object)d.ApprovedAt ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("?approved_at", d.ApprovedAt.HasValue ? TrustedGridData.ToDbUtc(d.ApprovedAt.Value) : DBNull.Value);
         cmd.Parameters.AddWithValue("?notes", (object)d.Notes ?? DBNull.Value);
     }
 

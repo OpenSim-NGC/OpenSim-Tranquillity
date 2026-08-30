@@ -134,6 +134,47 @@ public class SQLiteTrustedGridData : SQLiteFramework, ITrustedGridData, IDisposa
         }
     }
 
+    public TrustedGridData[] GetAll()
+    {
+        List<TrustedGridData> ret = new List<TrustedGridData>();
+        using (SQLiteCommand cmd = new SQLiteCommand($"select * from {Realm} order by home_uri"))
+        using (IDataReader reader = ExecuteReader(cmd, m_Connection))
+        {
+            while (reader.Read())
+                ret.Add(TrustedGridData.FromReader(reader));
+        }
+        return ret.ToArray();
+    }
+
+    public string[] GetAliases(UUID gridId)
+    {
+        List<string> ret = new List<string>();
+        using (SQLiteCommand cmd = new SQLiteCommand($"select alias_uri from {AliasRealm} where grid_id = :grid_id order by alias_uri"))
+        {
+            cmd.Parameters.Add(new SQLiteParameter(":grid_id", gridId.ToString()));
+            using (IDataReader reader = ExecuteReader(cmd, m_Connection))
+            {
+                while (reader.Read())
+                    ret.Add(reader["alias_uri"].ToString());
+            }
+        }
+        return ret.ToArray();
+    }
+
+    public bool Delete(UUID id)
+    {
+        using (SQLiteCommand aliases = new SQLiteCommand($"delete from {AliasRealm} where grid_id = :grid_id"))
+        {
+            aliases.Parameters.Add(new SQLiteParameter(":grid_id", id.ToString()));
+            ExecuteNonQuery(aliases, m_Connection);
+        }
+        using (SQLiteCommand cmd = new SQLiteCommand($"delete from {Realm} where id = :id"))
+        {
+            cmd.Parameters.Add(new SQLiteParameter(":id", id.ToString()));
+            return ExecuteNonQuery(cmd, m_Connection) > 0;
+        }
+    }
+
     private static void BindRow(SQLiteCommand cmd, TrustedGridData d)
     {
         cmd.Parameters.Add(new SQLiteParameter(":id", d.Id.ToString()));
@@ -142,10 +183,10 @@ public class SQLiteTrustedGridData : SQLiteFramework, ITrustedGridData, IDisposa
         cmd.Parameters.Add(new SQLiteParameter(":key_fingerprint", d.KeyFingerprint ?? string.Empty));
         cmd.Parameters.Add(new SQLiteParameter(":tier", d.Tier));
         cmd.Parameters.Add(new SQLiteParameter(":state", d.State));
-        cmd.Parameters.Add(new SQLiteParameter(":first_seen", d.FirstSeen));
-        cmd.Parameters.Add(new SQLiteParameter(":last_seen", d.LastSeen));
+        cmd.Parameters.Add(new SQLiteParameter(":first_seen", TrustedGridData.ToDbUtc(d.FirstSeen)));
+        cmd.Parameters.Add(new SQLiteParameter(":last_seen", TrustedGridData.ToDbUtc(d.LastSeen)));
         cmd.Parameters.Add(new SQLiteParameter(":approved_by", d.ApprovedBy ?? string.Empty));
-        cmd.Parameters.Add(new SQLiteParameter(":approved_at", (object)d.ApprovedAt ?? DBNull.Value));
+        cmd.Parameters.Add(new SQLiteParameter(":approved_at", d.ApprovedAt.HasValue ? TrustedGridData.ToDbUtc(d.ApprovedAt.Value) : DBNull.Value));
         cmd.Parameters.Add(new SQLiteParameter(":notes", (object)d.Notes ?? DBNull.Value));
     }
 

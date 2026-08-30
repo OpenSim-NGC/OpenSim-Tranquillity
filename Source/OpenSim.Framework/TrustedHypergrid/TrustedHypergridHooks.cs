@@ -27,6 +27,7 @@ using System.Collections;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Nini.Config;
+using OpenMetaverse;
 
 namespace OpenSim.Framework.TrustedHypergrid;
 
@@ -47,10 +48,19 @@ public static class TrustedHypergridHooks
     public static TrustedHypergridRuntime Runtime { get; set; }
 
     /// <summary>
+    /// The trust registry the runtime's verifier resolves against, or null when none was supplied
+    /// (verified callers then classify as Open). Also consulted for first-contact recording when it
+    /// implements <see cref="IGridTrustRecorder"/>. Settable for tests.
+    /// </summary>
+    public static IGridTrustLookup Lookup { get; set; }
+
+    /// <summary>
     /// Initialise the process runtime once from config. Idempotent: the first caller (the inbound
     /// gatekeeper connector, which owns the config) wins; later calls are no-ops.
+    /// <paramref name="lookup"/> is the trust registry (Slice 3); null keeps Slice 2b behaviour,
+    /// where a verified caller resolves to no grid and classifies Open.
     /// </summary>
-    public static void EnsureInitialized(IConfigSource config)
+    public static void EnsureInitialized(IConfigSource config, IGridTrustLookup lookup = null)
     {
         if (s_initialized)
             return;
@@ -62,7 +72,8 @@ public static class TrustedHypergridHooks
 
             try
             {
-                Runtime = TrustedHypergridRuntime.FromConfig(config);
+                Lookup = lookup;
+                Runtime = TrustedHypergridRuntime.FromConfig(config, lookup);
             }
             catch (Exception e)
             {
@@ -95,17 +106,65 @@ public static class TrustedHypergridHooks
     /// proceeds normally. In this slice the context is only logged; nothing is enforced.
     /// </summary>
     public static GridTrustContext ClassifyInbound(Hashtable parameters, string method)
+        => ClassifyInbound(parameters, method, null);
+
+    /// <summary>
+    /// As <see cref="ClassifyInbound(Hashtable, string)"/>, additionally recording first contact
+    /// (Design Brief §3) when the caller's home URI is known: a signature-verified caller is
+    /// recorded against <paramref name="claimedHomeUri"/> as Open/pending, a repeat contact
+    /// refreshes last-seen, and a changed key is flagged — never promoted, never refused. The
+    /// gatekeeper XML-RPC transport carries no caller URI (LEDGER D-5), so callers on that path
+    /// pass null and nothing is recorded.
+    /// </summary>
+    public static GridTrustContext ClassifyInbound(Hashtable parameters, string method, string claimedHomeUri)
     {
         TrustedHypergridRuntime rt = Runtime;
         if (rt == null || !rt.Enabled || rt.Verifier == null)
             return null;
 
+        DateTime now = DateTime.UtcNow;
         SignatureMaterial material = SignatureMaterial.FromHashtable(parameters);
-        GridTrustContext ctx = rt.Verifier.Verify(material, method, parameters, DateTime.UtcNow);
+        GridTrustContext ctx = rt.Verifier.Verify(material, method, parameters, now);
+
+        if (ctx.Outcome == VerificationOutcome.Verified
+            && !string.IsNullOrWhiteSpace(claimedHomeUri)
+            && Lookup is IGridTrustRecorder recorder)
+        {
+            ctx = RecordFirstContact(recorder, ctx, material, claimedHomeUri, now);
+        }
 
         m_log.LogDebug("[TRUSTED HG]: inbound {0} classified tier={1} outcome={2} grid={3}",
             method, ctx.Tier, ctx.Outcome, ctx.GridId);
 
+        return ctx;
+    }
+
+    /// <summary>
+    /// TOFU record and re-resolve. Any failure leaves the context exactly as verified (ADR-005).
+    /// </summary>
+    private static GridTrustContext RecordFirstContact(IGridTrustRecorder recorder, GridTrustContext ctx,
+        SignatureMaterial material, string claimedHomeUri, DateTime now)
+    {
+        try
+        {
+            byte[] publicKey = Convert.FromBase64String(material.Key);
+            string fingerprint = HGSignatureEnvelope.Sha256Hex(publicKey);
+            recorder.RecordPresentedKey(claimedHomeUri, publicKey, fingerprint, now);
+
+            if (ctx.GridId == UUID.Zero && Lookup.TryResolveByFingerprint(fingerprint, out UUID gridId, out int tier))
+            {
+                return new GridTrustContext
+                {
+                    GridId = gridId,
+                    Tier = tier,
+                    Outcome = ctx.Outcome,
+                };
+            }
+        }
+        catch (Exception e)
+        {
+            m_log.LogWarning(e, "[TRUSTED HG]: first-contact recording failed for {0}; classification unchanged", claimedHomeUri);
+        }
         return ctx;
     }
 }
