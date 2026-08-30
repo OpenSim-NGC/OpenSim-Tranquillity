@@ -48,15 +48,30 @@ public sealed class SignatureMaterial
     public const string XmlRpcTimestamp = "tg_ts";
     public const string XmlRpcNonce = "tg_nonce";
     public const string XmlRpcSignature = "tg_sig";
+    /// <summary>
+    /// Fifth key (Slice 3, LEDGER D-5): the sender's own gatekeeper URI, so first contact can be
+    /// recorded against a URI (§3). It is a label the sender claims, not an identity (identity is
+    /// the key, ADR-003) — but it IS signed: signer and verifier both fold it into the parameter
+    /// digest as <c>tg_uri=&lt;uri&gt;</c>, so a value rewritten on the wire fails verification
+    /// (R-2). Absent → nothing is digested and the Slice 2 form is unchanged.
+    /// </summary>
+    public const string XmlRpcUri = "tg_uri";
 
     // HTTP header names.
     public const string HeaderKey = "X-TG-Key";
     public const string HeaderTimestamp = "X-TG-Timestamp";
     public const string HeaderNonce = "X-TG-Nonce";
     public const string HeaderSignature = "X-TG-Signature";
+    public const string HeaderUri = "X-TG-Uri";
 
     /// <summary>Base64 Ed25519 public key (32 bytes) of the sender.</summary>
     public string Key { get; set; }
+
+    /// <summary>
+    /// The sender's claimed gatekeeper URI (advisory, unsigned); null/empty when not sent. Never
+    /// required: <see cref="HasAll"/> ignores it.
+    /// </summary>
+    public string Uri { get; set; }
 
     /// <summary>UTC timestamp, ISO-8601 seconds.</summary>
     public string Timestamp { get; set; }
@@ -86,6 +101,7 @@ public sealed class SignatureMaterial
             Timestamp = h[XmlRpcTimestamp] as string,
             Nonce = h[XmlRpcNonce] as string,
             Signature = h[XmlRpcSignature] as string,
+            Uri = h[XmlRpcUri] as string,
         };
     }
 
@@ -95,6 +111,8 @@ public sealed class SignatureMaterial
         h[XmlRpcTimestamp] = Timestamp;
         h[XmlRpcNonce] = Nonce;
         h[XmlRpcSignature] = Signature;
+        if (!string.IsNullOrEmpty(Uri))
+            h[XmlRpcUri] = Uri;        // absent when unknown, so the request stays byte-identical to Slice 2
     }
 
     // ---- HTTP transport (headers) ------------------------------------------
@@ -109,6 +127,7 @@ public sealed class SignatureMaterial
             Timestamp = headers[HeaderTimestamp],
             Nonce = headers[HeaderNonce],
             Signature = headers[HeaderSignature],
+            Uri = headers[HeaderUri],
         };
     }
 
@@ -118,5 +137,7 @@ public sealed class SignatureMaterial
         headers[HeaderTimestamp] = Timestamp;
         headers[HeaderNonce] = Nonce;
         headers[HeaderSignature] = Signature;
+        if (!string.IsNullOrEmpty(Uri))
+            headers[HeaderUri] = Uri;
     }
 }

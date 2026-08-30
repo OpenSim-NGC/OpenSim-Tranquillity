@@ -39,9 +39,21 @@ public sealed class GridSignatureSigner
 {
     private readonly GridKeypair m_keypair;
 
-    public GridSignatureSigner(GridKeypair keypair)
+    /// <summary>
+    /// This grid's own gatekeeper URI, sent as the advisory <c>tg_uri</c> so the far side can
+    /// record first contact against a URI (§3, LEDGER D-5). Null when unknown; then no
+    /// <c>tg_uri</c> is written and the request is byte-identical to Slice 2.
+    /// </summary>
+    public string HomeUri { get; }
+
+    public GridSignatureSigner(GridKeypair keypair) : this(keypair, null)
+    {
+    }
+
+    public GridSignatureSigner(GridKeypair keypair, string homeUri)
     {
         m_keypair = keypair ?? throw new ArgumentNullException(nameof(keypair));
+        HomeUri = string.IsNullOrWhiteSpace(homeUri) ? null : HGUriNormalizer.Normalize(homeUri);
     }
 
     /// <summary>
@@ -53,7 +65,9 @@ public sealed class GridSignatureSigner
     {
         string timestamp = HGSignatureEnvelope.FormatTimestamp(nowUtc);
         string nonce = Convert.ToBase64String(RandomNumberGenerator.GetBytes(HGSignatureEnvelope.NonceByteLength));
-        string paramsDigest = HGSignatureEnvelope.ParametersDigest(parameters);
+        // HomeUri (tg_uri) is folded into the digest so it cannot be rewritten on the wire (R-2);
+        // null adds nothing and yields the Slice 2 digest.
+        string paramsDigest = HGSignatureEnvelope.ParametersDigest(parameters, HomeUri);
 
         byte[] payload = HGSignatureEnvelope.BuildCanonicalPayload(
             method, m_keypair.Fingerprint, timestamp, nonce, paramsDigest);
@@ -69,10 +83,14 @@ public sealed class GridSignatureSigner
             Timestamp = timestamp,
             Nonce = nonce,
             Signature = Convert.ToBase64String(signature),
+            Uri = HomeUri,
         };
     }
 
-    /// <summary>Sign and attach the four <c>tg_*</c> keys to an XML-RPC param Hashtable in place.</summary>
+    /// <summary>
+    /// Sign and attach the <c>tg_*</c> keys to an XML-RPC param Hashtable in place (the four
+    /// signature keys, plus <c>tg_uri</c> when <see cref="HomeUri"/> is known).
+    /// </summary>
     public void SignInto(Hashtable parameters, string method, DateTime nowUtc)
     {
         Sign(method, parameters, nowUtc).WriteTo(parameters);

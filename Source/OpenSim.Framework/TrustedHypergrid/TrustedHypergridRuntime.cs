@@ -55,18 +55,48 @@ public sealed class TrustedHypergridRuntime
 
     public string Fingerprint => Keypair?.Fingerprint;
 
+    /// <summary>
+    /// This grid's gatekeeper URI (normalised), taken from <c>GatekeeperURI</c> in [Startup],
+    /// [Hypergrid], [GatekeeperService] or [UserAgentService] — the same lookup the gatekeeper
+    /// itself uses. Sent as the advisory <c>tg_uri</c> on signed calls. Null when unconfigured.
+    /// </summary>
+    public string HomeUri { get; }
+
     private TrustedHypergridRuntime()
     {
         Enabled = false;
     }
 
-    private TrustedHypergridRuntime(GridKeypair keypair, GridSignatureVerifier verifier, bool generated)
+    private TrustedHypergridRuntime(GridKeypair keypair, GridSignatureVerifier verifier, bool generated, string homeUri)
     {
         Enabled = true;
         Keypair = keypair;
-        Signer = new GridSignatureSigner(keypair);
+        HomeUri = homeUri;
+        Signer = new GridSignatureSigner(keypair, homeUri);
         Verifier = verifier;
         KeypairWasGenerated = generated;
+    }
+
+    private static readonly string[] s_gatekeeperUriSections = { "Startup", "Hypergrid", "GatekeeperService", "UserAgentService" };
+
+    /// <summary>Resolve and normalise this grid's GatekeeperURI from config; null (with a warning) if absent or malformed.</summary>
+    private static string ResolveHomeUri(IConfigSource config)
+    {
+        string raw = Util.GetConfigVarFromSections<string>(config, "GatekeeperURI", s_gatekeeperUriSections, string.Empty);
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            m_log.LogWarning("[TRUSTED HG]: no GatekeeperURI configured; outbound calls will carry no tg_uri and cannot be recorded by URI on the far side");
+            return null;
+        }
+        try
+        {
+            return HGUriNormalizer.Normalize(raw);
+        }
+        catch (ArgumentException e)
+        {
+            m_log.LogWarning(e, "[TRUSTED HG]: GatekeeperURI {0} is not an absolute URI; outbound calls will carry no tg_uri", raw);
+            return null;
+        }
     }
 
     /// <summary>A disabled runtime: no key, no signer, no verifier.</summary>
@@ -103,6 +133,10 @@ public sealed class TrustedHypergridRuntime
             m_log.LogInformation("[TRUSTED HG]: generated new grid identity at {0}, fingerprint {1}", file, keypair.Fingerprint);
         }
 
-        return new TrustedHypergridRuntime(keypair, new GridSignatureVerifier(lookup), generated);
+        string homeUri = ResolveHomeUri(config);
+        if (homeUri != null)
+            m_log.LogDebug("[TRUSTED HG]: signing outbound calls as {0}", homeUri);
+
+        return new TrustedHypergridRuntime(keypair, new GridSignatureVerifier(lookup), generated, homeUri);
     }
 }

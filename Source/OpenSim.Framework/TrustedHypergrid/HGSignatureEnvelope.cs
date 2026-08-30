@@ -84,7 +84,19 @@ public static class HGSignatureEnvelope
     /// signing or after the material has been attached. A null/empty parameter set digests the
     /// empty string.
     /// </summary>
-    public static string ParametersDigest(IDictionary parameters)
+    public static string ParametersDigest(IDictionary parameters) => ParametersDigest(parameters, null);
+
+    /// <summary>
+    /// As <see cref="ParametersDigest(IDictionary)"/>, additionally folding the sender's advisory
+    /// URI (<c>tg_uri</c> / <c>X-TG-Uri</c>, LEDGER D-5) into the digest as the entry
+    /// <c>tg_uri=&lt;uri&gt;</c>. The URI is taken from <paramref name="senderUri"/> — the signer's
+    /// own <c>HomeUri</c>, or the value the verifier extracted from the transport — never from the
+    /// raw parameter set, so it is digested exactly once whichever transport carried it. A
+    /// rewritten <c>tg_uri</c> therefore fails verification (R-2). When
+    /// <paramref name="senderUri"/> is null/empty nothing is added and the digest is
+    /// byte-identical to the Slice 2 form, so unsigned, stock and Slice 2 callers are unaffected.
+    /// </summary>
+    public static string ParametersDigest(IDictionary parameters, string senderUri)
     {
         var pairs = new List<string>();
         if (parameters != null)
@@ -98,6 +110,9 @@ public static class HGSignatureEnvelope
                 pairs.Add(key + "=" + value);
             }
         }
+
+        if (!string.IsNullOrEmpty(senderUri))
+            pairs.Add(SignatureMaterial.XmlRpcUri + "=" + senderUri);
 
         pairs.Sort(StringComparer.Ordinal);
         string canonical = string.Join(FieldSeparator.ToString(), pairs);

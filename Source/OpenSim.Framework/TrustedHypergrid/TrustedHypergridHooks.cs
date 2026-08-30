@@ -110,11 +110,11 @@ public static class TrustedHypergridHooks
 
     /// <summary>
     /// As <see cref="ClassifyInbound(Hashtable, string)"/>, additionally recording first contact
-    /// (Design Brief §3) when the caller's home URI is known: a signature-verified caller is
-    /// recorded against <paramref name="claimedHomeUri"/> as Open/pending, a repeat contact
-    /// refreshes last-seen, and a changed key is flagged — never promoted, never refused. The
-    /// gatekeeper XML-RPC transport carries no caller URI (LEDGER D-5), so callers on that path
-    /// pass null and nothing is recorded.
+    /// (Design Brief §3) for a signature-verified caller whose home URI is known — from
+    /// <paramref name="claimedHomeUri"/> if the transport supplies one, otherwise from the advisory
+    /// <c>tg_uri</c> the caller sent (LEDGER D-5). Recorded as Open/pending; a repeat contact
+    /// refreshes last-seen; a changed key is flagged — never promoted, never refused. A verified
+    /// caller that sent no URI is classified but not recorded.
     /// </summary>
     public static GridTrustContext ClassifyInbound(Hashtable parameters, string method, string claimedHomeUri)
     {
@@ -126,11 +126,12 @@ public static class TrustedHypergridHooks
         SignatureMaterial material = SignatureMaterial.FromHashtable(parameters);
         GridTrustContext ctx = rt.Verifier.Verify(material, method, parameters, now);
 
+        string homeUri = !string.IsNullOrWhiteSpace(claimedHomeUri) ? claimedHomeUri : material?.Uri;
         if (ctx.Outcome == VerificationOutcome.Verified
-            && !string.IsNullOrWhiteSpace(claimedHomeUri)
+            && !string.IsNullOrWhiteSpace(homeUri)
             && Lookup is IGridTrustRecorder recorder)
         {
-            ctx = RecordFirstContact(recorder, ctx, material, claimedHomeUri, now);
+            ctx = RecordFirstContact(recorder, ctx, material, homeUri, now);
         }
 
         m_log.LogDebug("[TRUSTED HG]: inbound {0} classified tier={1} outcome={2} grid={3}",

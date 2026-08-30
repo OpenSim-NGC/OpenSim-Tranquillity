@@ -102,7 +102,10 @@ public sealed class GridSignatureVerifier
 
             // Crypto: verify the Ed25519 signature over the canonical payload.
             string fingerprint = HGSignatureEnvelope.Sha256Hex(publicKey);
-            string paramsDigest = HGSignatureEnvelope.ParametersDigest(parameters);
+            // The sender's advisory URI is inside the digest (LEDGER D-5 / R-2): a tg_uri rewritten
+            // on the wire changes the digest and the signature no longer verifies → Open. Absent
+            // URI → the Slice 2 digest, unchanged.
+            string paramsDigest = HGSignatureEnvelope.ParametersDigest(parameters, material.Uri);
             byte[] payload = HGSignatureEnvelope.BuildCanonicalPayload(
                 method, fingerprint, material.Timestamp, material.Nonce, paramsDigest);
 

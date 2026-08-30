@@ -254,7 +254,9 @@
     ;; console gains: hgtrust list | show <uri|fingerprint> | approve <uri> [by] | block <uri> |
     ;; forget <uri> | key show. A signature-verified caller is resolved to its registry tier and the
     ;; tier is LOGGED, not enforced: nothing in the registry refuses a caller, and a grid becomes
-    ;; Trusted only through `hgtrust approve`. Storage follows every other Robust service: it
+    ;; Trusted only through `hgtrust approve`. First contact is recorded against the URI the caller
+    ;; sends as tg_uri (its own GatekeeperURI); this grid sends its GatekeeperURI from [Hypergrid]
+    ;; the same way. Storage follows every other Robust service: it
     ;; inherits StorageProvider and ConnectionString from [DatabaseService]; uncomment to override
     ;; (e.g. to keep the registry in a separate database).
     ; StorageProvider = "OpenSim.Data.MySQL.dll"

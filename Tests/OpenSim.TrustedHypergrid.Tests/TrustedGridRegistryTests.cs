@@ -41,7 +41,8 @@ public class TrustedGridRegistryTests : IDisposable
     }
 
     /// <summary>Config exactly as Robust would carry it: [DatabaseService] supplies the store.</summary>
-    private IConfigSource RegistryConfig(bool enabled = true, string keyFile = null, bool overrideInTrustSection = false)
+    private IConfigSource RegistryConfig(bool enabled = true, string keyFile = null, bool overrideInTrustSection = false,
+        string gatekeeperUri = "http://home.example:8002")
     {
         string db = TempFile(".db");
         string sqliteDll = Path.Combine(AppContext.BaseDirectory, "OpenSim.Data.SQLite.dll");
@@ -64,6 +65,8 @@ public class TrustedGridRegistryTests : IDisposable
         IConfig th = cfg.AddConfig(TrustedHypergridRuntime.ConfigSection);
         th.Set("Enabled", enabled ? "true" : "false");
         th.Set("PrivateKeyFile", keyFile ?? TempFile(".ini"));
+        if (!string.IsNullOrEmpty(gatekeeperUri))
+            cfg.AddConfig("Hypergrid").Set("GatekeeperURI", gatekeeperUri);   // where Robust.HG.ini carries it
         if (overrideInTrustSection)
         {
             th.Set("StorageProvider", sqliteDll);
@@ -358,6 +361,148 @@ public class TrustedGridRegistryTests : IDisposable
         Assert.NotNull(blocked);                                             // returned, not refused
         Assert.Equal(GridTrustContext.TierBlocked, blocked.Tier);
         Assert.Equal(VerificationOutcome.Verified, blocked.Outcome);
+    }
+
+    // ---- tg_uri: the advisory caller URI (LEDGER D-5) ----------------------------------------------
+
+    [Fact]
+    public void Signer_WithHomeUri_WritesNormalisedTgUri_WithoutIt_WritesNoKey()
+    {
+        GridKeypair k = GridKeypair.Generate();
+        Hashtable with = new() { ["region_name"] = "x" };
+        new GridSignatureSigner(k, "HTTP://Grid-C.Example:8002").SignInto(with, "link_region", DateTime.UtcNow);
+        Assert.Equal("http://grid-c.example:8002/", with[SignatureMaterial.XmlRpcUri]);
+        Assert.Equal("http://grid-c.example:8002/", SignatureMaterial.FromHashtable(with).Uri);
+
+        Hashtable without = new() { ["region_name"] = "x" };
+        new GridSignatureSigner(k).SignInto(without, "link_region", DateTime.UtcNow);
+        Assert.False(without.ContainsKey(SignatureMaterial.XmlRpcUri));      // byte-identical to Slice 2
+        Assert.Null(SignatureMaterial.FromHashtable(without).Uri);
+        Assert.Equal(4, without.Count - 1);                                   // exactly the four tg_* keys
+    }
+
+    [Fact]
+    public void TgUri_RewrittenOnTheWire_FailsVerification_AndFlagsNothing()
+    {
+        // R-2: a third party on the wire rewrites a legitimate grid's tg_uri to an ESTABLISHED
+        // grid's URI. Without a signed URI that would force a spurious state=2 on the established
+        // row with no key required. With tg_uri in the digest the signature no longer verifies.
+        TrustedGridRegistryService reg = new(RegistryConfig());
+        TrustedHypergridHooks.Runtime = TrustedHypergridRuntime.FromConfig(RegistryConfig(), reg);
+        TrustedHypergridHooks.Lookup = reg;
+
+        GridKeypair established = GridKeypair.Generate();
+        reg.RecordPresentedKey(GridA, established.PublicKey, established.Fingerprint, DateTime.UtcNow);
+        reg.Approve(GridA, "john");
+
+        GridKeypair legit = GridKeypair.Generate();
+        Hashtable p = new() { ["region_name"] = "x" };
+        new GridSignatureSigner(legit, GridB).SignInto(p, "link_region", DateTime.UtcNow);
+        p[SignatureMaterial.XmlRpcUri] = GridA;                              // rewritten in flight
+
+        GridTrustContext ctx = TrustedHypergridHooks.ClassifyInbound(p, "link_region");
+
+        Assert.Equal(VerificationOutcome.Unverified, ctx.Outcome);          // digest mismatch → Open, not refused
+        Assert.Equal(GridTrustContext.TierOpen, ctx.Tier);
+        TrustedGridData a = reg.Find(GridA);
+        Assert.Equal((int)TrustState.Approved, a.State);                     // established row untouched
+        Assert.Equal((int)TrustTier.Trusted, a.Tier);
+        Assert.Equal(established.Fingerprint, a.KeyFingerprint);
+        Assert.Null(reg.Find(GridB));                                        // and nothing recorded for the victim either
+    }
+
+    [Fact]
+    public void Digest_WithoutSenderUri_IsByteIdenticalToSlice2Form()
+    {
+        Hashtable p = new() { ["region_name"] = "Welcome", ["region_uuid"] = UUID.Random().ToString() };
+        string slice2 = HGSignatureEnvelope.ParametersDigest(p);
+        Assert.Equal(slice2, HGSignatureEnvelope.ParametersDigest(p, null));
+        Assert.Equal(slice2, HGSignatureEnvelope.ParametersDigest(p, string.Empty));
+
+        // material attached without a URI (Slice 2 signer) still digests identically
+        new GridSignatureSigner(GridKeypair.Generate()).SignInto(p, "link_region", DateTime.UtcNow);
+        Assert.Equal(slice2, HGSignatureEnvelope.ParametersDigest(p, SignatureMaterial.FromHashtable(p).Uri));
+
+        // with a URI the digest differs, and the raw tg_uri entry is never double-counted
+        Hashtable q = new() { ["region_name"] = "Welcome", ["region_uuid"] = p["region_uuid"] };
+        string withUri = HGSignatureEnvelope.ParametersDigest(q, GridB);
+        Assert.NotEqual(slice2, withUri);
+        q[SignatureMaterial.XmlRpcUri] = GridB;
+        Assert.Equal(withUri, HGSignatureEnvelope.ParametersDigest(q, GridB));
+    }
+
+    [Fact]
+    public void Slice2Signer_NoTgUri_StillVerifies_UnderSlice3Verifier()
+    {
+        TrustedGridRegistryService reg = new(RegistryConfig());
+        TrustedHypergridRuntime rt = TrustedHypergridRuntime.FromConfig(RegistryConfig(), reg);
+        Hashtable p = new() { ["region_name"] = "x" };
+        new GridSignatureSigner(GridKeypair.Generate()).SignInto(p, "link_region", DateTime.UtcNow);   // Slice 2 form
+        GridTrustContext ctx = rt.Verifier.Verify(SignatureMaterial.FromHashtable(p), "link_region", p, DateTime.UtcNow);
+        Assert.Equal(VerificationOutcome.Verified, ctx.Outcome);
+    }
+
+    [Fact]
+    public void Slice3Signer_WithTgUri_DoesNotVerify_UnderSlice2DigestRule_DegradesToOpen()
+    {
+        // A Slice 2 verifier excludes every tg_* key from its digest, so a Slice 3 signature
+        // (which covers tg_uri) does not match: the caller classifies Open — never refused.
+        GridKeypair k = GridKeypair.Generate();
+        Hashtable p = new() { ["region_name"] = "x" };
+        new GridSignatureSigner(k, GridB).SignInto(p, "link_region", DateTime.UtcNow);
+        SignatureMaterial m = SignatureMaterial.FromHashtable(p);
+
+        string slice2Digest = HGSignatureEnvelope.ParametersDigest(p);            // no URI folded in
+        string slice3Digest = HGSignatureEnvelope.ParametersDigest(p, m.Uri);
+        Assert.NotEqual(slice2Digest, slice3Digest);
+
+        byte[] slice2Payload = HGSignatureEnvelope.BuildCanonicalPayload("link_region", k.Fingerprint, m.Timestamp, m.Nonce, slice2Digest);
+        var v = new Org.BouncyCastle.Crypto.Signers.Ed25519Signer();
+        v.Init(false, new Org.BouncyCastle.Crypto.Parameters.Ed25519PublicKeyParameters(k.PublicKey, 0));
+        v.BlockUpdate(slice2Payload, 0, slice2Payload.Length);
+        Assert.False(v.VerifySignature(Convert.FromBase64String(m.Signature)));
+    }
+
+    [Fact]
+    public void ProductionCallSite_TwoArgClassifyInbound_RecordsFirstContact_FromTgUri()
+    {
+        TrustedGridRegistryService reg = new(RegistryConfig());
+        TrustedHypergridHooks.Runtime = TrustedHypergridRuntime.FromConfig(RegistryConfig(), reg);
+        TrustedHypergridHooks.Lookup = reg;
+
+        // The remote Tranquillity grid: its runtime carries its GatekeeperURI and signs with tg_uri.
+        TrustedHypergridRuntime remote = TrustedHypergridRuntime.FromConfig(RegistryConfig(gatekeeperUri: "http://Remote.Example:8002"));
+        Assert.Equal("http://remote.example:8002/", remote.HomeUri);
+        Hashtable p = new() { ["region_name"] = "Welcome" };
+        remote.Signer.SignInto(p, "link_region", DateTime.UtcNow);
+
+        GridTrustContext ctx = TrustedHypergridHooks.ClassifyInbound(p, "link_region");   // exactly what HypergridHandlers calls
+
+        Assert.Equal(VerificationOutcome.Verified, ctx.Outcome);
+        TrustedGridData rec = reg.Find("http://remote.example:8002/");
+        Assert.NotNull(rec);
+        Assert.Equal(rec.Id, ctx.GridId);
+        Assert.Equal(GridTrustContext.TierOpen, ctx.Tier);
+        Assert.Equal((int)TrustState.Pending, rec.State);
+        Assert.Equal(remote.Fingerprint, rec.KeyFingerprint);
+
+        // second contact: same row, and still not promoted
+        Hashtable again = new() { ["region_name"] = "Welcome" };
+        remote.Signer.SignInto(again, "get_region", DateTime.UtcNow);
+        TrustedHypergridHooks.ClassifyInbound(again, "get_region");
+        Assert.Single(reg.List());
+        Assert.Equal((int)TrustTier.Open, reg.Find("http://remote.example:8002/").Tier);
+    }
+
+    [Fact]
+    public void Runtime_WithoutGatekeeperUri_HasNoHomeUri_AndSignsWithoutTgUri()
+    {
+        TrustedHypergridRuntime rt = TrustedHypergridRuntime.FromConfig(RegistryConfig(gatekeeperUri: ""));
+        Assert.True(rt.Enabled);
+        Assert.Null(rt.HomeUri);
+        Hashtable p = new() { ["region_name"] = "x" };
+        rt.Signer.SignInto(p, "link_region", DateTime.UtcNow);
+        Assert.False(p.ContainsKey(SignatureMaterial.XmlRpcUri));
     }
 
     [Fact]
