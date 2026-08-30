@@ -67,12 +67,20 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     ///
     /// Pinned explicitly rather than relying on the library default, so an upstream
     /// change to that default cannot silently reintroduce the fault.
+    ///
+    /// Decomposition levels are 5, not the 4 this shipped with. That is alignment
+    /// rather than a proven fix: of 130 single-tile textures measured in this grid's
+    /// asset cache, 126 use 5 levels and every one at 512px or larger does, while no
+    /// large texture known to render uses 4. The viewer clamps requested discard to
+    /// MAX_DISCARD_LEVEL = 5 (indra/llimage/llimage.h:41), so 5 levels keeps every
+    /// discard the viewer may ask for available in the codestream. It costs nothing --
+    /// at 1024x1024 the output is smaller at 5 levels than at 4.
     /// </remarks>
     private static J2KEncoderConfiguration BuildEncoderConfig(int width, int height)
     {
         return new J2KEncoderConfiguration()
             .WithTiles(t => t.SetSize(width, height))
-            .WithWavelet(w => w.UseIrreversible97().WithDecompositionLevels(4))
+            .WithWavelet(w => w.UseIrreversible97().WithDecompositionLevels(5))
             .WithProgression(p => p.WithOrder(ProgressionOrder.LRCP).WithQualityLayers(0.1f, 0.5f, 1.0f));
     }
 
