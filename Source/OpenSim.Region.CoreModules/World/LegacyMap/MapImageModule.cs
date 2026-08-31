@@ -133,6 +133,20 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
                 }
 
                 float heightRange = maxHeight - minHeight;
+
+                // A region with no terrain edits is PERFECTLY FLAT - TerrainChannel's
+                // default is ClearLand(DefaultTerrainHeight), and DefaultTerrainHeight is
+                // 21f (OpenSim.Framework/TerrainData.cs:87). Every point is then
+                // simultaneously the minimum and the maximum, heightRange is 0, and the
+                // contrast stretch below divides 0f by 0f. That is NaN, and converting NaN
+                // to byte yields 0, so a brand new region renders a PURE BLACK map tile
+                // from its first render onward. No exception is thrown anywhere.
+                //
+                // Written as !(x > 0f) rather than x <= 0f ON PURPOSE: the negated form is
+                // also true for NaN, so a heightmap that already contains NaN is caught
+                // here instead of passing the guard and reaching the division anyway.
+                // Do not "simplify" this to <= 0f.
+                bool flatTerrain = !(heightRange > 0f);
                 
                 // Render terrain
                 int index = 0;
@@ -146,8 +160,14 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
                     for (int x = 0; x < mapWidth; x++)
                     {
                         float height = heightData[index++];
-                        // Normalize height to 0-255 range
-                        byte gray = (byte)(((height - minHeight) / heightRange) * 255);
+                        // Normalize height to 0-255 range. On flat terrain the stretch has
+                        // no answer - every point is both bounds - so legibility decides:
+                        // mid-grey, which shades to RGB(102,102,102) and is distinct both
+                        // from an empty cell's ocean fill RGB(30,70,95) and from the
+                        // RGB(0,0,0) this used to produce.
+                        byte gray = flatTerrain
+                            ? (byte)128
+                            : (byte)(((height - minHeight) / heightRange) * 255);
                         
                         // Apply some lighting to create terrain shading
                         byte shaded = (byte)(gray * 0.8f); // Darken slightly
