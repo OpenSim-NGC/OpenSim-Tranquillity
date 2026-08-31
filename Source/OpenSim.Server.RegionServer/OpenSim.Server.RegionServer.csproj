@@ -77,6 +77,8 @@
          no manual DLL copying, no compile/runtime identity splits. -->
     <ProjectReference Include="../../Source/Phlox.ScriptEngine/Phlox.ScriptEngine.csproj" />
     <ProjectReference Include="../../Addons/os-webrtc-janus/WebRtcVoiceRegionModule/WebRtcVoiceRegionModule.csproj" />
+    <ProjectReference Include="../../Addons/os-webrtc-janus/WebRtcVoiceServiceModule/WebRtcVoiceServiceModule.csproj" />
+    <ProjectReference Include="../../Addons/os-webrtc-janus/Janus/WebRtcJanusService.csproj" />
   </ItemGroup>
 
   <ItemGroup>
