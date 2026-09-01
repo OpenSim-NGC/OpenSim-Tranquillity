@@ -1,7 +1,5 @@
-using System;
+namespace Warp3D;
 
-namespace Warp3D
-{
 	/// <summary>
 	/// Summary description for warp_Light.
 	/// </summary>
@@ -63,4 +61,3 @@ namespace Warp3D
 			v2 = v.transform(matrix2);
 		}
 	}
-}

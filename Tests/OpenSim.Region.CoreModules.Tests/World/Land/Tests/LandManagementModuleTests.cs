@@ -25,242 +25,240 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.World.Land.Tests
+namespace OpenSim.Region.CoreModules.World.Land.Tests;
+
+public class LandManagementModuleTests : OpenSimTestCase
 {
-    public class LandManagementModuleTests : OpenSimTestCase
+    [Fact]
+    public void TestAddLandObject()
     {
-        [Fact]
-        public void TestAddLandObject()
-        {
-            TestHelpers.InMethod();
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            UUID userId = TestHelpers.ParseTail(0x1);
+        UUID userId = TestHelpers.ParseTail(0x1);
 
-            LandManagementModule lmm = new LandManagementModule();
-            Scene scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(scene, lmm);
+        LandManagementModule lmm = new LandManagementModule();
+        Scene scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(scene, lmm);
 
-            ILandObject lo = new LandObject(userId, false, scene);
-            lo.LandData.Name = "lo1";
-            lo.SetLandBitmap(
-                lo.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
-            lo = lmm.AddLandObject(lo);
+        ILandObject lo = new LandObject(userId, false, scene);
+        lo.LandData.Name = "lo1";
+        lo.SetLandBitmap(
+            lo.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
+        lo = lmm.AddLandObject(lo);
 
-            // TODO: Should add asserts to check that land object was added properly.
+        // TODO: Should add asserts to check that land object was added properly.
 
-            // At the moment, this test just makes sure that we can't add a land object that overlaps the areas that
-            // the first still holds.
-            ILandObject lo2 = new LandObject(userId, false, scene);
-            lo2.SetLandBitmap(
-                lo2.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
-            lo2.LandData.Name = "lo2";
-            lo2 = lmm.AddLandObject(lo2);
+        // At the moment, this test just makes sure that we can't add a land object that overlaps the areas that
+        // the first still holds.
+        ILandObject lo2 = new LandObject(userId, false, scene);
+        lo2.SetLandBitmap(
+            lo2.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
+        lo2.LandData.Name = "lo2";
+        lo2 = lmm.AddLandObject(lo2);
 
-            {
-                ILandObject loAtCoord = lmm.GetLandObject(0, 0);
-                // TODO: Assert.Equal(,); - incomplete assertion
-                // TODO: Assert.Equal(,); - incomplete assertion
-            }
-
-            {
-                ILandObject loAtCoord = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-                // TODO: Assert.Equal(,); - incomplete assertion
-                // TODO: Assert.Equal(,); - incomplete assertion
-            }
-        }
-
-        /// <summary>
-        /// Test parcels on region when no land data exists to be loaded.
-        /// </summary>
-        [Fact]
-        public void TestLoadWithNoParcels()
         {
-            TestHelpers.InMethod();
-//            TestHelpers.EnableLogging();
-
-            SceneHelpers sh = new SceneHelpers();
-            LandManagementModule lmm = new LandManagementModule();
-            Scene scene = sh.SetupScene();
-            SceneHelpers.SetupSceneModules(scene, lmm);
-
-            scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
-
-            ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
-            Assert.NotEqual(0, loAtCoord1.LandData.LocalID);
-            Assert.NotEqual(UUID.Zero, loAtCoord1.LandData.GlobalID);
-
-            ILandObject loAtCoord2 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
+            ILandObject loAtCoord = lmm.GetLandObject(0, 0);
             // TODO: Assert.Equal(,); - incomplete assertion
             // TODO: Assert.Equal(,); - incomplete assertion
         }
 
-        /// <summary>
-        /// Test parcels on region when a single parcel already exists but it does not cover the whole region.
-        /// </summary>
-        [Fact]
-        public void TestLoadWithSinglePartialCoveringParcel()
         {
-            TestHelpers.InMethod();
+            ILandObject loAtCoord = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+        }
+    }
+
+    /// <summary>
+    /// Test parcels on region when no land data exists to be loaded.
+    /// </summary>
+    [Fact]
+    public void TestLoadWithNoParcels()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            UUID userId = TestHelpers.ParseTail(0x1);
+        SceneHelpers sh = new SceneHelpers();
+        LandManagementModule lmm = new LandManagementModule();
+        Scene scene = sh.SetupScene();
+        SceneHelpers.SetupSceneModules(scene, lmm);
 
-            SceneHelpers sh = new SceneHelpers();
-            LandManagementModule lmm = new LandManagementModule();
-            Scene scene = sh.SetupScene();
-            SceneHelpers.SetupSceneModules(scene, lmm);
+        scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
 
-            ILandObject originalLo1 = new LandObject(userId, false, scene);
-            originalLo1.LandData.Name = "lo1";
-            originalLo1.SetLandBitmap(
-                originalLo1.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize / 2));
+        ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
+        Assert.NotEqual(0, loAtCoord1.LandData.LocalID);
+        Assert.NotEqual(UUID.Zero, loAtCoord1.LandData.GlobalID);
 
-            sh.SimDataService.StoreLandObject(originalLo1);
+        ILandObject loAtCoord2 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+    }
 
-            scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
+    /// <summary>
+    /// Test parcels on region when a single parcel already exists but it does not cover the whole region.
+    /// </summary>
+    [Fact]
+    public void TestLoadWithSinglePartialCoveringParcel()
+    {
+        TestHelpers.InMethod();
+//            TestHelpers.EnableLogging();
 
-            ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
+        UUID userId = TestHelpers.ParseTail(0x1);
 
-            ILandObject loAtCoord2 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
+        SceneHelpers sh = new SceneHelpers();
+        LandManagementModule lmm = new LandManagementModule();
+        Scene scene = sh.SetupScene();
+        SceneHelpers.SetupSceneModules(scene, lmm);
+
+        ILandObject originalLo1 = new LandObject(userId, false, scene);
+        originalLo1.LandData.Name = "lo1";
+        originalLo1.SetLandBitmap(
+            originalLo1.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize / 2));
+
+        sh.SimDataService.StoreLandObject(originalLo1);
+
+        scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
+
+        ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+
+        ILandObject loAtCoord2 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+    }
+
+    /// <summary>
+    /// Test parcels on region when a single parcel already exists but it does not cover the whole region.
+    /// </summary>
+    [Fact]
+    public void TestLoadWithMultiplePartialCoveringParcels()
+    {
+        TestHelpers.InMethod();
+//            TestHelpers.EnableLogging();
+
+        UUID userId = TestHelpers.ParseTail(0x1);
+
+        SceneHelpers sh = new SceneHelpers();
+        LandManagementModule lmm = new LandManagementModule();
+        Scene scene = sh.SetupScene();
+        SceneHelpers.SetupSceneModules(scene, lmm);
+
+        ILandObject originalLo1 = new LandObject(userId, false, scene);
+        originalLo1.LandData.Name = "lo1";
+        originalLo1.SetLandBitmap(
+            originalLo1.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize / 2));
+
+        sh.SimDataService.StoreLandObject(originalLo1);
+
+        ILandObject originalLo2 = new LandObject(userId, false, scene);
+        originalLo2.LandData.Name = "lo2";
+        originalLo2.SetLandBitmap(
+            originalLo2.GetSquareLandBitmap(
+            0, (int)Constants.RegionSize / 2, (int)Constants.RegionSize, ((int)Constants.RegionSize / 4) * 3));
+
+        sh.SimDataService.StoreLandObject(originalLo2);
+
+        scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
+
+        ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+
+        ILandObject loAtCoord2
+            = lmm.GetLandObject((int)Constants.RegionSize - 1, (((int)Constants.RegionSize / 4) * 3) - 1);
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+
+        ILandObject loAtCoord3 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
+        Assert.NotEqual(loAtCoord1.LandData.LocalID, loAtCoord3.LandData.LocalID);
+        Assert.NotEqual(loAtCoord2.LandData.LocalID, loAtCoord3.LandData.LocalID);
+        Assert.NotEqual(loAtCoord1.LandData.GlobalID, loAtCoord3.LandData.GlobalID);
+        Assert.NotEqual(loAtCoord2.LandData.GlobalID, loAtCoord3.LandData.GlobalID);
+    }
+
+    /// <summary>
+    /// Test parcels on region when whole region is parcelled (which should normally always be the case).
+    /// </summary>
+    [Fact]
+    public void TestLoad()
+    {
+        TestHelpers.InMethod();
+//            TestHelpers.EnableLogging();
+
+        UUID userId = TestHelpers.ParseTail(0x1);
+
+        SceneHelpers sh = new SceneHelpers();
+        LandManagementModule lmm = new LandManagementModule();
+        Scene scene = sh.SetupScene();
+        SceneHelpers.SetupSceneModules(scene, lmm);
+
+        ILandObject originalLo1 = new LandObject(userId, false, scene);
+        originalLo1.LandData.Name = "lo1";
+        originalLo1.SetLandBitmap(
+            originalLo1.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize / 2));
+
+        sh.SimDataService.StoreLandObject(originalLo1);
+
+        ILandObject originalLo2 = new LandObject(userId, false, scene);
+        originalLo2.LandData.Name = "lo2";
+        originalLo2.SetLandBitmap(
+            originalLo2.GetSquareLandBitmap(0, (int)Constants.RegionSize / 2, (int)Constants.RegionSize, (int)Constants.RegionSize));
+
+        sh.SimDataService.StoreLandObject(originalLo2);
+
+        scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
+
+        {
+            ILandObject loAtCoord = lmm.GetLandObject(0, 0);
             // TODO: Assert.Equal(,); - incomplete assertion
             // TODO: Assert.Equal(,); - incomplete assertion
         }
 
-        /// <summary>
-        /// Test parcels on region when a single parcel already exists but it does not cover the whole region.
-        /// </summary>
-        [Fact]
-        public void TestLoadWithMultiplePartialCoveringParcels()
         {
-            TestHelpers.InMethod();
+            ILandObject loAtCoord = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
+        }
+    }
+
+    [Fact]
+    public void TestSubdivide()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            UUID userId = TestHelpers.ParseTail(0x1);
+        UUID userId = TestHelpers.ParseTail(0x1);
 
-            SceneHelpers sh = new SceneHelpers();
-            LandManagementModule lmm = new LandManagementModule();
-            Scene scene = sh.SetupScene();
-            SceneHelpers.SetupSceneModules(scene, lmm);
+        LandManagementModule lmm = new LandManagementModule();
+        Scene scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(scene, lmm);
 
-            ILandObject originalLo1 = new LandObject(userId, false, scene);
-            originalLo1.LandData.Name = "lo1";
-            originalLo1.SetLandBitmap(
-                originalLo1.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize / 2));
+        ILandObject lo = new LandObject(userId, false, scene);
+        lo.LandData.Name = "lo1";
+        lo.SetLandBitmap(
+            lo.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
+        lo = lmm.AddLandObject(lo);
 
-            sh.SimDataService.StoreLandObject(originalLo1);
+        lmm.Subdivide(0, 0, Constants.LandUnit, Constants.LandUnit, userId);
 
-            ILandObject originalLo2 = new LandObject(userId, false, scene);
-            originalLo2.LandData.Name = "lo2";
-            originalLo2.SetLandBitmap(
-                originalLo2.GetSquareLandBitmap(
-                0, (int)Constants.RegionSize / 2, (int)Constants.RegionSize, ((int)Constants.RegionSize / 4) * 3));
-
-            sh.SimDataService.StoreLandObject(originalLo2);
-
-            scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
-
-            ILandObject loAtCoord1 = lmm.GetLandObject(0, 0);
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-
-            ILandObject loAtCoord2
-                = lmm.GetLandObject((int)Constants.RegionSize - 1, (((int)Constants.RegionSize / 4) * 3) - 1);
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-
-            ILandObject loAtCoord3 = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-            Assert.NotEqual(loAtCoord1.LandData.LocalID, loAtCoord3.LandData.LocalID);
-            Assert.NotEqual(loAtCoord2.LandData.LocalID, loAtCoord3.LandData.LocalID);
-            Assert.NotEqual(loAtCoord1.LandData.GlobalID, loAtCoord3.LandData.GlobalID);
-            Assert.NotEqual(loAtCoord2.LandData.GlobalID, loAtCoord3.LandData.GlobalID);
+        {
+            ILandObject loAtCoord = lmm.GetLandObject(0, 0);
+            Assert.NotEqual(lo.LandData.LocalID, loAtCoord.LandData.LocalID);
+            Assert.NotEqual(lo.LandData.GlobalID, loAtCoord.LandData.GlobalID);
         }
 
-        /// <summary>
-        /// Test parcels on region when whole region is parcelled (which should normally always be the case).
-        /// </summary>
-        [Fact]
-        public void TestLoad()
         {
-            TestHelpers.InMethod();
-//            TestHelpers.EnableLogging();
-
-            UUID userId = TestHelpers.ParseTail(0x1);
-
-            SceneHelpers sh = new SceneHelpers();
-            LandManagementModule lmm = new LandManagementModule();
-            Scene scene = sh.SetupScene();
-            SceneHelpers.SetupSceneModules(scene, lmm);
-
-            ILandObject originalLo1 = new LandObject(userId, false, scene);
-            originalLo1.LandData.Name = "lo1";
-            originalLo1.SetLandBitmap(
-                originalLo1.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize / 2));
-
-            sh.SimDataService.StoreLandObject(originalLo1);
-
-            ILandObject originalLo2 = new LandObject(userId, false, scene);
-            originalLo2.LandData.Name = "lo2";
-            originalLo2.SetLandBitmap(
-                originalLo2.GetSquareLandBitmap(0, (int)Constants.RegionSize / 2, (int)Constants.RegionSize, (int)Constants.RegionSize));
-
-            sh.SimDataService.StoreLandObject(originalLo2);
-
-            scene.loadAllLandObjectsFromStorage(scene.RegionInfo.RegionID);
-
-            {
-                ILandObject loAtCoord = lmm.GetLandObject(0, 0);
-                // TODO: Assert.Equal(,); - incomplete assertion
-                // TODO: Assert.Equal(,); - incomplete assertion
-            }
-
-            {
-                ILandObject loAtCoord = lmm.GetLandObject((int)Constants.RegionSize - 1, ((int)Constants.RegionSize - 1));
-                // TODO: Assert.Equal(,); - incomplete assertion
-                // TODO: Assert.Equal(,); - incomplete assertion
-            }
-        }
-
-        [Fact]
-        public void TestSubdivide()
-        {
-            TestHelpers.InMethod();
-//            TestHelpers.EnableLogging();
-
-            UUID userId = TestHelpers.ParseTail(0x1);
-
-            LandManagementModule lmm = new LandManagementModule();
-            Scene scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(scene, lmm);
-
-            ILandObject lo = new LandObject(userId, false, scene);
-            lo.LandData.Name = "lo1";
-            lo.SetLandBitmap(
-                lo.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
-            lo = lmm.AddLandObject(lo);
-
-            lmm.Subdivide(0, 0, Constants.LandUnit, Constants.LandUnit, userId);
-
-            {
-                ILandObject loAtCoord = lmm.GetLandObject(0, 0);
-                Assert.NotEqual(lo.LandData.LocalID, loAtCoord.LandData.LocalID);
-                Assert.NotEqual(lo.LandData.GlobalID, loAtCoord.LandData.GlobalID);
-            }
-
-            {
-                ILandObject loAtCoord = lmm.GetLandObject(Constants.LandUnit, Constants.LandUnit);
-                // TODO: Assert.Equal(,); - incomplete assertion
-                // TODO: Assert.Equal(,); - incomplete assertion
-            }
+            ILandObject loAtCoord = lmm.GetLandObject(Constants.LandUnit, Constants.LandUnit);
+            // TODO: Assert.Equal(,); - incomplete assertion
+            // TODO: Assert.Equal(,); - incomplete assertion
         }
     }
 }

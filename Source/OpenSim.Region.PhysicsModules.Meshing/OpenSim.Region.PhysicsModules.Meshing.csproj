@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyTitle>OpenSim.Region.PhysicsModules.Meshing</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>OpenSim</Product>
+    <Copyright>OpenSimulator developers</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+  </ItemGroup>
+  
+  <ItemGroup>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.SharedBase/OpenSim.Region.PhysicsModules.SharedBase.csproj" />
+  </ItemGroup>
+  
+</Project>

@@ -25,115 +25,111 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Net;
 using System.Text;
 using OpenSim.Framework.Servers.HttpServer;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class TestOSHttpResponse : IOSHttpResponse
 {
-    public class TestOSHttpResponse : IOSHttpResponse
-    {
-        /// <summary>
-        /// Content type property.
-        /// </summary>
-        /// <remarks>
-        /// Setting this property will also set IsContentTypeSet to
-        /// true.
-        /// </remarks>
-        public string ContentType { get; set; }
+    /// <summary>
+    /// Content type property.
+    /// </summary>
+    /// <remarks>
+    /// Setting this property will also set IsContentTypeSet to
+    /// true.
+    /// </remarks>
+    public string ContentType { get; set; }
 
-        /// <summary>
-        /// Boolean property indicating whether the content type
-        /// property actively has been set.
-        /// </summary>
-        /// <remarks>
-        /// IsContentTypeSet will go away together with .NET base.
-        /// </remarks>
-        // public bool IsContentTypeSet
-        // {
-        //     get { return _contentTypeSet; }
-        // }
-        // private bool _contentTypeSet;
+    /// <summary>
+    /// Boolean property indicating whether the content type
+    /// property actively has been set.
+    /// </summary>
+    /// <remarks>
+    /// IsContentTypeSet will go away together with .NET base.
+    /// </remarks>
+    // public bool IsContentTypeSet
+    // {
+    //     get { return _contentTypeSet; }
+    // }
+    // private bool _contentTypeSet;
 
-        /// <summary>
-        /// Length of the body content; 0 if there is no body.
-        /// </summary>
-        public long ContentLength { get; set; }
+    /// <summary>
+    /// Length of the body content; 0 if there is no body.
+    /// </summary>
+    public long ContentLength { get; set; }
 
-        /// <summary>
-        /// Alias for ContentLength.
-        /// </summary>
-        public long ContentLength64 { get; set; }
+    /// <summary>
+    /// Alias for ContentLength.
+    /// </summary>
+    public long ContentLength64 { get; set; }
 
-        public int Priority { get; set; }
-        public byte[] RawBuffer { get; set; }
-        public int RawBufferStart { get; set; }
-        public int RawBufferLen { get; set; }
+    public int Priority { get; set; }
+    public byte[] RawBuffer { get; set; }
+    public int RawBufferStart { get; set; }
+    public int RawBufferLen { get; set; }
 
-        /// <summary>
-        /// Encoding of the body content.
-        /// </summary>
-        public Encoding ContentEncoding { get; set; }
+    /// <summary>
+    /// Encoding of the body content.
+    /// </summary>
+    public Encoding ContentEncoding { get; set; }
 
-        public bool KeepAlive { get; set; }
+    public bool KeepAlive { get; set; }
 
-        /// <summary>
-        /// Get or set the keep alive timeout property (default is
-        /// 20). Setting this to 0 also disables KeepAlive. Setting
-        /// this to something else but 0 also enable KeepAlive.
-        /// </summary>
-        public int KeepAliveTimeout { get; set; }
+    /// <summary>
+    /// Get or set the keep alive timeout property (default is
+    /// 20). Setting this to 0 also disables KeepAlive. Setting
+    /// this to something else but 0 also enable KeepAlive.
+    /// </summary>
+    public int KeepAliveTimeout { get; set; }
 
-        /// <summary>
-        /// Return the output stream feeding the body.
-        /// </summary>
-        /// <remarks>
-        /// On its way out...
-        /// </remarks>
-        public Stream OutputStream { get; private set; }
+    /// <summary>
+    /// Return the output stream feeding the body.
+    /// </summary>
+    /// <remarks>
+    /// On its way out...
+    /// </remarks>
+    public Stream OutputStream { get; private set; }
 
-        public string ProtocolVersion { get; set; }
+    public string ProtocolVersion { get; set; }
 
-        /// <summary>
-        /// Return the output stream feeding the body.
-        /// </summary>
-        public Stream Body { get; private set; }
+    /// <summary>
+    /// Return the output stream feeding the body.
+    /// </summary>
+    public Stream Body { get; private set; }
 
-        /// <summary>
-        /// Chunk transfers.
-        /// </summary>
-        public bool SendChunked { get; set; }
+    /// <summary>
+    /// Chunk transfers.
+    /// </summary>
+    public bool SendChunked { get; set; }
 
-        /// <summary>
-        /// HTTP status code.
-        /// </summary>
-        public int StatusCode { get; set; }
+    /// <summary>
+    /// HTTP status code.
+    /// </summary>
+    public int StatusCode { get; set; }
 
-        /// <summary>
-        /// HTTP status description.
-        /// </summary>
-        public string StatusDescription { get; set; }
+    /// <summary>
+    /// HTTP status description.
+    /// </summary>
+    public string StatusDescription { get; set; }
 
-        public double RequestTS { get; }
+    public double RequestTS { get; }
 
-        /// <summary>
-        /// Set response as a http redirect
-        /// </summary>
-        /// <param name="url">redirection target url</param>
-        /// <param name="redirStatusCode">the response Status, must be Redirect, Moved,MovedPermanently,RedirectKeepVerb, RedirectMethod, TemporaryRedirect. Defaults to Redirect</param>
-        public void Redirect(string url, HttpStatusCode redirStatusCode = HttpStatusCode.Redirect) { throw new NotImplementedException(); }
-        /// <summary>
-        /// Add a header field and content to the response.
-        /// </summary>
-        /// <param name="key">string containing the header field
-        /// name</param>
-        /// <param name="value">string containing the header field
-        /// value</param>
-        public void AddHeader(string key, string value) { throw new NotImplementedException(); }
+    /// <summary>
+    /// Set response as a http redirect
+    /// </summary>
+    /// <param name="url">redirection target url</param>
+    /// <param name="redirStatusCode">the response Status, must be Redirect, Moved,MovedPermanently,RedirectKeepVerb, RedirectMethod, TemporaryRedirect. Defaults to Redirect</param>
+    public void Redirect(string url, HttpStatusCode redirStatusCode = HttpStatusCode.Redirect) { throw new NotImplementedException(); }
+    /// <summary>
+    /// Add a header field and content to the response.
+    /// </summary>
+    /// <param name="key">string containing the header field
+    /// name</param>
+    /// <param name="value">string containing the header field
+    /// value</param>
+    public void AddHeader(string key, string value) { throw new NotImplementedException(); }
 
-        public void Send() { }
-    }
+    public void Send() { }
 }

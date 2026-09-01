@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Addin id="OpenSim.Region.PhysicsModules.BulletS" version="0.9">
+    
+    <Runtime>
+        <Import assembly="OpenSim.Region.Framework.dll" />
+        <Import assembly="OpenSim.Region.PhysicsModules.BulletS.dll" />
+    </Runtime>
+
+    <Dependencies>
+        <Addin id="OpenSim.Server.RegionServer" version="0.9" />
+    </Dependencies>
+
+    <Extension path = "/OpenSim/RegionModules">
+        <RegionModule id="BulletSPhysicsScene" class="OpenSim.Region.PhysicsModules.BulletS.BSScene" />
+        <RegionModule id="ExtendedPhysics" class="OpenSim.Region.PhysicsModules.BulletS.ExtendedPhysics" />
+    </Extension>
+  
+</Addin>

@@ -1,7 +1,5 @@
-using System;
+namespace Warp3D;
 
-namespace Warp3D
-{
 	/// <summary>
 	/// Summary description for warp_TextureFactory.
 	/// </summary>
@@ -229,4 +227,3 @@ namespace Warp3D
 			return t;
 		}
 	}
-}

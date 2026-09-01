@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <ProjectType>Local</ProjectType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyTitle>OpenSim.Data.MySQL.MoneyData</AssemblyTitle>
+    <Company>OpenSim</Company>
+    <Product>OpenSim.Data.MySQL.MoneyData</Product>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="MySqlConnector" Version="2.5.0" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Properties/" />
+  </ItemGroup>
+</Project>

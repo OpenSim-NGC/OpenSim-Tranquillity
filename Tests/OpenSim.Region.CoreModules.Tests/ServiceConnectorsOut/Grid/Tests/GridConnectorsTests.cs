@@ -25,22 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
-using Xunit;
-
-using OpenSim.Framework;
-using OpenSim.Region.Framework.Scenes;
-using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid.Tests
+namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid.Tests;
+
+/// <summary>
+/// Disabled pending conversion from NUnit to xUnit.
+/// This test class requires significant manual work to convert NUnit-specific patterns.
+/// </summary>
+public class GridConnectorsTests : OpenSimTestCase
 {
-    /// <summary>
-    /// Disabled pending conversion from NUnit to xUnit.
-    /// This test class requires significant manual work to convert NUnit-specific patterns.
-    /// </summary>
-    public class GridConnectorsTests : OpenSimTestCase
-    {
-        // Placeholder for disabled tests
-    }
+    // Placeholder for disabled tests
 }

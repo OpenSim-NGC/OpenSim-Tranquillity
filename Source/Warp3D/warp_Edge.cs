@@ -1,7 +1,5 @@
-using System;
+namespace Warp3D;
 
-namespace Warp3D
-{
 	/// <summary>
 	/// Summary description for warp_Edge.
 	/// </summary>
@@ -30,4 +28,3 @@ namespace Warp3D
 			return b; 
 		}
 	}
-}

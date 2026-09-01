@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Addin id="OpenSim.Region.PhysicsModules.BasicPhysics" version="0.9">
+    
+    <Runtime>
+        <Import assembly="OpenSim.Region.Framework.dll" />
+        <Import assembly="OpenSim.Region.PhysicsModules.BasicPhysics.dll"/>
+    </Runtime>
+
+    <Dependencies>
+        <Addin id="OpenSim.Server.RegionServer" version="0.9" />
+    </Dependencies>
+
+    <Extension path = "/OpenSim/RegionModules">
+        <RegionModule id="BasicPhysicsScene" class="OpenSim.Region.PhysicsModules.BasicPhysics.BasicScene" />
+    </Extension>
+  
+</Addin>

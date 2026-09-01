@@ -28,44 +28,43 @@
 using System.Reflection;
 using OpenSim.Region.ScriptEngine.Interfaces;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api
+namespace OpenSim.Region.ScriptEngine.Shared.Api;
+
+public class ApiManager
 {
-    public class ApiManager
+    private Dictionary<string,Type> m_Apis = new Dictionary<string,Type>();
+
+    public string[] GetApis()
     {
-        private Dictionary<string,Type> m_Apis = new Dictionary<string,Type>();
-
-        public string[] GetApis()
+        if (m_Apis.Count <= 0)
         {
-            if (m_Apis.Count <= 0)
-            {
-                Assembly assembly = Assembly.GetExecutingAssembly();
+            Assembly assembly = Assembly.GetExecutingAssembly();
 
-                // Get all exported types and filter for only classes
-                IEnumerable<Type> classes = 
-                    from type in assembly.GetExportedTypes()
-                        where typeof(IScriptApi).IsAssignableFrom(type) && type.IsClass && !type.IsAbstract
-                        select type;
-                
-                foreach (Type t in classes)
+            // Get all exported types and filter for only classes
+            IEnumerable<Type> classes = 
+                from type in assembly.GetExportedTypes()
+                    where typeof(IScriptApi).IsAssignableFrom(type) && type.IsClass && !type.IsAbstract
+                    select type;
+            
+            foreach (Type t in classes)
+            {
+                if (t.Name.EndsWith("_Api"))
                 {
-                    if (t.Name.EndsWith("_Api"))
-                    {
-                        string sname = t.Name[..^4];
-                        m_Apis[sname] = t;
-                    }
+                    string sname = t.Name[..^4];
+                    m_Apis[sname] = t;
                 }
             }
-
-            return new List<string>(m_Apis.Keys).ToArray();
         }
 
-        public IScriptApi CreateApi(string api)
-        {
-            if (!m_Apis.ContainsKey(api))
-                return null;
+        return new List<string>(m_Apis.Keys).ToArray();
+    }
 
-            IScriptApi ret = (IScriptApi)(Activator.CreateInstance(m_Apis[api]));
-            return ret;
-        }
+    public IScriptApi CreateApi(string api)
+    {
+        if (!m_Apis.ContainsKey(api))
+            return null;
+
+        IScriptApi ret = (IScriptApi)(Activator.CreateInstance(m_Apis[api]));
+        return ret;
     }
 }

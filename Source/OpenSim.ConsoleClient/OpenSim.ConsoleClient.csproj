@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+  </ItemGroup>
+  
+  <ItemGroup>
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="System.CommandLine" Version="2.0.8" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
+  </ItemGroup>
+</Project>

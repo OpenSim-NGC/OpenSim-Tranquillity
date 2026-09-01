@@ -31,61 +31,60 @@ using Xunit;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.World.Media.Moap.Tests
+namespace OpenSim.Region.CoreModules.World.Media.Moap.Tests;
+
+public class MoapTests : OpenSimTestCase
 {
-    public class MoapTests : OpenSimTestCase
+    protected TestScene m_scene;
+    protected MoapModule m_module;
+
+    public override void SetUp()
     {
-        protected TestScene m_scene;
-        protected MoapModule m_module;
+        base.SetUp();
 
-        public override void SetUp()
-        {
-            base.SetUp();
+        m_module = new MoapModule();
+        m_scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(m_scene, m_module);
+    }
 
-            m_module = new MoapModule();
-            m_scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(m_scene, m_module);
-        }
-
-        [Fact]
-        public void TestClearMediaUrl()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestClearMediaUrl()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene).RootPart;
-            MediaEntry me = new MediaEntry();
+        SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene).RootPart;
+        MediaEntry me = new MediaEntry();
 
-            m_module.SetMediaEntry(part, 1, me);
-            m_module.ClearMediaEntry(part, 1);
+        m_module.SetMediaEntry(part, 1, me);
+        m_module.ClearMediaEntry(part, 1);
 
-            // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            // Although we've cleared one face, other faces may still be present.  So we need to check for an
-            // update media url version
-            // TODO: Assert.Equal(,); - incomplete assertion
+        // Although we've cleared one face, other faces may still be present.  So we need to check for an
+        // update media url version
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            // By changing media flag to false, the face texture once again becomes identical to the DefaultTexture.
-            // Therefore, when libOMV reserializes it, it disappears and we are left with no face texture in this slot.
-            // Not at all confusing, eh?
-            // TODO: Fix this assertion
-        }
+        // By changing media flag to false, the face texture once again becomes identical to the DefaultTexture.
+        // Therefore, when libOMV reserializes it, it disappears and we are left with no face texture in this slot.
+        // Not at all confusing, eh?
+        // TODO: Fix this assertion
+    }
 
-        [Fact]
-        public void TestSetMediaUrl()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestSetMediaUrl()
+    {
+        TestHelpers.InMethod();
 
-            string homeUrl = "opensimulator.org";
+        string homeUrl = "opensimulator.org";
 
-            SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene).RootPart;
-            MediaEntry me = new MediaEntry() { HomeURL = homeUrl };
+        SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene).RootPart;
+        MediaEntry me = new MediaEntry() { HomeURL = homeUrl };
 
-            m_module.SetMediaEntry(part, 1, me);
+        m_module.SetMediaEntry(part, 1, me);
 
-            // TODO: Assert.Equal(,); - incomplete assertion
-            // TODO: Assert.Equal(,); - incomplete assertion
-            Assert.True(part.Shape.Textures.FaceTextures[1].MediaFlags);
-        }
+        // TODO: Assert.Equal(,); - incomplete assertion
+        // TODO: Assert.Equal(,); - incomplete assertion
+        Assert.True(part.Shape.Textures.FaceTextures[1].MediaFlags);
     }
 }

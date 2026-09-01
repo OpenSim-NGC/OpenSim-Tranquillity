@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyTitle>OpenSim.Data</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>OpenSim.Data</Product>
+    <Copyright>Copyright (c) OpenSimulator.org Developers 2007-2009</Copyright>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="MySqlConnector" Version="2.5.0" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
+    <PackageReference Include="System.Data.SQLite" Version="2.0.3" />
+  </ItemGroup>
+</Project>

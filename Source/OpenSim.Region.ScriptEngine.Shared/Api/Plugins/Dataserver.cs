@@ -25,229 +25,226 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
+namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
+
+public class Dataserver
 {
-    public class Dataserver
+    private ObjectJobEngine m_WorkPool;
+
+    public AsyncCommandManager m_CmdManager;
+
+    public int DataserverRequestsCount
     {
-        private ObjectJobEngine m_WorkPool;
-
-        public AsyncCommandManager m_CmdManager;
-
-        public int DataserverRequestsCount
-        {
-            get
-            {
-                lock (DataserverRequests)
-                    return DataserverRequests.Count;
-            }
-        }
-
-        private Dictionary<string, DataserverRequest> DataserverRequests =  new Dictionary<string, DataserverRequest>();
-
-        public Dataserver(AsyncCommandManager CmdManager)
-        {
-            m_CmdManager = CmdManager;
-            m_WorkPool = new ObjectJobEngine(ProcessActions, "ScriptDataServer", 1000, 4);
-        }
-
-        private class DataserverRequest
-        {
-            public uint localID;
-            public UUID itemID;
-
-            public UUID ID;
-            public string handle;
-
-            public DateTime startTime;
-            public Action<string> action;
-        }
-
-        public string RequestWithImediatePost(uint localID, UUID itemID, string reply)
-        {
-            string ID = UUID.Random().ToString();
-            m_CmdManager.m_ScriptEngine.PostObjectEvent(localID,
-                    new EventParams("dataserver", new Object[]
-                            { new LSL_Types.LSLString(ID),
-                            new LSL_Types.LSLString(reply)},
-                    new DetectParams[0]));
-            return ID;
-        }
-
-        //legacy
-        public UUID RegisterRequest(uint localID, UUID itemID, string identifier)
+        get
         {
             lock (DataserverRequests)
-            {
-                if (DataserverRequests.ContainsKey(identifier))
-                    return UUID.Zero;
-
-                DataserverRequest ds = new DataserverRequest()
-                {
-                    localID = localID,
-                    itemID = itemID,
-
-                    ID = UUID.Random(),
-                    handle = identifier,
-
-                    startTime = DateTime.UtcNow,
-                    action = null
-                };
-
-                DataserverRequests[identifier] = ds;
-                return ds.ID;
-            }
+                return DataserverRequests.Count;
         }
+    }
 
-        // action, if provided, is executed async
-        // its code pattern should be:
-        //Action<string> act = eventID =>
-        //{
-        //     need operations to get reply string
-        //  m_AsyncCommands.DataserverPlugin.DataserverReply(eventID, reply);
-        //}
-        // eventID is the event id, provided by this on Invoque
-        // see ProcessActions below
+    private Dictionary<string, DataserverRequest> DataserverRequests =  new Dictionary<string, DataserverRequest>();
 
-        // temporary don't use
-        public UUID RegisterRequest(uint localID, UUID itemID, string identifier, Action<string> action)
+    public Dataserver(AsyncCommandManager CmdManager)
+    {
+        m_CmdManager = CmdManager;
+        m_WorkPool = new ObjectJobEngine(ProcessActions, "ScriptDataServer", 1000, 4);
+    }
+
+    private class DataserverRequest
+    {
+        public uint localID;
+        public UUID itemID;
+
+        public UUID ID;
+        public string handle;
+
+        public DateTime startTime;
+        public Action<string> action;
+    }
+
+    public string RequestWithImediatePost(uint localID, UUID itemID, string reply)
+    {
+        string ID = UUID.Random().ToString();
+        m_CmdManager.m_ScriptEngine.PostObjectEvent(localID,
+                new EventParams("dataserver", new Object[]
+                        { new LSL_Types.LSLString(ID),
+                        new LSL_Types.LSLString(reply)},
+                new DetectParams[0]));
+        return ID;
+    }
+
+    //legacy
+    public UUID RegisterRequest(uint localID, UUID itemID, string identifier)
+    {
+        lock (DataserverRequests)
         {
-            lock (DataserverRequests)
+            if (DataserverRequests.ContainsKey(identifier))
+                return UUID.Zero;
+
+            DataserverRequest ds = new DataserverRequest()
             {
-                if (DataserverRequests.ContainsKey(identifier))
-                    return UUID.Zero;
+                localID = localID,
+                itemID = itemID,
 
-                DataserverRequest ds = new DataserverRequest()
-                {
-                    localID = localID,
-                    itemID = itemID,
+                ID = UUID.Random(),
+                handle = identifier,
 
-                    ID = UUID.Random(),
-                    handle = identifier,
+                startTime = DateTime.UtcNow,
+                action = null
+            };
 
-                    startTime = DateTime.UtcNow,
-                    action = action
-                };
-
-                DataserverRequests[identifier] = ds;
-                if (action != null)
-                    m_WorkPool.Enqueue(identifier);
-
-                return ds.ID;
-            }
+            DataserverRequests[identifier] = ds;
+            return ds.ID;
         }
+    }
 
-        public UUID RegisterRequest(uint localID, UUID itemID, Action<string> action)
+    // action, if provided, is executed async
+    // its code pattern should be:
+    //Action<string> act = eventID =>
+    //{
+    //     need operations to get reply string
+    //  m_AsyncCommands.DataserverPlugin.DataserverReply(eventID, reply);
+    //}
+    // eventID is the event id, provided by this on Invoque
+    // see ProcessActions below
+
+    // temporary don't use
+    public UUID RegisterRequest(uint localID, UUID itemID, string identifier, Action<string> action)
+    {
+        lock (DataserverRequests)
         {
-            lock (DataserverRequests)
+            if (DataserverRequests.ContainsKey(identifier))
+                return UUID.Zero;
+
+            DataserverRequest ds = new DataserverRequest()
             {
-                string identifier = UUID.Random().ToString();
+                localID = localID,
+                itemID = itemID,
 
-                DataserverRequest ds = new DataserverRequest()
-                {
-                    localID = localID,
-                    itemID = itemID,
+                ID = UUID.Random(),
+                handle = identifier,
 
-                    ID = UUID.Random(),
-                    handle = identifier,
+                startTime = DateTime.UtcNow,
+                action = action
+            };
 
-                    startTime = DateTime.MaxValue,
-                    action = action
-                };
+            DataserverRequests[identifier] = ds;
+            if (action != null)
+                m_WorkPool.Enqueue(identifier);
 
-                DataserverRequests[identifier] = ds;
-                if (action != null)
-                    m_WorkPool.Enqueue(identifier);
-
-                return ds.ID;
-            }
+            return ds.ID;
         }
+    }
 
-        public void ProcessActions(object st)
+    public UUID RegisterRequest(uint localID, UUID itemID, Action<string> action)
+    {
+        lock (DataserverRequests)
         {
-            string id = st as string;
-            if(string.IsNullOrEmpty(id))
+            string identifier = UUID.Random().ToString();
+
+            DataserverRequest ds = new DataserverRequest()
+            {
+                localID = localID,
+                itemID = itemID,
+
+                ID = UUID.Random(),
+                handle = identifier,
+
+                startTime = DateTime.MaxValue,
+                action = action
+            };
+
+            DataserverRequests[identifier] = ds;
+            if (action != null)
+                m_WorkPool.Enqueue(identifier);
+
+            return ds.ID;
+        }
+    }
+
+    public void ProcessActions(object st)
+    {
+        string id = st as string;
+        if(string.IsNullOrEmpty(id))
+            return;
+
+        DataserverRequest ds = null;
+        lock (DataserverRequests)
+        {
+            if (!DataserverRequests.TryGetValue(id, out ds))
                 return;
+        }
 
-            DataserverRequest ds = null;
-            lock (DataserverRequests)
-            {
-                if (!DataserverRequests.TryGetValue(id, out ds))
-                    return;
-            }
+        if (ds == null || ds.action == null)
+            return;
+        try
+        {
+            ds.action.Invoke(ds.handle);
+        }
+        catch { }
 
-            if (ds == null || ds.action == null)
+        ds.action = null;
+
+        lock (DataserverRequests)
+        {
+            DataserverRequests.Remove(id);
+        }
+    }
+
+    //legacy ?
+    public void DataserverReply(string identifier, string reply)
+    {
+        DataserverRequest ds;
+        lock (DataserverRequests)
+        {
+            if (!DataserverRequests.TryGetValue(identifier, out ds))
                 return;
-            try
-            {
-                ds.action.Invoke(ds.handle);
-            }
-            catch { }
-
-            ds.action = null;
-
-            lock (DataserverRequests)
-            {
-                DataserverRequests.Remove(id);
-            }
+            DataserverRequests.Remove(identifier);
         }
 
-        //legacy ?
-        public void DataserverReply(string identifier, string reply)
+        m_CmdManager.m_ScriptEngine.PostObjectEvent(ds.localID,
+                new EventParams("dataserver", new Object[]
+                {
+                    new LSL_Types.LSLString(ds.ID.ToString()),
+                    new LSL_Types.LSLString(reply)
+                },
+                new DetectParams[0]));
+    }
+
+    public void RemoveEvents(uint localID, UUID itemID)
+    {
+        lock (DataserverRequests)
         {
-            DataserverRequest ds;
-            lock (DataserverRequests)
+            List<string> toremove = new List<string>(DataserverRequests.Count);
+            foreach (DataserverRequest ds in DataserverRequests.Values)
             {
-                if (!DataserverRequests.TryGetValue(identifier, out ds))
-                    return;
-                DataserverRequests.Remove(identifier);
+                if (ds.itemID.Equals(itemID))
+                    toremove.Add(ds.handle);
             }
-
-            m_CmdManager.m_ScriptEngine.PostObjectEvent(ds.localID,
-                    new EventParams("dataserver", new Object[]
-                    {
-                        new LSL_Types.LSLString(ds.ID.ToString()),
-                        new LSL_Types.LSLString(reply)
-                    },
-                    new DetectParams[0]));
-        }
-
-        public void RemoveEvents(uint localID, UUID itemID)
-        {
-            lock (DataserverRequests)
+            foreach (string s in toremove)
             {
-                List<string> toremove = new List<string>(DataserverRequests.Count);
-                foreach (DataserverRequest ds in DataserverRequests.Values)
-                {
-                    if (ds.itemID.Equals(itemID))
-                        toremove.Add(ds.handle);
-                }
-                foreach (string s in toremove)
-                {
-                    DataserverRequests.Remove(s);
-                }
+                DataserverRequests.Remove(s);
             }
         }
+    }
 
-        public void ExpireRequests()
+    public void ExpireRequests()
+    {
+        lock (DataserverRequests)
         {
-            lock (DataserverRequests)
+            List<string> toremove = new List<string>(DataserverRequests.Count);
+            DateTime expirebase = DateTime.UtcNow.AddSeconds(-30);
+            foreach (DataserverRequest ds in DataserverRequests.Values)
             {
-                List<string> toremove = new List<string>(DataserverRequests.Count);
-                DateTime expirebase = DateTime.UtcNow.AddSeconds(-30);
-                foreach (DataserverRequest ds in DataserverRequests.Values)
-                {
-                    if (ds.action == null && ds.startTime < expirebase)
-                        toremove.Add(ds.handle);
-                }
-                foreach (string s in toremove)
-                {
-                    DataserverRequests.Remove(s);
-                }
+                if (ds.action == null && ds.startTime < expirebase)
+                    toremove.Add(ds.handle);
+            }
+            foreach (string s in toremove)
+            {
+                DataserverRequests.Remove(s);
             }
         }
     }

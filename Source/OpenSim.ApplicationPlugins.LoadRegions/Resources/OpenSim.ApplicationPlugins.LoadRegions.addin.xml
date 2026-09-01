@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<Addin id="OpenSim.ApplicationPlugins.LoadRegions" version="0.9">
+
+  <Runtime>
+    <Import assembly="OpenSim.ApplicationPlugins.LoadRegions.dll" />
+  </Runtime>
+
+  <Dependencies>
+    <Addin id="OpenSim.Server.RegionServer" version="0.9" />
+  </Dependencies>
+
+  <Extension path = "/OpenSim/Startup">
+    <Plugin id="LoadRegions" type="OpenSim.ApplicationPlugins.LoadRegions.LoadRegionsPlugin" />
+  </Extension>
+    
+</Addin>

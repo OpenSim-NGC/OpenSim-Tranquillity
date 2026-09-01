@@ -25,210 +25,205 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
-using System;
-using System.Collections.Generic;
-using System.Threading;
 
-namespace OpenSim.Region.ScriptEngine.Yengine
+namespace OpenSim.Region.ScriptEngine.Yengine;
+
+
+public partial class Yengine
 {
+    private int m_WakeUpOne = 0;
+    public object m_WakeUpLock = new object();
 
-    public partial class Yengine
+    private Dictionary<int, XMRInstance> m_RunningInstances = new Dictionary<int, XMRInstance>();
+
+    private bool m_SuspendScriptThreadFlag = false;
+    private bool m_WakeUpThis = false;
+    public DateTime m_LastRanAt = DateTime.MinValue;
+    public long m_ScriptExecTime = 0;
+
+    public void StartThreadWorker(int i, ThreadPriority priority, string sceneName)
     {
-        private int m_WakeUpOne = 0;
-        public object m_WakeUpLock = new object();
+        Thread thd;
+        if(i >= 0)
+            thd = Yengine.StartMyThread(RunScriptThread, "YScript" + i.ToString() + " (" + sceneName +")", priority, -1);
+        else
+            thd = Yengine.StartMyThread(RunScriptThread, "YScript", priority, -1);
+        lock(m_WakeUpLock)
+            m_RunningInstances.Add(thd.ManagedThreadId, null);
+    }
 
-        private Dictionary<int, XMRInstance> m_RunningInstances = new Dictionary<int, XMRInstance>();
-
-        private bool m_SuspendScriptThreadFlag = false;
-        private bool m_WakeUpThis = false;
-        public DateTime m_LastRanAt = DateTime.MinValue;
-        public long m_ScriptExecTime = 0;
-
-        public void StartThreadWorker(int i, ThreadPriority priority, string sceneName)
+    public void StopThreadWorkers()
+    {
+        lock(m_WakeUpLock)
         {
-            Thread thd;
-            if(i >= 0)
-                thd = Yengine.StartMyThread(RunScriptThread, "YScript" + i.ToString() + " (" + sceneName +")", priority, -1);
-            else
-                thd = Yengine.StartMyThread(RunScriptThread, "YScript", priority, -1);
-            lock(m_WakeUpLock)
-                m_RunningInstances.Add(thd.ManagedThreadId, null);
+            while(m_RunningInstances.Count != 0)
+            {
+                Monitor.PulseAll(m_WakeUpLock);
+                Monitor.Wait(m_WakeUpLock, Watchdog.DEFAULT_WATCHDOG_TIMEOUT_MS / 2);
+            }
         }
+    }
 
-        public void StopThreadWorkers()
+    /**
+     * @brief Something was just added to the Start or Yield queue so
+     *        wake one of the RunScriptThread() instances to run it.
+     */
+    public void WakeUpOne()
+    {
+        lock(m_WakeUpLock)
         {
+            m_WakeUpOne++;
+            Monitor.Pulse(m_WakeUpLock);
+        }
+    }
+
+    public void SuspendThreads()
+    {
+        lock(m_WakeUpLock)
+        {
+            m_SuspendScriptThreadFlag = true;
+            Monitor.PulseAll(m_WakeUpLock);
+        }
+    }
+
+    public void ResumeThreads()
+    {
+        lock(m_WakeUpLock)
+        {
+            m_SuspendScriptThreadFlag = false;
+            Monitor.PulseAll(m_WakeUpLock);
+        }
+    }
+
+    /**
+     * @brief Thread that runs the scripts.
+     *
+     *        There are NUMSCRIPTHREADWKRS of these.
+     *        Each sits in a loop checking the Start and Yield queues for 
+     *        a script to run and calls the script as a microthread.
+     */
+    private void RunScriptThread()
+    {
+        int tid = System.Threading.Thread.CurrentThread.ManagedThreadId;
+        ThreadStart thunk;
+        XMRInstance inst;
+
+        bool didevent;
+
+        while(!m_Exiting)
+        {
+            Yengine.UpdateMyThread();
+
             lock(m_WakeUpLock)
             {
-                while(m_RunningInstances.Count != 0)
+                // Maybe there are some scripts waiting to be migrated in or out.
+                thunk = null;
+                if(m_ThunkQueue.Count > 0)
+                    thunk = m_ThunkQueue.Dequeue();
+
+                // Handle 'xmr resume/suspend' commands.
+                else if(m_SuspendScriptThreadFlag && !m_Exiting)
                 {
-                    Monitor.PulseAll(m_WakeUpLock);
                     Monitor.Wait(m_WakeUpLock, Watchdog.DEFAULT_WATCHDOG_TIMEOUT_MS / 2);
+                    continue;
                 }
             }
-        }
 
-        /**
-         * @brief Something was just added to the Start or Yield queue so
-         *        wake one of the RunScriptThread() instances to run it.
-         */
-        public void WakeUpOne()
-        {
-            lock(m_WakeUpLock)
+            if(thunk != null)
             {
-                m_WakeUpOne++;
-                Monitor.Pulse(m_WakeUpLock);
+                thunk();
+                continue;
             }
-        }
 
-        public void SuspendThreads()
-        {
-            lock(m_WakeUpLock)
+            if(m_StartProcessing)
             {
-                m_SuspendScriptThreadFlag = true;
-                Monitor.PulseAll(m_WakeUpLock);
-            }
-        }
-
-        public void ResumeThreads()
-        {
-            lock(m_WakeUpLock)
-            {
-                m_SuspendScriptThreadFlag = false;
-                Monitor.PulseAll(m_WakeUpLock);
-            }
-        }
-
-        /**
-         * @brief Thread that runs the scripts.
-         *
-         *        There are NUMSCRIPTHREADWKRS of these.
-         *        Each sits in a loop checking the Start and Yield queues for 
-         *        a script to run and calls the script as a microthread.
-         */
-        private void RunScriptThread()
-        {
-            int tid = System.Threading.Thread.CurrentThread.ManagedThreadId;
-            ThreadStart thunk;
-            XMRInstance inst;
-
-            bool didevent;
-
-            while(!m_Exiting)
-            {
-                Yengine.UpdateMyThread();
-
-                lock(m_WakeUpLock)
+                // If event just queued to any idle scripts
+                // start them right away.  But only start so
+                // many so we can make some progress on yield
+                // queue.
+                int numStarts;
+                didevent = false;
+                for(numStarts = 5; numStarts >= 0; --numStarts)
                 {
-                    // Maybe there are some scripts waiting to be migrated in or out.
-                    thunk = null;
-                    if(m_ThunkQueue.Count > 0)
-                        thunk = m_ThunkQueue.Dequeue();
+                    lock(m_StartQueue)
+                        inst = m_StartQueue.RemoveHead();
 
-                    // Handle 'xmr resume/suspend' commands.
-                    else if(m_SuspendScriptThreadFlag && !m_Exiting)
-                    {
-                        Monitor.Wait(m_WakeUpLock, Watchdog.DEFAULT_WATCHDOG_TIMEOUT_MS / 2);
+                    if(inst == null)
+                        break;
+                    if (inst.m_IState == XMRInstState.SUSPENDED)
                         continue;
-                    }
+                    if (inst.m_IState != XMRInstState.ONSTARTQ)
+                        throw new Exception("bad state");
+                    RunInstance(inst, tid);
+                    if(m_SuspendScriptThreadFlag || m_Exiting)
+                        continue;
+                    didevent = true;
                 }
 
-                if(thunk != null)
+                // If there is something to run, run it
+                // then rescan from the beginning in case
+                // a lot of things have changed meanwhile.
+                //
+                // These are considered lower priority than
+                // m_StartQueue as they have been taking at
+                // least one quantum of CPU time and event
+                // handlers are supposed to be quick.
+                lock(m_YieldQueue)
+                    inst = m_YieldQueue.RemoveHead();
+
+                if(inst != null)
                 {
-                    thunk();
+                    if (inst.m_IState == XMRInstState.SUSPENDED)
+                        continue;
+                    if (inst.m_IState != XMRInstState.ONYIELDQ)
+                        throw new Exception("bad state");
+
+                    RunInstance(inst, tid);
                     continue;
                 }
 
-                if(m_StartProcessing)
-                {
-                    // If event just queued to any idle scripts
-                    // start them right away.  But only start so
-                    // many so we can make some progress on yield
-                    // queue.
-                    int numStarts;
-                    didevent = false;
-                    for(numStarts = 5; numStarts >= 0; --numStarts)
-                    {
-                        lock(m_StartQueue)
-                            inst = m_StartQueue.RemoveHead();
-
-                        if(inst == null)
-                            break;
-                        if (inst.m_IState == XMRInstState.SUSPENDED)
-                            continue;
-                        if (inst.m_IState != XMRInstState.ONSTARTQ)
-                            throw new Exception("bad state");
-                        RunInstance(inst, tid);
-                        if(m_SuspendScriptThreadFlag || m_Exiting)
-                            continue;
-                        didevent = true;
-                    }
-
-                    // If there is something to run, run it
-                    // then rescan from the beginning in case
-                    // a lot of things have changed meanwhile.
-                    //
-                    // These are considered lower priority than
-                    // m_StartQueue as they have been taking at
-                    // least one quantum of CPU time and event
-                    // handlers are supposed to be quick.
-                    lock(m_YieldQueue)
-                        inst = m_YieldQueue.RemoveHead();
-
-                    if(inst != null)
-                    {
-                        if (inst.m_IState == XMRInstState.SUSPENDED)
-                            continue;
-                        if (inst.m_IState != XMRInstState.ONYIELDQ)
-                            throw new Exception("bad state");
-
-                        RunInstance(inst, tid);
-                        continue;
-                    }
-
-                    // If we left something dangling in the m_StartQueue or m_YieldQueue, go back to check it.
-                    if(didevent)
-                        continue;
-                }
-
-                // Nothing to do, sleep.
-                lock(m_WakeUpLock)
-                {
-                    if(!m_WakeUpThis && (m_WakeUpOne <= 0) && !m_Exiting)
-                        Monitor.Wait(m_WakeUpLock, Watchdog.DEFAULT_WATCHDOG_TIMEOUT_MS / 2);
-
-                    m_WakeUpThis = false;
-                    if((m_WakeUpOne > 0) && (--m_WakeUpOne > 0))
-                        Monitor.Pulse(m_WakeUpLock);
-                }
+                // If we left something dangling in the m_StartQueue or m_YieldQueue, go back to check it.
+                if(didevent)
+                    continue;
             }
-            lock(m_WakeUpLock)
-                m_RunningInstances.Remove(tid);
 
-            Yengine.MyThreadExiting();
+            // Nothing to do, sleep.
+            lock(m_WakeUpLock)
+            {
+                if(!m_WakeUpThis && (m_WakeUpOne <= 0) && !m_Exiting)
+                    Monitor.Wait(m_WakeUpLock, Watchdog.DEFAULT_WATCHDOG_TIMEOUT_MS / 2);
+
+                m_WakeUpThis = false;
+                if((m_WakeUpOne > 0) && (--m_WakeUpOne > 0))
+                    Monitor.Pulse(m_WakeUpLock);
+            }
         }
+        lock(m_WakeUpLock)
+            m_RunningInstances.Remove(tid);
 
-        /**
-         * @brief A script instance was just removed from the Start or Yield Queue.
-         *        So run it for a little bit then stick in whatever queue it should go in.
-         */
-        private void RunInstance(XMRInstance inst, int tid)
-        {
-            m_LastRanAt = DateTime.UtcNow;
-            m_ScriptExecTime -= (long)(m_LastRanAt - DateTime.MinValue).TotalMilliseconds;
-            inst.m_IState = XMRInstState.RUNNING;
+        Yengine.MyThreadExiting();
+    }
 
-            lock(m_WakeUpLock)
-                m_RunningInstances[tid] = inst;
+    /**
+     * @brief A script instance was just removed from the Start or Yield Queue.
+     *        So run it for a little bit then stick in whatever queue it should go in.
+     */
+    private void RunInstance(XMRInstance inst, int tid)
+    {
+        m_LastRanAt = DateTime.UtcNow;
+        m_ScriptExecTime -= (long)(m_LastRanAt - DateTime.MinValue).TotalMilliseconds;
+        inst.m_IState = XMRInstState.RUNNING;
 
-            XMRInstState newIState = inst.RunOne();
+        lock(m_WakeUpLock)
+            m_RunningInstances[tid] = inst;
 
-            lock(m_WakeUpLock)
-                m_RunningInstances[tid] = null;
+        XMRInstState newIState = inst.RunOne();
 
-            HandleNewIState(inst, newIState);
-            m_ScriptExecTime += (long)(DateTime.UtcNow - DateTime.MinValue).TotalMilliseconds;
-        }
+        lock(m_WakeUpLock)
+            m_RunningInstances[tid] = null;
+
+        HandleNewIState(inst, newIState);
+        m_ScriptExecTime += (long)(DateTime.UtcNow - DateTime.MinValue).TotalMilliseconds;
     }
 }

@@ -25,106 +25,104 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.CoreModules.World.Land;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+/// <summary>
+/// Land channel for test purposes
+/// </summary>
+public class TestLandChannel : ILandChannel
 {
-    /// <summary>
-    /// Land channel for test purposes
-    /// </summary>
-    public class TestLandChannel : ILandChannel
+    private Scene m_scene;
+    private List<ILandObject> m_parcels;
+
+    public float BanLineSafeHeight { get { return 100f; } }
+
+    public TestLandChannel(Scene scene)
     {
-        private Scene m_scene;
-        private List<ILandObject> m_parcels;
-
-        public float BanLineSafeHeight { get { return 100f; } }
-
-        public TestLandChannel(Scene scene)
-        {
-            m_scene = scene;
-            m_parcels = new List<ILandObject>();
-            SetupDefaultParcel();
-        }
-
-        private void SetupDefaultParcel()
-        {
-            ILandObject obj = new LandObject(UUID.Zero, false, m_scene);
-            obj.LandData.Name = "Your Parcel";
-            m_parcels.Add(obj);
-        }
-
-        public List<ILandObject> ParcelsNearPoint(Vector3 position)
-        {
-            return new List<ILandObject>();
-        }
-
-        public List<ILandObject> AllParcels()
-        {
-            return m_parcels;
-        }
-
-        public void Clear(bool setupDefaultParcel)
-        {
-            m_parcels.Clear();
-
-            if (setupDefaultParcel)
-                SetupDefaultParcel();
-        }
-
-        protected ILandObject GetNoLand()
-        {
-            ILandObject obj = new LandObject(UUID.Zero, false, m_scene);
-            obj.LandData.Name = "NO LAND";
-            return obj;
-        }
-
-        public ILandObject GetLandObject(Vector3 position)
-        {
-            return GetLandObject(position.X, position.Y);
-        }
-
-        public ILandObject GetLandObject(int x, int y)
-        {
-            return GetNoLand();
-        }
-
-        public ILandObject GetLandObjectClippedXY(float x, float y)
-        {
-            return GetNoLand();
-        }
-
-        public ILandObject GetLandObject(int localID)
-        {
-            return GetNoLand();
-        }
-
-        public ILandObject GetLandObject(UUID ID)
-        {
-            return GetNoLand();
-        }
-
-        public ILandObject GetLandObject(float x, float y)
-        {
-            return GetNoLand();
-        }
-
-        public bool IsLandPrimCountTainted() { return false; }
-        public bool IsForcefulBansAllowed() { return false; }
-        public void UpdateLandObject(int localID, LandData data) {}
-        public void SendParcelsOverlay(IClientAPI client) {}
-        public void ReturnObjectsInParcel(int localID, uint returnType, UUID[] agentIDs, UUID[] taskIDs, IClientAPI remoteClient) {}
-        public void setParcelObjectMaxOverride(overrideParcelMaxPrimCountDelegate overrideDel) {}
-        public void setSimulatorObjectMaxOverride(overrideSimulatorMaxPrimCountDelegate overrideDel) {}
-        public void SetParcelOtherCleanTime(IClientAPI remoteClient, int localID, int otherCleanTime) {}
-
-        public void Join(int start_x, int start_y, int end_x, int end_y, UUID attempting_user_id) {}
-        public void Subdivide(int start_x, int start_y, int end_x, int end_y, UUID attempting_user_id) {}
-        public void sendClientInitialLandInfo(IClientAPI remoteClient, bool overlay) { }
-        public void ClearAllEnvironments(){ }
+        m_scene = scene;
+        m_parcels = new List<ILandObject>();
+        SetupDefaultParcel();
     }
+
+    private void SetupDefaultParcel()
+    {
+        ILandObject obj = new LandObject(UUID.Zero, false, m_scene);
+        obj.LandData.Name = "Your Parcel";
+        m_parcels.Add(obj);
+    }
+
+    public List<ILandObject> ParcelsNearPoint(Vector3 position)
+    {
+        return new List<ILandObject>();
+    }
+
+    public List<ILandObject> AllParcels()
+    {
+        return m_parcels;
+    }
+
+    public void Clear(bool setupDefaultParcel)
+    {
+        m_parcels.Clear();
+
+        if (setupDefaultParcel)
+            SetupDefaultParcel();
+    }
+
+    protected ILandObject GetNoLand()
+    {
+        ILandObject obj = new LandObject(UUID.Zero, false, m_scene);
+        obj.LandData.Name = "NO LAND";
+        return obj;
+    }
+
+    public ILandObject GetLandObject(Vector3 position)
+    {
+        return GetLandObject(position.X, position.Y);
+    }
+
+    public ILandObject GetLandObject(int x, int y)
+    {
+        return GetNoLand();
+    }
+
+    public ILandObject GetLandObjectClippedXY(float x, float y)
+    {
+        return GetNoLand();
+    }
+
+    public ILandObject GetLandObject(int localID)
+    {
+        return GetNoLand();
+    }
+
+    public ILandObject GetLandObject(UUID ID)
+    {
+        return GetNoLand();
+    }
+
+    public ILandObject GetLandObject(float x, float y)
+    {
+        return GetNoLand();
+    }
+
+    public bool IsLandPrimCountTainted() { return false; }
+    public bool IsForcefulBansAllowed() { return false; }
+    public void UpdateLandObject(int localID, LandData data) {}
+    public void SendParcelsOverlay(IClientAPI client) {}
+    public void ReturnObjectsInParcel(int localID, uint returnType, UUID[] agentIDs, UUID[] taskIDs, IClientAPI remoteClient) {}
+    public void setParcelObjectMaxOverride(overrideParcelMaxPrimCountDelegate overrideDel) {}
+    public void setSimulatorObjectMaxOverride(overrideSimulatorMaxPrimCountDelegate overrideDel) {}
+    public void SetParcelOtherCleanTime(IClientAPI remoteClient, int localID, int otherCleanTime) {}
+
+    public void Join(int start_x, int start_y, int end_x, int end_y, UUID attempting_user_id) {}
+    public void Subdivide(int start_x, int start_y, int end_x, int end_y, UUID attempting_user_id) {}
+    public void sendClientInitialLandInfo(IClientAPI remoteClient, bool overlay) { }
+    public void ClearAllEnvironments(){ }
 }

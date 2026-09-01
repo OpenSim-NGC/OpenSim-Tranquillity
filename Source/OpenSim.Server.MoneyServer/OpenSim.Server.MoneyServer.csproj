@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyTitle>OpenSim.Server.MoneyServer</AssemblyTitle>
+    <Product>OpenSim.Server.MoneyServer</Product>
+    <IsPublishable>true</IsPublishable>
+    <EnableSdkContainerSupport>true</EnableSdkContainerSupport>
+  </PropertyGroup>
+  
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL/OpenSim.Data.MySQL.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Data.MySQL.MoneyData/OpenSim.Data.MySQL.MoneyData.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Console/OpenSim.Framework.Console.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers/OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Framework.Servers.HttpServer/OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.OptionalModules/OpenSim.Region.OptionalModules.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Base/OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Server.Handlers/OpenSim.Server.Handlers.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Ini" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.8" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="System.CommandLine" Version="2.0.8" />
+    <PackageReference Include="Autofac" Version="9.1.0" />
+    <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="11.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 
+      Include all files within the 'AppData' folder and its subfolders.
+      The 'Link' metadata flattens the output by omitting the top-level 'AppData' folder 
+      while preserving subdirectories.
+    -->
+    <Content Include="AppData\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <!-- 
+        This line is the key to stripping the top-level folder on build/publish.
+        It ensures files are placed directly in the output directory or in subfolders 
+        relative to the output root, not nested under "AppData" in the output.
+      -->
+      <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+  </ItemGroup>
+
+</Project>

@@ -29,7 +29,7 @@ using Xunit;
 
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.PhysicsModule.BulletS.Tests
+namespace OpenSim.Region.PhysicsModules.BulletS.Tests
 {
     public class BulletSimTests : OpenSimTestCase
     {

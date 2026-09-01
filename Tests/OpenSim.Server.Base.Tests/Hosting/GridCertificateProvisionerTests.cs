@@ -1,0 +1,123 @@
+/*
+ * Copyright (c) 2025, Tranquillity - OpenSimulator NGC
+ * Utopia Skye LLC
+ *
+ * This Source Code Form is subject to the terms of the
+ * Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed
+ * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+ */
+
+using System;
+using System.Collections.Generic;
+using Nini.Config;
+using OpenSim.Server.GridServer;
+using Xunit;
+
+namespace OpenSim.Server.Base.Tests.Hosting;
+
+/// <summary>
+/// Unit tests for <see cref="GridCertificateProvisioner"/>, the extracted startup
+/// certificate provisioning. The filesystem and certificate operations are replaced
+/// with in-memory seams so the configuration-driven decision logic can be asserted
+/// without touching disk or generating real certificates. Mirrors
+/// <see cref="RegionCertificateProvisionerTests"/>.
+/// </summary>
+public sealed class GridCertificateProvisionerTests
+{
+    private sealed class Recorder
+    {
+        public List<string> SelfSignedArgs { get; } = new();
+        public int SelfSignedCalls { get; private set; }
+
+        public void SelfSigned(string a, string b, string c, string d)
+        {
+            SelfSignedCalls++;
+            SelfSignedArgs.AddRange(new[] { a, b, c, d });
+        }
+    }
+
+    private static IConfig MakeConfig(Action<IConfig> configure)
+    {
+        var source = new IniConfigSource();
+        IConfig startup = source.AddConfig("Startup");
+        configure?.Invoke(startup);
+        return startup;
+    }
+
+    private static (GridCertificateProvisioner sut, Recorder rec) MakeSut(bool fileExists)
+    {
+        var rec = new Recorder();
+        var sut = new GridCertificateProvisioner
+        {
+            FileExists = _ => fileExists,
+            CreateOrUpdateSelfsignedCert = rec.SelfSigned,
+        };
+        return (sut, rec);
+    }
+
+    [Fact]
+    public void Provision_WhenDisabled_DoesNothing()
+    {
+        var (sut, rec) = MakeSut(fileExists: false);
+
+        sut.Provision(MakeConfig(_ => { }));
+
+        Assert.Equal(0, rec.SelfSignedCalls);
+    }
+
+    [Fact]
+    public void Provision_WhenFileMissing_CreatesWithDefaults()
+    {
+        var (sut, rec) = MakeSut(fileExists: false);
+
+        sut.Provision(MakeConfig(c => c.Set("EnableRobustSelfsignedCertSupport", "true")));
+
+        Assert.Equal(1, rec.SelfSignedCalls);
+        Assert.Equal(new[] { "Robust", "localhost", "127.0.0.1", "" }, rec.SelfSignedArgs);
+    }
+
+    [Fact]
+    public void Provision_WhenFileExistsAndNoRenew_DoesNotCreate()
+    {
+        var (sut, rec) = MakeSut(fileExists: true);
+
+        sut.Provision(MakeConfig(c =>
+        {
+            c.Set("EnableRobustSelfsignedCertSupport", "true");
+            c.Set("RobustCertRenewOnStartup", "false");
+        }));
+
+        Assert.Equal(0, rec.SelfSignedCalls);
+    }
+
+    [Fact]
+    public void Provision_WhenFileExistsAndRenew_Creates()
+    {
+        var (sut, rec) = MakeSut(fileExists: true);
+
+        sut.Provision(MakeConfig(c =>
+        {
+            c.Set("EnableRobustSelfsignedCertSupport", "true");
+            c.Set("RobustCertRenewOnStartup", "true");
+        }));
+
+        Assert.Equal(1, rec.SelfSignedCalls);
+    }
+
+    [Fact]
+    public void Provision_PassesConfiguredValues()
+    {
+        var (sut, rec) = MakeSut(fileExists: false);
+
+        sut.Provision(MakeConfig(c =>
+        {
+            c.Set("EnableRobustSelfsignedCertSupport", "true");
+            c.Set("RobustCertFileName", "MyCert");
+            c.Set("RobustCertHostName", "example.org");
+            c.Set("RobustCertHostIp", "10.0.0.1");
+            c.Set("RobustCertPassword", "secret");
+        }));
+
+        Assert.Equal(new[] { "MyCert", "example.org", "10.0.0.1", "secret" }, rec.SelfSignedArgs);
+    }
+}

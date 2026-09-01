@@ -347,7 +347,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.True(sog.GroupContainsForeignPrims);
 
             scene.Backup(true);
-            Assert.Equal(1, scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID).Count);
+            Assert.Single(scene.SimulationDataService.LoadObjects(scene.RegionInfo.RegionID));
 
             // These changes should occur immediately without waiting for a backup pass
             SceneObjectGroup groupToDelete = sog.DelinkFromGroup(linkPart, false);

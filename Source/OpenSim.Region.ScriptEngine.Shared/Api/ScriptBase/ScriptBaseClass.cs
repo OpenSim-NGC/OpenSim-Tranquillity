@@ -25,42 +25,38 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using System.Reflection;
-using System.Collections.Generic;
-using System.Diagnostics; //for [DebuggerNonUserCode]
 using OpenSim.Region.ScriptEngine.Interfaces;
 
-namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase
+namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase;
+
+public partial class ScriptBaseClass : IScript
 {
-    public partial class ScriptBaseClass : IScript
+    private Dictionary<string, MethodInfo> inits = new Dictionary<string, MethodInfo>();
+    public ScriptBaseClass()
     {
-        private Dictionary<string, MethodInfo> inits = new Dictionary<string, MethodInfo>();
-        public ScriptBaseClass()
+        MethodInfo[] myArrayMethodInfo = GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance);
+        foreach (MethodInfo mi in myArrayMethodInfo.AsSpan())
         {
-            MethodInfo[] myArrayMethodInfo = GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance);
-            foreach (MethodInfo mi in myArrayMethodInfo.AsSpan())
+            var name = mi.Name.AsSpan();
+            if (name.StartsWith("ApiType"))
             {
-                var name = mi.Name.AsSpan();
-                if (name.StartsWith("ApiType"))
-                {
-                    string type = new string(name[7..]);
-                    inits[type] = mi;
-                }
+                string type = new string(name[7..]);
+                inits[type] = mi;
             }
         }
+    }
 
-        public string[] GetApis()
-        {
-            string[] apis = new string[inits.Count];
-            inits.Keys.CopyTo(apis, 0);
-            return apis;
-        }
+    public string[] GetApis()
+    {
+        string[] apis = new string[inits.Count];
+        inits.Keys.CopyTo(apis, 0);
+        return apis;
+    }
 
-        public void InitApi(string api, IScriptApi data)
-        {
-            if (inits.TryGetValue(api, out MethodInfo mi))
-                mi?.Invoke(this, new object[]{ data });
-        }
+    public void InitApi(string api, IScriptApi data)
+    {
+        if (inits.TryGetValue(api, out MethodInfo mi))
+            mi?.Invoke(this, new object[]{ data });
     }
 }

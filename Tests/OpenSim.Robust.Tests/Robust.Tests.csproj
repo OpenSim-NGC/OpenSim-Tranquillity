@@ -6,16 +6,7 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
-  <ItemGroup>
-    <Reference Include="OpenMetaverse">
-      <HintPath>..\..\bin\OpenMetaverse.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="OpenMetaverseTypes">
-      <HintPath>..\..\bin\OpenMetaverseTypes.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-  </ItemGroup>
+  
   <ItemGroup>
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />

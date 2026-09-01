@@ -2,33 +2,55 @@ name: dotnet console app build
 
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - develop
+      - master
+      - 'release/*'
+
   pull_request:
-    branches: [ main, develop ]
+    branches: 
+      - develop
+      - 'release/*'
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4 # Checkout the repository
+    - name: Checkout Repository
+      uses: actions/checkout@v4 
+      with:
+        fetch-depth: 0
+
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '8.0.x' # Specify the desired .NET SDK version
+        dotnet-version: '8.0.x'
 
-    - name: Display dotnet version
-      run: dotnet --version
+    - name: Activate Nerdbank.GitVersioning
+      uses: dotnet/nbgv@v0.4.1
+      id: nbgv # Instantiates environment arrays (e.g., \$NBGV_NuGetPackageVersion)
 
     - name: Restore dependencies
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
       run: dotnet restore ./Tranquillity.sln
 
     - name: Build
-      run: dotnet build ./Tranquillity.sln --configuration Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+      run: dotnet build ./Tranquillity.sln --configuration Release --no-restore
 
 #    - name: Tests
+#      env:
+#        GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
 #      run: dotnet test ./Tranquillity.sln --verbosity normal
+#
 
-#    - name: Publish
-#      run: dotnet publish ./Tranquillity.sln --configuration Release
-
+#   Conditional Execution: Triggers deployment pipelines strictly for production code signatures
+#    - name: Publish Production Release
+#      if: github.ref == 'refs/heads/master'
+#      run: |
+#        echo "Deploying version \${{ steps.nbgv.outputs.SimpleVersion }} to Production Env!"
+#        # Insert target dotnet nuget push or server staging scripts here
+#        #

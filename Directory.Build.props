@@ -3,22 +3,16 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateDependencyFile>false</GenerateDependencyFile>
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
   </PropertyGroup>
-  <PropertyGroup>      
-    <MSBuildProjectExtensionsPath>$(SolutionDir)obj\$(Configuration)\$(MSBuildProjectName)\</MSBuildProjectExtensionsPath>
-    <IntermediateOutputPath>$(SolutionDir)obj\$(Configuration)\$(MSBuildProjectName)\</IntermediateOutputPath>
-    <OutputPath>$(SolutionDir)build\$(Configuration)\$(AssemblyName)\</OutputPath>
-    <OutDir>$(OutputPath)</OutDir>
-  </PropertyGroup>
-
-<!-- <ItemGroup>
-  <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">
-    <PrivateAssets>all</PrivateAssets>
-    <Version>3.6.133</Version>
-  </PackageReference>
-</ItemGroup> -->
-
+  <ItemGroup>
+    <PackageReference Include="Nerdbank.GitVersioning" Condition="!Exists('packages.config')">
+      <PrivateAssets>all</PrivateAssets>
+      <Version>3.9.50</Version>
+    </PackageReference>
+    <PackageReference Include="nini-core" Version="0.9.2.16" />
+    <PackageReference Include="OpenMetaverse" Version="1.0.6" />
+    <PackageReference Include="OpenMetaverse.Types" Version="1.0.6" />
+    <PackageReference Include="OpenMetaverse.StructuredData" Version="1.0.6" />
+  </ItemGroup>
 </Project>
