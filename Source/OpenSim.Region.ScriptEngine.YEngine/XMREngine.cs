@@ -1952,7 +1952,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         m_log.LogInformation("[YEngine]: state-load-failure-metrics {0}", report);
 
         string recoveryReport = XMRInstance.GetStateLoadRecoveryMetricsReport(resetAfterRead);
-        m_log.InfoFormat("[YEngine]: state-load-recovery-metrics {0}", recoveryReport);
+        m_log.LogInformation("[YEngine]: state-load-recovery-metrics {0}", recoveryReport);
 
         if(resetAfterRead)
             m_LastReportedStateLoadFailureTotal = XMRInstance.GetStateLoadFailureTotalCount();
