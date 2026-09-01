@@ -29,6 +29,7 @@ using System.Reflection;
 using System.Timers;
 using Nini.Config;
 using OpenMetaverse;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -45,9 +46,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
     protected Timer m_CountdownTimer = null;
     protected DateTime m_RestartBegin;
     protected List<int> m_Alerts;
-    protected string m_Message;
     protected UUID m_Initiator;
-    protected bool m_Notice = false;
     protected IDialogModule m_DialogModule = null;
     protected string m_MarkerPath = String.Empty;
     private int[] m_CurrentAlerts = null;
@@ -75,18 +74,12 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
         m_Scene = scene;
 
         scene.RegisterModuleInterface<IRestartModule>(this);
-        MainConsole.Instance.Commands.AddCommand("Regions",
-                false, "region restart bluebox",
-                "region restart bluebox <message> <delta seconds>+",
-                "Schedule a region restart",
-                "Schedule a region restart after a given number of seconds.  If one delta is given then the region is restarted in delta seconds time.  A time to restart is sent to users in the region as a dismissable bluebox notice.  If multiple deltas are given then a notice is sent when we reach each delta.",
-                HandleRegionRestart);
 
         MainConsole.Instance.Commands.AddCommand("Regions",
-                false, "region restart notice",
-                "region restart notice <message> <delta seconds>+",
+                false, "region restart",
+                "region restart <delta seconds>",
                 "Schedule a region restart",
-                "Schedule a region restart after a given number of seconds.  If one delta is given then the region is restarted in delta seconds time.  A time to restart is sent to users in the region as a transient notice.  If multiple deltas are given then a notice is sent when we reach each delta.",
+                "Schedule a region restart after a given number of seconds.  The region is restarted in delta seconds time.",
                 HandleRegionRestart);
 
         MainConsole.Instance.Commands.AddCommand("Regions",
@@ -123,7 +116,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
         get { return DateTime.Now - m_RestartBegin; }
     }
 
-    public void ScheduleRestart(UUID initiator, string message, int[] alerts, bool notice)
+    public void ScheduleRestart(UUID initiator, int seconds)
     {
         if (m_CountdownTimer != null)
         {
@@ -131,16 +124,40 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
             m_CountdownTimer = null;
         }
 
-        if (alerts == null)
+        if (seconds == 0)
         {
             CreateMarkerFile();
             m_Scene.RestartNow();
             return;
         }
 
-        m_Message = message;
+        if (m_Scene.GetScenePresences().Count == 0)
+        {
+            m_log.InfoFormat("No avatars in region {0}, restarting now...", m_Scene.Name);
+
+            CreateMarkerFile();
+            m_Scene.RestartNow();
+            return;
+        }
+
+        List<int> times = new List<int>();
+        while (seconds > 0)
+        {
+            times.Add(seconds);
+            if (seconds > 300)
+                seconds -= 120;
+            else if (seconds > 30)
+                seconds -= 30;
+            else
+                seconds -= 15;
+        }
+
+        times.Sort();
+        times.Reverse();
+
+        int[] alerts = times.ToArray();
+
         m_Initiator = initiator;
-        m_Notice = notice;
         m_CurrentAlerts = alerts;
         m_Alerts = new List<int>(alerts);
         m_Alerts.Sort();
@@ -185,35 +202,18 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
 
         if (sendOut)
         {
-            int minutes = currentAlert / 60;
-            string currentAlertString = String.Empty;
-            if (minutes > 0)
-            {
-                if (minutes == 1)
-                    currentAlertString += "1 minute";
-                else
-                    currentAlertString += String.Format("{0} minutes", minutes);
-                if ((currentAlert % 60) != 0)
-                    currentAlertString += " and ";
-            }
-            if ((currentAlert % 60) != 0)
-            {
-                int seconds = currentAlert % 60;
-                if (seconds == 1)
-                    currentAlertString += "1 second";
-                else
-                    currentAlertString += String.Format("{0} seconds", seconds);
-            }
+            string msg_id = "RegionRestartSeconds";
+            OSDMap osd = new OSDMap();
+            osd.Add("NAME", m_Scene.RegionInfo.RegionName);
+            osd.Add("SECONDS", currentAlert);
+            byte[] extra = Util.StringToBytes256(OSDParser.SerializeLLSDXmlString(osd));
 
-            string msg = String.Format(m_Message, currentAlertString);
-
-            if (m_DialogModule != null && msg != String.Empty)
+            m_Scene.ForEachRootClient(delegate (IClientAPI client)
             {
-                if (m_Notice)
-                    m_DialogModule.SendGeneralAlert(msg);
-                else
-                    m_DialogModule.SendNotificationToUsersInRegion(m_Initiator, "System", msg);
-            }
+                client.SendAlertMessage(msg_id, msg_id, extra);
+            });
+
+            m_log.InfoFormat("{0} will restart in {1} seconds", m_Scene.Name, currentAlert);    
         }
 
         return currentAlert - nextAlert;
@@ -261,6 +261,13 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
     {
         if (m_CountdownTimer == null)
             return;
+        
+        MainConsole.Instance.Output("Region restart delayed for " + seconds.ToString() + " seconds");
+
+        if (m_DialogModule != null)
+        {
+            m_DialogModule.SendNotificationToUsersInRegion(UUID.Zero, "System", "Region restart has been delayed.");
+        }
 
         m_CountdownTimer.Stop();
         m_CountdownTimer = null;
@@ -298,39 +305,28 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
         if (MainConsole.Instance.ConsoleScene != m_Scene)
             return;
 
-        if (args.Length < 5)
+        int seconds = 120;
+        if (args.Length >= 3)
         {
-            if (args.Length > 2)
+            if (args[2] == "abort")
             {
-                if (args[2] == "abort")
-                {
-                    string msg = String.Empty;
-                    if (args.Length > 3)
-                        msg = args[3];
+                string msg = String.Empty;
+                if (args.Length > 3)
+                    msg = args[3];
 
-                    AbortRestart(msg);
-
-                    MainConsole.Instance.Output("Region restart aborted");
-                    return;
-                }
+                AbortRestart(msg);
+                MainConsole.Instance.Output("Region restart aborted");
+                return;
             }
-
-            MainConsole.Instance.Output("Error: restart region <mode> <name> <delta seconds>+");
-            return;
+            else if (!int.TryParse(args[2], out seconds))
+            {
+                MainConsole.Instance.Output("Error: restart region <abort/delta seconds>");
+                return;
+            }
         }
 
-        bool notice = false;
-        if (args[2] == "notice")
-            notice = true;
-
-        List<int> times = new List<int>();
-        for (int i = 4 ; i < args.Length ; i++)
-            times.Add(Convert.ToInt32(args[i]));
-
-        MainConsole.Instance.Output(
-            "Region {0} scheduled for restart in {1} seconds", m_Scene.Name, times.Sum());
-
-        ScheduleRestart(UUID.Zero, args[3], times.ToArray(), notice);
+        MainConsole.Instance.Output("Region {0} scheduled for restart in {1} seconds", m_Scene.Name, seconds);
+        ScheduleRestart(UUID.Zero, seconds);
     }
 
     protected void CreateMarkerFile()

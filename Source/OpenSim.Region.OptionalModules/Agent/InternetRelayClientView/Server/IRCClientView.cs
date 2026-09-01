@@ -1224,6 +1224,10 @@ public class IRCClientView : IClientAPI, IClientCore
     {
 
     }
+    public void SendAlertMessage(string message, string info, byte[] extra)
+    {
+
+    }
 
     public void SendLoadURL(string objectname, UUID objectID, UUID ownerID, bool groupOwned, string message, string url)
     {

@@ -23,6 +23,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration.Json;
 
 namespace OpenSim.Server.GridServer;
 
@@ -104,11 +105,16 @@ class Program
 
         builder.ConfigureAppConfiguration(configuration =>
         {
-            configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: true);
+            configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: false);
+
+            foreach (var source in configuration.Sources.OfType<JsonConfigurationSource>())
+            {
+                source.ReloadOnChange = false;
+            }
 
             foreach (var item in iniFile)
             {
-                configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+                configuration.AddIniFile(item, optional: true, reloadOnChange: false);
             }
 
             if (string.IsNullOrEmpty(iniDirectory) is false)
@@ -117,7 +123,7 @@ class Program
                 {
                     foreach (var item in Directory.GetFiles(iniDirectory, "*.ini"))
                     {
-                        configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+                        configuration.AddIniFile(item, optional: true, reloadOnChange: false);
                     }
                 }
             }

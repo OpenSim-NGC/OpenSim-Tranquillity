@@ -134,12 +134,30 @@ public class Warp3DImageModule : IMapImageGenerator, INonSharedRegionModule
         m_scene = scene;
 
         List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
-        if (renderers.Count > 0)
-            m_log.LogInformation("[MAPTILE]: Loaded prim mesher " + renderers[0]);
+        string preferredRenderer = SelectPrimMesherFile(renderers);
+        if (preferredRenderer != null)
+            m_log.LogInformation("[MAPTILE]: Loaded prim mesher " + preferredRenderer);
         else
             m_log.LogInformation("[MAPTILE]: No prim mesher loaded, prim rendering will be disabled");
 
         m_scene.RegisterModuleInterface<IMapImageGenerator>(this);
+    }
+
+    // Picks the Meshmerizer renderer (proper faceted mesh + UVs) rather than relying on
+    // directory-scan ordering, which can otherwise select the bounding-box-only Simple renderer
+    // and leave prims untextured.
+    private static string SelectPrimMesherFile(List<string> renderers)
+    {
+        if (renderers.Count == 0)
+            return null;
+
+        foreach (string f in renderers)
+        {
+            if (System.IO.Path.GetFileName(f).IndexOf("Meshmerizer", StringComparison.OrdinalIgnoreCase) >= 0)
+                return f;
+        }
+
+        return renderers[0];
     }
 
     public void RegionLoaded(Scene scene)
@@ -182,9 +200,10 @@ public class Warp3DImageModule : IMapImageGenerator, INonSharedRegionModule
 public SKBitmap CreateMapTile()
     {
         List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
-        if (renderers.Count > 0)
+        string rendererFile = SelectPrimMesherFile(renderers);
+        if (rendererFile != null)
         {
-            m_primMesher = RenderingLoader.LoadRenderer(renderers[0]);
+            m_primMesher = RenderingLoader.LoadRenderer(rendererFile);
         }
 
         viewWidth = (int)m_scene.RegionInfo.RegionSizeX;
@@ -215,9 +234,10 @@ public SKBitmap CreateMapTile()
 public SKBitmap CreateViewImage(Vector3 camPos, Vector3 camDir, float pfov, int width, int height, bool useTextures)
     {
         List<string> renderers = RenderingLoader.ListRenderers(Util.ExecutingDirectory());
-        if (renderers.Count > 0)
+        string rendererFile = SelectPrimMesherFile(renderers);
+        if (rendererFile != null)
         {
-            m_primMesher = RenderingLoader.LoadRenderer(renderers[0]);
+            m_primMesher = RenderingLoader.LoadRenderer(rendererFile);
         }
 
         cameraPos = camPos;
@@ -322,13 +342,8 @@ private SKBitmap GenImage()
         {
             var j2k = J2kImage.FromBytes(j2kData);
             if (j2k == null) return null;
-            SKImage skImg = j2k.As<SKImage>();
-            if (skImg == null) return null;
-            using (SKData png = skImg.Encode(SKEncodedImageFormat.Png, 100))
-            using (var ms = new MemoryStream(png.ToArray()))
-            {
-                return SKBitmap.Decode(ms);
-            }
+            // CoreJ2K.Skia only registers an image creator for SKBitmap, not SKImage.
+            return j2k.As<SKBitmap>();
         }
         catch { return null; }
     }
@@ -440,12 +455,15 @@ private SKBitmap GenImage()
         renderer.Scene.addObject("Terrain", obj);
 
         OpenSim.Framework.RegionSettings regionInfo = m_scene.RegionInfo.RegionSettings;
+
+        // PBR-capable viewers only update TerrainPBRn, leaving the legacy TerrainTextureN fields
+        // stale, so PBR must take precedence when set. Fall back to the legacy fields otherwise.
         UUID[] textureIDs = new UUID[4]
         {
-            regionInfo.TerrainTexture1,
-            regionInfo.TerrainTexture2,
-            regionInfo.TerrainTexture3,
-            regionInfo.TerrainTexture4,
+            regionInfo.TerrainPBR1.IsNotZero() ? regionInfo.TerrainPBR1 : regionInfo.TerrainTexture1,
+            regionInfo.TerrainPBR2.IsNotZero() ? regionInfo.TerrainPBR2 : regionInfo.TerrainTexture2,
+            regionInfo.TerrainPBR3.IsNotZero() ? regionInfo.TerrainPBR3 : regionInfo.TerrainTexture3,
+            regionInfo.TerrainPBR4.IsNotZero() ? regionInfo.TerrainPBR4 : regionInfo.TerrainTexture4,
         };
 
         float[] startHeights = new float[4]
@@ -489,7 +507,10 @@ private SKBitmap GenImage()
             {
                 foreach (SceneObjectPart child in group.Parts)
                 {
-                    try { CreatePrim(renderer, child); }
+                    try 
+                    { 
+                        CreatePrim(renderer, child); 
+                    }
                     catch (Exception e)
                     {
                         m_log.LogWarning($"[Warp3D] failed to render prim {child.Name} at {child.GetWorldPosition()}: {e.Message}");
@@ -574,11 +595,17 @@ private SKBitmap GenImage()
                     }
                     else // It's sculptie
                     {
-                        // Note: Sculpt mesh rendering via GenerateFacetedSculptMesh requires System.Drawing.Bitmap.
-                        // Since we're migrating away from System.Drawing, sculpt rendering is temporarily disabled.
-                        // TODO: Update OpenMetaverse library to accept SkiaSharp bitmaps or find alternative approach.
-                        m_log.LogWarning("[Warp3D] Sculpt rendering for prim {0} at {1} is not supported in SkiaSharp-only mode",
-                            prim.Name, prim.GetWorldPosition().ToString());
+                        SKBitmap sculptBitmap = J2kBytesToSKBitmap(sculptAsset.Data);
+                        if (sculptBitmap is not null)
+                        {
+                            using (sculptBitmap)
+                                renderMesh = m_primMesher.GenerateFacetedSculptMesh(omvPrim, sculptBitmap, lod);
+                        }
+                        else
+                        {
+                            m_log.LogWarning("[Warp3D] failed to decode sculpt texture {0} of prim {1} at {2}",
+                                omvPrim.Sculpt.SculptTexture.ToString(), prim.Name, prim.GetWorldPosition().ToString());
+                        }
                     }
                 }
                 else
@@ -767,10 +794,13 @@ private SKBitmap GenImage()
     {
         string name = color.ToString();
 
-        // Try to get from the renderer's material cache using addMaterial
-        // Since Warp3D doesn't have TryGetMaterial, we create the material directly
-        warp_Material material = new warp_Material(ConvertColor(color));
-        renderer.Scene.addMaterial(name, material);
+        // warp_Scene.addMaterial() throws if the key already exists, so reuse a previously added material.
+        warp_Material material = renderer.Scene.material(name);
+        if (material is null)
+        {
+            material = new warp_Material(ConvertColor(color));
+            renderer.Scene.addMaterial(name, material);
+        }
         return material;
     }
 
@@ -780,9 +810,12 @@ private SKBitmap GenImage()
         string idstr = textureID.ToString() + color.ToString();
         string materialName = "MAPMAT" + idstr;
 
-        // Note: Warp3D doesn't have TryGetMaterial, so we always create and add
-        // The scene will handle duplicate names appropriately
-        warp_Material mat = new warp_Material();
+        // warp_Scene.addMaterial() throws if the key already exists, so reuse a previously added material.
+        warp_Material mat = renderer.Scene.material(materialName);
+        if (mat is not null)
+            return mat;
+
+        mat = new warp_Material();
         warp_Texture texture = GetTexture(textureID, sop);
         if (texture is not null)
         {

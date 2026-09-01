@@ -117,30 +117,30 @@ public sealed class MoneyXmlRpcSettings
         {
             defaultBalance = serverConfig.GetValue<int>("DefaultBalance", defaultBalance);
             forceTransfer = serverConfig.GetValue<bool>("EnableForceTransfer", forceTransfer);
-            bankerAvatar = serverConfig.GetValue<string>("BankerAvatar", bankerAvatar).ToLower();
+            bankerAvatar = ReadIniString(serverConfig, "BankerAvatar", bankerAvatar).ToLower();
 
             enableAmountZero = serverConfig.GetValue<bool>("EnableAmountZero", enableAmountZero);
             scriptSendMoney = serverConfig.GetValue<bool>("EnableScriptSendMoney", scriptSendMoney);
-            scriptAccessKey = serverConfig.GetValue<string>("MoneyScriptAccessKey", scriptAccessKey);
-            scriptIPAddress = serverConfig.GetValue<string>("MoneyScriptIPaddress", scriptIPAddress);
+            scriptAccessKey = ReadIniString(serverConfig, "MoneyScriptAccessKey", scriptAccessKey);
+            scriptIPAddress = ReadIniString(serverConfig, "MoneyScriptIPaddress", scriptIPAddress);
 
             hgEnable = serverConfig.GetValue<bool>("EnableHGAvatar", hgEnable);
             gstEnable = serverConfig.GetValue<bool>("EnableGuestAvatar", gstEnable);
             hgDefaultBalance = serverConfig.GetValue<int>("HGAvatarDefaultBalance", hgDefaultBalance);
             gstDefaultBalance = serverConfig.GetValue<int>("GuestAvatarDefaultBalance", gstDefaultBalance);
 
-            balanceMessageLandSale = serverConfig.GetValue<string>("BalanceMessageLandSale", balanceMessageLandSale);
-            balanceMessageRcvLandSale = serverConfig.GetValue<string>("BalanceMessageRcvLandSale", balanceMessageRcvLandSale);
-            balanceMessageSendGift = serverConfig.GetValue<string>("BalanceMessageSendGift", balanceMessageSendGift);
-            balanceMessageReceiveGift = serverConfig.GetValue<string>("BalanceMessageReceiveGift", balanceMessageReceiveGift);
-            balanceMessagePayCharge = serverConfig.GetValue<string>("BalanceMessagePayCharge", balanceMessagePayCharge);
-            balanceMessageBuyObject = serverConfig.GetValue<string>("BalanceMessageBuyObject", balanceMessageBuyObject);
-            balanceMessageSellObject = serverConfig.GetValue<string>("BalanceMessageSellObject", balanceMessageSellObject);
-            balanceMessageGetMoney = serverConfig.GetValue<string>("BalanceMessageGetMoney", balanceMessageGetMoney);
-            balanceMessageBuyMoney = serverConfig.GetValue<string>("BalanceMessageBuyMoney", balanceMessageBuyMoney);
-            balanceMessageRollBack = serverConfig.GetValue<string>("BalanceMessageRollBack", balanceMessageRollBack);
-            balanceMessageSendMoney = serverConfig.GetValue<string>("BalanceMessageSendMoney", balanceMessageSendMoney);
-            balanceMessageReceiveMoney = serverConfig.GetValue<string>("BalanceMessageReceiveMoney", balanceMessageReceiveMoney);
+            balanceMessageLandSale = ReadIniString(serverConfig, "BalanceMessageLandSale", balanceMessageLandSale);
+            balanceMessageRcvLandSale = ReadIniString(serverConfig, "BalanceMessageRcvLandSale", balanceMessageRcvLandSale);
+            balanceMessageSendGift = ReadIniString(serverConfig, "BalanceMessageSendGift", balanceMessageSendGift);
+            balanceMessageReceiveGift = ReadIniString(serverConfig, "BalanceMessageReceiveGift", balanceMessageReceiveGift);
+            balanceMessagePayCharge = ReadIniString(serverConfig, "BalanceMessagePayCharge", balanceMessagePayCharge);
+            balanceMessageBuyObject = ReadIniString(serverConfig, "BalanceMessageBuyObject", balanceMessageBuyObject);
+            balanceMessageSellObject = ReadIniString(serverConfig, "BalanceMessageSellObject", balanceMessageSellObject);
+            balanceMessageGetMoney = ReadIniString(serverConfig, "BalanceMessageGetMoney", balanceMessageGetMoney);
+            balanceMessageBuyMoney = ReadIniString(serverConfig, "BalanceMessageBuyMoney", balanceMessageBuyMoney);
+            balanceMessageRollBack = ReadIniString(serverConfig, "BalanceMessageRollBack", balanceMessageRollBack);
+            balanceMessageSendMoney = ReadIniString(serverConfig, "BalanceMessageSendMoney", balanceMessageSendMoney);
+            balanceMessageReceiveMoney = ReadIniString(serverConfig, "BalanceMessageReceiveMoney", balanceMessageReceiveMoney);
         }
         else
         {
@@ -171,5 +171,31 @@ public sealed class MoneyXmlRpcSettings
             balanceMessageSendMoney,
             balanceMessageReceiveMoney,
             enableAmountZero);
+    }
+
+    // The ini files use legacy Nini formatting: string values may be wrapped in
+    // double quotes and may carry a trailing ';' inline comment. The Microsoft
+    // ini provider keeps both as part of the value, so strip them here.
+    private static string ReadIniString(IConfiguration config, string key, string fallback)
+    {
+        string raw = config.GetValue<string>(key, fallback);
+        if (raw is null)
+            return fallback;
+
+        string value = raw.Trim();
+        if (value.Length == 0)
+            return value;
+
+        if (value[0] == '"')
+        {
+            int end = value.IndexOf('"', 1);
+            return end > 0 ? value.Substring(1, end - 1) : value.Substring(1);
+        }
+
+        int comment = value.IndexOfAny(new[] { ';', '#' });
+        if (comment >= 0)
+            value = value.Substring(0, comment).TrimEnd();
+
+        return value;
     }
 }

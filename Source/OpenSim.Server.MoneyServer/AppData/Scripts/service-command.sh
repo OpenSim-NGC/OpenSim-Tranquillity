@@ -3,14 +3,11 @@
 # saner programming env: these switches turn some bugs into errors
 set -o errexit -o pipefail -o noclobber -o nounset
 
-! getopt --test > /dev/null 
-if [[ ${PIPESTATUS[0]} -ne 4 ]]; then
-    echo "I’m sorry, `getopt --test` failed in this environment."
-    exit 1
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-OPTIONS=r:v
-LONGOPTS=release:,verbose
+OPTIONS=c:
+LONGOPTS=command:
 
 # -use ! and PIPESTATUS to get exit code with errexit set
 # -temporarily store output to be able to check for errors
@@ -26,18 +23,13 @@ fi
 # read getopt’s output this way to handle the quoting right:
 eval set -- "$PARSED"
 
-release=""
-v=n 
+command=""
 
 # now enjoy the options in order and nicely split until we see --
 while true; do
     case "$1" in
-        -v|--verbose)
-            v=y
-            shift
-            ;;
-        -r|--release)
-            release="$2"
+        -c|--command)
+            command="$2"
             shift 2
             ;;
         --)
@@ -53,44 +45,14 @@ done
 
 # handle non-option arguments
 if [[ $# -ne 1 ]]; then
-    echo "$0: An asset service name is required."
+    echo "$0: A service name is required."
     exit 4
 fi
 
-SERVICENAME=$1
+export SERVICENAME=$1
 
-# If no release was specified figure out what we should use
-if [ "${release}" == "" ]; then
+echo "Executing command '$command' on service OpenSim.Server.${SERVICENAME}"
 
-    while read -r -a service
-    do 
-	if [ "${service[0]}" == "${SERVICENAME}" ]
-	then
-	    if test ${service[1]+_}
-	    then
-		    release="${service[1]}"
-	    else
-		    release="default"
-	    fi
-
-	    break
-	fi
-    done < $HOME/bin/WebServiceList.txt
-fi
-
-# 
-# Options handled.  Shut things up.
-#
-
-BINDIR="$HOME/release/${release}"
-
-if [ ! -d $BINDIR ]; then
-    echo "Runtime directory $BINDIR does not exist!"
-    exit 1
-fi
-
-echo "Stopping web services ${SERVICENAME} in directory ${BINDIR}"
-
-screen -S ${SERVICENAME} -p 0 -X stuff "^C"
+screen -S "${SERVICENAME}" -p 0 -X stuff "$command^M^M"
 
 exit 0

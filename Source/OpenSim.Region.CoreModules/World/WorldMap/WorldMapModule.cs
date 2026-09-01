@@ -1181,9 +1181,11 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                     var j2k = J2kImage.FromBytes(mapasset.Data);
                     if (j2k != null)
                     {
-                        SKImage skImage = j2k.As<SKImage>();
-                        if (skImage != null)
+                        // CoreJ2K.Skia only registers an image creator for SKBitmap, not SKImage.
+                        skBitmap = j2k.As<SKBitmap>();
+                        if (skBitmap != null)
                         {
+                            using (SKImage skImage = SKImage.FromBitmap(skBitmap))
                             using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, 95))
                             {
                                 jpeg = encoded.ToArray();
@@ -1337,25 +1339,22 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                             var j2k = J2kImage.FromBytes(texAsset.Data);
                             if (j2k != null)
                             {
-                                SKImage skImage = j2k.As<SKImage>();
-                                if (skImage != null)
+                                // CoreJ2K.Skia only registers an image creator for SKBitmap, not SKImage.
+                                using (SKBitmap sk = j2k.As<SKBitmap>())
                                 {
-                                    using (SKBitmap sk = SKBitmap.FromImage(skImage))
+                                    if (sk != null)
                                     {
-                                        if (sk != null)
-                                        {
-                                            int x = r.RegionLocX - startX;
-                                            int y = r.RegionLocY - startY;
-                                            int sx = r.RegionSizeX;
-                                            int sy = r.RegionSizeY;
-                                            SKRect dst = new SKRect(x, spanY - y - sy, x + sx, spanY - y);
-                                            canvas.DrawBitmap(sk, dst);
+                                        int x = r.RegionLocX - startX;
+                                        int y = r.RegionLocY - startY;
+                                        int sx = r.RegionSizeX;
+                                        int sy = r.RegionSizeY;
+                                        SKRect dst = new SKRect(x, spanY - y - sy, x + sx, spanY - y);
+                                        canvas.DrawBitmap(sk, dst);
 
-                                            if (m_exportPrintRegionName && r.RegionHandle == m_regionHandle)
-                                            {
-                                                float textWidth = textFont.MeasureText(r.RegionName);
-                                                canvas.DrawText(r.RegionName, x + 30, spanY - y - 30 - 32, SKTextAlign.Left, textFont, textPaint);
-                                            }
+                                        if (m_exportPrintRegionName && r.RegionHandle == m_regionHandle)
+                                        {
+                                            float textWidth = textFont.MeasureText(r.RegionName);
+                                            canvas.DrawText(r.RegionName, x + 30, spanY - y - 30 - 32, SKTextAlign.Left, textFont, textPaint);
                                         }
                                     }
                                 }
