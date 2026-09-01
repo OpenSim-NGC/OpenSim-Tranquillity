@@ -133,7 +133,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
 
         if (m_Scene.GetScenePresences().Count == 0)
         {
-            m_log.InfoFormat("No avatars in region {0}, restarting now...", m_Scene.Name);
+            m_log.LogInformation("No avatars in region {0}, restarting now...", m_Scene.Name);
 
             CreateMarkerFile();
             m_Scene.RestartNow();
@@ -213,7 +213,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
                 client.SendAlertMessage(msg_id, msg_id, extra);
             });
 
-            m_log.InfoFormat("{0} will restart in {1} seconds", m_Scene.Name, currentAlert);    
+            m_log.LogInformation("{0} will restart in {1} seconds", m_Scene.Name, currentAlert);
         }
 
         return currentAlert - nextAlert;

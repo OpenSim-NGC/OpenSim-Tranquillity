@@ -20,6 +20,7 @@ using OpenSim.Server.MoneyServer.Models;
 using Microsoft.AspNetCore.Builder;
 using OpenSim.Server.MoneyServer.Controllers;
 using Microsoft.Extensions.Configuration.Json;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.MoneyServer;
 

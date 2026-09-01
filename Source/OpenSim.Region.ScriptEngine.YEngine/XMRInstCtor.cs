@@ -1389,7 +1389,7 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
                 throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MigrationVersionMismatch,
                     "incoming migration version " + mv + " but accept only " + migrationVersion);
 
-            m_log.WarnFormat("[YEngine]: state snapshot migration version mismatch for {0}: incoming={1}, current={2}; attempting best-effort restore",
+            m_log.LogWarning("[YEngine]: state snapshot migration version mismatch for {0}: incoming={1}, current={2}; attempting best-effort restore",
                 m_ItemID, mv, migrationVersion);
         }
 
@@ -1422,7 +1422,7 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
         if(versionMismatch)
         {
             RecordStateLoadRecovery(ScriptStateLoadFailureReason.MigrationVersionMismatch);
-            m_log.InfoFormat("[YEngine]: state snapshot for {0} successfully restored despite migration version mismatch (incoming={1}, current={2})",
+            m_log.LogInformation("[YEngine]: state snapshot for {0} successfully restored despite migration version mismatch (incoming={1}, current={2})",
                 m_ItemID, mv, migrationVersion);
         }
     }
