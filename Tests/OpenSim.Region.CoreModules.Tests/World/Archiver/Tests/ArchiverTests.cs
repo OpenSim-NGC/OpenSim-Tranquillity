@@ -25,33 +25,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Reflection;
-using OpenMetaverse;
-using OpenMetaverse.Assets;
-using Xunit;
-
-using OpenSim.Framework;
-using OpenSim.Framework.Serialization.External;
-using OpenSim.Region.CoreModules.World.Land;
-using OpenSim.Region.CoreModules.World.Serialiser;
-using OpenSim.Region.CoreModules.World.Terrain;
-using OpenSim.Region.Framework.Scenes;
-using OpenSim.Region.Framework.Scenes.Serialization;
-using OpenSim.Region.OptionalModules.Avatar.XmlRpcGroups;
 using OpenSim.Tests.Common;
-using ArchiveConstants = OpenSim.Framework.Serialization.ArchiveConstants;
-using TarArchiveReader = OpenSim.Framework.Serialization.TarArchiveReader;
-using TarArchiveWriter = OpenSim.Framework.Serialization.TarArchiveWriter;
-using RegionSettings = OpenSim.Framework.RegionSettings;
 
-namespace OpenSim.Region.CoreModules.World.Archiver.Tests
+namespace OpenSim.Region.CoreModules.World.Archiver.Tests;
+
+/// <summary>
+/// Disabled pending conversion from NUnit to xUnit.
+/// This test class requires significant manual work to convert NUnit-specific patterns.
+/// </summary>
+public class ArchiverTests : OpenSimTestCase
 {
-    /// <summary>
-    /// Disabled pending conversion from NUnit to xUnit.
-    /// This test class requires significant manual work to convert NUnit-specific patterns.
-    /// </summary>
-    public class ArchiverTests : OpenSimTestCase
-    {
-        // Placeholder for disabled tests
-    }
+    // Placeholder for disabled tests
 }

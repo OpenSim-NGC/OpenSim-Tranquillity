@@ -25,186 +25,184 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenMetaverse;
 using OpenMetaverse.Assets;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+/// <summary>
+/// Utility functions for carrying out task inventory tests.
+/// </summary>
+///
+public static class TaskInventoryHelpers
 {
     /// <summary>
-    /// Utility functions for carrying out task inventory tests.
+    /// Add a notecard item to the given part.
     /// </summary>
-    ///
-    public static class TaskInventoryHelpers
+    /// <param name="assetService"></param>
+    /// <param name="part"></param>
+    /// <param name="itemName"></param>
+    /// <param name="itemIDFrag">UUID or UUID stem</param>
+    /// <param name="assetIDFrag">UUID or UUID stem</param>
+    /// <param name="text">The tex to put in the notecard.</param>
+    /// <returns>The item that was added</returns>
+    public static TaskInventoryItem AddNotecard(
+        IAssetService assetService, SceneObjectPart part, string itemName, string itemIDStem, string assetIDStem, string text)
     {
-        /// <summary>
-        /// Add a notecard item to the given part.
-        /// </summary>
-        /// <param name="assetService"></param>
-        /// <param name="part"></param>
-        /// <param name="itemName"></param>
-        /// <param name="itemIDFrag">UUID or UUID stem</param>
-        /// <param name="assetIDFrag">UUID or UUID stem</param>
-        /// <param name="text">The tex to put in the notecard.</param>
-        /// <returns>The item that was added</returns>
-        public static TaskInventoryItem AddNotecard(
-            IAssetService assetService, SceneObjectPart part, string itemName, string itemIDStem, string assetIDStem, string text)
-        {
-            return AddNotecard(
-                assetService, part, itemName, TestHelpers.ParseStem(itemIDStem), TestHelpers.ParseStem(assetIDStem), text);
-        }
+        return AddNotecard(
+            assetService, part, itemName, TestHelpers.ParseStem(itemIDStem), TestHelpers.ParseStem(assetIDStem), text);
+    }
 
-        /// <summary>
-        /// Add a notecard item to the given part.
-        /// </summary>
-        /// <param name="assetService"></param>
-        /// <param name="part"></param>
-        /// <param name="itemName"></param>
-        /// <param name="itemID"></param>
-        /// <param name="assetID"></param>
-        /// <param name="text">The tex to put in the notecard.</param>
-        /// <returns>The item that was added</returns>
-        public static TaskInventoryItem AddNotecard(
-            IAssetService assetService, SceneObjectPart part, string itemName, UUID itemID, UUID assetID, string text)
-        {
-            AssetNotecard nc = new AssetNotecard();
-            nc.BodyText = text;
-            nc.Encode();
+    /// <summary>
+    /// Add a notecard item to the given part.
+    /// </summary>
+    /// <param name="assetService"></param>
+    /// <param name="part"></param>
+    /// <param name="itemName"></param>
+    /// <param name="itemID"></param>
+    /// <param name="assetID"></param>
+    /// <param name="text">The tex to put in the notecard.</param>
+    /// <returns>The item that was added</returns>
+    public static TaskInventoryItem AddNotecard(
+        IAssetService assetService, SceneObjectPart part, string itemName, UUID itemID, UUID assetID, string text)
+    {
+        AssetNotecard nc = new AssetNotecard();
+        nc.BodyText = text;
+        nc.Encode();
 
-            AssetBase ncAsset
-                = AssetHelpers.CreateAsset(assetID, AssetType.Notecard, nc.AssetData, UUID.Zero);
-            assetService.Store(ncAsset);
+        AssetBase ncAsset
+            = AssetHelpers.CreateAsset(assetID, AssetType.Notecard, nc.AssetData, UUID.Zero);
+        assetService.Store(ncAsset);
 
-            TaskInventoryItem ncItem
-                = new TaskInventoryItem
-                    { Name = itemName, AssetID = assetID, ItemID = itemID,
-                      Type = (int)AssetType.Notecard, InvType = (int)InventoryType.Notecard };
-            part.Inventory.AddInventoryItem(ncItem, true);
+        TaskInventoryItem ncItem
+            = new TaskInventoryItem
+                { Name = itemName, AssetID = assetID, ItemID = itemID,
+                  Type = (int)AssetType.Notecard, InvType = (int)InventoryType.Notecard };
+        part.Inventory.AddInventoryItem(ncItem, true);
 
-            return ncItem;
-        }
+        return ncItem;
+    }
 
-        /// <summary>
-        /// Add a simple script to the given part.
-        /// </summary>
-        /// <remarks>
-        /// TODO: Accept input for item and asset IDs to avoid mysterious script failures that try to use any of these
-        /// functions more than once in a test.
-        /// </remarks>
-        /// <param name="assetService"></param>
-        /// <param name="part"></param>
-        /// <returns>The item that was added</returns>
-        public static TaskInventoryItem AddScript(IAssetService assetService, SceneObjectPart part)
-        {
-            return AddScript(assetService, part, "scriptItem", "default { state_entry() { llSay(0, \"Hello World\"); } }");
-        }
+    /// <summary>
+    /// Add a simple script to the given part.
+    /// </summary>
+    /// <remarks>
+    /// TODO: Accept input for item and asset IDs to avoid mysterious script failures that try to use any of these
+    /// functions more than once in a test.
+    /// </remarks>
+    /// <param name="assetService"></param>
+    /// <param name="part"></param>
+    /// <returns>The item that was added</returns>
+    public static TaskInventoryItem AddScript(IAssetService assetService, SceneObjectPart part)
+    {
+        return AddScript(assetService, part, "scriptItem", "default { state_entry() { llSay(0, \"Hello World\"); } }");
+    }
 
-        /// <summary>
-        /// Add a simple script to the given part.
-        /// </summary>
-        /// <remarks>
-        /// TODO: Accept input for item and asset IDs so that we have completely replicatable regression tests rather
-        /// than a random component.
-        /// </remarks>
-        /// <param name="assetService"></param>
-        /// <param name="part"></param>
-        /// <param name="scriptName">Name of the script to add</param>
-        /// <param name="scriptSource">LSL script source</param>
-        /// <returns>The item that was added</returns>
-        public static TaskInventoryItem AddScript(
-            IAssetService assetService, SceneObjectPart part, string scriptName, string scriptSource)
-        {
-            return AddScript(assetService, part, UUID.Random(), UUID.Random(), scriptName, scriptSource);
-        }
+    /// <summary>
+    /// Add a simple script to the given part.
+    /// </summary>
+    /// <remarks>
+    /// TODO: Accept input for item and asset IDs so that we have completely replicatable regression tests rather
+    /// than a random component.
+    /// </remarks>
+    /// <param name="assetService"></param>
+    /// <param name="part"></param>
+    /// <param name="scriptName">Name of the script to add</param>
+    /// <param name="scriptSource">LSL script source</param>
+    /// <returns>The item that was added</returns>
+    public static TaskInventoryItem AddScript(
+        IAssetService assetService, SceneObjectPart part, string scriptName, string scriptSource)
+    {
+        return AddScript(assetService, part, UUID.Random(), UUID.Random(), scriptName, scriptSource);
+    }
 
-        /// <summary>
-        /// Add a simple script to the given part.
-        /// </summary>
-        /// <remarks>
-        /// TODO: Accept input for item and asset IDs so that we have completely replicatable regression tests rather
-        /// than a random component.
-        /// </remarks>
-        /// <param name="assetService"></param>
-        /// <param name="part"></param>
-        /// <param name="itemId">Item UUID for the script</param>
-        /// <param name="assetId">Asset UUID for the script</param>
-        /// <param name="scriptName">Name of the script to add</param>
-        /// <param name="scriptSource">LSL script source</param>
-        /// <returns>The item that was added</returns>
-        public static TaskInventoryItem AddScript(
-            IAssetService assetService, SceneObjectPart part, UUID itemId, UUID assetId, string scriptName, string scriptSource)
-        {
-            AssetScriptText ast = new AssetScriptText();
-            ast.Source = scriptSource;
-            ast.Encode();
+    /// <summary>
+    /// Add a simple script to the given part.
+    /// </summary>
+    /// <remarks>
+    /// TODO: Accept input for item and asset IDs so that we have completely replicatable regression tests rather
+    /// than a random component.
+    /// </remarks>
+    /// <param name="assetService"></param>
+    /// <param name="part"></param>
+    /// <param name="itemId">Item UUID for the script</param>
+    /// <param name="assetId">Asset UUID for the script</param>
+    /// <param name="scriptName">Name of the script to add</param>
+    /// <param name="scriptSource">LSL script source</param>
+    /// <returns>The item that was added</returns>
+    public static TaskInventoryItem AddScript(
+        IAssetService assetService, SceneObjectPart part, UUID itemId, UUID assetId, string scriptName, string scriptSource)
+    {
+        AssetScriptText ast = new AssetScriptText();
+        ast.Source = scriptSource;
+        ast.Encode();
 
-            AssetBase asset
-                = AssetHelpers.CreateAsset(assetId, AssetType.LSLText, ast.AssetData, UUID.Zero);
-            assetService.Store(asset);
-            TaskInventoryItem item
-                = new TaskInventoryItem
-            { Name = scriptName, AssetID = assetId, ItemID = itemId,
-                Type = (int)AssetType.LSLText, InvType = (int)InventoryType.LSL };
-            part.Inventory.AddInventoryItem(item, true);
+        AssetBase asset
+            = AssetHelpers.CreateAsset(assetId, AssetType.LSLText, ast.AssetData, UUID.Zero);
+        assetService.Store(asset);
+        TaskInventoryItem item
+            = new TaskInventoryItem
+        { Name = scriptName, AssetID = assetId, ItemID = itemId,
+            Type = (int)AssetType.LSLText, InvType = (int)InventoryType.LSL };
+        part.Inventory.AddInventoryItem(item, true);
 
-            return item;
-        }
+        return item;
+    }
 
-        /// <summary>
-        /// Add a scene object item to the given part.
-        /// </summary>
-        /// <remarks>
-        /// TODO: Accept input for item and asset IDs to avoid mysterious script failures that try to use any of these
-        /// functions more than once in a test.
-        /// </remarks>
-        ///
-        /// <param name="assetService"></param>
-        /// <param name="sop"></param>
-        /// <param name="itemName"></param>
-        /// <param name="itemId"></param>
-        /// <param name="soToAdd"></param>
-        /// <param name="soAssetId"></param>
-        public static TaskInventoryItem AddSceneObject(
-            IAssetService assetService, SceneObjectPart sop, string itemName, UUID itemId, SceneObjectGroup soToAdd, UUID soAssetId)
-        {
-            AssetBase taskSceneObjectAsset = AssetHelpers.CreateAsset(soAssetId, soToAdd);
-            assetService.Store(taskSceneObjectAsset);
-            TaskInventoryItem taskSceneObjectItem
-                = new TaskInventoryItem
-            { Name = itemName,
-                AssetID = taskSceneObjectAsset.FullID,
-                ItemID = itemId,
-                OwnerID = soToAdd.OwnerID,
-                Type = (int)AssetType.Object,
-                InvType = (int)InventoryType.Object };
-            sop.Inventory.AddInventoryItem(taskSceneObjectItem, true);
+    /// <summary>
+    /// Add a scene object item to the given part.
+    /// </summary>
+    /// <remarks>
+    /// TODO: Accept input for item and asset IDs to avoid mysterious script failures that try to use any of these
+    /// functions more than once in a test.
+    /// </remarks>
+    ///
+    /// <param name="assetService"></param>
+    /// <param name="sop"></param>
+    /// <param name="itemName"></param>
+    /// <param name="itemId"></param>
+    /// <param name="soToAdd"></param>
+    /// <param name="soAssetId"></param>
+    public static TaskInventoryItem AddSceneObject(
+        IAssetService assetService, SceneObjectPart sop, string itemName, UUID itemId, SceneObjectGroup soToAdd, UUID soAssetId)
+    {
+        AssetBase taskSceneObjectAsset = AssetHelpers.CreateAsset(soAssetId, soToAdd);
+        assetService.Store(taskSceneObjectAsset);
+        TaskInventoryItem taskSceneObjectItem
+            = new TaskInventoryItem
+        { Name = itemName,
+            AssetID = taskSceneObjectAsset.FullID,
+            ItemID = itemId,
+            OwnerID = soToAdd.OwnerID,
+            Type = (int)AssetType.Object,
+            InvType = (int)InventoryType.Object };
+        sop.Inventory.AddInventoryItem(taskSceneObjectItem, true);
 
-            return taskSceneObjectItem;
-        }
+        return taskSceneObjectItem;
+    }
 
-        /// <summary>
-        /// Add a scene object item to the given part.
-        /// </summary>
-        /// <remarks>
-        /// TODO: Accept input for item and asset IDs to avoid mysterious script failures that try to use any of these
-        /// functions more than once in a test.
-        /// </remarks>
-        ///
-        /// <param name="assetService"></param>
-        /// <param name="sop"></param>
-        /// <param name="itemName"></param>
-        /// <param name="id"></param>
-        /// <param name="userId"></param>
-        public static TaskInventoryItem AddSceneObject(
-            IAssetService assetService, SceneObjectPart sop, string itemName, UUID itemId, UUID userId)
-        {
-            SceneObjectGroup taskSceneObject = SceneHelpers.CreateSceneObject(1, userId);
+    /// <summary>
+    /// Add a scene object item to the given part.
+    /// </summary>
+    /// <remarks>
+    /// TODO: Accept input for item and asset IDs to avoid mysterious script failures that try to use any of these
+    /// functions more than once in a test.
+    /// </remarks>
+    ///
+    /// <param name="assetService"></param>
+    /// <param name="sop"></param>
+    /// <param name="itemName"></param>
+    /// <param name="id"></param>
+    /// <param name="userId"></param>
+    public static TaskInventoryItem AddSceneObject(
+        IAssetService assetService, SceneObjectPart sop, string itemName, UUID itemId, UUID userId)
+    {
+        SceneObjectGroup taskSceneObject = SceneHelpers.CreateSceneObject(1, userId);
 
-            return TaskInventoryHelpers.AddSceneObject(
-                assetService, sop, itemName, itemId, taskSceneObject, TestHelpers.ParseTail(0x10));
-        }
+        return TaskInventoryHelpers.AddSceneObject(
+            assetService, sop, itemName, itemId, taskSceneObject, TestHelpers.ParseTail(0x10));
     }
 }

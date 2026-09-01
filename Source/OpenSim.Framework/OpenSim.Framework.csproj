@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+      <TargetFramework>net8.0</TargetFramework>
+      <AssemblyTitle>OpenSim.Framework</AssemblyTitle>
+      <Company>http://opensimulator.org</Company>
+      <Product>OpenSim.Framework</Product>
+      <Copyright>Copyright (c) OpenSimulator.org Developers 2007-2009</Copyright>
+      <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup> 
+  
+  <ItemGroup>
+    <Reference Include="LukeSkywalker.IPNetwork" HintPath="../../Library/LukeSkywalker.IPNetwork.dll" />
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
+    <PackageReference Include="System.Security.Permissions" Version="10.0.8" />
+    <PackageReference Include="System.Threading.AccessControl" Version="10.0.8" />
+    <PackageReference Include="System.Threading.Tasks" Version="4.3.0" />
+    <PackageReference Include="System.Threading.Timer" Version="4.3.0" />
+    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
+    <PackageReference Include="log4net" Version="3.3.1" />
+    <PackageReference Include="McMaster.NETCore.Plugins" Version="2.0.0" />
+    <PackageReference Include="zlib.net-mutliplatform" Version="1.1.0" />
+  </ItemGroup>
+
+</Project>

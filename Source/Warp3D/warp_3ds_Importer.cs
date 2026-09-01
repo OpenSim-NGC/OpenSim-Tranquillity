@@ -1,10 +1,7 @@
-using System;
-using System.IO;
 using System.Collections;
-using System.Net;
 
-namespace Warp3D
-{
+namespace Warp3D;
+
 	/// <summary>
 	/// Summary description for warp_3ds_Importer.
 	/// </summary>
@@ -17,36 +14,36 @@ namespace Warp3D
 		private warp_Object currentObject = null;
 		private bool endOfStream = false;
 
-        private Hashtable _objects = new Hashtable();
+    private Hashtable _objects = new Hashtable();
 
 		public warp_3ds_Importer()
 		{
 		}
 
-        public async Task<Hashtable> importFromFileAsync( string name, String path )
+    public async Task<Hashtable> importFromFileAsync( string name, String path )
 		{
-            Stream fs = null;
-            _objects.Clear();
+        Stream fs = null;
+        _objects.Clear();
 
-            if ( path.StartsWith( "http" ) )
-            {
+        if ( path.StartsWith( "http" ) )
+        {
 				using (HttpClient client = new HttpClient())
 				{
 					fs = await client.GetStreamAsync(path);
 				}
-            }
-            else
-            {
-                fs = new FileStream( path, FileMode.Open );
-            }
+        }
+        else
+        {
+            fs = new FileStream( path, FileMode.Open );
+        }
 
 			BinaryReader br = new BinaryReader( fs );
 			return importFromStream( name, br );
 		}
 
-        public Hashtable importFromStream( string name, BinaryReader inStream )
+    public Hashtable importFromStream( string name, BinaryReader inStream )
 		{
-            _objects.Clear();
+        _objects.Clear();
 	
 			readJunkHeader(inStream);
 			if (currentJunkId != 0x4D4D)
@@ -63,12 +60,12 @@ namespace Warp3D
 			}
 			catch(Exception)
 			{
-                // ignored
+            // ignored
 			}
 
-            inStream.Close();
+        inStream.Close();
 
-            return _objects;
+        return _objects;
 		}
 	
 		private void readJunkHeader(BinaryReader inStream)
@@ -106,7 +103,7 @@ namespace Warp3D
 			if (currentJunkId == 0x4100 /* triangular polygon object */)
 			{ 
 				currentObject = new warp_Object();
-                _objects.Add( name+"_"+currentObjectName, currentObject );
+            _objects.Add( name+"_"+currentObjectName, currentObject );
 
 				return;
 			}
@@ -211,4 +208,3 @@ namespace Warp3D
 			}
 		}
 	}
-}

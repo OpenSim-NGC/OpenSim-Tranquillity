@@ -1,7 +1,46 @@
-
 services:
-  robust:
-    image: robust
+  moneyserver:
+    image: opensim.server.moneyserver
     build:
       context: .
-      dockerfile: OpenSim/Server/Dockerfile
+      dockerfile: Source/OpenSim.Server.MoneyServer/Dockerfile
+      pull: true
+      args:
+        configuration: Release
+      secrets:
+        - github_actor
+        - github_token
+
+  gridserver:
+    image: opensim.server.gridserver
+    build:
+      context: .
+      dockerfile: Source/OpenSim.Server.GridServer/Dockerfile
+      pull: true
+      args:
+        configuration: Release
+      secrets:
+        - github_actor
+        - github_token
+
+  regionserver:
+    image: opensim.server.regionserver
+    build:
+      context: .
+      dockerfile: Source/OpenSim.Server.RegionServer/Dockerfile
+      pull: true
+      args:
+        configuration: Release
+      secrets:
+        - github_actor
+        - github_token
+
+# Build secrets sourced from the host environment so the GitHub NuGet feed
+# credentials (%GITHUB_ACTOR% / %GITHUB_TOKEN%) are available during `dotnet
+# restore` without being baked into the image. Export GITHUB_ACTOR and
+# GITHUB_TOKEN before running `docker compose build`.
+secrets:
+  github_actor:
+    environment: GITHUB_ACTOR
+  github_token:
+    environment: GITHUB_TOKEN

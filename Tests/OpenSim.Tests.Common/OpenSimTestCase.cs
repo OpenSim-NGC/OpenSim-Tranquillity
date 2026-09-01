@@ -27,37 +27,36 @@
 
 using OpenSim.Framework.Servers;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+public class OpenSimTestCase : IDisposable
 {
-    public class OpenSimTestCase : IDisposable
+    protected OpenSimTestCase()
     {
-        protected OpenSimTestCase()
-        {
-            //TestHelpers.InMethod();
-            // Disable logging for each test so that one where logging is enabled doesn't cause all subsequent tests
-            // to have logging on if it failed with an exception.
-            TestHelpers.DisableLogging();
+        //TestHelpers.InMethod();
+        // Disable logging for each test so that one where logging is enabled doesn't cause all subsequent tests
+        // to have logging on if it failed with an exception.
+        TestHelpers.DisableLogging();
 
-            // This is an unfortunate bit of clean up we have to do because MainServer manages things through static
-            // variables and the VM is not restarted between tests.
-            if (MainServer.Instance != null)
-            {
-                MainServer.RemoveHttpServer(MainServer.Instance.Port);
-                // MainServer.Instance = null;
-            }
-        }
-
-        /// <summary>
-        /// For subclasses that override SetUp() - provides per-test setup functionality.
-        /// </summary>
-        public virtual void SetUp()
+        // This is an unfortunate bit of clean up we have to do because MainServer manages things through static
+        // variables and the VM is not restarted between tests.
+        if (MainServer.Instance != null)
         {
-            // Override in subclasses for per-test setup
+            MainServer.Instance.RemoveHttpServer(MainServer.Instance.DefaultServer.Port);
+            // MainServer.Instance = null;
         }
+    }
 
-        public virtual void Dispose()
-        {
-            // Do "global" teardown here; Called after every test method.
-        }
+    /// <summary>
+    /// For subclasses that override SetUp() - provides per-test setup functionality.
+    /// </summary>
+    public virtual void SetUp()
+    {
+        // Override in subclasses for per-test setup
+    }
+
+    public virtual void Dispose()
+    {
+        // Do "global" teardown here; Called after every test method.
     }
 }

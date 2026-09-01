@@ -25,92 +25,88 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.CoreModules.Scripting.XMLRPC;
 using OpenSim.Region.ScriptEngine.Interfaces;
-using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
+namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
+
+public class XmlRequest
 {
-    public class XmlRequest
+    public AsyncCommandManager m_CmdManager;
+
+    public XmlRequest(AsyncCommandManager CmdManager)
     {
-        public AsyncCommandManager m_CmdManager;
+        m_CmdManager = CmdManager;
+    }
 
-        public XmlRequest(AsyncCommandManager CmdManager)
+    public void CheckXMLRPCRequests()
+    {
+        if (m_CmdManager.m_ScriptEngine.World == null)
+            return;
+
+        IXMLRPC xmlrpc = m_CmdManager.m_ScriptEngine.World.RequestModuleInterface<IXMLRPC>();
+
+        if (xmlrpc != null)
         {
-            m_CmdManager = CmdManager;
-        }
+            RPCRequestInfo rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
 
-        public void CheckXMLRPCRequests()
-        {
-            if (m_CmdManager.m_ScriptEngine.World == null)
-                return;
-
-            IXMLRPC xmlrpc = m_CmdManager.m_ScriptEngine.World.RequestModuleInterface<IXMLRPC>();
-
-            if (xmlrpc != null)
+            while (rInfo != null)
             {
-                RPCRequestInfo rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+                xmlrpc.RemoveCompletedRequest(rInfo.GetMessageID());
 
-                while (rInfo != null)
+                //Deliver data to prim's remote_data handler
+                object[] resobj = new object[]
                 {
-                    xmlrpc.RemoveCompletedRequest(rInfo.GetMessageID());
+                    new LSL_Types.LSLInteger(2),
+                    new LSL_Types.LSLString(
+                            rInfo.GetChannelKey().ToString()),
+                    new LSL_Types.LSLString(
+                            rInfo.GetMessageID().ToString()),
+                    new LSL_Types.LSLString(String.Empty),
+                    new LSL_Types.LSLInteger(rInfo.GetIntValue()),
+                    new LSL_Types.LSLString(rInfo.GetStrVal())
+                };
 
-                    //Deliver data to prim's remote_data handler
-                    object[] resobj = new object[]
-                    {
-                        new LSL_Types.LSLInteger(2),
-                        new LSL_Types.LSLString(
-                                rInfo.GetChannelKey().ToString()),
-                        new LSL_Types.LSLString(
-                                rInfo.GetMessageID().ToString()),
-                        new LSL_Types.LSLString(String.Empty),
-                        new LSL_Types.LSLInteger(rInfo.GetIntValue()),
-                        new LSL_Types.LSLString(rInfo.GetStrVal())
-                    };
-
-                    foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
-                    {
-                        if (e.PostScriptEvent(
-                                rInfo.GetItemID(), new EventParams(
-                                    "remote_data", resobj,
-                                    new DetectParams[0])))
-                            break;
-                    }
-
-                    rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+                foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
+                {
+                    if (e.PostScriptEvent(
+                            rInfo.GetItemID(), new EventParams(
+                                "remote_data", resobj,
+                                new DetectParams[0])))
+                        break;
                 }
 
-                SendRemoteDataRequest srdInfo = (SendRemoteDataRequest)xmlrpc.GetNextCompletedSRDRequest();
+                rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+            }
 
-                while (srdInfo != null)
+            SendRemoteDataRequest srdInfo = (SendRemoteDataRequest)xmlrpc.GetNextCompletedSRDRequest();
+
+            while (srdInfo != null)
+            {
+                xmlrpc.RemoveCompletedSRDRequest(srdInfo.GetReqID());
+
+                //Deliver data to prim's remote_data handler
+                object[] resobj = new object[]
                 {
-                    xmlrpc.RemoveCompletedSRDRequest(srdInfo.GetReqID());
+                    new LSL_Types.LSLInteger(3),
+                    new LSL_Types.LSLString(srdInfo.Channel.ToString()),
+                    new LSL_Types.LSLString(srdInfo.GetReqID().ToString()),
+                    new LSL_Types.LSLString(String.Empty),
+                    new LSL_Types.LSLInteger(srdInfo.Idata),
+                    new LSL_Types.LSLString(srdInfo.Sdata)
+                };
 
-                    //Deliver data to prim's remote_data handler
-                    object[] resobj = new object[]
-                    {
-                        new LSL_Types.LSLInteger(3),
-                        new LSL_Types.LSLString(srdInfo.Channel.ToString()),
-                        new LSL_Types.LSLString(srdInfo.GetReqID().ToString()),
-                        new LSL_Types.LSLString(String.Empty),
-                        new LSL_Types.LSLInteger(srdInfo.Idata),
-                        new LSL_Types.LSLString(srdInfo.Sdata)
-                    };
-
-                    foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
-                    {
-                        if (e.PostScriptEvent(
-                                srdInfo.ItemID, new EventParams(
-                                    "remote_data", resobj,
-                                    new DetectParams[0])))
-                            break;
-                    }
-
-                    srdInfo = (SendRemoteDataRequest)xmlrpc.GetNextCompletedSRDRequest();
+                foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
+                {
+                    if (e.PostScriptEvent(
+                            srdInfo.ItemID, new EventParams(
+                                "remote_data", resobj,
+                                new DetectParams[0])))
+                        break;
                 }
+
+                srdInfo = (SendRemoteDataRequest)xmlrpc.GetNextCompletedSRDRequest();
             }
         }
     }

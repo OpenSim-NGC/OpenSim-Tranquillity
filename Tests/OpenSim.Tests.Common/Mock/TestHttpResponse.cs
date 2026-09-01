@@ -25,149 +25,142 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.IO;
-using System.Net;
-using System.Text;
-using OSHttpServer;
+namespace OpenSim.Tests.Common;
 
-namespace OpenSim.Tests.Common
-{
 /*
-    public class TestHttpResponse: IHttpResponse
+public class TestHttpResponse: IHttpResponse
+{
+    public Stream Body
     {
-        public Stream Body
-        {
-            get { return _body; }
+        get { return _body; }
 
-            set { _body = value; }
-        }
-        private Stream _body;
-
-        public string ProtocolVersion
-        {
-            get { return _protocolVersion; }
-            set { _protocolVersion = value; }
-        }
-        private string _protocolVersion;
-
-        public bool Chunked
-        {
-            get { return _chunked; }
-
-            set { _chunked = value; }
-        }
-        private bool _chunked;
-
-        public ConnectionType Connection
-        {
-            get { return _connection; }
-
-            set { _connection = value; }
-        }
-        private ConnectionType _connection;
-
-        public Encoding Encoding
-        {
-            get { return _encoding; }
-
-            set { _encoding = value; }
-        }
-        private Encoding _encoding;
-
-        public int KeepAlive
-        {
-            get { return _keepAlive; }
-
-            set { _keepAlive = value; }
-        }
-        private int _keepAlive;
-
-        public HttpStatusCode Status
-        {
-            get { return _status; }
-
-            set { _status = value; }
-        }
-        private HttpStatusCode _status;
-
-        public string Reason
-        {
-            get { return _reason; }
-
-            set { _reason = value; }
-        }
-        private string _reason;
-
-        public long ContentLength
-        {
-            get { return _contentLength; }
-
-            set { _contentLength = value; }
-        }
-        private long _contentLength;
-
-        public string ContentType
-        {
-            get { return _contentType; }
-
-            set { _contentType = value; }
-        }
-        private string _contentType;
-
-        public bool HeadersSent
-        {
-            get { return _headersSent; }
-        }
-        private bool _headersSent;
-
-        public bool Sent
-        {
-            get { return _sent; }
-        }
-        private bool _sent;
-
-        public ResponseCookies Cookies
-        {
-            get { return _cookies; }
-        }
-        private ResponseCookies _cookies = null;
-
-        public TestHttpResponse()
-        {
-            _headersSent = false;
-            _sent = false;
-        }
-
-        public void AddHeader(string name, string value) {}
-
-        public void Send()
-        {
-            if (!_headersSent) SendHeaders();
-            if (_sent) throw new InvalidOperationException("stuff already sent");
-            _sent = true;
-        }
-
-        public void SendBody(byte[] buffer, int offset, int count)
-        {
-            if (!_headersSent) SendHeaders();
-            _sent = true;
-        }
-
-        public void SendBody(byte[] buffer)
-        {
-            if (!_headersSent) SendHeaders();
-            _sent = true;
-        }
-
-        public void SendHeaders()
-        {
-            if (_headersSent) throw new InvalidOperationException("headers already sent");
-            _headersSent = true;
-        }
-
-        public void Redirect(Uri uri) {}
-        public void Redirect(string url) {}
+        set { _body = value; }
     }
-*/
+    private Stream _body;
+
+    public string ProtocolVersion
+    {
+        get { return _protocolVersion; }
+        set { _protocolVersion = value; }
+    }
+    private string _protocolVersion;
+
+    public bool Chunked
+    {
+        get { return _chunked; }
+
+        set { _chunked = value; }
+    }
+    private bool _chunked;
+
+    public ConnectionType Connection
+    {
+        get { return _connection; }
+
+        set { _connection = value; }
+    }
+    private ConnectionType _connection;
+
+    public Encoding Encoding
+    {
+        get { return _encoding; }
+
+        set { _encoding = value; }
+    }
+    private Encoding _encoding;
+
+    public int KeepAlive
+    {
+        get { return _keepAlive; }
+
+        set { _keepAlive = value; }
+    }
+    private int _keepAlive;
+
+    public HttpStatusCode Status
+    {
+        get { return _status; }
+
+        set { _status = value; }
+    }
+    private HttpStatusCode _status;
+
+    public string Reason
+    {
+        get { return _reason; }
+
+        set { _reason = value; }
+    }
+    private string _reason;
+
+    public long ContentLength
+    {
+        get { return _contentLength; }
+
+        set { _contentLength = value; }
+    }
+    private long _contentLength;
+
+    public string ContentType
+    {
+        get { return _contentType; }
+
+        set { _contentType = value; }
+    }
+    private string _contentType;
+
+    public bool HeadersSent
+    {
+        get { return _headersSent; }
+    }
+    private bool _headersSent;
+
+    public bool Sent
+    {
+        get { return _sent; }
+    }
+    private bool _sent;
+
+    public ResponseCookies Cookies
+    {
+        get { return _cookies; }
+    }
+    private ResponseCookies _cookies = null;
+
+    public TestHttpResponse()
+    {
+        _headersSent = false;
+        _sent = false;
+    }
+
+    public void AddHeader(string name, string value) {}
+
+    public void Send()
+    {
+        if (!_headersSent) SendHeaders();
+        if (_sent) throw new InvalidOperationException("stuff already sent");
+        _sent = true;
+    }
+
+    public void SendBody(byte[] buffer, int offset, int count)
+    {
+        if (!_headersSent) SendHeaders();
+        _sent = true;
+    }
+
+    public void SendBody(byte[] buffer)
+    {
+        if (!_headersSent) SendHeaders();
+        _sent = true;
+    }
+
+    public void SendHeaders()
+    {
+        if (_headersSent) throw new InvalidOperationException("headers already sent");
+        _headersSent = true;
+    }
+
+    public void Redirect(Uri uri) {}
+    public void Redirect(string url) {}
 }
+*/

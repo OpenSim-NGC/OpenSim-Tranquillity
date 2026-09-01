@@ -30,187 +30,186 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Data;
 
-namespace OpenSim.Tests.Common
+namespace OpenSim.Tests.Common;
+
+/// <summary>
+/// In memory inventory data plugin for test purposes.  Could be another dll when properly filled out and when the
+/// mono addin plugin system starts co-operating with the unit test system.  Currently no locking since unit
+/// tests are single threaded.
+/// </summary>
+public class TestInventoryDataPlugin : IInventoryDataPlugin
 {
-    /// <summary>
-    /// In memory inventory data plugin for test purposes.  Could be another dll when properly filled out and when the
-    /// mono addin plugin system starts co-operating with the unit test system.  Currently no locking since unit
-    /// tests are single threaded.
-    /// </summary>
-    public class TestInventoryDataPlugin : IInventoryDataPlugin
-    {
 //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        /// <value>
-        /// Inventory folders
-        /// </value>
-        private Dictionary<UUID, InventoryFolderBase> m_folders = new Dictionary<UUID, InventoryFolderBase>();
+    /// <value>
+    /// Inventory folders
+    /// </value>
+    private Dictionary<UUID, InventoryFolderBase> m_folders = new Dictionary<UUID, InventoryFolderBase>();
 
-        //// <value>
-        /// Inventory items
-        /// </value>
-        private Dictionary<UUID, InventoryItemBase> m_items = new Dictionary<UUID, InventoryItemBase>();
+    //// <value>
+    /// Inventory items
+    /// </value>
+    private Dictionary<UUID, InventoryItemBase> m_items = new Dictionary<UUID, InventoryItemBase>();
 
-        /// <value>
-        /// User root folders
-        /// </value>
-        private Dictionary<UUID, InventoryFolderBase> m_rootFolders = new Dictionary<UUID, InventoryFolderBase>();
+    /// <value>
+    /// User root folders
+    /// </value>
+    private Dictionary<UUID, InventoryFolderBase> m_rootFolders = new Dictionary<UUID, InventoryFolderBase>();
 
-        public string Version { get { return "0"; } }
-        public string Name { get { return "TestInventoryDataPlugin"; } }
+    public string Version { get { return "0"; } }
+    public string Name { get { return "TestInventoryDataPlugin"; } }
 
-        public void Initialise() {}
-        public void Initialise(string connect) {}
-        public void Dispose() {}
+    public void Initialise() {}
+    public void Initialise(string connect) {}
+    public void Dispose() {}
 
-        public List<InventoryFolderBase> getFolderHierarchy(UUID parentID)
+    public List<InventoryFolderBase> getFolderHierarchy(UUID parentID)
+    {
+        List<InventoryFolderBase> folders = new List<InventoryFolderBase>();
+
+        foreach (InventoryFolderBase folder in m_folders.Values)
         {
-            List<InventoryFolderBase> folders = new List<InventoryFolderBase>();
-
-            foreach (InventoryFolderBase folder in m_folders.Values)
+            if (folder.ParentID == parentID)
             {
-                if (folder.ParentID == parentID)
-                {
-                    folders.AddRange(getFolderHierarchy(folder.ID));
-                    folders.Add(folder);
-                }
+                folders.AddRange(getFolderHierarchy(folder.ID));
+                folders.Add(folder);
             }
-
-            return folders;
         }
 
-        public List<InventoryItemBase> getInventoryInFolder(UUID folderID)
-        {
+        return folders;
+    }
+
+    public List<InventoryItemBase> getInventoryInFolder(UUID folderID)
+    {
 //            InventoryFolderBase folder = m_folders[folderID];
 
 //            m_log.DebugFormat("[MOCK INV DB]: Getting items in folder {0} {1}", folder.Name, folder.ID);
 
-            List<InventoryItemBase> items = new List<InventoryItemBase>();
+        List<InventoryItemBase> items = new List<InventoryItemBase>();
 
-            foreach (InventoryItemBase item in m_items.Values)
+        foreach (InventoryItemBase item in m_items.Values)
+        {
+            if (item.Folder == folderID)
             {
-                if (item.Folder == folderID)
-                {
 //                    m_log.DebugFormat("[MOCK INV DB]: getInventoryInFolder() adding item {0}", item.Name);
-                    items.Add(item);
-                }
+                items.Add(item);
             }
-
-            return items;
         }
 
-        public List<InventoryFolderBase> getUserRootFolders(UUID user) { return null; }
+        return items;
+    }
 
-        public InventoryFolderBase getUserRootFolder(UUID user)
-        {
+    public List<InventoryFolderBase> getUserRootFolders(UUID user) { return null; }
+
+    public InventoryFolderBase getUserRootFolder(UUID user)
+    {
 //            m_log.DebugFormat("[MOCK INV DB]: Looking for root folder for {0}", user);
 
-            InventoryFolderBase folder = null;
-            m_rootFolders.TryGetValue(user, out folder);
+        InventoryFolderBase folder = null;
+        m_rootFolders.TryGetValue(user, out folder);
 
-            return folder;
-        }
+        return folder;
+    }
 
-        public List<InventoryFolderBase> getInventoryFolders(UUID parentID)
-        {
+    public List<InventoryFolderBase> getInventoryFolders(UUID parentID)
+    {
 //            InventoryFolderBase parentFolder = m_folders[parentID];
 
 //            m_log.DebugFormat("[MOCK INV DB]: Getting folders in folder {0} {1}", parentFolder.Name, parentFolder.ID);
 
-            List<InventoryFolderBase> folders = new List<InventoryFolderBase>();
+        List<InventoryFolderBase> folders = new List<InventoryFolderBase>();
 
-            foreach (InventoryFolderBase folder in m_folders.Values)
+        foreach (InventoryFolderBase folder in m_folders.Values)
+        {
+            if (folder.ParentID == parentID)
             {
-                if (folder.ParentID == parentID)
-                {
 //                    m_log.DebugFormat(
 //                        "[MOCK INV DB]: Found folder {0} {1} in {2} {3}",
 //                        folder.Name, folder.ID, parentFolder.Name, parentFolder.ID);
 
-                    folders.Add(folder);
-                }
+                folders.Add(folder);
             }
-
-            return folders;
         }
 
-        public InventoryFolderBase getInventoryFolder(UUID folderId)
-        {
-            InventoryFolderBase folder = null;
-            m_folders.TryGetValue(folderId, out folder);
+        return folders;
+    }
 
-            return folder;
-        }
+    public InventoryFolderBase getInventoryFolder(UUID folderId)
+    {
+        InventoryFolderBase folder = null;
+        m_folders.TryGetValue(folderId, out folder);
 
-        public InventoryFolderBase queryInventoryFolder(UUID folderID)
-        {
-            return getInventoryFolder(folderID);
-        }
+        return folder;
+    }
 
-        public void addInventoryFolder(InventoryFolderBase folder)
-        {
+    public InventoryFolderBase queryInventoryFolder(UUID folderID)
+    {
+        return getInventoryFolder(folderID);
+    }
+
+    public void addInventoryFolder(InventoryFolderBase folder)
+    {
 //            m_log.DebugFormat(
 //                "[MOCK INV DB]: Adding inventory folder {0} {1} type {2}",
 //                folder.Name, folder.ID, (AssetType)folder.Type);
 
-            m_folders[folder.ID] = folder;
+        m_folders[folder.ID] = folder;
 
-            if (folder.ParentID.IsZero())
-            {
+        if (folder.ParentID.IsZero())
+        {
 //                m_log.DebugFormat(
 //                    "[MOCK INV DB]: Adding root folder {0} {1} for {2}", folder.Name, folder.ID, folder.Owner);
-                m_rootFolders[folder.Owner] = folder;
-            }
+            m_rootFolders[folder.Owner] = folder;
         }
+    }
 
-        public void updateInventoryFolder(InventoryFolderBase folder)
-        {
-            m_folders[folder.ID] = folder;
-        }
+    public void updateInventoryFolder(InventoryFolderBase folder)
+    {
+        m_folders[folder.ID] = folder;
+    }
 
-        public void moveInventoryFolder(InventoryFolderBase folder)
-        {
-            // Simple replace
-            updateInventoryFolder(folder);
-        }
+    public void moveInventoryFolder(InventoryFolderBase folder)
+    {
+        // Simple replace
+        updateInventoryFolder(folder);
+    }
 
-        public void deleteInventoryFolder(UUID folderId)
-        {
-            if (m_folders.ContainsKey(folderId))
-                m_folders.Remove(folderId);
-        }
+    public void deleteInventoryFolder(UUID folderId)
+    {
+        if (m_folders.ContainsKey(folderId))
+            m_folders.Remove(folderId);
+    }
 
-        public void addInventoryItem(InventoryItemBase item)
-        {
-            InventoryFolderBase folder = m_folders[item.Folder];
+    public void addInventoryItem(InventoryItemBase item)
+    {
+        InventoryFolderBase folder = m_folders[item.Folder];
 
 //            m_log.DebugFormat(
 //                "[MOCK INV DB]: Adding inventory item {0} {1} in {2} {3}", item.Name, item.ID, folder.Name, folder.ID);
 
-            m_items[item.ID] = item;
-        }
-
-        public void updateInventoryItem(InventoryItemBase item) { addInventoryItem(item); }
-
-        public void deleteInventoryItem(UUID itemId)
-        {
-            if (m_items.ContainsKey(itemId))
-                m_items.Remove(itemId);
-        }
-
-        public InventoryItemBase getInventoryItem(UUID itemId)
-        {
-            if (m_items.ContainsKey(itemId))
-                return m_items[itemId];
-            else
-                return null;
-        }
-
-        public InventoryItemBase queryInventoryItem(UUID item)
-        {
-            return null;
-        }
-
-        public List<InventoryItemBase> fetchActiveGestures(UUID avatarID) { return null; }
+        m_items[item.ID] = item;
     }
+
+    public void updateInventoryItem(InventoryItemBase item) { addInventoryItem(item); }
+
+    public void deleteInventoryItem(UUID itemId)
+    {
+        if (m_items.ContainsKey(itemId))
+            m_items.Remove(itemId);
+    }
+
+    public InventoryItemBase getInventoryItem(UUID itemId)
+    {
+        if (m_items.ContainsKey(itemId))
+            return m_items[itemId];
+        else
+            return null;
+    }
+
+    public InventoryItemBase queryInventoryItem(UUID item)
+    {
+        return null;
+    }
+
+    public List<InventoryItemBase> fetchActiveGestures(UUID avatarID) { return null; }
 }

@@ -25,51 +25,48 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
 using Xunit;
-using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Terrain;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.Terrain.Tests
+namespace OpenSim.Region.CoreModules.Terrain.Tests;
+
+public class TerrainModuleTests : OpenSimTestCase
 {
-    public class TerrainModuleTests : OpenSimTestCase
+    [Fact]
+    public void TestTerrainFill()
     {
-        [Fact]
-        public void TestTerrainFill()
-        {
-            TestHelpers.InMethod();
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            //UUID userId = TestHelpers.ParseTail(0x1);
+        //UUID userId = TestHelpers.ParseTail(0x1);
 
-            TerrainModule tm = new TerrainModule();
-            Scene scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(scene, tm);
+        TerrainModule tm = new TerrainModule();
+        Scene scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(scene, tm);
 
-            // Fillheight of 30
-            {
-                float fillHeight = 30;
+        // Fillheight of 30
+        {
+            float fillHeight = 30;
 
-                tm.InterfaceFillTerrain(new object[] { fillHeight });
+            tm.InterfaceFillTerrain(new object[] { fillHeight });
 
-                float height = scene.Heightmap[128, 128];
+            float height = scene.Heightmap[128, 128];
 
-                Assert.Equal(fillHeight, height);
-            }
+            Assert.Equal(fillHeight, height);
+        }
 
-            // Max fillheight of 30
-            // According to http://wiki.secondlife.com/wiki/Tips_for_Creating_Heightfields_and_Details_on_Terrain_RAW_Files#Notes_for_Creating_Height_Field_Maps_for_Second_Life
-            {
-                float fillHeight = 508;
+        // Max fillheight of 30
+        // According to http://wiki.secondlife.com/wiki/Tips_for_Creating_Heightfields_and_Details_on_Terrain_RAW_Files#Notes_for_Creating_Height_Field_Maps_for_Second_Life
+        {
+            float fillHeight = 508;
 
-                tm.InterfaceFillTerrain(new object[] { fillHeight });
+            tm.InterfaceFillTerrain(new object[] { fillHeight });
 
-                float height = scene.Heightmap[128, 128];
+            float height = scene.Heightmap[128, 128];
 
-                Assert.Equal(fillHeight, height);
-            }
+            Assert.Equal(fillHeight, height);
         }
     }
 }

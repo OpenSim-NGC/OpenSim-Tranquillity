@@ -1,0 +1,132 @@
+﻿/*
+ * Copyright (c) Contributors, http://opensimulator.org/, http://www.nsl.tuis.ac.jp/
+ * See CONTRIBUTORS.TXT for a full list of copyright holders.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *	 * Redistributions of source code must retain the above copyright
+ *	   notice, this list of conditions and the following disclaimer.
+ *	 * Redistributions in binary form must reproduce the above copyright
+ *	   notice, this list of conditions and the following disclaimer in the
+ *	   documentation and/or other materials provided with the distribution.
+ *	 * Neither the name of the OpenSim Project nor the
+ *	   names of its contributors may be used to endorse or promote products
+ *	   derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE DEVELOPERS ``AS IS'' AND ANY
+ * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE CONTRIBUTORS BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Framework;
+using OpenSim.Framework.Servers;
+using OpenMetaverse;
+using System.Runtime.InteropServices;
+using OpenSim.Server.MoneyServer.Models;
+using OpenSim.Server.Base.Hosting;
+
+/// <summary>
+/// OpenSim Server MoneyServer
+/// </summary>
+namespace OpenSim.Server.MoneyServer;
+
+/// <summary>
+/// class MoneyServerBase : BaseOpenSimServer, IMoneyServiceCore
+/// Manni internal class
+/// </summary>
+public class MoneyService : IMoneyServiceCore, IHostedService
+{
+    /// <summary>
+    /// Random uuid for private data
+    /// </summary>
+    protected string m_osSecret = String.Empty;
+    public string osSecret => m_osSecret;
+
+    private readonly IMoneyServerRuntime _runtime;
+    public BaseHttpServer HttpServer => _runtime.HttpServer;
+
+    private readonly MoneySessionStore m_sessionStore;
+    public Dictionary<string, string> SessionDic => m_sessionStore.SessionDic;
+    public Dictionary<string, string> SecureSessionDic => m_sessionStore.SecureSessionDic;
+    public Dictionary<string, string> WebSessionDic => m_sessionStore.WebSessionDic;
+
+    private readonly ILogger<MoneyService> _logger;
+    private readonly IServerBase _serverBase;
+    private readonly IStartupFailureCoordinator _startupFailureCoordinator;
+
+    public MoneyService(
+        ILogger<MoneyService> logger,
+        IServerBase serverBase,
+        IStartupFailureCoordinator startupFailureCoordinator,
+        IMoneyServerRuntime runtime,
+        MoneySessionStore sessionStore
+        )
+    {
+        _logger = logger;
+        _serverBase = serverBase;
+        _startupFailureCoordinator = startupFailureCoordinator;
+        _runtime = runtime;
+        m_sessionStore = sessionStore ?? throw new ArgumentNullException(nameof(sessionStore));
+
+        // Random uuid for private data
+        m_osSecret = UUID.Random().ToString();
+    }
+
+    public Task StartAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("{Service} is running.", nameof(MoneyService));
+
+        _runtime.Initialize();
+        _runtime.StartMaintenance();
+        Startup();
+
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken stoppingToken)
+    {
+        _logger.LogInformation("{Service} is stopping.", nameof(MoneyService));
+
+        _runtime.Stop();
+
+        return Task.CompletedTask;
+    }
+    
+    
+    public virtual void Startup()
+    {
+        _logger.LogInformation("[STARTUP]: Beginning startup processing");
+        _logger.LogInformation("[STARTUP]: Version: " + _serverBase.Version);
+        _logger.LogInformation($"[STARTUP]: Operating system version: {Environment.OSVersion}, .NET platform {Util.RuntimePlatformStr}, Runtime {Environment.Version}");
+        _logger.LogInformation($"[STARTUP]: Processor Architecture: {RuntimeInformation.ProcessArchitecture}({(BitConverter.IsLittleEndian ? "le" : "be")} {(Environment.Is64BitProcess ? "64" : "32")}bit)");
+        _logger.LogInformation($"[STARTUP]: Memory: {GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (1024 * 1024)} MB");
+        
+        try
+        {
+            _serverBase.RegisterCommonCommands();
+            _serverBase.RegisterCommonComponents(_serverBase.Config);
+        }
+        catch(Exception e)
+        {
+            _startupFailureCoordinator.ThrowFatal("Fatal error while registering startup components.", e);
+        }
+    }
+
+    /// <summary>
+    /// Provides a list of help topics that are available.  Overriding classes should append their topics to the
+    /// information returned when the base method is called.
+    /// </summary>
+    ///
+    /// <returns>
+    /// A list of strings that represent different help topics on which more information is available
+    /// </returns>
+    protected virtual List<string> GetHelpTopics() { return new List<string>(); }
+}

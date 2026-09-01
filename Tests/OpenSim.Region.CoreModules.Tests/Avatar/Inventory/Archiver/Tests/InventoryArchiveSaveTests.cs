@@ -34,378 +34,377 @@ using OpenSim.Region.CoreModules.World.Serialiser;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
-namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests
+namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests;
+
+public class InventoryArchiveSaveTests : InventoryArchiveTestCase
 {
-    public class InventoryArchiveSaveTests : InventoryArchiveTestCase
+    protected TestScene m_scene;
+    protected InventoryArchiverModule m_archiverModule;
+
+    public override void SetUp()
     {
-        protected TestScene m_scene;
-        protected InventoryArchiverModule m_archiverModule;
+        base.SetUp();
 
-        public override void SetUp()
-        {
-            base.SetUp();
+        SerialiserModule serialiserModule = new SerialiserModule();
+        m_archiverModule = new InventoryArchiverModule();
 
-            SerialiserModule serialiserModule = new SerialiserModule();
-            m_archiverModule = new InventoryArchiverModule();
+        m_scene = new SceneHelpers().SetupScene();
+        SceneHelpers.SetupSceneModules(m_scene, serialiserModule, m_archiverModule);
+    }
 
-            m_scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(m_scene, serialiserModule, m_archiverModule);
-        }
-
-        /// <summary>
-        /// Test that the IAR has the required files in the right order.
-        /// </summary>
-        /// <remarks>
-        /// At the moment, the only thing that matters is that the control file is the very first one.
-        /// </remarks>
-        [Fact]
-        public void TestOrder()
-        {
-            TestHelpers.InMethod();
+    /// <summary>
+    /// Test that the IAR has the required files in the right order.
+    /// </summary>
+    /// <remarks>
+    /// At the moment, the only thing that matters is that the control file is the very first one.
+    /// </remarks>
+    [Fact]
+    public void TestOrder()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            MemoryStream archiveReadStream = new MemoryStream(m_iarStreamBytes);
-            TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
-            string filePath;
-            TarArchiveReader.TarEntryType tarEntryType;
+        MemoryStream archiveReadStream = new MemoryStream(m_iarStreamBytes);
+        TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
+        string filePath;
+        TarArchiveReader.TarEntryType tarEntryType;
 
-            byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
-            // TODO: Assert.Equal(,); - incomplete assertion
+        byte[] data = tar.ReadEntry(out filePath, out tarEntryType);
+        // TODO: Assert.Equal(,); - incomplete assertion
 
-            InventoryArchiveReadRequest iarr
-                = new InventoryArchiveReadRequest(UUID.Random(), null, null, null, null, null, null, (Stream)null, false);
-            iarr.LoadControlFile(filePath, data);
+        InventoryArchiveReadRequest iarr
+            = new InventoryArchiveReadRequest(UUID.Random(), null, null, null, null, null, null, (Stream)null, false);
+        iarr.LoadControlFile(filePath, data);
 
-            Assert.True(iarr.ControlFileLoaded);
-        }
+        Assert.True(iarr.ControlFileLoaded);
+    }
 
-        [Fact]
-        public void TestSaveRootFolderToIar()
-        {
-            TestHelpers.InMethod();
+    [Fact]
+    public void TestSaveRootFolderToIar()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            string userFirstName = "Jock";
-            string userLastName = "Stirrup";
-            string userPassword = "troll";
-            UUID userId = TestHelpers.ParseTail(0x20);
+        string userFirstName = "Jock";
+        string userLastName = "Stirrup";
+        string userPassword = "troll";
+        UUID userId = TestHelpers.ParseTail(0x20);
 
-            UserAccountHelpers.CreateUserWithInventory(m_scene, userFirstName, userLastName, userId, userPassword);
+        UserAccountHelpers.CreateUserWithInventory(m_scene, userFirstName, userLastName, userId, userPassword);
 
-            MemoryStream archiveWriteStream = new MemoryStream();
-            m_archiverModule.OnInventoryArchiveSaved += SaveCompleted;
+        MemoryStream archiveWriteStream = new MemoryStream();
+        m_archiverModule.OnInventoryArchiveSaved += SaveCompleted;
 
-            mre.Reset();
-            m_archiverModule.ArchiveInventory(
-                UUID.Random(), userFirstName, userLastName, "/", userPassword, archiveWriteStream);
-            mre.WaitOne(60000, false);
+        mre.Reset();
+        m_archiverModule.ArchiveInventory(
+            UUID.Random(), userFirstName, userLastName, "/", userPassword, archiveWriteStream);
+        mre.WaitOne(60000, false);
 
-            // Test created iar
-            byte[] archive = archiveWriteStream.ToArray();
-            MemoryStream archiveReadStream = new MemoryStream(archive);
-            TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
+        // Test created iar
+        byte[] archive = archiveWriteStream.ToArray();
+        MemoryStream archiveReadStream = new MemoryStream(archive);
+        TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
 
 //            InventoryArchiveUtils.
-            bool gotObjectsFolder = false;
+        bool gotObjectsFolder = false;
 
-            string objectsFolderName
-                = string.Format(
-                    "{0}{1}",
-                    ArchiveConstants.INVENTORY_PATH,
-                    InventoryArchiveWriteRequest.CreateArchiveFolderName(
-                        UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, userId, "Objects")));
-
-            string filePath;
-            TarArchiveReader.TarEntryType tarEntryType;
-
-            while (tar.ReadEntry(out filePath, out tarEntryType) != null)
-            {
-//                Console.WriteLine("Got {0}", filePath);
-
-                // Lazily, we only bother to look for the system objects folder created when we call CreateUserWithInventory()
-                // XXX: But really we need to stop all that stuff being created in tests or check for such folders
-                // more thoroughly
-                if (filePath == objectsFolderName)
-                    gotObjectsFolder = true;
-            }
-
-            Assert.True(gotObjectsFolder);
-        }
-
-        [Fact]
-        public void TestSaveNonRootFolderToIar()
-        {
-            TestHelpers.InMethod();
-//            TestHelpers.EnableLogging();
-
-            string userFirstName = "Jock";
-            string userLastName = "Stirrup";
-            string userPassword = "troll";
-            UUID userId = TestHelpers.ParseTail(0x20);
-
-            UserAccountHelpers.CreateUserWithInventory(m_scene, userFirstName, userLastName, userId, userPassword);
-
-            // Create base folder
-            InventoryFolderBase f1
-                = UserInventoryHelpers.CreateInventoryFolder(m_scene.InventoryService, userId, "f1", true);
-
-            // Create item1
-            SceneObjectGroup so1 = SceneHelpers.CreateSceneObject(1, userId, "My Little Dog Object", 0x5);
-            InventoryItemBase i1 = UserInventoryHelpers.AddInventoryItem(m_scene, so1, 0x50, 0x60, "f1");
-
-            // Create embedded folder
-            InventoryFolderBase f1_1
-                = UserInventoryHelpers.CreateInventoryFolder(m_scene.InventoryService, userId, "f1/f1.1", true);
-
-            // Create embedded item
-            SceneObjectGroup so1_1 = SceneHelpers.CreateSceneObject(1, userId, "My Little Cat Object", 0x6);
-            InventoryItemBase i2 = UserInventoryHelpers.AddInventoryItem(m_scene, so1_1, 0x500, 0x600, "f1/f1.1");
-
-            MemoryStream archiveWriteStream = new MemoryStream();
-            m_archiverModule.OnInventoryArchiveSaved += SaveCompleted;
-
-            mre.Reset();
-            m_archiverModule.ArchiveInventory(
-                UUID.Random(), userFirstName, userLastName, "f1", userPassword, archiveWriteStream);
-            mre.WaitOne(60000, false);
-
-            // Test created iar
-            byte[] archive = archiveWriteStream.ToArray();
-            MemoryStream archiveReadStream = new MemoryStream(archive);
-            TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
-
-//            InventoryArchiveUtils.
-            bool gotf1 = false, gotf1_1 = false, gotso1 = false, gotso2 = false;
-
-            string f1FileName
-                = string.Format("{0}{1}", ArchiveConstants.INVENTORY_PATH, InventoryArchiveWriteRequest.CreateArchiveFolderName(f1));
-            string f1_1FileName
-                = string.Format("{0}{1}", f1FileName, InventoryArchiveWriteRequest.CreateArchiveFolderName(f1_1));
-            string so1FileName
-                = string.Format("{0}{1}", f1FileName, InventoryArchiveWriteRequest.CreateArchiveItemName(i1));
-            string so2FileName
-                = string.Format("{0}{1}", f1_1FileName, InventoryArchiveWriteRequest.CreateArchiveItemName(i2));
-
-            string filePath;
-            TarArchiveReader.TarEntryType tarEntryType;
-
-            while (tar.ReadEntry(out filePath, out tarEntryType) != null)
-            {
-//                Console.WriteLine("Got {0}", filePath);
-
-                if (filePath == f1FileName)
-                    gotf1 = true;
-                else if (filePath == f1_1FileName)
-                    gotf1_1 = true;
-                else if (filePath == so1FileName)
-                    gotso1 = true;
-                else if (filePath == so2FileName)
-                    gotso2 = true;
-            }
-
-//            Assert.True(gotControlFile);
-            Assert.True(gotf1);
-            Assert.True(gotf1_1);
-            Assert.True(gotso1);
-            Assert.True(gotso2);
-
-            // TODO: Test presence of more files and contents of files.
-        }
-
-        /// <summary>
-        /// Test saving a single inventory item to an IAR
-        /// (subject to change since there is no fixed format yet).
-        /// </summary>
-        [Fact]
-        public void TestSaveItemToIar()
-        {
-            TestHelpers.InMethod();
-//            TestHelpers.EnableLogging();
-
-            // Create user
-            string userFirstName = "Jock";
-            string userLastName = "Stirrup";
-            string userPassword = "troll";
-            UUID userId = UUID.Parse("00000000-0000-0000-0000-000000000020");
-            UserAccountHelpers.CreateUserWithInventory(m_scene, userFirstName, userLastName, userId, userPassword);
-
-            // Create asset
-            UUID ownerId = UUID.Parse("00000000-0000-0000-0000-000000000040");
-            SceneObjectGroup object1 = SceneHelpers.CreateSceneObject(1, ownerId, "My Little Dog Object", 0x50);
-
-            UUID asset1Id = UUID.Parse("00000000-0000-0000-0000-000000000060");
-            AssetBase asset1 = AssetHelpers.CreateAsset(asset1Id, object1);
-            m_scene.AssetService.Store(asset1);
-
-            // Create item
-            UUID item1Id = UUID.Parse("00000000-0000-0000-0000-000000000080");
-            string item1Name = "My Little Dog";
-            InventoryItemBase item1 = new InventoryItemBase();
-            item1.Name = item1Name;
-            item1.AssetID = asset1.FullID;
-            item1.ID = item1Id;
-            InventoryFolderBase objsFolder
-                = InventoryArchiveUtils.FindFoldersByPath(m_scene.InventoryService, userId, "Objects")[0];
-            item1.Folder = objsFolder.ID;
-            m_scene.AddInventoryItem(item1);
-
-            MemoryStream archiveWriteStream = new MemoryStream();
-            m_archiverModule.OnInventoryArchiveSaved += SaveCompleted;
-
-            mre.Reset();
-            m_archiverModule.ArchiveInventory(
-                UUID.Random(), userFirstName, userLastName, "Objects/" + item1Name, userPassword, archiveWriteStream);
-            mre.WaitOne(60000, false);
-
-            byte[] archive = archiveWriteStream.ToArray();
-            MemoryStream archiveReadStream = new MemoryStream(archive);
-            TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
-
-            //bool gotControlFile = false;
-            bool gotObject1File = false;
-            //bool gotObject2File = false;
-            string expectedObject1FileName = InventoryArchiveWriteRequest.CreateArchiveItemName(item1);
-            string expectedObject1FilePath = string.Format(
+        string objectsFolderName
+            = string.Format(
                 "{0}{1}",
                 ArchiveConstants.INVENTORY_PATH,
-                expectedObject1FileName);
+                InventoryArchiveWriteRequest.CreateArchiveFolderName(
+                    UserInventoryHelpers.GetInventoryFolder(m_scene.InventoryService, userId, "Objects")));
 
-            string filePath;
-            TarArchiveReader.TarEntryType tarEntryType;
+        string filePath;
+        TarArchiveReader.TarEntryType tarEntryType;
+
+        while (tar.ReadEntry(out filePath, out tarEntryType) != null)
+        {
+//                Console.WriteLine("Got {0}", filePath);
+
+            // Lazily, we only bother to look for the system objects folder created when we call CreateUserWithInventory()
+            // XXX: But really we need to stop all that stuff being created in tests or check for such folders
+            // more thoroughly
+            if (filePath == objectsFolderName)
+                gotObjectsFolder = true;
+        }
+
+        Assert.True(gotObjectsFolder);
+    }
+
+    [Fact]
+    public void TestSaveNonRootFolderToIar()
+    {
+        TestHelpers.InMethod();
+//            TestHelpers.EnableLogging();
+
+        string userFirstName = "Jock";
+        string userLastName = "Stirrup";
+        string userPassword = "troll";
+        UUID userId = TestHelpers.ParseTail(0x20);
+
+        UserAccountHelpers.CreateUserWithInventory(m_scene, userFirstName, userLastName, userId, userPassword);
+
+        // Create base folder
+        InventoryFolderBase f1
+            = UserInventoryHelpers.CreateInventoryFolder(m_scene.InventoryService, userId, "f1", true);
+
+        // Create item1
+        SceneObjectGroup so1 = SceneHelpers.CreateSceneObject(1, userId, "My Little Dog Object", 0x5);
+        InventoryItemBase i1 = UserInventoryHelpers.AddInventoryItem(m_scene, so1, 0x50, 0x60, "f1");
+
+        // Create embedded folder
+        InventoryFolderBase f1_1
+            = UserInventoryHelpers.CreateInventoryFolder(m_scene.InventoryService, userId, "f1/f1.1", true);
+
+        // Create embedded item
+        SceneObjectGroup so1_1 = SceneHelpers.CreateSceneObject(1, userId, "My Little Cat Object", 0x6);
+        InventoryItemBase i2 = UserInventoryHelpers.AddInventoryItem(m_scene, so1_1, 0x500, 0x600, "f1/f1.1");
+
+        MemoryStream archiveWriteStream = new MemoryStream();
+        m_archiverModule.OnInventoryArchiveSaved += SaveCompleted;
+
+        mre.Reset();
+        m_archiverModule.ArchiveInventory(
+            UUID.Random(), userFirstName, userLastName, "f1", userPassword, archiveWriteStream);
+        mre.WaitOne(60000, false);
+
+        // Test created iar
+        byte[] archive = archiveWriteStream.ToArray();
+        MemoryStream archiveReadStream = new MemoryStream(archive);
+        TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
+
+//            InventoryArchiveUtils.
+        bool gotf1 = false, gotf1_1 = false, gotso1 = false, gotso2 = false;
+
+        string f1FileName
+            = string.Format("{0}{1}", ArchiveConstants.INVENTORY_PATH, InventoryArchiveWriteRequest.CreateArchiveFolderName(f1));
+        string f1_1FileName
+            = string.Format("{0}{1}", f1FileName, InventoryArchiveWriteRequest.CreateArchiveFolderName(f1_1));
+        string so1FileName
+            = string.Format("{0}{1}", f1FileName, InventoryArchiveWriteRequest.CreateArchiveItemName(i1));
+        string so2FileName
+            = string.Format("{0}{1}", f1_1FileName, InventoryArchiveWriteRequest.CreateArchiveItemName(i2));
+
+        string filePath;
+        TarArchiveReader.TarEntryType tarEntryType;
+
+        while (tar.ReadEntry(out filePath, out tarEntryType) != null)
+        {
+//                Console.WriteLine("Got {0}", filePath);
+
+            if (filePath == f1FileName)
+                gotf1 = true;
+            else if (filePath == f1_1FileName)
+                gotf1_1 = true;
+            else if (filePath == so1FileName)
+                gotso1 = true;
+            else if (filePath == so2FileName)
+                gotso2 = true;
+        }
+
+//            Assert.True(gotControlFile);
+        Assert.True(gotf1);
+        Assert.True(gotf1_1);
+        Assert.True(gotso1);
+        Assert.True(gotso2);
+
+        // TODO: Test presence of more files and contents of files.
+    }
+
+    /// <summary>
+    /// Test saving a single inventory item to an IAR
+    /// (subject to change since there is no fixed format yet).
+    /// </summary>
+    [Fact]
+    public void TestSaveItemToIar()
+    {
+        TestHelpers.InMethod();
+//            TestHelpers.EnableLogging();
+
+        // Create user
+        string userFirstName = "Jock";
+        string userLastName = "Stirrup";
+        string userPassword = "troll";
+        UUID userId = UUID.Parse("00000000-0000-0000-0000-000000000020");
+        UserAccountHelpers.CreateUserWithInventory(m_scene, userFirstName, userLastName, userId, userPassword);
+
+        // Create asset
+        UUID ownerId = UUID.Parse("00000000-0000-0000-0000-000000000040");
+        SceneObjectGroup object1 = SceneHelpers.CreateSceneObject(1, ownerId, "My Little Dog Object", 0x50);
+
+        UUID asset1Id = UUID.Parse("00000000-0000-0000-0000-000000000060");
+        AssetBase asset1 = AssetHelpers.CreateAsset(asset1Id, object1);
+        m_scene.AssetService.Store(asset1);
+
+        // Create item
+        UUID item1Id = UUID.Parse("00000000-0000-0000-0000-000000000080");
+        string item1Name = "My Little Dog";
+        InventoryItemBase item1 = new InventoryItemBase();
+        item1.Name = item1Name;
+        item1.AssetID = asset1.FullID;
+        item1.ID = item1Id;
+        InventoryFolderBase objsFolder
+            = InventoryArchiveUtils.FindFoldersByPath(m_scene.InventoryService, userId, "Objects")[0];
+        item1.Folder = objsFolder.ID;
+        m_scene.AddInventoryItem(item1);
+
+        MemoryStream archiveWriteStream = new MemoryStream();
+        m_archiverModule.OnInventoryArchiveSaved += SaveCompleted;
+
+        mre.Reset();
+        m_archiverModule.ArchiveInventory(
+            UUID.Random(), userFirstName, userLastName, "Objects/" + item1Name, userPassword, archiveWriteStream);
+        mre.WaitOne(60000, false);
+
+        byte[] archive = archiveWriteStream.ToArray();
+        MemoryStream archiveReadStream = new MemoryStream(archive);
+        TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
+
+        //bool gotControlFile = false;
+        bool gotObject1File = false;
+        //bool gotObject2File = false;
+        string expectedObject1FileName = InventoryArchiveWriteRequest.CreateArchiveItemName(item1);
+        string expectedObject1FilePath = string.Format(
+            "{0}{1}",
+            ArchiveConstants.INVENTORY_PATH,
+            expectedObject1FileName);
+
+        string filePath;
+        TarArchiveReader.TarEntryType tarEntryType;
 
 //            Console.WriteLine("Reading archive");
 
-            while (tar.ReadEntry(out filePath, out tarEntryType) != null)
-            {
-                Console.WriteLine("Got {0}", filePath);
+        while (tar.ReadEntry(out filePath, out tarEntryType) != null)
+        {
+            Console.WriteLine("Got {0}", filePath);
 
 //                if (ArchiveConstants.CONTROL_FILE_PATH == filePath)
 //                {
 //                    gotControlFile = true;
 //                }
 
-                if (filePath.StartsWith(ArchiveConstants.INVENTORY_PATH) && filePath.EndsWith(".xml"))
-                {
+            if (filePath.StartsWith(ArchiveConstants.INVENTORY_PATH) && filePath.EndsWith(".xml"))
+            {
 //                    string fileName = filePath.Remove(0, "Objects/".Length);
 //
 //                    if (fileName.StartsWith(part1.Name))
 //                    {
-                        // TODO: Assert.Equal(,); - incomplete assertion
-                        gotObject1File = true;
+                    // TODO: Assert.Equal(,); - incomplete assertion
+                    gotObject1File = true;
 //                    }
 //                    else if (fileName.StartsWith(part2.Name))
 //                    {
 //                        Assert.Equal(,);
 //                        gotObject2File = true;
 //                    }
-                }
             }
-
-//            Assert.True(gotControlFile);
-            Assert.True(gotObject1File);
-//            Assert.True(gotObject2File);
-
-            // TODO: Test presence of more files and contents of files.
         }
 
-        /// <summary>
-        /// Test saving a single inventory item to an IAR without its asset
-        /// </summary>
-        [Fact]
-        public void TestSaveItemToIarNoAssets()
-        {
-            TestHelpers.InMethod();
+//            Assert.True(gotControlFile);
+        Assert.True(gotObject1File);
+//            Assert.True(gotObject2File);
+
+        // TODO: Test presence of more files and contents of files.
+    }
+
+    /// <summary>
+    /// Test saving a single inventory item to an IAR without its asset
+    /// </summary>
+    [Fact]
+    public void TestSaveItemToIarNoAssets()
+    {
+        TestHelpers.InMethod();
 //            TestHelpers.EnableLogging();
 
-            // Create user
-            string userFirstName = "Jock";
-            string userLastName = "Stirrup";
-            string userPassword = "troll";
-            UUID userId = UUID.Parse("00000000-0000-0000-0000-000000000020");
-            UserAccountHelpers.CreateUserWithInventory(m_scene, userFirstName, userLastName, userId, userPassword);
+        // Create user
+        string userFirstName = "Jock";
+        string userLastName = "Stirrup";
+        string userPassword = "troll";
+        UUID userId = UUID.Parse("00000000-0000-0000-0000-000000000020");
+        UserAccountHelpers.CreateUserWithInventory(m_scene, userFirstName, userLastName, userId, userPassword);
 
-            // Create asset
-            UUID ownerId = UUID.Parse("00000000-0000-0000-0000-000000000040");
-            SceneObjectGroup object1 = SceneHelpers.CreateSceneObject(1, ownerId, "My Little Dog Object", 0x50);
+        // Create asset
+        UUID ownerId = UUID.Parse("00000000-0000-0000-0000-000000000040");
+        SceneObjectGroup object1 = SceneHelpers.CreateSceneObject(1, ownerId, "My Little Dog Object", 0x50);
 
-            UUID asset1Id = UUID.Parse("00000000-0000-0000-0000-000000000060");
-            AssetBase asset1 = AssetHelpers.CreateAsset(asset1Id, object1);
-            m_scene.AssetService.Store(asset1);
+        UUID asset1Id = UUID.Parse("00000000-0000-0000-0000-000000000060");
+        AssetBase asset1 = AssetHelpers.CreateAsset(asset1Id, object1);
+        m_scene.AssetService.Store(asset1);
 
-            // Create item
-            UUID item1Id = UUID.Parse("00000000-0000-0000-0000-000000000080");
-            string item1Name = "My Little Dog";
-            InventoryItemBase item1 = new InventoryItemBase();
-            item1.Name = item1Name;
-            item1.AssetID = asset1.FullID;
-            item1.ID = item1Id;
-            InventoryFolderBase objsFolder
-                = InventoryArchiveUtils.FindFoldersByPath(m_scene.InventoryService, userId, "Objects")[0];
-            item1.Folder = objsFolder.ID;
-            m_scene.AddInventoryItem(item1);
+        // Create item
+        UUID item1Id = UUID.Parse("00000000-0000-0000-0000-000000000080");
+        string item1Name = "My Little Dog";
+        InventoryItemBase item1 = new InventoryItemBase();
+        item1.Name = item1Name;
+        item1.AssetID = asset1.FullID;
+        item1.ID = item1Id;
+        InventoryFolderBase objsFolder
+            = InventoryArchiveUtils.FindFoldersByPath(m_scene.InventoryService, userId, "Objects")[0];
+        item1.Folder = objsFolder.ID;
+        m_scene.AddInventoryItem(item1);
 
-            MemoryStream archiveWriteStream = new MemoryStream();
+        MemoryStream archiveWriteStream = new MemoryStream();
 
-            Dictionary<string, Object> options = new Dictionary<string, Object>();
-            options.Add("noassets", true);
+        Dictionary<string, Object> options = new Dictionary<string, Object>();
+        options.Add("noassets", true);
 
-            // When we're not saving assets, archiving is being done synchronously.
-            m_archiverModule.ArchiveInventory(
-                UUID.Random(), userFirstName, userLastName, "Objects/" + item1Name, userPassword, archiveWriteStream, options);
+        // When we're not saving assets, archiving is being done synchronously.
+        m_archiverModule.ArchiveInventory(
+            UUID.Random(), userFirstName, userLastName, "Objects/" + item1Name, userPassword, archiveWriteStream, options);
 
-            byte[] archive = archiveWriteStream.ToArray();
-            MemoryStream archiveReadStream = new MemoryStream(archive);
-            TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
+        byte[] archive = archiveWriteStream.ToArray();
+        MemoryStream archiveReadStream = new MemoryStream(archive);
+        TarArchiveReader tar = new TarArchiveReader(archiveReadStream);
 
-            //bool gotControlFile = false;
-            bool gotObject1File = false;
-            //bool gotObject2File = false;
-            string expectedObject1FileName = InventoryArchiveWriteRequest.CreateArchiveItemName(item1);
-            string expectedObject1FilePath = string.Format(
-                "{0}{1}",
-                ArchiveConstants.INVENTORY_PATH,
-                expectedObject1FileName);
+        //bool gotControlFile = false;
+        bool gotObject1File = false;
+        //bool gotObject2File = false;
+        string expectedObject1FileName = InventoryArchiveWriteRequest.CreateArchiveItemName(item1);
+        string expectedObject1FilePath = string.Format(
+            "{0}{1}",
+            ArchiveConstants.INVENTORY_PATH,
+            expectedObject1FileName);
 
-            string filePath;
-            TarArchiveReader.TarEntryType tarEntryType;
+        string filePath;
+        TarArchiveReader.TarEntryType tarEntryType;
 
 //            Console.WriteLine("Reading archive");
 
-            while (tar.ReadEntry(out filePath, out tarEntryType) != null)
-            {
-                Console.WriteLine("Got {0}", filePath);
+        while (tar.ReadEntry(out filePath, out tarEntryType) != null)
+        {
+            Console.WriteLine("Got {0}", filePath);
 
 //                if (ArchiveConstants.CONTROL_FILE_PATH == filePath)
 //                {
 //                    gotControlFile = true;
 //                }
 
-                if (filePath.StartsWith(ArchiveConstants.INVENTORY_PATH) && filePath.EndsWith(".xml"))
-                {
+            if (filePath.StartsWith(ArchiveConstants.INVENTORY_PATH) && filePath.EndsWith(".xml"))
+            {
 //                    string fileName = filePath.Remove(0, "Objects/".Length);
 //
 //                    if (fileName.StartsWith(part1.Name))
 //                    {
-                        // TODO: Assert.Equal(,); - incomplete assertion
-                        gotObject1File = true;
+                    // TODO: Assert.Equal(,); - incomplete assertion
+                    gotObject1File = true;
 //                    }
 //                    else if (fileName.StartsWith(part2.Name))
 //                    {
 //                        Assert.Equal(,);
 //                        gotObject2File = true;
 //                    }
-                }
-                else if (filePath.StartsWith(ArchiveConstants.ASSETS_PATH))
-                {
-                    Assert.Fail("Found asset path in TestSaveItemToIarNoAssets()");
-                }
             }
+            else if (filePath.StartsWith(ArchiveConstants.ASSETS_PATH))
+            {
+                Assert.Fail("Found asset path in TestSaveItemToIarNoAssets()");
+            }
+        }
 
 //            Assert.True(gotControlFile);
-            Assert.True(gotObject1File);
+        Assert.True(gotObject1File);
 //            Assert.True(gotObject2File);
 
-            // TODO: Test presence of more files and contents of files.
-        }
+        // TODO: Test presence of more files and contents of files.
     }
 }

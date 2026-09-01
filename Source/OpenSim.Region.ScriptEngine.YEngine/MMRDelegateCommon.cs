@@ -25,97 +25,94 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 
-namespace OpenSim.Region.ScriptEngine.Yengine
+namespace OpenSim.Region.ScriptEngine.Yengine;
+
+
+public class DelegateCommon
 {
+    private string sig;  // rettype(arg1type,arg2type,...), eg, "void(list,string,integer)"
+    private Type type;   // resultant delegate type
 
-    public class DelegateCommon
+    private readonly static Dictionary<string, DelegateCommon> delegateCommons = new();
+    private readonly static Dictionary<Type, DelegateCommon> delegateCommonsBySysType = new();
+    private static ModuleBuilder delegateModuleBuilder = null;
+    public static Type[] constructorArgTypes = new Type[] { typeof(object), typeof(IntPtr) };
+
+    private DelegateCommon()
     {
-        private string sig;  // rettype(arg1type,arg2type,...), eg, "void(list,string,integer)"
-        private Type type;   // resultant delegate type
+    }
 
-        private readonly static Dictionary<string, DelegateCommon> delegateCommons = new();
-        private readonly static Dictionary<Type, DelegateCommon> delegateCommonsBySysType = new();
-        private static ModuleBuilder delegateModuleBuilder = null;
-        public static Type[] constructorArgTypes = new Type[] { typeof(object), typeof(IntPtr) };
-
-        private DelegateCommon()
+    public static Type GetType(System.Type ret, System.Type[] args, string sig)
+    {
+        DelegateCommon dc;
+        lock(delegateCommons)
         {
-        }
-
-        public static Type GetType(System.Type ret, System.Type[] args, string sig)
-        {
-            DelegateCommon dc;
-            lock(delegateCommons)
+            if(!delegateCommons.TryGetValue(sig, out dc))
             {
-                if(!delegateCommons.TryGetValue(sig, out dc))
+                dc = new DelegateCommon
                 {
-                    dc = new DelegateCommon
-                    {
-                        sig = sig,
-                        type = CreateDelegateType(sig, ret, args)
-                    };
-                    delegateCommons.Add(sig, dc);
-                    delegateCommonsBySysType.Add(dc.type, dc);
-                }
-            }
-            return dc.type;
-        }
-
-        public static Type TryGetType(string sig)
-        {
-            DelegateCommon dc;
-            lock(delegateCommons)
-            {
-                if(!delegateCommons.TryGetValue(sig, out dc))
-                    dc = null;
-            }
-            return dc?.type;
-        }
-
-        public static string TryGetName(Type t)
-        {
-            DelegateCommon dc;
-            lock(delegateCommons)
-            {
-                if(!delegateCommonsBySysType.TryGetValue(t, out dc))
-                    dc = null;
-            }
-            return dc?.sig;
-        }
-
-        // http://blog.bittercoder.com/PermaLink,guid,a770377a-b1ad-4590-9145-36381757a52b.aspx
-        private static Type CreateDelegateType(string name, Type retType, Type[] argTypes)
-        {
-            if(delegateModuleBuilder == null)
-            {
-                AssemblyName assembly = new()
-                {
-                    Name = "CustomDelegateAssembly"
+                    sig = sig,
+                    type = CreateDelegateType(sig, ret, args)
                 };
-                AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assembly, AssemblyBuilderAccess.RunAndCollect);
-                delegateModuleBuilder = assemblyBuilder.DefineDynamicModule("CustomDelegateModule");
+                delegateCommons.Add(sig, dc);
+                delegateCommonsBySysType.Add(dc.type, dc);
             }
-
-            TypeBuilder typeBuilder = delegateModuleBuilder.DefineType(name,
-                TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Class |
-                TypeAttributes.AnsiClass | TypeAttributes.AutoClass, typeof(MulticastDelegate));
-
-            ConstructorBuilder constructorBuilder = typeBuilder.DefineConstructor(
-                MethodAttributes.RTSpecialName | MethodAttributes.HideBySig | MethodAttributes.Public,
-                CallingConventions.Standard, constructorArgTypes);
-            constructorBuilder.SetImplementationFlags(MethodImplAttributes.Runtime | MethodImplAttributes.Managed);
-
-            MethodBuilder methodBuilder = typeBuilder.DefineMethod("Invoke",
-                MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot |
-                MethodAttributes.Virtual, retType, argTypes);
-            methodBuilder.SetImplementationFlags(MethodImplAttributes.Managed | MethodImplAttributes.Runtime);
-
-            return typeBuilder.CreateType();
         }
+        return dc.type;
+    }
+
+    public static Type TryGetType(string sig)
+    {
+        DelegateCommon dc;
+        lock(delegateCommons)
+        {
+            if(!delegateCommons.TryGetValue(sig, out dc))
+                dc = null;
+        }
+        return dc?.type;
+    }
+
+    public static string TryGetName(Type t)
+    {
+        DelegateCommon dc;
+        lock(delegateCommons)
+        {
+            if(!delegateCommonsBySysType.TryGetValue(t, out dc))
+                dc = null;
+        }
+        return dc?.sig;
+    }
+
+    // http://blog.bittercoder.com/PermaLink,guid,a770377a-b1ad-4590-9145-36381757a52b.aspx
+    private static Type CreateDelegateType(string name, Type retType, Type[] argTypes)
+    {
+        if(delegateModuleBuilder == null)
+        {
+            AssemblyName assembly = new()
+            {
+                Name = "CustomDelegateAssembly"
+            };
+            AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assembly, AssemblyBuilderAccess.RunAndCollect);
+            delegateModuleBuilder = assemblyBuilder.DefineDynamicModule("CustomDelegateModule");
+        }
+
+        TypeBuilder typeBuilder = delegateModuleBuilder.DefineType(name,
+            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.Class |
+            TypeAttributes.AnsiClass | TypeAttributes.AutoClass, typeof(MulticastDelegate));
+
+        ConstructorBuilder constructorBuilder = typeBuilder.DefineConstructor(
+            MethodAttributes.RTSpecialName | MethodAttributes.HideBySig | MethodAttributes.Public,
+            CallingConventions.Standard, constructorArgTypes);
+        constructorBuilder.SetImplementationFlags(MethodImplAttributes.Runtime | MethodImplAttributes.Managed);
+
+        MethodBuilder methodBuilder = typeBuilder.DefineMethod("Invoke",
+            MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot |
+            MethodAttributes.Virtual, retType, argTypes);
+        methodBuilder.SetImplementationFlags(MethodImplAttributes.Managed | MethodImplAttributes.Runtime);
+
+        return typeBuilder.CreateType();
     }
 }

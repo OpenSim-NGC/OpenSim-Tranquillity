@@ -1,5 +1,8 @@
 = The Quick Guide to OpenSim Unit Testing = 
 
+For build instructions, see Docs/BUILDING.md.
+For project overview and operational guidance, see README.md.
+
 == Running Tests ==
 
 On Linux you will need to have NUnit installed (http://www.nunit.org).
@@ -72,3 +75,31 @@ nunit-console OpenSim.Framework.Tests.dll (on windows)
 
 See the file OpenSim/Data/Tests/Resources/TestDataConnections.ini
 for information to setup testing for data
+
+== YEngine State-Load Telemetry (Phase 1.5) ==
+
+When testing script state restore/reset compatibility in live regions, YEngine can
+report aggregate state-load failure reasons.
+
+=== Configuration ===
+
+In the [YEngine] section:
+
+    StateLoadMetricsEnabled = true
+    StateLoadMetricsPeriodic = true
+
+With periodic metrics enabled, summary lines are emitted during maintenance
+cycles (MaintenanceInterval) only when totals change.
+
+=== Console Commands ===
+
+Use region console commands to inspect and reset counters:
+
+    yeng stateload show
+    yeng stateload reset
+
+Suggested workflow for test systems:
+
+1. Run `yeng stateload reset` before a test scenario.
+2. Execute teleport/crossing/restart scenarios that may trigger state restore.
+3. Run `yeng stateload show` and collect resulting reason counters.
