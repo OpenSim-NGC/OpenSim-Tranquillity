@@ -290,8 +290,8 @@ public class RemoteAdminPlugin : IApplicationPlugin
             responseData["accepted"] = true;
             responseData["rebooting"] = true;
 
-            string message;
-            List<int> times = new List<int>();
+            int timeout = 30;
+            bool cancel = false;
 
             if (requestData.ContainsKey("alerts"))
             {
@@ -299,55 +299,43 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 if (alertTimes.Length == 1 && Convert.ToInt32(alertTimes[0]) == -1)
                 {
                     m_log.LogInformation("[RADMIN]: Request to cancel restart.");
-
-                    if (restartModule != null)
+                    cancel = true;
+                }
+                else
+                {
+                    timeout = 0;
+                    foreach (string a in alertTimes)
                     {
-                        message = "Restart has been cancelled";
-
-                        if (requestData.ContainsKey("message"))
-                            message = requestData["message"].ToString();
-
-                        restartModule.AbortRestart(message);
-
-                        responseData["success"] = true;
-                        responseData["rebooting"] = false;
-
-                        return;
+                        timeout += Convert.ToInt32(a);
                     }
                 }
-                foreach (string a in alertTimes)
-                    times.Add(Convert.ToInt32(a));
             }
             else
             {
-                int timeout = 30;
                 if (requestData.ContainsKey("milliseconds"))
-                    timeout = Int32.Parse(requestData["milliseconds"].ToString()) / 1000;
-                while (timeout > 0)
                 {
-                    times.Add(timeout);
-                    if (timeout > 300)
-                        timeout -= 120;
-                    else if (timeout > 30)
-                        timeout -= 30;
+                    int milliseconds = Int32.Parse(requestData["milliseconds"].ToString());
+                    if (milliseconds == -1)
+                    {
+                        m_log.LogInformation("[RADMIN]: Request to cancel restart.");
+                        cancel = true;
+                    }
                     else
-                        timeout -= 15;
+                    {
+                        timeout = milliseconds / 1000;
+                    }
                 }
             }
 
-            m_log.LogInformation("[RADMIN]: Request to restart Region.");
-
-            message = "Region is restarting in {0}. Please save what you are doing and log out.";
-
-            if (requestData.ContainsKey("message"))
-                message = requestData["message"].ToString();
-
-            bool notice = true;
-            if (requestData.ContainsKey("noticetype")
-                && ((string)requestData["noticetype"] == "dialog"))
+            if (restartModule != null && cancel)
             {
-                notice = false;
+                restartModule.AbortRestart("Region restart has been aborted\n");
+                responseData["success"] = true;
+                responseData["rebooting"] = false;
+                return; 
             }
+
+            m_log.LogInformation("[RADMIN]: Request to restart Region.");
 
             if (startupConfig.GetBoolean("SkipDelayOnEmptyRegion", false))
             {
@@ -379,9 +367,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 if (agents == 0)
                 {
                     m_log.LogInformation("[RADMIN]: No avatars detected, shutting down without delay");
-
-                    times.Clear();
-                    times.Add(0);
+                    timeout = 0;
                 }
             }
 
@@ -396,7 +382,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             {
                 restartModule = s.RequestModuleInterface<IRestartModule>();
                 if (restartModule != null)
-                    restartModule.ScheduleRestart(UUID.Zero, message, times.ToArray(), notice);
+                    restartModule.ScheduleRestart(UUID.Zero, timeout);
             }
             responseData["success"] = true;
         }

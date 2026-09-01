@@ -15,6 +15,11 @@
   </ItemGroup>
   
   <ItemGroup>
+    <ProjectReference Include="../../Addons/Gloebit.GloebitMoneyModule/Gloebit.GloebitMoneyModule.csproj" />
+    <ProjectReference Include="../../Addons/OpenSim.Addons.Groups/OpenSim.Addons.Groups.csproj" />
+    <ProjectReference Include="../../Addons/OpenSim.Addons.OfflineIM/OpenSim.Addons.OfflineIM.csproj" />
+    <ProjectReference Include="../../Addons/OpenSimMutelist/OpenSimMutelist.Modules.csproj" />
+    <ProjectReference Include="../../Addons/OpenSimSearch/OpenSimSearch.Modules.csproj" />
     <ProjectReference Include="../../Source/OpenSim.ApplicationPlugins.LoadRegions/OpenSim.ApplicationPlugins.LoadRegions.csproj" />
     <ProjectReference Include="../../Source/OpenSim.ApplicationPlugins.RegionModulesController/OpenSim.ApplicationPlugins.RegionModulesController.csproj" />
     <ProjectReference Include="../../Source/OpenSim.ApplicationPlugins.RemoteController/OpenSim.ApplicationPlugins.RemoteController.csproj" />

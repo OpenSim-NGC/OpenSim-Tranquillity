@@ -13,6 +13,7 @@ using Autofac;
 using Autofac.Extensions.DependencyInjection;
 
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -130,11 +131,17 @@ public static class Program
 
         builder.ConfigureAppConfiguration(configuration =>
         {
-            configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: true);
+
+            foreach (var source in configuration.Sources.OfType<JsonConfigurationSource>())
+            {
+                source.ReloadOnChange = false;
+            }
+            
+            configuration.AddIniFile(iniMaster, optional: true, reloadOnChange: false);
 
             foreach (var item in iniFile)
             {
-                configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+                configuration.AddIniFile(item, optional: true, reloadOnChange: false);
             }
 
             if (string.IsNullOrEmpty(iniDirectory) is false)
@@ -143,7 +150,7 @@ public static class Program
                 {
                     foreach (var item in Directory.GetFiles(iniDirectory, "*.ini"))
                     {
-                        configuration.AddIniFile(item, optional: true, reloadOnChange: true);
+                        configuration.AddIniFile(item, optional: true, reloadOnChange: false);
                     }
                 }
             }

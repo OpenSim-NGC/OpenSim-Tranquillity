@@ -762,23 +762,11 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                 return;
             }
 
-            List<int> times = new List<int>();
-            while (timeInSeconds > 0)
-            {
-                times.Add(timeInSeconds);
-                if (timeInSeconds > 300)
-                    timeInSeconds -= 120;
-                else if (timeInSeconds > 30)
-                    timeInSeconds -= 30;
-                else
-                    timeInSeconds -= 15;
-            }
-
-            restartModule.ScheduleRestart(UUID.Zero, "Region will restart in {0}", times.ToArray(), false);
-
             m_log.LogInformation(
                 "User {0} requested restart of region {1} in {2} seconds",
-                remoteClient.Name, Scene.Name, times.Count != 0 ? times[0] : 0);
+                remoteClient.Name, Scene.Name, timeInSeconds);
+                
+            restartModule.ScheduleRestart(UUID.Zero, timeInSeconds);
         }
     }
 
