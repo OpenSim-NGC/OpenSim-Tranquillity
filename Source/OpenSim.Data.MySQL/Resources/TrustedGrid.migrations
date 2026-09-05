@@ -1,0 +1,29 @@
+:VERSION 1         # --------------------------
+
+BEGIN;
+
+CREATE TABLE `hg_trusted_grids` (
+    `id`              CHAR(36)      NOT NULL,
+    `home_uri`        VARCHAR(255)  NOT NULL,
+    `public_key`      VARBINARY(32) DEFAULT NULL,
+    `key_fingerprint` CHAR(64)      NOT NULL DEFAULT '',
+    `tier`            TINYINT       NOT NULL DEFAULT 1,
+    `state`           TINYINT       NOT NULL DEFAULT 0,
+    `first_seen`      DATETIME      NOT NULL,
+    `last_seen`       DATETIME      NOT NULL,
+    `approved_by`     VARCHAR(64)   NOT NULL DEFAULT '',
+    `approved_at`     DATETIME      DEFAULT NULL,
+    `notes`           TEXT,
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `home_uri` (`home_uri`),
+    KEY `key_fingerprint` (`key_fingerprint`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+CREATE TABLE `hg_grid_aliases` (
+    `grid_id`   CHAR(36)     NOT NULL,
+    `alias_uri` VARCHAR(255) NOT NULL,
+    PRIMARY KEY (`alias_uri`),
+    KEY `grid_id` (`grid_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+COMMIT;

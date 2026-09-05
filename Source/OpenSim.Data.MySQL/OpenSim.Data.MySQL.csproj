@@ -25,6 +25,7 @@
     <EmbeddedResource Include="Resources/GridStore.migrations" />
     <EmbeddedResource Include="Resources/GridUserStore.migrations" />
     <EmbeddedResource Include="Resources/HGTravelStore.migrations" />
+    <EmbeddedResource Include="Resources/TrustedGrid.migrations" />
     <EmbeddedResource Include="Resources/IM_Store.migrations" />
     <EmbeddedResource Include="Resources/InventoryStore.migrations" />
     <EmbeddedResource Include="Resources/LogStore.migrations" />
