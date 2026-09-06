@@ -178,16 +178,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             if (engines.Length == 0)
                 return;
 
-            // HTTP and XMLRPC only need one pass across all engines
-            if (m_HttpRequest.TryGetValue(engines[0], out HttpRequest httpPlugin))
-                httpPlugin.CheckHttpRequests();
-
-            if (m_XmlRequest.TryGetValue(engines[0], out XmlRequest xmlPlugin))
-                xmlPlugin.CheckXMLRPCRequests();
-
-            // Sensors are per-engine
+            // HTTP, XMLRPC and Sensors are backed by per-region (INonSharedRegionModule)
+            // module instances, each with its own completed-request queue, so every
+            // engine (one per region) must be polled - checking only engines[0] leaves
+            // other regions' completed requests stuck in their queue forever.
             foreach (IScriptEngine engine in engines)
             {
+                if (m_HttpRequest.TryGetValue(engine, out HttpRequest httpPlugin))
+                    httpPlugin.CheckHttpRequests();
+
+                if (m_XmlRequest.TryGetValue(engine, out XmlRequest xmlPlugin))
+                    xmlPlugin.CheckXMLRPCRequests();
+
                 if (m_SensorRepeat.TryGetValue(engine, out SensorRepeat sensorPlugin))
                     sensorPlugin.CheckSenseRepeaterEvents();
             }
