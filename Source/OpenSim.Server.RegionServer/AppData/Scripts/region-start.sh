@@ -6,6 +6,8 @@ set -o errexit -o pipefail -o noclobber -o nounset
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BASE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
+export SERVER_NAME="$(hostname -f)"
+
 # handle non-option arguments
 if [[ $# -ne 1 ]]; then
     echo "$0: A region name is required."
@@ -14,13 +16,13 @@ fi
 
 export REGIONNAME=$1
 
-export SERVER_NAME="$(hostname -f)"
 export CONSOLE="local"
 export BINDIR="$BASE_DIR"
 export CONFIGDIR="${CONFIGDIR:-$HOME/config}"
 export DATADIR="${DATADIR:-$HOME/data}"
 export LOGDIR="${LOGDIR:-$HOME/data/log}"
-export REGIONCONFIG="${REGIONCONFIG:-${CONFIGDIR}/regions/${REGIONNAME}}"
+export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/RegionServer.ini}"
+export DEFAULTCONFIG="${DEFAULTCONFIG:-${BINDIR}/OpenSimDefaults.ini}"
 
 if [ ! -d $BINDIR ]; then
     echo "Runtime directory $BINDIR does not exist!"
@@ -32,23 +34,35 @@ if [ ! -d $CONFIGDIR ]; then
     exit 2
 fi
 
-if [ ! -d $REGIONCONFIG ]; then
-    echo "Cannot find region configuration directory $REGIONCONFIG"
+if [ ! -d $DATADIR ]; then
+    echo "Cannot find data directory $DATADIR"
     exit 2
 fi
 
-export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/RegionServer.ini}"
-export LOGCONFIG="${LOGCONFIG:-${REGIONCONFIG}/RegionServer.dll.config}"
-export DEFAULTCONFIG="${DEFAULTCONFIG:-${BINDIR}/OpenSimDefaults.ini}"
-
-if [ ! -d $REGIONCONFIG ]; then
-    echo "Region configuration $REGIONCONFIG not found!"
+if [ ! -d $LOGDIR ]; then
+    echo "Cannot find log directory $LOGDIR"
     exit 2
 fi
 
-echo "Starting Region $REGIONNAME in directory $BINDIR with config $REGIONCONFIG Logs at ${LOGDIR}."
+if [ ! -f $CONFIGFILE ]; then
+    echo "Cannot find Region Config File $CONFIGFILE"
+    exit 2
+fi
 
-CMDARGS="--inimaster $DEFAULTCONFIG --inifile $CONFIGFILE --inidirectory $REGIONCONFIG --console $CONSOLE --logconfig ${LOGCONFIG}"
+if [ ! -f $DEFAULTCONFIG ]; then
+    echo "Cannot find Region Default Configuration $DEFAULTCONFIG"
+    exit 2
+fi
+
+export REGIONDIR="${REGIONDIR:-${CONFIGDIR}/regions/${REGIONNAME}}"
+export LOGCONFIG="${LOGCONFIG:-${REGIONDIR}/RegionServer.dll.config}"
+
+if [ ! -d $REGIONDIR ]; then
+    echo "Region configuration at $REGIONDIR not found!"
+    exit 2
+fi
+
+CMDARGS="--inimaster $DEFAULTCONFIG --inifile $CONFIGFILE --inidirectory $REGIONDIR --console $CONSOLE --logconfig ${LOGCONFIG}"
 
 (cd ${BINDIR} && screen -S "${REGIONNAME}" -d -m dotnet OpenSim.Server.RegionServer.dll ${CMDARGS})
 

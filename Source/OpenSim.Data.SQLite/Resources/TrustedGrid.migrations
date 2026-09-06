@@ -1,0 +1,31 @@
+:VERSION 1
+
+BEGIN TRANSACTION;
+
+CREATE TABLE hg_trusted_grids (
+    id              CHAR(36)     NOT NULL,
+    home_uri        VARCHAR(255) NOT NULL,
+    public_key      BLOB         DEFAULT NULL,
+    key_fingerprint CHAR(64)     NOT NULL DEFAULT '',
+    tier            TINYINT      NOT NULL DEFAULT 1,
+    state           TINYINT      NOT NULL DEFAULT 0,
+    first_seen      DATETIME     NOT NULL,
+    last_seen       DATETIME     NOT NULL,
+    approved_by     VARCHAR(64)  NOT NULL DEFAULT '',
+    approved_at     DATETIME     DEFAULT NULL,
+    notes           TEXT,
+    PRIMARY KEY (id),
+    UNIQUE (home_uri)
+);
+
+CREATE INDEX hg_trusted_grids_fingerprint ON hg_trusted_grids (key_fingerprint);
+
+CREATE TABLE hg_grid_aliases (
+    grid_id   CHAR(36)     NOT NULL,
+    alias_uri VARCHAR(255) NOT NULL,
+    PRIMARY KEY (alias_uri)
+);
+
+CREATE INDEX hg_grid_aliases_grid_id ON hg_grid_aliases (grid_id);
+
+COMMIT;

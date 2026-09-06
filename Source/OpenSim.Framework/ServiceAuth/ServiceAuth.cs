@@ -53,6 +53,13 @@ public class ServiceAuth
             case "BasicHttpAuthentication":
                 compoundAuth.AddAuthenticator(new BasicHttpAuthentication(config, section));
                 break;
+
+            case "TrustedGridAuthentication":
+                // Design Brief §6 / ADR-005: rejects only Blocked-tier callers. In Slice 2 no grid
+                // can be Blocked, so this is inert. Verification is done separately by
+                // GridSignatureVerifier and never rejects.
+                compoundAuth.AddAuthenticator(new TrustedGridAuthentication());
+                break;
         }
 
 //            foreach (IServiceAuth auth in compoundAuth.GetAuthentors())

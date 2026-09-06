@@ -231,6 +231,37 @@
     ;; entries can be unsecure url (host:port) if using ssl, direct login url if different, old grid url, etc
     ; GatekeeperURIAlias = "login.osgrid.org"
 
+[TrustedHypergrid]
+    ;# {Enabled} {} {Enable Trusted Hypergrid grid-to-grid trust?} {true false} false
+    ;; Trusted Hypergrid adds a signed identity to outbound Hypergrid calls and classifies
+    ;; inbound ones. It produces attribution and revocation, NOT prevention (ADR-008): a modified
+    ;; viewer defeats all server-side control for anything rendered on screen.
+    ;; When false (the default), no signing, no verification and no key load happen — behaviour is
+    ;; byte-identical to stock OpenSimulator. Unsigned and unverifiable callers are always accepted
+    ;; (Open tier); this never refuses a stock grid (ADR-005).
+    ; Enabled = false
+
+    ;# {PrivateKeyFile} {Enabled} {File holding this grid's Ed25519 private key (hex)} {} TrustedHypergridSecret.ini
+    ;; Stored OUTSIDE version control (see .gitignore) following the DirectDeliverySecret.ini pattern,
+    ;; as [TrustedHypergrid] PrivateKey = <hex>. Auto-generated on first run when Enabled=true and the
+    ;; file is absent; the fingerprint is logged at INFO on generation and on load. Never in the
+    ;; database, never committed. To share the file via config include, add an Include- line, e.g.:
+    ;;   Include-TrustedHypergrid = "TrustedHypergridSecret.ini"
+    ; PrivateKeyFile = "TrustedHypergridSecret.ini"
+
+    ;; Trust registry (Design Brief §3/§4). When Enabled=true the gatekeeper stands up the registry
+    ;; (tables hg_trusted_grids and hg_grid_aliases, created by migration on first start) and the
+    ;; console gains: hgtrust list | show <uri|fingerprint> | approve <uri> [by] | block <uri> |
+    ;; forget <uri> | key show. A signature-verified caller is resolved to its registry tier and the
+    ;; tier is LOGGED, not enforced: nothing in the registry refuses a caller, and a grid becomes
+    ;; Trusted only through `hgtrust approve`. First contact is recorded against the URI the caller
+    ;; sends as tg_uri (its own GatekeeperURI); this grid sends its GatekeeperURI from [Hypergrid]
+    ;; the same way. Storage follows every other Robust service: it
+    ;; inherits StorageProvider and ConnectionString from [DatabaseService]; uncomment to override
+    ;; (e.g. to keep the registry in a separate database).
+    ; StorageProvider = "OpenSim.Data.MySQL.dll"
+    ; ConnectionString = "Data Source=localhost;Database=trusted_hg;User ID=opensim;Password=***;Old Guids=true;"
+
 [AccessControl]
     ;# {AllowedClients} {} {Bar (|) separated list of allowed clients} {}
     ;; Bar (|) separated list of viewers which may gain access to the regions.
@@ -726,6 +757,15 @@
     ; how does the outside world reach me? This acts as public key too.
     ;; If you have GatekeeperURI set under [Hypergrid], no need to set it here, leave it commented
     ; ExternalName = "${Const|BaseURL}:${Const|PublicPort}"
+
+    ;; Trusted Hypergrid enforcement (Slice 3b; ADR-005, ADR-011). Leave this commented and
+    ;; nothing on the Hypergrid can be refused by this feature. Set it to
+    ;; TrustedGridAuthentication and the gatekeeper's link_region/get_region will refuse ONE thing:
+    ;; a caller whose signed, verified identity an operator has set to Blocked with
+    ;; `hgtrust block <uri>`. Trusted and Open callers, pending and unknown grids, unsigned callers
+    ;; and stock grids all proceed exactly as before. No other AuthType is applied to Hypergrid
+    ;; XML-RPC. Requires [TrustedHypergrid] Enabled = true; with it false this is inert.
+    ; AuthType = "TrustedGridAuthentication"
 
     ; Does this grid allow incoming links to any region in it?
     ; If false, HG TPs happen only to the Default regions specified in [GridService] section
