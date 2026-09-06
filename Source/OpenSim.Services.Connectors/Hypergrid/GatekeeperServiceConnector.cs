@@ -29,6 +29,7 @@ using System.Collections;
 using System.Net;
 using System.Reflection;
 using OpenSim.Framework;
+using OpenSim.Framework.TrustedHypergrid;
 using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenMetaverse;
@@ -84,6 +85,10 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
 
         IList paramList = new ArrayList();
         paramList.Add(hash);
+
+        // Trusted Hypergrid: attach signature material if the local grid identity is enabled.
+        // No-op otherwise, leaving the request byte-identical to stock (ADR-005).
+        TrustedHypergridHooks.SignOutbound(hash, "link_region");
 
         XmlRpcRequest request = new XmlRpcRequest("link_region", paramList);
         m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: Linking to " + info.ServerURI);
@@ -224,6 +229,9 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
 
         IList paramList = new ArrayList();
         paramList.Add(hash);
+
+        // Trusted Hypergrid: sign if enabled, otherwise no-op (ADR-005).
+        TrustedHypergridHooks.SignOutbound(hash, "get_region");
 
         XmlRpcRequest request = new XmlRpcRequest("get_region", paramList);
         m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: contacting " + gatekeeper.ServerURI);
