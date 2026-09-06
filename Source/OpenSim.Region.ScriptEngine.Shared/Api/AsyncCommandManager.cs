@@ -241,11 +241,11 @@ public class AsyncCommandManager
     {
         lock (staticLock)
         {
-            // Check XMLRPCRequests
-            try { m_XmlRequest[m_ScriptEngines[0]].CheckXMLRPCRequests(); } catch {}
-
             foreach (IScriptEngine s in m_ScriptEngines)
             {
+                // Check XMLRPCRequests (per-region module instance, must poll every engine)
+                try { m_XmlRequest[s].CheckXMLRPCRequests(); } catch {}
+
                 // Check HttpRequests
                 try { m_HttpRequest[s].CheckHttpRequests(); } catch { }
 
