@@ -26,7 +26,6 @@
  */
 
 using OpenSim.Region.Framework.Interfaces;
-using OpenSim.Region.CoreModules.Scripting.HttpRequest;
 using OpenSim.Region.ScriptEngine.Interfaces;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
@@ -49,11 +48,13 @@ public class HttpRequest
         if(iHttpReq == null)
             return;
 
-        HttpRequestClass httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
+        // Use the IHttpServiceRequest interface only: HttpRequestClass is defined in
+        // OpenSim.Region.CoreModules, which may be loaded into a different plugin
+        // load context than this assembly, making a direct cast to the concrete
+        // type fail with an InvalidCastException even though the type name matches.
+        IHttpServiceRequest httpInfo = iHttpReq.GetNextCompletedRequest();
         while (httpInfo != null)
         {
-            //m_log.Debug("[AsyncLSL]:" + httpInfo.response_body + httpInfo.status);
-
             // Deliver data to prim's remote_data handler
             //
             // TODO: Returning null for metadata, since the lsl function
@@ -76,7 +77,7 @@ public class HttpRequest
                         resobj, new DetectParams[0])))
                     break;
             }
-            httpInfo = (HttpRequestClass)iHttpReq.GetNextCompletedRequest();
+            httpInfo = iHttpReq.GetNextCompletedRequest();
         }
     }
 }

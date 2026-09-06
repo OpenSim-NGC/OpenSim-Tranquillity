@@ -482,7 +482,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
         }
     }
 
-    public IServiceRequest GetNextCompletedRequest()
+    public IHttpServiceRequest GetNextCompletedRequest()
     {
         if(m_CompletedRequests.TryDequeue(out HttpRequestClass req))
             return req;
@@ -505,7 +505,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
     #endregion
 }
 
-public class HttpRequestClass : IServiceRequest
+public class HttpRequestClass : IHttpServiceRequest
 {
     private static readonly string[] s_wellKnownContentHeaders = {
         "Content-Disposition",
@@ -572,9 +572,9 @@ public class HttpRequestClass : IServiceRequest
     public int MaxRedirects { get; set; } = 10;
 
     public string OutboundBody;
-    public string ResponseBody;
+    public string ResponseBody { get; set; }
     public Dictionary<string, string> Headers;
-    public int Status;
+    public int Status { get; set; }
     public string Url;
 
     public void Process()
