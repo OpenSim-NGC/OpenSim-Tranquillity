@@ -53,6 +53,12 @@ public enum HttpInitialRequestStatus
     DISALLOWED_BY_FILTER = 2
 }
 
+public interface IHttpServiceRequest : IServiceRequest
+{
+    int Status { get; }
+    string ResponseBody { get; }
+}
+
 public interface IHttpRequestModule
 {
     UUID MakeHttpRequest(string url, string parameters, string body);
@@ -79,7 +85,7 @@ public interface IHttpRequestModule
     /// </summary>
     /// <param name='id'></param>
     void StopHttpRequest(uint m_localID, UUID m_itemID);
-    IServiceRequest GetNextCompletedRequest();
+    IHttpServiceRequest GetNextCompletedRequest();
     void RemoveCompletedRequest(UUID id);
     bool CheckThrottle(uint localID, UUID onerID);
     bool CheckAllowed(Uri url);
