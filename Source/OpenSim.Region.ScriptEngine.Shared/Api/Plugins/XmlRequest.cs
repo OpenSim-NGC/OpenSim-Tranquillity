@@ -49,7 +49,11 @@ public class XmlRequest
 
         if (xmlrpc != null)
         {
-            RPCRequestInfo rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+            // Use the IXmlRpcRequestInfo interface only: RPCRequestInfo is defined in
+            // OpenSim.Region.CoreModules, which may be loaded into a different plugin
+            // load context than this assembly, making a direct cast to the concrete
+            // type fail with an InvalidCastException even though the type name matches.
+            IXmlRpcRequestInfo rInfo = xmlrpc.GetNextCompletedRequest();
 
             while (rInfo != null)
             {
@@ -77,7 +81,7 @@ public class XmlRequest
                         break;
                 }
 
-                rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+                rInfo = xmlrpc.GetNextCompletedRequest();
             }
 
             SendRemoteDataRequest srdInfo = (SendRemoteDataRequest)xmlrpc.GetNextCompletedSRDRequest();
