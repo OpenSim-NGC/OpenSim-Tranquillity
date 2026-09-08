@@ -27,7 +27,7 @@
 
 // Ported from Halcyon/InWorldz to Legion Grid (dotnet10-modernization)
 // Adaptations:
-//   - HttpRequestObject replaced with HttpRequestClass (IServiceRequest cast)
+//   - HttpRequestObject replaced with IHttpServiceRequest interface (no concrete cast)
 //   - Uses PostObjectEvent by LocalID instead of iterating all engines
 
 using System;
@@ -62,25 +62,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
             if (iHttpReq == null)
                 return;
 
-            IServiceRequest req = iHttpReq.GetNextCompletedRequest();
+            // Use the IHttpServiceRequest interface only: HttpRequestClass is defined in
+            // OpenSim.Region.CoreModules, which develop's McMaster-based plugin loader may
+            // load into a different AssemblyLoadContext than this assembly, making a direct
+            // cast to the concrete type fail with an InvalidCastException even though the
+            // type name matches. The interface exposes Status/ResponseBody safely.
+            IHttpServiceRequest req = iHttpReq.GetNextCompletedRequest();
             while (req != null)
             {
                 iHttpReq.RemoveCompletedRequest(req.ReqID);
 
-                // Do NOT cast to the concrete HttpRequestClass: develop's McMaster-based
-                // plugin loader gives region-module plugins isolated AssemblyLoadContexts,
-                // so this assembly's reference to OpenSim.Region.CoreModules can be a
-                // DIFFERENT loaded copy than the one that created the request — the type
-                // names match but identity fails and the cast silently discards the
-                // response. IServiceRequest (shared OpenSim.Region.Framework) carries
-                // ReqID/LocalID; Status and ResponseBody are read reflectively off the
-                // runtime type, which is load-context-agnostic.
                 object[] resobj = new object[]
                 {
                     req.ReqID.ToString(),
-                    GetIntField(req, "Status"),
+                    req.Status,
                     new object[0],   // metadata — HTTP_BODY_TRUNCATED not implemented
-                    GetStringField(req, "ResponseBody")
+                    req.ResponseBody
                 };
 
                 bool posted = m_CmdManager.m_ScriptEngine.PostObjectEvent(req.LocalID,
@@ -97,36 +94,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
         public void RemoveEvents(uint localID, OpenMetaverse.UUID itemID)
         {
             // Handled via IHttpRequestModule.StopHttpRequest in AsyncCommandManager.RemoveScript
-        }
-
-        // Load-context-agnostic field readers (see comment in CheckHttpRequests). Field
-        // lookups are cached per concrete runtime type.
-        private static Type s_fieldsType;
-        private static System.Reflection.FieldInfo s_statusField;
-        private static System.Reflection.FieldInfo s_bodyField;
-
-        private static void EnsureFieldCache(object req)
-        {
-            Type t = req.GetType();
-            if (t == s_fieldsType)
-                return;
-            s_statusField = t.GetField("Status");
-            s_bodyField = t.GetField("ResponseBody");
-            s_fieldsType = t;
-        }
-
-        private static int GetIntField(object req, string name)
-        {
-            EnsureFieldCache(req);
-            object v = (name == "Status" ? s_statusField : null)?.GetValue(req);
-            return v is int i ? i : 499;
-        }
-
-        private static string GetStringField(object req, string name)
-        {
-            EnsureFieldCache(req);
-            object v = (name == "ResponseBody" ? s_bodyField : null)?.GetValue(req);
-            return v as string ?? string.Empty;
         }
     }
 }

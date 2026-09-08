@@ -56,7 +56,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
             if (xmlrpc == null)
                 return;
 
-            RPCRequestInfo rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+            // Use the IXmlRpcRequestInfo interface only: RPCRequestInfo is defined in
+            // OpenSim.Region.CoreModules, which develop's McMaster-based plugin loader may
+            // load into a different AssemblyLoadContext than this assembly, making a direct
+            // cast to the concrete type fail with an InvalidCastException even though the
+            // type name matches.
+            IXmlRpcRequestInfo rInfo = xmlrpc.GetNextCompletedRequest();
             while (rInfo != null)
             {
                 xmlrpc.RemoveCompletedRequest(rInfo.GetMessageID());
@@ -75,7 +80,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                     rInfo.GetItemID(),
                     new EventParams("remote_data", resobj, Array.Empty<DetectParams>()));
 
-                rInfo = (RPCRequestInfo)xmlrpc.GetNextCompletedRequest();
+                rInfo = xmlrpc.GetNextCompletedRequest();
             }
 
             SendRemoteDataRequest srdInfo =
