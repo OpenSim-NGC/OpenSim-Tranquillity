@@ -241,7 +241,7 @@ public class HGGroupsService : GroupsService
         // check that there isn't already a notice with the same ID
         if (GetGroupNotice(RequestingAgentID, noticeID) != null)
         {
-            m_log.LogDebug("[Groups.HGGroupsService]: a notice with the same ID already exists", grec.ServiceLocation);
+            m_log.LogDebug($"[Groups.HGGroupsService]: a notice with the same ID already exists at {grec.ServiceLocation}");
             return false;
         }
 
