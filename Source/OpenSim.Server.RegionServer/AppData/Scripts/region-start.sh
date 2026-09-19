@@ -20,7 +20,6 @@ export CONSOLE="local"
 export BINDIR="$BASE_DIR"
 export CONFIGDIR="${CONFIGDIR:-$HOME/config}"
 export DATADIR="${DATADIR:-$HOME/data}"
-export LOGDIR="${LOGDIR:-$HOME/data/log}"
 export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/RegionServer.ini}"
 export DEFAULTCONFIG="${DEFAULTCONFIG:-${BINDIR}/OpenSimDefaults.ini}"
 
@@ -39,11 +38,6 @@ if [ ! -d $DATADIR ]; then
     exit 2
 fi
 
-if [ ! -d $LOGDIR ]; then
-    echo "Cannot find log directory $LOGDIR"
-    exit 2
-fi
-
 if [ ! -f $CONFIGFILE ]; then
     echo "Cannot find Region Config File $CONFIGFILE"
     exit 2
@@ -55,14 +49,13 @@ if [ ! -f $DEFAULTCONFIG ]; then
 fi
 
 export REGIONDIR="${REGIONDIR:-${CONFIGDIR}/regions/${REGIONNAME}}"
-export LOGCONFIG="${LOGCONFIG:-${REGIONDIR}/RegionServer.dll.config}"
 
 if [ ! -d $REGIONDIR ]; then
     echo "Region configuration at $REGIONDIR not found!"
     exit 2
 fi
 
-CMDARGS="--inimaster $DEFAULTCONFIG --inifile $CONFIGFILE --inidirectory $REGIONDIR --console $CONSOLE --logconfig ${LOGCONFIG}"
+CMDARGS="--inimaster $DEFAULTCONFIG --inifile $CONFIGFILE --inidirectory $REGIONDIR --console $CONSOLE"
 
 (cd ${BINDIR} && screen -S "${REGIONNAME}" -d -m dotnet OpenSim.Server.RegionServer.dll ${CMDARGS})
 

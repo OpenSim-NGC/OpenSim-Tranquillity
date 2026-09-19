@@ -19,11 +19,9 @@ export CONSOLE="local"
 export BINDIR="$BASE_DIR"
 export CONFIGDIR="${CONFIGDIR:-$HOME/config}"
 export DATADIR="${DATADIR:-$HOME/data}"
-export LOGDIR="${LOGDIR:-$HOME/data/log}"
 
 # Handle a couple of different possible config file names.
 export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/GridServer.${SERVICENAME}.ini}"
-export LOGCONFIG="${LOGCONFIG:-${CONFIGDIR}/GridServer.${SERVICENAME}.dll.config}"
 
 # Verify the environment
 if [ ! -d $BINDIR ]; then
@@ -38,7 +36,7 @@ fi
 
 echo "Starting grid service OpenSim.Server.GridServer (${SERVICENAME}) in directory ${BINDIR} with config ${CONFIGFILE}"
 
-CMDARGS="--inifile ${CONFIGFILE} --console $CONSOLE --logconfig ${LOGCONFIG}"
+CMDARGS="--inifile ${CONFIGFILE} --console $CONSOLE"
 
 (cd ${BINDIR} && screen -S ${SERVICENAME} -d -m dotnet OpenSim.Server.GridServer.dll ${CMDARGS})
 
