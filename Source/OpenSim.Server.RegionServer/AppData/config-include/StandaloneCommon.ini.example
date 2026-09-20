@@ -123,6 +123,13 @@
     ;LibraryName = "My World's Library"
 
 [LoginService]
+
+    ;; Server-side baking (ADR-002, viewer contract V6). Where viewers fetch other avatars' baked textures.
+    ;; Must point at the AppearanceServiceConnector's port and end with "/". Leave it unset and the login
+    ;; response omits agent_appearance_service entirely, which is correct for a grid with no such service --
+    ;; the viewer then keeps compositing locally. Set it only once the connector is running, because on a
+    ;; bit-0 region a viewer with no service URL never textures anyone.
+    ; AgentAppearanceServiceURL = "${Const|BaseURL}:${Const|PublicPort}/"
     WelcomeMessage = "Welcome, Avatar!"
 
     SRV_HomeURI = "${Hypergrid|HomeURI}"

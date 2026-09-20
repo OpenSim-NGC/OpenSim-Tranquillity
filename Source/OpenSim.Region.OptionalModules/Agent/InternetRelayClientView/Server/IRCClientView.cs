@@ -961,6 +961,10 @@ public class IRCClientView : IClientAPI, IClientCore
 
     }
 
+    public void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hoverheight, int cofVersion)
+    {
+    }
+
     public void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hoverheight)
     {
 

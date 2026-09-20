@@ -661,6 +661,10 @@ public class NPCAvatar : IClientAPI, INPC
     {
     }
 
+    public virtual void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hover, int cofVersion)
+    {
+    }
+
     public virtual void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hover)
     {
     }

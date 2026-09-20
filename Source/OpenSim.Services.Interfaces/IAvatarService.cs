@@ -87,6 +87,54 @@ public interface IAvatarService
 /// Each region/client that uses avatars will have a data structure
 /// of this type representing the avatars.
 /// </summary>
+/// <summary>
+/// Names in the avatar service's key/value store that do <b>not</b> belong to the appearance record.
+///
+/// <para>
+/// <see cref="IAvatarService.SetAvatar"/> has to start by deleting every row for the principal, because the
+/// appearance keys it writes are of variable cardinality: <c>Wearable i:j</c> and <c>_ap_&lt;point&gt;</c> exist
+/// only while something occupies that slot or attach point, and
+/// <see cref="AvatarData.ToAvatarAppearance"/> reads them additively
+/// (<c>wearables[index].Add(...)</c>, <c>SetAttachment</c>). Without the delete, taking a shirt off would leave
+/// its <c>Wearable 4:0</c> row behind and the next read would put the shirt back on. The delete is load-bearing
+/// and stays.
+/// </para>
+///
+/// <para>
+/// What must not be caught by it is data some other subsystem keeps in the same table. Server-side baking's
+/// ADR-004 index does exactly that — <c>Bake:&lt;channel&gt;</c>, <c>BakeHash:&lt;channel&gt;</c>,
+/// <c>BakeCOFVersion</c>, <c>BakeSize</c>, <c>BakeUpdated</c> — and before this existed, every appearance save
+/// destroyed it (Ledger Q-14). A name listed here is preserved across <c>SetAvatar</c>; everything else is the
+/// appearance record and is replaced wholesale, exactly as before.
+/// </para>
+///
+/// <para>
+/// No appearance key may start with a preserved prefix. The appearance layer writes <c>Serial</c>,
+/// <c>AvatarHeight</c>, <c>VisualParams</c>, <c>Wearable i:j</c> and <c>_ap_N</c>, plus <c>AvatarType</c> and the
+/// legacy <c>&lt;Type&gt;Item</c>/<c>&lt;Type&gt;Asset</c> pairs; none of them begins with <c>Bake</c>, and a test
+/// pins that.
+/// </para>
+/// </summary>
+public static class AvatarDataKeys
+{
+    /// <summary>Server-side baking's bake index (ADR-004). Covers <c>Bake:</c>, <c>BakeHash:</c>, <c>BakeCOFVersion</c>, <c>BakeSize</c> and <c>BakeUpdated</c> in one prefix.</summary>
+    public const string BakeIndexPrefix = "Bake";
+
+    /// <summary>Every prefix <see cref="IAvatarService.SetAvatar"/> preserves.</summary>
+    public static readonly string[] PreservedPrefixes = { BakeIndexPrefix };
+
+    /// <summary>True when the named row belongs to a module rather than to the appearance record.</summary>
+    public static bool IsPreserved(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return false;
+        foreach (string prefix in PreservedPrefixes)
+            if (name.StartsWith(prefix, StringComparison.Ordinal))
+                return true;
+        return false;
+    }
+}
+
 public class AvatarData
 {
     // This pretty much determines which name/value pairs will be
@@ -148,8 +196,20 @@ public class AvatarData
         // Wearables
         Data["AvatarHeight"] = appearance.AvatarHeight.ToString();
 
-        for (int i = 0 ; i < AvatarWearable.LEGACY_VERSION_MAX_WEARABLES ; i++)
+        // S11: every type the appearance actually has, not the first LEGACY_VERSION_MAX_WEARABLES (15) of them.
+        // The old bound stopped at type 14, so Physics (15) and Universal (16) were never written - the record
+        // for a live avatar wearing both held no "Wearable 15:*" or "Wearable 16:*" row at all, however
+        // faithfully the rest of the stack carried them. Nothing else in the tree is bounded this way: the
+        // wearable table is MAX_WEARABLES (17) wide (AvatarWearable.cs:75), the wire negotiates its own count and
+        // sends 15 and 16 in "wrbls8" (AvatarAppearance.cs:801-819), the compositor draws both, and the reader
+        // below takes any index (S10). This writer was the only floor. It is driven off the array's own length so
+        // it is right for a legacy 15-slot appearance too - AvatarAppearance's constructor and ClearWearables
+        // still make one of those (AvatarAppearance.cs:320-325) - and for whatever a later type count adds.
+        for (int i = 0 ; i < appearance.Wearables.Length ; i++)
         {
+            if (appearance.Wearables[i] is null)
+                continue;
+
             for (int j = 0 ; j < appearance.Wearables[i].Count ; j++)
             {
                 string fieldName = String.Format("Wearable {0}:{1}", i, j);
@@ -288,6 +348,12 @@ public class AvatarData
 
             AvatarWearable[] wearables = appearance.Wearables;
             int currentLength = wearables.Length;
+
+            // S10: the key is "Wearable <type>:<index>" and BOTH numbers matter. Several wearables of one type
+            // are layered in index order, later index on top (LLTexLayerTemplate::render, lltexlayer.cpp:1659-1689),
+            // so a record read back in row order would silently reorder them: Data comes from a row store, which
+            // owes no order at all. Collect first, then apply by (type, index).
+            var wornRows = new List<(int Type, int Index, UUID ItemID, UUID AssetID)>();
             foreach (KeyValuePair<string, string> _kvp in Data)
             {
                 // New style wearables
@@ -296,18 +362,12 @@ public class AvatarData
                     string wearIndex = _kvp.Key.Substring(9);
                     string[] wearIndices = wearIndex.Split(new char[] {':'});
                     int index = Convert.ToInt32(wearIndices[0]);
+                    // A record written before the index was carried has one entry per type and no ":<index>";
+                    // it reads as index 0, which is what it was.
+                    int slot = wearIndices.Length > 1 ? Convert.ToInt32(wearIndices[1]) : 0;
 
                     string[] ids = _kvp.Value.Split(new char[] {':'});
-                    UUID itemID = new UUID(ids[0]);
-                    UUID assetID = new UUID(ids[1]);
-                    if (index >= currentLength)
-                    {
-                        Array.Resize(ref wearables, index + 1);
-                        for (int i = currentLength ; i < wearables.Length ; i++)
-                            wearables[i] = new AvatarWearable();
-                        currentLength = wearables.Length;           
-                    }   
-                    wearables[index].Add(itemID, assetID);
+                    wornRows.Add((index, slot, new UUID(ids[0]), new UUID(ids[1])));
                     continue;
                 }
                 // Attachments
@@ -329,6 +389,20 @@ public class AvatarData
                     }
                 }
             }
+
+            wornRows.Sort((a, b) => a.Type != b.Type ? a.Type.CompareTo(b.Type) : a.Index.CompareTo(b.Index));
+            foreach (var row in wornRows)
+            {
+                if (row.Type >= currentLength)
+                {
+                    Array.Resize(ref wearables, row.Type + 1);
+                    for (int i = currentLength ; i < wearables.Length ; i++)
+                        wearables[i] = new AvatarWearable();
+                    currentLength = wearables.Length;
+                }
+                wearables[row.Type].Add(row.ItemID, row.AssetID);
+            }
+            appearance.Wearables = wearables;
 
             if (appearance.Wearables[AvatarWearable.BODY].Count == 0)
                 appearance.Wearables[AvatarWearable.BODY].Wear(

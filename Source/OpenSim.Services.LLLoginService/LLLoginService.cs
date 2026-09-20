@@ -77,6 +77,7 @@ public class LLLoginService : ILoginService
     protected string m_ProfileURL;
     protected string m_OpenIDURL;
     protected string m_SearchURL;
+    protected string m_AgentAppearanceServiceURL;
     protected string m_Currency;
     protected string m_ClassifiedFee;
     protected int m_MaxAgentGroups = 42;
@@ -125,6 +126,10 @@ public class LLLoginService : ILoginService
         m_ProfileURL = m_LoginServerConfig.GetString("ProfileServerURL", string.Empty);
         m_OpenIDURL = m_LoginServerConfig.GetString("OpenIDServerURL", string.Empty);
         m_SearchURL = m_LoginServerConfig.GetString("SearchURL", string.Empty);
+        // V6 / ADR-002. Empty by default, which means the key is omitted from the login response and the viewer
+        // keeps compositing locally. Lives in [LoginService] beside the other advertised URLs so grid and
+        // standalone configure it the same way -- both have that section.
+        m_AgentAppearanceServiceURL = m_LoginServerConfig.GetString("AgentAppearanceServiceURL", string.Empty);
         m_Currency = m_LoginServerConfig.GetString("Currency", string.Empty);
         m_ClassifiedFee = m_LoginServerConfig.GetString("ClassifiedFee", string.Empty);
         m_DestinationGuide = m_LoginServerConfig.GetString ("DestinationGuide", string.Empty);
@@ -205,6 +210,16 @@ public class LLLoginService : ILoginService
             if (!m_MapTileURL.EndsWith("/"))
                 m_MapTileURL += "/";
         }
+
+        // The viewer appends "texture/..." to this with no separator (llvoavatar.cpp:5912), so a value without a
+        // trailing slash produces a malformed URL and every bake fetch 404s. Same normalisation MapTileURL gets.
+        if (!string.IsNullOrWhiteSpace(m_AgentAppearanceServiceURL))
+        {
+            m_AgentAppearanceServiceURL = m_AgentAppearanceServiceURL.Trim();
+            if (!m_AgentAppearanceServiceURL.EndsWith("/"))
+                m_AgentAppearanceServiceURL += "/";
+        }
+        else m_AgentAppearanceServiceURL = string.Empty;
 
         IConfig messagingConfig = config.Configs["Messaging"];
         if (messagingConfig is not null)
@@ -629,6 +644,9 @@ public class LLLoginService : ILoginService
                     where, startLocation, position, lookAt, gestures, processedMessage, home, clientIP,
                     m_MapTileURL, m_ProfileURL, m_OpenIDURL, m_SearchURL, m_Currency, m_DSTZone,
                     m_DestinationGuide, m_AvatarPicker, realID, m_ClassifiedFee,m_MaxAgentGroups);
+
+            // Set after construction rather than threading another argument through a 20-parameter constructor.
+            response.AgentAppearanceServiceURL = m_AgentAppearanceServiceURL;
 
                 m_log.LogDebug("[LLOGIN SERVICE]: All clear. Sending login response to {0} {1}", firstName, lastName);
 
