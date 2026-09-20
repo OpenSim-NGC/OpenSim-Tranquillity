@@ -1,0 +1,23 @@
+{
+  "avatar": "Truly Bazar",
+  "outfit": "stock Library",
+  "captured": "2026-09-03",
+  "captured_via": "Firestorm client-bake path",
+  "authority": "LL viewer compositor (lltexlayer.cpp / llavatarappearance.cpp); the reference bakes are its output, captured through a client; nothing is keyed on the capturing client",
+  "grid": "Legion Grid (legiongrid_mysql / Robust localhost:8003)",
+  "bakeSize": 1024,
+  "goldens": {
+    "head": "e7b03937-957c-435d-9a3b-3b516b489ed5",
+    "upper": "569a9a6d-913a-487f-a524-3502751638e9",
+    "lower": "952302a7-fede-4e92-91b6-5d23f5706ddf",
+    "eyes": "c66c39e9-f87f-4b61-81b1-001130945eef",
+    "hair": "120e197c-3bf6-43a8-bd72-5f8095052f59"
+  },
+  "notSet": ["skirt", "leftarm", "leftleg", "aux1", "aux2", "aux3"],
+  "notes": [
+    "Goldens are reference bakes (LL compositor output) captured on the wire on 2026-09-03 via the Firestorm client-bake path.",
+    "Bakes are temporary assets: Robust answers 404 for them; fetch-fixtures.sh falls back to the region's Flotsam asset cache, where the sim keeps them as the same AssetBase XML.",
+    "Fixtures are not committed (binaries, resident content). Run fetch-fixtures.sh to populate fixtures/.",
+    "bakeSize is the size the gate bakes at, not the reference's: it is the shipped [Appearance] BakeSize (ADR-008, 1024). It was 512 through S1; raised to 1024 in S2 Part 0 so the threshold gate diffs what the live sim actually stores. The references stay as captured (2048 for head/upper/lower/hair, 512 for eyes) and both images are resampled to the compared size."
+  ]
+}

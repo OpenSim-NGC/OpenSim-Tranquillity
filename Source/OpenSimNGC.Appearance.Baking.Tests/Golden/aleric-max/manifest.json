@@ -1,0 +1,24 @@
+{
+  "avatar": "Aleric Fenwood",
+  "outfit": "Professional Male 1: Adam Skin (shaved), hair base, pants, shoe base, mens black socks, Black Suede Blazer with blue shirt (jacket), head tattoo; Shirt slot worn but empty (null asset id). 10 worn slots, none doubled; no Universal, Alpha, Gloves or Skirt.",
+  "captured": "2026-09-03",
+  "captured_via": "Firestorm client-bake path",
+  "authority": "LL viewer compositor (lltexlayer.cpp / llavatarappearance.cpp); the reference bakes are its output, captured through a client; nothing is keyed on the capturing client",
+  "grid": "Legion Grid (legiongrid_mysql / Robust localhost:8003)",
+  "region": "Ebony",
+  "bakeSize": 1024,
+  "goldens": {
+    "head": "6e572118-ceb1-4da2-8db2-aa8882b4720f",
+    "upper": "1acde2f6-2b68-475d-b48e-8b0c2c1f64c1",
+    "lower": "36087dee-d890-4cf9-a086-9edf9de59509",
+    "eyes": "1df4c391-cbe0-499e-b703-df08647bbb37",
+    "hair": "dff4be04-3213-4c63-b4bb-bbb3b88b0e01"
+  },
+  "notSet": ["skirt", "leftarm", "leftleg", "aux1", "aux2", "aux3"],
+  "notes": [
+    "Second reference set (S1b), added to close Ledger Q-11: Truly's stock-Library outfit exercised no unsupported layer, so the compositor's behaviour on a richer outfit was unproven.",
+    "Goldens are reference bakes (LL compositor output) captured on 2026-09-03 via the Firestorm client-bake path.",
+    "Bakes are temporary assets: Robust answers 404 for them; fetch-fixtures.sh falls back to the region's Flotsam asset cache, where the sim keeps them as the same AssetBase XML.",
+    "Fixtures are not committed (binaries, resident content). Run fetch-fixtures.sh aleric-max to populate fixtures/."
+  ]
+}
