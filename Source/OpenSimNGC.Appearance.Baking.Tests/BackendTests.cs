@@ -362,10 +362,10 @@ public class BackendTests
     }
 
     /// <summary>
-    /// Drawn-but-transparent is NOT undrawn. Truly Bazar's hair wearable carries a 4x4 fully transparent
-    /// texture: the base layer draws it, the bake is legitimately all-transparent, and it must still be stored.
-    /// Asserted on the real truly-stock fixtures, and on a synthetic equivalent so the rule is covered when the
-    /// fixtures are not fetched.
+    /// Drawn-but-transparent is NOT undrawn. A hair wearable carrying a fully transparent texture still draws:
+    /// the base layer draws it, the bake is legitimately all-transparent, and it must still be stored. This is
+    /// the synthetic half and needs no fixtures; the same rule on real content is
+    /// <see cref="a_real_outfit_reports_nothing_drawn_on_no_channel"/>.
     /// </summary>
     [Fact]
     public void a_channel_that_drew_a_fully_transparent_texture_is_not_nothing_drawn()
@@ -381,10 +381,17 @@ public class BackendTests
         Assert.Contains(synthetic.Fidelity.Notes, n => n.StartsWith("base drawn"));
         var img = J2kCodec.Decode(synthetic.J2kBytes);
         Assert.True(img.A.All(a => a <= 2), "the bald hair bake is legitimately all-transparent and must still be stored");
+    }
 
-        // the real thing: Truly Bazar's stock outfit
+    /// <summary>
+    /// The same rule on real content: a captured outfit's hair draws even when its texture is fully transparent,
+    /// and no channel of an ordinary outfit reports nothing drawn. Needs the truly-stock reference set, so it is
+    /// skipped rather than silently passed when the fixtures have not been generated.
+    /// </summary>
+    [OpenSimNGC.Appearance.Baking.Tests.Golden.GoldenFact("truly-stock")]
+    public void a_real_outfit_reports_nothing_drawn_on_no_channel()
+    {
         var fx = TrulyFixtures();
-        if (!File.Exists(Path.Combine(fx, "avatar.json"))) { Console.WriteLine("SKIPPED (truly-stock fixtures not fetched): synthetic case asserted above"); return; }
         using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(fx, "avatar.json")));
         var worn = new List<WearableInput>();
         foreach (var w in doc.RootElement.GetProperty("wearables").EnumerateArray())
@@ -404,7 +411,7 @@ public class BackendTests
             }
         var real = new SkiaBakeBackend().Bake(new BakeRequest(worn, new Dictionary<int, float>(), tex, 128));
         var realHair = real.Single(r => r.Channel == BakeChannel.Hair);
-        Assert.False(realHair.NothingDrawn, "Truly's bald hair drew: " + string.Join(" | ", realHair.Fidelity.Notes));
+        Assert.False(realHair.NothingDrawn, "the reference outfit bald hair drew: " + string.Join(" | ", realHair.Fidelity.Notes));
         // and no channel of a normal outfit reports nothing drawn
         Assert.All(real, r => Assert.False(r.NothingDrawn, $"{r.Channel}: " + string.Join(" | ", r.Fidelity.Notes)));
     }

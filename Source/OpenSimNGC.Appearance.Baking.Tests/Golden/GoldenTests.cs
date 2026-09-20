@@ -13,20 +13,21 @@ namespace OpenSimNGC.Appearance.Baking.Tests.Golden;
 /// an avatar's worn outfit plus the reference bakes (LL compositor output, captured via the client-bake path
 /// named in that manifest). The authority is the LL compositor, never the capturing client (Ledger P-1).
 /// <list type="bullet">
-///   <item><c>truly-stock/</c> — Truly Bazar, stock Library outfit (S0b).</item>
-///   <item><c>aleric-max/</c> — Aleric Fenwood, a richer outfit: socks, jacket and a tattoo (S1b, Ledger Q-11).</item>
+///   <item><c>truly-stock/</c> — a stock Library outfit.</item>
+///   <item><c>aleric-max/</c> — a richer outfit: socks, jacket and a tattoo, added because the stock one exercised no unsupported layer.</item>
 /// </list>
 /// Fixtures are fetched per set by <c>fetch-fixtures.sh &lt;set&gt;</c> into <c>&lt;set&gt;/fixtures/</c> (gitignored);
-/// when they are absent the test reports that and returns without asserting anything.
+/// when they are absent the test is <b>skipped</b> by <see cref="GoldenFactAttribute"/>, with the reason naming the
+/// script and the environment it needs. Nothing here ever passes without asserting.
 ///
-/// <para><see cref="reference_set_versus_library_bakes"/> bakes at the manifest's <c>bakeSize</c> — which is the
+/// <para>The threshold gate bakes at the manifest's <c>bakeSize</c> — which is the
 /// shipped <c>[Appearance] BakeSize</c> (ADR-008: 1024), not the reference's own size — and asserts, per channel:
 /// RGB (mean |d| &lt;= 4, at most 5% of pixels with |d| &gt; 8 — both skipped when the reference alpha is entirely
 /// zero, as for a bald hair), alpha (mean |d| &lt;= 2) and the 5th component, the morph mask (mean |d| &lt;= 4 and,
 /// unless the reference's mask is uniform, at most 5% of pixels with |d| &gt; 8). It writes the table and the full
 /// per-layer decision log to <c>Golden/last-run-&lt;set&gt;.txt</c>. The numbers came first (S0b), the thresholds after.</para>
 ///
-/// <para><see cref="bake_size_sweep"/> (S1b Part 2) repeats the comparison at 512, 1024 and 2048 and reports the
+/// <para>The size sweep repeats the comparison at 512, 1024 and 2048 and reports the
 /// encoded byte size per channel per size. It asserts only that every channel encodes and decodes at the size asked
 /// for: it is the evidence for ADR-008's default, not a gate on it.</para>
 /// </summary>
@@ -37,13 +38,13 @@ public class GoldenTests
 
     private static string GoldenDir([CallerFilePath] string path = "") => Path.GetDirectoryName(path)!;
 
-    /// <summary>Every set present: a subdirectory holding a manifest.json.</summary>
-    public static IEnumerable<object[]> Sets()
-        => Directory.EnumerateDirectories(GoldenDir())
-                    .Where(d => File.Exists(Path.Combine(d, "manifest.json")))
-                    .Select(d => Path.GetFileName(d)!)
-                    .OrderBy(n => n, StringComparer.Ordinal)
-                    .Select(n => new object[] { n });
+    /// <summary>
+    /// The reference sets, named rather than discovered. Discovery would hide a set whose fixtures are absent;
+    /// naming it gives one skip per set per gate, with the reason on it. A new set gets a directory, a
+    /// manifest.json, and one method per gate below.
+    /// </summary>
+    private const string TrulyStock = "truly-stock";
+    private const string AlericMax = "aleric-max";
 
     private sealed record Manifest(string Avatar, string Outfit, string Captured,
         [property: System.Text.Json.Serialization.JsonPropertyName("captured_via")] string? CapturedVia,
@@ -77,18 +78,17 @@ public class GoldenTests
         public required Dictionary<int, float> VisualParams;
     }
 
-    /// <summary>Loads a set, or returns null with a reason when its fixtures are not there.</summary>
-    private static SetContext? Load(string set, out string? reason)
+    /// <summary>
+    /// Loads a set. Callers are marked <see cref="GoldenFactAttribute"/>, which skips the test when the
+    /// fixtures are absent, so reaching here without them is a broken harness rather than a missing capture.
+    /// </summary>
+    private static SetContext Load(string set)
     {
-        reason = null;
         var dir = Path.Combine(GoldenDir(), set);
         var fixtures = Path.Combine(dir, "fixtures");
         var manifest = JsonSerializer.Deserialize<Manifest>(File.ReadAllText(Path.Combine(dir, "manifest.json")), JsonOpts)!;
-        if (!Directory.Exists(fixtures) || !File.Exists(Path.Combine(fixtures, "avatar.json")))
-        {
-            reason = $"SKIPPED [{set}]: no fixtures at {fixtures}. Run Golden/fetch-fixtures.sh {set} (needs the Legion grid DB and Robust) to populate them; nothing is asserted without them.";
-            return null;
-        }
+        if (!File.Exists(Path.Combine(fixtures, "avatar.json")))
+            throw new FileNotFoundException($"fixtures for '{set}' are missing but the test was not skipped; see GoldenFactAttribute", Path.Combine(fixtures, "avatar.json"));
 
         var avatar = JsonSerializer.Deserialize<AvatarJson>(File.ReadAllText(Path.Combine(fixtures, "avatar.json")), JsonOpts)!;
         string Fixture(string uuid, params string[] exts)
@@ -228,12 +228,15 @@ public class GoldenTests
 
     // ------------------------------------------------------------------ the threshold gate
 
-    [Theory]
-    [MemberData(nameof(Sets))]
-    public void reference_set_versus_library_bakes(string set)
+    [GoldenFact(TrulyStock)]
+    public void reference_set_versus_library_bakes_truly_stock() => ReferenceSetVersusLibraryBakes(TrulyStock);
+
+    [GoldenFact(AlericMax)]
+    public void reference_set_versus_library_bakes_aleric_max() => ReferenceSetVersusLibraryBakes(AlericMax);
+
+    private void ReferenceSetVersusLibraryBakes(string set)
     {
-        var c = Load(set, out var reason);
-        if (c is null) { _out.WriteLine(reason!); return; }
+        var c = Load(set);
 
         var size = c.Manifest.BakeSize;
         var (results, rows, failures) = Compare(c, size);
@@ -265,14 +268,17 @@ public class GoldenTests
         Assert.True(failures.Count == 0, string.Join("; ", failures));
     }
 
-    // ------------------------------------------------------------------ S1b Part 2: bake size
+    // ------------------------------------------------------------------ bake size sweep
 
-    [Theory]
-    [MemberData(nameof(Sets))]
-    public void bake_size_sweep(string set)
+    [GoldenFact(TrulyStock)]
+    public void bake_size_sweep_truly_stock() => BakeSizeSweep(TrulyStock);
+
+    [GoldenFact(AlericMax)]
+    public void bake_size_sweep_aleric_max() => BakeSizeSweep(AlericMax);
+
+    private void BakeSizeSweep(string set)
     {
-        var c = Load(set, out var reason);
-        if (c is null) { _out.WriteLine(reason!); return; }
+        var c = Load(set);
 
         var report = new StringBuilder();
         Header(report, c, 0);

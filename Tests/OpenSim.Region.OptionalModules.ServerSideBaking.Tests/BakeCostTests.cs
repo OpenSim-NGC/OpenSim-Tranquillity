@@ -43,19 +43,15 @@ public class BakeCostTests
     private static string GoldenDir([CallerFilePath] string here = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "Source", "OpenSimNGC.Appearance.Baking.Tests", "Golden"));
 
-    public static IEnumerable<object[]> Sets()
-        => new[] { new object[] { "truly-stock" }, new object[] { "aleric-max" } };
+    [GoldenFixturesFact("truly-stock")]
+    public void where_the_bake_second_goes_truly_stock() => WhereTheBakeSecondGoes("truly-stock");
 
-    [Theory]
-    [MemberData(nameof(Sets))]
-    public void where_the_bake_second_goes(string set)
+    [GoldenFixturesFact("aleric-max")]
+    public void where_the_bake_second_goes_aleric_max() => WhereTheBakeSecondGoes("aleric-max");
+
+    private void WhereTheBakeSecondGoes(string set)
     {
         var fixtures = Path.Combine(GoldenDir(), set, "fixtures");
-        if (!File.Exists(Path.Combine(fixtures, "avatar.json")))
-        {
-            _out.WriteLine($"SKIPPED [{set}]: no fixtures at {fixtures}; run Golden/fetch-fixtures.sh {set}");
-            return;
-        }
 
         var assets = new FakeAssetService();
         foreach (var f in Directory.GetFiles(fixtures))

@@ -190,17 +190,13 @@ public class BakeIndexSurvivesAppearanceSaveTests
     private static string FixtureDir([CallerFilePath] string here = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "Source", "OpenSimNGC.Appearance.Baking.Tests", "Golden", "truly-stock", "fixtures"));
 
-    private const string SkipNote = "SKIPPED: golden fixtures not fetched (Source/OpenSimNGC.Appearance.Baking.Tests/Golden/truly-stock/fixtures)";
-
     /// <summary>
     /// The whole point of Q-14, end to end: bake, let an appearance save run through the real service, bake again.
     /// Before the fix the second run recomposited all five channels. Now it reuses all five.
     /// </summary>
-    [Fact]
+    [GoldenFixturesFact("truly-stock")]
     public void ABakeAfterAnAppearanceSaveStillReuses()
     {
-        if (!File.Exists(Path.Combine(FixtureDir(), "avatar.json"))) { Console.WriteLine(SkipNote); return; }
-
         var dir = FixtureDir();
         var assets = new FakeAssetService();
         foreach (var f in Directory.GetFiles(dir))

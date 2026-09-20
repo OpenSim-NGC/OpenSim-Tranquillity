@@ -5,21 +5,48 @@
 #
 # Usage:  ./fetch-fixtures.sh [set-name]        (default: truly-stock)
 #
-# A "set" is a subdirectory here holding manifest.json (committed) and fixtures/ (not committed):
-#   truly-stock/   Truly Bazar, stock Library outfit          (S0b)
-#   aleric-max/    Aleric Fenwood, richer outfit              (S1b, Ledger Q-11)
-#
+# A "set" is a subdirectory here holding manifest.json (committed) and fixtures/ (not committed).
 # The avatar's name comes from the manifest's "avatar" field; the reference bake UUIDs from its
-# "goldens" map. Steps:
+# "goldens" map.
 #
-#   1. The avatar's PrincipalID from the live grid DB (container legiongrid_mysql, database legiongrid).
-#      The root password is read from D:\legiongrid-runtime\.env (key LEGIONGRID_DB_ROOT_PW); it is
-#      never written anywhere.
+# ---------------------------------------------------------------------------------------------
+# REQUIRED ENVIRONMENT
+#
+# This script reads from a running OpenSim grid. It has no defaults: every variable below must be
+# exported for your own grid, and the script stops with a message naming any that is missing.
+#
+#   GOLDEN_DB_CONTAINER   Name of the running Docker container hosting the grid's MySQL/MariaDB
+#                         server. The script runs `docker exec <container> mysql ...` against it.
+#   GOLDEN_DB_NAME        The grid's database, the one holding UserAccounts and Avatars.
+#   GOLDEN_DB_ENV_FILE    Path to a file holding the database root password as KEY=value on its
+#                         own line. The password is read from this file and is never written
+#                         anywhere by this script.
+#   GOLDEN_DB_PW_KEY      The key name to read out of GOLDEN_DB_ENV_FILE.
+#   GOLDEN_ROBUST_ASSETS  Base URL of the grid's Robust asset service, without a trailing slash.
+#                         The script GETs <base>/<uuid> and expects AssetBase XML.
+#   GOLDEN_REGION_CACHE   Root of a simulator's Flotsam asset cache (the directory holding the
+#                         three-character shard subdirectories). Bakes are temporary assets that
+#                         Robust does not retain, so they are read from here instead.
+#
+# Worked example, with placeholder values only:
+#
+#   export GOLDEN_DB_CONTAINER=mygrid_mysql
+#   export GOLDEN_DB_NAME=mygrid
+#   export GOLDEN_DB_ENV_FILE=/srv/mygrid/.env
+#   export GOLDEN_DB_PW_KEY=MYSQL_ROOT_PASSWORD
+#   export GOLDEN_ROBUST_ASSETS=http://robust.internal:8003/assets
+#   export GOLDEN_REGION_CACHE=/srv/mygrid/regionserver/assetcache
+#   ./fetch-fixtures.sh truly-stock
+#
+# ---------------------------------------------------------------------------------------------
+# Steps:
+#
+#   1. The avatar's PrincipalID from the grid database named by GOLDEN_DB_NAME.
 #   2. Their Avatars rows ('Wearable <type>:<index>' = itemID:assetID, and VisualParams) -> fixtures/avatar.json
-#   3. Every wearable asset, every texture those wearables reference, and the reference bakes, from Robust
-#      (http://localhost:8003/assets/<uuid>, AssetBase XML with base64 Data) -> fixtures/<uuid>.<ext>.
-#      Bakes are temporary assets and Robust does not hold them; for those the region's Flotsam asset
-#      cache (same AssetBase XML on disk) is read instead, and the source column says so.
+#   3. Every wearable asset, every texture those wearables reference, and the reference bakes, from
+#      the Robust asset service (AssetBase XML with base64 Data) -> fixtures/<uuid>.<ext>.
+#      Bakes are temporary assets and Robust does not hold them; for those the simulator's Flotsam
+#      asset cache (same AssetBase XML on disk) is read instead, and the source column says so.
 #
 # Nothing is fabricated: any UUID that cannot be fetched from either source stops the script (exit 1).
 #
@@ -31,11 +58,12 @@ SET="${1:-truly-stock}"
 SET_DIR="$HERE/$SET"
 MANIFEST="$SET_DIR/manifest.json"
 OUT="$SET_DIR/fixtures"
-ENV_FILE="${LEGIONGRID_ENV:-D:/legiongrid-runtime/.env}"
-ROBUST="${ROBUST_ASSETS:-http://localhost:8003/assets}"
-REGION_CACHE="${LEGIONGRID_REGION_CACHE:-D:/legiongrid/regionserver/assetcache}"
-DB_CONTAINER="${LEGIONGRID_DB_CONTAINER:-legiongrid_mysql}"
-DB_NAME="${LEGIONGRID_DB_NAME:-legiongrid}"
+ENV_FILE="${GOLDEN_DB_ENV_FILE:?set GOLDEN_DB_ENV_FILE to the file holding the grid database root password (KEY=value); see the header}"
+PW_KEY="${GOLDEN_DB_PW_KEY:?set GOLDEN_DB_PW_KEY to the key name to read out of GOLDEN_DB_ENV_FILE; see the header}"
+ROBUST="${GOLDEN_ROBUST_ASSETS:?set GOLDEN_ROBUST_ASSETS to the grid Robust asset service base URL, no trailing slash; see the header}"
+REGION_CACHE="${GOLDEN_REGION_CACHE:?set GOLDEN_REGION_CACHE to a simulator Flotsam asset cache root; see the header}"
+DB_CONTAINER="${GOLDEN_DB_CONTAINER:?set GOLDEN_DB_CONTAINER to the Docker container running the grid database; see the header}"
+DB_NAME="${GOLDEN_DB_NAME:?set GOLDEN_DB_NAME to the grid database holding UserAccounts and Avatars; see the header}"
 
 die() { echo "FETCH FAILED: $*" >&2; exit 1; }
 
@@ -57,8 +85,8 @@ echo "manifest   $MANIFEST"
 echo "avatar     $FIRST $LAST"
 
 [ -f "$ENV_FILE" ] || die "env file $ENV_FILE not found"
-PW="$(grep -E '^LEGIONGRID_DB_ROOT_PW=' "$ENV_FILE" | cut -d= -f2- | tr -d '"\r')"
-[ -n "$PW" ] || die "LEGIONGRID_DB_ROOT_PW not set in $ENV_FILE"
+PW="$(grep -E "^${PW_KEY}=" "$ENV_FILE" | cut -d= -f2- | tr -d '"\r')"
+[ -n "$PW" ] || die "$PW_KEY not set in $ENV_FILE"
 
 sql() { docker exec "$DB_CONTAINER" mysql -uroot -p"$PW" "$DB_NAME" -N -B -e "$1" 2>/dev/null | tr -d '\r'; }
 
