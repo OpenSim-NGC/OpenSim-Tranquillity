@@ -53,7 +53,7 @@ public class AisErrorHygieneTraversalTests
 
     /// <summary>Text a real connector fault might carry. If this reaches the client, the fix is not working.</summary>
     private const string Secret =
-        "Server=10.44.0.9;Database=legiongrid;Uid=root;Pwd=hunter2 -- at MySql.Data.MySqlClient.NativeDriver.Open()";
+        "Server=db.example.org;Database=opensim;Uid=root;Pwd=hunter2 -- at MySql.Data.MySqlClient.NativeDriver.Open()";
 
     private sealed class HygRequest : OpenSim.Framework.Servers.HttpServer.IOSHttpRequest
     {
@@ -136,7 +136,7 @@ public class AisErrorHygieneTraversalTests
 
             // the whole point: nothing of the exception may travel
             Assert.That(wire, Does.Not.Contain("hunter2"), "a credential reached the client");
-            Assert.That(wire, Does.Not.Contain("10.44.0.9"), "a host address reached the client");
+            Assert.That(wire, Does.Not.Contain("db.example.org"), "a host address reached the client");
             Assert.That(wire, Does.Not.Contain("MySql"), "an internal type name reached the client");
             Assert.That(wire, Does.Not.Contain(Secret));
             Assert.That(wire, Does.Not.Contain("InvalidOperationException"));

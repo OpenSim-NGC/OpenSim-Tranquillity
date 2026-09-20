@@ -75,12 +75,12 @@ public class LoginResponseAdvertisementTests
     [Fact]
     public void WhenConfiguredTheResponseCarriesTheUrlInBothEncodings()
     {
-        var (xml, llsd) = Build("http://legiongrid.ddns.net:8002/");
+        var (xml, llsd) = Build("http://example.org:8002/");
 
         Assert.True(xml.ContainsKey(Key));
-        Assert.Equal("http://legiongrid.ddns.net:8002/", xml[Key]);
+        Assert.Equal("http://example.org:8002/", xml[Key]);
         Assert.True(llsd.ContainsKey(Key));
-        Assert.Equal("http://legiongrid.ddns.net:8002/", llsd[Key].AsString());
+        Assert.Equal("http://example.org:8002/", llsd[Key].AsString());
     }
 
     [Fact]
