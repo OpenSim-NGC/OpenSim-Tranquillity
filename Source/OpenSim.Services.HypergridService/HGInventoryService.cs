@@ -227,6 +227,12 @@ public class HGInventoryService : XInventoryService, IInventoryService
         return false;
     }
 
+    public override bool DeleteFolders(UUID principalID, List<UUID> folderIDs, bool onlyIfTrash)
+    {
+        // NOGO, whatever the flag says
+        return false;
+    }
+
     public override bool PurgeFolder(InventoryFolderBase folder)
     {
         // NOGO

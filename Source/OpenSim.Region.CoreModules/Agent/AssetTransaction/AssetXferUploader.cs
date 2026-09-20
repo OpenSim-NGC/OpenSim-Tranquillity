@@ -333,7 +333,12 @@ public class AssetXferUploader
         }
     }
 
-    public void RequestUpdateInventoryItem(IClientAPI remoteClient, InventoryItemBase item)
+    /// <summary>
+    /// A19: returns <b>false when the update was refused</b> - <see cref="ValidateAssets"/> said no, so the asset
+    /// was not stored and the item was not repointed. When the xfer has not completed yet there is nothing to
+    /// validate and this returns true; the refusal, if one comes, arrives on the alert-message path as before.
+    /// </summary>
+    public bool RequestUpdateInventoryItem(IClientAPI remoteClient, InventoryItemBase item)
     {
         // We must lock to avoid a race with a separate thread uploading the asset.
         lock (this)
@@ -355,7 +360,7 @@ public class AssetXferUploader
 
             if (m_uploadState == UploadState.Complete)
             {
-                CompleteItemUpdate(item);
+                return CompleteItemUpdate(item);
             }
             else
             {
@@ -378,6 +383,9 @@ public class AssetXferUploader
                 m_updateItemData = item;
             }
         }
+
+        // Still uploading: nothing has been validated, so this is not a refusal.
+        return true;
     }
 
     public void RequestUpdateTaskInventoryItem(IClientAPI remoteClient, TaskInventoryItem taskItem)
@@ -507,6 +515,34 @@ public class AssetXferUploader
         return true;
     }
 
+    /// <summary>
+    /// A19: whether a texture is one the grid's library holds with full rights, and may therefore be referenced by
+    /// anyone's wearable. The owner is read off <c>ILibraryService.LibraryRootFolder.Owner</c> rather than
+    /// hardcoded, so a grid supplying its own library owner still works - the same rule
+    /// <c>AISv3Module.LibraryOwnerOf</c> uses. Returns false when the region has no library service, which leaves
+    /// the previous behaviour exactly as it was.
+    /// </summary>
+    private bool IsLibraryTexture(UUID textureId, uint requiredPerms)
+        => IsLibraryTexture(
+            textureId,
+            m_Scene?.LibraryService?.LibraryRootFolder?.Owner ?? UUID.Zero,
+            requiredPerms,
+            (owner, asset) => m_Scene.InventoryService.GetAssetPermissions(owner, asset));
+
+    /// <summary>
+    /// The rule itself, with the two lookups injected so it is a plain unit test: no <c>Scene</c>, no inventory
+    /// service. A texture is acceptable when the LIBRARY owner holds it with the same full rights the resident
+    /// would have needed. Anything else - another resident's texture, a texture nobody holds - is unchanged.
+    /// </summary>
+    public static bool IsLibraryTexture(UUID textureId, UUID libraryOwner, uint requiredPerms, Func<UUID, UUID, int> permissionsOf)
+    {
+        if (libraryOwner.IsZero() || permissionsOf is null)
+            return false;
+
+        uint perms = (uint)permissionsOf(libraryOwner, textureId);
+        return (perms & requiredPerms) == requiredPerms;
+    }
+
     private uint ValidateAssets()
     {
         uint retPerms = 0x7fffffff;
@@ -567,6 +603,19 @@ public class AssetXferUploader
 
                             if ((perms & texturesfullPermMask) != texturesfullPermMask)
                             {
+                                // A19: a LIBRARY texture is not the resident's and never will be, and asking
+                                // GetAssetPermissions for it under the resident's id returns nothing - so the check
+                                // above rejects every wearable built on one. SL allows library textures in
+                                // wearables, the library is readable by everyone by construction, and this grid
+                                // ships one; a resident who picks a library texture in the appearance editor got a
+                                // 200 and a silently unsaved item. Ask again as the library's owner: a texture that
+                                // resolves there with the same full rights is one anybody may reference.
+                                if (IsLibraryTexture(tx, texturesfullPermMask))
+                                {
+                                    textures--;
+                                    continue;
+                                }
+
                                 m_log.LogError("[ASSET UPLOADER]: REJECTED update with texture {0} from {1} because they do not own the texture", tx, ourClient.AgentId);
                                 return 0;
                             }

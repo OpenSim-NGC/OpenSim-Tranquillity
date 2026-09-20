@@ -235,6 +235,11 @@ public class LocalInventoryServicesConnector : ISharedRegionModule, IInventorySe
         return m_InventoryService.DeleteFolders(ownerID, folderIDs);
     }
 
+    public bool DeleteFolders(UUID ownerID, List<UUID> folderIDs, bool onlyIfTrash)
+    {
+        return m_InventoryService.DeleteFolders(ownerID, folderIDs, onlyIfTrash);
+    }
+
     /// <summary>
     /// Purge an inventory folder of all its items and subfolders.
     /// </summary>

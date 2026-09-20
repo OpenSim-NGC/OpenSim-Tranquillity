@@ -121,6 +121,20 @@ public interface IInventoryService
     bool DeleteFolders(UUID userID, List<UUID> folderIDs);
 
     /// <summary>
+    /// Delete folders, optionally without the Trash restriction.
+    /// </summary>
+    /// <remarks>
+    /// The two-argument overload above is <paramref name="onlyIfTrash"/> = true: it silently skips any folder
+    /// whose parent is not Trash or Lost And Found, and still returns true. That is the right default for the
+    /// legacy UDP paths, but AIS v3 <c>DELETE /category/{id}</c> must delete any non-protected folder wherever it
+    /// sits, because that is what the LL viewer asks for. This overload exposes the behaviour
+    /// <c>XInventoryService</c> has always implemented. Add-only: the two-argument signature and every existing
+    /// caller are unchanged.
+    /// </remarks>
+    /// <param name="onlyIfTrash">When true, only folders under Trash or Lost And Found are deleted.</param>
+    bool DeleteFolders(UUID userID, List<UUID> folderIDs, bool onlyIfTrash);
+
+    /// <summary>
     /// Purge an inventory folder of all its items and subfolders.
     /// </summary>
     /// <param name="folder"></param>
