@@ -37,8 +37,8 @@ public class AISv3Module : ISharedRegionModule
     /// <c>&lt;capurl&gt;/category/{id}/children</c>, <c>&lt;capurl&gt;/orphans</c>. The listener keeps exact and
     /// variable-path handlers in different dictionaries and only the latter is matched by prefix
     /// (<c>BaseHttpServer.TryGetSimpleStreamHandler</c>, <c>AddSimpleStreamHandler</c>), so registering the
-    /// default way makes every AIS request 404 before the handler is entered. That is the A6 live failure;
-    /// see Docs/feature/ais-v3/A6-LIVE-FAILURE.md.
+    /// default way makes every AIS request 404 before the handler is entered, while the seed capabilities
+    /// response still looks correct — which is exactly how this was first found, on a live region.
     /// </summary>
     public const bool VarPath = true;
 

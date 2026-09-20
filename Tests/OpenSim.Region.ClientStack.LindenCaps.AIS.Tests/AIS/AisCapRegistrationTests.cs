@@ -13,10 +13,9 @@ using OpenSim.Region.ClientStack.LindenCaps.AIS;
 namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 
 /// <summary>
-/// The wiring, not the handler. These are the tests that would have caught the A6 live failure: AIS advertised its
-/// caps correctly and then every request 404'd inside the HTTP server, because a capability whose URLs carry
-/// sub-paths must be registered as a **variable-path** handler and AIS was not
-/// (Docs/feature/ais-v3/A6-LIVE-FAILURE.md).
+/// The wiring, not the handler. These are the tests that would have caught the first live failure: AIS advertised
+/// its caps correctly and then every request 404'd inside the HTTP server, because a capability whose URLs carry
+/// sub-paths must be registered as a **variable-path** handler and AIS was not.
 ///
 /// <para>The existing 114 tests all passed while this was broken: they call
 /// <c>AisHandler.Handle(request, response)</c> directly, so they exercise routing, envelopes and every operation,

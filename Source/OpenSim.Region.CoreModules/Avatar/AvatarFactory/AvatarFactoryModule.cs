@@ -106,7 +106,7 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
     /// **silently**: the change stayed in memory and died with the presence. A detach followed by a logout inside
     /// the save window therefore left the stored appearance still wearing the garment, and the viewer put the item
     /// back on the next login. Wear is affected identically. This predates AIS and hits the legacy path just as
-    /// hard; the evidence is in Docs/feature/ais-v3/A12-ATTACHMENT-RECONCILIATION.md of the AIS branch.</para>
+    /// hard: it is a property of the deferred save, not of whichever protocol requested the change.</para>
     ///
     /// <para><b>Why <c>OnRemovePresence</c> is the right hook.</b> <c>Scene.RemoveClient</c> raises it at
     /// <c>Scene.cs:3866</c>, while the presence is still in the scene graph: it is not removed until

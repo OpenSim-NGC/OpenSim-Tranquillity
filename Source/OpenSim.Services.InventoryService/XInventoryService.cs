@@ -210,9 +210,8 @@ public class XInventoryService : ServiceBase, IInventoryService
     /// trips old, and this method is entered concurrently for the same principal: Direct Delivery calls
     /// <c>CreateUserInventory</c> on every delivery, and a region can call it at any time through
     /// <c>XInventoryInConnector</c>. Two overlapping calls that both read "missing" both create, and there is no
-    /// unique key on <c>(agentID, type)</c> to catch the loser — which is how seven Legion Grid accounts came to
-    /// hold two Current Outfit folders each, one of them never written to (A7,
-    /// Docs/feature/ais-v3/A7-DUPLICATE-COF.md).</para>
+    /// unique key on <c>(agentID, type)</c> to catch the loser, so the losing folder simply exists from then on,
+    /// never written to.</para>
     ///
     /// <para>Re-reading immediately before the insert narrows that window from the whole method to a single
     /// query. <b>It does not close it.</b> Nothing here can: only a unique constraint on <c>(agentID, type)</c>
@@ -260,8 +259,9 @@ public class XInventoryService : ServiceBase, IInventoryService
     ///   <see cref="GetSystemFolders"/> keeps only <c>type &gt;= 0</c>.</item>
     /// </list>
     ///
-    /// <para>A warning here is a data fault and wants the dedupe in Docs/feature/ais-v3/A7-DUPLICATE-COF.md. It is
-    /// not self-healing: nothing in this class removes a folder.</para>
+    /// <para>A warning here is a data fault and wants an operator to merge the folders by hand, moving the
+    /// contents of the unused one into the one the viewer writes to. It is not self-healing: nothing in this
+    /// class removes a folder.</para>
     /// </summary>
     private void WarnOnDuplicateSystemFolders(UUID principalID, XInventoryFolder[] sysFolders)
     {
@@ -285,9 +285,9 @@ public class XInventoryService : ServiceBase, IInventoryService
 
             m_log.LogWarning(
                 "[XINVENTORY]: agent {Principal} has {Count} folders of type {Type} directly under the inventory "
-                + "root ({Folders}); exactly one is expected. This is a data fault, not a fault of this login - see "
-                + "Docs/feature/ais-v3/A7-DUPLICATE-COF.md for the dedupe. Folders of the same type inside My "
-                + "Suitcase are expected and are not counted here.",
+                + "root ({Folders}); exactly one is expected. This is a data fault, not a fault of this login, and "
+                + "wants the folders merged by hand. Folders of the same type inside My Suitcase are expected and "
+                + "are not counted here.",
                 principalID, kv.Value.Count, (FolderType)kv.Key,
                 string.Join(", ", kv.Value.ConvertAll(f => $"{f.folderID} v{f.version}")));
         }

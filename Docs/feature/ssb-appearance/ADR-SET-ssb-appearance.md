@@ -84,8 +84,8 @@ because `AvatarService.SetAvatar` deletes every row for the principal first — 
 **Status:** Accepted, revised 2026-09-03 by measurement (supersedes the 512 default carried from D-7)
 **Decision:** Sim default **1024** px per channel; `[Appearance] BakeSize` accepts 512, 1024 or 2048. Hash includes size so a config change invalidates stored bakes on next login rather than serving mixed sizes.
 
-**Why 1024 and not the original 512.** S1b ran both reference sets at all three sizes against the LL
-compositor references (`S1b-FIDELITY.md` §6). 1024 is the knee: every channel improves from 512 to 1024, and on
+**Why 1024 and not the original 512.** Both reference sets were run at all three sizes against the LL
+compositor references; the bake-size sweep in the golden harness reproduces the measurement. 1024 is the knee: every channel improves from 512 to 1024, and on
 the richer of the two outfits the improvement is large — Aleric's lower channel goes from mean abs RGB **2.29**
 at 512 to **0.89** at 1024, the single worst number in the matrix and the only one that would have failed a
 tighter threshold. Going on to 2048 buys nothing: five of the nine channel rows get *worse*, none improves

@@ -124,9 +124,9 @@ public static class AisInventory
     /// <para>The service's own resolution is a coin flip: <c>XInventoryService.GetSystemFolderForType</c> returns
     /// <c>folders[0]</c> from a query with no <c>ORDER BY</c> and no <c>LIMIT</c>
     /// (<c>MySQLGenericTableHandler.Get</c> passes an empty <c>options</c>), and nothing in the schema forbids
-    /// duplicates — <c>inventoryfolders</c> has no unique key on <c>(agentID, type)</c>. On Legion Grid seven
-    /// accounts carry two type-46 folders each, and picking the wrong one silently writes an outfit change into a
-    /// folder no viewer reads. That is the A7 live failure; see Docs/feature/ais-v3/A7-DUPLICATE-COF.md.</para>
+    /// duplicates — <c>inventoryfolders</c> has no unique key on <c>(agentID, type)</c>. Where an agent does
+    /// carry two folders of a type, picking the wrong one silently writes an outfit change into a folder no
+    /// viewer reads, which is how this was found live.</para>
     ///
     /// <para>The rule is **highest <c>Version</c>, lowest id on a tie**. A folder's version is incremented on
     /// every child add or remove and never decreases, so the folder the viewer has been writing to is the folder
@@ -165,10 +165,10 @@ public static class AisInventory
         // outfit change that quietly does not stick.
         m_log.LogWarning(
             "[AIS]: agent {Agent} has {Count} folders of type {Type} ({Candidates}); using {Chosen} version {Version}. "
-            + "Duplicate system folders DIRECTLY UNDER THE ROOT are a data fault, not an AIS one - see "
-            + "Docs/feature/ais-v3/A7-DUPLICATE-COF.md. A second folder of this type inside My Suitcase is "
-            + "EXPECTED (HGSuitcaseInventoryService.CreateSystemFolders builds a full set there) and is not a "
-            + "fault; AIS-COF-1 found that every \"duplicate\" Current Outfit on this grid was the suitcase one",
+            + "Duplicate system folders DIRECTLY UNDER THE ROOT are a data fault, not an AIS one. A second "
+            + "folder of this type inside My Suitcase is EXPECTED (HGSuitcaseInventoryService.CreateSystemFolders "
+            + "builds a full set there) and is not a fault: on the grid where this was first investigated every "
+            + "apparent duplicate Current Outfit turned out to be the suitcase one",
             agentId, candidates.Count, type,
             string.Join(", ", candidates.Select(f => $"{f.ID} v{f.Version}")),
             chosen.ID, chosen.Version);

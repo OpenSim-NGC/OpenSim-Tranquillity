@@ -1,6 +1,6 @@
 # T1 — test-infrastructure defects at the deployed tree
 
-Tree: `D:\tranq-fix`, branch `fix/test-fixtures`, HEAD `db7c746248` (deployed). Runs are serial
+Measured on branch `fix/test-fixtures`, HEAD `db7c746248`. Runs are serial
 (`-- xUnit.ParallelizeTestCollections=false`) so order-flaky tests do not blur the count.
 
 ## Part 1 — `OpenSim.Region.CoreModules.Tests`: 35 failures at clean HEAD

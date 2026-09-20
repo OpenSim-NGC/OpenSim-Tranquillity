@@ -8,9 +8,9 @@ using OpenSim.Region.ClientStack.LindenCaps.AIS;
 namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 
 /// <summary>
-/// The A7 live failure: an agent with two Current Outfit folders, where the inventory service resolves
-/// <c>"current"</c> to the wrong one and a take-off is written into a folder no viewer reads
-/// (Docs/feature/ais-v3/A7-DUPLICATE-COF.md).
+/// The live failure this resolution rule exists for: an agent with two Current Outfit folders, where the
+/// inventory service resolves <c>"current"</c> to the wrong one and a take-off is written into a folder no
+/// viewer reads.
 ///
 /// <para>The existing suite could not catch this because every fixture gives its fake agent exactly **one** folder
 /// per type. `FakeAisBackend.GetFolderForType` then answers correctly no matter what rule it uses, so the tests

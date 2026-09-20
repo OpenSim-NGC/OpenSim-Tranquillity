@@ -11,10 +11,10 @@ using OpenSim.Tests.Common;
 namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 
 /// <summary>
-/// A11: every mutation must say, in the log, what it answered — the status and the delta keys with their
-/// contents. A10 could not separate "the viewer rejected our delta" from "our delta was fine" because nothing
-/// recorded what was sent back; both hypotheses died on the same missing evidence
-/// (Docs/feature/ais-v3/A10-STEP10-REDIAGNOSIS.md).
+/// Every mutation must say, in the log, what it answered — the status and the delta keys with their contents.
+/// A live diagnosis once could not separate "the viewer rejected our delta" from "our delta was fine", because
+/// nothing recorded what had been sent back; both hypotheses died on the same missing evidence. This is that
+/// evidence, made permanent.
 /// </summary>
 [TestFixture]
 public class AisResponseLoggingTests

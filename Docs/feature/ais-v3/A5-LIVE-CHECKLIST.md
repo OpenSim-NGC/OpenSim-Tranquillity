@@ -401,10 +401,9 @@ impossible on a single Robust.
 
 ### 22. Two slams at once on Truly's COF: one outfit wins, never both
 
-**Do:** as **Truly**, run `two-slam-race.sh` from the AIS-SEC-3 handoff
-(`D:\legiongrid\_ops\handoffs\HANDOFF-AIS-SEC-3-20260912.md`). Fill in only the **cap path** and the **two
-link sets**; the script targets `category/current/links`, so the COF id is resolved server-side and is not a
-placeholder. It fires both `PUT`s concurrently and prints both status codes.
+**Do:** as the test avatar, fire two `PUT`s at `category/current/links` concurrently, each with a different
+link set, and print both status codes. Any two-process shell will do; the route resolves the COF id
+server-side, so only the cap path and the two link sets have to be filled in.
 
 **Expected:**
 
@@ -506,7 +505,7 @@ and there is no control.**
 Firestorm remains a test client and never an authority (Ledger P-1). What changes is the reading of a green
 result: it means Firestorm is satisfied, not that the protocol is right. Anything observed only in Firestorm
 must be checked against the LL viewer source before it is relied on — step 13's legacy fallback is the live
-example (`A5-RUN-2026-09-04.md`). These are the steps where Firestorm's own machinery differs most, so they
+example. These are the steps where Firestorm's own machinery differs most, so they
 carry the least transferable evidence:
 
 - **1** (full load) — Firestorm's fetch pacing differs;

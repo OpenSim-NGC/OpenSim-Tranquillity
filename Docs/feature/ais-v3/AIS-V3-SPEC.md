@@ -1,6 +1,6 @@
 # AIS v3 — the surface the LL viewer drives
 
-**Authority (Ledger P-1):** the LL viewer source at `F:\viewer-develop` (viewer 26.1.1). Every row below cites
+**Authority:** the Linden Lab viewer source, version 26.1.1. Every row below cites
 the file and line it was read from. Files read, read-only: `indra/newview/llaisapi.h` (167 lines),
 `indra/newview/llaisapi.cpp` (1798 lines), the AIS call site in `indra/newview/llinventorymodel.cpp`
 (`:1025-1058`), and the AIS call sites `remove_inventory_item`, `remove_inventory_category`,
@@ -477,8 +477,9 @@ stops refusing four classes of folder the viewer never considered protected. The
   RemoveCategory → the removed object's parent; PurgeDescendents → the purged folder; UpdateItem / UpdateCategory
   → the parent when the update moves the object, otherwise the object's own folder is listed with delta 0
   (`:1245`, `:1298`, `:1427`); CopyLibraryCategory → the destination. Those are derived from the viewer's
-  accounting, not from an explicit table; the server rule in OpenSim is the data-layer increment recorded in
-  `S0a-VERIFICATION.md` V6.
+  accounting, not from an explicit table; the server rule in OpenSim is the data layer's own increment, which
+  fires on item store, delete and move and on folder store, and which the cap's category create also applies
+  to the parent. The handler must therefore re-read the folder after a write rather than compute the version.
 
 ## 1f. HTTP status handling (`InvokeAISCommandCoro`, `:851-1011`)
 

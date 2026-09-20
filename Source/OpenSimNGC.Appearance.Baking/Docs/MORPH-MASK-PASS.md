@@ -5,7 +5,7 @@
 **morph mask** from `LLTexLayerSet::gatherMorphMaskAlpha` (`lltexlayer.cpp:460-472`), and that is what this
 library produces as `CompositeResult.MorphMask` and encodes as component 4.
 
-Authority (Ledger P-1): the LL viewer source, read read-only at `F:\viewer-develop` (viewer 26.1.1 per
+Authority: the Linden Lab viewer source, read read-only (viewer 26.1.1 per
 `indra/newview/VIEWER_VERSION.txt`): `indra/llappearance/lltexlayer.cpp`, `lltexlayer.h`,
 `lltexlayerparams.cpp`, `indra/newview/llviewertexlayer.cpp`, and `indra/newview/character/avatar_lad.xml`.
 Line numbers below are from those files at that version. This document is the spec `TexLayerCompositor`

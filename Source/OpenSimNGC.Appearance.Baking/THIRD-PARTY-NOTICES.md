@@ -14,8 +14,8 @@ code). The file is embedded unmodified as a data resource; it is not compiled or
 linked into executable code. The full LGPL 2.1 text is in the viewer's `LICENSE`
 file and at <https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>.
 
-**Copied from:** a local checkout of the viewer source tree at `F:\viewer-develop`
-on 2026-09-03. That directory is not a git repository (no `.git`), so the exact
+**Copied from:** a local checkout of the Linden Lab viewer source tree, taken
+on 2026-09-03. That checkout is not a git repository (no `.git`), so the exact
 upstream commit could not be read from it. Identifying data that could be read:
 
 | Field | Value |
@@ -28,7 +28,7 @@ upstream commit could not be read from it. Identifying data that could be read:
 
 The SSB design documents (`Docs/feature/ssb-appearance/RECON-ssb-appearance-addendum.md` §3)
 name the viewer commit used for the wire contract as `62033f2`; that identity could
-not be confirmed against `F:\viewer-develop` and is recorded here as a claim, not a fact.
+not be confirmed against that checkout and is recorded here as a claim, not a fact.
 
 **Modifications:** none. Byte-for-byte copy.
 
@@ -42,7 +42,7 @@ shaped by one), so they ship with the library alongside `avatar_lad.xml` (ADR-00
 **Licence:** the same as `avatar_lad.xml` above: GNU LGPL 2.1 with the Linden Lab viewer linking exception.
 Embedded unmodified as data resources; not compiled or linked.
 
-**Source:** the Linden Lab viewer source tree at `F:\viewer-develop` (viewer 26.1.1 per
+**Source:** the Linden Lab viewer source tree (viewer 26.1.1 per
 `indra/newview/VIEWER_VERSION.txt`), directory `indra/newview/character/`. The files were first taken (S0b,
 2026-09-03) from the copy redistributed inside the `LibreMetaverse` 3.1.4 NuGet package; in S0d every one of
 the 56 was re-verified byte for byte (SHA-256 below) against the viewer tree and found identical, so the viewer

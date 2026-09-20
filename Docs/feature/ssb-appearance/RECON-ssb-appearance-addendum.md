@@ -1,15 +1,14 @@
 # RECON Addendum — Server-Side Baking (SSB) for NGC-Tranquillity
 
-**Programme:** Track L, item L-2 (BUILD-PLAN-sl-parity-v2)
-**Supplements:** `RECON-ssb-appearance.md` (Claude Code recon, delivered 2026-09-02 to `D:\_TO_REVIEW\ssb-appearance\`)
-**Tree pin:** the parity audit's findings are pinned to `645b0f3`; live grid runs `cb141dd61d` + `db7c746248` (maptile fix). Nothing appearance-related has changed between those commits as far as chat history shows — **VERIFY at S0** (Build Plan).
+**Supplements:** an earlier reconnaissance pass over the appearance surface, not carried here; everything this
+document relies on is restated below.
 **Date:** 2026-09-03
 
 ## 1. Why an addendum
 
 The CC recon was written before the web-viewer Sessions 11 and 12 and the appearance wire spike. Those three pieces of work changed the SSB picture materially:
 
-1. A **working, data-driven bake compositor now exists in C# on .NET 10** — `gateway/src/Gateway/Baking/` in `D:\web-viewer`. It interprets `avatar_lad.xml` layer sets with the viewer's `LLTexLayerSet` semantics, has a fidelity gate, and has been compared against Firestorm bakes on real avatars. The recon's "port BakeLayer.cs onto SkiaSharp+CoreJ2K" recommendation is therefore **already ~done, in the wrong repo**. SSB on the sim is no longer a compositor project; it is a *plumbing* project plus a *library extraction*.
+1. A **working, data-driven bake compositor now exists in C# on .NET 10** — `Gateway/Baking/` in the web-viewer gateway, a separate repository. It interprets `avatar_lad.xml` layer sets with the viewer's `LLTexLayerSet` semantics, has a fidelity gate, and has been compared against Firestorm bakes on real avatars. The recon's "port BakeLayer.cs onto SkiaSharp+CoreJ2K" recommendation is therefore **already ~done, in the wrong repo**. SSB on the sim is no longer a compositor project; it is a *plumbing* project plus a *library extraction*.
 2. **LibreMetaverse 3.1.4's `Baker` is disqualified** as a backend for anything that persists (decompile-confirmed: tiles sub-1024 layers into a 2×2 mosaic; earlier: skips layers). The recon's `IBakeBackend` seam stays, but "managed baker as default" now means *our* compositor, not LibreMetaverse's.
 3. The wire spike established what the **sim already delivers** with zero grid changes: other avatars' baked-texture UUIDs (5 legacy slots) in `AvatarAppearance`, fetchable as ordinary assets; `VisualParams` present; `AppearanceData` block still omitted (count 0). The only reason a passive client stays a cloud is that nothing bakes for it.
 
@@ -65,7 +64,7 @@ Consequence of V7: **SSB without AIS gives the LL viewer "log in as yourself, ca
 
 ## 5. Halcyon reference — what to take, what not
 
-From `/d/halcyon-reference-fresh/` (read-only). The recon recommended "Halcyon's persistent-bake rule". Restating it precisely so it is not over-applied:
+From a read-only checkout of the Halcyon source tree. The recon recommended "Halcyon's persistent-bake rule". Restating it precisely so it is not over-applied:
 
 - **Take:** bakes are first-class persisted assets tied to the avatar record; a login does not force a rebake if the stored bakes match the stored wearables; a change to wearables/params invalidates them.
 - **Take:** hash-of-inputs as the invalidation key (wearable asset IDs + visual params + texture IDs per bake channel), so the compositor is skipped when nothing changed.

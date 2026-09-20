@@ -52,7 +52,7 @@ G6. Ordinary OpenSim grid owners can run the web viewer without any of this; SSB
    <channel>/<uuid> --->|  (proxy to AssetService)     |                         |
                         +------------------------------+                         |
                                                                                  |
-   Web-viewer gateway (D:\web-viewer) ---- on non-SSB grids only ----------------+
+   Web-viewer gateway (separate repository) ---- on non-SSB grids only ----------+
       on SSB regions: appearance-passive, consumes AvatarAppearance + asset route
 ```
 
@@ -60,13 +60,13 @@ G6. Ordinary OpenSim grid owners can run the web viewer without any of this; SSB
 
 | # | Component | Repo / location | New or changed |
 |---|---|---|---|
-| C1 | `OpenSimNGC.Appearance.Baking` — shared compositor library | Tranquillity tree (placement: ADR-003) | **new project**, code lifted from `D:\web-viewer\gateway\src\Gateway\Baking\` |
+| C1 | `OpenSimNGC.Appearance.Baking` — shared compositor library | Tranquillity tree (placement: ADR-003) | **new project**, code lifted from the web-viewer gateway's `Gateway/Baking/` |
 | C2 | `AppearanceBakeModule` — region module: orchestration, cap, triggers, sender | `Addons/` or `Source/OpenSim.Region.OptionalModules` (ADR-003) | new |
 | C3 | `BakeStore` — persist bakes as assets, record channel→UUID + input hash + COF version in the avatar service, expiry reaper | region module + Robust reaper | new |
 | C4 | `AppearanceServiceConnector` — Robust HTTP handler for `texture/<agent>/<channel>/<uuid>` and login-response `agent_appearance_service` | Robust | new (ADR-002) |
 | C5 | `LLClientView.SendAppearance` — emit `AppearanceData{AppearanceVersion=1, CofVersion}` when the avatar is server-baked; unchanged otherwise | `OpenSim.Region.ClientStack.Linden.UDP` | changed, add-only |
 | C6 | `RegionHandshake` — set bit 0 of `RegionProtocols` when `[Appearance] ServerSideBaking = true` | ClientStack | changed, flag-gated |
-| C7 | Gateway SSB-aware mode | `D:\web-viewer` | changed (Build Plan S6) |
+| C7 | Gateway SSB-aware mode | the web-viewer gateway, a separate repository | changed there, not here |
 
 ### 4.2 Bake pipeline (C2 → C1 → C3)
 
@@ -299,18 +299,6 @@ So the gateway gets `cof_version` and `appearance_version` for self and for othe
 ### 7.3 Does it surface `agent_appearance_service`? — **yes**
 
 `LibreMetaverse.LoginResponseData.AgentAppearanceServiceURL` (get/set) and `LibreMetaverse.NetworkManager.AgentAppearanceServiceURL` (get). The gateway does not need to read the raw login LLSD. This is the value S4 taught Robust to advertise and `llstartup.cpp` adopts only when non-empty.
-
-### 7.4 Where the compositor project reference points — **stale branch, current content**
-
-`gateway/src/Gateway/Gateway.csproj` references
-
-    D:\tranq-ssb\Source\OpenSimNGC.Appearance.Baking\OpenSimNGC.Appearance.Baking.csproj
-
-`D:\tranq-ssb` is a worktree on **`feature/ssb-appearance` at `162bfadcc3`** ("perf(ssb): instrument the bake phases and answer Q-10", S2 Part 2), not the integration branch. It is 20+ commits behind `feature/ais-v3`.
-
-**It does not currently matter for correctness.** `git diff 162bfadcc3 b13f15add3 -- Source/OpenSimNGC.Appearance.Baking/` is empty and no commit in that range touches the library: S3, S4 and S5 changed the region module, the services and the wire, never the compositor. The gateway is therefore building a byte-identical library to the one at `b13f15add3`.
-
-It is still a hazard rather than a fact to file away: the next change to the library will land on `feature/ais-v3` and the gateway will silently keep building the old one. **Not repointed in this session — John's decision.**
 
 ### 7.5 The gateway's self-appearance flow — every route to the bake/send step
 
