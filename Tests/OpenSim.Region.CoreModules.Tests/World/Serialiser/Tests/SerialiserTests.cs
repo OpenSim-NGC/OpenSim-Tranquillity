@@ -589,6 +589,14 @@ public class SerialiserTests : OpenSimTestCase
     protected Scene m_scene;
     protected SerialiserModule m_serialiserModule;
 
+    // Formerly NUnit [SetUp]; the xunit migration (#197) dropped the attribute and nothing called it, so every test
+    // here ran with m_scene null. Wired back through OpenSimTestCase.SetUp() (Docs/feature/repo-audit/T1-TEST-FIXTURES.md).
+    public override void SetUp()
+    {
+        base.SetUp();
+        Init();
+    }
+
     private void Init()
     {
         m_serialiserModule = new SerialiserModule();

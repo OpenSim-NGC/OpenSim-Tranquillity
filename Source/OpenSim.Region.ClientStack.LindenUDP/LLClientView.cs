@@ -992,7 +992,13 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         //RegionProtocols
             // bit 0 signals server side texture baking
             // bit 63 signals more than 6 baked textures support"
-        zc.AddUInt64(1UL << 63);
+        // Viewer contract V1 (llviewerregion.cpp:3097): the viewer chooses the server-bake path for this region
+        // iff bit 0 is set. It is set only where [Appearance] ServerSideBaking resolved true, so a region without
+        // the module, or with the flag off, sends the value it always sent.
+        ulong regionProtocols = 1UL << 63;
+        if (m_scene.RequestModuleInterface<IServerSideBakingRegion>() is { ServerSideBakingEnabled: true })
+            regionProtocols |= 1UL;
+        zc.AddUInt64(regionProtocols);
 
         buf.DataLength = zc.Finish();
         m_udpServer.SendUDPPacket(m_udpClient, buf, ThrottleOutPacketType.Unknown);
@@ -4512,6 +4518,15 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             };
 
     public void SendAppearance(UUID targetID, byte[] visualParams, byte[] textureEntry, float hover)
+        => SendAppearance(targetID, visualParams, textureEntry, hover, -1);
+
+    /// <summary>
+    /// <paramref name="cofVersion"/> negative reproduces the pre-SSB packet byte for byte: AppearanceData count 0.
+    /// Non-negative emits one AppearanceData block {AppearanceVersion=1, CofVersion, Flags=0} — viewer contract
+    /// V4 (llvoavatar.cpp:9779-9800: an appearance for self with no block is dropped as stale) and V5
+    /// (:9727-9737: the version is 1 when the server bakes).
+    /// </summary>
+    public void SendAppearance(UUID targetID, byte[] visualParams, byte[] textureEntry, float hover, int cofVersion)
     {
         // doing post zero encode, because odds of beeing bad are not that low
         UDPPacketBuffer buf = OpenSimUDPBase.GetNewUDPBuffer(m_udpClient.RemoteEndPoint);
@@ -4543,8 +4558,18 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         if(len > 0)
             Buffer.BlockCopy(visualParams, 0, data, pos, len); pos += len;
 
-        // no AppearanceData
-        data[pos++] = 0;
+        // AppearanceData: one block for a sim-baked avatar, the historical count of 0 otherwise
+        if (cofVersion < 0)
+        {
+            data[pos++] = 0;
+        }
+        else
+        {
+            data[pos++] = 1;
+            data[pos++] = 1;                                                    // AppearanceVersion (U8), V5
+            Utils.IntToBytesSafepos(cofVersion, data, pos); pos += 4;           // CofVersion (S32)
+            Utils.UIntToBytesSafepos(0, data, pos); pos += 4;                   // Flags (U32), unused
+        }
         // AppearanceHover vector 3
         data[pos++] = 1;
         Utils.FloatToBytesSafepos(0, data, pos); pos += 4;

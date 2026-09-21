@@ -4346,7 +4346,34 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
     public void SendAppearanceToAgentNF(ScenePresence avatar)
     {
-        avatar.ControllingClient.SendAppearance(UUID, Appearance.VisualParams, Appearance.Texture.GetBakesBytes(), Appearance.AvatarPreferencesHoverZ);
+        // -1 unless this simulator baked this avatar in this region, in which case the appearance carries the
+        // AppearanceData block the LL viewer needs to accept its own appearance (V4/V5). On a region with no
+        // baking module, or with the flag off, this is -1 for everyone and the packet is unchanged.
+        int cofVersion = m_scene.RequestModuleInterface<IServerSideBakingRegion>()?.BakedCofVersion(UUID) ?? -1;
+
+        // The AppearanceData block is not enough on its own. The viewer prefers the appearance-version *parameter*
+        // over the block's field, and discards the whole message when the two disagree
+        // (llvoavatar.cpp:9663-9690, :9720-9723) — which is what kept a bit-0 region's avatars in the cloud
+        // state: block said 1, parameter said 0. The two are made to agree here, on a copy, for exactly the
+        // avatars that carry the block. cofVersion < 0 leaves both the parameters and the packet untouched -
+        // with one exception, below.
+        byte[] visualParams;
+        if (cofVersion >= 0)
+            visualParams = AvatarAppearance.WithAppearanceVersion(Appearance.VisualParams, 1);
+        else if (IsNPC)
+            // SSB-NPC-1: an NPC's appearance is a clone of its owner's, parameter 11000 included, and an owner on a
+            // server-bake region sends that parameter as 1. Nothing ever bakes an NPC, so its message has no
+            // AppearanceData block - and a parameter of 1 beside no block puts the viewer on the server-bake path
+            // for this avatar (resolve_appearance_version prefers the parameter), which fetches every baked face
+            // from the appearance service under the NPC's UUID. No index lives there, every channel is a 404, and
+            // the NPC never leaves the cloud state. Say 0 - the message every avatar carried before SSB - and the
+            // viewer fetches the stored bake assets the faces name from the region, as it always did. On a copy:
+            // the parameter is a property of the message, not of the appearance.
+            visualParams = AvatarAppearance.WithAppearanceVersion(Appearance.VisualParams, 0);
+        else
+            visualParams = Appearance.VisualParams;
+
+        avatar.ControllingClient.SendAppearance(UUID, visualParams, Appearance.Texture.GetBakesBytes(), Appearance.AvatarPreferencesHoverZ, cofVersion);
     }
 
     public void SendAnimPackToAgent(ScenePresence p)

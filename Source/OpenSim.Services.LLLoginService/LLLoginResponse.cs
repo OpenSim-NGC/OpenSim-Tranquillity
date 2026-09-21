@@ -179,6 +179,13 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
 
     private string searchURL;
 
+    /// <summary>
+    /// Where the viewer fetches other avatars' server-side bakes: <c>agent_appearance_service</c> in the login
+    /// response (viewer contract V6). Empty means "this grid has none", and the key is then left out of the
+    /// response entirely rather than sent empty — see <see cref="ToHashtable"/>.
+    /// </summary>
+    private string agentAppearanceServiceURL = String.Empty;
+
     // Error Flags
     private string errorReason;
     private string errorMessage;
@@ -463,6 +470,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
         profileURL = String.Empty;
         openIDURL = String.Empty;
         searchURL = String.Empty;
+        agentAppearanceServiceURL = String.Empty;
 
         currency = String.Empty;
         ClassifiedFee = "0";
@@ -537,6 +545,13 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
 
             if (searchURL != String.Empty)
                 responseData["search"] = searchURL;
+
+            // V6: with no service the viewer logs "AgentAppearanceServiceURL not set - Baked texture requests
+            // will fail" and never textures anyone on a bit-0 region (llvoavatar.cpp:5901-5906). Omitting the key
+            // is the honest form of "we have none"; the viewer only adopts a non-empty value anyway
+            // (llstartup.cpp:4047-4051).
+            if (agentAppearanceServiceURL != String.Empty)
+                responseData["agent_appearance_service"] = agentAppearanceServiceURL;
 
             if (mapTileURL != String.Empty)
                 responseData["map-server-url"] = mapTileURL;
@@ -678,6 +693,9 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
 
             if (searchURL != String.Empty)
                 map["search"] = OSD.FromString(searchURL);
+
+            if (agentAppearanceServiceURL != String.Empty)
+                map["agent_appearance_service"] = OSD.FromString(agentAppearanceServiceURL);
 
             if (ClassifiedFee != String.Empty)
                 map["classified_fee"] = OSD.FromString(ClassifiedFee);
@@ -1067,6 +1085,13 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
     {
         get { return searchURL; }
         set { searchURL = value; }
+    }
+
+    /// <summary>See <see cref="agentAppearanceServiceURL"/>. Set by the login service from config; empty by default.</summary>
+    public string AgentAppearanceServiceURL
+    {
+        get { return agentAppearanceServiceURL; }
+        set { agentAppearanceServiceURL = value ?? String.Empty; }
     }
 
     public string Message

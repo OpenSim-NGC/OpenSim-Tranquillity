@@ -566,6 +566,11 @@ public class TestClient : IClientAPI, IClientCore
     {
     }
 
+    public virtual void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hover, int cofVersion)
+    {
+    }
+
+
     public virtual void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hover)
     {
     }
@@ -849,6 +854,14 @@ public class TestClient : IClientAPI, IClientCore
     public virtual void SendPlayAttachedSound(UUID soundID, UUID objectID, UUID ownerID, float gain,
                                               byte flags)
     {
+    }
+
+    /// <summary>
+    /// Test seam: raise <see cref="OnAvatarNowWearing"/> as if an AgentIsNowWearing packet had arrived.
+    /// </summary>
+    public void TriggerAvatarNowWearing(AvatarWearingArgs e)
+    {
+        OnAvatarNowWearing?.Invoke(this, e);
     }
 
     public void SendTriggeredSound(UUID soundID, UUID ownerID, UUID objectID, UUID parentID, ulong handle, Vector3 position, float gain)

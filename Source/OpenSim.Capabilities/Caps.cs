@@ -193,10 +193,14 @@ public class Caps : IDisposable
         m_capsHandlers[capName] = handler;
     }
 
-    public void RegisterSimpleHandler(string capName, ISimpleStreamHandler handler, bool addToListener = true)
+    /// <param name="varPath">
+    /// True when the capability serves paths below its own URL rather than only the URL itself. Every existing
+    /// cap answers on its exact URL and leaves this false; AIS v3 is the first that does not.
+    /// </param>
+    public void RegisterSimpleHandler(string capName, ISimpleStreamHandler handler, bool addToListener = true, bool varPath = false)
     {
         //m_log.LogDebug("[CAPS]: Registering handler for \"{0}\": path {1}", capName, handler.Path);
-        m_capsHandlers.AddSimpleHandler(capName, handler, addToListener);
+        m_capsHandlers.AddSimpleHandler(capName, handler, addToListener, varPath);
     }
 
     public void RegisterPollHandler(string capName, PollServiceEventArgs pollServiceHandler)

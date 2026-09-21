@@ -1297,6 +1297,28 @@
     ;;   AdminsOnly                               — grid administrators/gods only
     ; ExperienceCreators = EstateManagersAndRegionOwners
 
+[AIS]
+    ;; AIS v3 (InventoryAPIv3 / LibraryAPIv3) for the whole simulator. See [AIS] in OpenSimDefaults.ini for what
+    ;; enabling it means - it routes ALL of an LL viewer's inventory traffic through it. One line, no region named:
+    ;;
+    ; Enabled = true
+    ;;
+    ;; A single region opts OUT with AIS_Enabled = false in its own [<Region Name>] section. A region section is
+    ;; never the way to opt in.
+
+
+[Appearance]
+    ;; Server-side baking for the whole simulator. See [Appearance] in OpenSimDefaults.ini. One line, no region
+    ;; named:
+    ;;
+    ; ServerSideBaking = true
+    ;;
+    ;; A single region opts OUT with ServerSideBaking = false in its own [<Region Name>] section.
+    ;;
+    ;; Those two lines - [AIS] Enabled and [Appearance] ServerSideBaking - are the whole switch. Each region logs
+    ;; one line at INFO when it loads saying which config decided, "(global)" or "(region section)".
+
+
 [Architecture]
     ;# {Include-Architecture} {} {Choose one of the following architectures} {config-include/Standalone.ini config-include/StandaloneHypergrid.ini config-include/Grid.ini config-include/GridHypergrid.ini} config-include/Standalone.ini
     ;; Uncomment one of the following includes as required.  For instance, to create a standalone OpenSim,

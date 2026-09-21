@@ -86,6 +86,52 @@ public class AvatarAppearance
         set { m_visualparams = value; }
     }
 
+    /// <summary>
+    /// Index of the <c>AppearanceMessage_Version</c> visual parameter (<c>avatar_lad.xml</c> id 11000) in the
+    /// wire array — the same slot <see cref="VPElement._APPEARANCEMESSAGE_VERSION"/> names.
+    /// </summary>
+    public const int APPEARANCE_VERSION_PARAM_INDEX = (int)VPElement._APPEARANCEMESSAGE_VERSION;
+
+    /// <summary>
+    /// A copy of <paramref name="visualParams"/> with the appearance-version parameter set to
+    /// <paramref name="version"/>, for an avatar this simulator baked.
+    ///
+    /// <para>
+    /// The viewer reads the appearance version from two places and <b>prefers the parameter</b>:
+    /// <c>resolve_appearance_version</c> takes <c>mParamAppearanceVersion</c> when it is set and only falls back
+    /// to the <c>AppearanceData</c> field otherwise (<c>llvoavatar.cpp:9663-9690</c>). Worse, when both are
+    /// present and they <i>disagree</i> it logs "inconsistent appearance_version settings" and returns false, and
+    /// the caller then discards the entire appearance message — "bad appearance version info, discarding"
+    /// (<c>:9720-9723</c>). The avatar never gets its TextureEntry, so it never fetches a bake and never leaves
+    /// the cloud state.
+    /// </para>
+    ///
+    /// <para>
+    /// The parameter is transmitted as a byte mapped through the parameter's own range, and id 11000 is declared
+    /// <c>value_min="0" value_max="255"</c> (<c>avatar_lad.xml</c>), so <c>U8_to_F32</c> is the identity there
+    /// (<c>llvoavatar.cpp:9628-9630</c>, <c>:9650-9658</c>): the byte must literally equal the version in the
+    /// <c>AppearanceData</c> block, which for a server bake is 1.
+    /// </para>
+    ///
+    /// <para>
+    /// Never mutates its argument. A flag-off region must keep sending the avatar's own stored parameters
+    /// untouched, and this value is not part of the avatar's appearance — it is a property of the message.
+    /// An array too short to hold the slot is returned as-is: the viewer will not find the parameter among the
+    /// transmitted blocks either, and an absent parameter with a present field resolves to the field.
+    /// </para>
+    /// </summary>
+    public static byte[] WithAppearanceVersion(byte[] visualParams, byte version)
+    {
+        if (visualParams is null || visualParams.Length <= APPEARANCE_VERSION_PARAM_INDEX)
+            return visualParams;
+        if (visualParams[APPEARANCE_VERSION_PARAM_INDEX] == version)
+            return visualParams;
+
+        byte[] copy = (byte[])visualParams.Clone();
+        copy[APPEARANCE_VERSION_PARAM_INDEX] = version;
+        return copy;
+    }
+
     public Vector3 AvatarSize
     {
         get { return m_avatarSize; }

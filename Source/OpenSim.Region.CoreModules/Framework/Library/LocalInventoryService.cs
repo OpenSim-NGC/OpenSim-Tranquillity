@@ -201,6 +201,7 @@ public class LocalInventoryService : IInventoryService
     /// <returns>true if the item was successfully deleted</returns>
     //bool DeleteItem(InventoryItemBase item);
     public bool DeleteFolders(UUID userID, List<UUID> folderIDs) { return false; }
+    public bool DeleteFolders(UUID userID, List<UUID> folderIDs, bool onlyIfTrash) { return false; }
 
     /// <summary>
     /// Purge an inventory folder of all its items and subfolders.

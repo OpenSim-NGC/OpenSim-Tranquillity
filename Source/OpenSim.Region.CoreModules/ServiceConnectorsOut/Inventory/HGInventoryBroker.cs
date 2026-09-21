@@ -438,6 +438,23 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
         return connector.DeleteFolders(ownerID, folderIDs);
     }
 
+    public bool DeleteFolders(UUID ownerID, List<UUID> folderIDs, bool onlyIfTrash)
+    {
+        if (folderIDs == null)
+            return false;
+        if (folderIDs.Count == 0)
+            return false;
+
+        string invURL = GetInventoryServiceURL(ownerID);
+
+        if (invURL is null) // not there, forward to local inventory connector to resolve
+            return m_LocalGridInventoryService.DeleteFolders(ownerID, folderIDs, onlyIfTrash);
+
+        IInventoryService connector = GetConnector(invURL);
+
+        return connector.DeleteFolders(ownerID, folderIDs, onlyIfTrash);
+    }
+
     public bool MoveFolder(InventoryFolderBase folder)
     {
         if (folder == null)

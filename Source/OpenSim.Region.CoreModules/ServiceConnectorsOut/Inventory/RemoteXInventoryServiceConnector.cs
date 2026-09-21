@@ -243,6 +243,16 @@ public class RemoteXInventoryServicesConnector : ISharedRegionModule, IInventory
         return m_RemoteConnector.DeleteFolders(ownerID, folderIDs);
     }
 
+    public bool DeleteFolders(UUID ownerID, List<UUID> folderIDs, bool onlyIfTrash)
+    {
+        if (folderIDs == null)
+            return false;
+        if (folderIDs.Count == 0)
+            return false;
+
+        return m_RemoteConnector.DeleteFolders(ownerID, folderIDs, onlyIfTrash);
+    }
+
 
     public  bool PurgeFolder(InventoryFolderBase folder)
     {

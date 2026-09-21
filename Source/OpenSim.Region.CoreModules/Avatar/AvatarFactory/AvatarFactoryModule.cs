@@ -82,6 +82,7 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
 
         scene.RegisterModuleInterface<IAvatarFactoryModule>(this);
         scene.EventManager.OnNewClient += SubscribeToClientEvents;
+        scene.EventManager.OnRemovePresence += FlushAppearanceSaveOnClose;
     }
 
     public void RemoveRegion(Scene scene)
@@ -90,9 +91,61 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
         {
             scene.UnregisterModuleInterface<IAvatarFactoryModule>(this);
             scene.EventManager.OnNewClient -= SubscribeToClientEvents;
+            scene.EventManager.OnRemovePresence -= FlushAppearanceSaveOnClose;
         }
 
         m_scene = null;
+    }
+
+    /// <summary>
+    /// Write a pending appearance change before the presence goes away.
+    ///
+    /// <para><b>The defect this closes.</b> <see cref="QueueAppearanceSave"/> defers the write by
+    /// <c>m_savetime</c> seconds, and <see cref="SaveAppearance"/> resolves the <c>ScenePresence</c> only when the
+    /// timer finally fires. If the agent left in between, the presence was gone and the write was skipped
+    /// **silently**: the change stayed in memory and died with the presence. A detach followed by a logout inside
+    /// the save window therefore left the stored appearance still wearing the garment, and the viewer put the item
+    /// back on the next login. Wear is affected identically. This predates AIS and hits the legacy path just as
+    /// hard: it is a property of the deferred save, not of whichever protocol requested the change.</para>
+    ///
+    /// <para><b>Why <c>OnRemovePresence</c> is the right hook.</b> <c>Scene.RemoveClient</c> raises it at
+    /// <c>Scene.cs:3866</c>, while the presence is still in the scene graph: it is not removed until
+    /// <c>m_sceneGraph.RemoveScenePresence</c> in the <c>finally</c> block at <c>:3898</c>, and not disposed until
+    /// <c>:3905</c>. So <c>GetScenePresence</c> still resolves here — which is precisely what
+    /// <see cref="SaveAppearance"/> needs and precisely what it lacks when the timer fires later. Nothing between
+    /// the event and the removal changes appearance either: <c>DeRezAttachments</c> (<c>:3871</c>) saves the
+    /// attachment *objects* and calls <c>ScenePresence.ClearAttachments</c>, which only empties the group list
+    /// (<c>ScenePresence.cs:5488-5492</c>) and never touches <c>Appearance</c>.</para>
+    ///
+    /// <para><b>No extra write per session.</b> The queue is consulted, never forced: with nothing pending this
+    /// writes nothing. A session that changed no appearance costs one dictionary lookup.</para>
+    ///
+    /// <para><b>Child agents are skipped.</b> A child agent's <c>Appearance</c> is a copy of state owned by
+    /// whichever region holds the root, so writing it from here could publish a stale outfit over a newer one. On
+    /// a teleport the source's root is converted by <c>ScenePresence.MakeChildAgent</c>, not by
+    /// <c>RemoveClient</c>, and the appearance travels to the destination in the agent data — so skipping loses
+    /// nothing and not skipping risks a stale overwrite.</para>
+    /// </summary>
+    private void FlushAppearanceSaveOnClose(UUID agentId)
+    {
+        // Only a genuinely pending change earns a write; an unchanged session must stay free.
+        if (!m_savequeue.TryRemove(agentId, out _))
+            return;
+
+        ScenePresence sp = m_scene?.GetScenePresence(agentId);
+        if (sp is null)
+        {
+            m_log.LogWarning(
+                "[AVFACTORY]: pending appearance change for {AgentId} could not be flushed on close - no presence. The change is lost.",
+                agentId);
+            return;
+        }
+
+        if (sp.IsChildAgent)
+            return;
+
+        m_log.LogDebug("[AVFACTORY]: flushing pending appearance save for {AgentId} on close", agentId);
+        SaveAppearance(new List<UUID> { agentId });
     }
 
     public void RegionLoaded(Scene scene)
@@ -333,6 +386,17 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
 
     public void QueueAppearanceSave(UUID agentid)
     {
+        // S8: a child presence's appearance is a copy of the root's, carried for drawing. It is not authoritative
+        // and must never reach the avatar service - see the guard in SaveAppearance for what happened when it did.
+        var queueing = m_scene?.GetScenePresence(agentid);
+        if (queueing is not null && queueing.IsChildAgent)
+        {
+            m_log.LogDebug(
+                "[AVFACTORY]: not queueing an appearance save for {AgentId} in {Region}: child presence, the root region owns this appearance",
+                agentid, m_scene.Name);
+            return;
+        }
+
 //            m_log.LogDebug("[AVFACTORY]: Queueing appearance save for {0}", agentid);
 
         // 10000 ticks per millisecond, 1000 milliseconds per second
@@ -816,7 +880,29 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
         {
             ScenePresence sp = m_scene.GetScenePresence(id);
             if(sp == null)
+            {
+                // The presence went away between queueing and firing, so the change can no longer be read and is
+                // lost. FlushAppearanceSaveOnClose exists to make this unreachable on a normal close; if it is
+                // ever reached again, something closes a presence by a path that does not raise OnRemovePresence,
+                // and that must not be silent a second time.
+                m_log.LogWarning(
+                    "[AVFACTORY]: dropping queued appearance save for {AgentId}: no presence when the save fired. The change is lost.",
+                    id);
                 continue;
+            }
+            if (sp.IsChildAgent)
+            {
+                // S8: the authoritative write barrier. Everything below resolves items against THIS region's
+                // inventory view and then writes the result to the avatar service; on a child presence that is a
+                // write about an avatar another region owns, made from a presence that is only a copy. On
+                // 2026-09-05 a save that ran on a non-root presence resolved four body-part items it could not
+                // see, and the stored record lost skin, hair, eyes and shirt (slots 1-4).
+                m_log.LogDebug(
+                    "[AVFACTORY]: skipping appearance save for {AgentId} in {Region}: child presence",
+                    id, m_scene.Name);
+                continue;
+            }
+
             // This could take awhile since it needs to pull inventory
             // We need to do it at the point of save so that there is a sufficient delay for any upload of new body part/shape
             // assets and item asset id changes to complete.
@@ -826,7 +912,13 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
             SetAppearanceAssets(id, sp.Appearance);
 
             m_scene.AvatarService.SetAppearance(id, sp.Appearance);
-            //m_scene.EventManager.TriggerAvatarAppearanceChanged(sp);
+
+            // The appearance is now applied AND persisted: SetAppearanceAssets has resolved every worn item to
+            // its asset id, and the avatar service has the result. This is the only point in the region where
+            // both are true, which is why server-side baking triggers off it rather than off the arrival of a
+            // change (Design Brief §4.6, Ledger Q-16). Uncommented in S5; the event has existed unused since
+            // before this fork.
+            m_scene.EventManager.TriggerAvatarAppearanceChanged(sp);
         }
     }
 
@@ -870,11 +962,26 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
                     }
                     else
                     {
+                        // S8: KEEP the slot. The message this replaced said "setting to default" and the code
+                        // then did something worse than that - it removed the wearable outright, so the slot went
+                        // empty, and because the very next statement in SaveAppearance persists the whole
+                        // appearance (and AvatarService.SetAvatar deletes every row before rewriting,
+                        // AvatarService.cs:93), the slot vanished from the stored record altogether. An item id
+                        // this region cannot resolve is a statement about the inventory lookup, not about what
+                        // the avatar is wearing: a stale viewer cache, an inventory service that answered late or
+                        // not at all, or an item from another grid will all produce it, and in each case the
+                        // wearable the agent already has is the better answer than none.
+                        //
+                        // This is the same failure S0c fixed for a different input. There the viewer LISTED fewer
+                        // slots than were worn and the unlisted ones were dropped; here the slot IS listed and
+                        // the item behind it cannot be resolved. S0c merged instead of replacing; this keeps
+                        // instead of removing. Both leave the last known good wearable in place.
+                        //
+                        // Inherited from upstream unchanged (OpenSim-NGC develop a68d59f232,
+                        // AvatarFactoryModule.cs:871-878).
                         m_log.LogWarning(
-                            "[AVFACTORY]: Can't find inventory item {0} for {1}, setting to default",
-                            appearance.Wearables[i][j].ItemID, (WearableType)i);
-
-                        appearance.Wearables[i].RemoveItem(appearance.Wearables[i][j].ItemID);
+                            "[AVFACTORY]: agent {AgentId} slot {Slot} ({SlotIndex}) names item {ItemId}, which this region cannot resolve; keeping the wearable already in the slot and leaving it out of this save's asset resolution",
+                            userID, (WearableType)i, i, appearance.Wearables[i][j].ItemID);
                     }
                 }
             }
@@ -1201,36 +1308,113 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
             return;
         }
 
-        // operate on a copy of the appearance so we don't have to lock anything yet
-        AvatarAppearance avatAppearance = new AvatarAppearance(sp.Appearance, false);
+        // S0c (Ledger R-4 / Q-3): merge the viewer's list INTO the existing wearables instead of
+        // starting from an empty set. Historically this built a fresh AvatarAppearance with
+        // copyWearables=false and filled only the slots the viewer mentioned, so any partial
+        // AgentIsNowWearing (incomplete inventory fetch, bot, gateway) silently deleted every
+        // wearable it did not list, and the loss was persisted and self-reinforcing.
+        //
+        // Semantics preserved from the old code for slots the viewer DID mention: the slot is
+        // replaced by exactly the listed items, and an ItemID of UUID.Zero contributes nothing
+        // (AvatarWearable.Add ignores Zero), so "type X, item Zero" still means "clear slot X".
+        // Only unlisted slots change behaviour: they now keep their current contents.
+        AvatarWearable[] merged = MergeNowWearing(sp.Appearance.Wearables, e.NowWearing, out bool changed);
 
-        foreach (AvatarWearingArgs.Wearable wear in e.NowWearing)
+        if (!changed)
         {
-            // If the wearable type is larger than the current array, expand it
-            if (avatAppearance.Wearables.Length <= wear.Type)
-            {
-                int currentLength = avatAppearance.Wearables.Length;
-                AvatarWearable[] wears = avatAppearance.Wearables;
-                Array.Resize(ref wears, wear.Type + 1);
-                for (int i = currentLength ; i <= wear.Type ; i++)
-                    wears[i] = new AvatarWearable();
-                avatAppearance.Wearables = wears;
-            }
-            avatAppearance.Wearables[wear.Type].Add(wear.ItemID, UUID.Zero);
+            // m_log.LogDebug("[AVFACTORY]: AgentIsNowWearing for {0} matches stored wearables; nothing to persist", client.AgentId);
+            return;
         }
-
-        avatAppearance.GetAssetsFrom(sp.Appearance);
 
         lock (m_setAppearanceLock)
         {
             // Update only those fields that we have changed. This is important because the viewer
             // often sends AvatarIsWearing and SetAppearance packets at once, and AvatarIsWearing
             // shouldn't overwrite the changes made in SetAppearance.
-            sp.Appearance.Wearables = avatAppearance.Wearables;
+            sp.Appearance.Wearables = merged;
             // We don't need to send the appearance here since the "iswearing" will trigger a new set
             // of visual param and baked texture changes. When those complete, the new appearance will be sent
             QueueAppearanceSave(client.AgentId);
         }
+    }
+
+    /// <summary>
+    /// Apply an AgentIsNowWearing list to an existing wearable set.
+    /// </summary>
+    /// <remarks>
+    /// Pure function; neither argument is mutated. Rules:
+    /// <list type="bullet">
+    /// <item>A wearable type that appears in <paramref name="nowWearing"/> is replaced by exactly the
+    /// listed items for that type (in order, capped by <see cref="AvatarWearable.Add"/>). Asset ids are
+    /// carried over from <paramref name="existing"/> for items already known in that slot; new items get
+    /// <see cref="UUID.Zero"/> and are resolved later on save, as before.</item>
+    /// <item>A listed item with <see cref="UUID.Zero"/> as its id contributes nothing, so a type listed only
+    /// with Zero ends up empty. This is the historical meaning of Zero ("not wearing this type").</item>
+    /// <item>A wearable type that does not appear in <paramref name="nowWearing"/> keeps its current items.</item>
+    /// </list>
+    /// </remarks>
+    /// <param name="existing">The agent's current wearables. May be null (treated as empty).</param>
+    /// <param name="nowWearing">The viewer's list.</param>
+    /// <param name="changed">True if the returned set differs from <paramref name="existing"/> in any item id.</param>
+    /// <returns>A new array; safe to assign to <see cref="AvatarAppearance.Wearables"/>.</returns>
+    public static AvatarWearable[] MergeNowWearing(
+        AvatarWearable[] existing, IEnumerable<AvatarWearingArgs.Wearable> nowWearing, out bool changed)
+    {
+        existing ??= Array.Empty<AvatarWearable>();
+
+        int length = existing.Length;
+        var listedTypes = new HashSet<int>();
+        foreach (AvatarWearingArgs.Wearable wear in nowWearing)
+        {
+            listedTypes.Add(wear.Type);
+            if (wear.Type >= length)
+                length = wear.Type + 1;
+        }
+
+        AvatarWearable[] merged = new AvatarWearable[length];
+        for (int i = 0; i < length; i++)
+        {
+            merged[i] = new AvatarWearable();
+            if (listedTypes.Contains(i))
+                continue;
+
+            // Unlisted slot: keep what the agent already has.
+            if (i < existing.Length && existing[i] != null)
+            {
+                for (int j = 0; j < existing[i].Count; j++)
+                    merged[i].Add(existing[i][j].ItemID, existing[i][j].AssetID);
+            }
+        }
+
+        foreach (AvatarWearingArgs.Wearable wear in nowWearing)
+        {
+            // Listed slot: exactly the listed items. Add() ignores UUID.Zero, so a Zero entry clears.
+            UUID assetID = UUID.Zero;
+            if (wear.Type < existing.Length && existing[wear.Type] != null)
+                assetID = existing[wear.Type].GetAsset(wear.ItemID);
+            merged[wear.Type].Add(wear.ItemID, assetID);
+        }
+
+        changed = !SameItemIds(existing, merged);
+        return merged;
+    }
+
+    private static bool SameItemIds(AvatarWearable[] a, AvatarWearable[] b)
+    {
+        int length = Math.Max(a.Length, b.Length);
+        for (int i = 0; i < length; i++)
+        {
+            int ca = (i < a.Length && a[i] != null) ? a[i].Count : 0;
+            int cb = (i < b.Length && b[i] != null) ? b[i].Count : 0;
+            if (ca != cb)
+                return false;
+            for (int j = 0; j < ca; j++)
+            {
+                if (a[i][j].ItemID != b[i][j].ItemID)
+                    return false;
+            }
+        }
+        return true;
     }
 
 /*

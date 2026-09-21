@@ -33,7 +33,17 @@ namespace OpenSim.Region.Framework.Interfaces;
 
 public interface IAgentAssetTransactions
 {
-    void HandleItemUpdateFromTransaction(IClientAPI remoteClient, UUID transactionID,
+    /// <summary>
+    /// Apply the asset an xfer transaction uploaded to an inventory item.
+    /// </summary>
+    /// <returns>
+    /// A19: <b>false when the update was refused</b> - the referenced assets did not validate, so the asset was not
+    /// stored and the item still points at what it pointed at before. It returns true when the update was applied
+    /// and also when the xfer is still in flight, because at that point nothing has been validated and the region
+    /// cannot honestly say the save failed; the caller learns of a later refusal the same way the legacy route
+    /// does, through the alert and the bulk inventory update the uploader sends.
+    /// </returns>
+    bool HandleItemUpdateFromTransaction(IClientAPI remoteClient, UUID transactionID,
                                          InventoryItemBase item);
 
     bool HandleItemCreationFromTransaction(IClientAPI remoteClient, UUID transactionID, UUID folderID,

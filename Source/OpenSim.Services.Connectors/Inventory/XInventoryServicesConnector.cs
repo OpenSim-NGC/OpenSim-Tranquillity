@@ -370,17 +370,31 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
 
     public bool DeleteFolders(UUID principalID, List<UUID> folderIDs)
     {
+        return DeleteFolders(principalID, folderIDs, true);
+    }
+
+    /// <remarks>
+    /// ONLYIFTRASH is sent only when it is false, so an older Robust that does not know the field keeps its
+    /// current trash-only behaviour and a newer one honours the flag (XInventoryInConnector defaults it to true
+    /// when absent).
+    /// </remarks>
+    public bool DeleteFolders(UUID principalID, List<UUID> folderIDs, bool onlyIfTrash)
+    {
         List<string> slist = [];
 
         foreach (UUID f in folderIDs)
             slist.Add(f.ToString());
 
-        Dictionary<string,object> ret = MakeRequest(
-                new Dictionary<string,object> {
-                    { "METHOD", "DELETEFOLDERS"},
-                    { "PRINCIPAL", principalID.ToString() },
-                    { "FOLDERS", slist }
-                });
+        Dictionary<string,object> request = new()
+        {
+            { "METHOD", "DELETEFOLDERS"},
+            { "PRINCIPAL", principalID.ToString() },
+            { "FOLDERS", slist }
+        };
+        if (!onlyIfTrash)
+            request["ONLYIFTRASH"] = "0";
+
+        Dictionary<string,object> ret = MakeRequest(request);
 
         return CheckReturn(ret);
     }

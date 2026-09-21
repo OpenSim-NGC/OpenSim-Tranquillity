@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AIS v3 error body (AIS-V3-SPEC.md 1f): must be an LLSD map (llaisapi.cpp:882-885) and must not carry
+     item_id/category_id + parent_id pairs, because the viewer parses every response as an update (:946).
+     The keys below are conventional; the permitted viewer lines read none of them. -->
+<llsd>
+<map>
+  <key>error_code</key><integer>501</integer>
+  <key>error_description</key><string>NotImplemented</string>
+  <key>message</key><string>FetchCategoryChildren is not implemented</string>
+</map>
+</llsd>
