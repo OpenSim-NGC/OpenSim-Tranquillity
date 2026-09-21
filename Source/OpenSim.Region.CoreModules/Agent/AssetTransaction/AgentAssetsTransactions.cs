@@ -185,7 +185,8 @@ public class AgentAssetTransactions
         uploader.RequestUpdateTaskInventoryItem(remoteClient, item);
     }
 
-    public void RequestUpdateInventoryItem(IClientAPI remoteClient,
+    /// <returns>A19: false when the update was refused; see <see cref="IAgentAssetTransactions"/>.</returns>
+    public bool RequestUpdateInventoryItem(IClientAPI remoteClient,
             UUID transactionID, InventoryItemBase item)
     {
         AssetXferUploader uploader = RequestXferUploader(transactionID);
@@ -201,6 +202,6 @@ public class AgentAssetTransactions
                 uploader.SetOldData(oldAsset.Data);
         }
 
-        uploader.RequestUpdateInventoryItem(remoteClient, item);
+        return uploader.RequestUpdateInventoryItem(remoteClient, item);
     }
 }

@@ -181,7 +181,8 @@ public class AssetTransactionModule : INonSharedRegionModule,
     /// <param name="remoteClient"></param>
     /// <param name="transactionID"></param>
     /// <param name="item"></param>
-    public void HandleItemUpdateFromTransaction(IClientAPI remoteClient,
+    /// <returns>A19: false when the update was refused; see <see cref="IAgentAssetTransactions"/>.</returns>
+    public bool HandleItemUpdateFromTransaction(IClientAPI remoteClient,
             UUID transactionID, InventoryItemBase item)
     {
 //            m_log.LogDebug(
@@ -190,7 +191,7 @@ public class AssetTransactionModule : INonSharedRegionModule,
 
         AgentAssetTransactions transactions = GetUserTransactions(remoteClient.AgentId);
 
-        transactions.RequestUpdateInventoryItem(remoteClient, transactionID, item);
+        return transactions.RequestUpdateInventoryItem(remoteClient, transactionID, item);
     }
 
     /// <summary>

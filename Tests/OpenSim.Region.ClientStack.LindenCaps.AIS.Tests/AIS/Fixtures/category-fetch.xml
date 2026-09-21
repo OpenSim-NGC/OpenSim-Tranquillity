@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AIS v3 GET /category/{id}/children?depth=1 response (AIS-V3-SPEC.md 1c/1d, llaisapi.cpp:1203-1206, 1327-1464, 1466-1482).
+     A category is a map with category_id, parent_id, agent_id, version and _embedded holding ALL THREE collections
+     (categories, items, links) keyed by uuid string; links are a separate collection from items. Field names beyond
+     those the permitted viewer lines read (name, type_default, permissions, sale_info, ...) are A-Q1, UNVERIFIED. -->
+<llsd>
+<map>
+  <key>category_id</key><uuid>11111111-1111-4111-8111-111111111111</uuid>
+  <key>parent_id</key><uuid>00000000-0000-0000-0000-000000000001</uuid>
+  <key>agent_id</key><uuid>aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa</uuid>
+  <key>name</key><string>Clothing</string>
+  <key>type_default</key><integer>5</integer>
+  <key>version</key><integer>7</integer>
+  <key>_embedded</key>
+  <map>
+    <key>categories</key>
+    <map>
+      <key>66666666-6666-4666-8666-666666666666</key>
+      <map>
+        <key>category_id</key><uuid>66666666-6666-4666-8666-666666666666</uuid>
+        <key>parent_id</key><uuid>11111111-1111-4111-8111-111111111111</uuid>
+        <key>agent_id</key><uuid>aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa</uuid>
+        <key>name</key><string>Outfits</string>
+        <key>type_default</key><integer>-1</integer>
+        <key>version</key><integer>2</integer>
+        <key>_embedded</key>
+        <map>
+          <key>categories</key><map></map>
+          <key>items</key><map></map>
+          <key>links</key><map></map>
+        </map>
+      </map>
+    </map>
+    <key>items</key>
+    <map>
+      <key>22222222-2222-4222-8222-222222222222</key>
+      <map>
+        <key>item_id</key><uuid>22222222-2222-4222-8222-222222222222</uuid>
+        <key>parent_id</key><uuid>11111111-1111-4111-8111-111111111111</uuid>
+        <key>agent_id</key><uuid>aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa</uuid>
+        <key>asset_id</key><uuid>77777777-7777-4777-8777-777777777777</uuid>
+        <key>name</key><string>Blue Shirt</string>
+        <key>desc</key><string></string>
+        <key>type</key><integer>5</integer>
+        <key>inv_type</key><integer>18</integer>
+        <key>flags</key><integer>4</integer>
+        <key>created_at</key><integer>1756900000</integer>
+        <key>permissions</key>
+        <map>
+          <key>base_mask</key><integer>2147483647</integer>
+          <key>owner_mask</key><integer>2147483647</integer>
+          <key>group_mask</key><integer>0</integer>
+          <key>everyone_mask</key><integer>0</integer>
+          <key>next_owner_mask</key><integer>532480</integer>
+          <key>creator_id</key><uuid>aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa</uuid>
+          <key>owner_id</key><uuid>aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa</uuid>
+          <key>group_id</key><uuid>00000000-0000-0000-0000-000000000000</uuid>
+          <key>is_owner_group</key><boolean>false</boolean>
+        </map>
+        <key>sale_info</key>
+        <map>
+          <key>sale_type</key><integer>0</integer>
+          <key>sale_price</key><integer>10</integer>
+        </map>
+      </map>
+    </map>
+    <key>links</key>
+    <map>
+      <key>88888888-8888-4888-8888-888888888888</key>
+      <map>
+        <key>item_id</key><uuid>88888888-8888-4888-8888-888888888888</uuid>
+        <key>parent_id</key><uuid>11111111-1111-4111-8111-111111111111</uuid>
+        <key>agent_id</key><uuid>aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa</uuid>
+        <key>linked_id</key><uuid>22222222-2222-4222-8222-222222222222</uuid>
+        <key>name</key><string>Blue Shirt</string>
+        <key>desc</key><string>@clothing</string>
+        <key>type</key><integer>24</integer>
+        <key>inv_type</key><integer>18</integer>
+        <key>flags</key><integer>4</integer>
+        <key>created_at</key><integer>1756900001</integer>
+      </map>
+    </map>
+  </map>
+</map>
+</llsd>

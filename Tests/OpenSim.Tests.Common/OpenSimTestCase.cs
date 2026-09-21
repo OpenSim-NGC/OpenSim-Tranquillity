@@ -29,7 +29,18 @@ using OpenSim.Framework.Servers;
 
 namespace OpenSim.Tests.Common;
 
-public class OpenSimTestCase : IDisposable
+/// <summary>
+/// Base class for every xunit test class in the tree. xunit constructs a fresh instance per test; NUnit's
+/// per-test [SetUp] is reproduced through <see cref="IAsyncLifetime.InitializeAsync"/>, which xunit calls after
+/// the constructor (subclass constructor bodies included) and before the test method, exactly where NUnit ran
+/// [SetUp]. Subclasses override <see cref="SetUp"/> and call base.SetUp(). Teardown stays on
+/// <see cref="Dispose"/>: xunit 2 calls DisposeAsync and then Dispose, so DisposeAsync is a no-op.
+///
+/// History: the xunit migration (#197) turned the subclasses' [SetUp] methods into overrides of SetUp() and
+/// nothing invoked them, so every test relying on fields assigned in SetUp ran against null
+/// (Docs/feature/repo-audit/T1-TEST-FIXTURES.md).
+/// </summary>
+public class OpenSimTestCase : IDisposable, Xunit.IAsyncLifetime
 {
     protected OpenSimTestCase()
     {
@@ -48,12 +59,22 @@ public class OpenSimTestCase : IDisposable
     }
 
     /// <summary>
-    /// For subclasses that override SetUp() - provides per-test setup functionality.
+    /// Per-test setup, run before every test method (the NUnit [SetUp] equivalent). Override and call base.SetUp().
     /// </summary>
     public virtual void SetUp()
     {
         // Override in subclasses for per-test setup
     }
+
+    /// <summary>xunit's post-construction hook: runs <see cref="SetUp"/> before the test method.</summary>
+    public virtual Task InitializeAsync()
+    {
+        SetUp();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>xunit calls this before <see cref="Dispose"/>; teardown lives in Dispose so nothing runs twice.</summary>
+    public virtual Task DisposeAsync() => Task.CompletedTask;
 
     public virtual void Dispose()
     {

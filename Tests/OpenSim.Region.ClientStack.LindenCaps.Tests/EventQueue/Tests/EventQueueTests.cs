@@ -39,6 +39,9 @@ using OpenSim.Region.CoreModules.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.OptionalModules.World.NPC;
 using OpenSim.Tests.Common;
+using Nini.Config;
+using Xunit;
+using OpenSim.Region.ClientStack.LindenCaps;
 
 namespace OpenSim.Region.ClientStack.Linden.Tests
 {
@@ -46,6 +49,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
     {
         private TestScene m_scene;
         private EventQueueGetModule m_eqgMod;
+        private BaseHttpServer m_server;
         private NPCModule m_npcMod;
 
         public override void SetUp()
@@ -56,11 +60,11 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
 
             // This is an unfortunate bit of clean up we have to do because MainServer manages things through static
             // variables and the VM is not restarted between tests.
-            MainServer.RemoveHttpServer(port);
+            // T1: MainServer is instance-based now; OpenSimTestCase removed the previous default server, so this one becomes DefaultServer.
+            MainServer.Instance.RemoveHttpServer(port);
 
-            BaseHttpServer server = new BaseHttpServer(port, false, "","","");
-            MainServer.AddHttpServer(server);
-            MainServer.Instance = server;
+            m_server = new BaseHttpServer(port, false, "","","");
+            MainServer.Instance.AddHttpServer(m_server);
 
             IConfigSource config = new IniConfigSource();
             config.AddConfig("Startup");
@@ -86,7 +90,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             SceneHelpers.AddScenePresence(m_scene, TestHelpers.ParseTail(0x1));
 
             // TODO: Add more assertions for the other aspects of event queues
-            Assert.True(MainServer.Instance.GetPollServiceHandlerKeys().Count));
+            Assert.Equal(1, m_server.GetPollServiceHandlerKeys().Count);
         }
 
         [Fact]
@@ -101,7 +105,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             m_scene.CloseAgent(spId, false);
 
             // TODO: Add more assertions for the other aspects of event queues
-            Assert.True(MainServer.Instance.GetPollServiceHandlerKeys().Count));
+            Assert.Equal(0, m_server.GetPollServiceHandlerKeys().Count);
         }
 
         [Fact]
@@ -127,7 +131,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
                     eventsResponse = m_eqgMod.GetEvents(UUID.Zero, sp.UUID);
             }
 
-            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.OK));
+            Assert.Equal((int)HttpStatusCode.OK, (int)eventsResponse["int_response_code"]);
 
 //            Console.WriteLine("Response [{0}]", (string)eventsResponse["str_response_string"]);
             string data = String.Empty;
@@ -146,7 +150,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
                     foundUpdate = true;
             }
 
-            Assert.True(foundUpdate));
+            Assert.True(foundUpdate, string.Format("Did not find {0} in response", messageName));
         }
 
         /// <summary>
@@ -164,7 +168,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
 
             Hashtable eventsResponse = m_eqgMod.GetEvents(UUID.Zero, TestHelpers.ParseTail(0x1));
 
-            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.NotFound));
+            Assert.Equal((int)HttpStatusCode.NotFound, (int)eventsResponse["int_response_code"]);
         }
 
         /// <summary>
@@ -188,7 +192,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
 
             Hashtable eventsResponse = m_eqgMod.GetEvents(UUID.Zero, npc.UUID);
 
-            Assert.True((int)eventsResponse["int_response_code"])HttpStatusCode.NotFound));
+            Assert.Equal((int)HttpStatusCode.NotFound, (int)eventsResponse["int_response_code"]);
         }
     }
 }

@@ -47,6 +47,12 @@ public class AvatarService : AvatarServiceBase, IAvatarService
         m_log.LogDebug("[AVATAR SERVICE]: Starting avatar service");
     }
 
+    /// <summary>Test seam; see <see cref="AvatarServiceBase(IConfigSource, IAvatarData)"/>.</summary>
+    protected AvatarService(IConfigSource config, IAvatarData database)
+        : base(config, database)
+    {
+    }
+
     public AvatarAppearance GetAppearance(UUID principalID)
     {
         AvatarData avatar = GetAvatar(principalID);
@@ -90,6 +96,29 @@ public class AvatarService : AvatarServiceBase, IAvatarService
                 count++;
 
 //            m_log.LogDebug("[AVATAR SERVICE]: SetAvatar for {0}, attachs={1}", principalID, count);
+
+        // The delete below is load-bearing and stays: the appearance keys are of variable cardinality
+        // (`Wearable i:j`, `_ap_<point>`) and ToAvatarAppearance reads them additively, so a row left behind by a
+        // shirt that has been taken off would put the shirt back on at the next read.
+        //
+        // What it must not take with it is another subsystem's data in the same table — server-side baking's
+        // ADR-004 index (Ledger Q-14). Those rows are read back first and rewritten immediately after the
+        // appearance keys, so an appearance save is transparent to them. Grids that have never baked pay nothing:
+        // with no preserved rows this is exactly the code that was here before, one delete and the same stores.
+        List<AvatarBaseData> preserved = null;
+        foreach (AvatarBaseData row in m_Database.Get("PrincipalID", principalID.ToString()))
+        {
+            if (row.Data is null || !row.Data.TryGetValue("Name", out string name) || !AvatarDataKeys.IsPreserved(name))
+                continue;
+            row.Data.TryGetValue("Value", out string value);
+            (preserved ??= new List<AvatarBaseData>()).Add(
+                new AvatarBaseData
+                {
+                    PrincipalID = principalID,
+                    Data = new Dictionary<string, string> { ["Name"] = name, ["Value"] = value ?? string.Empty },
+                });
+        }
+
         m_Database.Delete("PrincipalID", principalID.ToString());
 
         AvatarBaseData av = new AvatarBaseData();
@@ -100,7 +129,10 @@ public class AvatarService : AvatarServiceBase, IAvatarService
         av.Data["Value"] = avatar.AvatarType.ToString();
 
         if (!m_Database.Store(av))
+        {
+            RestorePreserved(preserved);
             return false;
+        }
 
         foreach (KeyValuePair<string,string> kvp in avatar.Data)
         {
@@ -136,11 +168,33 @@ public class AvatarService : AvatarServiceBase, IAvatarService
             if (!m_Database.Store(av))
             {
                 m_Database.Delete("PrincipalID", principalID.ToString());
+                RestorePreserved(preserved);
                 return false;
             }
         }
 
+        RestorePreserved(preserved);
         return true;
+    }
+
+    /// <summary>
+    /// Put the module-owned rows back after the appearance rows have been written. Called on the success path and
+    /// on both failure paths, because a failed appearance write is no reason to destroy a bake index that is still
+    /// pointing at valid assets. A store that fails here is logged and not fatal: the index going missing means
+    /// "re-bake", which is always safe (ADR-004).
+    /// </summary>
+    private void RestorePreserved(List<AvatarBaseData> preserved)
+    {
+        if (preserved is null)
+            return;
+
+        foreach (AvatarBaseData row in preserved)
+        {
+            if (!m_Database.Store(row))
+                m_log.LogWarning(
+                    "[AVATAR SERVICE]: could not restore preserved key {Name} for {PrincipalID} after an appearance save; it is lost and will be rebuilt",
+                    row.Data["Name"], row.PrincipalID);
+        }
     }
 
     public bool ResetAvatar(UUID principalID)

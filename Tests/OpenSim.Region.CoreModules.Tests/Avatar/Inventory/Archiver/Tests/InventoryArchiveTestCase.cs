@@ -69,6 +69,9 @@ public class InventoryArchiveTestCase : OpenSimTestCase
     protected string m_item1Name = "Ray Gun Item";
     protected string m_coaItemName = "Coalesced Item";
 
+    // Formerly NUnit [TestFixtureSetUp]; the xunit migration (#197) dropped the attribute and nothing called it,
+    // so m_iarStreamBytes stayed null. xunit builds a fresh instance per test, so it now runs from SetUp().
+    // (Docs/feature/repo-audit/T1-TEST-FIXTURES.md)
     public void FixtureSetup()
     {
         // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
@@ -77,6 +80,7 @@ public class InventoryArchiveTestCase : OpenSimTestCase
         ConstructDefaultIarBytesForTestLoad();
     }
 
+    // Formerly NUnit [TestFixtureTearDown]; now run from Dispose().
     public void TearDown()
     {
         // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
@@ -85,9 +89,16 @@ public class InventoryArchiveTestCase : OpenSimTestCase
         Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
     }
 
+    public override void Dispose()
+    {
+        TearDown();
+        base.Dispose();
+    }
+
     public override void SetUp()
     {
         base.SetUp();
+        FixtureSetup();
         m_iarStream = new MemoryStream(m_iarStreamBytes);
     }
 

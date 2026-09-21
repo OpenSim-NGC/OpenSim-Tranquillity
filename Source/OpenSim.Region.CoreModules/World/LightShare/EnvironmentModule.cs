@@ -753,8 +753,27 @@ public class EnvironmentModule : INonSharedRegionModule, IEnvironmentModule
         }
         try
         {
-            ViewerEnvironment VEnv = new();
             OSD env = OSDParser.Deserialize(request.InputStream);
+
+            // ENV-1: refuse a body that is not the LLSD array a WindLight setting is, at the boundary, before
+            // anything is constructed or stored. OSDParser.Deserialize returns a bare OSD with OSDType.Unknown
+            // for a truncated or non-LLSD body rather than throwing or returning null (AIS-AUDIT-1 1b), so
+            // without this check a malformed request reached FromWLOSD and was stopped only because
+            // DayCycle.FromWLOSD dereferenced a null array and threw. That throw was the sole thing preventing
+            // StoreOnRegion from writing a fresh DEFAULT environment over the region's real one - a truncated
+            // request blanking the environment. The two other callers of FromWLOSD (:181 and :637) already
+            // test `is OSDArray`; this is the same check, in the one place it was missing.
+            // See Docs/feature/ais-v3/AUDIT-1-MALFORMED-LLSD.md section 5.
+            if (env is not OSDArray)
+            {
+                m_log.LogWarning(
+                    "[{0}]: rejected a legacy WindLight setting for region {1} from agentID {2}: the body is {3}, an LLSD array was expected",
+                    Name, m_scene.Name, agentID, env is null ? "null" : env.Type.ToString());
+                fail_reason = string.Format("Environment settings for region {0} were not in the expected format, settings not saved.", m_scene.Name);
+                goto Error;
+            }
+
+            ViewerEnvironment VEnv = new();
             VEnv.FromWLOSD(env);
 
             StoreOnRegion(VEnv);

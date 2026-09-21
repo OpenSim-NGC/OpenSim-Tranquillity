@@ -459,7 +459,15 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
                 uuids.Add(u);
         }
 
-        if (m_InventoryService.DeleteFolders(principal, uuids))
+        // Absent means true, so an older simulator that does not send the field keeps the trash-only behaviour.
+        bool onlyIfTrash = true;
+        if (request.TryGetValue("ONLYIFTRASH", out object flag))
+        {
+            string s = flag?.ToString();
+            onlyIfTrash = !(s == "0" || string.Equals(s, "false", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (m_InventoryService.DeleteFolders(principal, uuids, onlyIfTrash))
             return SuccessResult();
         else
             return

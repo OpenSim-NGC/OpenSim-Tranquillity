@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    OpenSimNGC.Appearance.Baking — shared server-side bake compositor (ADR-003).
+
+    Rules for this project:
+      * net10.0, nullable enabled (overrides the tree-wide Nullable=disable in Directory.Build.props).
+      * NO ProjectReference to any OpenSim.Region.* project, and none to OpenSim.Framework either:
+        the library must be consumable by Robust and by the web-viewer gateway without region code.
+      * The only OpenMetaverse dependency is OpenMetaverse.Types (for OpenMetaverse.UUID).
+        Directory.Build.props injects all five UtopiaSkye.OpenMetaverse* packages tree-wide;
+        the four that are not needed are removed below so the dependency graph stays honest.
+      * SkiaSharp and CoreJ2K.Skia are pinned to the versions the rest of the tree uses
+        (S0a verification V8 / V7). CoreJ2K.Skia is a plain NuGet package, so it can be
+        referenced here directly — no region code is pulled in.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>OpenSimNGC.Appearance.Baking</RootNamespace>
+    <AssemblyName>OpenSimNGC.Appearance.Baking</AssemblyName>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- CS1591: the compositor's data classes mirror avatar_lad.xml attributes one to one; the file-level docs cover them. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsPackable>true</IsPackable>
+    <PackageId>OpenSimNGC.Appearance.Baking</PackageId>
+    <Description>Server-side avatar bake compositor shared by OpenSim-Tranquillity regions and the NGC web-viewer gateway.</Description>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Keep only OpenMetaverse.Types (provides OpenMetaverse.UUID). -->
+    <PackageReference Remove="UtopiaSkye.OpenMetaverse" />
+    <PackageReference Remove="UtopiaSkye.OpenMetaverse.StructuredData" />
+    <PackageReference Remove="UtopiaSkye.OpenMetaverse.Rendering.Meshmerizer" />
+    <PackageReference Remove="UtopiaSkye.OpenMetaverse.Rendering.Simple" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Versions match the rest of the tree: see Docs/feature/ssb-appearance/S0a-VERIFICATION.md V7/V8. -->
+    <PackageReference Include="SkiaSharp" Version="4.151.1" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.3.3.91" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      avatar_lad.xml vendored from the Linden Lab viewer (ADR-007). See THIRD-PARTY-NOTICES.md.
+      LogicalName is fixed so consumers do not depend on folder-to-namespace mangling.
+    -->
+    <EmbeddedResource Include="Data\avatar_lad.xml" LogicalName="OpenSimNGC.Appearance.Baking.Data.avatar_lad.xml" />
+    <!--
+      The 56 character images (parameter masks, skin base, eye whites, aux base) avatar_lad.xml names by file,
+      from the Linden Lab viewer's character/ directory (see THIRD-PARTY-NOTICES.md). Resource names are
+      OpenSimNGC.Appearance.Baking.Data.character.<file>.
+    -->
+    <EmbeddedResource Include="Data\character\*.tga" LogicalName="OpenSimNGC.Appearance.Baking.Data.character.%(Filename)%(Extension)" />
+    <None Include="THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="" />
+  </ItemGroup>
+
+</Project>

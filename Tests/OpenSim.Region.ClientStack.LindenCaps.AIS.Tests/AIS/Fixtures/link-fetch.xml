@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AIS v3 GET /item/{id} response when the item is a link (AIS-V3-SPEC.md 1c, llaisapi.cpp:1185-1188): linked_id
+     plus parent_id select parseLink; the target rides in _embedded.item (llaisapi.cpp:1496). The viewer replaces a
+     link's permissions and sale info with defaults, so they are omitted. -->
+<llsd>
+<map>
+  <key>item_id</key><uuid>88888888-8888-4888-8888-888888888888</uuid>
+  <key>parent_id</key><uuid>99999999-9999-4999-8999-999999999999</uuid>
+  <key>agent_id</key><uuid>aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa</uuid>
+  <key>linked_id</key><uuid>22222222-2222-4222-8222-222222222222</uuid>
+  <key>name</key><string>Blue Shirt</string>
+  <key>desc</key><string>@clothing</string>
+  <key>type</key><integer>24</integer>
+  <key>inv_type</key><integer>18</integer>
+  <key>flags</key><integer>4</integer>
+  <key>created_at</key><integer>1756900001</integer>
+  <key>_embedded</key>
+  <map>
+    <key>item</key>
+    <map>
+      <key>item_id</key><uuid>22222222-2222-4222-8222-222222222222</uuid>
+      <key>parent_id</key><uuid>11111111-1111-4111-8111-111111111111</uuid>
+      <key>agent_id</key><uuid>aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa</uuid>
+      <key>asset_id</key><uuid>77777777-7777-4777-8777-777777777777</uuid>
+      <key>name</key><string>Blue Shirt</string>
+      <key>desc</key><string></string>
+      <key>type</key><integer>5</integer>
+      <key>inv_type</key><integer>18</integer>
+      <key>flags</key><integer>4</integer>
+      <key>created_at</key><integer>1756900000</integer>
+    </map>
+  </map>
+</map>
+</llsd>

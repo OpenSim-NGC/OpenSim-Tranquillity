@@ -127,6 +127,11 @@
     ;; Uncomment to provide bakes caching
     ; BakedTextureService = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:XBakesConnector"
 
+    ;; Server-side baking read path (Docs/feature/ssb-appearance, ADR-002). Uncomment together with the
+    ;; [AppearanceService] section below and [LoginService] AgentAppearanceServiceURL. PUBLIC port: the viewer
+    ;; fetches from it directly. Only needed where a region sets [Appearance] ServerSideBaking = true.
+    ; AppearanceServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:AppearanceServerConnector"
+
     ;; Uncomment for UserProfiles see [UserProfilesService] to configure...
     ; UserProfilesServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:UserProfilesConnector"
 
@@ -494,6 +499,14 @@
     ; Url to search service
     ; SearchURL = "${Const|BaseURL}:${Const|PublicPort}/";
 
+    ;; Server-side baking (ADR-002, viewer contract V6). Where viewers fetch other avatars' baked textures.
+    ;; Must point at the AppearanceServiceConnector's port and end with "/". Leave it unset and the login
+    ;; response omits agent_appearance_service entirely, which is correct for a grid with no such service --
+    ;; the viewer then keeps compositing locally. Set it only once the connector is running, because on a
+    ;; bit-0 region a viewer with no service URL never textures anyone.
+    ; AgentAppearanceServiceURL = "${Const|BaseURL}:${Const|PublicPort}/"
+
+
     ; For V3 destination guide
     ; DestinationGuide = "${Const|BaseURL}/guide"
 
@@ -652,6 +665,17 @@
     UserAccountService = OpenSim.Services.UserAccountService.dll:UserAccountService
     AuthenticationServiceModule = "OpenSim.Services.AuthenticationService.dll:PasswordAuthenticationService"
 
+
+;; Server-side baking: serves GET texture/<agent>/<channel>/<uuid> from the bakes a simulator stored, resolving
+;; the channel through the avatar service's Bake:<channel> index. Inert unless AppearanceServiceConnector is
+;; uncommented in [ServiceList] above. The <channel> token is a name -- head, upper, lower, eyes, skirt, hair,
+;; leftarm, leftleg, aux1, aux2, aux3 -- which is what the viewer sends (llvoavatar.cpp getImageURL).
+;; Whatever URL you put in [LoginService] AgentAppearanceServiceURL must reach this connector's port and end
+;; with a "/", because the viewer appends "texture/..." to it with no separator.
+[AppearanceService]
+    LocalServiceModule = "OpenSim.Services.AvatarService.dll:AppearanceService"
+    AvatarService = "OpenSim.Services.AvatarService.dll:AvatarService"
+    AssetService = "OpenSim.Services.AssetService.dll:AssetService"
 
 [BakedTextureService]
     LocalServiceModule = "OpenSim.Server.Handlers.dll:XBakes"
