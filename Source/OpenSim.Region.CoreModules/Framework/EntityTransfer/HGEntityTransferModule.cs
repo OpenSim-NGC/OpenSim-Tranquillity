@@ -283,6 +283,17 @@ public class HGEntityTransferModule : EntityTransferModule, IUserAgentVerificati
                 };
 
                 bool success = connector.LoginAgentToGrid(source, agentCircuit, reg, finalDestination, false, out reason);
+
+                // HG TRAVEL TOKEN: the home grid rotated ServiceSessionID for this hop. Store it
+                // on the circuit this scene holds, or the NEXT hop - including the trip home -
+                // presents the previous token and is refused.
+                if (success && !string.IsNullOrEmpty(agentCircuit.ServiceSessionID))
+                {
+                    AgentCircuitData live = sp.Scene.AuthenticateHandler?.GetAgentCircuitData(sp.ControllingClient.CircuitCode);
+                    if (live is not null)
+                        live.ServiceSessionID = agentCircuit.ServiceSessionID;
+                }
+
                 //logout = success & !isLocal; // flag for later logout from this grid; this is an HG TP
                 logout = success; // flag for later logout from this grid; this is an HG TP
 
