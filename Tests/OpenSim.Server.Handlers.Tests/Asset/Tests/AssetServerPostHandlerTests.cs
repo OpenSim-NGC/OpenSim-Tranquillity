@@ -31,6 +31,7 @@ using System.Net;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
+using Nini.Config;
 using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -101,7 +102,7 @@ namespace OpenSim.Server.Handlers.Asset.Test
             TestOSHttpResponse response = new TestOSHttpResponse();
             asph.Handle(null, buffer, null, response);
 
-            Assert.True(response.StatusCode)HttpStatusCode.BadRequest));
+            Xunit.Assert.Equal((int)HttpStatusCode.BadRequest, response.StatusCode);
         }
     }
 }

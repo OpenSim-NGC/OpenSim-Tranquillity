@@ -31,7 +31,6 @@ public class HttpRequest : IHttpRequest
     private Uri m_uri = null;
     private string m_uriPath;
     public IHttpClientContext m_context;
-    IPEndPoint m_remoteIPEndPoint = null;
 
     public HttpRequest(IHttpClientContext pContext)
     {
@@ -281,25 +280,7 @@ public class HttpRequest : IHttpRequest
     {
         get
         {
-            if(m_remoteIPEndPoint == null)
-            {
-                string addr = m_headers["x-forwarded-for"];
-                if(!string.IsNullOrEmpty(addr))
-                {
-                    int port = m_context.LocalIPEndPoint.Port;
-                    try
-                    {
-                        m_remoteIPEndPoint = new IPEndPoint(IPAddress.Parse(addr), port);
-                    }
-                    catch
-                    {
-                        m_remoteIPEndPoint = null;
-                    }
-                }
-            }
-            m_remoteIPEndPoint ??= m_context.LocalIPEndPoint;
-
-            return m_remoteIPEndPoint;
+            return m_context.LocalIPEndPoint;
         }
     }
     /*
