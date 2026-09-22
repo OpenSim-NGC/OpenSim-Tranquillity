@@ -24,6 +24,8 @@
  */
 
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using OpenMetaverse;
 
 using Microsoft.Extensions.Logging;
@@ -80,6 +82,7 @@ public class GloebitTransaction {
     public bool enacted;
     public bool consumed;
     public bool canceled;
+    public string CallbackKey;
 
     // Timestamps for reporting
     public DateTime cTime;
@@ -161,6 +164,7 @@ public class GloebitTransaction {
         this.enacted = false;
         this.consumed = false;
         this.canceled = false;
+        this.CallbackKey = UUID.Random().ToString();
 
         // Timestamps for reporting
         this.cTime = DateTime.UtcNow;
@@ -268,19 +272,19 @@ public class GloebitTransaction {
     public Uri BuildEnactURI(Uri baseURI) {
         UriBuilder enact_uri = new UriBuilder(baseURI);
         enact_uri.Path = "gloebit/transaction";
-        enact_uri.Query = String.Format("id={0}&state={1}", this.TransactionID, "enact");
+        enact_uri.Query = String.Format("id={0}&state={1}&key={2}", this.TransactionID, "enact", this.CallbackKey);
         return enact_uri.Uri;
     }
     public Uri BuildConsumeURI(Uri baseURI) {
         UriBuilder consume_uri = new UriBuilder(baseURI);
         consume_uri.Path = "gloebit/transaction";
-        consume_uri.Query = String.Format("id={0}&state={1}", this.TransactionID, "consume");
+        consume_uri.Query = String.Format("id={0}&state={1}&key={2}", this.TransactionID, "consume", this.CallbackKey);
         return consume_uri.Uri;
     }
     public Uri BuildCancelURI(Uri baseURI) {
         UriBuilder cancel_uri = new UriBuilder(baseURI);
         cancel_uri.Path = "gloebit/transaction";
-        cancel_uri.Query = String.Format("id={0}&state={1}", this.TransactionID, "cancel");
+        cancel_uri.Query = String.Format("id={0}&state={1}&key={2}", this.TransactionID, "cancel", this.CallbackKey);
         return cancel_uri.Uri;
     }
 
@@ -289,6 +293,11 @@ public class GloebitTransaction {
     /**************************************************/
 
     public static bool ProcessStateRequest(string transactionIDstr, string stateRequested, IAssetCallback assetCallbacks, GloebitAPIWrapper.ITransactionAlert transactionAlerts, out string returnMsg)
+    {
+        return ProcessStateRequest(transactionIDstr, stateRequested, null, assetCallbacks, transactionAlerts, out returnMsg);
+    }
+
+    public static bool ProcessStateRequest(string transactionIDstr, string stateRequested, string callbackKey, IAssetCallback assetCallbacks, GloebitAPIWrapper.ITransactionAlert transactionAlerts, out string returnMsg)
     {
         bool result = false;
 
@@ -299,6 +308,11 @@ public class GloebitTransaction {
         // TODO: is this what we want to return?
         if (myTxn == null) {
             returnMsg = "No matching transaction found.";
+            return false;
+        }
+
+        if (!myTxn.VerifyCallbackKey(callbackKey)) {
+            returnMsg = "Invalid callback key.";
             return false;
         }
 
@@ -349,6 +363,16 @@ public class GloebitTransaction {
             s_pendingTransactionMap.Remove(transactionIDstr);
         }
         return result;
+    }
+
+    public bool VerifyCallbackKey(string callbackKey)
+    {
+        if (string.IsNullOrEmpty(CallbackKey) || string.IsNullOrEmpty(callbackKey))
+            return false;
+
+        byte[] expected = Encoding.UTF8.GetBytes(CallbackKey);
+        byte[] actual = Encoding.UTF8.GetBytes(callbackKey);
+        return expected.Length == actual.Length && CryptographicOperations.FixedTimeEquals(expected, actual);
     }
 
     private bool enactHold(IAssetCallback assetCallbacks, GloebitAPIWrapper.ITransactionAlert transactionAlerts, out string returnMsg)

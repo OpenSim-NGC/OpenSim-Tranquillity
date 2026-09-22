@@ -168,11 +168,13 @@ public class HGFriendsService : IHGFriendsService
 
     public bool DeleteFriendship(FriendInfo friend, string secret)
     {
+        if (string.IsNullOrEmpty(secret) || !UUID.TryParse(friend.Friend, out UUID requestedFriendID))
+            return false;
+
         FriendInfo[] finfos = m_FriendsService.GetFriends(friend.PrincipalID);
         foreach (FriendInfo finfo in finfos)
         {
-            // We check the secret here. Or if the friendship request was initiated here, and was declined
-            if (finfo.Friend.StartsWith(friend.Friend) && finfo.Friend.EndsWith(secret))
+            if (FriendshipDeleteMatches(finfo.Friend, requestedFriendID, secret))
             {
                 m_log.LogDebug("[HGFRIENDS SERVICE]: Delete friendship {0} {1}", friend.PrincipalID, friend.Friend);
                 m_FriendsService.Delete(friend.PrincipalID, finfo.Friend);
@@ -183,6 +185,17 @@ public class HGFriendsService : IHGFriendsService
         }
 
         return false;
+    }
+
+    public static bool FriendshipDeleteMatches(string storedFriend, UUID requestedFriendID, string secret)
+    {
+        if (requestedFriendID.IsZero() || string.IsNullOrEmpty(secret))
+            return false;
+
+        if (!Util.ParseUniversalUserIdentifier(storedFriend, out UUID storedFriendID, out _, out _, out _, out string storedSecret))
+            return false;
+
+        return storedFriendID.Equals(requestedFriendID) && storedSecret == secret;
     }
 
     public bool FriendshipOffered(UUID fromID, string fromName, UUID toID, string message)

@@ -159,9 +159,17 @@ public class GloebitAPIWrapper : GloebitAPI.IAsyncEndpointCallback {
 
         string agentId = requestData["agentId"] as string;
         string code = requestData["code"] as string;
+        string state = requestData["state"] as string;
 
         UUID parsedAgentId = UUID.Parse(agentId);
         GloebitUser u = GloebitUser.Get(m_key, parsedAgentId);
+        if (!u.ConsumeAuthorizationState(state)) {
+            Hashtable failure = new Hashtable();
+            failure["int_response_code"] = 403;
+            failure["str_response_string"] = "<html><head><title>Gloebit authorization failed</title></head><body><h2>Gloebit authorization failed</h2></body></html>";
+            failure["content_type"] = "text/html";
+            return failure;
+        }
 
         // Start async flow to exchange the code for a permanent token
         m_api.ExchangeAccessToken(u, code, m_platformAccessors.GetBaseURI());
@@ -717,9 +725,10 @@ public class GloebitAPIWrapper : GloebitAPI.IAsyncEndpointCallback {
         // TODO: check that these exist in requestData.  If not, signal error and send response with false.
         string transactionIDstr = requestData["id"] as string;
         string stateRequested = requestData["state"] as string;
+        string callbackKey = requestData["key"] as string;
         string returnMsg = "";
 
-        bool success = GloebitTransaction.ProcessStateRequest(transactionIDstr, stateRequested, m_assetCallbacks, m_transactionAlerts, out returnMsg);
+        bool success = GloebitTransaction.ProcessStateRequest(transactionIDstr, stateRequested, callbackKey, m_assetCallbacks, m_transactionAlerts, out returnMsg);
 
         //JsonValue[] result;
         //JsonValue[0] = JsonValue.CreateBooleanValue(success);

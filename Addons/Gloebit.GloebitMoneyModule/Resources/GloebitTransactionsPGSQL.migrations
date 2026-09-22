@@ -51,3 +51,12 @@ BEGIN TRANSACTION;
 ALTER TABLE GloebitTransactions DROP COLUMN IF EXISTS "LocalID";
 
 COMMIT;
+
+
+:VERSION 3         # -------------------------------
+
+BEGIN TRANSACTION;
+
+ALTER TABLE GloebitTransactions ADD COLUMN "CallbackKey" CHAR(36) NULL;
+
+COMMIT;

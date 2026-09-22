@@ -54,6 +54,38 @@ public class ControlPlaneAccessTests
         Xunit.Assert.Equal((int)HttpStatusCode.Forbidden, response.StatusCode);
     }
 
+    [Fact]
+    public void AuthorizePrivilegedInstantMessageBlocksUntrustedCaller()
+    {
+        ControlPlaneAccess access = new(new IniConfigSource());
+
+        bool authorized = access.AuthorizePrivilegedInstantMessage(250, new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000));
+
+        Xunit.Assert.False(authorized);
+    }
+
+    [Fact]
+    public void AuthorizePrivilegedInstantMessageAllowsTrustedCaller()
+    {
+        IniConfigSource config = new();
+        config.AddConfig("Security").Set("ControlPlaneTrustedHosts", "203.0.113.10");
+        ControlPlaneAccess access = new(config);
+
+        bool authorized = access.AuthorizePrivilegedInstantMessage((byte)OpenMetaverse.InstantMessageDialog.GodLikeRequestTeleport, new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000));
+
+        Xunit.Assert.True(authorized);
+    }
+
+    [Fact]
+    public void AuthorizePrivilegedInstantMessageAllowsOrdinaryDialogFromUntrustedCaller()
+    {
+        ControlPlaneAccess access = new(new IniConfigSource());
+
+        bool authorized = access.AuthorizePrivilegedInstantMessage((byte)OpenMetaverse.InstantMessageDialog.MessageFromAgent, new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000));
+
+        Xunit.Assert.True(authorized);
+    }
+
     private static FakeRequest RequestFrom(string address)
     {
         return new FakeRequest(new IPEndPoint(IPAddress.Parse(address), 9000));

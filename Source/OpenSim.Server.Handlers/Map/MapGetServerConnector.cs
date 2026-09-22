@@ -89,54 +89,59 @@ class MapServerGetHandler : BaseStreamHandler
             return Array.Empty<byte>();
         }
 
-        byte[] result = Array.Empty<byte>();
-        string format = string.Empty;
-
-        //UUID scopeID = new UUID("07f8d88e-cd5e-4239-a0ed-843f75d09992");
-        UUID scopeID = UUID.Zero;
-
-        // This will be map/tilefile.ext, but on multitenancy it will be
-        // map/scope/teilefile.ext
-        path = path.Trim('/');
-        string[] bits = path.Split(new char[] {'/'});
-        if (bits.Length > 2)
+        try
         {
-            try
-            {
-                scopeID = new UUID(bits[1]);
-            }
-            catch
-            {
-                return new byte[9];
-            }
-            path = bits[2];
+            byte[] result = Array.Empty<byte>();
+            string format = string.Empty;
+
+            //UUID scopeID = new UUID("07f8d88e-cd5e-4239-a0ed-843f75d09992");
+            UUID scopeID = UUID.Zero;
+
+            // This will be map/tilefile.ext, but on multitenancy it will be
+            // map/scope/teilefile.ext
             path = path.Trim('/');
-        }
+            string[] bits = path.Split(new char[] {'/'});
+            if (bits.Length > 2)
+            {
+                try
+                {
+                    scopeID = new UUID(bits[1]);
+                }
+                catch
+                {
+                    return new byte[9];
+                }
+                path = bits[2];
+                path = path.Trim('/');
+            }
 
-        if(path.Length == 0)
+            if(path.Length == 0)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+                httpResponse.ContentType = "text/plain";
+                return Array.Empty<byte>();
+            }
+
+            result = m_MapService.GetMapTile(path, scopeID, out format);
+            if (result.Length > 0)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.OK;
+                if (format.Equals(".png"))
+                    httpResponse.ContentType = "image/png";
+                else if (format.Equals(".jpg") || format.Equals(".jpeg"))
+                    httpResponse.ContentType = "image/jpeg";
+            }
+            else
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+                httpResponse.ContentType = "text/plain";
+            }
+
+            return result;
+        }
+        finally
         {
-            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-            httpResponse.ContentType = "text/plain";
-            return Array.Empty<byte>();
+            Monitor.Exit(ev);
         }
-
-        result = m_MapService.GetMapTile(path, scopeID, out format);
-        if (result.Length > 0)
-        {
-            httpResponse.StatusCode = (int)HttpStatusCode.OK;
-            if (format.Equals(".png"))
-                httpResponse.ContentType = "image/png";
-            else if (format.Equals(".jpg") || format.Equals(".jpeg"))
-                httpResponse.ContentType = "image/jpeg";
-        }
-        else
-        {
-            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
-            httpResponse.ContentType = "text/plain";
-        }
-
-        Monitor.Exit(ev);
-
-        return result;
     }
 }

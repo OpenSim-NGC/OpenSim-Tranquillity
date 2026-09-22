@@ -1,11 +1,15 @@
 using System.Net;
 using Nini.Config;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework.Servers.HttpServer;
 
 namespace OpenSim.Server.Handlers.Base;
 
 public class ControlPlaneAccess
 {
+    public const string JsonRpcRemoteAddressKey = "__opensim_remote_address";
+    public const string JsonRpcLlHttpRequestKey = "__opensim_llhttprequest";
+
     private readonly HashSet<IPAddress> m_trustedHosts = new();
 
     public ControlPlaneAccess(IConfigSource config)
@@ -20,19 +24,63 @@ public class ControlPlaneAccess
 
     public bool Authorize(IOSHttpRequest request, IOSHttpResponse response, HttpStatusCode blockedStatus = HttpStatusCode.Forbidden)
     {
-        if (request.Headers["X-SecondLife-Shard"] != null)
+        if (IsLlHttpRequest(request.Headers["X-SecondLife-Shard"] != null))
         {
             response.StatusCode = (int)HttpStatusCode.Forbidden;
             response.RawBuffer = Array.Empty<byte>();
             return false;
         }
 
-        IPAddress address = NormalizeAddress(request.RemoteIPEndPoint.Address);
-        if (IPAddress.IsLoopback(address) || m_trustedHosts.Contains(address))
+        if (IsTrustedAddress(request.RemoteIPEndPoint.Address))
             return true;
 
         response.StatusCode = (int)blockedStatus;
         response.RawBuffer = Array.Empty<byte>();
+        return false;
+    }
+
+    public bool AuthorizeJsonRpc(OSDMap json, ref JsonRpcResponse response)
+    {
+        if (json.TryGetValue(JsonRpcLlHttpRequestKey, out OSD llHttpRequest) && IsLlHttpRequest(llHttpRequest.AsBoolean()))
+            return MethodNotFound(ref response);
+
+        if (!json.TryGetValue(JsonRpcRemoteAddressKey, out OSD remoteAddress) || !IPAddress.TryParse(remoteAddress.AsString(), out IPAddress address))
+            return MethodNotFound(ref response);
+
+        if (IsTrustedAddress(address))
+            return true;
+
+        return MethodNotFound(ref response);
+    }
+
+    public bool IsTrustedAddress(IPAddress address)
+    {
+        address = NormalizeAddress(address);
+        return IPAddress.IsLoopback(address) || m_trustedHosts.Contains(address);
+    }
+
+    public bool AuthorizePrivilegedInstantMessage(byte dialog, IPEndPoint remoteClient)
+    {
+        if (!IsPrivilegedInstantMessageDialog(dialog))
+            return true;
+
+        return remoteClient != null && IsTrustedAddress(remoteClient.Address);
+    }
+
+    public static bool IsPrivilegedInstantMessageDialog(byte dialog)
+    {
+        return dialog == 250 || dialog == (byte)OpenMetaverse.InstantMessageDialog.GodLikeRequestTeleport;
+    }
+
+    private static bool IsLlHttpRequest(bool hasSecondLifeShardHeader)
+    {
+        return hasSecondLifeShardHeader;
+    }
+
+    private static bool MethodNotFound(ref JsonRpcResponse response)
+    {
+        response.Error.Code = ErrorCode.MethodNotFound;
+        response.Error.Message = "Method not found";
         return false;
     }
 
