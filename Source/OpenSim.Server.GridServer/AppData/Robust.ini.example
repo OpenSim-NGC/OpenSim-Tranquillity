@@ -144,6 +144,9 @@
 ; * server instance, if none is specified above
 ; *
 [Network]
+    ; IP address the ROBUST HTTP listener binds to. Default 0.0.0.0 (all
+    ; interfaces) preserves previous behaviour.
+    ; address = 0.0.0.0
     port = ${Const|PrivatePort}
 
     ; HTTPS for "Out of band" management applications such as the remote admin

@@ -50,10 +50,13 @@ public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
 
         // unsecure main server
         BaseHttpServer server = new BaseHttpServer(mainport);
+        server.ListenIPAddress = serversInfo.HttpListenerAddress;
         if (!serversInfo.HttpUsesSSL)
         {
             mainHttpServer = server;
-            server.Start();
+            server.Start(serversInfo.HttpListenerPortMin, serversInfo.HttpListenerPortMax);
+            // write back the port actually chosen so downstream consumers agree
+            serversInfo.HttpListenerPort = server.Port;
         }
         else
         {

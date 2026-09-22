@@ -49,6 +49,7 @@ public class RegionInfo
     public bool Persistent = true;
 
     private EstateSettings m_estateSettings;
+    private IConfigSource m_configSource = null;
     private RegionSettings m_regionSettings;
 
     public UUID originRegionID = UUID.Zero;
@@ -134,7 +135,7 @@ public class RegionInfo
 
     public RegionInfo(string description, string filename, bool skipConsoleConfig, IConfigSource configSource, string configName)
     {
-        // m_configSource = configSource;
+        m_configSource = configSource;
         if (filename.ToLower().EndsWith(".ini"))
         {
             if (!File.Exists(filename)) // New region config request
@@ -563,17 +564,32 @@ public class RegionInfo
 
         // InternalPort
         //
+        // May be a number, or the literal MATCHING to inherit the port the
+        // region's HTTP listener actually bound (supports http_listener_port_min/max).
+        string str_port = "MATCHING";
         int port;
         allKeys.Remove("InternalPort");
         if (config.Contains("InternalPort"))
         {
-            port = config.GetInt("InternalPort", 9000);
+            str_port = config.GetString("InternalPort", str_port);
         }
         else
         {
-            port = Convert.ToInt32(MainConsole.Instance.Prompt("Internal port", "9000"));
-            config.Set("InternalPort", port);
+            // Prompt default stays "9000" so interactive region creation behaves
+            // exactly as before; MATCHING is opt-in by typing it (or via the file).
+            str_port = MainConsole.Instance.Prompt("Internal port", "9000");
+            config.Set("InternalPort", str_port);
         }
+
+        if (str_port == "MATCHING")
+        {
+            IConfig networkConfig = (m_configSource != null) ? m_configSource.Configs["Network"] : null;
+            port = (networkConfig != null) ? networkConfig.GetInt("http_listener_port", 9000) : 9000;
+            m_httpPort = (uint)port;
+        }
+        else if (!int.TryParse(str_port, out port))
+            port = 9000;
+
         m_internalEndPoint = new IPEndPoint(address, port);
 
         // ResolveAddress

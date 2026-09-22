@@ -20,6 +20,8 @@ RegionUUID = 11111111-2222-3333-4444-555555555555
 Location = 1000,1000
 InternalAddress = 0.0.0.0
 InternalPort = 9000
+; InternalPort may also be the literal MATCHING to inherit the port the
+; region HTTP listener actually bound (useful with http_listener_port_min/max).
 AllowAlternatePorts = False
 ExternalHostName = SYSTEMIP
 

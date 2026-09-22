@@ -25,13 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Net;
 using Nini.Config;
 
 namespace OpenSim.Framework;
 
 public class NetworkServersInfo
 {
+    public IPAddress HttpListenerAddress = IPAddress.Any;
     public uint HttpListenerPort = ConfigSettings.DefaultRegionHttpPort;
+    public uint HttpListenerPortMin = ConfigSettings.DefaultRegionHttpPort;
+    public uint HttpListenerPortMax = ConfigSettings.DefaultRegionHttpPort;
     public bool secureInventoryServer = false;
     public bool isSandbox;
     public bool HttpUsesSSL = false;
@@ -57,8 +61,16 @@ public class NetworkServersInfo
 
     public void loadFromConfiguration(IConfigSource config)
     {
+        string str_ip = config.Configs["Network"].GetString("http_listener_address", "0.0.0.0");
+        if (!IPAddress.TryParse(str_ip, out HttpListenerAddress))
+            HttpListenerAddress = IPAddress.Any;
+
         HttpListenerPort =
             (uint) config.Configs["Network"].GetInt("http_listener_port", (int) ConfigSettings.DefaultRegionHttpPort);
+        HttpListenerPortMin =
+            (uint) config.Configs["Network"].GetInt("http_listener_port_min", (int) HttpListenerPort);
+        HttpListenerPortMax =
+            (uint) config.Configs["Network"].GetInt("http_listener_port_max", (int) HttpListenerPort);
         httpSSLPort =
             (uint)config.Configs["Network"].GetInt("http_listener_sslport", ((int)ConfigSettings.DefaultRegionHttpPort+1));
         HttpUsesSSL = config.Configs["Network"].GetBoolean("http_listener_ssl", false);
