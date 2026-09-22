@@ -44,6 +44,11 @@ public sealed class GridHttpServerFactory : IGridHttpServerFactory
 
         uint port = (uint)networkConfig.GetInt("port", 0);
 
+        string str_address = networkConfig.GetString("address", "0.0.0.0");
+        System.Net.IPAddress bindAddress;
+        if (!System.Net.IPAddress.TryParse(str_address, out bindAddress))
+            bindAddress = System.Net.IPAddress.Any;
+
         if (port == 0)
             throw new InvalidOperationException("No 'port' entry found in [Network].  Server can't start");
 
@@ -105,7 +110,10 @@ public sealed class GridHttpServerFactory : IGridHttpServerFactory
 
         // Start every registered server and wire up the console.
         foreach (BaseHttpServer s in MainServer.Instance.Servers.Values)
+        {
+            s.ListenIPAddress = bindAddress;
             s.Start();
+        }
 
         MainServer.Instance.RegisterHttpConsoleCommands(console);
 

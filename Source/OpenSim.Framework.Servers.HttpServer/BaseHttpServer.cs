@@ -1971,6 +1971,33 @@ public class BaseHttpServer : IHttpServer
     }
 
     /// <summary>
+    /// Pick the first free TCP port in [port_min, port_max], set it as this
+    /// server's port, then start normally. With port_min == port_max this
+    /// behaves exactly like Start().
+    /// </summary>
+    public void Start(uint port_min, uint port_max)
+    {
+        if (port_min != port_max)
+        {
+            var used = new System.Collections.Generic.HashSet<int>();
+            foreach (var ep in System.Net.NetworkInformation.IPGlobalProperties
+                                .GetIPGlobalProperties().GetActiveTcpListeners())
+                used.Add(ep.Port);
+
+            for (uint p = port_min; p <= port_max; p++)
+            {
+                if (!used.Contains((int)p))
+                {
+                    m_port = p;
+                    break;
+                }
+            }
+        }
+
+        Start(true, true);
+    }
+
+    /// <summary>
     /// Start the http server
     /// </summary>
     /// <param name='processPollRequestsAsync'>
