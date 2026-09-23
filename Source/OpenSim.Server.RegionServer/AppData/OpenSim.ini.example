@@ -628,7 +628,8 @@
 
     ;; Region control-plane endpoints such as /agent, /object, /region and /friends
     ;; accept POST requests only from loopback and the hosts listed here.
-    ;; Add the IP addresses or hostnames of your ROBUST host(s) and all region hosts.
+    ;; Add the IP addresses or hostnames of your ROBUST/GridServer login host(s)
+    ;; and all region hosts. Grid login creates the root agent through /agent.
     ;; Separate multiple entries with commas, semicolons, pipes or whitespace.
     ; ControlPlaneTrustedHosts = "192.0.2.10, 192.0.2.11"
 

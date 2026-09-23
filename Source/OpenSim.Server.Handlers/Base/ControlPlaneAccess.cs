@@ -1,12 +1,16 @@
 using System.Net;
 using Nini.Config;
 using OpenMetaverse.StructuredData;
+using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Base;
 
 public class ControlPlaneAccess
 {
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(ControlPlaneAccess));
+
     public const string JsonRpcRemoteAddressKey = "__opensim_remote_address";
     public const string JsonRpcLlHttpRequestKey = "__opensim_llhttprequest";
 
@@ -20,12 +24,18 @@ public class ControlPlaneAccess
         string hosts = GetConfiguredHosts(config);
         foreach (string host in hosts.Split(new[] { ',', ';', '|', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
             AddTrustedHost(host.Trim());
+
+        AddConfiguredLocalHost(config);
+
+        m_log.LogInformation("[CONTROL PLANE ACCESS]: Trusted control-plane addresses: {0}", string.Join(", ", m_trustedHosts));
     }
 
     public bool Authorize(IOSHttpRequest request, IOSHttpResponse response, HttpStatusCode blockedStatus = HttpStatusCode.Forbidden)
     {
         if (IsLlHttpRequest(request.Headers["X-SecondLife-Shard"] != null))
         {
+            m_log.LogWarning("[CONTROL PLANE ACCESS]: Refusing {0} {1} from {2}: script HTTP marker is not allowed on control-plane endpoints",
+                request.HttpMethod, request.UriPath, request.RemoteIPEndPoint);
             response.StatusCode = (int)HttpStatusCode.Forbidden;
             response.RawBuffer = Array.Empty<byte>();
             return false;
@@ -34,6 +44,8 @@ public class ControlPlaneAccess
         if (IsTrustedAddress(request.RemoteIPEndPoint.Address))
             return true;
 
+        m_log.LogWarning("[CONTROL PLANE ACCESS]: Refusing {0} {1} from {2}: source address is not in ControlPlaneTrustedHosts",
+            request.HttpMethod, request.UriPath, request.RemoteIPEndPoint);
         response.StatusCode = (int)blockedStatus;
         response.RawBuffer = Array.Empty<byte>();
         return false;
@@ -104,6 +116,15 @@ public class ControlPlaneAccess
         }
 
         return string.Empty;
+    }
+
+    private void AddConfiguredLocalHost(IConfigSource config)
+    {
+        IConfig network = config?.Configs["Network"];
+        if (network == null)
+            return;
+
+        AddTrustedHost(network.GetString("hostname", string.Empty));
     }
 
     private void AddTrustedHost(string host)

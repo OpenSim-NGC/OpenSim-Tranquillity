@@ -39,6 +39,20 @@ public class ControlPlaneAccessTests
     }
 
     [Fact]
+    public void AuthorizeAllowsConfiguredLocalNetworkHost()
+    {
+        IniConfigSource config = new();
+        config.AddConfig("Network").Set("hostname", "203.0.113.10");
+        ControlPlaneAccess access = new(config);
+        TestOSHttpResponse response = new();
+
+        bool authorized = access.Authorize(RequestFrom("203.0.113.10"), response);
+
+        Xunit.Assert.True(authorized);
+        Xunit.Assert.Equal(0, response.StatusCode);
+    }
+
+    [Fact]
     public void AuthorizeBlocksScriptMarkedRequestFromTrustedAddress()
     {
         IniConfigSource config = new();

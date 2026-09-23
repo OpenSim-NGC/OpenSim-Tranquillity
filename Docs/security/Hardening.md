@@ -19,6 +19,8 @@ ControlPlaneTrustedHosts = 10.20.0.10, 10.20.0.21, 10.20.0.22
 
 Entries can be IPv4 addresses, IPv6 addresses, hostnames, or full HTTP(S) URLs. Separate entries with commas, semicolons, pipes, or whitespace. Loopback is always trusted.
 
+The configured local `[Network] hostname` is also trusted. This keeps same-host multi-region deployments working when regions contact each other through the host's LAN name instead of loopback.
+
 Add the actual source addresses of:
 
 - Every region/simulator that can create child agents, cross objects, announce neighbours, or relay friendship state to this process.
@@ -27,9 +29,19 @@ Add the actual source addresses of:
 
 Do not add public client networks, arbitrary foreign Hypergrid grids, or broad internet ranges.
 
-### Child-agent `403` diagnosis
+### Grid login and child-agent `403` diagnosis
+
+Viewer login requests to the XML-RPC/LLSD login endpoint are not directly gated by `ControlPlaneTrustedHosts`. However, a successful grid login still requires the login service to create the root agent on the selected region with `POST /agent/<avatar-id>/...`. If credentials are accepted but the login finishes with `403`, add the login service or ROBUST/GridServer host's actual outbound IP address to `ControlPlaneTrustedHosts` on the destination region host.
 
 A child-agent create is `POST /agent/<avatar-id>/...` from the source simulator to the destination simulator. If a crossing, teleport, or visibility update fails with `403`, add the **source simulator's outbound IP address** to `ControlPlaneTrustedHosts` on the destination simulator.
+
+### Neighbour hello `404` diagnosis
+
+Neighbour startup sends `POST /region/<region-id>/...` to the neighbouring simulator. An untrusted caller deliberately receives `404 NotFound` so the endpoint is not exposed to scanners. A log entry such as `Exception on DoHelloNeighbourCall from Skye Garden back to Musings ... 404` uses confusing legacy wording: the first named region is the HTTP destination. In that example, add the outbound source address of **Musings** to `ControlPlaneTrustedHosts` on **Skye Garden**.
+
+If the two regions run on different hosts, configure each destination host to trust the other host's actual outbound address. If they run in the same process or host via loopback, no entry is normally required.
+
+If each region has its own per-region `.ini` with a `[Network]` section, verify that the destination process logs the expected `Trusted control-plane addresses` line at startup. Put `ControlPlaneTrustedHosts` in the per-region file if the shared setting is not present after per-region overrides are merged.
 
 This is expected fail-closed behavior. There is no separate domain-association configuration. In a multi-host grid, each region should normally list all region-service hosts and relevant ROBUST hosts. A one-host standalone commonly needs no setting because loopback is trusted.
 
@@ -48,7 +60,7 @@ Requests carrying `X-SecondLife-Shard` are rejected on control-plane paths even 
 
 No Kitely Market integration module is present in this source tree, so compatibility depends on the delivery protocol used by the external service.
 
-Normal viewer login, CAPS, inventory, and asset-service workflows are not gated by `ControlPlaneTrustedHosts`. A marketplace using those normal user-facing paths should be unaffected.
+Normal viewer login requests, CAPS, inventory, and asset-service workflows are not gated by `ControlPlaneTrustedHosts`. The server-to-region agent placement performed after login is gated as described above. A marketplace using ordinary user-facing paths should be unaffected.
 
 A third-party delivery service that directly posts to a protected control-plane endpoint, particularly `POST /agent/...` or `POST /object/...`, will receive `403` unless its actual outbound source IP is listed in `ControlPlaneTrustedHosts`. Do not broadly allow a public marketplace network by default. First confirm the exact endpoint and source addresses with the provider, then allow only stable, provider-controlled addresses if that integration genuinely requires it.
 
