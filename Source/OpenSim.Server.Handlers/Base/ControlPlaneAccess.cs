@@ -27,7 +27,7 @@ public class ControlPlaneAccess
 
         AddConfiguredLocalHost(config);
 
-        m_log.LogInformation("[CONTROL PLANE ACCESS]: Trusted control-plane addresses: {0}", string.Join(", ", m_trustedHosts));
+        m_log.LogInformation("[CONTROL PLANE ACCESS]: Trusted control-plane addresses configured: {0}", m_trustedHosts.Count);
     }
 
     public bool Authorize(IOSHttpRequest request, IOSHttpResponse response, HttpStatusCode blockedStatus = HttpStatusCode.Forbidden)
