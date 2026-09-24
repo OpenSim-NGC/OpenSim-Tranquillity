@@ -626,6 +626,13 @@
     ;; the region ports use UDP.
     ; http_listener_port = 9000
 
+    ;; Region control-plane endpoints such as /agent, /object, /region and /friends
+    ;; accept POST requests only from loopback and the hosts listed here.
+    ;; Add the IP addresses or hostnames of your ROBUST/GridServer login host(s)
+    ;; and all region hosts. Grid login creates the root agent through /agent.
+    ;; Separate multiple entries with commas, semicolons, pipes or whitespace.
+    ; ControlPlaneTrustedHosts = "192.0.2.10, 192.0.2.11"
+
     ; optional main server secure http (ssl)
     ; to use ssl you need a ssl certificate in PKCS12 format that validates the ExternalHostnames 
     ; or their domains

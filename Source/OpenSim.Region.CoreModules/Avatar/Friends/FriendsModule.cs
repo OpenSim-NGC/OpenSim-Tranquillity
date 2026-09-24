@@ -36,6 +36,7 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Friends;
 using OpenSim.Server.Base;
+using OpenSim.Server.Handlers.Base;
 using Microsoft.Extensions.Logging;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using PresenceInfo = OpenSim.Services.Interfaces.PresenceInfo;
@@ -180,7 +181,7 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
             // Instantiate the request handler
             IHttpServer server = MainServer.Instance.GetHttpServer((uint)mPort);
 
-            server?.AddSimpleStreamHandler(new FriendsSimpleRequestHandler(this));
+            server?.AddSimpleStreamHandler(new FriendsSimpleRequestHandler(this, new ControlPlaneAccess(config)));
         }
 
         if (m_FriendsService is null)

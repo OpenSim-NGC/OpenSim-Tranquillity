@@ -58,6 +58,6 @@ public class NeighbourServiceInConnector : ServiceConnector
         //if (authentication)
         //    m_AuthenticationService = scene.RequestModuleInterface<IAuthenticationService>();
 
-        server.AddSimpleStreamHandler(new NeighbourSimpleHandler(m_NeighbourService, m_AuthenticationService), true);
+        server.AddSimpleStreamHandler(new NeighbourSimpleHandler(m_NeighbourService, m_AuthenticationService, new ControlPlaneAccess(source)), true);
     }
 }

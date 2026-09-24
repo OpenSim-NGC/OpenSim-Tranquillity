@@ -57,6 +57,7 @@ public interface IUserAgentService
     bool LoginAgentToGrid(GridRegion source, AgentCircuitData agent, GridRegion gatekeeper, GridRegion finalDestination, bool fromLogin, out string reason);
 
     void LogoutAgent(UUID userID, UUID sessionID);
+    bool IsKnownTravelingAgent(UUID userID, UUID sessionID);
 
     /// <summary>
     /// Returns the home region of a remote user.

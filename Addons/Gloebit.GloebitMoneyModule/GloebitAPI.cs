@@ -126,6 +126,7 @@ public class GloebitAPI {
     /// <param name="userName">string name of user on this app.</param>
     /// <param name="baseURI">URL where Gloebit can send the auth response back to this app.</param>
     public Uri BuildAuthorizationURI(GloebitUser user, string userName, Uri baseURI) {
+        string state = user.BeginAuthorization();
 
         //********* BUILD AUTHORIZE QUERY ARG STRING ***************//
         ////Dictionary<string, string> auth_params = new Dictionary<string, string>();
@@ -141,8 +142,7 @@ public class GloebitAPI {
         auth_params["response_type"] = "code";
         auth_params["user"] = userName;
         auth_params["uid"] = user.PrincipalID;
-        // TODO - make use of 'state' param for XSRF protection
-        // auth_params["state"] = ???;
+        auth_params["state"] = state;
 
         string query_string = BuildURLEncodedParamString(auth_params);
 

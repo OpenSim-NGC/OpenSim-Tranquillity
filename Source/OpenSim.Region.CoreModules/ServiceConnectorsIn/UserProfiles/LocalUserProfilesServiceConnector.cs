@@ -30,6 +30,7 @@ using Nini.Config;
 using System.Reflection;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers;
+using OpenSim.Server.Handlers.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
@@ -128,7 +129,7 @@ public class LocalUserProfilesServicesConnector : ISharedRegionModule
 
         Enabled = true;
 
-        JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule);
+        JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule, new ControlPlaneAccess(source));
 
         Server.AddJsonRPCHandler("avatarclassifiedsrequest", handler.AvatarClassifiedsRequest);
         Server.AddJsonRPCHandler("classified_update", handler.ClassifiedUpdate);

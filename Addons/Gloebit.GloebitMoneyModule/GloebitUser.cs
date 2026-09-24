@@ -36,6 +36,8 @@
  */
 
 using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using OpenMetaverse;
 
 using Microsoft.Extensions.Logging;
@@ -52,6 +54,7 @@ public class GloebitUser {
     public string GloebitID;
     public string GloebitToken;
     public string LastSessionID;
+    public string PendingAuthState;
 
     // TODO - update userMap to be a proper LRU Cache
     private static Dictionary<string, GloebitUser> s_userMap = new Dictionary<string, GloebitUser>();
@@ -67,6 +70,7 @@ public class GloebitUser {
         this.GloebitID = gloebitID;
         this.GloebitToken = token;
         this.LastSessionID = sessionID;
+        this.PendingAuthState = string.Empty;
     }
 
     private GloebitUser(GloebitUser copyFrom) {
@@ -75,12 +79,14 @@ public class GloebitUser {
         this.GloebitID = copyFrom.GloebitID;
         this.GloebitToken = copyFrom.GloebitToken;
         this.LastSessionID = copyFrom.LastSessionID;
+        this.PendingAuthState = copyFrom.PendingAuthState ?? string.Empty;
     }
 
     private void UpdateFrom(GloebitUser updateFrom) {
         this.GloebitID = updateFrom.GloebitID;
         this.GloebitToken = updateFrom.GloebitToken;
         this.LastSessionID = updateFrom.LastSessionID;
+        this.PendingAuthState = updateFrom.PendingAuthState ?? string.Empty;
     }
 
     public static GloebitUser Get(UUID appKey, UUID agentID) {
@@ -201,6 +207,56 @@ public class GloebitUser {
 
     public bool IsAuthed() {
         return !String.IsNullOrEmpty(this.GloebitToken);
+    }
+
+    public string BeginAuthorization()
+    {
+        string state = UUID.Random().ToString();
+        GloebitUser u;
+        lock (s_userMap) {
+            s_userMap.TryGetValue(PrincipalID, out u);
+        }
+        if (u == null)
+            u = this;
+
+        lock (u.userLock) {
+            u.PendingAuthState = state;
+            if (!GloebitUserData.Instance.Store(u))
+                throw new Exception(String.Format("[GLOEBITMONEYMODULE] GloebitUser.BeginAuthorization Failed to store user {0}", PrincipalID));
+            this.UpdateFrom(u);
+        }
+        return state;
+    }
+
+    public bool ConsumeAuthorizationState(string state)
+    {
+        if (String.IsNullOrEmpty(state) || String.IsNullOrEmpty(PendingAuthState))
+            return false;
+
+        GloebitUser u;
+        lock (s_userMap) {
+            s_userMap.TryGetValue(PrincipalID, out u);
+        }
+        if (u == null)
+            u = this;
+
+        lock (u.userLock) {
+            if (!FixedTimeEquals(u.PendingAuthState, state))
+                return false;
+
+            u.PendingAuthState = String.Empty;
+            if (!GloebitUserData.Instance.Store(u))
+                throw new Exception(String.Format("[GLOEBITMONEYMODULE] GloebitUser.ConsumeAuthorizationState Failed to store user {0}", PrincipalID));
+            this.UpdateFrom(u);
+            return true;
+        }
+    }
+
+    private static bool FixedTimeEquals(string expected, string actual)
+    {
+        byte[] expectedBytes = Encoding.UTF8.GetBytes(expected ?? string.Empty);
+        byte[] actualBytes = Encoding.UTF8.GetBytes(actual ?? string.Empty);
+        return expectedBytes.Length == actualBytes.Length && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
     }
 
     // TODO: Why is this static?
