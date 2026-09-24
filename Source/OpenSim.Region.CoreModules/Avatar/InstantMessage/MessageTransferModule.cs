@@ -32,6 +32,7 @@ using Nwc.XmlRpc;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
+using OpenSim.Server.Handlers.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
@@ -50,6 +51,7 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
     protected string m_MessageKey = string.Empty;
     protected List<Scene> m_Scenes = new List<Scene>();
     protected Dictionary<UUID, UUID> m_UserRegionMap = new();
+    private ControlPlaneAccess m_ControlPlaneAccess;
 
     public event UndeliveredMessage OnUndeliveredMessage;
 
@@ -67,6 +69,8 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
 
     public virtual void Initialise(IConfigSource config)
     {
+        m_ControlPlaneAccess = new ControlPlaneAccess(config);
+
         IConfig cnf = config.Configs["Messaging"];
         if (cnf != null)
         {
@@ -289,6 +293,9 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
                     dialog = dialogdata[0];
                 }
 
+                if (!m_ControlPlaneAccess.AuthorizePrivilegedInstantMessage(dialog, remoteClient))
+                    return FailureResponse();
+
                 if ((string)requestData["from_group"] == "TRUE")
                     fromGroup = true;
 
@@ -416,14 +423,20 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
 
         //Send response back to region calling if it was successful
         // calling region uses this to know when to look up a user's location again.
+        return InstantMessageResponse(successful);
+    }
+
+    private static XmlRpcResponse FailureResponse()
+    {
+        return InstantMessageResponse(false);
+    }
+
+    private static XmlRpcResponse InstantMessageResponse(bool successful)
+    {
         XmlRpcResponse resp = new XmlRpcResponse();
         Hashtable respdata = new Hashtable();
-        if (successful)
-            respdata["success"] = "TRUE";
-        else
-            respdata["success"] = "FALSE";
+        respdata["success"] = successful ? "TRUE" : "FALSE";
         resp.Value = respdata;
-
         return resp;
     }
 

@@ -32,6 +32,7 @@ using System.Xml;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
@@ -46,6 +47,7 @@ public class FriendsSimpleRequestHandler : SimpleStreamHandler
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private FriendsModule m_FriendsModule;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
     /*
     public FriendsRequestHandler(FriendsModule fmodule)
             : base("POST", "/friends", new BasicDosProtectorOptions()
@@ -58,9 +60,10 @@ public class FriendsSimpleRequestHandler : SimpleStreamHandler
                                             ThrottledAction = BasicDOSProtector.ThrottleAction.DoThrottledMethod
                                         })
     */
-    public FriendsSimpleRequestHandler(FriendsModule fmodule) : base("/friends")
+    public FriendsSimpleRequestHandler(FriendsModule fmodule, ControlPlaneAccess controlPlaneAccess) : base("/friends")
     {
         m_FriendsModule = fmodule;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
@@ -76,6 +79,9 @@ public class FriendsSimpleRequestHandler : SimpleStreamHandler
             httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
+
+        if (!m_ControlPlaneAccess.Authorize(httpRequest, httpResponse))
+            return;
 
         httpResponse.KeepAlive = false;
         httpResponse.StatusCode = (int)HttpStatusCode.OK;

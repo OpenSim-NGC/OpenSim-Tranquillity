@@ -470,6 +470,15 @@ public class GatekeeperService : IGatekeeperService
                 {
                     if (guinfo.Online && !guinfo.LastRegionID.IsZero())
                     {
+                        if (account is null && !ForeignSessionHomeMatches(guinfo, authURL))
+                        {
+                            reason = "You appear to be already logged in on the destination grid";
+                            m_log.LogInformation(
+                                "[GATEKEEPER SERVICE]: Refusing duplicate foreign login for {0}; stored home does not match claimed home {1}",
+                                aCircuit.AgentID, authURL);
+                            return false;
+                        }
+
                         if (SendAgentGodKillToRegion(UUID.Zero, agentID, uui, guinfo))
                         {
                             if (account is not null)
@@ -619,6 +628,12 @@ public class GatekeeperService : IGatekeeperService
         }
         else
         {
+            if (!HypergridEgressPolicy.IsAllowedTarget(userURL, m_gatekeeperURL))
+            {
+                m_log.LogInformation("[GATEKEEPER SERVICE]: Refusing verification callback to disallowed HomeURI {0}", userURL);
+                return false;
+            }
+
             IUserAgentService userAgentService = new UserAgentServiceConnector(userURL);
 
             try
@@ -681,6 +696,17 @@ public class GatekeeperService : IGatekeeperService
             }
         }
         return false;
+    }
+
+    public static bool ForeignSessionHomeMatches(GridUserInfo existingSession, string claimedHomeURI)
+    {
+        if (existingSession == null || string.IsNullOrWhiteSpace(existingSession.UserID) || string.IsNullOrWhiteSpace(claimedHomeURI))
+            return false;
+
+        if (!Util.ParseUniversalUserIdentifier(existingSession.UserID, out UUID _, out string storedHomeURI))
+            return false;
+
+        return UserAgentService.IsLocalGridURI(storedHomeURI, claimedHomeURI);
     }
 
     private bool SendAgentGodKillToRegion(UUID scopeID, UUID agentID, string uui, GridUserInfo guinfo)

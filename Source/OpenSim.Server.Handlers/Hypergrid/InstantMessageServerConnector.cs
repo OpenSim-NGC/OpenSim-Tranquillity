@@ -48,6 +48,7 @@ public class InstantMessageServerConnector : ServiceConnector
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInstantMessage m_IMService;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
 
     public InstantMessageServerConnector(IConfigSource config, IHttpServer server) :
         this(config, server, (IInstantMessageSimConnector)null)
@@ -62,6 +63,8 @@ public class InstantMessageServerConnector : ServiceConnector
     public InstantMessageServerConnector(IConfigSource config, IHttpServer server, IInstantMessageSimConnector simConnector) :
             base(config, server, String.Empty)
     {
+        m_ControlPlaneAccess = new ControlPlaneAccess(config);
+
         IConfig gridConfig = config.Configs["HGInstantMessageService"];
         if (gridConfig != null)
         {
@@ -157,6 +160,9 @@ public class InstantMessageServerConnector : ServiceConnector
                     dialog = dialogdata[0];
                 }
 
+                if (!m_ControlPlaneAccess.AuthorizePrivilegedInstantMessage(dialog, remoteClient))
+                    return FailureResponse();
+
                 if ((string)requestData["from_group"] == "TRUE")
                     fromGroup = true;
 
@@ -229,11 +235,20 @@ public class InstantMessageServerConnector : ServiceConnector
 
         //Send response back to region calling if it was successful
         // calling region uses this to know when to look up a user's location again.
+        return InstantMessageResponse(successful);
+    }
+
+    private static XmlRpcResponse FailureResponse()
+    {
+        return InstantMessageResponse(false);
+    }
+
+    private static XmlRpcResponse InstantMessageResponse(bool successful)
+    {
         XmlRpcResponse resp = new XmlRpcResponse();
         Hashtable respdata = new Hashtable();
         respdata["success"] = successful ? "TRUE" : "FALSE";
         resp.Value = respdata;
-
         return resp;
     }
 
