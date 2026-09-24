@@ -410,3 +410,35 @@ public class ExpressionConformanceTests
     private static IEnumerable<string> SplitGlobals(string globals)
         => globals.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 }
+
+/// <summary>
+/// Statement assignments (x = e; and x op= e;) are type-checked like declarations: LSL rejects
+/// a value that cannot be assigned, and a constant is not a variable.
+/// </summary>
+public class AssignmentStatementTypeTests
+{
+    [Theory]
+    [InlineData("integer i; i = \"abc\";")]
+    [InlineData("integer i; i = 2.5;")]
+    [InlineData("string s; s = 5;")]
+    [InlineData("list l; l = <1,2,3>;")]
+    [InlineData("string s; s -= \"a\";")]
+    [InlineData("PI = 3.0;")]
+    [InlineData("TRUE = 0;")]
+    public void RejectedAssignment_(string body)
+    {
+        var c = PhloxCompiler.CompileInDefault(body);
+        Assert.True(c.HasErrors(), $"'{body}' compiled; LSL rejects it");
+    }
+
+    [Theory]
+    [InlineData("key k; k = \"abc\"; string s; s = k; llOwnerSay(s);", "abc")]
+    [InlineData("float f; f = 3; f += 1; llOwnerSay((string)f);", "4.000000")]
+    [InlineData("vector v; v.y = 2; v.y *= 3; llOwnerSay((string)v.y);", "6.000000")]
+    [InlineData("list l; l = []; l += 1; llOwnerSay((string)l);", "1")]
+    public void AcceptedAssignment_(string body, string expect)
+    {
+        var r = ExprRunner.RunInDefault(body);
+        Assert.True(r.Ok && r.Said.SequenceEqual(new[] { expect }), $"'{body}': got {r.Describe()} (expect [{expect}])");
+    }
+}
