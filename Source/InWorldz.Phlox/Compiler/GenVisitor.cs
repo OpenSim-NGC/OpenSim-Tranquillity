@@ -410,9 +410,16 @@ namespace InWorldz.Phlox.Compiler
         {
             var children = context.bitwiseExpression();
             if (children.Length == 1) return DoPromotion(context, Visit(children[0]));
-            string op = GetBinaryOpText(context);
-            return ByteCodeEmitter.BinaryOp(op == "&&" ? "booland" : "boolor",
-                Visit(children[0]), Visit(children[1]));
+            // && and || share one precedence level and are left-associative; every operand is
+            // evaluated (LSL does not short-circuit).
+            string result = Visit(children[0]);
+            for (int i = 1; i < children.Length; i++)
+            {
+                string op = GetBinaryOpTextAt(context, i);
+                result = ByteCodeEmitter.BinaryOp(op == "&&" ? "booland" : "boolor",
+                    result, Visit(children[i]));
+            }
+            return DoPromotion(context, result);
         }
 
         public override string VisitBitwiseExpression(
