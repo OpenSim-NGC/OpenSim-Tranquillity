@@ -161,6 +161,53 @@ namespace InWorldz.Phlox.Compiler
             return null;
         }
 
+        // ── Assignment statements ─────────────────────────────────────────────
+
+        /// <summary>
+        /// x = e; and x op= e; (the statement form, a separate grammar rule from the assignment
+        /// expression). The value must be assignable to the target, and an integer stored into
+        /// a float or a vector/rotation component is promoted to float.
+        /// </summary>
+        public override ISymbolType VisitAssignmentStmt([NotNull] LSLParser.AssignmentStmtContext context)
+        {
+            ISymbolType rhsType = Visit(context.expression());
+            IToken nameToken = context.lhs().ID().Symbol;
+            string name = nameToken.Text;
+
+            IScope scope = null;
+            IParseTree node = context;
+            while (node != null && scope == null)
+            {
+                scope = _annotations.GetScope(node);
+                node = node.Parent;
+            }
+            Symbol sym = (scope ?? _symtab.Globals).Resolve(name);
+            if (!(sym is VariableSymbol varSym) || sym is ConstantSymbol)
+            {
+                Error(nameToken, sym == null ? $"Undefined symbol '{name}'" : $"'{name}' is not assignable");
+                return null;
+            }
+
+            ISymbolType lhsType = context.subscript != null ? SymbolTable.FLOAT : varSym.Type;
+            string op = context.op?.Text ?? "=";
+            if (rhsType == null) return null;
+            if (op == "=")
+            {
+                ISymbolType promotion = SymbolTable.promoteFromTo[Idx(rhsType), Idx(lhsType)];
+                if (!_symtab.CanAssignTo(rhsType, lhsType, promotion))
+                    Error(nameToken, $"Cannot assign {rhsType.Name} to {lhsType?.Name}");
+                else if (promotion != null)
+                    SetPromote(context.expression(), promotion);
+            }
+            else
+            {
+                ISymbolType[,] table = _symtab.FindOperationTable(op, nameToken.Line, nameToken.Column);
+                if (table != null && table[Idx(lhsType), Idx(rhsType)] == SymbolTable.VOID)
+                    Error(nameToken, $"Type mismatch: cannot apply '{op}' to {lhsType?.Name} and {rhsType.Name}");
+            }
+            return null;
+        }
+
         // ── Return statements ─────────────────────────────────────────────────
 
         public override ISymbolType VisitReturnStmt([NotNull] LSLParser.ReturnStmtContext context)
