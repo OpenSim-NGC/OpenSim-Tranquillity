@@ -26,9 +26,15 @@
  */
 
 using OpenMetaverse;
+using OpenSim.Services.Interfaces;
 
 public interface IUserAccountCacheModule
 {
     void Remove(string name);
     void Remove(UUID id);
+
+    /// <summary>B2: cache-only reads, never a service call. <paramref name="inCache"/> is true
+    /// when the cache holds an answer for the key, which may be a cached null (a known-missing account).</summary>
+    UserAccount Get(UUID userID, out bool inCache);
+    UserAccount Get(string name, out bool inCache);
 }
