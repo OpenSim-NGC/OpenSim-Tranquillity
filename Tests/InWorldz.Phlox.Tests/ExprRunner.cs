@@ -123,9 +123,14 @@ public static class ExprRunner
         private static Dictionary<int, FunctionSig> BuildIndex()
         {
             var map = new Dictionary<int, FunctionSig>();
-            foreach (var sig in Defaults.SystemMethods.Values) map[sig.TableIndex] = sig;
+            foreach (object entry in Defaults.SystemMethods.Values)
+                foreach (var sig in Signatures(entry)) map[sig.TableIndex] = sig;
             return map;
         }
+
+        // A name maps to one signature, or to a list of them where a builtin has overloads.
+        private static IEnumerable<FunctionSig> Signatures(object entry)
+            => entry is FunctionSig sig ? new[] { sig } : (IEnumerable<FunctionSig>)entry;
 
         public void Call(int funcid)
         {
