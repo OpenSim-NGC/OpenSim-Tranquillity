@@ -163,7 +163,7 @@ public class RestClient : IDisposable
         }
         catch (Exception e)
         {
-            m_log.LogError(e, "[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}");
+            m_log.LogError(e, "[REST]: An exception was raised adding query parameter to dictionary");
         }
     }
 
@@ -183,7 +183,7 @@ public class RestClient : IDisposable
         }
         catch (Exception e)
         {
-            m_log.LogError(e, "[REST]: An exception was raised adding query parameter to dictionary. Exception: {0}");
+            m_log.LogError(e, "[REST]: An exception was raised adding query parameter to dictionary");
         }
     }
 

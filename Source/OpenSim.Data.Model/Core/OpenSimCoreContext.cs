@@ -55,6 +55,7 @@ public partial class OpenSimCoreContext : DbContext
     public virtual DbSet<OsGroupsPrincipal> OsGroupsPrincipals { get; set; }
     public virtual DbSet<OsGroupsRole> OsGroupsRoles { get; set; }
     public virtual DbSet<OsGroupsRolemembership> OsGroupsRolememberships { get; set; }
+    public virtual DbSet<PartnerRequest> PartnerRequests { get; set; }
     public virtual DbSet<Presence> Presences { get; set; }
     public virtual DbSet<Region> Regions { get; set; }
     public virtual DbSet<Token> Tokens { get; set; }
@@ -862,6 +863,8 @@ public partial class OpenSimCoreContext : DbContext
             entity.Property(e => e.Id)
                 .HasColumnType("mediumint")
                 .HasColumnName("ID");
+            entity.Property(e => e.EmailSent)
+                .HasColumnName("EmailSent");
             entity.Property(e => e.FromId)
                 .IsRequired()
                 .HasMaxLength(36)
@@ -1298,6 +1301,34 @@ public partial class OpenSimCoreContext : DbContext
                 .HasColumnName("PrincipalID");
         });
 
+        modelBuilder.Entity<PartnerRequest>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity
+                .ToTable("partnerrequests")
+                .HasCharSet("latin1")
+                .UseCollation("latin1_swedish_ci");
+
+            entity.HasIndex(e => new { e.RequesterId, e.RecipientId }, "RequesterRecipient").IsUnique();
+            entity.HasIndex(e => new { e.RecipientId, e.CreatedUtc }, "RecipientCreatedUtc");
+
+            entity.Property(e => e.Id).HasColumnName("id");
+            entity.Property(e => e.RequesterId)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("requesterId");
+            entity.Property(e => e.RecipientId)
+                .IsRequired()
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("recipientId");
+            entity.Property(e => e.CreatedUtc)
+                .HasColumnType("datetime(6)")
+                .HasColumnName("createdUtc");
+        });
+
         modelBuilder.Entity<Presence>(entity =>
         {
             entity
@@ -1498,6 +1529,9 @@ public partial class OpenSimCoreContext : DbContext
             entity.Property(e => e.Active)
                 .HasDefaultValueSql("'1'")
                 .HasColumnName("active");
+            entity.Property(e => e.DisplayName)
+                .HasMaxLength(31)
+                .HasColumnName("DisplayName");
             entity.Property(e => e.Email).HasMaxLength(64);
             entity.Property(e => e.FirstName)
                 .IsRequired()
@@ -1518,6 +1552,9 @@ public partial class OpenSimCoreContext : DbContext
             entity.Property(e => e.ServiceUrls)
                 .HasColumnType("text")
                 .HasColumnName("ServiceURLs");
+            entity.Property(e => e.NameChanged)
+                .HasDefaultValueSql("'0'")
+                .HasColumnName("NameChanged");
             entity.Property(e => e.UserTitle)
                 .IsRequired()
                 .HasMaxLength(64)

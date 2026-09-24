@@ -22,6 +22,8 @@ public partial class OpenSimEconomyContext : DbContext
 
     public virtual DbSet<Balance> Balances { get; set; }
 
+    public virtual DbSet<PaymentOrder> PaymentOrders { get; set; }
+
     public virtual DbSet<Totalsale> Totalsales { get; set; }
 
     public virtual DbSet<Transaction> Transactions { get; set; }
@@ -49,6 +51,50 @@ public partial class OpenSimEconomyContext : DbContext
             entity.Property(e => e.Balance1).HasColumnName("balance");
             entity.Property(e => e.Status).HasColumnName("status");
             entity.Property(e => e.Type).HasColumnName("type");
+        });
+
+        modelBuilder.Entity<PaymentOrder>(entity =>
+        {
+            entity.HasKey(e => e.Id).HasName("PRIMARY");
+
+            entity.ToTable("payment_orders");
+
+            entity.HasIndex(e => new { e.Gateway, e.GatewayOrderId })
+                .IsUnique()
+                .HasDatabaseName("IX_payment_orders_gateway_order");
+
+            entity.Property(e => e.Id)
+                .HasMaxLength(36)
+                .HasColumnName("id");
+            entity.Property(e => e.UserId)
+                .IsRequired()
+                .HasMaxLength(36)
+                .HasColumnName("user_id");
+            entity.Property(e => e.Gateway)
+                .IsRequired()
+                .HasMaxLength(32)
+                .HasColumnName("gateway");
+            entity.Property(e => e.GatewayOrderId)
+                .IsRequired()
+                .HasMaxLength(128)
+                .HasColumnName("gateway_order_id");
+            entity.Property(e => e.GatewayCaptureId)
+                .HasMaxLength(128)
+                .HasColumnName("gateway_capture_id");
+            entity.Property(e => e.CurrencyAmount).HasColumnName("currency_amount");
+            entity.Property(e => e.FiatAmount)
+                .HasPrecision(18, 2)
+                .HasColumnName("fiat_amount");
+            entity.Property(e => e.FiatCurrency)
+                .IsRequired()
+                .HasMaxLength(3)
+                .HasColumnName("fiat_currency");
+            entity.Property(e => e.Status)
+                .IsRequired()
+                .HasMaxLength(32)
+                .HasColumnName("status");
+            entity.Property(e => e.CreatedUtc).HasColumnName("created_utc");
+            entity.Property(e => e.CompletedUtc).HasColumnName("completed_utc");
         });
 
         modelBuilder.Entity<Totalsale>(entity =>

@@ -5,6 +5,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
  */
 
+using System;
+
 namespace OpenSim.Data.Model.Region;
 
 public partial class Prim
