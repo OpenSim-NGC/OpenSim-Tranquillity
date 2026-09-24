@@ -559,6 +559,17 @@ namespace InWorldz.Phlox.Compiler
         public override string VisitUnaryMinus([NotNull] LSLParser.UnaryMinusContext context)
         {
             ISymbolType t = EvalType(context.unaryExpression());
+            // A minus sign directly on a literal is part of the literal: -2147483648 is the
+            // minimum integer, whereas 2147483648 on its own is out of range and would load as -1.
+            IParseTree operand = context.unaryExpression();
+            while (operand.ChildCount == 1 && !(operand is ITerminalNode)) operand = operand.GetChild(0);
+            if (operand is ITerminalNode lit)
+            {
+                if (lit.Symbol.Type == LSLParser.INTEGER_LITERAL)
+                    return DoPromotion(context, ByteCodeEmitter.IConst("-" + lit.GetText()));
+                if (lit.Symbol.Type == LSLParser.FLOAT_LITERAL)
+                    return DoPromotion(context, ByteCodeEmitter.FConst(FormatFloat("-" + lit.GetText())));
+            }
             string expr = Visit(context.unaryExpression());
             string result = t == SymbolTable.INT    ? ByteCodeEmitter.INeg(expr)
                           : t == SymbolTable.FLOAT  ? ByteCodeEmitter.FNeg(expr)
