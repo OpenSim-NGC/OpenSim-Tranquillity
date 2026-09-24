@@ -317,8 +317,21 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             if (engines == null) return;
 
             object[] args = new object[] { data.BotID.ToString(), eventType, new object[0] };
+            // PHLOX-6: the same outcome as SL's path_update(integer type, list reserved), for a
+            // script that speaks SL pathfinding (llCreateCharacter / llNavigateTo) rather than the
+            // InWorldz bot API. Posted beside bot_update rather than instead of it - a script
+            // declares one handler or the other, and an engine drops an event the script has no
+            // handler for. BotData carries no marker for how the bot was created, so both go.
+            // Mapping per wiki.secondlife.com/wiki/Path_update: BOT_MOVE_COMPLETE (1) ->
+            // PU_GOAL_REACHED (1); BOT_MOVE_FAILED (3, a navigation timeout) -> PU_FAILURE_UNREACHABLE
+            // (4, "goal is no longer reachable for some reason").
+            int puType = eventType == 1 ? 1 : eventType == 3 ? 4 : 1000000 /* PU_FAILURE_OTHER */;
+            object[] pathArgs = new object[] { puType, new object[0] };
             foreach (IScriptModule engine in engines)
+            {
                 engine?.PostScriptEvent(data.PathEventScriptID, "bot_update", args);
+                engine?.PostScriptEvent(data.PathEventScriptID, "path_update", pathArgs);
+            }
         }
 
         #endregion
