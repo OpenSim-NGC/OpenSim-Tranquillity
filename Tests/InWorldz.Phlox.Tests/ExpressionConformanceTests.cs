@@ -35,6 +35,10 @@ namespace InWorldz.Phlox.Tests;
 /// </summary>
 public class ExpressionConformanceTests
 {
+    private readonly Xunit.Abstractions.ITestOutputHelper _out;
+
+    public ExpressionConformanceTests(Xunit.Abstractions.ITestOutputHelper output) { _out = output; }
+
     public sealed record Case(string Id, string Cause, string Source, string Globals, string Body,
         string[] Expect, string Skip = null)
     {
@@ -380,7 +384,7 @@ public class ExpressionConformanceTests
         {
             var r = ExprRunner.RunInDefault(c.Body, c.Globals);
             Assert.True(r.Ok, $"{c.Id}: {r.Describe()}");
-            Console.WriteLine($"DECISION {c.Id}: got {r.Describe()} (SL [{string.Join(" | ", c.Expect)}])");
+            _out.WriteLine($"DECISION {c.Id}: got {r.Describe()} (SL [{string.Join(" | ", c.Expect)}])");
         }
     }
 

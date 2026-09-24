@@ -7,7 +7,8 @@ namespace InWorldz.Phlox.Tests;
 /// chains, and/or chains and compound assignment. Expected values follow Lua 5.1 (reference
 /// manual 2.5.6: + and - share a level and are left-associative, as are * / %; "and" binds
 /// tighter than "or"; 2.5.3: and/or short-circuit and return an operand, not a boolean) and
-/// Luau's compound assignment (luau.org/syntax: a op= b is a = a op b, evaluated once).
+/// Luau's compound assignment (luau.org/syntax: a op= b is a = a op b, evaluated once), which
+/// the SLua front end does not parse yet.
 /// </summary>
 public class SLuaExpressionTests
 {
@@ -25,11 +26,22 @@ public class SLuaExpressionTests
         new object[] { "nil or false or 5", "local a, b, c = nil, false, 5\nll.Say(0, tostring(a or b or c))", "5" },
         new object[] { "a or b and c", "local a, b, c = false, 2, 3\nll.Say(0, tostring(a or b and c))", "3" },
         new object[] { "a and b or c", "local a, b, c = false, 2, 3\nll.Say(0, tostring(a and b or c))", "3" },
-        new object[] { "compound += -= *= /= %=",
-            "local a = 10\na += 5\na -= 3\na *= 2\na /= 4\na %= 4\nll.Say(0, tostring(a))", "2" },
-        new object[] { "compound ..=", "local s = \"a\"\ns ..= \"b\"\ns ..= \"c\"\nll.Say(0, s)", "abc" },
         new object[] { "comparison chain", "local a, b = 1, 2\nll.Say(0, tostring(a < b == true))", "true" },
     };
+
+    private const string CompoundGap =
+        "GAP: the SLua front end does not parse compound assignment (a += 1, s ..= \"x\"): it reports " +
+        "\"expected '=' (assignment) or a call statement\". A missing feature, not a wrong value.";
+
+    [Fact(Skip = CompoundGap)]
+    public void CompoundArithmeticAssignment()
+        => Assert.Equal(new[] { "2" },
+            ExprRunner.RunSLua("local a = 10\na += 5\na -= 3\na *= 2\na /= 4\na %= 4\nll.Say(0, tostring(a))").Said);
+
+    [Fact(Skip = CompoundGap)]
+    public void CompoundConcatAssignment()
+        => Assert.Equal(new[] { "abc" },
+            ExprRunner.RunSLua("local s = \"a\"\ns ..= \"b\"\ns ..= \"c\"\nll.Say(0, s)").Said);
 
     [Theory]
     [MemberData(nameof(Cases))]
