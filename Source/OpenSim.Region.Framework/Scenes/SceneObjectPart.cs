@@ -2005,6 +2005,33 @@ public class SceneObjectPart : EntityBase, IDisposable
         client.SendObjectPropertiesReply(this);
     }
 
+    /// <summary>
+    /// PROPS-1. Push full ObjectProperties to everyone in the region.
+    ///
+    /// <para>
+    /// The touch and sit labels a viewer shows in its context menu come from the FULL
+    /// ObjectProperties reply - <c>LLSelectMgr::processObjectProperties</c> fills
+    /// <c>LLSelectNode::mTouchName</c> (llselectmgr.cpp:6110) and the menu reads it
+    /// (llviewermenu.cpp:3096-3101). The region only sends that on select
+    /// (<c>Scene.PacketHandlers.cs:223</c>); a right-click sends
+    /// <c>RequestObjectPropertiesFamily</c>, whose reply carries no touch name at all. So a script
+    /// that changes the label after the viewer last selected the object has no way to be seen
+    /// unless the region pushes the properties itself.
+    /// </para>
+    /// </summary>
+    public void SendPropertiesToAllClients()
+    {
+        SceneObjectGroup group = ParentGroup;
+        if (group is null || group.IsDeleted || group.Scene is null)
+            return;
+
+        group.Scene.ForEachClient(delegate (IClientAPI client)
+        {
+            try { client.SendObjectPropertiesReply(this); }
+            catch { /* one client's failure must not stop the rest */ }
+        });
+    }
+
     // TODO: unused:
     // private void handleTimerAccounting(uint localID, double interval)
     // {
