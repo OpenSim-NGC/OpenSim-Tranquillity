@@ -523,7 +523,9 @@ namespace InWorldz.Phlox.Compiler
                     ? TemplateMapping.Subtraction[Idx(lType), Idx(rType)]
                     : TemplateMapping.Addition[Idx(lType), Idx(rType)];
                 result = ByteCodeEmitter.BinaryOp(subtemplate, result, Visit(children[i]));
-                lType = EvalType(context);
+                // The next pair's left operand is this pair's result, not the whole chain's.
+                lType = (isMinus ? SymbolTable.subtractionResultType : SymbolTable.additionResultType)
+                    [Idx(lType), Idx(rType)];
             }
             return DoPromotion(context, result);
         }
@@ -545,7 +547,9 @@ namespace InWorldz.Phlox.Compiler
                     : op == "/" ? TemplateMapping.Division[Idx(lType), Idx(rType)]
                     : TemplateMapping.Multiplication[Idx(lType), Idx(rType)];
                 result = ByteCodeEmitter.BinaryOp(subtemplate, result, Visit(children[i]));
-                lType = EvalType(context);
+                lType = (op == "%" ? SymbolTable.modResultType
+                    : op == "/" ? SymbolTable.divisionResultType
+                    : SymbolTable.multiplicationResultType)[Idx(lType), Idx(rType)];
             }
             return DoPromotion(context, result);
         }
