@@ -468,7 +468,7 @@ namespace InWorldz.Phlox.Compiler
         public override ISymbolType VisitUnaryMinus([NotNull] LSLParser.UnaryMinusContext context)
         {
             ISymbolType t = Visit(context.unaryExpression());
-            if (t != SymbolTable.INT && t != SymbolTable.FLOAT && t != SymbolTable.VECTOR)
+            if (t != SymbolTable.INT && t != SymbolTable.FLOAT && t != SymbolTable.VECTOR && t != SymbolTable.ROTATION)
                 Error(context.MINUS().Symbol,
                     $"Unary minus cannot be applied to type {t?.Name}");
             SetType(context, t);
