@@ -148,7 +148,10 @@ namespace Phlox.ScriptEngine
                 {
                     try
                     {
-                        var restoredRuntimeState = savedState.ToRuntimeState();
+                        // A state saved mid-event on bytecode that has since been recompiled
+                        // comes back idle, with its globals, queue and timers.
+                        var restoredRuntimeState = savedState.ToRuntimeStateFor(compiled, req.ItemID, out string recompiledNote);
+                        if (recompiledNote != null) m_log.LogInformation(recompiledNote);
                         interp = new Interpreter(compiled, restoredRuntimeState, shim);
                         freshStart = false;
                         m_log.LogDebug("[PhloxExe]: Restored state for {0}", req.ItemID);

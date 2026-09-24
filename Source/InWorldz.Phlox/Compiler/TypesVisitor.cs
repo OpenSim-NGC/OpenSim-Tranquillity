@@ -161,6 +161,53 @@ namespace InWorldz.Phlox.Compiler
             return null;
         }
 
+        // ── Assignment statements ─────────────────────────────────────────────
+
+        /// <summary>
+        /// x = e; and x op= e; (the statement form, a separate grammar rule from the assignment
+        /// expression). The value must be assignable to the target, and an integer stored into
+        /// a float or a vector/rotation component is promoted to float.
+        /// </summary>
+        public override ISymbolType VisitAssignmentStmt([NotNull] LSLParser.AssignmentStmtContext context)
+        {
+            ISymbolType rhsType = Visit(context.expression());
+            IToken nameToken = context.lhs().ID().Symbol;
+            string name = nameToken.Text;
+
+            IScope scope = null;
+            IParseTree node = context;
+            while (node != null && scope == null)
+            {
+                scope = _annotations.GetScope(node);
+                node = node.Parent;
+            }
+            Symbol sym = (scope ?? _symtab.Globals).Resolve(name);
+            if (!(sym is VariableSymbol varSym) || sym is ConstantSymbol)
+            {
+                Error(nameToken, sym == null ? $"Undefined symbol '{name}'" : $"'{name}' is not assignable");
+                return null;
+            }
+
+            ISymbolType lhsType = context.subscript != null ? SymbolTable.FLOAT : varSym.Type;
+            string op = context.op?.Text ?? "=";
+            if (rhsType == null) return null;
+            if (op == "=")
+            {
+                ISymbolType promotion = SymbolTable.promoteFromTo[Idx(rhsType), Idx(lhsType)];
+                if (!_symtab.CanAssignTo(rhsType, lhsType, promotion))
+                    Error(nameToken, $"Cannot assign {rhsType.Name} to {lhsType?.Name}");
+                else if (promotion != null)
+                    SetPromote(context.expression(), promotion);
+            }
+            else
+            {
+                ISymbolType[,] table = _symtab.FindOperationTable(op, nameToken.Line, nameToken.Column);
+                if (table != null && table[Idx(lhsType), Idx(rhsType)] == SymbolTable.VOID)
+                    Error(nameToken, $"Type mismatch: cannot apply '{op}' to {lhsType?.Name} and {rhsType.Name}");
+            }
+            return null;
+        }
+
         // ── Return statements ─────────────────────────────────────────────────
 
         public override ISymbolType VisitReturnStmt([NotNull] LSLParser.ReturnStmtContext context)
@@ -250,9 +297,10 @@ namespace InWorldz.Phlox.Compiler
 		public override ISymbolType VisitAssignmentExpression(
 			[NotNull] LSLParser.AssignmentExpressionContext context)
 		{
-			// Only treat as assignment if there's an operator token AND two direct sub-expressions
-			string op = GetAssignOp(context);
-			if (string.IsNullOrEmpty(op) || context.assignmentExpression(1) == null)
+			// The rule is booleanExpression (op assignmentExpression)*, right-recursive: for
+			// x = e the target is booleanExpression() and the value is assignmentExpression(0).
+			LSLParser.AssignmentExpressionContext valueCtx = context.assignmentExpression(0);
+			if (valueCtx == null)
 			{
 				// Pure boolean expression passthrough
 				ISymbolType t = context.booleanExpression() != null
@@ -261,9 +309,13 @@ namespace InWorldz.Phlox.Compiler
 				SetType(context, t ?? SymbolTable.VOID);
 				return t;
 			}
+			if (context.assignmentExpression().Length > 1)
+				ErrorAtContext(context, "Invalid assignment target");
 
-			ISymbolType lhsType = Visit(context.assignmentExpression(0));
-			ISymbolType rhsType = Visit(context.assignmentExpression(1));
+			ISymbolType lhsType = Visit(context.booleanExpression());
+			if (AssignmentTarget(context.booleanExpression()) == null)
+				ErrorAtContext(context, "Invalid assignment target");
+			ISymbolType rhsType = Visit(valueCtx);
 			string op2 = GetAssignOp(context);
 			ISymbolType resultType;
 
@@ -279,7 +331,7 @@ namespace InWorldz.Phlox.Compiler
 				}
 				else
 				{
-					if (promotion != null) SetPromote(context.assignmentExpression(1), promotion);
+					if (promotion != null) SetPromote(valueCtx, promotion);
 					resultType = lhsType;
 				}
 			}
@@ -412,12 +464,11 @@ namespace InWorldz.Phlox.Compiler
             }
 
             ISymbolType result = Visit(children[0]);
-            // Walk left to right — each MINUS or implicit PLUS between children.
-            var minusTokens = context.MINUS();
+            // Walk left to right; the operator for each pair sits between the two operands.
             for (int i = 1; i < children.Length; i++)
             {
                 ISymbolType rhs = Visit(children[i]);
-                bool isMinus = (minusTokens != null && i - 1 < minusTokens.Length);
+                bool isMinus = GetOpAt(context, i) == "-";
                 ISymbolType[,] table = isMinus
                     ? SymbolTable.subtractionResultType
                     : SymbolTable.additionResultType;
@@ -464,7 +515,7 @@ namespace InWorldz.Phlox.Compiler
         public override ISymbolType VisitUnaryMinus([NotNull] LSLParser.UnaryMinusContext context)
         {
             ISymbolType t = Visit(context.unaryExpression());
-            if (t != SymbolTable.INT && t != SymbolTable.FLOAT && t != SymbolTable.VECTOR)
+            if (t != SymbolTable.INT && t != SymbolTable.FLOAT && t != SymbolTable.VECTOR && t != SymbolTable.ROTATION)
                 Error(context.MINUS().Symbol,
                     $"Unary minus cannot be applied to type {t?.Name}");
             SetType(context, t);
@@ -794,6 +845,9 @@ namespace InWorldz.Phlox.Compiler
         private void ErrorAtContext(ParserRuleContext ctx, string msg)
             => Error(ctx.Start.Line, ctx.Start.Column, msg);
 
+        private static ParserRuleContext AssignmentTarget(LSLParser.BooleanExpressionContext target)
+            => GenVisitor.AssignmentTarget(target);
+
         /// <summary>
         /// Extracts the assignment operator text from an AssignmentExpressionContext.
         /// The operator is a terminal token between the two sub-expressions.
@@ -816,6 +870,16 @@ namespace InWorldz.Phlox.Compiler
                 }
             }
             return "=";
+        }
+
+        /// <summary>
+        /// The operator before the rhsIndex-th operand of a flat (expr (op expr)*) rule: it sits at
+        /// child position 2*rhsIndex - 1.
+        /// </summary>
+        private static string GetOpAt(ParserRuleContext ctx, int rhsIndex)
+        {
+            int opPos = 2 * rhsIndex - 1;
+            return opPos < ctx.ChildCount && ctx.GetChild(opPos) is ITerminalNode tn ? tn.GetText() : string.Empty;
         }
 
         /// <summary>

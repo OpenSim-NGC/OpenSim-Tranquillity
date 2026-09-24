@@ -76,6 +76,13 @@ namespace InWorldz.Phlox.Serialization
         [ProtoMember(21)]
         public float TotalRuntime;
 
+        /// <summary>
+        /// The CompiledScript.BytecodeIdentity the state was captured on (tag 27). Absent - null -
+        /// in rows written before it; see <see cref="ToRuntimeStateFor"/>.
+        /// </summary>
+        [ProtoMember(27)]
+        public string BytecodeIdentity;
+
         public SerializedRuntimeState()
         {
         }
@@ -144,6 +151,7 @@ namespace InWorldz.Phlox.Serialization
             serState.TimerLastScheduledOn = Util.Clock.TickCountToDateTime(state.TimerLastScheduledOn, tickCountNow);
             serState.TimerInterval = state.TimerInterval;
             serState.RunningEvent = SerializedPostedEvent.FromPostedEvent(state.RunningEvent);
+            serState.BytecodeIdentity = state.BytecodeIdentity;
             serState.ActiveListens = listensSnapshot;
             serState.StartParameter = state.StartParameter;
 
@@ -247,7 +255,34 @@ namespace InWorldz.Phlox.Serialization
 
             state.OtherRuntime = TotalRuntime;
             state.StartTimeOnSimulator = Util.Clock.GetLongTickCount();
+            state.BytecodeIdentity = this.BytecodeIdentity;
 
+            return state;
+        }
+
+        /// <summary>
+        /// Restores this state to run on <paramref name="script"/>. The IP, call frames, operand
+        /// stack and running event only mean something in the bytecode they were captured on. If
+        /// the script has been recompiled since (its identity differs), or the row predates the
+        /// identity, a state saved mid-event keeps its globals, LSL state, queued events, timers and
+        /// listens, drops the in-progress event and resumes idle; <paramref name="recompiledNote"/>
+        /// is then the line to log, otherwise null. Unchanged bytecode, and a state saved idle,
+        /// restore exactly as <see cref="ToRuntimeState"/> does.
+        /// </summary>
+        public VM.RuntimeState ToRuntimeStateFor(VM.CompiledScript script, OpenMetaverse.UUID itemId, out string recompiledNote)
+        {
+            VM.RuntimeState state = ToRuntimeState();
+            recompiledNote = null;
+
+            bool sameBytecode = this.BytecodeIdentity != null && this.BytecodeIdentity == script.BytecodeIdentity;
+            if (!sameBytecode && state.IsMidEvent)
+            {
+                state.DropExecutionPosition();
+                recompiledNote = $"[PhloxState]: {itemId} recompiled since its state was saved; " +
+                                 $"resumed idle in state {state.LSLState}, in-progress event dropped";
+            }
+
+            state.BytecodeIdentity = script.BytecodeIdentity;
             return state;
         }
     }
