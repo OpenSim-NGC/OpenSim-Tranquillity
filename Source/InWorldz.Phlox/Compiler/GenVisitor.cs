@@ -427,11 +427,13 @@ namespace InWorldz.Phlox.Compiler
         {
             var children = context.equalityExpression();
             if (children.Length == 1) return DoPromotion(context, Visit(children[0]));
-            string op = GetBinaryOpText(context);
-            string tname = op == "|" ? "bitor" : op == "&" ? "bitand" : "bitxor";
+            // | & ^ are one level in this grammar, left-associative: each pair takes the operator
+            // between its operands.
             string result = Visit(children[0]);
             for (int i = 1; i < children.Length; i++)
             {
+                string op = GetBinaryOpTextAt(context, i);
+                string tname = op == "|" ? "bitor" : op == "&" ? "bitand" : "bitxor";
                 result = ByteCodeEmitter.BinaryOp(tname, result, Visit(children[i]));
             }
             return DoPromotion(context, result);
