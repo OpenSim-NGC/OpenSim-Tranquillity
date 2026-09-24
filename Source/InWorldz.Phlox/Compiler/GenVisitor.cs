@@ -991,8 +991,12 @@ namespace InWorldz.Phlox.Compiler
 
         private bool IsConstantExpr(IParseTree tree)
         {
-            if (tree is LSLParser.FloatLiteralContext || tree is LSLParser.IntegerLiteralContext)
+            // Only literals the vconst/rconst text can carry: a hex integer (0x10) cannot be
+            // written as a float component, so such a literal is built at run time instead.
+            if (tree is LSLParser.FloatLiteralContext)
                 return true;
+            if (tree is LSLParser.IntegerLiteralContext il)
+                return !il.GetText().StartsWith("0x", StringComparison.OrdinalIgnoreCase);
             if (tree.ChildCount == 1) return IsConstantExpr(tree.GetChild(0));
             return false;
         }
