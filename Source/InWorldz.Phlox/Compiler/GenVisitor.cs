@@ -273,7 +273,9 @@ namespace InWorldz.Phlox.Compiler
 			string condExpr = context.cond != null ? Visit(context.cond) : null;
 			string loopExpr = context.loop != null ? GenExpression(context.loop) : null;
 			string body = Visit(context.statement());
-			ISymbolType condType = context.cond != null ? EvalType(context.cond) : null;
+			// The condition's type is on its expression; the exprStatement around it (which may be
+			// just ';') is never annotated, which left a float/string/key condition without booleval.
+			ISymbolType condType = context.cond?.expression() != null ? EvalType(context.cond.expression()) : null;
 			bool needsBoolEval = condType != null && condType != SymbolTable.INT;
 			return ByteCodeEmitter.ForLoop(initExpr, condExpr, loopExpr, body,
 				NextLabel("forloop_start_"), NextLabel("forloop_out_"), needsBoolEval);
