@@ -5,6 +5,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
  */
 
+using System;
+
 namespace OpenSim.Data.Model.Core;
 
 public partial class ImOffline
@@ -14,4 +16,5 @@ public partial class ImOffline
     public string FromId { get; set; } = String.Empty;
     public string Message { get; set; } = String.Empty;
     public DateTime Tmstamp { get; set; } = DateTime.Now;
+    public bool EmailSent { get; set; } = false;
 }

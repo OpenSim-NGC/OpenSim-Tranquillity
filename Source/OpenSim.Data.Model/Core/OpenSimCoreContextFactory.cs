@@ -5,6 +5,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
  */
 
+using System;
+using System.IO;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
@@ -28,7 +30,7 @@ public class OpenSimCoreContextFactory : IDesignTimeDbContextFactory<OpenSimCore
         var connectionString = configuration.GetConnectionString("OpenSimCoreConnection") ??
             throw new InvalidOperationException("Connection string 'OpenSimCoreConnection' not found.");
 
-        // Configure DbContext to use MySQL with the Microting (Pomelo fork) provider
+        // Configure DbContext to use MySQL with Microting provider
         optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
             mySqlOptions => mySqlOptions.MigrationsAssembly(typeof(OpenSimCoreContext).Assembly.FullName));
 

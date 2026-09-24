@@ -5,6 +5,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/. 
  */
 
+using System;
+
 namespace OpenSim.Data.Model.Core;
 
 public partial class UserAccount
@@ -20,4 +22,6 @@ public partial class UserAccount
     public int UserFlags { get; set; }
     public string UserTitle { get; set; } = String.Empty;
     public int Active { get; set; } = 1;
+    public string DisplayName { get; set; }
+    public int? NameChanged { get; set; }
 }
