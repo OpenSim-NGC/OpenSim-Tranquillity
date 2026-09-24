@@ -429,16 +429,34 @@ namespace InWorldz.Phlox.Compiler
         {
             var children = context.equalityExpression();
             if (children.Length == 1) return DoPromotion(context, Visit(children[0]));
-            // | & ^ are one level in this grammar, left-associative: each pair takes the operator
-            // between its operands.
-            string result = Visit(children[0]);
-            for (int i = 1; i < children.Length; i++)
+            // The grammar parses | & ^ as one flat chain; LSL gives & higher precedence than ^,
+            // and ^ higher than |, each left-associative. Re-associate the chain by precedence
+            // climbing. Operands are still emitted in source order.
+            int next = 0;
+            return DoPromotion(context, GenBitwiseChain(context, children, 1, ref next));
+        }
+
+        private static int BitwisePrecedence(string op) => op == "&" ? 3 : op == "^" ? 2 : 1;
+
+        /// <summary>
+        /// Emits children[next] and every following operator whose precedence is at least
+        /// minPrec, with its right operand; next is left on the last operand consumed.
+        /// </summary>
+        private string GenBitwiseChain(LSLParser.BitwiseExpressionContext context,
+            LSLParser.EqualityExpressionContext[] children, int minPrec, ref int next)
+        {
+            string result = Visit(children[next]);
+            while (next + 1 < children.Length)
             {
-                string op = GetBinaryOpTextAt(context, i);
+                string op = GetBinaryOpTextAt(context, next + 1);
+                int prec = BitwisePrecedence(op);
+                if (prec < minPrec) break;
+                next++;
+                string rhs = GenBitwiseChain(context, children, prec + 1, ref next);
                 string tname = op == "|" ? "bitor" : op == "&" ? "bitand" : "bitxor";
-                result = ByteCodeEmitter.BinaryOp(tname, result, Visit(children[i]));
+                result = ByteCodeEmitter.BinaryOp(tname, result, rhs);
             }
-            return DoPromotion(context, result);
+            return result;
         }
 
         public override string VisitEqualityExpression(
