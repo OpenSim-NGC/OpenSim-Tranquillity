@@ -442,3 +442,30 @@ public class AssignmentStatementTypeTests
         Assert.True(r.Ok && r.Said.SequenceEqual(new[] { expect }), $"'{body}': got {r.Describe()} (expect [{expect}])");
     }
 }
+
+/// <summary>A for-loop condition of any type, and vector literals with hex components.</summary>
+public class ForConditionAndVectorLiteralTests
+{
+    [Theory]
+    // OPS/FOR: a float condition is true when non-zero: 0.5 and 0.25 run, 0.0 stops.
+    [InlineData("float f = 0.5; integer n; for (; f; f -= 0.25) { if (++n > 50) jump out; } @out; llOwnerSay((string)n);", "2")]
+    // A string condition is true when non-empty.
+    [InlineData("string s = \"a\"; integer n; for (; s; s = \"\") { if (++n > 50) jump out; } @out; llOwnerSay((string)n);", "1")]
+    // A key condition is true when it is a valid, non-null key.
+    [InlineData("key k = NULL_KEY; integer n; for (; k; ) { if (++n > 50) jump out; } @out; llOwnerSay((string)n);", "0")]
+    public void ForCondition_(string body, string expect)
+    {
+        var r = ExprRunner.RunInDefault(body);
+        Assert.True(r.Ok && r.Said.SequenceEqual(new[] { expect }), $"'{body}': got {r.Describe()} (expect [{expect}])");
+    }
+
+    [Theory]
+    [InlineData("vector v = <0x10, 0, 0>; llOwnerSay((string)v.x);", "16.000000")]
+    [InlineData("rotation r = <0, 0, 0, 0x1>; llOwnerSay((string)r.s);", "1.000000")]
+    [InlineData("vector v = <1, 2.5, 3>; llOwnerSay((string)v.z);", "3.000000")]
+    public void VectorLiteral_(string body, string expect)
+    {
+        var r = ExprRunner.RunInDefault(body);
+        Assert.True(r.Ok && r.Said.SequenceEqual(new[] { expect }), $"'{body}': got {r.Describe()} (expect [{expect}])");
+    }
+}
