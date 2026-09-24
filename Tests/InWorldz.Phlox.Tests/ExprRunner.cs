@@ -95,6 +95,86 @@ public static class ExprRunner
         return result;
     }
 
+    /// <summary>Compiles LSL for a test that drives the interpreter itself; throws on a compile error.</summary>
+    public static CompiledScript CompileLsl(string source)
+    {
+        var compiled = PhloxCompiler.CompileTo(source, out var listener);
+        if (compiled == null || listener.HasErrors())
+            throw new InvalidOperationException("compile failed: " + listener.Report);
+        return compiled;
+    }
+
+    /// <summary>
+    /// One interpreter a test can stop and continue: it runs until the script is no longer
+    /// Running (finished, or parked in llSleep as the region's API parks it), and it can be built
+    /// on a restored <see cref="RuntimeState"/>.
+    /// </summary>
+    public sealed class Session
+    {
+        public readonly Result Result = new();
+        public readonly Interpreter Interp;
+        public CompiledScript Script => Interp.Script;
+        public RuntimeState State => Interp.ScriptState;
+
+        private Session(CompiledScript script, RuntimeState restored)
+        {
+            var shim = new RecordingShim(Result);
+            Interp = restored == null ? new Interpreter(script, shim) : new Interpreter(script, restored, shim);
+            shim.Interp = Interp;
+        }
+
+        /// <summary>A fresh script: globals, then state_entry, up to the first stop.</summary>
+        public static Session Start(CompiledScript script)
+        {
+            var s = new Session(script, null);
+            s.Guard(() =>
+            {
+                RunToWait(s.Interp, s.Result);
+                var info = script.FindEvent(0, (int)SupportedEventList.Events.STATE_ENTRY);
+                s.State.RunState = RuntimeState.Status.Running;
+                s.State.DoEvent(info,
+                    new PostedEvent { EventType = SupportedEventList.Events.STATE_ENTRY, Args = Array.Empty<object>() },
+                    Array.Empty<object>());
+                RunToWait(s.Interp, s.Result);
+            });
+            return s;
+        }
+
+        /// <summary>A script built on a restored state; nothing runs until the test says so.</summary>
+        public static Session Attach(CompiledScript script, RuntimeState restored) => new(script, restored);
+
+        /// <summary>Starts a handler for a waiting script, as the scheduler does, and runs it.</summary>
+        public void Deliver(PostedEvent evt)
+        {
+            if (State.RunState != RuntimeState.Status.Waiting)
+            {
+                Result.RuntimeError ??= "not waiting: " + State.RunState;
+                return;
+            }
+            var info = Script.FindEvent(State.LSLState, (int)evt.EventType);
+            State.RunState = RuntimeState.Status.Running;
+            Guard(() =>
+            {
+                State.DoEvent(info, evt, evt.Args);
+                RunToWait(Interp, Result);
+            });
+        }
+
+        /// <summary>Wakes a sleeping script, as the scheduler does when NextWakeup passes, and runs on.</summary>
+        public void Wake()
+        {
+            if (State.RunState != RuntimeState.Status.Sleeping) return;
+            State.RunState = RuntimeState.Status.Running;
+            Guard(() => RunToWait(Interp, Result));
+        }
+
+        private void Guard(Action run)
+        {
+            try { run(); }
+            catch (Exception ex) { Result.RuntimeError ??= ex.GetType().Name + ": " + FirstLine(ex.Message); }
+        }
+    }
+
     private static void RunToWait(Interpreter interp, Result result)
     {
         int ticks = 0;
@@ -146,6 +226,12 @@ public static class ExprRunner
                     break;
                 case "llSay": case "llShout": case "llWhisper": case "llRegionSay":
                     _result.Said.Add(Format(args[1]));
+                    break;
+                case "llSleep":
+                    // As the region's API does it: park the script until NextWakeup.
+                    Interp.ScriptState.NextWakeup = InWorldz.Phlox.Util.Clock.GetLongTickCount()
+                        + (ulong)(Convert.ToSingle(args[0]) * 1000f);
+                    Interp.ScriptState.RunState = RuntimeState.Status.Sleeping;
                     break;
             }
             if (sig.ReturnType != VarType.Void) Interp.SafeOperandsPush(DefaultOf(sig.ReturnType));
