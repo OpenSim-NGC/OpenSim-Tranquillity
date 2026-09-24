@@ -1355,6 +1355,15 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// PHLOX-7b. The two SIT_FLAG_* bits the sit path cannot act on yet - SIT_FLAG_NO_COLLIDE (0x10) and
+    /// SIT_FLAG_NO_DAMAGE (0x20) - stored so llGetLinkSitFlags reads back what llSetLinkSitFlags set.
+    /// ALLOW_UNSIT and SCRIPTED_ONLY live in AllowUnsit / ScriptedSitOnly, which ScenePresence honours;
+    /// SIT_TARGET is read-only, derived from IsSitTargetSet. Not persisted, like its siblings.
+    /// </summary>
+    [XmlIgnore]
+    public int SitFlagsStored { get; set; }
+
     [XmlIgnore]
     public bool ScriptedSitOnly
     {
