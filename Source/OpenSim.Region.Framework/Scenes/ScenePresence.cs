@@ -5299,12 +5299,12 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if (Invulnerable || IsViewerUIGod)
             return;
 
-        // The following may be better in the ICombatModule
-        // probably tweaking of the values for ground and normal prim collisions will be needed
-        float startHealth = Health;
-        if(coldata.Count > 0)
+        // PHLOX-10: the physics frame's collisions become ONE damage batch through the one door,
+        // ApplyDamage. The amounts are the ones this block always computed; the Health arithmetic
+        // and the kill live in ApplyDamage now. A Damage-bearing prim still dies on contact.
+        if (coldata.Count > 0)
         {
-            uint killerObj = 0;
+            List<DamageEntry> batch = null;
             SceneObjectPart part;
             float rvel; // relative velocity, negative on approch
             foreach (uint localid in coldata.Keys)
@@ -5313,60 +5313,88 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 {
                     // 0 is the ground
                     rvel = coldata[0].RelativeSpeed;
-                    if(rvel < -5.0f)
-                        Health -= 0.01f * rvel * rvel;
+                    if (rvel < -5.0f)
+                        (batch ??= new List<DamageEntry>()).Add(
+                            new DamageEntry(UUID.Zero, UUID.Zero, 0, 0.01f * rvel * rvel, DamageEntry.TYPE_IMPACT));
                 }
                 else
                 {
                     part = Scene.GetSceneObjectPart(localid);
 
-                    if(part != null && !part.ParentGroup.IsVolumeDetect)
+                    if (part != null && !part.ParentGroup.IsVolumeDetect)
                     {
                         if (part.ParentGroup.Damage > 0.0f)
                         {
                             // Something with damage...
-                            Health -= part.ParentGroup.Damage;
+                            (batch ??= new List<DamageEntry>()).Add(new DamageEntry(
+                                part.UUID, part.OwnerID, localid, part.ParentGroup.Damage, DamageEntry.TYPE_IMPACT));
                             part.ParentGroup.Scene.DeleteSceneObject(part.ParentGroup, false);
                         }
                         else
                         {
                             // An ordinary prim
                             rvel = coldata[localid].RelativeSpeed;
-                            if(rvel < -5.0f)
-                            {
-                                Health -=  0.005f * rvel * rvel;
-                            }
+                            if (rvel < -5.0f)
+                                (batch ??= new List<DamageEntry>()).Add(new DamageEntry(
+                                    part.UUID, part.OwnerID, localid, 0.005f * rvel * rvel, DamageEntry.TYPE_IMPACT));
                         }
                     }
-                    else
-                    {
-
-                    }
-                }
-
-                if (Health <= 0.0f)
-                {
-                    if (localid != 0)
-                        killerObj = localid;
                 }
             }
 
-            if (Health <= 0)
-            {
-                ControllingClient.SendHealth(Health);
-                m_scene.EventManager.TriggerAvatarKill(killerObj, this);
-                return;
-            }
+            if (batch != null)
+                ApplyDamage(batch, false);
         }
-
-        if(Math.Abs(Health - startHealth) > 1.0)
-            ControllingClient.SendHealth(Health);
     }
 
     public void setHealthWithUpdate(float health)
     {
         Health = health;
         ControllingClient.SendHealth(Health);
+    }
+
+    /// <summary>
+    /// PHLOX-10. The one door for damage to this avatar. Every door that used to do its own Health
+    /// arithmetic - the physics frame's collisions, llAdjustDamage, llSetHealth, llDamage - builds a
+    /// <see cref="DamageEntry"/> and comes through here, so the SL damage events have one place to
+    /// hang off. Gods and the invulnerable take nothing (as the collision path always ruled).
+    /// Health is clamped to 0..100; at 0 the client is told and <see cref="EventManager.TriggerAvatarKill"/>
+    /// fires with the last entry's local id, exactly once.
+    /// </summary>
+    /// <param name="announce">true: always tell the client (scripted damage); false: only when the
+    /// change is more than 1.0, the collision path's rule against per-frame spam.</param>
+    public void ApplyDamage(UUID sourceObject, UUID sourceOwner, uint sourceLocalId, float amount, int damageType, bool announce)
+        => ApplyDamage(new List<DamageEntry> { new DamageEntry(sourceObject, sourceOwner, sourceLocalId, amount, damageType) }, announce);
+
+    public void ApplyDamage(List<DamageEntry> batch, bool announce)
+    {
+        if (batch == null || batch.Count == 0)
+            return;
+        if (Invulnerable || IsViewerUIGod)
+            return;
+
+        float startHealth = Health;
+        uint killerObj = 0;
+        foreach (DamageEntry d in batch)
+        {
+            Health -= d.Amount;
+            if (Health <= 0.0f && d.SourceLocalId != 0)
+                killerObj = d.SourceLocalId;
+        }
+
+        if (Health > 100.0f)
+            Health = 100.0f;
+
+        if (Health <= 0.0f)
+        {
+            Health = 0.0f;
+            ControllingClient.SendHealth(Health);
+            m_scene.EventManager.TriggerAvatarKill(killerObj, this);
+            return;
+        }
+
+        if (announce || Math.Abs(Health - startHealth) > 1.0)
+            ControllingClient.SendHealth(Health);
     }
 
 
