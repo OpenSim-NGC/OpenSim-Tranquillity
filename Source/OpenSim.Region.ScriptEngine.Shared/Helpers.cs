@@ -126,6 +126,13 @@ public class DetectParams
     public int Type;
     public LSL_Types.Vector3 Velocity;
 
+    // PHLOX-10: on_damage / final_damage. llDetectedDamage(n) = [Damage, DamageType, OriginalDamage];
+    // AdjustDamage, set only for on_damage, is how llAdjustDamage(n, v) rewrites the pending entry.
+    public float Damage;
+    public int DamageType;
+    public float OriginalDamage;
+    public Action<float> AdjustDamage;
+
     private LSL_Types.Vector3 touchST;
     public LSL_Types.Vector3 TouchST { get { return touchST; } }
 

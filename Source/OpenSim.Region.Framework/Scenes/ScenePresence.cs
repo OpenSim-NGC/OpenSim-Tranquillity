@@ -5373,6 +5373,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if (Invulnerable || IsViewerUIGod)
             return;
 
+        // SL order (wiki: on_damage, final_damage): 1. on_damage sees the batch and may adjust it;
+        // 2. the adjusted amounts land; 3. final_damage sees what landed; 4. death, if Health hit 0.
+        m_scene.EventManager.TriggerAvatarDamage(this, batch);
+
         float startHealth = Health;
         uint killerObj = 0;
         foreach (DamageEntry d in batch)
@@ -5384,10 +5388,14 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         if (Health > 100.0f)
             Health = 100.0f;
-
-        if (Health <= 0.0f)
-        {
+        bool dead = Health <= 0.0f;
+        if (dead)
             Health = 0.0f;
+
+        m_scene.EventManager.TriggerAvatarDamageApplied(this, batch);
+
+        if (dead)
+        {
             ControllingClient.SendHealth(Health);
             m_scene.EventManager.TriggerAvatarKill(killerObj, this);
             return;
