@@ -36,7 +36,10 @@ namespace Phlox.ScriptEngine
         // History:
         //   1 — original Halcyon schema (Vector3/Quaternion as strings)
         //   2 — SerializedVector3 / SerializedQuaternion wrapper classes (protobuf-net 3.x)
-        private const int CACHE_SCHEMA_VERSION = 2;
+        //   3 — compiler correctness fixes (assignments in expressions, +/- and && / || / | & ^
+        //       chains, typed constants, statement promotions): bytecode from an earlier compiler
+        //       computes the wrong values, so every cached script is recompiled once.
+        private const int CACHE_SCHEMA_VERSION = 3;
         private const string VERSION_FILE = "ScriptEngines/Phlox/bytecode/.schema_version";
 
         private readonly IAssetService m_AssetService;
