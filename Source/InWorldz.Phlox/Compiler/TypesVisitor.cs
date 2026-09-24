@@ -417,12 +417,11 @@ namespace InWorldz.Phlox.Compiler
             }
 
             ISymbolType result = Visit(children[0]);
-            // Walk left to right — each MINUS or implicit PLUS between children.
-            var minusTokens = context.MINUS();
+            // Walk left to right; the operator for each pair sits between the two operands.
             for (int i = 1; i < children.Length; i++)
             {
                 ISymbolType rhs = Visit(children[i]);
-                bool isMinus = (minusTokens != null && i - 1 < minusTokens.Length);
+                bool isMinus = GetOpAt(context, i) == "-";
                 ISymbolType[,] table = isMinus
                     ? SymbolTable.subtractionResultType
                     : SymbolTable.additionResultType;
@@ -824,6 +823,16 @@ namespace InWorldz.Phlox.Compiler
                 }
             }
             return "=";
+        }
+
+        /// <summary>
+        /// The operator before the rhsIndex-th operand of a flat (expr (op expr)*) rule: it sits at
+        /// child position 2*rhsIndex - 1.
+        /// </summary>
+        private static string GetOpAt(ParserRuleContext ctx, int rhsIndex)
+        {
+            int opPos = 2 * rhsIndex - 1;
+            return opPos < ctx.ChildCount && ctx.GetChild(opPos) is ITerminalNode tn ? tn.GetText() : string.Empty;
         }
 
         /// <summary>

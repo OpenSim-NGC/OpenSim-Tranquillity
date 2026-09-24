@@ -504,12 +504,12 @@ namespace InWorldz.Phlox.Compiler
 
             string result = Visit(children[0]);
             ISymbolType lType = EvalType(children[0]);
-            var minusTokens = context.MINUS();
-
             for (int i = 1; i < children.Length; i++)
             {
                 ISymbolType rType = EvalType(children[i]);
-                bool isMinus = minusTokens != null && (i - 1) < minusTokens.Length;
+                // The operator is the one between this operand and the last, not a count of the
+                // minus signs anywhere in the chain (which made a + b - c compute a - b + c).
+                bool isMinus = GetBinaryOpTextAt(context, i) == "-";
                 string subtemplate = isMinus
                     ? TemplateMapping.Subtraction[Idx(lType), Idx(rType)]
                     : TemplateMapping.Addition[Idx(lType), Idx(rType)];
