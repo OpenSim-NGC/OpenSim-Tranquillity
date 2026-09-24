@@ -362,26 +362,30 @@ namespace InWorldz.Phlox.Compiler
             => Visit(context.expr());
 
         public override string VisitExpr([NotNull] LSLParser.ExprContext context)
-            => DoPromotion(context, GenAssignmentExpr(context.assignmentExpression(), true));
+            => DoPromotion(context, Visit(context.assignmentExpression()));
 
         public override string VisitAssignmentExpression(
             [NotNull] LSLParser.AssignmentExpressionContext context)
             => DoPromotion(context, GenAssignmentExpr(context, true));
 
+        /// <summary>
+        /// An assignment used as an expression: a for-loop init or step, a = b = c, an
+        /// assignment in a condition or an argument. The rule is
+        /// booleanExpression (op assignmentExpression)*, right-recursive, so for x = e the
+        /// target is booleanExpression() and the value is assignmentExpression(0). The value
+        /// is stored and then, with pushFinal, loaded again as the expression's result.
+        /// </summary>
         private string GenAssignmentExpr(LSLParser.AssignmentExpressionContext ctx, bool pushFinal)
         {
-            var assigns = ctx.assignmentExpression();
-            if (assigns.Length == 0)
-                return DoPromotion(ctx, GenBooleanExpr(ctx.booleanExpression()));
+            var valueCtx = ctx.assignmentExpression(0);
+            string op = GetAssignOpText(ctx);
+            if (valueCtx == null || string.IsNullOrEmpty(op))
+                return GenBooleanExpr(ctx.booleanExpression());
 
-		string op = GetAssignOpText(ctx);
-		if (string.IsNullOrEmpty(op) || ctx.assignmentExpression(1) == null)
-			return DoPromotion(ctx, GenBooleanExpr(ctx.booleanExpression()));
+            ISymbolType rhsType = EvalType(valueCtx);
+            string rhsCode = Visit(valueCtx);
+            VariableSymbol varSym = ResolveAssignmentTarget(ctx.booleanExpression(), out string subIdx);
 
-		ISymbolType rhsType = EvalType(ctx.assignmentExpression(1));
-		string rhsCode = GenAssignmentExpr(ctx.assignmentExpression(1), true);
-		VariableSymbol varSym = WalkForVarSym(ctx.assignmentExpression(0), out string subIdx);
-		
             if (varSym == null) { Error("Invalid assignment target"); return string.Empty; }
 
             if (op == "=")
@@ -791,30 +795,45 @@ namespace InWorldz.Phlox.Compiler
             return null;
         }
 
-		 private VariableSymbol WalkForVarSym(IParseTree tree, out string subIdx)
-		{
-			subIdx = null;
-			if (tree is LSLParser.IdExprContext id)
-			{
-				var annotated = GetSymbol(id) as VariableSymbol;
-				if (annotated != null) return annotated;
-				string name = id.ID().GetText();
-				IScope scope = FindScopeForNode(id);
-				return scope?.Resolve(name) as VariableSymbol
-					?? _symtab.Globals.Resolve(name) as VariableSymbol;
-			}
-			if (tree is LSLParser.SubscriptPostfixContext sp)
-			{
-				subIdx = CalcSubIndex(sp.ID().GetText());
-				return GetVarSymFromPostfix(sp.postfixExpression());
-			}
-			for (int i = 0; i < tree.ChildCount; i++)
-			{
-				var v = WalkForVarSym(tree.GetChild(i), out subIdx);
-				if (v != null) return v;
-			}
-			return null;
-		}
+        /// <summary>
+        /// The node an assignment stores to: a bare identifier or a component of one (v.x),
+        /// reached through the single-child chain of expression levels above it. Anything
+        /// else (a literal, a call, an operator, parentheses) is not assignable: null.
+        /// </summary>
+        internal static ParserRuleContext AssignmentTarget(LSLParser.BooleanExpressionContext target)
+        {
+            IParseTree node = target;
+            while (node != null)
+            {
+                if (node is LSLParser.IdExprContext id) return id;
+                if (node is LSLParser.SubscriptPostfixContext sp)
+                    return sp.postfixExpression() is LSLParser.PrimaryExprContext pc
+                        && pc.primary() is LSLParser.IdExprContext ? sp : null;
+                if (node is LSLParser.ParenExprContext || node.ChildCount != 1) return null;
+                node = node.GetChild(0);
+            }
+            return null;
+        }
+
+        private VariableSymbol ResolveAssignmentTarget(LSLParser.BooleanExpressionContext target, out string subIdx)
+        {
+            subIdx = null;
+            LSLParser.IdExprContext id;
+            switch (AssignmentTarget(target))
+            {
+                case LSLParser.IdExprContext i:
+                    id = i;
+                    break;
+                case LSLParser.SubscriptPostfixContext sp:
+                    subIdx = CalcSubIndex(sp.ID().GetText());
+                    id = (LSLParser.IdExprContext)((LSLParser.PrimaryExprContext)sp.postfixExpression()).primary();
+                    break;
+                default:
+                    return null;
+            }
+            var sym = GetSymbol(id) as VariableSymbol;
+            return sym is ConstantSymbol ? null : sym;
+        }
 
 		private IScope FindScopeForNode(IParseTree node)
 		{

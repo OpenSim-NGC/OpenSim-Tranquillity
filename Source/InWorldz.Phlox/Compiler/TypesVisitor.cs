@@ -250,9 +250,10 @@ namespace InWorldz.Phlox.Compiler
 		public override ISymbolType VisitAssignmentExpression(
 			[NotNull] LSLParser.AssignmentExpressionContext context)
 		{
-			// Only treat as assignment if there's an operator token AND two direct sub-expressions
-			string op = GetAssignOp(context);
-			if (string.IsNullOrEmpty(op) || context.assignmentExpression(1) == null)
+			// The rule is booleanExpression (op assignmentExpression)*, right-recursive: for
+			// x = e the target is booleanExpression() and the value is assignmentExpression(0).
+			LSLParser.AssignmentExpressionContext valueCtx = context.assignmentExpression(0);
+			if (valueCtx == null)
 			{
 				// Pure boolean expression passthrough
 				ISymbolType t = context.booleanExpression() != null
@@ -261,9 +262,13 @@ namespace InWorldz.Phlox.Compiler
 				SetType(context, t ?? SymbolTable.VOID);
 				return t;
 			}
+			if (context.assignmentExpression().Length > 1)
+				ErrorAtContext(context, "Invalid assignment target");
 
-			ISymbolType lhsType = Visit(context.assignmentExpression(0));
-			ISymbolType rhsType = Visit(context.assignmentExpression(1));
+			ISymbolType lhsType = Visit(context.booleanExpression());
+			if (AssignmentTarget(context.booleanExpression()) == null)
+				ErrorAtContext(context, "Invalid assignment target");
+			ISymbolType rhsType = Visit(valueCtx);
 			string op2 = GetAssignOp(context);
 			ISymbolType resultType;
 
@@ -279,7 +284,7 @@ namespace InWorldz.Phlox.Compiler
 				}
 				else
 				{
-					if (promotion != null) SetPromote(context.assignmentExpression(1), promotion);
+					if (promotion != null) SetPromote(valueCtx, promotion);
 					resultType = lhsType;
 				}
 			}
@@ -793,6 +798,9 @@ namespace InWorldz.Phlox.Compiler
 
         private void ErrorAtContext(ParserRuleContext ctx, string msg)
             => Error(ctx.Start.Line, ctx.Start.Column, msg);
+
+        private static ParserRuleContext AssignmentTarget(LSLParser.BooleanExpressionContext target)
+            => GenVisitor.AssignmentTarget(target);
 
         /// <summary>
         /// Extracts the assignment operator text from an AssignmentExpressionContext.
