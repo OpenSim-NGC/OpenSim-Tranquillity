@@ -266,7 +266,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             return data.BotScene.GetScenePresence(data.BotID);
         }
 
-        private static UUID OutfitKey(UUID ownerID, string outfitName)
+        public static UUID OutfitKey(UUID ownerID, string outfitName)   // PHLOX-16: osOwnerSaveAppearance returns it
         {
             // Deterministic UUID from owner + outfit name for dictionary keying
             return UUID.Parse(Utils.MD5String(ownerID.ToString() + ":" + outfitName.ToLowerInvariant()));
