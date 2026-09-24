@@ -33,6 +33,7 @@ public partial class OpenSimCoreContext : DbContext
     public virtual DbSet<Estateban> Estatebans { get; set; }
     public virtual DbSet<EstateAllowedExperience> EstateAllowedExperiences { get; set; }
     public virtual DbSet<EstateKeyExperience> EstateKeyExperiences { get; set; }
+    public virtual DbSet<EstateBlockedExperience> EstateBlockedExperiences { get; set; }
     public virtual DbSet<Experience> Experiences { get; set; }
     public virtual DbSet<ExperienceKVP> ExperienceKVPs { get; set; }
     public virtual DbSet<ExperiencePermission> ExperiencePermissions { get; set; }
@@ -396,7 +397,7 @@ public partial class OpenSimCoreContext : DbContext
         {
             entity.ToTable("estate_allowed_experiences");
 
-            entity.HasKey(e => new { e.uuid, e.EstateId });
+            entity.HasNoKey();
 
             entity.Property(e => e.uuid)
                 .HasMaxLength(36)
@@ -411,7 +412,22 @@ public partial class OpenSimCoreContext : DbContext
         {
             entity.ToTable("estate_key_experiences");
 
-            entity.HasKey(e => new { e.uuid, e.EstateId });
+            entity.HasNoKey();
+
+            entity.Property(e => e.uuid)
+                .HasMaxLength(36)
+                .IsFixedLength()
+                .HasColumnName("uuid");
+
+            entity.Property(e => e.EstateId)
+                .HasColumnName("EstateID");
+        });
+
+        modelBuilder.Entity<EstateBlockedExperience>(entity =>
+        {
+            entity
+                .HasNoKey()
+                .ToTable("estate_blocked_experiences");
 
             entity.Property(e => e.uuid)
                 .HasMaxLength(36)

@@ -10,5 +10,5 @@ namespace OpenSim.Data.Model.Core;
 public class EstateKeyExperience
 {
     public string uuid { get; set; }
-    public int EstateId { get; set; }
+    public uint EstateId { get; set; }
 }

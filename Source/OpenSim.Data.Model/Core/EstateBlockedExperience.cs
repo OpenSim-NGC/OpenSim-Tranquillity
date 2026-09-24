@@ -7,7 +7,7 @@
 
 namespace OpenSim.Data.Model.Core;
 
-public partial class EstateAllowedExperience
+public class EstateBlockedExperience
 {
     public string uuid { get; set; }
     public uint EstateId { get; set; }
