@@ -340,6 +340,11 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
         public UUID CreateBot(string firstName, string lastName, Vector3 startPos,
             string outfitName, UUID scriptItemID, UUID ownerID, out string reason)
+            => CreateBot(firstName, lastName, startPos, outfitName, scriptItemID, ownerID, true, true, out reason);
+
+        /// <summary>PHLOX-14: the osNpcCreate door. Same bot, same BotData; ownership and sensing per the OS_NPC_* flags.</summary>
+        public UUID CreateBot(string firstName, string lastName, Vector3 startPos,
+            string outfitName, UUID scriptItemID, UUID ownerID, bool owned, bool senseAsAgent, out string reason)
         {
             reason = null;
             if (m_npcModule == null) { reason = "NPC module not available"; return UUID.Zero; }
@@ -387,9 +392,10 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 }
             }
 
-            bool senseAsAgent = true; // Bots appear as agents by default
+            // PHLOX-14: the bot* door always senses as agent and is always owned; osNpcCreate chooses.
+            UUID npcOwner = owned ? ownerID : UUID.Zero;
             UUID botID = m_npcModule.CreateNPC(firstName, lastName, startPos,
-                ownerID, senseAsAgent, ownerScene, appearance);
+                npcOwner, senseAsAgent, ownerScene, appearance);
 
             if (botID == UUID.Zero)
             {
@@ -400,7 +406,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             BotData data = new BotData
             {
                 BotID = botID,
-                OwnerID = ownerID,
+                OwnerID = npcOwner,
                 ScriptItemID = scriptItemID,
                 BotScene = ownerScene
             };
@@ -1203,6 +1209,31 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             m_log.LogInformation("[BotManager] Saved outfit '{0}' for {1}", outfitName, ownerID);
         }
 
+        /// <summary>PHLOX-14: osNpcSaveAppearance - the bot's own appearance into the caller's outfit store.</summary>
+        public UUID SaveBotOutfit(UUID botID, string outfitName, UUID ownerID, out string reason)
+        {
+            reason = null;
+            if (string.IsNullOrWhiteSpace(outfitName)) { reason = "No outfit name"; return UUID.Zero; }
+            BotData data = GetBotWithPermission(botID, ownerID);
+            if (data == null) { reason = "Bot not found or no permission"; return UUID.Zero; }
+            ScenePresence sp = GetBotSP(data);
+            if (sp == null) { reason = "Bot has no presence"; return UUID.Zero; }
+            string ownerKey = ownerID.ToString();
+            UUID oKey = OutfitKey(ownerID, outfitName);
+            AvatarAppearance saved = new AvatarAppearance(sp.Appearance, true);
+            lock (m_savedOutfits)
+            {
+                if (!m_savedOutfits.ContainsKey(ownerKey))
+                    m_savedOutfits[ownerKey] = new Dictionary<UUID, AvatarAppearance>();
+                m_savedOutfits[ownerKey][oKey] = saved;
+                if (!m_outfitNames.ContainsKey(ownerKey))
+                    m_outfitNames[ownerKey] = new Dictionary<UUID, string>();
+                m_outfitNames[ownerKey][oKey] = outfitName;
+            }
+            m_log.LogInformation("[BotManager] Saved bot {0}'s appearance as outfit '{1}' for {2}", botID, outfitName, ownerID);
+            return oKey;
+        }
+
         public void RemoveOutfitFromDatabase(UUID ownerID, string outfitName)
         {
             string ownerKey = ownerID.ToString();
@@ -1289,6 +1320,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
         public List<UUID> GetBotsWithTag(string tag)
         {
+            // PHLOX-14: an empty tag means every bot - no bot carries "" as a tag, so this was an
+            // always-empty query; it is how botGetBotsWithTag("") lists an osNpcCreate'd NPC.
+            if (string.IsNullOrEmpty(tag)) return GetAllBots();
             List<UUID> result = new List<UUID>();
             lock (m_bots)
             {
