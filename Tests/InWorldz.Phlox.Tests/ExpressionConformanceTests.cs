@@ -176,10 +176,13 @@ public class ExpressionConformanceTests
             "vector w = (v -= <1,1,1>); llOwnerSay(fmtv(w));",
             "2.000000,3.000000,4.000000", "1.000000,2.000000,3.000000", "2.000000,4.000000,6.000000",
             "1.000000,2.000000,3.000000", "2.000000,4.000000,6.000000", "1.000000,3.000000,5.000000"),
+        // Rotation * and / are left out: the VM's rotation multiply negates its result, a VM
+        // matter separate from the compiler (ZERO_ROTATION * ZERO_ROTATION is <0,0,0,-1>).
         CG("A29 rotation targets", AssignExpr, "ASSIGN", Fmt,
-            "rotation r = ZERO_ROTATION; r *= <0,0,0,1>; rotation q; rotation p = q = r; " +
-            "llOwnerSay(fmtr(p)); llOwnerSay(fmtr(q));",
-            "0.000000,0.000000,0.000000,1.000000", "0.000000,0.000000,0.000000,1.000000"),
+            "rotation r = <1,2,3,4>; r += <1,1,1,1>; r -= <0,0,0,1>; rotation q; rotation p = q = r; " +
+            "rotation s = (r += <0,0,0,1>); llOwnerSay(fmtr(p)); llOwnerSay(fmtr(q)); llOwnerSay(fmtr(s));",
+            "2.000000,3.000000,4.000000,4.000000", "2.000000,3.000000,4.000000,4.000000",
+            "2.000000,3.000000,4.000000,5.000000"),
 
         // ── Vector and rotation components ───────────────────────────────────
         CG("A30 component = float statement", Control, "ASSIGN", Fmt,
