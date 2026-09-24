@@ -35,12 +35,8 @@ namespace InWorldz.Phlox.Tests;
 /// </summary>
 public class ExpressionConformanceTests
 {
-    private readonly Xunit.Abstractions.ITestOutputHelper _out;
-
-    public ExpressionConformanceTests(Xunit.Abstractions.ITestOutputHelper output) { _out = output; }
-
     public sealed record Case(string Id, string Cause, string Source, string Globals, string Body,
-        string[] Expect, string Skip = null)
+        string[] Expect)
     {
         public string Name => Cause + "/" + Id;
     }
@@ -56,16 +52,13 @@ public class ExpressionConformanceTests
     private const string Additive = "additive-op";
     private const string BooleanChain = "boolean-chain";
     private const string BitwiseChain = "bitwise-chain";
+    private const string BitwisePrecedence = "bitwise-precedence";
     private const string ChainTypes = "chain-types";
     private const string NegLiteral = "neg-literal";
     private const string RotNeg = "rotation-neg";
     private const string ConstLoad = "const-load";
     private const string Control = "control";
 
-    private const string BitwisePrecedenceDecision =
-        "DECISION: SL gives & > ^ > | (OPS); Phlox's grammar, like Halcyon's, has | & ^ on one level " +
-        "evaluated left to right. The values differ only when a lower-precedence bitwise operator " +
-        "comes first. Kept as the SL value until the precedence is decided.";
 
     private static Case C(string id, string cause, string source, string body, params string[] expect)
         => new(id, cause, source, "", body, expect);
@@ -282,12 +275,28 @@ public class ExpressionConformanceTests
             "integer a = 12; integer b = 5; integer c = 1; llOwnerSay((string)(a ^ b | c));", "9"),
         C("B28 a & b ^ c", BitwiseChain, "OPS (& before ^)",
             "integer a = 3; integer b = 5; integer c = 6; llOwnerSay((string)(a & b ^ c));", "7"),
-        new Case("B29 a | b & c (SL precedence)", BitwiseChain, "OPS (& before |: 1 | (2 & 0))", "",
-            "integer a = 1; integer b = 2; integer c = 0; llOwnerSay((string)(a | b & c));", new[] { "1" },
-            BitwisePrecedenceDecision),
-        new Case("B30 a | b ^ c (SL precedence)", BitwiseChain, "OPS (^ before |: 4 | (1 ^ 5))", "",
-            "integer a = 4; integer b = 1; integer c = 5; llOwnerSay((string)(a | b ^ c));", new[] { "4" },
-            BitwisePrecedenceDecision),
+        C("B29 a | b & c", BitwisePrecedence, "OPS (& before |: 1 | (2 & 0))",
+            "integer a = 1; integer b = 2; integer c = 0; llOwnerSay((string)(a | b & c));", "1"),
+        C("B30 a | b ^ c", BitwisePrecedence, "OPS (^ before |: 4 | (1 ^ 5))",
+            "integer a = 4; integer b = 1; integer c = 5; llOwnerSay((string)(a | b ^ c));", "4"),
+        C("B49 a ^ b & c | d", BitwisePrecedence, "OPS ((8 ^ (6 & 3)) | 1)",
+            "integer a = 8; integer b = 6; integer c = 3; integer d = 1; llOwnerSay((string)(a ^ b & c | d));", "11"),
+        C("B50 a | b ^ c & d", BitwisePrecedence, "OPS (1 | (2 ^ (3 & 5)))",
+            "integer a = 1; integer b = 2; integer c = 3; integer d = 5; llOwnerSay((string)(a | b ^ c & d));", "3"),
+        C("B51 a & b | c ^ d & e", BitwisePrecedence, "OPS ((12 & 10) | (5 ^ (3 & 6)))",
+            "integer a = 12; integer b = 10; integer c = 5; integer d = 3; integer e = 6; " +
+            "llOwnerSay((string)(a & b | c ^ d & e));", "15"),
+        C("B52 a | b == c & d", BitwisePrecedence, "OPS (== before & before |: 4 | ((2 == 2) & 3))",
+            "integer a = 4; integer b = 2; integer c = 2; integer d = 3; llOwnerSay((string)(a | b == c & d));", "5"),
+        C("B53 a | b + c & d", BitwisePrecedence, "OPS (+ before & before |: 8 | ((1 + 1) & 3))",
+            "integer a = 8; integer b = 1; integer c = 1; integer d = 3; llOwnerSay((string)(a | b + c & d));", "10"),
+        C("B54 a || b | c & d", BitwisePrecedence, "OPS (bitwise before ||: 0 || (1 | (2 & 0)))",
+            "integer a = 0; integer b = 1; integer c = 2; integer d = 0; llOwnerSay((string)(a || b | c & d));", "1"),
+        C("B55 a ^ b & c | d > e", BitwisePrecedence, "OPS (> before & before ^ before |: (5 ^ (3 & 1)) | (8 > 2))",
+            "integer a = 5; integer b = 3; integer c = 1; integer d = 8; integer e = 2; " +
+            "llOwnerSay((string)(a ^ b & c | d > e));", "5"),
+        C("B56 a | b << c & d", BitwisePrecedence, "OPS (<< before & before |: 16 | ((1 << 2) & 7))",
+            "integer a = 16; integer b = 1; integer c = 2; integer d = 7; llOwnerSay((string)(a | b << c & d));", "20"),
         C("B31 a & b == c", Control, "OPS (== before &)",
             "integer a = 6; integer b = 1; integer c = 1; llOwnerSay((string)(a & b == c));", "0"),
 
@@ -357,7 +366,7 @@ public class ExpressionConformanceTests
 
     public static IEnumerable<object[]> CaseNames()
     {
-        foreach (var c in Cases.Where(c => c.Skip == null)) yield return new object[] { c.Name };
+        foreach (var c in Cases) yield return new object[] { c.Name };
     }
 
     private static Case Find(string name) => Cases.Single(c => c.Name == name);
@@ -373,26 +382,11 @@ public class ExpressionConformanceTests
             $"{c.Id}: got {r.Describe()} (expect {want}) [source: {c.Source}]");
     }
 
-    /// <summary>
-    /// The cases whose SL value is not what this compiler gives by design, pending a decision.
-    /// Each is run and its current value printed, so the report quotes it.
-    /// </summary>
-    [Fact]
-    public void SkippedCasesAreDecisions()
-    {
-        foreach (var c in Cases.Where(c => c.Skip != null))
-        {
-            var r = ExprRunner.RunInDefault(c.Body, c.Globals);
-            Assert.True(r.Ok, $"{c.Id}: {r.Describe()}");
-            _out.WriteLine($"DECISION {c.Id}: got {r.Describe()} (SL [{string.Join(" | ", c.Expect)}])");
-        }
-    }
-
     /// <summary>Every active case in one script, each in its own function, called in order.</summary>
     [Fact]
     public void AllCasesTogetherInOneScript()
     {
-        var active = Cases.Where(c => c.Skip == null).ToList();
+        var active = Cases.ToList();
         var globals = new List<string>();
         foreach (var c in active)
             foreach (var g in SplitGlobals(c.Globals))
