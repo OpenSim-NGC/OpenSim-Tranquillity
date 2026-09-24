@@ -41,15 +41,12 @@ public class StateRecompileGuardTests
         return ProtoBuf.Serializer.Deserialize<SerializedRuntimeState>(ms);
     }
 
-    /// <summary>The restore under test: today's path, which records no bytecode identity.</summary>
+    /// <summary>The restore under test, as the scheduler calls it.</summary>
     private static RuntimeState Restore(SerializedRuntimeState ser, CompiledScript script, out string note)
-    {
-        note = null;
-        return ser.ToRuntimeState();
-    }
+        => ser.ToRuntimeStateFor(script, Item, out note);
 
-    /// <summary>A row written before states recorded their bytecode: every row, today.</summary>
-    private static void MakeLegacy(SerializedRuntimeState ser) { }
+    /// <summary>A row written before states recorded their bytecode.</summary>
+    private static void MakeLegacy(SerializedRuntimeState ser) => ser.BytecodeIdentity = null;
 
     private static string Describe(RuntimeState s)
     {
@@ -93,6 +90,24 @@ public class StateRecompileGuardTests
         Assert.True(state == expectState && s.Result.Ok && s.Result.Said.SequenceEqual(new[] { "touched 41" }) && note == RecompiledLine,
             $"restored {state} (expect {expectState}); then {s.Result.Describe()} (expect [touched 41]); " +
             $"log \"{note ?? "(none)"}\" (expect \"{RecompiledLine}\")");
+    }
+
+    /// <summary>
+    /// A script loaded from the bytecode cache must have the identity it had when compiled, or
+    /// every state saved on a fresh compile would be dropped when the cached copy is loaded.
+    /// </summary>
+    [Fact]
+    public void IdentitySurvivesTheBytecodeCache()
+    {
+        var script = ExprRunner.CompileLsl(Script.Replace("g = 41;",
+            "g = 41; vector v = <1.5, 2, 3>; rotation r = <0, 0, 0.5, 1>; float f = 0.25; llOwnerSay(\"x\" + (string)v + (string)r + (string)f);"));
+        using var ms = new MemoryStream();
+        ProtoBuf.Serializer.Serialize(ms, SerializedScript.FromCompiledScript(script));
+        ms.Position = 0;
+        var cached = ProtoBuf.Serializer.Deserialize<SerializedScript>(ms).ToCompiledScript();
+
+        Assert.Equal(script.BytecodeIdentity, cached.BytecodeIdentity);
+        Assert.NotEqual(script.BytecodeIdentity, ExprRunner.CompileLsl(Recompiled).BytecodeIdentity);
     }
 
     [Fact]
