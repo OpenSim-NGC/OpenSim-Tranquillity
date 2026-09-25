@@ -3,7 +3,9 @@ branches:
   only:
   - develop
 image: Visual Studio 2022
-configuration: Debug
+environment:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: 1
 install:
 - ps: |
     Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile "$env:TEMP\dotnet-install.ps1"
@@ -11,10 +13,9 @@ install:
 - dotnet --list-sdks
 - git submodule update --init --recursive
 - dotnet restore
-build:
-  project: Tranquillity.sln
-  verbosity: minimal
-test: off
+build: off
+build_script:
+- dotnet build Tranquillity.sln -c Debug --no-restore
 artifacts:
 - path: Source\OpenSim.Server.RegionServer\bin\Debug\net10.0
   name: NGC-Tranquillity-RegionServer
