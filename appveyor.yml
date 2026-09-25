@@ -1,9 +1,14 @@
-version: 0.9.7.{build}
+version: 1.0.0.{build}
 branches:
   only:
   - develop
 image: Visual Studio 2022
+configuration: Debug
 install:
+- ps: |
+    Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile "$env:TEMP\dotnet-install.ps1"
+    & "$env:TEMP\dotnet-install.ps1" -Channel 10.0 -InstallDir "$env:ProgramFiles\dotnet"
+- dotnet --list-sdks
 - git submodule update --init --recursive
 - dotnet restore
 build:
@@ -11,5 +16,7 @@ build:
   verbosity: minimal
 test: off
 artifacts:
-- path: build\Debug\net10.0
-  name: NGC-Tranquillity
+- path: Source\OpenSim.Server.RegionServer\bin\Debug\net10.0
+  name: NGC-Tranquillity-RegionServer
+- path: Source\OpenSim.Server.GridServer\bin\Debug\net10.0
+  name: NGC-Tranquillity-Robust
