@@ -272,3 +272,4 @@ Source/OpenSim.Server.RegionServer/AppData/config-include/storage/SQLiteStandalo
 # Generated on first run when [TrustedHypergrid] Enabled=true; holds the Ed25519 private key as hex.
 TrustedHypergridSecret.ini
 **/TrustedHypergridSecret.ini
+**/ICan.md
