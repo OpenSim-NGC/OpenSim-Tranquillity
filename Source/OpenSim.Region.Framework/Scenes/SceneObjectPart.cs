@@ -1355,6 +1355,15 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// PHLOX-7b. The two SIT_FLAG_* bits the sit path cannot act on yet - SIT_FLAG_NO_COLLIDE (0x10) and
+    /// SIT_FLAG_NO_DAMAGE (0x20) - stored so llGetLinkSitFlags reads back what llSetLinkSitFlags set.
+    /// ALLOW_UNSIT and SCRIPTED_ONLY live in AllowUnsit / ScriptedSitOnly, which ScenePresence honours;
+    /// SIT_TARGET is read-only, derived from IsSitTargetSet. Not persisted, like its siblings.
+    /// </summary>
+    [XmlIgnore]
+    public int SitFlagsStored { get; set; }
+
     [XmlIgnore]
     public bool ScriptedSitOnly
     {
@@ -2003,6 +2012,33 @@ public class SceneObjectPart : EntityBase, IDisposable
     public void SendPropertiesToClient(IClientAPI client)
     {
         client.SendObjectPropertiesReply(this);
+    }
+
+    /// <summary>
+    /// PROPS-1. Push full ObjectProperties to everyone in the region.
+    ///
+    /// <para>
+    /// The touch and sit labels a viewer shows in its context menu come from the FULL
+    /// ObjectProperties reply - <c>LLSelectMgr::processObjectProperties</c> fills
+    /// <c>LLSelectNode::mTouchName</c> (llselectmgr.cpp:6110) and the menu reads it
+    /// (llviewermenu.cpp:3096-3101). The region only sends that on select
+    /// (<c>Scene.PacketHandlers.cs:223</c>); a right-click sends
+    /// <c>RequestObjectPropertiesFamily</c>, whose reply carries no touch name at all. So a script
+    /// that changes the label after the viewer last selected the object has no way to be seen
+    /// unless the region pushes the properties itself.
+    /// </para>
+    /// </summary>
+    public void SendPropertiesToAllClients()
+    {
+        SceneObjectGroup group = ParentGroup;
+        if (group is null || group.IsDeleted || group.Scene is null)
+            return;
+
+        group.Scene.ForEachClient(delegate (IClientAPI client)
+        {
+            try { client.SendObjectPropertiesReply(this); }
+            catch { /* one client's failure must not stop the rest */ }
+        });
     }
 
     // TODO: unused:

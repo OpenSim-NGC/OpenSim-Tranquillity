@@ -715,6 +715,16 @@ public class EventManager
     public delegate void AvatarKillData(uint KillerLocalID, ScenePresence avatar);
     public event AvatarKillData OnAvatarKilled;
 
+    /// <summary>
+    /// PHLOX-10. Damage is about to be applied to a presence: the batch is MUTABLE - a handler
+    /// (the script engine's on_damage) may rewrite each entry's Amount before it lands. Raised
+    /// synchronously from ScenePresence.ApplyDamage; handlers must return before the damage applies.
+    /// </summary>
+    public delegate void AvatarDamageData(ScenePresence avatar, List<DamageEntry> batch);
+    public event AvatarDamageData OnAvatarDamage;
+    /// <summary>PHLOX-10. The batch has been applied; Amount is what landed. final_damage hangs here.</summary>
+    public event AvatarDamageData OnAvatarDamageApplied;
+
     /*
     public delegate void ScriptTimerEvent(uint localID, double timerinterval);
     /// <summary>
@@ -2370,6 +2380,34 @@ public class EventManager
                         "[EVENT MANAGER]: Delegate for TriggerRequestChangeWaterHeight failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
+            }
+        }
+    }
+
+    public void TriggerAvatarDamage(ScenePresence avatar, List<DamageEntry> batch)
+    {
+        AvatarDamageData handler = OnAvatarDamage;
+        if (handler == null) return;
+        foreach (AvatarDamageData d in handler.GetInvocationList())
+        {
+            try { d(avatar, batch); }
+            catch (Exception e)
+            {
+                m_log.LogError("[EVENT MANAGER]: Delegate for TriggerAvatarDamage failed - continuing.  {0} {1}", e.Message, e.StackTrace);
+            }
+        }
+    }
+
+    public void TriggerAvatarDamageApplied(ScenePresence avatar, List<DamageEntry> batch)
+    {
+        AvatarDamageData handler = OnAvatarDamageApplied;
+        if (handler == null) return;
+        foreach (AvatarDamageData d in handler.GetInvocationList())
+        {
+            try { d(avatar, batch); }
+            catch (Exception e)
+            {
+                m_log.LogError("[EVENT MANAGER]: Delegate for TriggerAvatarDamageApplied failed - continuing.  {0} {1}", e.Message, e.StackTrace);
             }
         }
     }
