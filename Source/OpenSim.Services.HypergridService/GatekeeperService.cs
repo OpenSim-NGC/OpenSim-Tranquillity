@@ -406,7 +406,9 @@ public class GatekeeperService : IGatekeeperService
                 // Make sure this is the user coming home, and not a foreign user with same UUID as a local user
                 if (m_UserAgentService is not null)
                 {
-                    if (!m_UserAgentService.IsAgentComingHome(aCircuit.SessionID, m_gatekeeperURL))
+                    if (!(m_UserAgentService is UserAgentService localHomeService
+                            ? localHomeService.IsAgentComingHome(aCircuit.SessionID, aCircuit.AgentID, m_gatekeeperURL)
+                            : m_UserAgentService.IsAgentComingHome(aCircuit.SessionID, m_gatekeeperURL)))
                     {
                         // Can't do, sorry
                         reason = "Unauthorized";
@@ -624,7 +626,9 @@ public class GatekeeperService : IGatekeeperService
 
         if (m_gatekeeperHost.Equals(userHomeHost))
         {
-            return m_UserAgentService.VerifyAgent(aCircuit.SessionID, aCircuit.ServiceSessionID);
+            return m_UserAgentService is UserAgentService localVerifyService
+                ? localVerifyService.VerifyAgent(aCircuit.SessionID, aCircuit.AgentID, aCircuit.ServiceSessionID)
+                : m_UserAgentService.VerifyAgent(aCircuit.SessionID, aCircuit.ServiceSessionID);
         }
         else
         {
