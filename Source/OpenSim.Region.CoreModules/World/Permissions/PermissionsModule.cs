@@ -309,7 +309,7 @@ public class DefaultPermissionsModule : INonSharedRegionModule, IPermissionsModu
         scenePermissions.OnEditNotecard += CanEditNotecard;
         scenePermissions.OnEditScript += CanEditScript;
         scenePermissions.OnResetScript += CanResetScript;
-        scenePermissions.OnRunScript += CanRunScript;
+        scenePermissions.OnRunScriptWithEngine += CanRunScript;
         scenePermissions.OnCompileScript += CanCompileScript;
         
         scenePermissions.OnCreateUserInventory += CanCreateUserInventory;
@@ -409,7 +409,7 @@ public class DefaultPermissionsModule : INonSharedRegionModule, IPermissionsModu
         scenePermissions.OnEditNotecard -= CanEditNotecard;
         scenePermissions.OnEditScript -= CanEditScript;
         scenePermissions.OnResetScript -= CanResetScript;
-        scenePermissions.OnRunScript -= CanRunScript;
+        scenePermissions.OnRunScriptWithEngine -= CanRunScript;
         scenePermissions.OnCompileScript -= CanCompileScript;
         
         scenePermissions.OnCreateUserInventory -= CanCreateUserInventory;
@@ -1829,13 +1829,20 @@ public class DefaultPermissionsModule : INonSharedRegionModule, IPermissionsModu
         return IsAdministrator(user);
     }
 
-    private bool CanRunScript(TaskInventoryItem scriptitem, SceneObjectPart part)
+    /// <remarks>
+    /// This handler is the parcel rule. When the engine that will run the script enforces the parcel rules itself
+    /// (IParcelScriptPolicyEngine), the whole decision, including attachments and estate managers, is the engine's.
+    /// </remarks>
+    private bool CanRunScript(TaskInventoryItem scriptitem, SceneObjectPart part, bool engineEnforcesParcelRules)
     {
         DebugPermissionInformation(MethodInfo.GetCurrentMethod().Name);
         if (m_bypassPermissions) return m_bypassPermissionsValue;
 
         if(scriptitem is null || part is null)
             return false;
+
+        if (engineEnforcesParcelRules)
+            return true;
 
         SceneObjectGroup sog = part.ParentGroup;
         if(sog is null)

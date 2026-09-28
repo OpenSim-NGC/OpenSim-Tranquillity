@@ -313,10 +313,108 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
     public bool IsAttachment
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set;
+        get { return m_isAttachment; }
+        set
+        {
+            m_isAttachment = value;
+            // an attachment has no parcel; a later drop to the ground records a first parcel again
+            if (value)
+                ForgetParcel();
+        }
     }
+    private bool m_isAttachment;
+
+    #region Parcel tracking
+
+    private const int NoParcel = int.MinValue;
+
+    // runtime only, never persisted: the parcel last recorded for this object, see CheckParcelCrossing
+    private bool m_parcelTracking;
+    private int m_currentParcelLocalID = NoParcel;
+    private ILandObject m_currentParcel;
+
+    /// <summary>
+    /// The parcel last recorded for this object by <see cref="CheckParcelCrossing"/>, or null.
+    /// </summary>
+    public ILandObject CurrentParcel
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_currentParcel; }
+    }
+
+    private void ForgetParcel()
+    {
+        m_currentParcel = null;
+        m_currentParcelLocalID = NoParcel;
+    }
+
+    /// <summary>
+    /// Called by the scene graph once the object is in the scene: from now on parcel crossings and owner or
+    /// group changes are reported, and the first parcel is recorded now.
+    /// </summary>
+    internal void StartParcelTracking()
+    {
+        // an object arriving from another region may be the same instance; its old record means nothing here
+        ForgetParcel();
+        m_parcelTracking = true;
+        CheckParcelCrossing();
+    }
+
+    /// <summary>
+    /// Records the parcel under the object's position and raises
+    /// <see cref="EventManager.OnGroupCrossedToNewParcel"/> if it differs from the last one recorded.
+    /// </summary>
+    /// <remarks>
+    /// One land lookup and one integer compare; the event is raised only on an actual change.
+    /// Does nothing for attachments, deleted objects and objects not (yet) in the scene.
+    /// </remarks>
+    public void CheckParcelCrossing()
+    {
+        if (!m_parcelTracking || m_isAttachment || IsDeleted)
+            return;
+
+        Scene scene = m_scene;
+        ILandChannel land = scene?.LandChannel;
+        if (land is null)
+            return;
+
+        Vector3 pos = m_rootPart.GroupPosition;
+        ILandObject parcel;
+        try
+        {
+            parcel = land.GetLandObjectClippedXY(pos.X, pos.Y);
+        }
+        catch
+        {
+            // land is being replaced (oar load); the next move records it
+            return;
+        }
+
+        LandData ldata = parcel?.LandData;
+        if (ldata is null || ldata.LocalID == m_currentParcelLocalID)
+            return;
+
+        ILandObject oldParcel = m_currentParcel;
+        m_currentParcel = parcel;
+        m_currentParcelLocalID = ldata.LocalID;
+
+        scene.EventManager.TriggerGroupCrossedToNewParcel(this, oldParcel, parcel);
+    }
+
+    private void TriggerOwnerOrGroupChanged(UUID oldOwner, UUID oldGroup)
+    {
+        if (!m_parcelTracking || IsDeleted || m_scene is null)
+            return;
+
+        UUID newOwner = m_rootPart.OwnerID;
+        UUID newGroup = m_rootPart.GroupID;
+        if (oldOwner.Equals(newOwner) && oldGroup.Equals(newGroup))
+            return;
+
+        m_scene.EventManager.TriggerObjectOwnerOrGroupChanged(this, oldOwner, newOwner, oldGroup, newGroup);
+    }
+
+    #endregion
 
     /// <summary>
     /// What experience temp attached this item
@@ -740,6 +838,8 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             }
 
             Scene?.EventManager.TriggerParcelPrimCountTainted();
+
+            CheckParcelCrossing();
         }
     }
 
@@ -1070,6 +1170,9 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         sog.inTransit = false;
         AttachToBackup();
         sog.ScheduleGroupForUpdate(PrimUpdateFlags.FullUpdatewithAnimMatOvr);
+
+        // the object was clamped back into the region, maybe onto another parcel
+        sog.CheckParcelCrossing();
     }
 
     private class TeleportObjectData
@@ -2359,6 +2462,9 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
     public void SetOwnerId(UUID userId)
     {
+            UUID oldOwner = m_rootPart.OwnerID;
+            UUID oldGroup = m_rootPart.GroupID;
+
             ForEachPart(delegate(SceneObjectPart part)
             {
                 if (part.OwnerID.NotEqual(userId))
@@ -2368,6 +2474,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
                     part.OwnerID = userId;
                 }
             });
+
+            TriggerOwnerOrGroupChanged(oldOwner, oldGroup);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2577,6 +2685,10 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         // a copy is not in transit hopefully
         dupe.inTransit = false;
+
+        // a copy is not in the scene yet; adding it records its first parcel
+        dupe.m_parcelTracking = false;
+        dupe.ForgetParcel();
 
         // new group as no sitting avatars
         dupe.m_sittingAvatars = new List<ScenePresence>();
@@ -2850,6 +2962,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     {
         SceneObjectPart rpart = RootPart;
         UUID oldowner = rpart.OwnerID;
+        UUID oldgroup = rpart.GroupID;
         ForEachPart(delegate(SceneObjectPart part)
         {
             if(part.GroupID.NotEqual(part.OwnerID))
@@ -2869,6 +2982,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         }
 
         rpart.ScheduleFullUpdate();
+
+        TriggerOwnerOrGroupChanged(oldowner, oldgroup);
     }
 
     /// <summary>
@@ -5171,6 +5286,9 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// <param name="client"></param>
     public void SetGroup(UUID GroupID, IClientAPI client)
     {
+        UUID oldOwner = m_rootPart.OwnerID;
+        UUID oldGroup = m_rootPart.GroupID;
+
         SceneObjectPart[] parts = m_parts.GetArray();
         for (int i = 0; i < parts.Length; i++)
         {
@@ -5184,6 +5302,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         // Don't trigger the update here - otherwise some client issues occur when multiple updates are scheduled
         // for the same object with very different properties.  The caller must schedule the update.
         //ScheduleGroupForFullUpdate();
+
+        TriggerOwnerOrGroupChanged(oldOwner, oldGroup);
     }
 
     public void TriggerScriptChangedEvent(Changed val)

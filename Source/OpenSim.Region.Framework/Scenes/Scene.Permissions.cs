@@ -63,6 +63,11 @@ public delegate bool EditScriptHandler(UUID script, UUID objectID, UUID user);
 public delegate bool EditNotecardHandler(UUID notecard, UUID objectID, UUID user);
 public delegate bool RunScriptHandlerByIDs(UUID script, UUID objectID, UUID user);
 public delegate bool RunScriptHandler(TaskInventoryItem item, SceneObjectPart part);
+/// <param name="engineEnforcesParcelRules">
+/// true when the script engine that will run the script implements IParcelScriptPolicyEngine and enforces the
+/// parcel script rules itself, so a parcel-based refusal must be left to that engine
+/// </param>
+public delegate bool RunScriptWithEngineHandler(TaskInventoryItem item, SceneObjectPart part, bool engineEnforcesParcelRules);
 public delegate bool CompileScriptHandler(UUID ownerUUID, int scriptType);
 public delegate bool StartScriptHandler(UUID script, UUID user);
 public delegate bool StopScriptHandler(UUID script, UUID user);
@@ -143,6 +148,7 @@ public class ScenePermissions
     public event EditNotecardHandler OnEditNotecard;
     public event RunScriptHandlerByIDs OnRunScriptByIDs;
     public event RunScriptHandler OnRunScript;
+    public event RunScriptWithEngineHandler OnRunScriptWithEngine;
     public event CompileScriptHandler OnCompileScript;
     public event StartScriptHandler OnStartScript;
     public event StopScriptHandler OnStopScript;
@@ -713,6 +719,18 @@ public class ScenePermissions
 
     public bool CanRunScript(TaskInventoryItem item, SceneObjectPart part)
     {
+        return CanRunScript(item, part, false);
+    }
+
+    /// <summary>
+    /// Can this script start in this part?
+    /// </summary>
+    /// <param name="engineEnforcesParcelRules">
+    /// true when the engine that will run the script enforces the parcel script rules itself
+    /// (see IParcelScriptPolicyEngine); handlers then leave parcel-based refusals to the engine
+    /// </param>
+    public bool CanRunScript(TaskInventoryItem item, SceneObjectPart part, bool engineEnforcesParcelRules)
+    {
         RunScriptHandler handler = OnRunScript;
         if (handler is not null)
         {
@@ -721,6 +739,17 @@ public class ScenePermissions
             foreach (RunScriptHandler h in handler.GetInvocationList().AsSpan())
             {
                 if (h(item, part) == false)
+                    return false;
+            }
+        }
+        RunScriptWithEngineHandler engineHandler = OnRunScriptWithEngine;
+        if (engineHandler is not null)
+        {
+            if(item is null || part is null)
+                return false;
+            foreach (RunScriptWithEngineHandler h in engineHandler.GetInvocationList().AsSpan())
+            {
+                if (h(item, part, engineEnforcesParcelRules) == false)
                     return false;
             }
         }
