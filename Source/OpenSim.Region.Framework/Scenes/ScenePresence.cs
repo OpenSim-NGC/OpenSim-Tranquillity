@@ -353,6 +353,8 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     }
 
     private uint m_requestedSitTargetID;
+    // The experience whose llSitOnLink seated this avatar; Zero for a manual sit or when not seated.
+    private UUID m_experienceUsedForSit;
 
     /// <summary>
     /// Are we sitting on the ground?
@@ -2653,14 +2655,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         if ((allFlags & ACFlags.AGENT_CONTROL_STAND_UP) != 0)
         {
-            if (ParentPart != null && !ParentPart.AllowUnsit)
+            if (ExperienceHoldsSeat())
             {
-                // Check that the experience still has permission to keep the user seated
-                if(Scene.ExperienceModule.GetExperiencePermission(remoteClient.AgentId, ParentPart.ExperienceUsedForSit) == ExperiencePermission.Allowed)
-                {
-                    ControllingClient.SendAgentAlertMessage(string.Format("'{0}' will not allow you to stand at this time.", ParentPart.Name), false);
-                    return;
-                }
+                ControllingClient.SendAgentAlertMessage(string.Format("'{0}' will not allow you to stand at this time.", ParentPart.Name), false);
+                return;
             }
 
             StandUp();
@@ -3157,6 +3155,8 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         bool satOnObject = IsSatOnObject;
         SceneObjectPart part = ParentPart;
         SitGround = false;
+        // SL PRIM_ALLOW_UNSIT: the restriction ends on "unseating for any reason".
+        m_experienceUsedForSit = UUID.Zero;
 
         if (satOnObject)
         {
@@ -3260,7 +3260,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         TriggerScenePresenceUpdated();
     }
 
-    private SceneObjectPart FindNextAvailableSitTarget(UUID targetID)
+    private SceneObjectPart FindNextAvailableSitTarget(UUID targetID, bool manualSit)
     {
         SceneObjectPart targetPart = m_scene.GetSceneObjectPart(targetID);
         if (targetPart == null)
@@ -3281,6 +3281,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         //look for prims with explicit sit targets that are available
         foreach (SceneObjectPart part in partArray)
         {
+            // SL SIT_FLAG_SCRIPTED_ONLY: "Only allow scripted sits on this sit target."
+            if (manualSit && part.ScriptedSitOnly)
+                continue;
+
             if (part.IsSitTargetSet && part.SitTargetAvatar.IsZero() && part.SitActiveRange >= 0)
             {
                 if(lastPart == null)
@@ -3301,9 +3305,9 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         return lastPart ?? targetPart;
     }
 
-    private void SendSitResponse(UUID targetID, Vector3 offset, Quaternion sitOrientation)
+    private void SendSitResponse(UUID targetID, Vector3 offset, Quaternion sitOrientation, bool manualSit)
     {
-        SceneObjectPart part = FindNextAvailableSitTarget(targetID);
+        SceneObjectPart part = FindNextAvailableSitTarget(targetID, manualSit);
         if (part == null)
             return;
 
@@ -3396,7 +3400,8 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if (part == null)
             return;
 
-        if(part.ScriptedSitOnly)
+        // SL PRIM_SCRIPTED_SIT_ONLY: "Attempts to do a manual sit will fail."
+        if(part.ScriptedSitOnly || ScriptedSitOnlyRefusesManualSit(part.ParentGroup))
         {
             ControllingClient.SendAgentAlertMessage("There is no suitable surface to sit on, try another spot.", false);
             return;
@@ -3408,13 +3413,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 return; // already sitting here, ignore
 
 
-            if (!ParentPart.AllowUnsit)
+            if (ExperienceHoldsSeat())
             {
-                if (Scene.ExperienceModule.GetExperiencePermission(this.UUID, ParentPart.ExperienceUsedForSit) == ExperiencePermission.Allowed)
-                {
-                    ControllingClient.SendAgentAlertMessage(string.Format("'{0}' will not allow you to change your seat at this time.", ParentPart.Name), false);
-                    return;
-                }
+                ControllingClient.SendAgentAlertMessage(string.Format("'{0}' will not allow you to change your seat at this time.", ParentPart.Name), false);
+                return;
             }
 
             StandUp();
@@ -3422,7 +3424,51 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         else if (SitGround)
             StandUp();
 
-        SendSitResponse(targetID, offset, Quaternion.Identity);
+        // A manual sit: SL PRIM_ALLOW_UNSIT "has no effect on agents who had seated manually".
+        m_experienceUsedForSit = UUID.Zero;
+        SendSitResponse(targetID, offset, Quaternion.Identity, true);
+    }
+
+    /// <summary>
+    /// True when PRIM_ALLOW_UNSIT keeps this avatar in its seat. SL: "When set on a prim that is running a script as
+    /// part of an experience an avatar that is seated on the sit target and has agreed to participate in the
+    /// experience will be unable to stand or select another prim to sit on." and "This flag has no effect on agents
+    /// who had seated manually (i.e. not via llSitOnLink using experience permissions)."
+    /// </summary>
+    private bool ExperienceHoldsSeat()
+    {
+        SceneObjectPart seat = ParentPart;
+        if (seat == null || seat.AllowUnsit)
+            return false;
+
+        // Seated manually: the flag does not apply, and the experience module is not consulted.
+        if (m_experienceUsedForSit.IsZero())
+            return false;
+
+        // No experience support in this region: SL "this value will be ignored and standing will behave as normal".
+        IExperienceModule experiences = Scene.ExperienceModule;
+        if (experiences == null)
+            return false;
+
+        // The restriction ends on "experience disablement": only a still-allowed experience holds the seat.
+        return experiences.GetExperiencePermission(UUID, m_experienceUsedForSit) == ExperiencePermission.Allowed;
+    }
+
+    /// <summary>
+    /// SL PRIM_SCRIPTED_SIT_ONLY: "If any prim in a linkset has PRIM_SCRIPTED_SIT_ONLY set and no other prim in the
+    /// linkset has a sit target then an avatar cannot manually sit on the object."
+    /// </summary>
+    private static bool ScriptedSitOnlyRefusesManualSit(SceneObjectGroup group)
+    {
+        bool anyScriptedSitOnly = false;
+        foreach (SceneObjectPart p in group.Parts)
+        {
+            if (p.ScriptedSitOnly)
+                anyScriptedSitOnly = true;
+            else if (p.IsSitTargetSet)
+                return false;
+        }
+        return anyScriptedSitOnly;
     }
 
     public void ScriptedSit(SceneObjectPart part, UUID agent_id, UUID experience_id)
@@ -3442,7 +3488,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             StandUp();
 
 
-        SendSitResponse(part.UUID, part.SitTargetPositionLL, part.SitTargetOrientationLL);
+        SendSitResponse(part.UUID, part.SitTargetPositionLL, part.SitTargetOrientationLL, false);
+
+        // Record the experience that seated the avatar, for PRIM_ALLOW_UNSIT (ExperienceHoldsSeat).
+        m_experienceUsedForSit = ParentPart == part ? experience_id : UUID.Zero;
     }
 
     // returns  false if does not suport so older sit can be tried
