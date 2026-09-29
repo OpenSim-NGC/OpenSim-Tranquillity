@@ -523,6 +523,20 @@ public class EventManager
     public event ScriptControlEvent OnScriptControlEvent;
 
     /// <summary>
+    /// Triggered when one or more scripts stop holding taken controls on an avatar: the script's own release
+    /// (llReleaseControls, llTakeControls with pass_on and not accept) and every release the core makes (the viewer's
+    /// release keys, ClearControls on a crossing, a stand-up, a permission revoke or script removal, the avatar
+    /// leaving the region, an incoming agent update that no longer carries the registration).
+    /// </summary>
+    /// <remarks>
+    /// Raised only when a registration was actually removed, with exactly the removed script item ids, after
+    /// <see cref="ScenePresence"/> has released its registrations lock, so a handler may call
+    /// <see cref="ScenePresence.HasScriptControls"/>. Triggered by <see cref="TriggerScriptControlsReleased"/>.
+    /// </remarks>
+    public delegate void ScriptControlsReleased(UUID agentId, UUID[] scriptItemIds);
+    public event ScriptControlsReleased OnScriptControlsReleased;
+
+    /// <summary>
     /// TODO: Should be triggered when a physics object starts moving.
     /// </summary>
     public delegate void ScriptMovingStartEvent(uint localID);
@@ -2494,6 +2508,27 @@ public class EventManager
                 {
                     m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerControlEvent failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerScriptControlsReleased(UUID agentId, UUID[] scriptItemIds)
+    {
+        ScriptControlsReleased handlerScriptControlsReleased = OnScriptControlsReleased;
+        if (handlerScriptControlsReleased != null)
+        {
+            foreach (ScriptControlsReleased d in handlerScriptControlsReleased.GetInvocationList())
+            {
+                try
+                {
+                    d(agentId, scriptItemIds);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerScriptControlsReleased failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
             }

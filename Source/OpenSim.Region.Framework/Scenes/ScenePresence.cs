@@ -1236,7 +1236,9 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 m_attachments = null;
             }
             */
-            scriptedcontrols.Clear();
+            UUID[] releasedControls = TakeAllScriptControls();
+            if (releasedControls != null)
+                m_scene.EventManager.TriggerScriptControlsReleased(UUID, releasedControls);
             // gc gets confused with this cycling
             ControllingClient = null;
             GodController = null; // gc gets confused with this cycling
@@ -5065,12 +5067,19 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         Scene.AttachmentsModule?.CopyAttachments(cAgent, this);
 
+        List<UUID> replacedControls = null;
         try
         {
             lock (scriptedcontrols)
             {
                 if (cAgent.Controllers != null)
                 {
+                    // registrations the incoming set does not carry are released
+                    foreach (UUID id in scriptedcontrols.Keys)
+                    {
+                        if (Array.FindIndex(cAgent.Controllers, c => c.ItemID.Equals(id)) < 0)
+                            (replacedControls ??= new List<UUID>()).Add(id);
+                    }
                     scriptedcontrols.Clear();
                     IgnoredControls = ScriptControlled.CONTROL_ZERO;
 
@@ -5091,6 +5100,8 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             }
         }
         catch { }
+        if (replacedControls != null)
+            m_scene.EventManager.TriggerScriptControlsReleased(UUID, replacedControls.ToArray());
 
         // we are losing animator somewhere
         if (Animator == null)
@@ -5854,13 +5865,17 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             obj.ignoreControls = ScriptControlled.CONTROL_ZERO;
         }
 
+        bool released = false;
         lock (scriptedcontrols)
         {
             if (pass_on == 1 && accept == 0)
             {
                 IgnoredControls &= ~(ScriptControlled)controls;
                 if (scriptedcontrols.ContainsKey(Script_item_UUID))
+                {
                     RemoveScriptFromControlNotifications(Script_item_UUID, part);
+                    released = true;
+                }
             }
             else
             {
@@ -5869,6 +5884,9 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         }
 
         ControllingClient.SendTakeControls(controls, pass_on == 1, true);
+
+        if (released)
+            m_scene.EventManager.TriggerScriptControlsReleased(UUID, new UUID[] { Script_item_UUID });
     }
 
     private void AddScriptToControlNotifications(OpenMetaverse.UUID Script_item_UUID, SceneObjectPart part, ref ScriptControllers obj)
@@ -5899,6 +5917,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
     public void HandleForceReleaseControls(IClientAPI remoteClient, UUID agentID)
     {
+        UUID[] released;
         lock (scriptedcontrols)
         {
             foreach (ScriptControllers c in scriptedcontrols.Values)
@@ -5909,9 +5928,12 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             }
 
             IgnoredControls = ScriptControlled.CONTROL_ZERO;
-            scriptedcontrols.Clear();
+            released = TakeAllScriptControls();
         }
         ControllingClient.SendTakeControls(int.MaxValue, false, false);
+
+        if (released != null)
+            m_scene.EventManager.TriggerScriptControlsReleased(UUID, released);
     }
 
     public void HandleRevokePermissions(UUID objectID, uint permissions )
@@ -5936,9 +5958,39 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     public void ClearControls()
     {
         IgnoredControls = ScriptControlled.CONTROL_ZERO;
+        UUID[] released = TakeAllScriptControls();
+        if (released != null)
+            m_scene.EventManager.TriggerScriptControlsReleased(UUID, released);
+    }
+
+    /// <summary>
+    /// Does this script item hold taken controls on this avatar right now (llTakeControls registered it and nothing
+    /// has released it since)? Read under the same lock the registrations are changed under.
+    /// </summary>
+    /// <remarks>
+    /// Whenever a registration is removed, by the script itself or by the core (the viewer's release keys,
+    /// ClearControls on a crossing, a stand-up, a permission revoke, the avatar leaving the region), the scene raises
+    /// <see cref="EventManager.OnScriptControlsReleased"/> with the item ids removed.
+    /// </remarks>
+    public bool HasScriptControls(UUID scriptItemId)
+    {
         lock (scriptedcontrols)
         {
+            return scriptedcontrols.ContainsKey(scriptItemId);
+        }
+    }
+
+    /// <summary>Removes every registration; returns the item ids removed, or null when there were none.</summary>
+    private UUID[] TakeAllScriptControls()
+    {
+        lock (scriptedcontrols)
+        {
+            if (scriptedcontrols.Count == 0)
+                return null;
+            UUID[] released = new UUID[scriptedcontrols.Count];
+            scriptedcontrols.Keys.CopyTo(released, 0);
             scriptedcontrols.Clear();
+            return released;
         }
     }
 
@@ -5961,6 +6013,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     {
         SceneObjectPart part = m_scene.GetSceneObjectPart(Obj_localID);
 
+        bool released = false;
         lock (scriptedcontrols)
         {
             if (scriptedcontrols.TryGetValue(Script_item_UUID, out ScriptControllers takecontrols))
@@ -5971,6 +6024,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 ControllingClient.SendTakeControls((int)sctc, true, false);
 
                 RemoveScriptFromControlNotifications(Script_item_UUID, part);
+                released = true;
                 IgnoredControls = ScriptControlled.CONTROL_ZERO;
                 foreach (ScriptControllers scData in scriptedcontrols.Values)
                 {
@@ -5978,6 +6032,9 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
                 }
             }
         }
+
+        if (released)
+            m_scene.EventManager.TriggerScriptControlsReleased(UUID, new UUID[] { Script_item_UUID });
     }
 
     private void SendControlsToScripts(uint flags)
