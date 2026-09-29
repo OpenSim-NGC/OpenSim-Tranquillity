@@ -95,6 +95,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
     private int RemoteReplyScriptTimeout = 9000;
     private int RemoteReplyScriptWait = 300;
     private object XMLRPCListLock = new object();
+    private OutboundUrlFilter m_outboundUrlFilter;
 
     #region ISharedRegionModule Members
 
@@ -117,6 +118,10 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
             {
             }
         }
+
+        // llSendRemoteData goes where the script says, so it gets llHTTPRequest's filter: same [Network] keys,
+        // same defaults.
+        m_outboundUrlFilter = new OutboundUrlFilter("Script XML-RPC module", config);
     }
 
     public void PostInitialise()
@@ -364,11 +369,21 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         }
     }
 
+    /// <returns>The request id, or UUID.Zero if the outbound URL filter refuses <paramref name="dest"/>.</returns>
     public UUID SendRemoteData(uint localID, UUID itemID, string channel, string dest, int idata, string sdata)
     {
+        if (Uri.TryCreate(dest, UriKind.Absolute, out Uri destUri) && !m_outboundUrlFilter.CheckAllowed(destUri))
+        {
+            m_log.LogWarning("[XML RPC MODULE]: llSendRemoteData to {0} from item {1} disallowed by filter", dest, itemID);
+            return UUID.Zero;
+        }
+
         SendRemoteDataRequest req = new SendRemoteDataRequest(
             localID, itemID, channel, dest, idata, sdata
-            );
+            )
+        {
+            UrlFilter = m_outboundUrlFilter
+        };
         m_pendingSRDResponses.Add(req.GetReqID(), req);
         req.Process();
         return req.ReqID;
@@ -634,6 +649,12 @@ public class SendRemoteDataRequest: IServiceRequest
         set { _reqID = value; }
     }
     public XmlRpcRequest Request;
+
+    /// <summary>
+    /// Checks the destination and every redirect. Without one the request is not sent.
+    /// </summary>
+    public OutboundUrlFilter UrlFilter;
+
     public int ResponseIdata;
     public string ResponseSdata;
     public string Sdata;
@@ -684,7 +705,16 @@ public class SendRemoteDataRequest: IServiceRequest
         HttpClient hclient = null;
         try
         {
-            hclient = WebUtil.GetNewGlobalHttpClient(-1);
+            // The shared no-redirect handler behind a handler that follows redirects itself and filters every
+            // hop; otherwise as WebUtil.GetNewGlobalHttpClient(-1), whose handler follows up to 10 unfiltered.
+            // Neither handler is disposed with the client: the inner one is shared.
+            hclient = new HttpClient(
+                new OutboundUrlFilterRedirectHandler(UrlFilter, WebUtil.SharedSocketsHttpHandlerNoRedir, 10), false)
+            {
+                Timeout = TimeSpan.FromMilliseconds(30000),
+                MaxResponseContentBufferSize = 250 * 1024 * 1024,
+            };
+            hclient.DefaultRequestHeaders.ExpectContinue = false;
             XmlRpcResponse resp = req.Send(DestURL, hclient);
             if (resp != null)
             {

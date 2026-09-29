@@ -58,7 +58,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
         public float control;
     }
 
-    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(HttpRequestModule));
 
     private static HttpClient VeriFyCertClient = null;
     private static HttpClient VeriFyNoCertClient = null;
@@ -368,6 +368,14 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         break;
 
                     case (int)HttpRequestConstants.HTTP_MIMETYPE:
+                        // Sent as the Content-Type line without validation (SendRequest), so a line break here
+                        // would inject header lines. Refused as an initial-check failure, before anything is queued.
+                        if (!HttpRequestMimeType.IsValid(parameters[i + 1]))
+                        {
+                            m_log.LogWarning("[{0}]: request from item {1} refused: {2}",
+                                m_name, itemID, HttpRequestMimeType.InvalidMessage);
+                            return UUID.Zero;
+                        }
                         htc.HttpMIMEType = parameters[i + 1];
                         break;
 
