@@ -807,6 +807,11 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         if (currentAgentCircuit is not null)
         {
             agentCircuit.ServiceURLs = currentAgentCircuit.ServiceURLs;
+            // The home grid authorises every hypergrid hop against the ServiceSessionID it
+            // issued and rotates it on each hop. This circuit comes from RequestClientInfo(),
+            // which does not carry it, so without this line an outbound hop presents an EMPTY
+            // token and the traveller's home grid refuses it - including the trip home.
+            agentCircuit.ServiceSessionID = currentAgentCircuit.ServiceSessionID;
             agentCircuit.IPAddress = currentAgentCircuit.IPAddress;
             agentCircuit.Viewer = currentAgentCircuit.Viewer;
             agentCircuit.Channel = currentAgentCircuit.Channel;
@@ -1685,6 +1690,11 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         if (currentAgentCircuit is not null)
         {
             agentCircuit.ServiceURLs = currentAgentCircuit.ServiceURLs;
+            // The home grid authorises every hypergrid hop against the ServiceSessionID it
+            // issued and rotates it on each hop. This circuit comes from RequestClientInfo(),
+            // which does not carry it, so without this line an outbound hop presents an EMPTY
+            // token and the traveller's home grid refuses it - including the trip home.
+            agentCircuit.ServiceSessionID = currentAgentCircuit.ServiceSessionID;
             agentCircuit.IPAddress = currentAgentCircuit.IPAddress;
             agentCircuit.Viewer = currentAgentCircuit.Viewer;
             agentCircuit.Channel = currentAgentCircuit.Channel;

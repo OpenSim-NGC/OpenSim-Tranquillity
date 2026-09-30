@@ -320,6 +320,20 @@ public class LLUDPServer : OpenSimUDPBase
     protected bool m_disableFacelights = false;
 
     /// <summary>
+    /// Refuse a UDP circuit whose source address is not the one recorded when the agent
+    /// was authorised. Before this the mismatch was logged and the circuit accepted, so a
+    /// viewer could attach from a different address than the one that passed CAPS auth.
+    /// Addresses inside private or loopback ranges are exempt (NAT, local proxying).
+    /// Default OFF, deliberately. A feature that can refuse a resident's circuit is opt-in:
+    /// a region receiving this build with no RejectCircuitIPMismatch key in its ini must not
+    /// start enforcing on its next restart. Turning it on is a config line somebody can point
+    /// at afterwards. The symptom when it is wrong - UseCircuitCode refused - reads as a
+    /// network fault, not as policy, so it should never arrive by default.
+    /// DHPG security plan hg_homeagent_session_bind, item 5.
+    /// </summary>
+    protected bool m_rejectCircuitIPMismatch = false;   // OPT-IN: see the remark above
+
+    /// <summary>
     /// Record how many packets have been resent
     /// </summary>
     internal int PacketsResentCount { get; set; }
@@ -404,6 +418,7 @@ public class LLUDPServer : OpenSimUDPBase
             m_defaultRTO = config.GetInt("DefaultRTO", 0);
             m_maxRTO = config.GetInt("MaxRTO", 0);
             m_disableFacelights = config.GetBoolean("DisableFacelights", false);
+            m_rejectCircuitIPMismatch = config.GetBoolean("RejectCircuitIPMismatch", m_rejectCircuitIPMismatch);
             m_ackTimeout = 1000 * config.GetInt("AckTimeout", 60);
             m_pausedAckTimeout = 1000 * config.GetInt("PausedAckTimeout", 300);
             SupportViewerObjectsCache = config.GetBoolean("SupportViewerObjectsCache", SupportViewerObjectsCache);
@@ -1541,6 +1556,31 @@ public class LLUDPServer : OpenSimUDPBase
 
     #endregion BinaryStats
 
+    /// <summary>
+    /// True for loopback, link-local and RFC1918 private addresses - the cases where a
+    /// source address legitimately differs from the one recorded at authorisation (NAT,
+    /// docker bridges, local proxies). Used to exempt them from the circuit IP check.
+    /// </summary>
+    private static bool IsPrivateOrLoopback(IPAddress ip)
+    {
+        if (ip is null)
+            return true;
+
+        if (IPAddress.IsLoopback(ip))
+            return true;
+
+        if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+        {
+            byte[] b = ip.GetAddressBytes();
+            return b[0] == 10
+                || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+                || (b[0] == 192 && b[1] == 168)
+                || (b[0] == 169 && b[1] == 254);
+        }
+
+        return ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal;
+    }
+
     protected void HandleUseCircuitCode(object o)
     {
         IPEndPoint endPoint = null;
@@ -1564,7 +1604,21 @@ public class LLUDPServer : OpenSimUDPBase
                     {
                         IPAddress aIP = IPAddress.Parse(aCircuit.IPAddress);
                         if(!endPoint.Address.Equals(aIP))
+                        {
+                            // Private and loopback addresses are exempt: NAT, docker bridges and local
+                            // proxies legitimately change the source address.
+                            bool exempt = IsPrivateOrLoopback(endPoint.Address) || IsPrivateOrLoopback(aIP);
+
+                            if (m_rejectCircuitIPMismatch && !exempt)
+                            {
+                                m_log.LogWarning($"[LLUDPSERVER]: Refusing circuit {uccp.CircuitCode.Code}: UseCircuitCode from {endPoint.Address} but agent was authorised from {aCircuit.IPAddress}");
+                                lock (m_pendingCache)
+                                    m_pendingCache.Remove(endPoint);
+                                return;
+                            }
+
                             m_log.LogDebug($"[LLUDPSERVER]: HandleUseCircuitCode IP mismatch {endPoint.Address} != {aCircuit.IPAddress}");
+                        }
                     }
                     catch
                     {

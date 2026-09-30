@@ -1945,6 +1945,13 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             agentData.CapsPath = capsModule.GetCapsPath(m_agentId);
             agentData.ChildrenCapSeeds = new Dictionary<ulong, string>(capsModule.GetChildrenSeeds(m_agentId));
         }
+        // Carry the hypergrid travel token from the circuit this client actually arrived
+        // on. A fresh AgentCircuitData has an empty ServiceSessionID, and a hop presenting
+        // an empty token is refused by the traveller's home grid.
+        AgentCircuitData storedCircuit = ((Scene)m_scene).AuthenticateHandler?.GetAgentCircuitData(m_circuitCode);
+        if (storedCircuit is not null && !string.IsNullOrEmpty(storedCircuit.ServiceSessionID))
+            agentData.ServiceSessionID = storedCircuit.ServiceSessionID;
+
         return agentData;
     }
 
