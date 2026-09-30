@@ -83,10 +83,9 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
 
         m_CreateDefaultAvatarEntries = userConfig.GetBoolean("CreateDefaultAvatarEntries", false);
 
-        if (m_RootInstance == null)
+        // Atomic check-and-set: of several instances constructed at once, exactly one becomes the root.
+        if (Interlocked.CompareExchange(ref m_RootInstance, this, null) == null)
         {
-            m_RootInstance = this;
-
             //  create a system grid god account
             UserAccount ggod = GetUserAccount(UUID.Zero, Constants.servicesGodAgentID);
             if(ggod == null)
