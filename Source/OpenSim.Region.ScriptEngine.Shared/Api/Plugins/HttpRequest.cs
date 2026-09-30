@@ -71,16 +71,27 @@ public class HttpRequest
             // As in SL, every script in the prim gets it: each engine is offered it once and posts
             // it to its own scripts in that prim. The prim is in this region (the module is per
             // region), so no other region's engine is offered it: local ids are per region.
+            IScriptEngine[] listed = m_CmdManager.ScriptEngines;
             foreach (IScriptEngine e in RegionScriptEngines(scene))
             {
-                // Built for each engine: an engine may convert the arguments in place.
-                object[] resobj = new object[]
-                {
-                    new LSL_Types.LSLString(httpInfo.ReqID.ToString()),
-                    new LSL_Types.LSLInteger(httpInfo.Status),
-                    new LSL_Types.list(),
-                    new LSL_Types.LSLString(httpInfo.ResponseBody)
-                };
+                // Built for each engine: an engine may convert the arguments in place. The engines
+                // this pump serves get the LSL_Types they always got; any other engine gets plain
+                // values, as core modules post to any engine (UrlModule): string, int, object[].
+                object[] resobj = Array.IndexOf(listed, e) >= 0
+                    ? new object[]
+                    {
+                        new LSL_Types.LSLString(httpInfo.ReqID.ToString()),
+                        new LSL_Types.LSLInteger(httpInfo.Status),
+                        new LSL_Types.list(),
+                        new LSL_Types.LSLString(httpInfo.ResponseBody)
+                    }
+                    : new object[]
+                    {
+                        httpInfo.ReqID.ToString(),
+                        httpInfo.Status,
+                        new object[0],
+                        httpInfo.ResponseBody
+                    };
 
                 e.PostObjectEvent(httpInfo.LocalID,
                         new EventParams("http_response",

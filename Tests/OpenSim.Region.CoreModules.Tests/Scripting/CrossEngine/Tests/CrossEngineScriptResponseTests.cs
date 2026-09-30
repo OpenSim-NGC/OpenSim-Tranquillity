@@ -151,9 +151,7 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
         Received r = Assert.Single(other.Delivered);
         Assert.Equal(otherScript, r.ItemID);
         Assert.Equal("http_response", r.EventName);
-        Assert.Equal(reqID.ToString(), r.Args[0].ToString());
-        Assert.Equal(202, (int)(LSL_Types.LSLInteger)r.Args[1]);
-        Assert.Equal("for the other engine", r.Args[3].ToString());
+        AssertPlainHttpResponse(r, reqID, 202, "for the other engine");
         Assert.Empty(yengine.Delivered);
     }
 
@@ -187,6 +185,28 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
         Assert.Equal(200, (int)(LSL_Types.LSLInteger)r.Args[1]);
         Assert.Equal("for yengine", r.Args[3].ToString());
         Assert.Empty(other.Delivered);
+    }
+
+    /// <summary>What YEngine always got: LSLString id, LSLInteger status, list, LSLString body.</summary>
+    private static void AssertLslHttpResponse(Received r, UUID reqID, int status, string body)
+    {
+        Assert.Equal(4, r.Args.Length);
+        Assert.Equal(reqID.ToString(), Assert.IsType<LSL_Types.LSLString>(r.Args[0]).m_string);
+        Assert.Equal(status, Assert.IsType<LSL_Types.LSLInteger>(r.Args[1]).value);
+        Assert.IsType<LSL_Types.list>(r.Args[2]);
+        Assert.Equal(body, Assert.IsType<LSL_Types.LSLString>(r.Args[3]).m_string);
+    }
+
+    /// <summary>
+    /// What an engine the shared pump does not serve gets: plain values, as core modules post to any engine (UrlModule).
+    /// </summary>
+    private static void AssertPlainHttpResponse(Received r, UUID reqID, int status, string body)
+    {
+        Assert.Equal(4, r.Args.Length);
+        Assert.Equal(reqID.ToString(), Assert.IsType<string>(r.Args[0]));
+        Assert.Equal(status, Assert.IsType<int>(r.Args[1]));
+        Assert.Empty(Assert.IsType<object[]>(r.Args[2]));
+        Assert.Equal(body, Assert.IsType<string>(r.Args[3]));
     }
 
     /// <summary>
@@ -227,7 +247,10 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
             foreach (UUID reqID in reqs)
             {
                 Received r = Assert.Single(e.Delivered, x => x.Args[0].ToString() == reqID.ToString());
-                Assert.Equal("body " + reqID, r.Args[3].ToString());
+                if (e == yengine)
+                    AssertLslHttpResponse(r, reqID, 200, "body " + reqID);
+                else
+                    AssertPlainHttpResponse(r, reqID, 200, "body " + reqID);
             }
         }
     }
@@ -340,10 +363,13 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
         Received r = Assert.Single(other.Delivered);
         Assert.Equal(otherScript, r.ItemID);
         Assert.Equal("remote_data", r.EventName);
-        Assert.Equal(2, (int)(LSL_Types.LSLInteger)r.Args[0]);
-        Assert.Equal(channel.ToString(), r.Args[1].ToString());
-        Assert.Equal(3, (int)(LSL_Types.LSLInteger)r.Args[4]);
-        Assert.Equal("hello", r.Args[5].ToString());
+        Assert.Equal(6, r.Args.Length);
+        Assert.Equal(2, Assert.IsType<int>(r.Args[0]));
+        Assert.Equal(channel.ToString(), Assert.IsType<string>(r.Args[1]));
+        Assert.IsType<string>(r.Args[2]);
+        Assert.Equal(string.Empty, Assert.IsType<string>(r.Args[3]));
+        Assert.Equal(3, Assert.IsType<int>(r.Args[4]));
+        Assert.Equal("hello", Assert.IsType<string>(r.Args[5]));
         Assert.Empty(yengine.Delivered);
     }
 
@@ -370,6 +396,8 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
         Assert.Equal("y ping", ((Hashtable)((ArrayList)result.Value)[0])["StringValue"]);
         Received r = Assert.Single(yengine.Delivered);
         Assert.Equal(yScript, r.ItemID);
+        Assert.Equal(2, Assert.IsType<LSL_Types.LSLInteger>(r.Args[0]).value);
+        Assert.Equal("ping", Assert.IsType<LSL_Types.LSLString>(r.Args[5]).m_string);
         Assert.Empty(other.Delivered);
     }
 

@@ -121,9 +121,20 @@ public class XmlRequest
         }
 
         // Not stopping at the first that says yes: an engine may accept an item it does not run.
-        // Arguments copied for each: an engine may convert them in place.
+        // Arguments built for each (an engine may convert them in place), as plain values, as core
+        // modules post to any engine (UrlModule): string and int.
         foreach (IScriptEngine e in OtherScriptEngines())
-            e.PostScriptEvent(itemID, new EventParams("remote_data", (object[])resobj.Clone(), new DetectParams[0]));
+            e.PostScriptEvent(itemID, new EventParams("remote_data", PlainValues(resobj), new DetectParams[0]));
+    }
+
+    private static object[] PlainValues(object[] resobj)
+    {
+        return Array.ConvertAll(resobj, a => a switch
+        {
+            LSL_Types.LSLInteger i => (object)i.value,
+            LSL_Types.LSLString s => s.m_string,
+            _ => a
+        });
     }
 
     /// <summary>
