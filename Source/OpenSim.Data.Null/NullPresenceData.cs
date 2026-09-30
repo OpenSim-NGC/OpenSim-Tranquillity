@@ -38,10 +38,6 @@ public class NullPresenceData : IPresenceData
 
     public static NullPresenceData Instance;
 
-    // Test storage shared by every scene in the process (Instance); test classes run in parallel,
-    // so every access is serialised. Monitor is re-entrant, so the delegation to Instance is safe.
-    private static readonly object s_lock = new object();
-
     Dictionary<UUID, PresenceData> m_presenceData = new Dictionary<UUID, PresenceData>();
 
     public NullPresenceData(string connectionString, string realm)
@@ -56,193 +52,172 @@ public class NullPresenceData : IPresenceData
 
     public bool Store(PresenceData data)
     {
-        lock (s_lock)
-        {
-            if (Instance != this)
-                return Instance.Store(data);
+        if (Instance != this)
+            return Instance.Store(data);
 
 //            m_log.LogDebug("[NULL PRESENCE DATA]: Storing presence {0}", data.UserID);
 //            Console.WriteLine("HOME for " + data.UserID + " is " + (data.Data.ContainsKey("HomeRegionID") ? data.Data["HomeRegionID"] : "Not found"));
 
-            m_presenceData[data.SessionID] = data;
-            return true;
-        }
+        m_presenceData[data.SessionID] = data;
+        return true;
     }
 
     public PresenceData Get(UUID sessionID)
     {
-        lock (s_lock)
-        {
-            if (Instance != this)
-                return Instance.Get(sessionID);
+        if (Instance != this)
+            return Instance.Get(sessionID);
 
-            return m_presenceData.TryGetValue(sessionID, out PresenceData pd) ? pd : null;
-        }
+        return m_presenceData.TryGetValue(sessionID, out PresenceData pd) ? pd : null;
     }
 
     public void LogoutRegionAgents(UUID regionID)
     {
-        lock (s_lock)
+        if (Instance != this)
         {
-            if (Instance != this)
-            {
-                Instance.LogoutRegionAgents(regionID);
-                return;
-            }
-
-            List<UUID> toBeDeleted = new List<UUID>();
-            foreach (KeyValuePair<UUID, PresenceData> kvp in m_presenceData)
-                if (kvp.Value.RegionID == regionID)
-                    toBeDeleted.Add(kvp.Key);
-
-            foreach (UUID u in toBeDeleted)
-                m_presenceData.Remove(u);
+            Instance.LogoutRegionAgents(regionID);
+            return;
         }
+
+        List<UUID> toBeDeleted = new List<UUID>();
+        foreach (KeyValuePair<UUID, PresenceData> kvp in m_presenceData)
+            if (kvp.Value.RegionID == regionID)
+                toBeDeleted.Add(kvp.Key);
+
+        foreach (UUID u in toBeDeleted)
+            m_presenceData.Remove(u);
     }
 
     public bool ReportAgent(UUID sessionID, UUID regionID)
     {
-        lock (s_lock)
+        if (Instance != this)
+            return Instance.ReportAgent(sessionID, regionID);
+
+        if (m_presenceData.TryGetValue(sessionID, out PresenceData pd))
         {
-            if (Instance != this)
-                return Instance.ReportAgent(sessionID, regionID);
-
-            if (m_presenceData.TryGetValue(sessionID, out PresenceData pd))
-            {
-                pd.RegionID = regionID;
-                return true;
-            }
-
-            return false;
+            pd.RegionID = regionID;
+            return true;
         }
+
+        return false;
     }
 
     public PresenceData[] Get(string field, string data)
     {
-        lock (s_lock)
-        {
-            if (Instance != this)
-                return Instance.Get(field, data);
+        if (Instance != this)
+            return Instance.Get(field, data);
 
 //            m_log.LogDebug(
 //                "[NULL PRESENCE DATA]: Getting presence data for field {0} with parameter {1}", field, data);
 
-            List<PresenceData> presences = new List<PresenceData>();
-            if (field == "UserID")
+        List<PresenceData> presences = new List<PresenceData>();
+        if (field == "UserID")
+        {
+            foreach (PresenceData p in m_presenceData.Values)
             {
-                foreach (PresenceData p in m_presenceData.Values)
+                if (p.UserID == data)
                 {
-                    if (p.UserID == data)
-                    {
-                        presences.Add(p);
+                    presences.Add(p);
 //                        Console.WriteLine("HOME for " + p.UserID + " is " + (p.Data.ContainsKey("HomeRegionID") ? p.Data["HomeRegionID"] : "Not found"));
-                    }
                 }
-
-                return presences.ToArray();
-            }
-            else if (field == "SessionID")
-            {
-                if (!UUID.TryParse(data, out UUID session))
-                    return presences.ToArray();
-
-                if (m_presenceData.TryGetValue(session, out PresenceData pd))
-                {
-                    presences.Add(pd);
-                    return presences.ToArray();
-                }
-            }
-            else if (field == "RegionID")
-            {
-                UUID region = UUID.Zero;
-                if (!UUID.TryParse(data, out region))
-                    return presences.ToArray();
-                foreach (PresenceData p in m_presenceData.Values)
-                    if (p.RegionID == region)
-                        presences.Add(p);
-                return presences.ToArray();
-            }
-            else
-            {
-                foreach (PresenceData p in m_presenceData.Values)
-                {
-                    if (p.Data.TryGetValue(field, out string spd) && spd == data)
-                        presences.Add(p);
-                }
-                return presences.ToArray();
             }
 
             return presences.ToArray();
         }
+        else if (field == "SessionID")
+        {
+            if (!UUID.TryParse(data, out UUID session))
+                return presences.ToArray();
+
+            if (m_presenceData.TryGetValue(session, out PresenceData pd))
+            {
+                presences.Add(pd);
+                return presences.ToArray();
+            }
+        }
+        else if (field == "RegionID")
+        {
+            UUID region = UUID.Zero;
+            if (!UUID.TryParse(data, out region))
+                return presences.ToArray();
+            foreach (PresenceData p in m_presenceData.Values)
+                if (p.RegionID == region)
+                    presences.Add(p);
+            return presences.ToArray();
+        }
+        else
+        {
+            foreach (PresenceData p in m_presenceData.Values)
+            {
+                if (p.Data.TryGetValue(field, out string spd) && spd == data)
+                    presences.Add(p);
+            }
+            return presences.ToArray();
+        }
+
+        return presences.ToArray();
     }
 
 
     public bool Delete(string field, string data)
     {
-        lock (s_lock)
-        {
 //            m_log.LogDebug(
 //                "[NULL PRESENCE DATA]: Deleting presence data for field {0} with parameter {1}", field, data);
 
-            if (Instance != this)
-                return Instance.Delete(field, data);
+        if (Instance != this)
+            return Instance.Delete(field, data);
 
-            List<UUID> presences = new List<UUID>();
-            if (field == "UserID")
-            {
-                foreach (KeyValuePair<UUID, PresenceData> p in m_presenceData)
-                    if (p.Value.UserID == data)
-                        presences.Add(p.Key);
-            }
-            else if (field == "SessionID")
-            {
-                UUID session = UUID.Zero;
-                if (UUID.TryParse(data, out session))
-                {
-                    if (m_presenceData.ContainsKey(session))
-                    {
-                        presences.Add(session);
-                    }
-                }
-            }
-            else if (field == "RegionID")
-            {
-                UUID region = UUID.Zero;
-                if (UUID.TryParse(data, out region))
-                {
-                    foreach (KeyValuePair<UUID, PresenceData> p in m_presenceData)
-                        if (p.Value.RegionID == region)
-                            presences.Add(p.Key);
-                }
-            }
-            else
-            {
-                foreach (KeyValuePair<UUID, PresenceData> p in m_presenceData)
-                {
-                    if (p.Value.Data.ContainsKey(field) && p.Value.Data[field] == data)
-                        presences.Add(p.Key);
-                }
-            }
-
-            foreach (UUID u in presences)
-                m_presenceData.Remove(u);
-
-            if (presences.Count == 0)
-                return false;
-
-            return true;
+        List<UUID> presences = new List<UUID>();
+        if (field == "UserID")
+        {
+            foreach (KeyValuePair<UUID, PresenceData> p in m_presenceData)
+                if (p.Value.UserID == data)
+                    presences.Add(p.Key);
         }
+        else if (field == "SessionID")
+        {
+            UUID session = UUID.Zero;
+            if (UUID.TryParse(data, out session))
+            {
+                if (m_presenceData.ContainsKey(session))
+                {
+                    presences.Add(session);
+                }
+            }
+        }
+        else if (field == "RegionID")
+        {
+            UUID region = UUID.Zero;
+            if (UUID.TryParse(data, out region))
+            {
+                foreach (KeyValuePair<UUID, PresenceData> p in m_presenceData)
+                    if (p.Value.RegionID == region)
+                        presences.Add(p.Key);
+            }
+        }
+        else
+        {
+            foreach (KeyValuePair<UUID, PresenceData> p in m_presenceData)
+            {
+                if (p.Value.Data.ContainsKey(field) && p.Value.Data[field] == data)
+                    presences.Add(p.Key);
+            }
+        }
+
+        foreach (UUID u in presences)
+            m_presenceData.Remove(u);
+
+        if (presences.Count == 0)
+            return false;
+
+        return true;
     }
 
     public bool VerifyAgent(UUID agentId, UUID secureSessionID)
     {
-        lock (s_lock)
-        {
-            if (Instance != this)
-                return Instance.VerifyAgent(agentId, secureSessionID);
+        if (Instance != this)
+            return Instance.VerifyAgent(agentId, secureSessionID);
 
-            return false;
-        }
+        return false;
     }
 
 }
