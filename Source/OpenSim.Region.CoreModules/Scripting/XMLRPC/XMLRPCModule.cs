@@ -327,6 +327,11 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         }
     }
 
+    /// <summary>
+    /// Takes the next request for a script: every region's script engine pumps poll this one
+    /// module, so the request is moved to the awaiting-reply list here, under the lock, and no
+    /// other pump can take it as well. RemoveCompletedRequest afterwards has nothing left to do.
+    /// </summary>
     public IXmlRpcRequestInfo GetNextCompletedRequest()
     {
         if (m_rpcPending != null)
@@ -339,7 +344,12 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
 
                     if (m_rpcPending.TryGetValue(luid, out tmpReq))
                     {
-                        if (!tmpReq.IsProcessed()) return tmpReq;
+                        if (!tmpReq.IsProcessed())
+                        {
+                            m_rpcPending.Remove(luid);
+                            m_rpcPendingResponses.Add(luid, tmpReq);
+                            return tmpReq;
+                        }
                     }
                 }
             }
@@ -357,7 +367,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
                 m_rpcPending.Remove(id);
                 m_rpcPendingResponses.Add(id, tmp);
             }
-            else
+            else if (!m_rpcPendingResponses.ContainsKey(id))
             {
                 m_log.LogError("[XML RPC MODULE]: UNABLE TO REMOVE COMPLETED REQUEST");
             }
@@ -386,8 +396,12 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
 
                     if (m_pendingSRDResponses.TryGetValue(luid, out tmpReq))
                     {
+                        // Taken here, under the lock, so only one script engine pump delivers it.
                         if (tmpReq.Finished)
+                        {
+                            m_pendingSRDResponses.Remove(luid);
                             return tmpReq;
+                        }
                     }
                 }
             }
