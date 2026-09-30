@@ -7,9 +7,7 @@
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="XMLRPC">
-      <HintPath>..\..\Library\XMLRPC.dll</HintPath>
-    </Reference>
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
   
   <ItemGroup>
