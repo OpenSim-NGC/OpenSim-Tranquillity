@@ -75,13 +75,22 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     /// MAX_DISCARD_LEVEL = 5 (indra/llimage/llimage.h:41), so 5 levels keeps every
     /// discard the viewer may ask for available in the codestream. It costs nothing --
     /// at 1024x1024 the output is smaller at 5 levels than at 4.
+    ///
+    /// DRAW-1: the output must be the RAW CODESTREAM, not a JP2 file. CoreJ2K's default wraps the
+    /// codestream in JP2 boxes (jP, ftyp, jp2h, jp2c - the codestream itself started at byte 77 of every
+    /// dynamic texture this shipped), and the viewer's decoder is created for bare codestreams only
+    /// (opj_create_decompress(OPJ_CODEC_J2K), indra/llimagej2coj/llimagej2coj.cpp:311 and :385), so
+    /// opj_read_header failed on the signature box and every dynamic texture rendered as a flat grey prim
+    /// with a valid image on disk. WithFileFormat(false) is the same setting the server-side bake codec
+    /// uses (OpenSimNGC.Appearance.Baking/J2kCodec.cs, EncoderConfig), whose bakes the viewer renders.
     /// </remarks>
     private static J2KEncoderConfiguration BuildEncoderConfig(int width, int height)
     {
         return new J2KEncoderConfiguration()
             .WithTiles(t => t.SetSize(width, height))
             .WithWavelet(w => w.UseIrreversible97().WithDecompositionLevels(5))
-            .WithProgression(p => p.WithOrder(ProgressionOrder.LRCP).WithQualityLayers(0.1f, 0.5f, 1.0f));
+            .WithProgression(p => p.WithOrder(ProgressionOrder.LRCP).WithQualityLayers(0.1f, 0.5f, 1.0f))
+            .WithFileFormat(false);
     }
 
     private Scene m_scene;
@@ -572,7 +581,10 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                             Color = drawColor,
                             IsAntialias = true
                         };
-                        canvas.DrawText(nextLine, startPoint.X, startPoint.Y, SKTextAlign.Left, myFont, textPaint);
+                        // DRAW-1: the pen position is the TOP-LEFT of the text, as System.Drawing's DrawString took it
+                        // and as every script written against upstream expects; SkiaSharp's DrawText takes the
+                        // BASELINE, which put "MoveTo 20,20; Text Hello" with its glyphs ABOVE y=20. Ascent is negative.
+                        canvas.DrawText(nextLine, startPoint.X, startPoint.Y - myFont.Metrics.Ascent, SKTextAlign.Left, myFont, textPaint);
                         textPaint.Dispose();
                     }
                     continue;

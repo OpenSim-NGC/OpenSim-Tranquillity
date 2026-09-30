@@ -277,11 +277,26 @@ public class ChatModule : ISharedRegionModule
             }
         }
 
+        // PHLOX-9b. Object chat on DEBUG_CHANNEL is for the object's OWNER: script errors and the API's
+        // "no permission / not found" lines. The SL wiki says the sim broadcasts and "most viewers filter
+        // out messages received on DEBUG_CHANNEL from objects owned by others" - not every viewer
+        // does, and a bystander can get the script-warning box for someone else's prim.
+        // The sim filters, so the outcome does not depend on the viewer. Avatar-sourced DEBUG_CHANNEL chat
+        // (a viewer typing /2147483647) is untouched, as is every other channel. Scripted listens are
+        // unaffected: the script engine subscribes to OnChatFromWorld itself, beside this module.
+        UUID debugOwnerOnly = UUID.Zero;
+        if (c.Type == ChatTypeEnum.DebugChannel && sourceType == ChatSourceType.Object
+            && c.SenderObject is SceneObjectPart debugPart)
+            debugOwnerOnly = debugPart.ParentGroup.OwnerID;
+
         Vector3 regionPos = new Vector3(scene.RegionInfo.WorldLocX, scene.RegionInfo.WorldLocY, 0);
         scene.ForEachScenePresence(
             delegate(ScenePresence presence)
             {
                 if (destination.IsNotZero() && presence.UUID.NotEqual(destination))
+                    return;
+
+                if (debugOwnerOnly.IsNotZero() && presence.UUID.NotEqual(debugOwnerOnly))
                     return;
 
                 if(presence.IsChildAgent)
