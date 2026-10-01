@@ -860,14 +860,16 @@ namespace Phlox.ScriptEngine
             script.ScriptState.TimerInterval = (int)(sec * 1000);
             m_ParcelTimerLeft.Remove(itemId);   // A new timer replaces the time a parcel pause kept
 
-            // Remove any existing timer handle
+            // Remove any existing timer handle, and any timer event already queued. A timer that fired while the
+            // script was busy has no handle any more (the wake removed it) but its event still waits in the queue;
+            // Halcyon ScriptSetTimer removes that one when there is no handle. SL: "Setting sec to 0.0 stops the timer".
             C5.IPriorityQueueHandle<SleepEntry> existing;
             if (m_TimerHandles.TryGetValue(itemId, out existing))
             {
                 m_TimerHandles.Remove(itemId);
                 m_SleepHeap.Delete(existing);
-                script.ScriptState.RemovePendingTimerEvent();
             }
+            script.ScriptState.RemovePendingTimerEvent();
 
             if (script.ScriptState.TimerInterval > 0)
             {
@@ -1164,9 +1166,10 @@ namespace Phlox.ScriptEngine
                     continue;
                 }
 
-                // A script paused by the parcel keeps what belongs to its own state change - Halcyon queues
-                // state_entry for a disabled script - and runs it on resume. Everything else is dropped below.
-                if ((script.ScriptState.LocalDisable & RuntimeState.LocalDisableFlag.Parcel) != 0
+                // A script that is not enabled - stopped by its owner or paused by the parcel - keeps what belongs to
+                // its own state change and runs it when it is started or resumed: Halcyon queues state_entry for a
+                // disabled script and does not run it. Everything else is dropped below.
+                if (!script.ScriptState.Enabled
                     && (pe.Evt.EventType == SupportedEventList.Events.STATE_ENTRY || pe.Evt.EventType == SupportedEventList.Events.STATE_EXIT))
                 {
                     pe.Evt.SignalCompleted();
@@ -1176,7 +1179,7 @@ namespace Phlox.ScriptEngine
 
                 // Halcyon (ExecutionScheduler, pending events): "killed and disabled scripts should no longer respond
                 // to outside stimuli". That is also what a parcel pause does with an event that arrives.
-                if (!script.ScriptState.Enabled && pe.Evt.EventType != SupportedEventList.Events.STATE_ENTRY)
+                if (!script.ScriptState.Enabled)
                 {
                     pe.Evt.SignalCompleted();
                     continue;
@@ -1185,9 +1188,12 @@ namespace Phlox.ScriptEngine
                 PhloxEventInfo info = FindEventHandler(pe.Evt, script);
                 if (info == null) { pe.Evt.SignalCompleted(); continue; }
 
-                // Flood protection: drop events if the script's queue is full
+                // Flood protection: drop events if the script's queue is full - but never on_rez, state_entry,
+                // state_exit or timer, which RuntimeState.QueueEvent lets past the limit as Halcyon's did. A lost
+                // state event leaves a state change half done, and a lost timer event stops the timer for good: it is
+                // re-armed only when its event runs (CheckAndResetTimer).
                 int queueDepth = script.ScriptState.EventQueue.Count;
-                if (queueDepth >= MAX_EVENT_QUEUE_DEPTH)
+                if (queueDepth >= MAX_EVENT_QUEUE_DEPTH && !OverflowsQueueLimit(pe.Evt.EventType))
                 {
                     m_log.LogWarning("[PhloxExe]: Event queue full ({0} events) for script {1}, dropping {2} event",
                         queueDepth, pe.ItemId, pe.Evt.EventType);
@@ -1220,11 +1226,33 @@ namespace Phlox.ScriptEngine
                     else
                         StartEvent(pe.Evt, script, info);
                 }
+                else if (IsNullChangeControl(pe.Evt) && ControlQueued(script))
+                {
+                    // Halcyon ExecutionScheduler: "sometimes the client will spam the server with control events";
+                    // a control() that changes no key is not queued while a control() already waits.
+                    pe.Evt.SignalCompleted();
+                }
                 else
                 {
                     script.ScriptState.QueueEvent(pe.Evt);
                 }
             }
+        }
+
+        /// <summary>The kinds RuntimeState.QueueEvent keeps past the queue limit (its OVERFLOWABLE_EVENTS).</summary>
+        private static bool OverflowsQueueLimit(SupportedEventList.Events type)
+            => type == SupportedEventList.Events.ON_REZ || type == SupportedEventList.Events.STATE_ENTRY
+               || type == SupportedEventList.Events.STATE_EXIT || type == SupportedEventList.Events.TIMER;
+
+        /// <summary>control(key id, integer level, integer edge) with edge 0: the viewer repeating keys held, nothing changed.</summary>
+        private static bool IsNullChangeControl(PostedEvent evt)
+            => evt.EventType == SupportedEventList.Events.CONTROL
+               && evt.Args != null && evt.Args.Length > 2 && evt.Args[2] is int edge && edge == 0;
+
+        private static bool ControlQueued(Interpreter script)
+        {
+            lock (script.ScriptState.EventQueueLock)
+                return script.ScriptState.IsEventQueued(SupportedEventList.Events.CONTROL);
         }
 
         private void ProcessEnableDisable()
@@ -1251,6 +1279,7 @@ namespace Phlox.ScriptEngine
                 {
                     // Ticking Running on a crashed script starts it fresh, never from its dead frame
                     if (script.ScriptState.TerminatedReason != null) { ResetNow(req.ItemId); continue; }
+                    bool wasOn = script.ScriptState.GeneralEnable;
                     script.ScriptState.GeneralEnable = true;
                     bool heldFresh;
                     lock (m_AllScriptsLock) heldFresh = m_HeldFresh.Remove(req.ItemId);
@@ -1258,19 +1287,87 @@ namespace Phlox.ScriptEngine
                     {
                         // Loaded with the Running flag off and never started - its state_entry is owed now
                         PostEvent(req.ItemId, new PostedEvent { EventType = SupportedEventList.Events.STATE_ENTRY, Args = Array.Empty<object>() });
+                        if (!m_RunIndex.ContainsKey(req.ItemId))
+                            AddToRunQueue(script);
                     }
-                    if (!m_RunIndex.ContainsKey(req.ItemId))
-                        AddToRunQueue(script);
+                    else if (!wasOn)
+                        StartAfterStop(script);
                 }
-                else
+                else if (script.ScriptState.GeneralEnable)
                 {
+                    bool wasEnabled = script.ScriptState.Enabled;
                     script.ScriptState.GeneralEnable = false;
                     RemoveFromRunQueue(req.ItemId);
+                    ulong? timerLeft = wasEnabled ? TimerTimeLeft(script) : null;
                     UnregisterFromNotifications(script);
+                    if (timerLeft.HasValue) m_StoppedTimerLeft[req.ItemId] = timerLeft.Value;
+                    // Halcyon AfterDisable -> OnScriptUnloaded(GloballyDisabled): the async handlers stop and taken
+                    // controls are let go. Their records stay, so a start takes them up again (StartAfterStop).
+                    if (wasEnabled && m_Apis.TryGetValue(req.ItemId, out LSLSystemAPI api)) api.OnScriptStopped();
                     m_Engine.StateManager?.ScriptChanged(script);   // A stopped script never runs again to get itself saved
                 }
                 script.SetScriptEventFlags();
             }
+        }
+
+        /// <summary>
+        /// The time a stopped script's timer had left when it was stopped, kept for its start. Halcyon kept the same in
+        /// StateCapturedOn and TimerLastScheduledOn (AfterDisable, InjectScript).
+        /// </summary>
+        private readonly System.Collections.Generic.Dictionary<UUID, ulong> m_StoppedTimerLeft = new();
+
+        /// <summary>
+        /// Milliseconds until the timer's next event, or null when the script has no timer. A timer whose event is
+        /// already posted and not yet run has none left.
+        /// </summary>
+        private ulong? TimerTimeLeft(Interpreter script)
+        {
+            if (script.ScriptState.TimerInterval <= 0) return null;
+            if (!m_TimerHandles.TryGetValue(script.ItemId, out var h)) return 0;
+            ulong readyOn = m_SleepHeap[h].ReadyOn;
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            return readyOn > now ? readyOn - now : 0;
+        }
+
+        /// <summary>
+        /// A stopped script is started again (the Running checkbox, llSetScriptState TRUE): it carries on where it was,
+        /// as Halcyon EnableScript -> InjectScript did. A running script goes back on the run queue, a sleeping one waits
+        /// out the rest of its sleep, an idle one runs what was queued for it (a state_entry held while it was stopped),
+        /// and one inside a blocking call waits for the call's answer, which queues it. The timer comes back with the
+        /// time it had left, and OnScriptInjected takes up the sensor repeat and the controls the stop let go.
+        /// A script the parcel still pauses stays paused; ResumeForParcel starts it.
+        /// </summary>
+        private void StartAfterStop(Interpreter script)
+        {
+            var st = script.ScriptState;
+            bool hadLeft = m_StoppedTimerLeft.Remove(script.ItemId, out ulong left);
+            if (!st.Enabled) return;
+
+            if (st.TimerInterval > 0 && !m_TimerHandles.ContainsKey(script.ItemId))
+            {
+                if (hadLeft) ResumeTimerWithTimeLeft(script, left);
+                else TrackTimer(script, InWorldz.Phlox.Util.Clock.Now + (ulong)st.TimerInterval, false);
+            }
+
+            switch (st.RunState)
+            {
+                case RuntimeState.Status.Running:
+                    AddToRunQueue(script);
+                    break;
+                case RuntimeState.Status.Sleeping:
+                    if (!m_StdSleepHandles.ContainsKey(script.ItemId))
+                        TrackSleep(script, st.NextWakeup);
+                    break;
+                case RuntimeState.Status.Waiting:
+                    bool queued;
+                    lock (st.EventQueueLock) queued = st.EventQueue != null && st.EventQueue.Count > 0;
+                    if (queued) DeliverNextQueuedEvent(script);
+                    break;
+                // Syscall: the return arrives as usual and queues it.
+            }
+
+            try { script.OnScriptInjected(false); }
+            catch (Exception e) { m_log.LogError(e, "[PhloxExe]: {0} started again, but restoring its sensor and controls failed", script.ItemId); }
         }
 
         private void ProcessSuspendResume()
@@ -1692,6 +1789,14 @@ namespace Phlox.ScriptEngine
 			int state = script.ScriptState.LSLState;
 			if (state < 0 || script.Script.StateEvents == null || state >= script.Script.StateEvents.Length)
 				return null;
+			if (evt.TransitionToState != PostedEvent.NO_TRANSITION && script.ScriptState.Enabled)
+			{
+				// SL llSetTimerEvent: "The timer persists across state changes". OnStateChange took the timer's wake
+				// off the heap with the rest; the new state gets it back when it has a timer() to run, as Halcyon
+				// DoStateTransitionAndFindEventHandler does. A stopped script is re-armed when it is started.
+				PhloxEventInfo timer = script.Script.FindEvent(state, (int)SupportedEventList.Events.TIMER);
+				if (timer != null) CheckAndResetTimer(script, timer);
+			}
 			return script.Script.FindEvent(state, (int)evt.EventType);
 		}
 
@@ -1806,6 +1911,7 @@ namespace Phlox.ScriptEngine
         private void UnregisterFromNotifications(Interpreter script)
         {
             m_ParcelTimerLeft.Remove(script.ItemId);
+            m_StoppedTimerLeft.Remove(script.ItemId);
             C5.IPriorityQueueHandle<SleepEntry> h;
             if (m_StdSleepHandles.TryGetValue(script.ItemId, out h))
             {
@@ -1936,7 +2042,8 @@ namespace Phlox.ScriptEngine
                 script.ItemId, script.Script.AssetId, e);
             try
             {
-                script.ShoutError($"Script {script.Script.AssetId} stopped: {e.Message}");
+                // Halcyon's wording (ExecutionScheduler.TerminateScriptWithError), which error-catcher scripts match
+                script.ShoutError($"Script {script.Script.AssetId} encountered a problem and was stopped: {e.Message}");
             }
             catch { /* ignore errors during error reporting */ }
         }

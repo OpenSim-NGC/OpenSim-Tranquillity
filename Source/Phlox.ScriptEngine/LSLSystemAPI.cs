@@ -151,7 +151,6 @@ namespace Phlox.ScriptEngine
         private Interpreter m_thisScript;
         public Interpreter Script { get => m_thisScript; set => m_thisScript = value; }
         public Scene World => m_ScriptEngine.World;
-        private DateTime m_scriptTimer = DateTime.UtcNow;  // for llResetTime/llGetAndResetTime
 
         // Thread-local Random so each scheduler thread gets its own seeded instance;
         // avoids both per-call seed collisions (new Random()) and lock contention.
@@ -442,6 +441,19 @@ namespace Phlox.ScriptEngine
             ReleaseScriptResources(ScriptEnd.Unload);
             // Halcyon OnScriptUnloaded "silently release controls". The permissions and the Control record stay
             // with the item and its saved state (a crossing object takes them with it); only an avatar still here is let go.
+            ReleaseControlsOnUnload();
+        }
+
+        /// <summary>
+        /// The script was stopped (the Running checkbox, llSetScriptState FALSE). As Halcyon's OnScriptUnloaded with
+        /// GloballyDisabled: the sensor repeat stops, owed dataserver replies are dropped and taken controls are let go.
+        /// The SensorRepeat and Control records stay, and listens stay registered (a stopped script's chat is dropped by
+        /// the scheduler), so a start carries on with them through OnScriptInjected.
+        /// </summary>
+        internal void OnScriptStopped()
+        {
+            PauseSensorForParcel();
+            m_PendingDataserver.Clear();
             ReleaseControlsOnUnload();
         }
 
@@ -1026,17 +1038,20 @@ namespace Phlox.ScriptEngine
             return llGetTimeOfDay();
         }
 
-        public float llGetTime() => (float)(DateTime.UtcNow - m_scriptTimer).TotalSeconds;
+        // The script's run time lives in its RuntimeState, as Halcyon's llGetTime (ScriptState.TotalRuntime): Reset()
+        // starts it again (SL llGetTime: the time "is reset when the script is reset") and it is saved with the state, so
+        // it carries across a region restart or a crossing.
+        public float llGetTime() => m_thisScript?.ScriptState?.TotalRuntime ?? 0f;
 
         public void llResetTime()
         {
-            m_scriptTimer = DateTime.UtcNow;
+            m_thisScript?.ScriptState?.ResetRuntime();
         }
 
         public float llGetAndResetTime()
         {
-            float elapsed = (float)(DateTime.UtcNow - m_scriptTimer).TotalSeconds;
-            m_scriptTimer = DateTime.UtcNow;
+            float elapsed = llGetTime();
+            llResetTime();
             return elapsed;
         }
         public int llGetLocalTime() => 0;
