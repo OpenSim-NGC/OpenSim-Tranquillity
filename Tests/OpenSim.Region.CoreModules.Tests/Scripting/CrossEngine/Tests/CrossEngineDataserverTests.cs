@@ -243,6 +243,51 @@ public class CrossEngineDataserverTests : OpenSimTestCase
         Assert.Empty(other.Delivered);
     }
 
+    /// <summary>
+    /// Another engine that throws neither reaches the caller nor keeps the event from the engines after it: the calling
+    /// engine's scripts and a third engine's script in the prim still get each answer once.
+    /// </summary>
+    [Fact]
+    public void AnEngineThatThrowsKeepsTheAnswerFromNoOtherEngine()
+    {
+        TestScene scene = new SceneHelpers().SetupScene();
+        StandInEngine yengine = AddYEngine(scene, out AsyncCommandManager commands);
+        StandInEngine thrower = AddOtherEngine(scene);
+        thrower.Throws = true;
+        StandInEngine third = AddOtherEngine(scene);
+
+        const uint prim = 920007;
+        UUID requester = UUID.Random();
+        UUID secondY = UUID.Random();
+        UUID throwerScript = UUID.Random();
+        UUID thirdScript = UUID.Random();
+        yengine.AddScript(prim, requester);
+        yengine.AddScript(prim, secondY);
+        thrower.AddScript(prim, throwerScript);
+        third.AddScript(prim, thirdScript);
+
+        Dataserver ds = commands.DataserverPlugin;
+        string handle = UUID.Random().ToString();
+        string key = ds.RegisterRequest(prim, requester, handle).ToString();
+        ds.DataserverReply(handle, "the answer");
+        string immediate = ds.RequestWithImediatePost(prim, requester, "cached");
+
+        Assert.Equal(2, thrower.Attempts);
+        List<Received> y = yengine.Delivered;
+        Assert.Equal(4, y.Count);
+        AssertLslDataserver(Assert.Single(y, r => r.ItemID == requester && IsKey(r, key)), requester, key, "the answer");
+        AssertLslDataserver(Assert.Single(y, r => r.ItemID == secondY && IsKey(r, key)), secondY, key, "the answer");
+        AssertLslDataserver(Assert.Single(y, r => r.ItemID == requester && IsKey(r, immediate)), requester, immediate, "cached");
+        AssertLslDataserver(Assert.Single(y, r => r.ItemID == secondY && IsKey(r, immediate)), secondY, immediate, "cached");
+        List<Received> t = third.Delivered;
+        Assert.Equal(2, t.Count);
+        AssertPlainDataserver(t[0], thirdScript, key, "the answer");
+        AssertPlainDataserver(t[1], thirdScript, immediate, "cached");
+    }
+
+    private static bool IsKey(Received r, string key) =>
+        r.Args.Length > 0 && r.Args[0] is LSL_Types.LSLString s && s.m_string == key;
+
     // ── osMessageObject ──────────────────────────────────────────────────────
 
     private static IConfigSource OsslConfig()
@@ -307,6 +352,7 @@ public class CrossEngineDataserverTests : OpenSimTestCase
     /// <summary>
     /// Runs a set of scripts (item ids by prim local id) and records what they are posted. Like a real engine, it
     /// delivers only to scripts it runs. AcceptsAnything makes it answer true for any prim or item, as an engine may.
+    /// Throws makes its PostObjectEvent throw, counting the attempts.
     /// </summary>
     private sealed class StandInEngine : IScriptEngine, IScriptModule
     {
@@ -325,6 +371,9 @@ public class CrossEngineDataserverTests : OpenSimTestCase
 
         public string Name { get; }
         public bool AcceptsAnything { get; init; }
+        public bool Throws { get; set; }
+        public int Attempts => Volatile.Read(ref m_attempts);
+        private int m_attempts;
         public IConfigSource ConfigSourceOverride { get; set; }
         public ConcurrentQueue<Received> ReceivedQueue { get; } = new();
         public List<Received> Delivered => ReceivedQueue.ToList();
@@ -338,6 +387,11 @@ public class CrossEngineDataserverTests : OpenSimTestCase
 
         public bool PostObjectEvent(uint localID, EventParams parms)
         {
+            if (Throws)
+            {
+                Interlocked.Increment(ref m_attempts);
+                throw new InvalidOperationException(Name + " failed to post");
+            }
             if (!m_scripts.TryGetValue(localID, out List<UUID> items))
                 return AcceptsAnything;
             foreach (UUID item in items)

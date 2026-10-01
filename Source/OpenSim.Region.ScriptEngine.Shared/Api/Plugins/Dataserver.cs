@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Reflection;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -34,6 +36,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 
 public class Dataserver
 {
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
     private ObjectJobEngine m_WorkPool;
 
     public AsyncCommandManager m_CmdManager;
@@ -216,7 +220,8 @@ public class Dataserver
     /// posts only to the scripts it runs, so each engine is given the event once. The calling engine gets exactly what it
     /// always got, first; any other engine of the region gets plain values (string key, string data), as core modules
     /// post to any engine, in an array of its own, since an engine may convert arguments in place. Local ids are per
-    /// region, so no other region's engine is given it.
+    /// region, so no other region's engine is given it. An exception from another engine is logged and goes no further:
+    /// it neither reaches the caller nor keeps the event from the engines after it.
     /// </remarks>
     public static void PostToEveryEngine(IScriptEngine own, uint localID, string key, string data)
     {
@@ -241,8 +246,15 @@ public class Dataserver
 
         foreach (IScriptEngine e in others)
         {
-            e.PostObjectEvent(localID,
-                    new EventParams("dataserver", new object[] { key, data }, new DetectParams[0]));
+            try
+            {
+                e.PostObjectEvent(localID,
+                        new EventParams("dataserver", new object[] { key, data }, new DetectParams[0]));
+            }
+            catch (Exception ex)
+            {
+                m_log.LogError(ex, "[DATASERVER]: {0} failed to post dataserver to prim {1}", e.ScriptEngineName, localID);
+            }
         }
     }
 
