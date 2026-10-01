@@ -1100,22 +1100,29 @@ private static string ConvToString(object o)
         /// </summary>
         private static void Defer(SyscallShim self, string fn, object[] args, Func<object> call, object failure, bool safePush)
         {
+            // Null is how a function with no value answers (its failure value is null too). A function with a value
+            // that answers null would leave the operand stack one short and the script would fail later, far from the
+            // cause; it stops the script at the call instead, as Halcyon's SafeOperandsPush did.
+            bool hasValue = failure != null;
             var advisor = self._systemAPI as ISyscallDeferralAdvisor;
             if (self.DeferServiceCall == null || advisor == null || !advisor.NeedsService(fn, args))
             {
                 object r = call();
-                if (r != null)
+                if (r != null || hasValue)
                 {
-                    if (safePush) self._interpreter.SafeOperandsPush(r);
+                    if (safePush || r == null) self._interpreter.SafeOperandsPush(r);
                     else self._interpreter.ScriptState.Operands.Push(r);
                 }
                 return;
             }
 
+            // On the service lane an exception is the call's fault, which the scheduler raises in the script.
+            Func<object> body = !hasValue ? call
+                : () => call() ?? throw new VM.VMException("Attempt to push null operand.\n" + fn + " returned no value");
             var state = self._interpreter.ScriptState;
             var ctx = new SyscallContext(self._interpreter.ItemId, state.SyscallSeq = SyscallContext.NextSeq());
             state.RunState = VM.RuntimeState.Status.Syscall;
-            self.DeferServiceCall(new DeferredServiceCall(ctx, fn, failure, call));
+            self.DeferServiceCall(new DeferredServiceCall(ctx, fn, failure, body));
         }
 
         public void SetScriptEventFlags()
