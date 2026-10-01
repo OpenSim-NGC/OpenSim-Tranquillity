@@ -4253,12 +4253,58 @@ namespace Phlox.ScriptEngine
         public string llGetInventoryName(int type, int number)
         {
             if (m_host == null) return string.Empty;
-            int idx = 0;
-            lock (m_host.TaskInventory)
-                foreach (var kvp in m_host.TaskInventory)
-                    if (type == -1 || kvp.Value.Type == type)
-                        if (idx++ == number) return kvp.Value.Name;
-            return string.Empty;
+            return InventoryNameAt(new[] { m_host }, type, number);
+        }
+
+        /// <summary>
+        /// Halcyon's InvNameComparer (LSLSystemAPI.cs:5057-5096), the order SL lists inventory in: letters compared without
+        /// case, and space, punctuation and digits ordered by their place in OrderLSL, before the letters; characters not in
+        /// it sort after those that are. A name sorts before a longer one it begins. Equal names compare equal (Halcyon's
+        /// answered 1, which a sort may not be given).
+        /// </summary>
+        private sealed class InvNameComparer : IComparer<string>
+        {
+            public static readonly InvNameComparer Instance = new InvNameComparer();
+            private const string OrderLSL = " !\"#$%&'()*+,-./0123456789:;<=>?@[\\]^_`ABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~";
+
+            private static int CompareChars(char c1, char c2)
+            {
+                int val1 = OrderLSL.IndexOf(char.ToUpperInvariant(c1));
+                int val2 = OrderLSL.IndexOf(char.ToUpperInvariant(c2));
+                if (val1 != -1 && val2 != -1) return val1 - val2;
+                if (val1 == -1 && val2 == -1) return c1 - c2;
+                return val1 == -1 ? 1 : -1;
+            }
+
+            public int Compare(string name1, string name2)
+            {
+                int max = Math.Min(name1.Length, name2.Length);
+                for (int x = 0; x < max; x++)
+                {
+                    int cmp = CompareChars(name1[x], name2[x]);
+                    if (cmp != 0) return cmp;
+                }
+                return name1.Length.CompareTo(name2.Length);
+            }
+        }
+
+        /// <summary>The inventory names of <paramref name="type"/> (-1 any) in <paramref name="parts"/>, in LSL order.</summary>
+        private static List<string> SortedInventoryNames(IEnumerable<SceneObjectPart> parts, int type, Func<string, bool> match = null)
+        {
+            var names = new List<string>();
+            foreach (SceneObjectPart part in parts)
+                lock (part.TaskInventory)
+                    foreach (var kvp in part.TaskInventory)
+                        if ((type == -1 || kvp.Value.Type == type) && (match == null || match(kvp.Value.Name)))
+                            names.Add(kvp.Value.Name);
+            names.Sort(InvNameComparer.Instance);
+            return names;
+        }
+
+        private static string InventoryNameAt(IEnumerable<SceneObjectPart> parts, int type, int number)
+        {
+            List<string> names = SortedInventoryNames(parts, type);
+            return number >= 0 && number < names.Count ? names[number] : string.Empty;
         }
         public int llGetInventoryType(string name)
         {
@@ -4296,7 +4342,10 @@ namespace Phlox.ScriptEngine
             lock (m_host.TaskInventory)
                 foreach (var kvp in m_host.TaskInventory)
                     if (kvp.Value.Name == item) return kvp.Value.CreatorID.ToString();
-            return UUID.Zero.ToString();
+            // SL: "If item is missing from the prim's inventory then an error is shouted on DEBUG_CHANNEL"; "" as YEngine
+            // and Halcyon (LSLSystemAPI.cs:12707-12712, which said it on channel 0 with its chat pause).
+            ScriptShoutError("No item named '" + item + "'");
+            return string.Empty;
         }
         public string llGetInventoryDesc(string item)
         {
@@ -4403,7 +4452,9 @@ namespace Phlox.ScriptEngine
             => (value & (PERM_COPY | PERM_TRANSFER)) == 0 ? value | PERM_TRANSFER : value;
         public void llGiveInventory(string destination, string inventory)
         {
-            ScriptSleep(2000);
+            // SL: "If destination is an avatar the script sleeps for 2.0 seconds. (Giving to objects or attachments has
+            // no delay)"; Halcyon's _GiveInventory waits for an avatar and for errors (LSLSystemAPI.cs:5351).
+            if (!GivesToPrim(destination)) ScriptSleep(2000);
             if (m_host == null || World == null) return;
 
             if (!UUID.TryParse(destination, out UUID destId) || destId == UUID.Zero)
@@ -4438,42 +4489,64 @@ namespace Phlox.ScriptEngine
         }
         public void llGiveInventoryList(string target, string folder, LSLList inventory)
         {
-            if (m_host == null || World == null) return;
-            if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return;
-            if (GiveRefusedByMute(destId, "inventory list")) { ScriptSleep(3000); return; }
-
-            // SL: the avatar must be in, or able to see into, the region (SVC-868). YEngine gives nothing to one
-            // with no presence here - "we could check if it is a grid user ... but that increases security risk" -
-            // and says so on DEBUG_CHANNEL. llGiveInventory and iwDeliverInventory[List] still deliver anywhere.
-            if (World.GetSceneObjectPart(destId) == null && World.GetScenePresence(destId) == null)
+            // SL: "This function causes the script to sleep for 3.0 seconds", with no exception for a prim destination
+            // (Halcyon's 0 s for one is not carried) - on every path, including a list that names nothing here.
+            try
             {
-                ShoutError("llGiveInventoryList: Unable to give list, destination not found");
-                ScriptSleep(3000);
-                return;
-            }
+                if (m_host == null || World == null) return;
+                if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return;
+                if (GiveRefusedByMute(destId, "inventory list")) return;
 
-            // Collect UUIDs of the named items from task inventory
-            var itemIDs = new List<UUID>();
-            lock (m_host.TaskInventory)
-            {
-                foreach (var kvp in m_host.TaskInventory)
+                // SL: the avatar must be in, or able to see into, the region (SVC-868). YEngine gives nothing to one
+                // with no presence here - "we could check if it is a grid user ... but that increases security risk" -
+                // and says so on DEBUG_CHANNEL. llGiveInventory and iwDeliverInventory[List] still deliver anywhere.
+                if (World.GetSceneObjectPart(destId) == null && World.GetScenePresence(destId) == null)
                 {
-                    for (int i = 0; i < inventory.Length; i++)
-                    {
-                        if (kvp.Value.Name == inventory.Data[i]?.ToString())
-                        {
-                            itemIDs.Add(kvp.Value.ItemID);
-                            break;
-                        }
-                    }
+                    ShoutError("llGiveInventoryList: Unable to give list, destination not found");
+                    return;
                 }
-            }
-            if (itemIDs.Count == 0) return;
 
-            if (GiveTaskItems(m_host, destId, folder, itemIDs, out string failure) != IW_DELIVER_OK)
-                ShoutError($"Failed to give inventory list: {failure}");
-            ScriptSleep(3000);
+                List<UUID> itemIDs = ListedItems(m_host, inventory, shoutMissing: true);
+                if (itemIDs.Count == 0) return;
+
+                if (GiveTaskItems(m_host, destId, folder, itemIDs, out string failure) != IW_DELIVER_OK)
+                    ShoutError($"Failed to give inventory list: {failure}");
+            }
+            finally
+            {
+                ScriptSleep(3000);
+            }
         }
+
+        /// <summary>
+        /// The task items a give list names, in list order: an entry is an item's name or its task item key (Halcyon,
+        /// LSLSystemAPI.cs:8453-8458). With <paramref name="shoutMissing"/>, an entry that names nothing here is said on
+        /// DEBUG_CHANNEL (SL llGiveInventoryList: "If inventory is missing from the prim's inventory then an error is
+        /// shouted on DEBUG_CHANNEL") and the rest are still given.
+        /// </summary>
+        private List<UUID> ListedItems(SceneObjectPart part, LSLList inventory, bool shoutMissing)
+        {
+            var itemIDs = new List<UUID>();
+            for (int i = 0; i < inventory.Length; i++)
+            {
+                string entry = inventory.Data[i]?.ToString();
+                UUID found = UUID.Zero;
+                lock (part.TaskInventory)
+                    foreach (var kvp in part.TaskInventory)
+                        if (kvp.Value.Name == entry || kvp.Value.ItemID.ToString() == entry) { found = kvp.Value.ItemID; break; }
+                if (found == UUID.Zero)
+                {
+                    if (shoutMissing) ShoutError($"Could not find item '{entry}'");
+                    continue;
+                }
+                if (!itemIDs.Contains(found)) itemIDs.Add(found);
+            }
+            return itemIDs;
+        }
+
+        /// <summary>Is the give's destination a prim in this region (a give that has no delay)?</summary>
+        private bool GivesToPrim(string destination)
+            => UUID.TryParse(destination, out UUID destId) && destId != UUID.Zero && World?.GetSceneObjectPart(destId) != null;
 
         public void llRemoveInventory(string item)
         {
@@ -4759,25 +4832,17 @@ namespace Phlox.ScriptEngine
         }
         public LSLList iwSearchLinkInventory(int link, int type, string pattern, int matchtype)
         {
+            // Halcyon's SearchInventory (LSLSystemAPI.cs:5140-5164): its texts for the two counting match types, nothing
+            // for a higher one, and the names in LSL order. Every prim of a multi-prim link is searched (an extension).
             if (matchtype > 2)
             {
-                ScriptShoutError("IW_MATCH_COUNT/REGEX not valid for iwSearchLinkInventory");
+                if (matchtype == 3) LSLError("IW_MATCH_COUNT is not a valid matching type for iwSearchInventory or iwSearchLinkInventory.");
+                else if (matchtype == 4) LSLError("IW_MATCH_COUNT_REGEX is not a valid matching type for iwSearchInventory or iwSearchLinkInventory.");
                 return new LSLList();
             }
-            List<object> ret = new List<object>();
-            foreach (SceneObjectPart part in GetLinkParts(link))
-            {
-                lock (part.TaskInventory)
-                {
-                    foreach (var kvp in part.TaskInventory)
-                    {
-                        if (type != -1 && kvp.Value.Type != type) continue;
-                        if (String.IsNullOrEmpty(pattern) || iwMatchString(kvp.Value.Name, pattern, matchtype) == 1)
-                            ret.Add(kvp.Value.Name);
-                    }
-                }
-            }
-            return new LSLList(ret);
+            List<string> names = SortedInventoryNames(GetLinkParts(link), type,
+                n => String.IsNullOrEmpty(pattern) || iwMatchString(n, pattern, matchtype) == 1);
+            return new LSLList(names.Cast<object>().ToList());
         }
         public int iwGetLinkInventoryNumber(int linknumber, int type)
         {
@@ -4796,8 +4861,13 @@ namespace Phlox.ScriptEngine
                         if (kvp.Value.Name == name) return kvp.Value.Type;
             return -1;
         }
+        /// <summary>
+        /// Halcyon (LSLSystemAPI.cs:12680-12686): -1 ANDed with each selected prim's mask for the item, a prim without it
+        /// counting as -1, so the answer is -1 when no prim holds it and the common bits when several do.
+        /// </summary>
         public int iwGetLinkInventoryPermMask(int linknumber, string item, int mask)
         {
+            int rc = -1;
             foreach (SceneObjectPart part in GetLinkParts(linknumber))
                 lock (part.TaskInventory)
                     foreach (var kvp in part.TaskInventory)
@@ -4805,25 +4875,19 @@ namespace Phlox.ScriptEngine
                         {
                             switch (mask)
                             {
-                                case 0: return (int)kvp.Value.BasePermissions;
-                                case 1: return (int)kvp.Value.CurrentPermissions;
-                                case 2: return (int)kvp.Value.GroupPermissions;
-                                case 3: return (int)kvp.Value.EveryonePermissions;
-                                case 4: return (int)kvp.Value.NextPermissions;
+                                case 0: rc &= (int)kvp.Value.BasePermissions; break;
+                                case 1: rc &= (int)kvp.Value.CurrentPermissions; break;
+                                case 2: rc &= (int)kvp.Value.GroupPermissions; break;
+                                case 3: rc &= (int)kvp.Value.EveryonePermissions; break;
+                                case 4: rc &= (int)kvp.Value.NextPermissions; break;
                             }
+                            break;
                         }
-            return 0;
+            return rc;
         }
+        /// <summary>The names of every selected prim, in LSL order (Halcyon sorted one prim's, LSLSystemAPI.cs:5130-5137).</summary>
         public string iwGetLinkInventoryName(int linknumber, int type, int number)
-        {
-            int idx = 0;
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
-                lock (part.TaskInventory)
-                    foreach (var kvp in part.TaskInventory)
-                        if (type == -1 || kvp.Value.Type == type)
-                            if (idx++ == number) return kvp.Value.Name;
-            return string.Empty;
-        }
+            => InventoryNameAt(GetLinkParts(linknumber), type, number);
         public string iwGetLinkInventoryKey(int linknumber, string name)
         {
             foreach (SceneObjectPart part in GetLinkParts(linknumber))
@@ -4835,13 +4899,21 @@ namespace Phlox.ScriptEngine
                                 : AssetKeyIfFullPerm(kvp.Value.AssetID, kvp.Value.CurrentPermissions);
             return UUID.Zero.ToString();
         }
+        /// <summary>
+        /// As llGetInventoryCreator over every selected prim: a missing item is "" with Halcyon's "No item named '...' in
+        /// link N" on DEBUG_CHANNEL (LSLSystemAPI.cs:12695-12724); a link with no prim is NULL_KEY, silently.
+        /// </summary>
         public string iwGetLinkInventoryCreator(int linknumber, string item)
         {
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            var parts = GetLinkParts(linknumber).ToList();
+            if (parts.Count == 0) return UUID.Zero.ToString();
+            foreach (SceneObjectPart part in parts)
                 lock (part.TaskInventory)
                     foreach (var kvp in part.TaskInventory)
                         if (kvp.Value.Name == item) return kvp.Value.CreatorID.ToString();
-            return UUID.Zero.ToString();
+            if (parts.Count == 1 && parts[0].LinkNum == 0) ScriptShoutError("No item named '" + item + "'");
+            else ScriptShoutError("No item named '" + item + "' in link " + linknumber);
+            return string.Empty;
         }
         public void iwRemoveLinkInventory(int linknumber, string item)
         {
@@ -4853,8 +4925,9 @@ namespace Phlox.ScriptEngine
                     {
                         if (kvp.Value.Name == item)
                         {
+                            // One per selected prim, as Halcyon (LSLSystemAPI.cs:5498-5503).
                             part.Inventory.RemoveInventoryItem(kvp.Key);
-                            return;
+                            break;
                         }
                     }
                 }
@@ -4862,7 +4935,8 @@ namespace Phlox.ScriptEngine
         }
         public void iwGiveLinkInventory(int linknumber, string destination, string inventory)
         {
-            ScriptSleep(2000);
+            // Halcyon: 2 s for an avatar destination and for errors, none for a prim (LSLSystemAPI.cs:5351).
+            if (!GivesToPrim(destination)) ScriptSleep(2000);
             GiveLinkInventory(linknumber, destination, inventory);
         }
 
@@ -4874,11 +4948,6 @@ namespace Phlox.ScriptEngine
         private int GiveLinkInventory(int linknumber, string destination, string inventory)
         {
             if (World == null) return IW_DELIVER_PRIM;
-            if (!UUID.TryParse(destination, out UUID destId) || destId == UUID.Zero)
-            {
-                llSay(0, "Could not parse destination key: " + destination);
-                return IW_DELIVER_BADKEY;
-            }
 
             // Find the item in the specified link's inventory
             TaskInventoryItem item = null;
@@ -4893,7 +4962,13 @@ namespace Phlox.ScriptEngine
                         { item = kvp.Value; sourcePart = part; break; }
                 if (item != null) break;
             }
+            // Halcyon looks for the prim before the key (LSLSystemAPI.cs GiveLinkInventory -> _GiveInventory).
             if (!anyPart) return IW_DELIVER_PRIM;
+            if (!UUID.TryParse(destination, out UUID destId) || destId == UUID.Zero)
+            {
+                llSay(0, "Could not parse destination key: " + destination);
+                return IW_DELIVER_BADKEY;
+            }
             if (GiveRefusedByMute(destId, "inventory")) return IW_DELIVER_MUTED;   // Before the item, as Halcyon
             if (item == null || sourcePart == null)
             {
@@ -4959,11 +5034,39 @@ namespace Phlox.ScriptEngine
         private int GiveTaskItems(SceneObjectPart source, UUID destId, string category, List<UUID> itemIDs, out string failure)
         {
             failure = null;
-            if (World.GetSceneObjectPart(destId) != null || World.GetScenePresence(destId) != null)
+            if (World.GetSceneObjectPart(destId) != null)
             {
-                if (World.MoveTaskInventoryItems(destId, category, source, itemIDs) != UUID.Zero) return IW_DELIVER_OK;
-                failure = "the recipient's inventory could not be reached";
-                return IW_DELIVER_USER;
+                World.MoveTaskInventoryItems(destId, category, source, itemIDs);
+                return IW_DELIVER_OK;
+            }
+            // Halcyon gives an avatar all of the list or none of it: an item that cannot be moved aborts the give with
+            // its reason (LSLSystemAPI.cs:8478-8501). Core's MoveTaskInventoryItems alerts per item and gives the rest, so
+            // the items are checked first, by its own rules (CreateAgentInventoryItemFromTask).
+            foreach (UUID itemId in itemIDs)
+            {
+                TaskInventoryItem item = source.Inventory.GetInventoryItem(itemId);
+                if (item == null)
+                {
+                    failure = "Item not found: " + itemId;
+                    return IW_DELIVER_ITEM;
+                }
+                if (destId != item.OwnerID && (item.CurrentPermissions & (uint)OpenSim.Framework.PermissionMask.Transfer) == 0)
+                {
+                    failure = "Item doesn't have the Transfer permission.";
+                    return IW_DELIVER_PERM;
+                }
+            }
+            if (World.GetScenePresence(destId) != null)
+            {
+                UUID given = World.MoveTaskInventoryItems(destId, category, source, itemIDs);
+                if (given == UUID.Zero)
+                {
+                    failure = "the recipient's inventory could not be reached";
+                    return IW_DELIVER_USER;
+                }
+                // Halcyon offers the folder to a present avatar too, so the viewer shows the offer.
+                SendGiveNotice(source, destId, "'" + category + "'", given, (byte)AssetType.Folder);
+                return IW_DELIVER_OK;
             }
             if (!AvatarKnown(destId))
             {
@@ -4978,13 +5081,14 @@ namespace Phlox.ScriptEngine
             }
             var folder = new InventoryFolderBase(UUID.Random(), category, destId, -1, root.ID, root.Version);
             World.InventoryService.AddFolder(folder);
-            int given = 0;
             foreach (UUID itemId in itemIDs)
             {
-                if (World.MoveTaskInventoryItem(destId, folder.ID, source, itemId, out string reason) != null) given++;
-                else failure = reason;
+                if (World.MoveTaskInventoryItem(destId, folder.ID, source, itemId, out string reason) == null)
+                {
+                    failure = reason;
+                    return DeliverReasonToResult(failure);
+                }
             }
-            if (given == 0) return DeliverReasonToResult(failure);
             SendGiveNotice(source, destId, "'" + category + "'", folder.ID, (byte)AssetType.Folder);
             return IW_DELIVER_OK;
         }
@@ -4992,11 +5096,13 @@ namespace Phlox.ScriptEngine
         /// <summary>The TaskInventoryOffered notice: to the client when present, else through the IM transfer module (offline IM).</summary>
         private void SendGiveNotice(SceneObjectPart source, UUID destId, string text, UUID givenId, byte assetType)
         {
+            // From the object: its root prim's name, owner and position (Halcyon _GiveInventory, LSLSystemAPI.cs:5419-5427).
+            SceneObjectPart root = source.ParentGroup?.RootPart ?? source;
             GridInstantMessage msg = new GridInstantMessage(World,
-                source.OwnerID, source.Name, destId,
+                root.OwnerID, root.Name, destId,
                 (byte)InstantMessageDialog.TaskInventoryOffered,
-                false, text + ". (" + source.Name + " is located at " + World.RegionInfo.RegionName + " " + source.AbsolutePosition + ")",
-                givenId, true, source.AbsolutePosition,
+                false, text + ". (" + root.Name + " is located at " + World.RegionInfo.RegionName + " " + root.AbsolutePosition + ")",
+                givenId, true, root.AbsolutePosition,
                 new byte[] { assetType }, true);
             if (World.TryGetScenePresence(destId, out ScenePresence sp) && !sp.IsChildAgent)
                 sp.ControllingClient.SendInstantMessage(msg);
@@ -5020,30 +5126,27 @@ namespace Phlox.ScriptEngine
         {
             // Faithful port: give inventory items from a specific link prim
             if (m_host == null || World == null) return;
-            if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return;
-            if (GiveRefusedByMute(destId, "inventory list")) { ScriptSleep(3000); return; }   // otherwise unchanged
-
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            // Halcyon: 3 s for an avatar, none for a prim (LSLSystemAPI.cs:8469-8473).
+            try
             {
-                var itemIDs = new List<UUID>();
-                lock (part.TaskInventory)
+                if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return;
+                if (GiveRefusedByMute(destId, "inventory list")) return;   // otherwise unchanged
+
+                // One folder, from the first prim of the link that holds a listed item (Halcyon :8511-8518).
+                foreach (SceneObjectPart part in GetLinkParts(linknumber))
                 {
-                    foreach (var kvp in part.TaskInventory)
-                    {
-                        for (int i = 0; i < inventory.Length; i++)
-                        {
-                            if (kvp.Value.Name == inventory.Data[i]?.ToString())
-                            {
-                                itemIDs.Add(kvp.Value.ItemID);
-                                break;
-                            }
-                        }
-                    }
+                    List<UUID> itemIDs = ListedItems(part, inventory, shoutMissing: false);
+                    if (itemIDs.Count == 0) continue;
+                    ListedItems(part, inventory, shoutMissing: true);   // say the entries this prim does not hold
+                    if (GiveTaskItems(part, destId, folder, itemIDs, out string failure) != IW_DELIVER_OK)
+                        ShoutError($"Failed to give inventory list: {failure}");
+                    break;
                 }
-                if (itemIDs.Count > 0 && GiveTaskItems(part, destId, folder, itemIDs, out string failure) != IW_DELIVER_OK)
-                    ShoutError($"Failed to give inventory list: {failure}");
             }
-            ScriptSleep(3000);
+            finally
+            {
+                if (!GivesToPrim(target)) ScriptSleep(3000);
+            }
         }
         public string iwGetLinkInventoryDesc(int linknumber, string name)
         {
@@ -5071,7 +5174,7 @@ namespace Phlox.ScriptEngine
         {
             int rc = IW_DELIVER_PRIM;
             try { rc = GiveLinkInventory(linknumber, destination, inventory); }
-            finally { m_ScriptEngine.SysReturn(m_itemID, rc, 100); }
+            finally { m_ScriptEngine.SysReturn(m_itemID, rc, GivesToPrim(destination) ? 0 : 100); }   // none for a prim, as Halcyon
         }
 
         /// <summary>
@@ -5084,7 +5187,7 @@ namespace Phlox.ScriptEngine
         {
             int rc = IW_DELIVER_PRIM;
             try { rc = DeliverInventoryList(linknumber, target, folder, inventory); }
-            finally { m_ScriptEngine.SysReturn(m_itemID, rc, 100); }
+            finally { m_ScriptEngine.SysReturn(m_itemID, rc, GivesToPrim(target) ? 0 : 100); }   // none for a prim, as Halcyon
         }
 
         private int DeliverInventoryList(int linknumber, string target, string folder, LSLList inventory)
