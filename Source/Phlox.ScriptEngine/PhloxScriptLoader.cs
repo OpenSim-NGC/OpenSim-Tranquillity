@@ -49,7 +49,11 @@ namespace Phlox.ScriptEngine
         //   5 — one recompile for three changes: <<= and >>=, SL's Experience key-value form (610-616 return a
         //       request key; the answer arrives in dataserver), and exact float literals (more than 7 significant
         //       digits were rounded). State kept as in 4.
-        private const int CACHE_SCHEMA_VERSION = 5;
+        //   6 — no format change. Earlier versions could store one save's bytecode in the cache file of another save's
+        //       asset (a script saved again while its previous save was still loading), so a restart ran the wrong code.
+        //       The loader no longer does; this bump purges such entries once. Every script recompiles once from its own
+        //       source at the first start; saved state is kept as in 4.
+        private const int CACHE_SCHEMA_VERSION = 6;
         private const string VERSION_FILE_NAME = ".schema_version";
 
         // CACHE_DIR and its stamp, unless the engine was given another folder (a test seam; production never
@@ -228,7 +232,9 @@ namespace Phlox.ScriptEngine
         /// The first-line rule gives this item to another engine. Now, on the caller's thread (the editor's
         /// GetScriptErrors follows on it): forget its load record, so no query answers with an earlier Phlox outcome,
         /// and drop its loads still queued. Then on the load worker, after any unload posted before this: unload a Phlox
-        /// instance if there is one and delete the item's state row, so it is never restored into a later instance.
+        /// instance if there is one, with its normal save. The item's state row is kept, as YEngine keeps its own state
+        /// file for a script it declines (XMREngine.OnRezScript): if the script comes back to Phlox with the same asset it
+        /// resumes from that row, and an edited script has a new asset, so LoadState does not restore the row.
         /// </summary>
         internal void Disown(uint localID, UUID itemID)
         {
@@ -251,7 +257,7 @@ namespace Phlox.ScriptEngine
                 }
             }
             lock (m_PendingUnloads)
-                m_PendingUnloads.AddLast(new PhloxUnloadRequest { LocalID = localID, ItemID = itemID, Disown = true });
+                m_PendingUnloads.AddLast(new PhloxUnloadRequest { LocalID = localID, ItemID = itemID });
             m_WorkArrived();
         }
 
@@ -324,10 +330,6 @@ namespace Phlox.ScriptEngine
             Interpreter script = m_ExeScheduler.FindScript(req.ItemID);
             if (script != null)
                 UnloadScript(req, script);
-            // After the unload's save, so the row cannot come back; an empty check first, as most items
-            // disowned (every other engine's script in the region) never had a row.
-            if (req.Disown)
-                m_ExeScheduler.DeleteStateRowIfAny(req.ItemID);
         }
 
         private void UnloadScript(PhloxUnloadRequest req, Interpreter script)
@@ -600,9 +602,7 @@ namespace Phlox.ScriptEngine
             {
                 try
                 {
-                    result = InWorldz.Phlox.SLua.SLuaCompiler.IsLuaScript(scriptText)
-                        ? frontend.CompileLua(scriptText)
-                        : frontend.Compile(scriptText);
+                    result = CompileByLanguage(frontend, scriptText);
                 }
                 catch (Exception e) { failure = e; }
             }, CompileStackSize)
@@ -611,6 +611,35 @@ namespace Phlox.ScriptEngine
             t.Join();
             if (failure != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(failure).Throw();
             return result;
+        }
+
+        /// <summary>
+        /// Compile the script as LSL or SLua. A first line naming Phlox ("//InWorldz.Phlox:&lt;language&gt;", the header that
+        /// gives a script to Phlox on any region, <see cref="PhloxEngineHeader"/>) decides by its language part, read as
+        /// YEngine reads its own: "" or "lsl" is LSL; "slua" is SLua, compiled with the header line blanked (its newline
+        /// kept) so error line numbers match the source; anything else is a compile error on line 1. The language part
+        /// is lowercased first, as YEngine does, so "SLua" and "SLUA" are SLua too. Without that header, the source decides
+        /// (<see cref="InWorldz.Phlox.SLua.SLuaCompiler.IsLuaScript"/>).
+        /// </summary>
+        internal static CompiledScript CompileByLanguage(CompilerFrontend frontend, string scriptText)
+        {
+            if (PhloxEngineHeader.NamedEngine(scriptText) == PhloxEngineHeader.PhloxName)
+            {
+                string language = PhloxEngineHeader.Language(scriptText);
+                if (language == "slua")
+                    return frontend.CompileLua(scriptText[scriptText.IndexOf('\n')..]);
+                if (language.Length > 0 && language != "lsl")
+                {
+                    string header = scriptText[..scriptText.IndexOf('\n')].TrimEnd('\r');
+                    frontend.Listener?.Error($"line 1:0 the first line {header} names the language \"{language}\"; " +
+                                             "Phlox runs lsl or slua");
+                    return null;
+                }
+                return frontend.Compile(scriptText);
+            }
+            return InWorldz.Phlox.SLua.SLuaCompiler.IsLuaScript(scriptText)
+                ? frontend.CompileLua(scriptText)
+                : frontend.Compile(scriptText);
         }
 
         /// <summary>Is the compile thread still running? (False after <see cref="Stop"/> once it has finished.)</summary>
@@ -646,9 +675,7 @@ namespace Phlox.ScriptEngine
                 BeforeCompileForTest?.Invoke(job.ScriptText);
                 int delay = CompileDelayForTest?.Invoke(job.ScriptText) ?? 0;
                 if (delay > 0) System.Threading.Thread.Sleep(delay);
-                job.Compiled = InWorldz.Phlox.SLua.SLuaCompiler.IsLuaScript(job.ScriptText)
-                    ? frontend.CompileLua(job.ScriptText)
-                    : frontend.Compile(job.ScriptText);
+                job.Compiled = CompileByLanguage(frontend, job.ScriptText);
                 if (job.Compiled != null)
                 {
                     job.Compiled.AssetId = job.AssetId;

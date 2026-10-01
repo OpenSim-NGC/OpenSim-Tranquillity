@@ -2030,9 +2030,6 @@ namespace Phlox.ScriptEngine
             if (m_DeferredEvents.Remove(itemId, out var list)) m_DroppedForUnloaded += list.Events.Count;
         }
 
-        /// <summary>The item is another engine's script now - its Phlox state row must never be restored.</summary>
-        internal void DeleteStateRowIfAny(UUID itemId) => m_Engine?.StateManager?.DeleteStateIfPresent(itemId);
-
         /// <summary>Held events for items not loaded, and events dropped because their item was not loaded (tests, leak check).</summary>
         internal (int Items, int Events, long Dropped) DeferredStats()
         {

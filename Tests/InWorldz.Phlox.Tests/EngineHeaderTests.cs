@@ -218,10 +218,11 @@ public class EngineHeaderTests
 
     /// <summary>
     /// A Phlox state row for an item whose asset is unchanged but which another engine now owns (the operator loaded
-    /// YEngine) is never restored into a later Phlox instance (the operator unloaded it again).
+    /// YEngine) is kept, with no Phlox instance, and restored when the script comes back to Phlox (the operator unloaded
+    /// YEngine again), as YEngine keeps its own state file for a script it declines.
     /// </summary>
     [Fact]
-    public void AStateRowOfAScriptAnotherEngineTookIsNeverRestored()
+    public void AStateRowOfAScriptAnotherEngineTookIsKeptAndRestoredWhenItComesBack()
     {
         var assetId = UUID.Random();
         var itemId = UUID.Random();
@@ -244,13 +245,15 @@ public class EngineHeaderTests
             NotPhloxs(h2, itemId);
             Assert.True(h2.PumpUntilIdle(TimeSpan.FromSeconds(10)));   // the loader has run the disown
         }
-        using (var h3 = new SchedulerHarness())   // YEngine gone again: Phlox's, and fresh
+        Assert.Equal(1, StateRows(itemId));   // kept, though Phlox has no instance of it
+        using (var h3 = new SchedulerHarness())   // YEngine gone again: Phlox's, resumed
         {
             Rez(h3, src, Phlox, itemId, assetId);
-            Assert.True(h3.PumpUntil(() => h3.Said.Contains("fresh"), Cap), "the old state was restored: no state_entry");
+            Assert.True(h3.PumpUntil(() => h3.InterpreterFor(itemId) != null, Cap), h3.Diagnose(itemId));
             h3.PostTouch(itemId);
             Assert.True(h3.PumpUntil(() => h3.Said.Any(s => s.StartsWith("count ")), Cap));
-            Assert.Contains("count 1", h3.Said);
+            Assert.Contains("count 2", h3.Said);
+            Assert.DoesNotContain("fresh", h3.Said);
         }
     }
 
@@ -370,6 +373,16 @@ public class EngineHeaderTests
         h.Prim.Inventory.GetInventoryItem(item).OwnerChanged = true;
         h.Prim.ParentGroup.ResumeScripts();
         SaidExactlyOnce(h, "p owner changed");
+    }
+
+    private static int StateRows(UUID itemId)
+    {
+        using var conn = new System.Data.SQLite.SQLiteConnection("Data Source=ScriptEngines/Phlox/state/script_state.db");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM script_state WHERE item_id = @id";
+        cmd.Parameters.AddWithValue("@id", itemId.ToString());
+        return Convert.ToInt32(cmd.ExecuteScalar());
     }
 
     private static bool TaskInventoryHelpersRunning(SchedulerHarness h, UUID item, out bool running)

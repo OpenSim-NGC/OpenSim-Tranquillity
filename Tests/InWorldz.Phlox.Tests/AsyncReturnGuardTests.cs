@@ -36,6 +36,8 @@ public class AsyncReturnGuardTests
         ("iwRezObject",            VarType.Key,     "\"nothing\", ZERO_VECTOR, ZERO_VECTOR, ZERO_ROTATION, 0", NullKey),
         ("iwRezAtRoot",            VarType.Key,     "\"nothing\", ZERO_VECTOR, ZERO_VECTOR, ZERO_ROTATION, 0", NullKey),
         ("iwRezAt",                VarType.Key,     "\"nothing\", 0, ZERO_VECTOR, ZERO_VECTOR, ZERO_ROTATION, 0", NullKey),
+        // SL wiki LlRezObjectWithParams: "On failure, returns (key)"" (in LSL)" - empty, not NULL_KEY.
+        ("llRezObjectWithParams",  VarType.Key,     "\"nothing\", []",                             ""),
         // The harness has no permissions module, so everybody is a god and may manage the estate; a NULL_KEY
         // target is FALSE on every path (SL: "FALSE if ... invalid or null id").
         ("llManageEstateAccess",   VarType.Integer, "0, NULL_KEY",                                 "0"),

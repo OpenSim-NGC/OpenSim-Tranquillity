@@ -4524,7 +4524,7 @@ namespace InWorldz.Phlox.Types
             }},
             {"llRezObjectWithParams", new FunctionSig {
                 FunctionName = "llRezObjectWithParams",
-                ReturnType = VarType.Void,
+                ReturnType = VarType.Key,
                 ParamTypes = new VarType[] { VarType.String, VarType.List },
                 ParamNames = new string[] { "inventory", "params" },
                 TableIndex = 641
