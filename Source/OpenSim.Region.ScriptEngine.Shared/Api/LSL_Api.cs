@@ -8636,7 +8636,14 @@ public void llDetachFromAvatar()
         ScriptSleep(m_sleepMsOnSendRemoteData);
         if (xmlrpcMod == null)
             return "";
-        return (xmlrpcMod.SendRemoteData(m_host.LocalId, m_item.ItemID, channel, dest, idata, sdata)).ToString();
+        UUID reqID = xmlrpcMod.SendRemoteData(m_host.LocalId, m_item.ItemID, channel, dest, idata, sdata);
+        if (reqID.IsZero())
+        {
+            // the module refuses only a destination the outbound URL filter disallows; reported as llHTTPRequest does
+            Error("llSendRemoteData", string.Format("Request to {0} disallowed by filter", dest));
+            return string.Empty;
+        }
+        return reqID.ToString();
     }
 
     public void llRemoteDataReply(string channel, string message_id, string sdata, int idata)
@@ -14768,6 +14775,14 @@ public void llDetachFromAvatar()
             {
                 Error("llHTTPRequest", "Parameter " + i.ToString() + " is an invalid flag");
                 ScriptSleep(200);
+                return string.Empty;
+            }
+
+            if (flag == (int)HttpRequestConstants.HTTP_MIMETYPE &&
+                !HttpRequestMimeType.IsValid(parameters.Data[i+1].ToString()))
+            {
+                // the request module refuses it too; this says why
+                Error("llHTTPRequest", HttpRequestMimeType.InvalidMessage);
                 return string.Empty;
             }
 

@@ -98,6 +98,8 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
 
     private string m_fontName = "Arial";
 
+    private OutboundUrlFilter m_outboundUrlFilter;
+
     public VectorRenderModule()
     {
     }
@@ -208,6 +210,10 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
             m_fontName = cfg.GetString("font_name", m_fontName);
         }
         m_log.LogDebug("[VECTORRENDERMODULE]: using font \"{0}\" for text rendering.", m_fontName);
+
+        // The Image command fetches a URL the script chose, so it gets llHTTPRequest's filter: same [Network]
+        // keys, same defaults.
+        m_outboundUrlFilter = new OutboundUrlFilter("Script vector render module", config);
 
         // We won't dispose of these explicitly since this module is only removed when the entire simulator
         // is shut down.
@@ -965,7 +971,17 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     {
         try
         {
-            var handler = new HttpClientHandler();
+            // A refused URL is drawn as the same error box as an unreachable one.
+            if (Uri.TryCreate(url, UriKind.Absolute, out Uri uri) && !m_outboundUrlFilter.CheckAllowed(uri))
+            {
+                m_log.LogWarning("[VECTORRENDERMODULE]: Image {0} disallowed by filter", url);
+                return null;
+            }
+
+            // Redirects are followed by the filtering handler (the default handler's 50 hops, each one checked)
+            // instead of by HttpClientHandler, which would follow them unchecked.
+            var handler = new OutboundUrlFilterRedirectHandler(
+                m_outboundUrlFilter, new HttpClientHandler { AllowAutoRedirect = false }, 50);
             using (var client = new System.Net.Http.HttpClient(handler))
             {
                 using (var response = client.GetAsync(url).Result)

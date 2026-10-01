@@ -41,6 +41,57 @@ public enum HttpRequestConstants
 }
 
 /// <summary>
+/// What HTTP_MIMETYPE may be. The value becomes the request's Content-Type line as given, so it is checked here
+/// rather than trusted: a line break in it would add header lines of the script's choosing.
+/// </summary>
+public static class HttpRequestMimeType
+{
+    public const string InvalidMessage = "HTTP_MIMETYPE is not a valid media type";
+
+    /// <summary>
+    /// A media type with optional parameters: type "/" subtype (RFC 9110 tokens), optional whitespace, then either
+    /// nothing or ";" and the parameters. No control character anywhere (CR and LF included; a tab is allowed).
+    /// </summary>
+    public static bool IsValid(string value)
+    {
+        if (string.IsNullOrEmpty(value))
+            return false;
+
+        foreach (char c in value)
+        {
+            if (char.IsControl(c) && c != '\t')
+                return false;
+        }
+
+        int i = 0;
+        if (!SkipToken(value, ref i) || i >= value.Length || value[i] != '/')
+            return false;
+        i++;
+        if (!SkipToken(value, ref i))
+            return false;
+
+        while (i < value.Length && (value[i] == ' ' || value[i] == '\t'))
+            i++;
+
+        return i == value.Length || value[i] == ';';
+    }
+
+    private static bool SkipToken(string value, ref int i)
+    {
+        int start = i;
+        while (i < value.Length && IsTokenChar(value[i]))
+            i++;
+        return i > start;
+    }
+
+    private static bool IsTokenChar(char c)
+    {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+            "!#$%&'*+-.^_`|~".IndexOf(c) >= 0;
+    }
+}
+
+/// <summary>
 /// The initial status of the request before it is placed on the wire.
 /// </summary>
 /// <remarks>
