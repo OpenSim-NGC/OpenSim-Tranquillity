@@ -977,9 +977,9 @@ namespace InWorldz.Phlox.Compiler
 			// Walk up the parse tree to find the nearest scope annotation
 			IScope scope = FindScopeForNode(ctx);
 
+			// The variable in scope at this point: a local declared further on is not (SymbolTable.ResolveVisible).
 			string name = idNode.GetText();
-			var sym = scope?.Resolve(name) as VariableSymbol
-				   ?? _symtab.Globals.Resolve(name) as VariableSymbol;
+			var sym = _symtab.ResolveVisible(scope ?? _symtab.Globals, name, idNode.Symbol.TokenIndex, out _) as VariableSymbol;
 
 			if (ctx.ChildCount > 1)
 				subIdx = CalcSubIndex(ctx.GetChild(ctx.ChildCount - 1).GetText());
@@ -1009,8 +1009,7 @@ namespace InWorldz.Phlox.Compiler
                                 ? CalcSubIndex(subscriptToken.Text) : null;
                         IParseTree parent = ids[0].Parent;
                         IScope scope = FindScopeForNode(parent);
-			var sym = scope?.Resolve(varName) as VariableSymbol
-				   ?? _symtab.Globals.Resolve(varName) as VariableSymbol;
+			var sym = _symtab.ResolveVisible(scope ?? _symtab.Globals, varName, ids[0].Symbol.TokenIndex, out _) as VariableSymbol;
 			return (sym, subIdx, sym?.Type);
 		}
 

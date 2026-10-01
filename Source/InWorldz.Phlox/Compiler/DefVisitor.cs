@@ -111,6 +111,9 @@ namespace InWorldz.Phlox.Compiler
             ISymbolType type = ResolveType(typeName);
             var sym = new VariableSymbol(varName, type);
             sym.Def = MakeDef(context.ID());
+            // A local is in scope only after its declaration, its own initialiser included (SymbolTable.ResolveVisible).
+            if (_currentScope != _symtab.Globals)
+                sym.DeclarationEndTokenIndex = context.Stop.TokenIndex;
 
             _symtab.Define(sym, _currentScope);
 

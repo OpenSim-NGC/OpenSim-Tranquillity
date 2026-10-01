@@ -208,6 +208,30 @@ namespace InWorldz.Phlox.Compiler
             return valueType == destType || promotion == destType;
         }
 
+        /// <summary>
+        /// Resolves a name used at token <paramref name="useTokenIndex"/>. A local variable is in scope from the end of
+        /// its declaration onward (SL's rule), so a use before it, or inside its own initialiser, means the same name
+        /// one scope out: an outer block's local, a parameter, a global. Halcyon's compiler did the same in
+        /// SymbolTable.EnsureResolve, except that it went straight to the parameter or global. Returns null when
+        /// nothing of that name is in scope; <paramref name="declaredLater"/> then tells "declared further on" from
+        /// "never declared".
+        /// </summary>
+        public Symbol ResolveVisible(IScope scope, string name, int useTokenIndex, out bool declaredLater)
+        {
+            declaredLater = false;
+            while (scope != null)
+            {
+                Symbol sym = scope.Resolve(name);
+                if (sym == null) return null;
+                if (!(sym is VariableSymbol local) || local.DeclarationEndTokenIndex < 0 || useTokenIndex < 0
+                    || useTokenIndex > local.DeclarationEndTokenIndex)
+                    return sym;
+                declaredLater = true;
+                scope = sym.Scope?.EnclosingScope;
+            }
+            return null;
+        }
+
         public bool CanCast(int from, int to)
         {
             return castFromTo[from, to] != VOID;

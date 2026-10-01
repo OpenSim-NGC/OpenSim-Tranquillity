@@ -85,7 +85,16 @@ public class NestingLimitTests
         foreach (var k in kinds)
             foreach (var (mode, r) in new[] { ("cold", cold), ("warm", warm) })
             {
-                Expect(failures, $"{lang}:{k}:{limit}", mode, r[$"{lang}:{k}:{limit}"], true, message);
+                // A list inside a list is a compile error at any depth (SL; Halcyon's CheckListLiteral), so the deepest
+                // list the limit allows reaches the type check and fails there: that error, not the limit or a crash.
+                if (lang == "lsl" && k == "list")
+                {
+                    string atLimit = r[$"{lang}:{k}:{limit}"];
+                    if (!(atLimit.StartsWith("ERROR") && atLimit.Contains("A list can not contain another list") && !atLimit.Contains(message)))
+                        failures.Add($"{lang}:{k}:{limit} {mode}: expected the nested-list error, got {atLimit}");
+                }
+                else
+                    Expect(failures, $"{lang}:{k}:{limit}", mode, r[$"{lang}:{k}:{limit}"], true, message);
                 Expect(failures, $"{lang}:{k}:{limit + 1}", mode, r[$"{lang}:{k}:{limit + 1}"], false, message);
             }
         Assert.True(failures.Count == 0, string.Join("\n", failures));

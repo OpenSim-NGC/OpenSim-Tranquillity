@@ -210,12 +210,16 @@ namespace InWorldz.Phlox.Compiler
                 scope = _annotations.GetScope(node);
                 node = node.Parent;
             }
-            Symbol sym = (scope ?? _symtab.Globals).Resolve(name);
+            Symbol sym = _symtab.ResolveVisible(scope ?? _symtab.Globals, name, nameToken.TokenIndex, out bool declaredLater);
             if (!(sym is VariableSymbol varSym) || sym is ConstantSymbol)
             {
-                Error(nameToken, sym == null ? $"Undefined symbol '{name}'" : $"'{name}' is not assignable");
+                Error(nameToken, sym != null ? $"'{name}' is not assignable"
+                    : declaredLater ? $"Symbol '{name}' can not be used before it is defined"
+                    : $"Undefined symbol '{name}'");
                 return null;
             }
+            if (context.subscript != null && !CheckSubscript(nameToken, varSym.Type, context.subscript.Text))
+                return null;
 
             ISymbolType lhsType = context.subscript != null ? SymbolTable.FLOAT : varSym.Type;
             string op = context.op?.Text ?? "=";
@@ -408,6 +412,7 @@ namespace InWorldz.Phlox.Compiler
                 ISymbolType t = Visit(children[i]);
                 if (t == SymbolTable.KEY)
                     ErrorAtContext(children[i], $"Type mismatch: '{GetOpAt(context, i == 0 ? 1 : i)}' cannot be applied to a key");
+                else CheckHasValue(children[i], t);
             }
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
@@ -448,8 +453,18 @@ namespace InWorldz.Phlox.Compiler
                 SetType(context, t);
                 return t;
             }
-            // == !=  — result integer
-            foreach (var c in children) Visit(c);
+            // == !=  — result integer. The two sides must have the same type after integer-to-float and key/string
+            // conversion (Halcyon's SymbolTable.EqOp and HaveSameTypes; SL refuses the same pairs). A chain compares
+            // left to right, so every comparison after the first has an integer on its left.
+            ISymbolType lhs = Visit(children[0]);
+            for (int i = 1; i < children.Length; i++)
+            {
+                ISymbolType rhs = Visit(children[i]);
+                if (lhs != null && rhs != null && !HaveSameTypes(lhs, rhs))
+                    ErrorAtContext(children[i - 1],
+                        "Type mismatch, equality operators == and != require arguments of the same type");
+                lhs = SymbolTable.INT;
+            }
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
         }
@@ -464,8 +479,24 @@ namespace InWorldz.Phlox.Compiler
                 SetType(context, t);
                 return t;
             }
-            // < > <= >=  — result integer
-            foreach (var c in children) Visit(c);
+            // < > <= >=  — result integer. Halcyon's SymbolTable.RelOp: the same types as == (above), and no strings.
+            // Halcyon also accepted key, vector, rotation and list pairs, which SL refuses; content written for it may
+            // use them, so they keep compiling.
+            ISymbolType lhs = Visit(children[0]);
+            for (int i = 1; i < children.Length; i++)
+            {
+                ISymbolType rhs = Visit(children[i]);
+                if (lhs != null && rhs != null)
+                {
+                    if (!HaveSameTypes(lhs, rhs))
+                        ErrorAtContext(children[i - 1],
+                            "Type mismatch, relational operators require arguments of the same type");
+                    if (lhs == SymbolTable.STRING || rhs == SymbolTable.STRING)
+                        ErrorAtContext(children[i - 1],
+                            "Type mismatch, strings can not be compared with < or >");
+                }
+                lhs = SymbolTable.INT;
+            }
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
         }
@@ -575,6 +606,7 @@ namespace InWorldz.Phlox.Compiler
             // LST_BOOLEAN}); Phlox compiled it and the script stopped at run time.
             if (t == SymbolTable.KEY)
                 ErrorAtContext(context, "Type mismatch: '!' cannot be applied to a key");
+            else CheckHasValue(context.unaryExpression(), t);
             // ! always produces integer (boolean)
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
@@ -703,7 +735,9 @@ namespace InWorldz.Phlox.Compiler
 
             if (methSym == null)
             {
-                // Already reported by DefVisitor if undefined; just return void.
+                // Halcyon's message (SymbolTable.MethodCall); the assembler used to be the first to notice, without a line.
+                if (funcName != null)
+                    ErrorAtContext(context, $"Call to undefined function {funcName}()");
                 SetType(context, SymbolTable.VOID);
                 return SymbolTable.VOID;
             }
@@ -747,7 +781,11 @@ namespace InWorldz.Phlox.Compiler
             [NotNull] LSLParser.SubscriptPostfixContext context)
         {
             ISymbolType baseType = Visit(context.postfixExpression());
-            // Subscript (.x .y .z .s) always returns float.
+            // Subscript (.x .y .z .s) always returns float. Only a vector or rotation VARIABLE has members (Halcyon's
+            // SymbolTable.SubScript; SL refuses llGetPos().z, which compiled to no code at all).
+            bool isVariable = context.postfixExpression() is LSLParser.PrimaryExprContext pc
+                && pc.primary() is LSLParser.IdExprContext id && _annotations.GetSymbol(id) is VariableSymbol;
+            CheckSubscript(context.postfixExpression().Start, isVariable ? baseType : null, context.ID().GetText());
             SetType(context, SymbolTable.FLOAT);
             return SymbolTable.FLOAT;
         }
@@ -780,6 +818,7 @@ namespace InWorldz.Phlox.Compiler
         {
             // Visit the three component expressions inside vecLiteral.
             VisitChildren(context);
+            CheckComponents(context.vecLiteral().expr(), "Vector");
             SetType(context, SymbolTable.VECTOR);
             return SymbolTable.VECTOR;
         }
@@ -788,6 +827,7 @@ namespace InWorldz.Phlox.Compiler
             [NotNull] LSLParser.RotationLiteralExprContext context)
         {
             VisitChildren(context);
+            CheckComponents(context.rotLiteral().expr(), "Rotation");
             SetType(context, SymbolTable.ROTATION);
             return SymbolTable.ROTATION;
         }
@@ -795,8 +835,19 @@ namespace InWorldz.Phlox.Compiler
         public override ISymbolType VisitListLiteralExpr(
             [NotNull] LSLParser.ListLiteralExprContext context)
         {
-            // All element types are valid in LSL lists — just visit children.
+            // Any value but a list (Halcyon's SymbolTable.CheckListLiteral; SL refuses a nested list too).
             VisitChildren(context);
+            var elements = context.listLiteral().listContents()?.expr();
+            if (elements != null)
+            {
+                foreach (var e in elements)
+                {
+                    ISymbolType t = TypeOf(e);
+                    if (t == SymbolTable.LIST)
+                        ErrorAtContext(context, "A list can not contain another list");
+                    else CheckHasValue(e, t);
+                }
+            }
             SetType(context, SymbolTable.LIST);
             return SymbolTable.LIST;
         }
@@ -822,10 +873,15 @@ namespace InWorldz.Phlox.Compiler
 			}
 			if (scope == null) scope = _symtab.Globals;
 
-			Symbol sym = scope.Resolve(name) ?? scope.Resolve(name + "()");
+			Symbol sym = _symtab.ResolveVisible(scope, name, context.ID().Symbol.TokenIndex, out bool declaredLater)
+				?? scope.Resolve(name + "()");
 			if (sym == null)
 			{
-				Error(context.ID().Symbol, $"Undefined symbol '{name}'");
+				// A callee's name is reported by the call, as "Call to undefined function".
+				if (!IsCallee(context))
+					Error(context.ID().Symbol, declaredLater
+						? $"Symbol '{name}' can not be used before it is defined"
+						: $"Undefined symbol '{name}'");
 				SetType(context, SymbolTable.VOID);
 				return SymbolTable.VOID;
 			}
@@ -855,6 +911,7 @@ namespace InWorldz.Phlox.Compiler
 
             if (methSym == null)
             {
+                ErrorAtContext(context, $"Call to undefined function {funcName}()");
                 SetType(context, SymbolTable.VOID);
                 return SymbolTable.VOID;
             }
@@ -903,6 +960,143 @@ namespace InWorldz.Phlox.Compiler
 
         private void ErrorAtContext(ParserRuleContext ctx, string msg)
             => Error(ctx.Start.Line, ctx.Start.Column, msg);
+
+        /// <summary>
+        /// Halcyon's SymbolTable.HaveSameTypes: equal, or equal once one side takes LSL's implicit conversion
+        /// (integer to float, key to string, string to key).
+        /// </summary>
+        private static bool HaveSameTypes(ISymbolType a, ISymbolType b)
+            => a == b
+            || SymbolTable.promoteFromTo[a.TypeIndex, b.TypeIndex] == b
+            || SymbolTable.promoteFromTo[b.TypeIndex, a.TypeIndex] == a;
+
+        /// <summary>
+        /// A member (.x .y .z .s) of <paramref name="baseType"/>, null when the base is not a variable. Halcyon's
+        /// messages (SymbolTable.SubScript): a vector has x, y and z; a rotation x, y, z and s.
+        /// </summary>
+        private bool CheckSubscript(IToken at, ISymbolType baseType, string member)
+        {
+            if (baseType != SymbolTable.VECTOR && baseType != SymbolTable.ROTATION)
+            {
+                Error(at, $"Use of subscript .{member} requires a vector or rotation variable");
+                return false;
+            }
+            if (member != "x" && member != "y" && member != "z" && !(member == "s" && baseType == SymbolTable.ROTATION))
+            {
+                Error(at, $"Invalid subscript .{member}");
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>Vector and rotation components are floats or integers (Halcyon's CheckVectorLiteral / CheckRotationLiteral).</summary>
+        private void CheckComponents(LSLParser.ExprContext[] parts, string kind)
+        {
+            foreach (var e in parts)
+            {
+                ISymbolType t = TypeOf(e);
+                if (t != null && t != SymbolTable.FLOAT && t != SymbolTable.INT)
+                {
+                    ErrorAtContext(parts[0], $"{kind} components must be float or implicitly convertable to float ");
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// A call to a function that returns nothing, used where a value is needed: the call pushes no value, so the
+        /// operator after it would take the wrong operand. SL refuses it at compile time.
+        /// </summary>
+        private void CheckHasValue(ParserRuleContext e, ISymbolType t)
+        {
+            if (e != null && t == SymbolTable.VOID)
+                ErrorAtContext(e, "A function that returns no value can not be used as a value");
+        }
+
+        /// <summary>The name of a call in an expression: f in f(...).</summary>
+        private static bool IsCallee(LSLParser.IdExprContext id)
+            => id.Parent is LSLParser.PrimaryExprContext pc
+            && pc.Parent is LSLParser.MethodCallPostfixContext call
+            && call.postfixExpression() == pc;
+
+        /// <summary>
+        /// The variable of a statement-level ++x; x++; --x; x--; (separate grammar rules from the expression forms):
+        /// it must be in scope at this point, and a member must be one the variable has.
+        /// </summary>
+        private void CheckStatementTarget(ParserRuleContext context, ITerminalNode id, IToken subscript)
+        {
+            IScope scope = null;
+            IParseTree node = context;
+            while (node != null && scope == null)
+            {
+                scope = _annotations.GetScope(node);
+                node = node.Parent;
+            }
+            string name = id.GetText();
+            Symbol sym = _symtab.ResolveVisible(scope ?? _symtab.Globals, name, id.Symbol.TokenIndex, out bool declaredLater);
+            if (!(sym is VariableSymbol varSym) || sym is ConstantSymbol)
+            {
+                Error(id.Symbol, sym != null ? $"'{name}' is not assignable"
+                    : declaredLater ? $"Symbol '{name}' can not be used before it is defined"
+                    : $"Undefined symbol '{name}'");
+                return;
+            }
+            if (subscript != null) CheckSubscript(id.Symbol, varSym.Type, subscript.Text);
+        }
+
+        public override ISymbolType VisitPreIncrementStmt([NotNull] LSLParser.PreIncrementStmtContext context)
+        {
+            CheckStatementTarget(context, context.ID(0), context.subscript);
+            return null;
+        }
+
+        public override ISymbolType VisitPreDecrementStmt([NotNull] LSLParser.PreDecrementStmtContext context)
+        {
+            CheckStatementTarget(context, context.ID(0), context.subscript);
+            return null;
+        }
+
+        public override ISymbolType VisitPostIncrementStmt([NotNull] LSLParser.PostIncrementStmtContext context)
+        {
+            CheckStatementTarget(context, context.ID(0), context.subscript);
+            return null;
+        }
+
+        public override ISymbolType VisitPostDecrementStmt([NotNull] LSLParser.PostDecrementStmtContext context)
+        {
+            CheckStatementTarget(context, context.ID(0), context.subscript);
+            return null;
+        }
+
+        // A condition must be a value: a function that returns nothing pushes none.
+        public override ISymbolType VisitIfStmt([NotNull] LSLParser.IfStmtContext context)
+        {
+            VisitChildren(context);
+            CheckHasValue(context.expression(), TypeOf(context.expression()));
+            return null;
+        }
+
+        public override ISymbolType VisitWhileStmt([NotNull] LSLParser.WhileStmtContext context)
+        {
+            VisitChildren(context);
+            CheckHasValue(context.expression(), TypeOf(context.expression()));
+            return null;
+        }
+
+        public override ISymbolType VisitDoWhileStmt([NotNull] LSLParser.DoWhileStmtContext context)
+        {
+            VisitChildren(context);
+            CheckHasValue(context.expression(), TypeOf(context.expression()));
+            return null;
+        }
+
+        public override ISymbolType VisitForStmt([NotNull] LSLParser.ForStmtContext context)
+        {
+            VisitChildren(context);
+            var cond = context.cond?.expression();
+            CheckHasValue(cond, cond == null ? null : TypeOf(cond));
+            return null;
+        }
 
         private static ParserRuleContext AssignmentTarget(LSLParser.BooleanExpressionContext target)
             => GenVisitor.AssignmentTarget(target);
