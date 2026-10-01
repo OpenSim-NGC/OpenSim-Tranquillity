@@ -8185,8 +8185,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llPlaySound(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -8202,13 +8202,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llLinkPlaySound(int link, string sound, float volume, int flags)
         {
             // SL: play a sound on a specific link. flags: SOUND_PLAY=0, SOUND_LOOP=1, SOUND_TRIGGER=2, SOUND_SYNC=4
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            if (m_host == null) return;
+            bool loop = (flags & 1) != 0;
+            bool trigger = (flags & 2) != 0;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero)
+            {
+                MissingSound(sound, trigger ? Array.Empty<SceneObjectPart>() : GetLinkParts(link).ToArray());
+                return;
+            }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
-            bool loop = (flags & 1) != 0;
-            bool trigger = (flags & 2) != 0;
             foreach (SceneObjectPart part in GetLinkParts(link))
             {
                 if (trigger)
@@ -8221,8 +8226,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llLoopSound(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -8232,8 +8237,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llLoopSoundMaster(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -8243,8 +8248,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llLoopSoundSlave(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -8254,8 +8259,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llPlaySoundSlave(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -8265,8 +8270,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llTriggerSound(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -8276,8 +8281,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llTriggerSoundLimited(string sound, float volume, Vector3 top, Vector3 bottom)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -8303,7 +8308,52 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             ScriptSleep(1000);
         }
 
-        public void llSoundPreload(string sound) { llPreloadSound(sound); }
+        /// <summary>
+        /// SL: "This function has been deprecated, please use llPreloadSound instead." It preloads as llPreloadSound
+        /// does, without llPreloadSound's 1 s delay: Halcyon's has none ("documented to have no delay",
+        /// LSLSystemAPI.cs:4050-4057).
+        /// </summary>
+        public void llSoundPreload(string sound)
+        {
+            if (m_host == null) return;
+            UUID soundID = KeyOrName(sound);
+            if (soundID == UUID.Zero) return;
+            World?.RequestModuleInterface<ISoundModule>()?.PreloadSound(m_host, soundID);
+        }
+
+        /// <summary>
+        /// A sound as the sound calls name it: the script's prim's sound item of that name, else a UUID; UUID.Zero when
+        /// neither. SL (llPlaySound, llLoopSound): "If sound is missing from the prim's inventory and it is not a UUID or
+        /// it is not a sound then an error is shouted on DEBUG_CHANNEL" - an item of another type does not count.
+        /// </summary>
+        private UUID SoundKeyOrName(string k)
+        {
+            if (string.IsNullOrEmpty(k)) return UUID.Zero;
+            lock (m_host.TaskInventory)
+            {
+                foreach (var kvp in m_host.TaskInventory)
+                {
+                    if (kvp.Value.Name == k && kvp.Value.Type == (int)AssetType.Sound)
+                        return kvp.Value.AssetID;
+                }
+            }
+            return UUID.TryParse(k, out UUID id) ? id : UUID.Zero;
+        }
+
+        /// <summary>
+        /// A sound the prim does not have: the sound playing on each of <paramref name="stop"/> stops, as Halcyon's
+        /// UpdateSound with a zero key stops it, and SL's error goes out on DEBUG_CHANNEL with the text Phlox gives for a
+        /// missing collision sound. The trigger calls pass no prims: they play no attached sound to stop.
+        /// </summary>
+        private void MissingSound(string sound, params SceneObjectPart[] stop)
+        {
+            if (stop.Length > 0)
+            {
+                ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
+                foreach (SceneObjectPart part in stop) sm?.StopSound(part);
+            }
+            ShoutError($"Could not find sound '{sound}'");
+        }
 
         public void llAdjustSoundVolume(float volume)
         {
@@ -13133,7 +13183,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public void llEmail(string address, string subject, string message)
         {
-            // Faithful port from Halcyon
+            // Faithful port from Halcyon (LSLSystemAPI.cs:3944-3957): the 20 s delay is in a finally, so it applies
+            // with no email module too. SL: "This function causes the script to sleep for 20.0 seconds."
             try
             {
                 IEmailModule emailModule = World?.RequestModuleInterface<IEmailModule>();
@@ -13144,7 +13195,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             {
                 m_log.LogWarning("[PhloxAPI]: llEmail exception: {0}", e.Message);
             }
-            ScriptSleep(20000);
+            finally
+            {
+                ScriptSleep(20000);
+            }
         }
         public void llGetNextEmail(string address, string subject)
         {
