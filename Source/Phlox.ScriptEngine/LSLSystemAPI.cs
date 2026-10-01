@@ -1939,7 +1939,44 @@ namespace Phlox.ScriptEngine
             var targets = GetLinkParts(linknum).ToList();
             foreach (var p in targets)
                 m_ScriptEngine.PostObjectEvent(p.LocalId, parms);
-            LinkMessageBackPressure(ScriptItemsIn(targets));
+            var receivers = ScriptItemsIn(targets);
+            OfferLinkMessageToOtherEngines(receivers, m_host.LinkNum, num, str ?? string.Empty, id ?? UUID.Zero.ToString());
+            LinkMessageBackPressure(receivers);
+        }
+
+        /// <summary>
+        /// SL wiki llMessageLinked: the event fires "in all scripts in the prim(s) described by link", whatever engine runs
+        /// them. The posts above reach only this engine's scripts, so each other script engine of the region is offered
+        /// every targeted script item once, with plain values (int, int, string, string), as core modules post
+        /// link_message. An engine queues only for the scripts it runs, so no script gets it twice. An exception from
+        /// another engine is logged once for that engine and call and goes no further.
+        /// </summary>
+        private void OfferLinkMessageToOtherEngines(IEnumerable<UUID> items, int sender, int num, string str, string id)
+        {
+            var others = new List<OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine>();
+            foreach (IScriptModule m in World?.RequestModuleInterfaces<IScriptModule>() ?? Array.Empty<IScriptModule>())
+                if (!ReferenceEquals(m, m_ScriptEngine) && m is OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine e && !others.Contains(e))
+                    others.Add(e);
+            if (others.Count == 0) return;
+
+            foreach (var e in others)
+            {
+                bool logged = false;
+                foreach (UUID item in items)
+                {
+                    try
+                    {
+                        e.PostScriptEvent(item, new EventParams("link_message",
+                            new object[] { sender, num, str, id }, new DetectParams[0]));
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!logged)
+                            m_log.LogWarning("[PhloxAPI]: llMessageLinked: another script engine failed to take a link message: {0}", ex.Message);
+                        logged = true;
+                    }
+                }
+            }
         }
         public int llGetStartParameter()
         {
