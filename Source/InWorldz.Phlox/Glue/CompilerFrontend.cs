@@ -79,35 +79,52 @@ namespace InWorldz.Phlox.Glue
 
         /// <summary>
         /// Strip invisible/non-ASCII characters that can appear when scripts are
-        /// pasted from web browsers or chat clients. Characters inside string
-        /// literals (between unescaped double-quotes) are preserved.
+        /// pasted from web browsers or chat clients. String literals and comments
+        /// are copied unchanged: SL keeps a string's contents verbatim. They are
+        /// found as the lexer finds them (LSL.g4 STRING_LITERAL, COMMENT_SINGLE,
+        /// COMMENT_BLOCK): inside a string a backslash escapes exactly the next
+        /// character, and a quote inside a comment starts nothing.
         /// </summary>
-        private static string SanitizeScript(string src)
+        internal static string SanitizeScript(string src)
         {
             var sb = new System.Text.StringBuilder(src.Length);
-            bool inString = false;
-            for (int i = 0; i < src.Length; i++)
+            int i = 0, n = src.Length;
+            while (i < n)
             {
                 char c = src[i];
+                int start = i;
 
-                // Track string literal boundaries (handle escaped quotes)
-                if (c == '"' && (i == 0 || src[i - 1] != '\\'))
+                if (c == '"')
                 {
-                    inString = !inString;
-                    sb.Append(c);
+                    i++;
+                    while (i < n && src[i] != '"')
+                        i += src[i] == '\\' && i + 1 < n ? 2 : 1;
+                    i = Math.Min(i + 1, n);
+                    sb.Append(src, start, i - start);
                     continue;
                 }
 
-                if (inString)
+                if (c == '/' && i + 1 < n && src[i + 1] == '/')
                 {
-                    sb.Append(c);
+                    i += 2;
+                    while (i < n && src[i] != '\r' && src[i] != '\n') i++;
+                    sb.Append(src, start, i - start);
                     continue;
                 }
 
-                // Outside strings: keep only printable ASCII + common whitespace
+                if (c == '/' && i + 1 < n && src[i + 1] == '*')
+                {
+                    int end = src.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    i = end < 0 ? n : end + 2;
+                    sb.Append(src, start, i - start);
+                    continue;
+                }
+
+                // Outside strings and comments: keep only printable ASCII + common whitespace
                 if (c == '\t' || c == '\n' || c == '\r' || (c >= 0x20 && c <= 0x7E))
                     sb.Append(c);
                 // else: silently drop the character
+                i++;
             }
             return sb.ToString();
         }
@@ -144,6 +161,12 @@ namespace InWorldz.Phlox.Glue
                 // Phase 1: Lex and Parse
                 // --------------------------------------------------------
                 LSLLexer lexer = new LSLLexer(input);
+                // A character the lexer does not recognise is a syntax error, as in SL. Halcyon passed lexer
+                // diagnostics to the compile listener (its LSLListenerTraceRedirector); ANTLR's default listener
+                // only printed them to the console and the lexer skipped the character.
+                LslLexerErrorListener lexerErrors = new LslLexerErrorListener(_listener);
+                lexer.RemoveErrorListeners();
+                lexer.AddErrorListener(lexerErrors);
                 CommonTokenStream tokens = new CommonTokenStream(lexer);
 
                 // Two-stage parse. Full-context (LL) prediction resolves the grammar's dangling
@@ -174,9 +197,9 @@ namespace InWorldz.Phlox.Glue
                     tree = parser.prog();
                 }
 
-                if (errorListener.ErrorCount > 0)
+                if (errorListener.ErrorCount > 0 || lexerErrors.ErrorCount > 0)
                 {
-                    _listener.Error(errorListener.ErrorCount + " syntax error(s)");
+                    _listener.Error(errorListener.ErrorCount + lexerErrors.ErrorCount + " syntax error(s)");
                     return null;
                 }
 
@@ -384,6 +407,34 @@ namespace InWorldz.Phlox.Glue
                 throw new TooManyErrorsException("Too many errors", e);
 
             _listener?.Error($"line {line}:{charPositionInLine} {msg}");
+        }
+    }
+
+    /// <summary>
+    /// The lexer's errors, routed to the LSL listener like the parser's. Every one is counted; the first ten are
+    /// reported, the rest only counted.
+    /// </summary>
+    internal class LslLexerErrorListener : IAntlrErrorListener<int>
+    {
+        private readonly ILSLListener _listener;
+        public int ErrorCount { get; private set; }
+
+        public LslLexerErrorListener(ILSLListener listener)
+        {
+            _listener = listener;
+        }
+
+        public void SyntaxError(
+            System.IO.TextWriter output,
+            IRecognizer recognizer,
+            int offendingSymbol,
+            int line,
+            int charPositionInLine,
+            string msg,
+            RecognitionException e)
+        {
+            if (++ErrorCount <= 10)
+                _listener?.Error($"line {line}:{charPositionInLine} {msg}");
         }
     }
 }
