@@ -273,7 +273,9 @@ namespace InWorldz.Phlox.Compiler
 			string condExpr = context.cond != null ? Visit(context.cond) : null;
 			string loopExpr = context.loop != null ? GenExpression(context.loop) : null;
 			string body = Visit(context.statement());
-			ISymbolType condType = context.cond != null ? EvalType(context.cond) : null;
+			// The condition's type is on its expression; the exprStatement around it (which may be
+			// just ';') is never annotated, which left a float/string/key condition without booleval.
+			ISymbolType condType = context.cond?.expression() != null ? EvalType(context.cond.expression()) : null;
 			bool needsBoolEval = condType != null && condType != SymbolTable.INT;
 			return ByteCodeEmitter.ForLoop(initExpr, condExpr, loopExpr, body,
 				NextLabel("forloop_start_"), NextLabel("forloop_out_"), needsBoolEval);
@@ -362,26 +364,30 @@ namespace InWorldz.Phlox.Compiler
             => Visit(context.expr());
 
         public override string VisitExpr([NotNull] LSLParser.ExprContext context)
-            => DoPromotion(context, GenAssignmentExpr(context.assignmentExpression(), true));
+            => DoPromotion(context, Visit(context.assignmentExpression()));
 
         public override string VisitAssignmentExpression(
             [NotNull] LSLParser.AssignmentExpressionContext context)
             => DoPromotion(context, GenAssignmentExpr(context, true));
 
+        /// <summary>
+        /// An assignment used as an expression: a for-loop init or step, a = b = c, an
+        /// assignment in a condition or an argument. The rule is
+        /// booleanExpression (op assignmentExpression)*, right-recursive, so for x = e the
+        /// target is booleanExpression() and the value is assignmentExpression(0). The value
+        /// is stored and then, with pushFinal, loaded again as the expression's result.
+        /// </summary>
         private string GenAssignmentExpr(LSLParser.AssignmentExpressionContext ctx, bool pushFinal)
         {
-            var assigns = ctx.assignmentExpression();
-            if (assigns.Length == 0)
-                return DoPromotion(ctx, GenBooleanExpr(ctx.booleanExpression()));
+            var valueCtx = ctx.assignmentExpression(0);
+            string op = GetAssignOpText(ctx);
+            if (valueCtx == null || string.IsNullOrEmpty(op))
+                return GenBooleanExpr(ctx.booleanExpression());
 
-		string op = GetAssignOpText(ctx);
-		if (string.IsNullOrEmpty(op) || ctx.assignmentExpression(1) == null)
-			return DoPromotion(ctx, GenBooleanExpr(ctx.booleanExpression()));
+            ISymbolType rhsType = EvalType(valueCtx);
+            string rhsCode = Visit(valueCtx);
+            VariableSymbol varSym = ResolveAssignmentTarget(ctx.booleanExpression(), out string subIdx);
 
-		ISymbolType rhsType = EvalType(ctx.assignmentExpression(1));
-		string rhsCode = GenAssignmentExpr(ctx.assignmentExpression(1), true);
-		VariableSymbol varSym = WalkForVarSym(ctx.assignmentExpression(0), out string subIdx);
-		
             if (varSym == null) { Error("Invalid assignment target"); return string.Empty; }
 
             if (op == "=")
@@ -406,9 +412,16 @@ namespace InWorldz.Phlox.Compiler
         {
             var children = context.bitwiseExpression();
             if (children.Length == 1) return DoPromotion(context, Visit(children[0]));
-            string op = GetBinaryOpText(context);
-            return ByteCodeEmitter.BinaryOp(op == "&&" ? "booland" : "boolor",
-                Visit(children[0]), Visit(children[1]));
+            // && and || share one precedence level and are left-associative; every operand is
+            // evaluated (LSL does not short-circuit).
+            string result = Visit(children[0]);
+            for (int i = 1; i < children.Length; i++)
+            {
+                string op = GetBinaryOpTextAt(context, i);
+                result = ByteCodeEmitter.BinaryOp(op == "&&" ? "booland" : "boolor",
+                    result, Visit(children[i]));
+            }
+            return DoPromotion(context, result);
         }
 
         public override string VisitBitwiseExpression(
@@ -416,14 +429,34 @@ namespace InWorldz.Phlox.Compiler
         {
             var children = context.equalityExpression();
             if (children.Length == 1) return DoPromotion(context, Visit(children[0]));
-            string op = GetBinaryOpText(context);
-            string tname = op == "|" ? "bitor" : op == "&" ? "bitand" : "bitxor";
-            string result = Visit(children[0]);
-            for (int i = 1; i < children.Length; i++)
+            // The grammar parses | & ^ as one flat chain; LSL gives & higher precedence than ^,
+            // and ^ higher than |, each left-associative. Re-associate the chain by precedence
+            // climbing. Operands are still emitted in source order.
+            int next = 0;
+            return DoPromotion(context, GenBitwiseChain(context, children, 1, ref next));
+        }
+
+        private static int BitwisePrecedence(string op) => op == "&" ? 3 : op == "^" ? 2 : 1;
+
+        /// <summary>
+        /// Emits children[next] and every following operator whose precedence is at least
+        /// minPrec, with its right operand; next is left on the last operand consumed.
+        /// </summary>
+        private string GenBitwiseChain(LSLParser.BitwiseExpressionContext context,
+            LSLParser.EqualityExpressionContext[] children, int minPrec, ref int next)
+        {
+            string result = Visit(children[next]);
+            while (next + 1 < children.Length)
             {
-                result = ByteCodeEmitter.BinaryOp(tname, result, Visit(children[i]));
+                string op = GetBinaryOpTextAt(context, next + 1);
+                int prec = BitwisePrecedence(op);
+                if (prec < minPrec) break;
+                next++;
+                string rhs = GenBitwiseChain(context, children, prec + 1, ref next);
+                string tname = op == "|" ? "bitor" : op == "&" ? "bitand" : "bitxor";
+                result = ByteCodeEmitter.BinaryOp(tname, result, rhs);
             }
-            return DoPromotion(context, result);
+            return result;
         }
 
         public override string VisitEqualityExpression(
@@ -500,17 +533,19 @@ namespace InWorldz.Phlox.Compiler
 
             string result = Visit(children[0]);
             ISymbolType lType = EvalType(children[0]);
-            var minusTokens = context.MINUS();
-
             for (int i = 1; i < children.Length; i++)
             {
                 ISymbolType rType = EvalType(children[i]);
-                bool isMinus = minusTokens != null && (i - 1) < minusTokens.Length;
+                // The operator is the one between this operand and the last, not a count of the
+                // minus signs anywhere in the chain (which made a + b - c compute a - b + c).
+                bool isMinus = GetBinaryOpTextAt(context, i) == "-";
                 string subtemplate = isMinus
                     ? TemplateMapping.Subtraction[Idx(lType), Idx(rType)]
                     : TemplateMapping.Addition[Idx(lType), Idx(rType)];
                 result = ByteCodeEmitter.BinaryOp(subtemplate, result, Visit(children[i]));
-                lType = EvalType(context);
+                // The next pair's left operand is this pair's result, not the whole chain's.
+                lType = (isMinus ? SymbolTable.subtractionResultType : SymbolTable.additionResultType)
+                    [Idx(lType), Idx(rType)];
             }
             return DoPromotion(context, result);
         }
@@ -532,7 +567,9 @@ namespace InWorldz.Phlox.Compiler
                     : op == "/" ? TemplateMapping.Division[Idx(lType), Idx(rType)]
                     : TemplateMapping.Multiplication[Idx(lType), Idx(rType)];
                 result = ByteCodeEmitter.BinaryOp(subtemplate, result, Visit(children[i]));
-                lType = EvalType(context);
+                lType = (op == "%" ? SymbolTable.modResultType
+                    : op == "/" ? SymbolTable.divisionResultType
+                    : SymbolTable.multiplicationResultType)[Idx(lType), Idx(rType)];
             }
             return DoPromotion(context, result);
         }
@@ -542,6 +579,17 @@ namespace InWorldz.Phlox.Compiler
         public override string VisitUnaryMinus([NotNull] LSLParser.UnaryMinusContext context)
         {
             ISymbolType t = EvalType(context.unaryExpression());
+            // A minus sign directly on a literal is part of the literal: -2147483648 is the
+            // minimum integer, whereas 2147483648 on its own is out of range and would load as -1.
+            IParseTree operand = context.unaryExpression();
+            while (operand.ChildCount == 1 && !(operand is ITerminalNode)) operand = operand.GetChild(0);
+            if (operand is ITerminalNode lit)
+            {
+                if (lit.Symbol.Type == LSLParser.INTEGER_LITERAL)
+                    return DoPromotion(context, ByteCodeEmitter.IConst("-" + lit.GetText()));
+                if (lit.Symbol.Type == LSLParser.FLOAT_LITERAL)
+                    return DoPromotion(context, ByteCodeEmitter.FConst(FormatFloat("-" + lit.GetText())));
+            }
             string expr = Visit(context.unaryExpression());
             string result = t == SymbolTable.INT    ? ByteCodeEmitter.INeg(expr)
                           : t == SymbolTable.FLOAT  ? ByteCodeEmitter.FNeg(expr)
@@ -791,30 +839,45 @@ namespace InWorldz.Phlox.Compiler
             return null;
         }
 
-		 private VariableSymbol WalkForVarSym(IParseTree tree, out string subIdx)
-		{
-			subIdx = null;
-			if (tree is LSLParser.IdExprContext id)
-			{
-				var annotated = GetSymbol(id) as VariableSymbol;
-				if (annotated != null) return annotated;
-				string name = id.ID().GetText();
-				IScope scope = FindScopeForNode(id);
-				return scope?.Resolve(name) as VariableSymbol
-					?? _symtab.Globals.Resolve(name) as VariableSymbol;
-			}
-			if (tree is LSLParser.SubscriptPostfixContext sp)
-			{
-				subIdx = CalcSubIndex(sp.ID().GetText());
-				return GetVarSymFromPostfix(sp.postfixExpression());
-			}
-			for (int i = 0; i < tree.ChildCount; i++)
-			{
-				var v = WalkForVarSym(tree.GetChild(i), out subIdx);
-				if (v != null) return v;
-			}
-			return null;
-		}
+        /// <summary>
+        /// The node an assignment stores to: a bare identifier or a component of one (v.x),
+        /// reached through the single-child chain of expression levels above it. Anything
+        /// else (a literal, a call, an operator, parentheses) is not assignable: null.
+        /// </summary>
+        internal static ParserRuleContext AssignmentTarget(LSLParser.BooleanExpressionContext target)
+        {
+            IParseTree node = target;
+            while (node != null)
+            {
+                if (node is LSLParser.IdExprContext id) return id;
+                if (node is LSLParser.SubscriptPostfixContext sp)
+                    return sp.postfixExpression() is LSLParser.PrimaryExprContext pc
+                        && pc.primary() is LSLParser.IdExprContext ? sp : null;
+                if (node is LSLParser.ParenExprContext || node.ChildCount != 1) return null;
+                node = node.GetChild(0);
+            }
+            return null;
+        }
+
+        private VariableSymbol ResolveAssignmentTarget(LSLParser.BooleanExpressionContext target, out string subIdx)
+        {
+            subIdx = null;
+            LSLParser.IdExprContext id;
+            switch (AssignmentTarget(target))
+            {
+                case LSLParser.IdExprContext i:
+                    id = i;
+                    break;
+                case LSLParser.SubscriptPostfixContext sp:
+                    subIdx = CalcSubIndex(sp.ID().GetText());
+                    id = (LSLParser.IdExprContext)((LSLParser.PrimaryExprContext)sp.postfixExpression()).primary();
+                    break;
+                default:
+                    return null;
+            }
+            var sym = GetSymbol(id) as VariableSymbol;
+            return sym is ConstantSymbol ? null : sym;
+        }
 
 		private IScope FindScopeForNode(IParseTree node)
 		{
@@ -946,8 +1009,12 @@ namespace InWorldz.Phlox.Compiler
 
         private bool IsConstantExpr(IParseTree tree)
         {
-            if (tree is LSLParser.FloatLiteralContext || tree is LSLParser.IntegerLiteralContext)
+            // Only literals the vconst/rconst text can carry: a hex integer (0x10) cannot be
+            // written as a float component, so such a literal is built at run time instead.
+            if (tree is LSLParser.FloatLiteralContext)
                 return true;
+            if (tree is LSLParser.IntegerLiteralContext il)
+                return !il.GetText().StartsWith("0x", StringComparison.OrdinalIgnoreCase);
             if (tree.ChildCount == 1) return IsConstantExpr(tree.GetChild(0));
             return false;
         }

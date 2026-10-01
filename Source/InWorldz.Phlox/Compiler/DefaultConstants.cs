@@ -18,7 +18,7 @@ namespace InWorldz.Phlox.Compiler
 
             {"TOUCH_INVALID_TEXCOORD",     new ConstantSymbol("TOUCH_INVALID_TEXCOORD", SymbolTable.VECTOR, "<-1.0,-1.0,0.0>")},
             {"TOUCH_INVALID_VECTOR",       new ConstantSymbol("TOUCH_INVALID_VECTOR", SymbolTable.VECTOR, "<0.0,0.0,0.0>")},
-            {"TOUCH_INVALID_FACE",         new ConstantSymbol("TOUCH_INVALID_FACE", SymbolTable.INT, "0x7FFFFFFF")},
+            {"TOUCH_INVALID_FACE",         new ConstantSymbol("TOUCH_INVALID_FACE", SymbolTable.INT, "0xFFFFFFFF")},  // -1, as SL and llDetectedTouchFace give it
 
 
             {"PAY_HIDE", new ConstantSymbol("PAY_HIDE", SymbolTable.INT, "-1")},

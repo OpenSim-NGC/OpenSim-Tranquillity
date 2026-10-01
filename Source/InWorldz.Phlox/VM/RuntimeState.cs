@@ -131,6 +131,37 @@ namespace InWorldz.Phlox.VM
         public PostedEvent RunningEvent;
 
         /// <summary>
+        /// The <see cref="CompiledScript.BytecodeIdentity"/> of the bytecode this state runs on. It
+        /// is saved with the state so a restore can tell whether the IP, call frames and operand
+        /// stack still belong to the bytecode they are restored into. Null for a state saved before
+        /// the identity was recorded.
+        /// </summary>
+        public string BytecodeIdentity;
+
+        /// <summary>
+        /// True while an event handler is in progress: running, asleep in llSleep, or parked in a
+        /// syscall. A Waiting script holds no execution position; a Killed one is left alone.
+        /// </summary>
+        public bool IsMidEvent =>
+            RunState == Status.Running || RunState == Status.Sleeping || RunState == Status.Syscall;
+
+        /// <summary>
+        /// Drops the in-progress event (running event, call frames, IP, operand stack and any
+        /// sleep or pending syscall) and leaves the script Waiting. Globals, the LSL state, queued
+        /// events, timers and listens are kept.
+        /// </summary>
+        public void DropExecutionPosition()
+        {
+            RunningEvent = null;
+            Calls.Clear();
+            TopFrame = null;
+            Operands.Clear();
+            IP = 0;
+            NextWakeup = 0;
+            RunState = Status.Waiting;
+        }
+
+        /// <summary>
         /// The UUID of the agent that has granted the latest perms
         /// </summary>
         public string PermsGranter; 

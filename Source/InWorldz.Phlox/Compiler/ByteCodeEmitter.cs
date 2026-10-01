@@ -93,9 +93,14 @@ namespace InWorldz.Phlox.Compiler
 
         public static string SysConstLoad(string template, string value)
         {
-            // template is e.g. "syssconst", "sysvconst", "sysrconst"
+            // template is e.g. "iconst", "fconst", "syssconst", "sysvconst", "sysrconst".
+            // Integer and float constants must load as integers and floats: as strings, a hex
+            // value such as DEBUG_CHANNEL (0x7FFFFFFF) fails to convert at run time and a list
+            // or (string) cast sees the table's text instead of the number.
             switch (template)
             {
+                case "iconst":    return $"iconst {value}";
+                case "fconst":    return $"fconst {value}";
                 case "syssconst": return $"sconst \"{value}\"";
                 case "sysvconst": return $"vconst {value}";
                 case "sysrconst": return $"rconst {value}";
