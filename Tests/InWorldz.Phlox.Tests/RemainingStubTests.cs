@@ -146,8 +146,8 @@ public class RemainingStubTests
     }
 
     /// <summary>
-    /// wiki: an unknown region answers DATA_SIM_STATUS "unknown region" and DATA_SIM_RATING "rating or
-    /// region unknown". Before this the call returned NULL_KEY and raised nothing at all.
+    /// wiki: an unknown region answers DATA_SIM_STATUS "unknown" and DATA_SIM_RATING "UNKNOWN", the values in the
+    /// wiki's tables (as YEngine answers). Before this the call returned NULL_KEY and raised nothing at all.
     /// </summary>
     [Fact]
     public void AnUnknownRegionStillRaisesTheDataserverEvent()
@@ -161,11 +161,11 @@ public class RemainingStubTests
             }
             dataserver(key q, string d) { llSay(0, ""ds="" + d); }
         }");
-        h.PumpUntil(() => h.Said.Contains("key=1") && h.Said.Contains("ds=unknown region") && h.Said.Contains("ds=rating or region unknown"));
+        h.PumpUntil(() => h.Said.Contains("key=1") && h.Said.Contains("ds=unknown") && h.Said.Contains("ds=UNKNOWN"));
         _out.WriteLine("said=[" + string.Join(" | ", h.Said) + "]");
 
         Assert.Contains("key=1", h.Said);
-        Assert.Contains("ds=unknown region", h.Said);
-        Assert.Contains("ds=rating or region unknown", h.Said);
+        Assert.Contains("ds=unknown", h.Said);
+        Assert.Contains("ds=UNKNOWN", h.Said);
     }
 }

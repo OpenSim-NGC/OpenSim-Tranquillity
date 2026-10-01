@@ -1164,15 +1164,20 @@ namespace Phlox.ScriptEngine
                 0f);
         }
         public int llGetRegionAgentCount() => World?.GetRootAgentCount() ?? 0;
+        /// <summary>
+        /// The estate module's full RegionFlags, as Halcyon (LSLSystemAPI.cs:13722-13725) and YEngine return them: fixed
+        /// sun, block terraform, block land resell and the rest. Without an estate module, the flags RegionSettings holds.
+        /// </summary>
         public int llGetRegionFlags()
         {
+            IEstateModule estate = World?.RequestModuleInterface<IEstateModule>();
+            if (estate != null) return (int)estate.GetRegionFlags();
             if (World?.RegionInfo?.RegionSettings == null) return 0;
             var s = World.RegionInfo.RegionSettings;
             int flags = 0;
             if (s.AllowDamage)      flags |= REGION_FLAG_ALLOW_DAMAGE;
             if (s.BlockFly)         flags |= REGION_FLAG_BLOCK_FLY;
             if (s.RestrictPushing)  flags |= REGION_FLAG_RESTRICT_PUSHOBJECT;
-            if (s.AllowLandResell)  flags |= 0x4;      // REGION_FLAG_ALLOW_LAND_RESELL
             if (s.DisableCollisions)flags |= REGION_FLAG_DISABLE_COLLISIONS;
             if (s.DisablePhysics)   flags |= REGION_FLAG_DISABLE_PHYSICS;
             if (s.Sandbox)          flags |= REGION_FLAG_SANDBOX;
@@ -2081,6 +2086,10 @@ namespace Phlox.ScriptEngine
                 ScriptShoutError("llGetScriptState: script '" + name + "' not found");
                 return 0;
             }
+            // Halcyon asks the engine (EngineInterface.GetScriptState). A script this engine does not run, or one still
+            // compiling, answers from the item's Running flag, which llSetScriptState keeps.
+            if (m_ScriptEngine != null && m_ScriptEngine.HasScript(item.ItemID, out bool running))
+                return running ? 1 : 0;
             return item.ScriptRunning ? 1 : 0;
         }
 
@@ -2098,6 +2107,8 @@ namespace Phlox.ScriptEngine
                 World.EventManager.TriggerStartScript(m_host.LocalId, item.ItemID);
             else
                 World.EventManager.TriggerStopScript(m_host.LocalId, item.ItemID);
+            // The Running flag the viewer's checkbox shows and the region saves.
+            m_ScriptEngine?.SetItemRunningFlag(m_host.LocalId, item.ItemID, run != 0);
         }
         public void llSetRemoteScriptAccessPin(int pin)
         {
@@ -2270,18 +2281,10 @@ namespace Phlox.ScriptEngine
         {
             return m_thisScript?.ScriptState?.StartParameter ?? 0;
         }
-        public int llGetFreeMemory() => 65536;
-        public int llGetUsedMemory()
-        {
-            // Phlox VM doesn't track per-script memory the way Mono does.
-            // Return a reasonable estimate: 16KB base + script state size.
-            if (m_thisScript?.ScriptState != null)
-            {
-                int stackSize = m_thisScript.ScriptState.Operands?.Count ?? 0;
-                return 16384 + (stackSize * 64);
-            }
-            return 16384;
-        }
+        // The VM's own accounting of the script's memory, as Halcyon reads it (EngineInterface.GetFreeMemory and
+        // GetUsedMemory: MemInfo.MemoryFree, MemInfo.MemoryUsed); the limit is MemoryInfo.MAX_MEMORY, llGetMemoryLimit's 128 KiB.
+        public int llGetFreeMemory() => m_thisScript?.ScriptState?.MemInfo?.MemoryFree ?? 0;
+        public int llGetUsedMemory() => m_thisScript?.ScriptState?.MemInfo?.MemoryUsed ?? 0;
         public int llSetMemoryLimit(int limit)
         {
             // Halcyon only accepts 128K (131072)
@@ -5397,33 +5400,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// </summary>
         private string RezObjectInternal(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot, string startString)
         {
-            if (RezRotationIsNaN(rot)) return UUID.Zero.ToString();
-            ScriptSleep(100);
-            if (m_host == null || World == null) return UUID.Zero.ToString();
-
-            if (Util.GetDistanceTo(pos, m_host.AbsolutePosition) > 10f)
-            {
-                ShoutError("Unable to create requested object. Position exceeds 10m distance limit.");
-                return UUID.Zero.ToString();
-            }
-
-            TaskInventoryItem item = FindInventoryItem(inventory, (int)InventoryType.Object);
-            if (item == null)
-            {
-                ShoutError("Unable to create requested object. Inventory item '" + inventory + "' not found or is not an object.");
-                return UUID.Zero.ToString();
-            }
-
-            List<SceneObjectGroup> rezzed = World.RezObject(
-                m_host, item,
-                m_host.OwnerID, m_host.GroupID,
-                pos, rot, vel, param, atRoot, false, false);
-
-            if (rezzed == null || rezzed.Count == 0)
-            {
-                ShoutError("Unable to create requested object '" + inventory + "'.");
-                return UUID.Zero.ToString();
-            }
+            List<SceneObjectGroup> rezzed = RezChecked(inventory, pos, vel, rot, param, atRoot);
+            if (rezzed == null) return UUID.Zero.ToString();
 
             foreach (SceneObjectGroup grp in rezzed)
             {
@@ -5436,6 +5414,52 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 PostObjectRez(result);
             }
             return result;
+        }
+
+        /// <summary>
+        /// The checks and errors of Halcyon's iwRezAt (LSLSystemAPI.cs:3155-3245), which every rez function shares. A NaN
+        /// rotation, a position over 10 m away, an item that is not an object and a refused rez each shout their own
+        /// text and cost no delay; a missing item and a rez cost 100 ms (Halcyon's sleepTime). Halcyon was silent for a
+        /// missing item; Phlox keeps its error for it (SL: an error is shouted). The scene does not say why a rez was
+        /// refused, so the refusal names no reason. Null when nothing was rezzed.
+        /// </summary>
+        private List<SceneObjectGroup> RezChecked(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot)
+        {
+            if (RezRotationIsNaN(rot)) return null;
+            if (m_host == null || World == null) return null;
+
+            if (Util.GetDistanceTo(pos, m_host.AbsolutePosition) > 10f)
+            {
+                ShoutError("Unable to create requested object. Position exceeds 10m distance limit.");
+                return null;
+            }
+
+            TaskInventoryItem item = FindInventoryItem(inventory, -1);
+            if (item == null)
+            {
+                ShoutError("Unable to create requested object. Inventory item '" + inventory + "' not found.");
+                ScriptSleep(100);
+                return null;
+            }
+            if (item.Type != (int)AssetType.Object)
+            {
+                ShoutError("Unable to create requested object. Inventory item '" + inventory + "' is something other than an object.");
+                return null;
+            }
+
+            List<SceneObjectGroup> rezzed = World.RezObject(
+                m_host, item,
+                m_host.OwnerID, m_host.GroupID,
+                pos, rot, vel, param, atRoot, false, false);
+
+            if (rezzed == null || rezzed.Count == 0)
+            {
+                string spos = (int)Math.Round(pos.X) + "," + (int)Math.Round(pos.Y) + "," + (int)Math.Round(pos.Z);
+                ShoutError("Object '" + m_host.ParentGroup.Name + "' is unable to create object '" + inventory + "' at <" + spos + ">. The object failed to rez");
+                return null;
+            }
+            ScriptSleep(100);
+            return rezzed;
         }
         /// <summary>
         /// The table returns key and the async shim returns only what the body hands to
@@ -5469,34 +5493,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public string iwRezAt(string inventory, int rezAtRoot, Vector3 pos, Vector3 vel, Quaternion rot, int param)
         {
-            if (RezRotationIsNaN(rot)) return UUID.Zero.ToString();
-            ScriptSleep(100);
-            if (m_host == null || World == null) return UUID.Zero.ToString();
-
-            if (Util.GetDistanceTo(pos, m_host.AbsolutePosition) > 10f)
-            {
-                ShoutError("Unable to create requested object. Position exceeds 10m distance limit.");
-                return UUID.Zero.ToString();
-            }
-
-            TaskInventoryItem item = FindInventoryItem(inventory, (int)InventoryType.Object);
-            if (item == null)
-            {
-                ShoutError("Unable to create requested object. Inventory item '" + inventory + "' not found or is not an object.");
-                return UUID.Zero.ToString();
-            }
-
-            bool atRoot = (rezAtRoot != 0);
-            List<SceneObjectGroup> rezzed = World.RezObject(
-                m_host, item,
-                m_host.OwnerID, m_host.GroupID,
-                pos, rot, vel, param, atRoot, false, false);
-
-            if (rezzed == null || rezzed.Count == 0)
-            {
-                ShoutError("Unable to create requested object '" + inventory + "'.");
-                return UUID.Zero.ToString();
-            }
+            List<SceneObjectGroup> rezzed = RezChecked(inventory, pos, vel, rot, param, rezAtRoot != 0);
+            if (rezzed == null) return UUID.Zero.ToString();
 
             string result = UUID.Zero.ToString();
             foreach (SceneObjectGroup grp in rezzed)
@@ -5507,14 +5505,30 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return result;
         }
 
-        public string iwRezPrim(LSLList primParams, LSLList particleSystem, LSLList inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param) { /* InWorldz-specific — no OpenSim equivalent */ return UUID.Zero.ToString(); }
+        /// <summary>Not implemented: says so, as llGodLikeRezObject does, instead of a silent NULL_KEY (Halcyon has a full iwRezPrim).</summary>
+        public string iwRezPrim(LSLList primParams, LSLList particleSystem, LSLList inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param)
+        {
+            NotImplemented("iwRezPrim");
+            return UUID.Zero.ToString();
+        }
         public void llGodLikeRezObject(string inventory, Vector3 pos) => NotImplemented("llGodLikeRezObject");   // Halcyon LSLSystemAPI.cs:4384
+        /// <summary>
+        /// SL wiki llDie: no effect in an attachment (Halcyon LSLSystemAPI.cs:1363-1367). Otherwise the object goes and the
+        /// script stops at once: Halcyon marks it Killed (:1368), so nothing after llDie in the same event runs on the
+        /// deleted object while the unload is still queued.
+        /// </summary>
         public void llDie()
         {
             if (m_host == null) return;
             SceneObjectGroup group = m_host.ParentGroup;
-            if (group == null || group.IsDeleted) return;
+            if (group == null || group.IsDeleted || group.IsAttachment) return;
             World?.DeleteSceneObject(group, false);
+            RuntimeState state = m_thisScript?.ScriptState;
+            if (state != null)
+            {
+                state.RunningEvent?.SignalCompleted();
+                state.RunState = RuntimeState.Status.Killed;
+            }
         }
         public void llDerezObject(string id)
         {
@@ -10000,6 +10014,48 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return part?.ParentGroup.PrimCount ?? 0;
         }
 
+        // llGetObjectDetails flags past OBJECT_TEMP_ON_REZ (SL wiki; compiler DefaultConstants) and InWorldz's memory total.
+        private const int OBJECT_CHARACTER_TIME = 17, OBJECT_PATHFINDING_TYPE = 20, OBJECT_RENDER_WEIGHT = 24,
+            OBJECT_HOVER_HEIGHT = 25, OBJECT_BODY_SHAPE_TYPE = 26, OBJECT_LAST_OWNER_ID = 27, OBJECT_CLICK_ACTION = 28,
+            IW_OBJECT_SCRIPT_MEMORY_USED = 10001, OBJECT_UNKNOWN_DETAIL = -1, OPT_OTHER = -1, OPT_LEGACY_LINKSET = 0,
+            OPT_AVATAR = 1;
+
+        /// <summary>
+        /// The script totals Halcyon adds up over an object's prims, or an avatar's attachments (GetPartScriptTotal,
+        /// GetAgentTotals, LSLSystemAPI.cs:5186-5300), for scripts of either engine: running and total counts as the
+        /// scene counts them; OBJECT_SCRIPT_MEMORY the memory each script may use (a Phlox script's 128 KiB, Halcyon's
+        /// GetMaxMemory; another engine's running script the 16 KiB YEngine reports); IW_OBJECT_SCRIPT_MEMORY_USED the
+        /// memory in use; OBJECT_SCRIPT_TIME the engines' average time per frame in seconds, as YEngine reads it.
+        /// </summary>
+        private object ScriptTotal(IEnumerable<SceneObjectGroup> groups, int which)
+        {
+            int total = 0;
+            float time = 0f;
+            IScriptModule[] engines = World.RequestModuleInterfaces<IScriptModule>();
+            foreach (SceneObjectGroup grp in groups)
+            {
+                if (grp == null || grp.IsDeleted) continue;
+                switch (which)
+                {
+                    case OBJECT_RUNNING_SCRIPT_COUNT: total += grp.RunningScriptCount(); break;
+                    case OBJECT_TOTAL_SCRIPT_COUNT: total += grp.ScriptCount(); break;
+                    case IW_OBJECT_SCRIPT_MEMORY_USED: if (grp.ScriptsMemory(out int used)) total += used; break;
+                    case OBJECT_SCRIPT_TIME: time += grp.ScriptExecutionTime() / 1000.0f; break;
+                    case OBJECT_SCRIPT_MEMORY:
+                        foreach (SceneObjectPart part in grp.Parts)
+                            foreach (TaskInventoryItem script in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                            {
+                                if (m_ScriptEngine != null && m_ScriptEngine.HasScript(script.ItemID, out _))
+                                    total += InWorldz.Phlox.VM.MemoryInfo.MAX_MEMORY;
+                                else if (engines.Any(e => e != null && e.HasScript(script.ItemID, out bool running) && running))
+                                    total += 16384;
+                            }
+                        break;
+                }
+            }
+            return which == OBJECT_SCRIPT_TIME ? (object)time : total;
+        }
+
         public LSLList llGetObjectDetails(string id, LSLList parms)
         {
 
@@ -10011,35 +10067,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             ScenePresence sp = World?.GetScenePresence(key);
             if (sp != null)
             {
-                foreach (object param in parms.Data)
-                {
-                    int p; try { p = Convert.ToInt32(param); } catch { continue; }
-                    switch (p)
-                    {
-                        case OBJECT_NAME:     ret.Add(sp.Name); break;
-                        case OBJECT_DESC:     ret.Add(string.Empty); break;
-                        case OBJECT_POS:      ret.Add(sp.AbsolutePosition); break;
-                        case OBJECT_ROT:      ret.Add(sp.Rotation); break;
-                        case OBJECT_VELOCITY: ret.Add(sp.Velocity); break;
-                        case OBJECT_OWNER:    ret.Add(sp.UUID.ToString()); break;
-                        case OBJECT_GROUP:    ret.Add(UUID.Zero.ToString()); break;
-                        case OBJECT_CREATOR:  ret.Add(UUID.Zero.ToString()); break;
-                        case OBJECT_RUNNING_SCRIPT_COUNT: ret.Add(0); break;
-                        case OBJECT_TOTAL_SCRIPT_COUNT:   ret.Add(0); break;
-                        case OBJECT_SCRIPT_MEMORY:        ret.Add(0); break;
-                        case OBJECT_SCRIPT_TIME:          ret.Add(0f); break;
-                        case OBJECT_PRIM_EQUIVALENCE:     ret.Add(1); break;
-                        case OBJECT_SERVER_COST:          ret.Add(0f); break;
-                        case OBJECT_STREAMING_COST:       ret.Add(0f); break;
-                        case OBJECT_PHYSICS_COST:         ret.Add(0f); break;
-                        case OBJECT_ROOT:                 ret.Add(sp.UUID.ToString()); break;
-                        case OBJECT_ATTACHED_POINT:       ret.Add(0); break;
-                        case OBJECT_PHYSICS:              ret.Add(0); break;
-                        case OBJECT_PHANTOM:              ret.Add(0); break;
-                        case OBJECT_TEMP_ON_REZ:          ret.Add(0); break;
-                        default:                          ret.Add(string.Empty); break;
-                    }
-                }
+                AvatarDetails(ret, sp, parms);
                 return new LSLList(ret);
             }
 
@@ -10063,23 +10091,95 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             ? UUID.Zero.ToString() : grp.OwnerID.ToString()); break;
                     case OBJECT_GROUP:    ret.Add(grp.GroupID.ToString()); break;
                     case OBJECT_CREATOR:  ret.Add(part.CreatorID.ToString()); break;
-                    case OBJECT_RUNNING_SCRIPT_COUNT: ret.Add(0); break;
-                    case OBJECT_TOTAL_SCRIPT_COUNT:   ret.Add(grp.ScriptCount()); break;
-                    case OBJECT_SCRIPT_MEMORY:        ret.Add(0); break;
-                    case OBJECT_SCRIPT_TIME:          ret.Add(0f); break;
+                    case OBJECT_RUNNING_SCRIPT_COUNT:
+                    case OBJECT_TOTAL_SCRIPT_COUNT:
+                    case OBJECT_SCRIPT_MEMORY:
+                    case OBJECT_SCRIPT_TIME:
+                    case IW_OBJECT_SCRIPT_MEMORY_USED:
+                        ret.Add(ScriptTotal(new[] { grp }, p)); break;
+                    // The prim count is what NGC's parcels count (PrimCountModule), so it is this core's land impact.
                     case OBJECT_PRIM_EQUIVALENCE:     ret.Add(grp.PrimCount); break;
                     case OBJECT_SERVER_COST:          ret.Add(0f); break;
-                    case OBJECT_STREAMING_COST:       ret.Add(0f); break;
-                    case OBJECT_PHYSICS_COST:         ret.Add(0f); break;
+                    // The part's costs, as YEngine reports them (LSL_Api.llGetObjectDetails).
+                    case OBJECT_STREAMING_COST:       ret.Add(part.StreamingCost); break;
+                    case OBJECT_PHYSICS_COST:         ret.Add(part.PhysicsCost); break;
                     case OBJECT_ROOT:                 ret.Add(grp.RootPart.UUID.ToString()); break;
                     case OBJECT_ATTACHED_POINT:       ret.Add((int)grp.AttachmentPoint); break;
                     case OBJECT_PHYSICS:              ret.Add(grp.UsesPhysics ? 1 : 0); break;
                     case OBJECT_PHANTOM:              ret.Add(grp.IsPhantom ? 1 : 0); break;
                     case OBJECT_TEMP_ON_REZ:          ret.Add(grp.IsTemporary ? 1 : 0); break;
-                    default:                          ret.Add(string.Empty); break;
+                    // The seven later flags with the values Halcyon (:14314-14358) and YEngine give an object.
+                    case OBJECT_CHARACTER_TIME:       ret.Add(0f); break;
+                    case OBJECT_PATHFINDING_TYPE:
+                    {
+                        byte pcode = part.Shape.PCode;
+                        bool other = grp.IsAttachment || pcode == (byte)PCode.Grass || pcode == (byte)PCode.Tree || pcode == (byte)PCode.NewTree;
+                        ret.Add(other ? OPT_OTHER : OPT_LEGACY_LINKSET);
+                        break;
+                    }
+                    case OBJECT_RENDER_WEIGHT:        ret.Add(0); break;
+                    case OBJECT_HOVER_HEIGHT:         ret.Add(0f); break;
+                    case OBJECT_BODY_SHAPE_TYPE:      ret.Add(-1f); break;
+                    case OBJECT_LAST_OWNER_ID:        ret.Add(grp.LastOwnerID.ToString()); break;
+                    case OBJECT_CLICK_ACTION:         ret.Add((int)part.ClickAction); break;
+                    // SL: "OBJECT_UNKNOWN_DETAIL is returned when passed an invalid integer parameter."
+                    default:                          ret.Add(OBJECT_UNKNOWN_DETAIL); break;
                 }
             }
             return new LSLList(ret);
+        }
+
+        /// <summary>llGetObjectDetails for an avatar; iwGetAgentList's details are the same values.</summary>
+        private void AvatarDetails(List<object> ret, ScenePresence sp, LSLList parms)
+        {
+            foreach (object param in parms.Data)
+            {
+                int p; try { p = Convert.ToInt32(param); } catch { continue; }
+                switch (p)
+                {
+                    case OBJECT_NAME:     ret.Add(sp.Name); break;
+                    case OBJECT_DESC:     ret.Add(string.Empty); break;
+                    case OBJECT_POS:      ret.Add(sp.AbsolutePosition); break;
+                    case OBJECT_ROT:      ret.Add(sp.Rotation); break;
+                    case OBJECT_VELOCITY: ret.Add(sp.Velocity); break;
+                    case OBJECT_OWNER:    ret.Add(sp.UUID.ToString()); break;
+                    case OBJECT_GROUP:    ret.Add(UUID.Zero.ToString()); break;
+                    case OBJECT_CREATOR:  ret.Add(UUID.Zero.ToString()); break;
+                    // An avatar's totals are its attachments' (Halcyon GetAgentTotals).
+                    case OBJECT_RUNNING_SCRIPT_COUNT:
+                    case OBJECT_TOTAL_SCRIPT_COUNT:
+                    case OBJECT_SCRIPT_MEMORY:
+                    case OBJECT_SCRIPT_TIME:
+                    case IW_OBJECT_SCRIPT_MEMORY_USED:
+                        ret.Add(ScriptTotal(sp.GetAttachments(), p)); break;
+                    case OBJECT_PRIM_EQUIVALENCE:     ret.Add(1); break;
+                    case OBJECT_SERVER_COST:          ret.Add(0f); break;
+                    case OBJECT_STREAMING_COST:       ret.Add(0f); break;
+                    case OBJECT_PHYSICS_COST:         ret.Add(0f); break;
+                    // A seated avatar's root is the root of what it sits on (SL, Halcyon :14184-14190, YEngine).
+                    case OBJECT_ROOT:
+                        ret.Add((sp.ParentPart?.ParentGroup?.RootPart?.UUID ?? sp.UUID).ToString()); break;
+                    case OBJECT_ATTACHED_POINT:       ret.Add(0); break;
+                    case OBJECT_PHYSICS:              ret.Add(0); break;
+                    case OBJECT_PHANTOM:              ret.Add(0); break;
+                    case OBJECT_TEMP_ON_REZ:          ret.Add(0); break;
+                    // The seven later flags with the values Halcyon (:14181-14229) and YEngine give an avatar.
+                    case OBJECT_CHARACTER_TIME:       ret.Add(0f); break;
+                    case OBJECT_PATHFINDING_TYPE:     ret.Add(OPT_AVATAR); break;
+                    case OBJECT_RENDER_WEIGHT:        ret.Add(-1); break;
+                    case OBJECT_HOVER_HEIGHT:         ret.Add(0f); break;
+                    case OBJECT_BODY_SHAPE_TYPE:
+                    {
+                        byte[] vp = sp.Appearance?.VisualParams;
+                        int male = (int)AvatarAppearance.VPElement.SHAPE_MALE;
+                        ret.Add(vp != null && male < vp.Length && vp[male] != 0 ? 1f : 0f);
+                        break;
+                    }
+                    case OBJECT_LAST_OWNER_ID:        ret.Add(UUID.Zero.ToString()); break;
+                    case OBJECT_CLICK_ACTION:         ret.Add(0); break;
+                    default:                          ret.Add(OBJECT_UNKNOWN_DETAIL); break;
+                }
+            }
         }
         public LSLList llGetBoundingBox(string obj)
         {
@@ -10190,6 +10290,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             m_host.ParentGroup?.InvalidateDeepEffectivePerms();
         }
+        /// <summary>
+        /// SL wiki llGetAgentList: "agents in God Mode depending on the level will have NULL_KEY returned instead of their
+        /// real key". A god keeps its place in the list, so counts stay true, and its key is not given.
+        /// </summary>
         public LSLList llGetAgentList(int scope, LSLList options)
         {
             Func<ScenePresence, bool> inScope = AgentListScope(scope);
@@ -10201,7 +10305,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             foreach (ScenePresence sp in presences)
             {
                 if (!inScope(sp)) continue;
-                result.Add(sp.UUID.ToString());
+                result.Add(sp.IsViewerUIGod ? UUID.Zero.ToString() : sp.UUID.ToString());
                 if (result.Count >= 100) break;   // SL's maximum
             }
             return new LSLList(result);
@@ -10211,7 +10315,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// llGetAgentList's scope as YEngine reads it (LSL_Api.llGetAgentList) - SL's
         /// AGENT_LIST_PARCEL (1), AGENT_LIST_PARCEL_OWNER (2) or AGENT_LIST_REGION (4), with the
         /// AGENT_LIST_EXCLUDENPC flag; PARCEL_OWNER is every parcel with the same owner as the one the
-        /// object is on. Null for any other scope (INVALID_SCOPE). Gods and child agents are not listed.
+        /// object is on. Null for any other scope (INVALID_SCOPE). Child agents are not listed.
         /// </summary>
         private Func<ScenePresence, bool> AgentListScope(int scope)
         {
@@ -10230,7 +10334,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             return sp =>
             {
-                if (sp.IsChildAgent || sp.IsDeleted || sp.IsViewerUIGod) return false;
+                if (sp.IsChildAgent || sp.IsDeleted) return false;
                 if (noNpc && sp.IsNPC) return false;
                 if (scope == AGENT_LIST_REGION) return true;
                 ILandObject land = World.LandChannel?.GetLandObject(sp.AbsolutePosition);
@@ -10238,30 +10342,39 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 return scope == AGENT_LIST_PARCEL_OWNER ? land.LandData.OwnerID == id : land.LandData.GlobalID == id;
             };
         }
+
+        /// <summary>
+        /// Halcyon iwGetAgentList (LSLSystemAPI.cs:14360-14454). For each agent in scope and in the box, the
+        /// llGetObjectDetails values <paramref name="paramList"/> asks for (Halcyon GetAgentDetails), so
+        /// [OBJECT_NAME, OBJECT_POS] gives name, pos, name, pos ...; an empty list gives the agents' keys (Halcyon gave
+        /// nothing). The box applies only when both corners are non-zero; on each axis 0 and 0 accept any value, and
+        /// the corners may come in either order (Halcyon IsInRange). Gods stay hidden, as in the sensors.
+        /// </summary>
         public LSLList iwGetAgentList(int scope, Vector3 minPos, Vector3 maxPos, LSLList paramList)
         {
-            // Like llGetAgentList but with optional bounding box filter
             Func<ScenePresence, bool> inScope = AgentListScope(scope);
             if (inScope == null) return new LSLList(new List<object> { "INVALID_SCOPE" });
             List<object> result = new List<object>();
             List<ScenePresence> presences = World?.GetScenePresences();
             if (presences == null) return new LSLList();
 
-            bool useBBox = (minPos != Vector3.Zero || maxPos != Vector3.Zero);
+            static bool InRange(float value, float a, float b)
+                => (a == 0f && b == 0f) || (value >= Math.Min(a, b) && value <= Math.Max(a, b));
+            bool useBBox = minPos != Vector3.Zero && maxPos != Vector3.Zero;
 
             foreach (ScenePresence sp in presences)
             {
-                if (sp.IsChildAgent) continue;
+                if (sp.IsViewerUIGod || sp.IsInTransit || !inScope(sp)) continue;
 
-                // Bounding box filter
                 if (useBBox)
                 {
                     Vector3 pos = sp.AbsolutePosition;
-                    if (pos.X < minPos.X || pos.Y < minPos.Y || pos.Z < minPos.Z) continue;
-                    if (pos.X > maxPos.X || pos.Y > maxPos.Y || pos.Z > maxPos.Z) continue;
+                    if (!InRange(pos.X, minPos.X, maxPos.X) || !InRange(pos.Y, minPos.Y, maxPos.Y) || !InRange(pos.Z, minPos.Z, maxPos.Z))
+                        continue;
                 }
 
-                if (inScope(sp)) result.Add(sp.UUID.ToString());
+                if (paramList == null || paramList.Length == 0) result.Add(sp.UUID.ToString());
+                else AvatarDetails(result, sp, paramList);
             }
             return new LSLList(result);
         }
@@ -15161,9 +15274,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// "up"/..., DATA_SIM_RATING "PG"/"MATURE"/"ADULT"/"UNKNOWN", 1.0 s sleep. Ported from upstream
         /// LSL_Api.cs:13389-13485: the local region answers from RegionInfo; any other region is
         /// resolved through GridService.GetRegionByName, with the hypergrid RegionSecret dance for
-        /// POS. Two departures from upstream, both towards the wiki: POS is in metres (upstream returns
-        /// region units against the wiki's "global position"), and an unknown region answers with the
-        /// wiki's texts rather than "unknown". The reply goes by the dataserver door.
+        /// POS. POS is in metres (upstream returns region units against the wiki's "global position"). An unknown
+        /// region answers SL's values, DATA_SIM_STATUS "unknown" and DATA_SIM_RATING "UNKNOWN", as YEngine does.
+        /// The reply goes by the dataserver door.
         /// </summary>
         public string llRequestSimulatorData(string simulator, int data)
         {
@@ -15193,7 +15306,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             else
             {
-                reply = data == DATA_SIM_STATUS ? "unknown region" : data == DATA_SIM_RATING ? "rating or region unknown" : "unknown";
+                reply = data == DATA_SIM_RATING ? "UNKNOWN" : "unknown";
                 try
                 {
                     var info = World.GridService?.GetRegionByName(World.RegionInfo.ScopeID, simulator);
@@ -15226,27 +15339,53 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             ScriptSleep(1000);
             return queryID.ToString();
         }
+        /// <summary>
+        /// SL wiki llGetEnv, with YEngine's reading of it (LSL_Api.llGetEnv): the name in any letter case; frame_number
+        /// the simulator's frame counter; region_start_time the Unix time the region started, and region_up_time the
+        /// seconds since; the chat ranges. Plus Halcyon's keys that tell content which platform it is on
+        /// (Scene.GetEnv, Scene.cs:855-976): script_engine "Phlox", the region's size, the version texts, and the grid's
+        /// names from [GridInfoService]. "inworldz" and "halcyon" are "", as on any server that is neither.
+        /// </summary>
         public string llGetEnv(string name)
         {
-            if (World?.RegionInfo == null) return string.Empty;
-            return name switch
+            if (World?.RegionInfo == null || name == null) return string.Empty;
+            Nini.Config.IConfig gridInfo = m_ScriptEngine?.ConfigSource?.Configs[GridInfoSection];
+            string GridInfo(string key) => gridInfo?.GetString(key, string.Empty)?.Trim() ?? string.Empty;
+            // [Chat]'s ranges, with the keys and defaults the chat module and YEngine read.
+            Nini.Config.IConfig chat = m_ScriptEngine?.ConfigSource?.Configs["Chat"];
+            string Range(string key, int fallback) => (chat?.GetInt(key, fallback) ?? fallback).ToString();
+            return name.ToLowerInvariant() switch
             {
                 "agent_limit"          => World.RegionInfo.RegionSettings.AgentLimit.ToString(),
                 "dynamic_pathfinding"  => "disabled",
                 "estate_id"            => World.RegionInfo.EstateSettings.EstateID.ToString(),
                 "estate_name"          => World.RegionInfo.EstateSettings.EstateName ?? string.Empty,
-                "frame_number"         => World.StatsReporter?.LastReportedSimFPS.ToString() ?? "0",
+                "frame_number"         => World.Frame.ToString(),
                 "region_cpu_ratio"     => "1",
                 "region_idle"          => "0",
                 "region_product_name"  => World.RegionInfo.RegionType ?? string.Empty,
                 "region_product_sku"   => "OpenSim",
-                "region_start_time"    => "0",
+                "region_start_time"    => World.UnixStartTime.ToString(),
+                "region_up_time"       => (OpenSim.Framework.Util.UnixTimeSinceEpoch() - World.UnixStartTime).ToString(),
                 "sim_channel"          => "OpenSim",
-                "sim_version"          => "0.9.3.0",
+                "sim_version"          => World.GetSimulatorVersion(),
                 "simulator_hostname"   => World.RegionInfo.ExternalHostName ?? string.Empty,
                 "region_max_prims"     => World.RegionInfo.ObjectCapacity.ToString(),
                 "region_object_bonus"  => ((float)World.RegionInfo.RegionSettings.ObjectBonus).ToString(),
+                "whisper_range"        => Range("whisper_distance", PhloxListenManager.DefaultWhisperDistance),
+                "chat_range"           => Range("say_distance", PhloxListenManager.DefaultSayDistance),
+                "shout_range"          => Range("shout_distance", PhloxListenManager.DefaultShoutDistance),
                 "grid"                 => OpenSim.Region.ScriptEngine.Shared.Api.LSL_Api.EnvGridName(World), // YEngine's own answer
+                "script_engine"        => "Phlox",
+                "region_size_x"        => World.RegionInfo.RegionSizeX.ToString(),
+                "region_size_y"        => World.RegionInfo.RegionSizeY.ToString(),
+                "region_size_z"        => ((int)Constants.RegionHeight).ToString(),
+                "short_version"        => OpenSim.VersionInfo.VersionNumber,
+                "long_version"         => World.GetSimulatorVersion(),
+                "platform"             => GridInfo("platform"),
+                "grid_management"      => GridInfo("gridmanagement"),
+                "grid_nick"            => GridInfo("gridnick"),
+                "grid_name"            => OpenSim.Region.ScriptEngine.Shared.Api.LSL_Api.EnvGridName(World),
                 _                     => string.Empty
             };
         }
