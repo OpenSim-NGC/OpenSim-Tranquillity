@@ -336,12 +336,64 @@ namespace Phlox.ScriptEngine
             return false;
         }
 
-        /// <summary>What a line read answers today: the line, or EOF ("\n\n\n") past either end.</summary>
-        private static string NotecardLineAnswer(PhloxNotecardCache.Card card, int line) => card.Line(line) ?? "\n\n\n";
+        /// <summary>SL's notecard line limit: "If the requested line is longer than 1024 bytes (not characters), dataserver will only return the first 1024 bytes".</summary>
+        private const int NOTECARD_LINE_BYTES_DEFAULT = 1024;
 
-        /// <summary>What iwGetNotecardSegment answers today: part of the line from startOffset, at most maxLength (&gt; 0) chars.</summary>
+        /// <summary>YEngine's ceiling for NotecardLineReadCharsMax (LSL_Api.cs LoadConfig).</summary>
+        private const int NOTECARD_LINE_BYTES_MAX = 65535;
+
+        private int m_notecardLineCap;
+
+        /// <summary>
+        /// The most bytes a line read returns: NotecardLineReadCharsMax from [InWorldz.Phlox], else the same key from
+        /// [YEngine] (so one setting can govern both engines), else SL's 1024. YEngine's own default is 255 characters.
+        /// </summary>
+        private int NotecardLineCap
+        {
+            get
+            {
+                if (m_notecardLineCap > 0) return m_notecardLineCap;
+                const string key = "NotecardLineReadCharsMax";
+                var configs = m_ScriptEngine?.ConfigSource?.Configs;
+                Nini.Config.IConfig own = configs?["InWorldz.Phlox"], yengine = configs?["YEngine"];
+                int cap = own != null && own.Contains(key) ? own.GetInt(key, NOTECARD_LINE_BYTES_DEFAULT)
+                    : yengine != null && yengine.Contains(key) ? yengine.GetInt(key, NOTECARD_LINE_BYTES_DEFAULT)
+                    : NOTECARD_LINE_BYTES_DEFAULT;
+                if (cap <= 0) cap = NOTECARD_LINE_BYTES_DEFAULT;
+                m_notecardLineCap = Math.Min(cap, NOTECARD_LINE_BYTES_MAX);
+                return m_notecardLineCap;
+            }
+        }
+
+        /// <summary>The first <paramref name="maxBytes"/> bytes of <paramref name="text"/> in UTF-8, without splitting a character.</summary>
+        private static string CutToUtf8Bytes(string text, int maxBytes)
+        {
+            if (text.Length * 3 <= maxBytes) return text;   // no character takes more than three bytes per UTF-16 unit
+            byte[] utf8 = Encoding.UTF8.GetBytes(text);
+            if (utf8.Length <= maxBytes) return text;
+            int cut = maxBytes;
+            while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--;   // back to the start of the split character
+            return Encoding.UTF8.GetString(utf8, 0, cut);
+        }
+
+        /// <summary>
+        /// What a line read answers: the line, cut to <see cref="NotecardLineCap"/> bytes; EOF ("\n\n\n") past the end;
+        /// "" for a negative line (SL: negative indexes are not supported; Halcyon and YEngine answer "").
+        /// </summary>
+        private string NotecardLineAnswer(PhloxNotecardCache.Card card, int line)
+        {
+            if (line < 0) return string.Empty;
+            string text = card.Line(line);
+            return text == null ? "\n\n\n" : CutToUtf8Bytes(text, NotecardLineCap);
+        }
+
+        /// <summary>
+        /// What iwGetNotecardSegment answers: part of the line from startOffset, at most maxLength chars. As Halcyon's
+        /// NotecardCache.GetLine (LSLSystemAPI.cs:18685-18709): "" for a negative line or a maxLength of zero or less.
+        /// </summary>
         private static string NotecardSegmentAnswer(PhloxNotecardCache.Card card, int line, int startOffset, int maxLength)
         {
+            if (line < 0 || maxLength <= 0) return string.Empty;
             string result = card.Line(line);
             if (result == null) return "\n\n\n";
             if (startOffset > 0 && startOffset < result.Length)
@@ -4443,18 +4495,21 @@ namespace Phlox.ScriptEngine
         {
             if (m_host?.ParentGroup == null) return;
             m_host.ParentGroup.RootPart.AllowedDrop = (add != 0);
-            // Trigger a flag update so the viewer knows drop is allowed
-            m_host.ParentGroup.RootPart.ScheduleFullUpdate();
+            // The flag enters the object's flags only when its script events are aggregated (SceneObjectPart
+            // aggregateScriptEvents), which also sends the update; Halcyon re-aggregated here (LSLSystemAPI.cs:6382-6388).
+            m_host.ParentGroup.RootPart.aggregateScriptEvents();
         }
         public void iwMakeNotecard(string name, LSLList data)
         {
-            // Faithful port from Halcyon: create a notecard in this prim's inventory
-            if (m_host == null || World == null || string.IsNullOrEmpty(name)) return;
+            // Faithful port from Halcyon: create a notecard in this prim's inventory. Its 5 s is in a finally
+            // (LSLSystemAPI.cs:14740-14790), so the refusals (no name, more than 64K) wait too.
+            if (m_host == null || World == null) return;
 
             const int MAX_LENGTH = 65536;
 
             try
             {
+                if (string.IsNullOrEmpty(name)) return;
                 StringBuilder notecardData = new StringBuilder();
                 for (int i = 0; i < data.Length; i++)
                 {
@@ -4478,7 +4533,6 @@ namespace Phlox.ScriptEngine
                 if (string.IsNullOrEmpty(stored))
                 {
                     ShoutError("Notecard asset storage failed!");
-                    ScriptSleep(5000);
                     return;
                 }
 
@@ -4509,8 +4563,28 @@ namespace Phlox.ScriptEngine
             {
                 m_log.LogWarning("[PhloxAPI]: iwMakeNotecard exception: {0}", e.Message);
             }
-            ScriptSleep(5000);
+            finally
+            {
+                ScriptSleep(5000);
+            }
         }
+        /// <summary>
+        /// The notecard a reader names in <paramref name="part"/>: a notecard item of that name, else the name read as a
+        /// notecard asset key (SL llGetNotecardLine: "a notecard in the inventory of the prim this script is in or a UUID
+        /// of a notecard"; "If name is a UUID then there are no new asset permissions consequences for the object").
+        /// Halcyon (LSLSystemAPI.cs:14530-14540) and YEngine read a key the same way. The fetch refuses an asset that is not
+        /// a notecard ("could not be found", AnswerNotecardRead). UUID.Zero when it names neither.
+        /// </summary>
+        private static UUID NotecardAssetIn(SceneObjectPart part, string name)
+        {
+            if (string.IsNullOrEmpty(name)) return UUID.Zero;
+            lock (part.TaskInventory)
+                foreach (var kvp in part.TaskInventory)
+                    if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
+                        return kvp.Value.AssetID;
+            return UUID.TryParse(name, out UUID asset) ? asset : UUID.Zero;
+        }
+
         /// <summary>
         /// Halcyon's GetNumberOfNotecardLines delays (LSLSystemAPI.cs:14521-14580) - 25 ms answered from the
         /// notecard cache, 50 ms fetched, 100 ms when there is no such notecard - and its cache. The answer is unchanged.
@@ -4518,8 +4592,8 @@ namespace Phlox.ScriptEngine
         public string llGetNumberOfNotecardLines(string name)
         {
             if (m_host == null) return UUID.Zero.ToString();
-            TaskInventoryItem item = string.IsNullOrEmpty(name) ? null : FindInventoryItem(name, (int)AssetType.Notecard);
-            if (item == null)
+            UUID notecard = NotecardAssetIn(m_host, name);
+            if (notecard == UUID.Zero)
             {
                 // Halcyon LSLSystemAPI.cs:14543-14547, the error, then its 100 ms (which replaces the 15).
                 ScriptShoutError("Notecard '" + name + "' could not be found.");
@@ -4527,7 +4601,7 @@ namespace Phlox.ScriptEngine
                 return UUID.Zero.ToString();
             }
             UUID queryID = NewDataserverQuery();
-            bool cached = AnswerNotecardRead(item.AssetID, queryID, c => c.LineCount.ToString(), name, "llGetNumberOfNotecardLines");
+            bool cached = AnswerNotecardRead(notecard, queryID, c => c.LineCount.ToString(), name, "llGetNumberOfNotecardLines");
             NotecardSleep(cached ? NOTECARD_COUNT_FAST_DELAY : NOTECARD_COUNT_LONG_DELAY);
             return queryID.ToString();
         }
@@ -4539,8 +4613,8 @@ namespace Phlox.ScriptEngine
         public string llGetNotecardLine(string name, int line)
         {
             if (m_host == null) return UUID.Zero.ToString();
-            TaskInventoryItem item = string.IsNullOrEmpty(name) ? null : FindInventoryItem(name, (int)AssetType.Notecard);
-            if (item == null)
+            UUID notecard = NotecardAssetIn(m_host, name);
+            if (notecard == UUID.Zero)
             {
                 // Halcyon GetNotecardSegment, LSLSystemAPI.cs:14624-14628 (no delay after it).
                 ScriptShoutError("Notecard '" + name + "' could not be found.");
@@ -4548,7 +4622,7 @@ namespace Phlox.ScriptEngine
             }
             UUID queryID = NewDataserverQuery();
             int lineNum = line;
-            bool cached = AnswerNotecardRead(item.AssetID, queryID, c => NotecardLineAnswer(c, lineNum), name, "llGetNotecardLine");
+            bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardLineAnswer(c, lineNum), name, "llGetNotecardLine");
             if (cached) NotecardLineCachedSleep(line, 0);
             else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
             return queryID.ToString();
@@ -4557,11 +4631,11 @@ namespace Phlox.ScriptEngine
         {
             // Faithful port: read a segment of a notecard line (offset + length)
             if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.Notecard);
-            if (item == null) { ScriptShoutError("Notecard '" + name + "' could not be found."); return UUID.Zero.ToString(); }
+            UUID notecard = NotecardAssetIn(m_host, name);
+            if (notecard == UUID.Zero) { ScriptShoutError("Notecard '" + name + "' could not be found."); return UUID.Zero.ToString(); }
             UUID queryID = NewDataserverQuery();
             int lineNum = line;
-            bool cached = AnswerNotecardRead(item.AssetID, queryID, c => NotecardSegmentAnswer(c, lineNum, startOffset, maxLength),
+            bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardSegmentAnswer(c, lineNum, startOffset, maxLength),
                 name, "iwGetNotecardSegment");
             if (cached) NotecardLineCachedSleep(line, startOffset);   // As llGetNotecardLine
             else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
@@ -4607,9 +4681,10 @@ namespace Phlox.ScriptEngine
         }
         public string llRequestInventoryData(string name)
         {
-            // Looks up a landmark by name and fires dataserver with its position
+            // Looks up a landmark by name and fires dataserver with its position. SL: "This function causes the script
+            // to sleep for 1.0 seconds", on every call; a missing landmark: "an error is shouted on DEBUG_CHANNEL".
+            // Halcyon returned "" with no event for one (LSLSystemAPI.cs:5686-5692).
             if (m_host == null) return UUID.Zero.ToString();
-            UUID queryID = NewDataserverQuery();
 
             TaskInventoryItem landmark = null;
             lock (m_host.TaskInventory)
@@ -4626,11 +4701,16 @@ namespace Phlox.ScriptEngine
 
             if (landmark == null)
             {
-                PostDataserverEvent(queryID, string.Empty);
-                return queryID.ToString();
+                ShoutError("No landmark named '" + name + "'");
+                ScriptSleep(1000);
+                return string.Empty;
             }
 
+            UUID queryID = NewDataserverQuery();
             UUID assetId = landmark.AssetID;
+            // SL: "a global position as an offset from the current region's origin"; Halcyon added the landmark region's
+            // corner, from its region_handle, less this region's (LSLSystemAPI.cs:5666-5680).
+            Vector3 here = new Vector3(World.RegionInfo.WorldLocX, World.RegionInfo.WorldLocY, 0);
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
@@ -4638,9 +4718,10 @@ namespace Phlox.ScriptEngine
                     AssetBase asset = World.AssetService.Get(assetId.ToString());
                     if (asset == null) { PostDataserverEvent(queryID, string.Empty); return; }
 
-                    // Landmark format: first line is "Landmark version N", then "region_id UUID", then "local_pos x y z"
+                    // Landmark format: "Landmark version N", "region_id UUID", "local_pos x y z", "region_handle N"
                     string data = System.Text.Encoding.UTF8.GetString(asset.Data);
                     Vector3 pos = Vector3.Zero;
+                    ulong handle = 0;
                     foreach (string line in data.Split('\n'))
                     {
                         string trimmed = line.Trim();
@@ -4652,8 +4733,17 @@ namespace Phlox.ScriptEngine
                                     float.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture),
                                     float.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture),
                                     float.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture));
-                            break;
                         }
+                        else if (trimmed.StartsWith("region_handle"))
+                        {
+                            string[] parts = trimmed.Split(' ');
+                            if (parts.Length == 2) ulong.TryParse(parts[1], out handle);
+                        }
+                    }
+                    if (handle != 0)
+                    {
+                        Utils.LongToUInts(handle, out uint x, out uint y);
+                        pos += new Vector3(x, y, 0) - here;
                     }
                     PostDataserverEvent(queryID, pos.ToString());
                 }
@@ -5025,19 +5115,11 @@ namespace Phlox.ScriptEngine
         {
             // Faithful port: get notecard line count from a specific link's inventory
             if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            foreach (UUID notecard in LinkNotecardAssets(linknumber, name))
             {
-                TaskInventoryItem item = null;
-                lock (part.TaskInventory)
-                {
-                    foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
-                        { item = kvp.Value; break; }
-                }
-                if (item == null) continue;
                 UUID queryID = NewDataserverQuery();
                 // Halcyon's GetNumberOfNotecardLines delays and cache, as llGetNumberOfNotecardLines
-                bool cached = AnswerNotecardRead(item.AssetID, queryID, c => c.LineCount.ToString(), name, null);
+                bool cached = AnswerNotecardRead(notecard, queryID, c => c.LineCount.ToString(), name, null);
                 NotecardSleep(cached ? NOTECARD_COUNT_FAST_DELAY : NOTECARD_COUNT_LONG_DELAY);
                 return queryID.ToString();
             }
@@ -5051,20 +5133,12 @@ namespace Phlox.ScriptEngine
         {
             // Faithful port: read a notecard line from a specific link's inventory
             if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            foreach (UUID notecard in LinkNotecardAssets(linknumber, name))
             {
-                TaskInventoryItem item = null;
-                lock (part.TaskInventory)
-                {
-                    foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
-                        { item = kvp.Value; break; }
-                }
-                if (item == null) continue;
                 UUID queryID = NewDataserverQuery();
                 int lineNum = line;
                 // Halcyon's GetNotecardSegment delays and cache, as llGetNotecardLine
-                bool cached = AnswerNotecardRead(item.AssetID, queryID, c => NotecardLineAnswer(c, lineNum), name, null);
+                bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardLineAnswer(c, lineNum), name, null);
                 if (cached) NotecardLineCachedSleep(line, 0);
                 else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
                 return queryID.ToString();
@@ -5079,26 +5153,40 @@ namespace Phlox.ScriptEngine
         {
             // Faithful port: read a notecard segment from a specific link's inventory
             if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            foreach (UUID notecard in LinkNotecardAssets(linknumber, name))
             {
-                TaskInventoryItem item = null;
-                lock (part.TaskInventory)
-                {
-                    foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
-                        { item = kvp.Value; break; }
-                }
-                if (item == null) continue;
                 UUID queryID = NewDataserverQuery();
                 int lineNum = line;
                 // Halcyon's GetNotecardSegment delays and cache, as iwGetNotecardSegment
-                bool cached = AnswerNotecardRead(item.AssetID, queryID, c => NotecardSegmentAnswer(c, lineNum, startOffset, maxLength),
+                bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardSegmentAnswer(c, lineNum, startOffset, maxLength),
                     name, null);
                 if (cached) NotecardLineCachedSleep(line, startOffset);
                 else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
                 return queryID.ToString();
             }
+            // As iwGetLinkNotecardLine: Halcyon said 'could not be found' for a link prim without it (LSLSystemAPI.cs:14624-14628).
+            ShoutError("iwGetLinkNotecardSegment: Notecard '" + name + "' not found in link " + linknumber + ".");
+            if (GetLinkParts(linknumber).Any()) ChatSleep();
             return UUID.Zero.ToString();
+        }
+
+        /// <summary>
+        /// The notecard an iwGetLink* reader reads: a notecard of that name in the first prim of the link that holds one
+        /// (every prim of a multi-prim link is searched, an extension), else the name read as a notecard asset key (as
+        /// NotecardAssetIn). Empty when it names neither.
+        /// </summary>
+        private List<UUID> LinkNotecardAssets(int linknumber, string name)
+        {
+            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            {
+                lock (part.TaskInventory)
+                    foreach (var kvp in part.TaskInventory)
+                        if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
+                            return new List<UUID> { kvp.Value.AssetID };
+            }
+            var byKey = new List<UUID>();
+            if (UUID.TryParse(name, out UUID asset) && asset != UUID.Zero) byKey.Add(asset);
+            return byKey;
         }
 
         // ── Object manipulation ────────────────────────────────────────────────
