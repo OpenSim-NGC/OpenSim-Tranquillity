@@ -214,6 +214,10 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   others. Compile errors appear in the viewer's script editor.
 - **No Scripts parcels.** On a parcel where scripts are not allowed, Phlox scripts pause, and
   resume when the parcel rules allow them again.
+- **`llCreateLink` and the region's edit rules.** Phlox also asks the region whether the
+  object's owner may edit both objects (the same check as editing them by hand). If not,
+  nothing is linked, no error is shown and the call returns without its delay. YEngine
+  does not make this check.
 
 ---
 

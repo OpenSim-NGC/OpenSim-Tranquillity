@@ -313,6 +313,55 @@ public class DroppedChecksTests
         Assert.DoesNotContain(h.Said, s => s.Contains("llCreateLink") || s.Contains("PERMISSION_CHANGE_LINKS"));
     }
 
+    // The region's edit permission, as Halcyon's llCreateLink checks it (CanEditObject on both objects, for the
+    // script's owner). A refusal there is silent in Halcyon: no error, no sleep, nothing linked.
+
+    [Fact]
+    public void CreateLinkFailsSilentlyWhenTheRegionWouldNotLetTheOwnerEditTheScriptsObject()
+    {
+        using var h = new SchedulerHarness();
+        var target = SceneHelpers.AddSceneObject(h.Scene, "link target", h.Prim.OwnerID);
+        var host = h.Prim.ParentGroup.UUID;
+        h.Scene.Permissions.OnEditObjectByIDs += (obj, editor) => obj != host;
+        LinkAsOwner(h, target);
+        Assert.Contains("prims=1", h.Said);
+        Assert.Equal(1, h.Prim.ParentGroup.PrimCount);
+        Assert.Equal(1, target.PrimCount);
+        Assert.DoesNotContain(h.Said, s => s.Contains("llCreateLink") || s.Contains("PERMISSION_CHANGE_LINKS"));
+    }
+
+    [Fact]
+    public void CreateLinkFailsSilentlyWhenTheRegionWouldNotLetTheOwnerEditTheTarget()
+    {
+        using var h = new SchedulerHarness();
+        var target = SceneHelpers.AddSceneObject(h.Scene, "link target", h.Prim.OwnerID);
+        var targetId = target.UUID;
+        h.Scene.Permissions.OnEditObjectByIDs += (obj, editor) => obj != targetId;
+        LinkAsOwner(h, target);
+        Assert.Contains("prims=1", h.Said);
+        Assert.Equal(1, h.Prim.ParentGroup.PrimCount);
+        Assert.Equal(1, target.PrimCount);
+        Assert.DoesNotContain(h.Said, s => s.Contains("llCreateLink") || s.Contains("PERMISSION_CHANGE_LINKS"));
+    }
+
+    [Fact]
+    public void CreateLinkLinksWhenTheRegionLetsTheOwnerEditBothObjects()
+    {
+        using var h = new SchedulerHarness();
+        var target = SceneHelpers.AddSceneObject(h.Scene, "link target", h.Prim.OwnerID);
+        var owner = h.Prim.OwnerID;
+        var asked = new System.Collections.Concurrent.ConcurrentBag<(UUID Obj, UUID Editor)>();
+        h.Scene.Permissions.OnEditObjectByIDs += (obj, editor) => { asked.Add((obj, editor)); return editor == owner; };
+        var host = h.Prim.ParentGroup.UUID;
+        var targetId = target.UUID;
+        LinkAsOwner(h, target);
+        Assert.Contains("prims=2", h.Said);
+        Assert.Equal(2, h.Prim.ParentGroup.PrimCount);
+        Assert.Contains((host, owner), asked);
+        Assert.Contains((targetId, owner), asked);
+        Assert.DoesNotContain(h.Said, s => s.Contains("llCreateLink") || s.Contains("PERMISSION_CHANGE_LINKS"));
+    }
+
     [Fact]
     public void CreateLinkRefusesANoModifyTarget()
     {

@@ -5229,6 +5229,20 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 return;
             }
 
+            // The region's edit permission on both objects, for the script's owner (who granted the permission above):
+            // linking edits both, so a link the region would not let the owner make by hand fails. Halcyon checks it
+            // (CanEditObject on the script's object and on the target) and fails silently - no error, no sleep; YEngine
+            // does not check it. A target that is not here or is attached is left to CreateLinkCore's error.
+            UUID editor = m_host.ParentGroup.OwnerID;
+            if (!World.Permissions.CanEditObject(m_host.ParentGroup.UUID, editor)) return;
+            if (UUID.TryParse(target, out UUID targetId) && targetId != UUID.Zero)
+            {
+                SceneObjectGroup targetGroup = World.GetSceneObjectPart(targetId)?.ParentGroup;
+                if (targetGroup != null && !targetGroup.IsAttachment
+                    && !World.Permissions.CanEditObject(targetGroup.UUID, editor))
+                    return;
+            }
+
             string failure = CreateLinkCore(target, parent);
             if (failure != null) ShoutError("llCreateLink: " + failure);
         }
