@@ -1940,18 +1940,20 @@ namespace Phlox.ScriptEngine
             foreach (var p in targets)
                 m_ScriptEngine.PostObjectEvent(p.LocalId, parms);
             var receivers = ScriptItemsIn(targets);
-            OfferLinkMessageToOtherEngines(receivers, m_host.LinkNum, num, str ?? string.Empty, id ?? UUID.Zero.ToString());
+            OfferToOtherEngines("llMessageLinked", () => receivers, "link_message", () => (object[])parms.Params.Clone());
             LinkMessageBackPressure(receivers);
         }
 
         /// <summary>
-        /// SL wiki llMessageLinked: the event fires "in all scripts in the prim(s) described by link", whatever engine runs
-        /// them. The posts above reach only this engine's scripts, so each other script engine of the region is offered
-        /// every targeted script item once, with plain values (int, int, string, string), as core modules post
-        /// link_message. An engine queues only for the scripts it runs, so no script gets it twice. An exception from
-        /// another engine is logged once for that engine and call and goes no further.
+        /// An event SL raises in every script of some prims, whatever engine runs them (llMessageLinked: "in all scripts in
+        /// the prim(s) described by link"; object_rez, email, linkset_data and dataserver likewise, see their callers).
+        /// Phlox's own posts reach only its own scripts, so each other script engine of the region is offered every script
+        /// item <paramref name="items"/> lists once, with plain values (int, string), as core modules post events; YEngine
+        /// unwraps those. An engine queues only for the scripts it runs, so no script gets it twice. An exception from
+        /// another engine is logged once for that engine and call and goes no further. With no other engine (a Phlox-only
+        /// region) nothing is listed or posted.
         /// </summary>
-        private void OfferLinkMessageToOtherEngines(IEnumerable<UUID> items, int sender, int num, string str, string id)
+        private void OfferToOtherEngines(string caller, Func<IEnumerable<UUID>> items, string eventName, Func<object[]> args)
         {
             var others = new List<OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine>();
             foreach (IScriptModule m in World?.RequestModuleInterfaces<IScriptModule>() ?? Array.Empty<IScriptModule>())
@@ -1959,20 +1961,20 @@ namespace Phlox.ScriptEngine
                     others.Add(e);
             if (others.Count == 0) return;
 
+            var list = items().ToList();
             foreach (var e in others)
             {
                 bool logged = false;
-                foreach (UUID item in items)
+                foreach (UUID item in list)
                 {
                     try
                     {
-                        e.PostScriptEvent(item, new EventParams("link_message",
-                            new object[] { sender, num, str, id }, new DetectParams[0]));
+                        e.PostScriptEvent(item, new EventParams(eventName, args(), new DetectParams[0]));
                     }
                     catch (Exception ex)
                     {
                         if (!logged)
-                            m_log.LogWarning("[PhloxAPI]: llMessageLinked: another script engine failed to take a link message: {0}", ex.Message);
+                            m_log.LogWarning("[PhloxAPI]: {0}: another script engine failed to take a {1} event: {2}", caller, eventName, ex.Message);
                         logged = true;
                     }
                 }
@@ -4880,6 +4882,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             => RezObjectInternal(inventory, pos, vel, rot, param, atRoot, null);
 
         /// <summary>
+        /// SL wiki object_rez: "Triggers in all running scripts with an object_rez event, AND in the same prim as the
+        /// script calling llRezObject or llRezAtRoot. Does NOT trigger in linked prims." Phlox's scripts in this prim, then
+        /// every other engine's, with the rezzed root's key.
+        /// </summary>
+        private void PostObjectRez(string rootKey)
+        {
+            m_ScriptEngine.PostObjectEvent(m_host.LocalId, new EventParams("object_rez", new object[] { rootKey }, new DetectParams[0]));
+            SceneObjectPart host = m_host;
+            OfferToOtherEngines("object_rez", () => ScriptItemsIn(new[] { host }), "object_rez", () => new object[] { rootKey });
+        }
+
+        /// <summary>
         /// The one rez path, now carrying REZ_PARAM_STRING. Upstream stores it on the rezzed
         /// group (LSL_Api.cs:3894, sog.RezStringParameter) and llGetStartString reads it back
         /// (LSL_Api.cs:4589-4593); until now Phlox parsed REZ_PARAM only and the string went nowhere.
@@ -4922,10 +4936,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             foreach (SceneObjectGroup grp in rezzed)
             {
                 result = grp.RootPart.UUID.ToString();
-                m_ScriptEngine.PostObjectEvent(m_host.LocalId,
-                    new EventParams("object_rez",
-                        new object[] { result },
-                        new DetectParams[0]));
+                PostObjectRez(result);
             }
             return result;
         }
@@ -4994,10 +5005,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             foreach (SceneObjectGroup grp in rezzed)
             {
                 result = grp.RootPart.UUID.ToString();
-                m_ScriptEngine.PostObjectEvent(m_host.LocalId,
-                    new EventParams("object_rez",
-                        new object[] { result },
-                        new DetectParams[0]));
+                PostObjectRez(result);
             }
             return result;
         }
@@ -10743,6 +10751,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (sceneOP == null) { ShoutError("osMessageObject() cannot send message to " + objUUID + ", object was not found in scene."); return; }
             m_ScriptEngine.PostObjectEvent(sceneOP.LocalId, new EventParams("dataserver",
                 new object[] { m_host.UUID.ToString(), message ?? string.Empty }, new DetectParams[0]));
+            // Every script in the target prim, whatever engine runs it.
+            string sender = m_host.UUID.ToString(), text = message ?? string.Empty;
+            OfferToOtherEngines("osMessageObject", () => ScriptItemsIn(new[] { sceneOP }), "dataserver", () => new object[] { sender, text });
         }
 
         /// <summary>OSSL_Api.cs:5941-5966 - ungated upstream. Every other script in the prim (or the linkset) is reset, then this one.</summary>
@@ -13055,6 +13066,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             email.numLeft
                         },
                         new DetectParams[0]));
+                // The email queue "is associated with the prim and any script in the prim can access it" (SL wiki email):
+                // every script in this prim, whatever engine runs it.
+                SceneObjectPart host = m_host;
+                OfferToOtherEngines("llGetNextEmail", () => ScriptItemsIn(new[] { host }), "email", () => new object[] {
+                    email.time ?? string.Empty, email.sender ?? string.Empty, email.subject ?? string.Empty,
+                    email.message ?? string.Empty, email.numLeft });
             }
             catch (Exception e)
             {
@@ -14643,6 +14660,21 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return m_host.ParentGroup.LinksetData.Get(name, pass) ?? string.Empty;
         }
 
+        /// <summary>
+        /// SL wiki linkset_data: "The linkset_data event fires in all scripts in a linkset whenever the datastore has been
+        /// modified through a call to one of the llLinksetData functions." Phlox's scripts (PostObjectLinksetDataEvent fans
+        /// out to every prim), then every other engine's script in every prim of the linkset. Offered here, not from the
+        /// engine's PostObjectLinksetDataEvent, so another caller of that interface method is never offered back.
+        /// </summary>
+        private void PostLinksetData(int action, string name, string value)
+        {
+            m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, action, name, value);
+            SceneObjectGroup group = m_host.ParentGroup;
+            if (group == null) return;
+            OfferToOtherEngines("linkset_data", () => ScriptItemsIn(group.Parts), "linkset_data",
+                () => new object[] { action, name ?? string.Empty, value ?? string.Empty });
+        }
+
         public int llLinksetDataWrite(string name, string value)
         {
             if (string.IsNullOrEmpty(name))
@@ -14655,7 +14687,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 int delRet = m_host.ParentGroup.LinksetData.Remove(name);
                 if (delRet == 0)
                 {
-                    m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_DELETE, name, string.Empty);
+                    PostLinksetData(LINKSETDATA_DELETE, name, string.Empty);
                     m_host.ParentGroup.HasGroupChanged = true;
                 }
                 return delRet;
@@ -14666,7 +14698,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int ret = m_host.ParentGroup.LinksetData.AddOrUpdate(name, value);
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_UPDATE, name, value);
+                PostLinksetData(LINKSETDATA_UPDATE, name, value);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return ret;
@@ -14684,7 +14716,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 int delRet = m_host.ParentGroup.LinksetData.Remove(name, pass);
                 if (delRet == 0)
                 {
-                    m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_DELETE, name, string.Empty);
+                    PostLinksetData(LINKSETDATA_DELETE, name, string.Empty);
                     m_host.ParentGroup.HasGroupChanged = true;
                 }
                 return delRet;
@@ -14695,7 +14727,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int ret = m_host.ParentGroup.LinksetData.AddOrUpdate(name, value, pass);
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_UPDATE, name, string.Empty);
+                PostLinksetData(LINKSETDATA_UPDATE, name, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return ret;
@@ -14710,7 +14742,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int ret = m_host.ParentGroup.LinksetData.Remove(name);
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_DELETE, name, string.Empty);
+                PostLinksetData(LINKSETDATA_DELETE, name, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return ret;
@@ -14725,7 +14757,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int ret = m_host.ParentGroup.LinksetData.Remove(name, pass);
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_DELETE, name, string.Empty);
+                PostLinksetData(LINKSETDATA_DELETE, name, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return ret;
@@ -14739,7 +14771,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             m_host.ParentGroup.LinksetData = null;
             if (changed)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_RESET, string.Empty, string.Empty);
+                PostLinksetData(LINKSETDATA_RESET, string.Empty, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
         }
@@ -14752,7 +14784,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (deleted.Length > 0)
             {
                 string deletedList = string.Join(",", deleted);
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_MULTIDELETE, deletedList, string.Empty);
+                PostLinksetData(LINKSETDATA_MULTIDELETE, deletedList, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return new LSLList(new object[] { deleted.Length, notDeleted });
@@ -16601,6 +16633,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     }
                 }
             }
+            // A bot's attachments are rezzed like any avatar's, so their scripts may be another engine's: each other
+            // engine is offered the same scripts, once each.
+            int sender = m_host.ParentGroup.PrimCount == 1 ? 0 : m_host.LinkNum;
+            string text = msg ?? string.Empty, key = id ?? string.Empty;
+            OfferToOtherEngines("botMessageLinked", () => receivers, "link_message", () => new object[] { sender, num, text, key });
             LinkMessageBackPressure(receivers);
         }
 

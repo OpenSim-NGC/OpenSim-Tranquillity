@@ -201,8 +201,13 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 ### Scripts on both engines in one object
 - Chat crosses between the engines in both directions.
 - An `http_response` is delivered to the scripts in the prim whichever engine they run on.
-- A Phlox script's `dataserver` answer goes to every script in the prim, YEngine scripts
-  included. A YEngine script's answer reaches only YEngine scripts.
+- Events a Phlox script raises reach every script SL names, YEngine scripts included:
+  - a `dataserver` answer, `object_rez` and `email`: every script in the calling script's prim;
+  - `osMessageObject`'s `dataserver`: every script in the target prim;
+  - `llMessageLinked`: every script in the targeted prims;
+  - `linkset_data`: every script in the linkset;
+  - `botMessageLinked`: every script in the bot's attachments.
+- Events a YEngine script raises follow YEngine's own delivery.
 
 ### Other behaviour
 - **Compiling.** Phlox compiles on its own thread, so saving a script does not pause the

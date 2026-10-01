@@ -1581,13 +1581,23 @@ namespace Phlox.ScriptEngine
                     posted++;
             }
 
+            // An exception from another engine is logged for that engine and goes no further: the engines after it are
+            // still offered the answer, and it never reaches the asking script's request (whose failure path would
+            // report it to the owner as the request's own error).
             var seen = new List<IScriptEngine>();
             foreach (IScriptModule m in World?.RequestModuleInterfaces<IScriptModule>() ?? Array.Empty<IScriptModule>())
             {
                 if (ReferenceEquals(m, this) || m is not IScriptEngine e || seen.Contains(e)) continue;
                 seen.Add(e);
-                e.PostObjectEvent(part.LocalId, new EventParams("dataserver",
-                    new object[] { new LSL_Types.LSLString(queryId), new LSL_Types.LSLString(data) }, new DetectParams[0]));
+                try
+                {
+                    e.PostObjectEvent(part.LocalId, new EventParams("dataserver",
+                        new object[] { new LSL_Types.LSLString(queryId), new LSL_Types.LSLString(data) }, new DetectParams[0]));
+                }
+                catch (Exception ex)
+                {
+                    m_log.LogWarning("[PhloxEngine]: another script engine failed to take a dataserver event: {0}", ex.Message);
+                }
             }
             return posted;
         }

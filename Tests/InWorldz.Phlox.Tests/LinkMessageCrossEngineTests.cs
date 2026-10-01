@@ -217,12 +217,13 @@ public class LinkMessageOtherEngineTests
 public interface IStandInScriptEngine : IScriptModule, IScriptEngine { }
 
 /// <summary>
-/// A generated other engine: records PostScriptEvent(UUID, EventParams) and, when asked, throws from it. Everything else
-/// returns its default.
+/// A generated other engine: records PostScriptEvent(UUID, EventParams) and PostObjectEvent(uint, EventParams) and, when
+/// asked, throws from them. Everything else returns its default.
 /// </summary>
 public class StandInEngine : DispatchProxy
 {
     public readonly List<(UUID Item, EventParams Parms)> Posts = new();
+    public readonly List<(uint LocalId, EventParams Parms)> ObjectPosts = new();
     public bool Throws;
 
     public static IStandInScriptEngine Create(bool throws)
@@ -239,6 +240,12 @@ public class StandInEngine : DispatchProxy
         if (targetMethod.Name == "PostScriptEvent" && args.Length == 2 && args[1] is EventParams p)
         {
             lock (Posts) Posts.Add(((UUID)args[0], p));
+            if (Throws) throw new InvalidOperationException("stand-in engine failure");
+            return false;
+        }
+        if (targetMethod.Name == "PostObjectEvent" && args.Length == 2 && args[0] is uint id && args[1] is EventParams o)
+        {
+            lock (ObjectPosts) ObjectPosts.Add((id, o));
             if (Throws) throw new InvalidOperationException("stand-in engine failure");
             return false;
         }
