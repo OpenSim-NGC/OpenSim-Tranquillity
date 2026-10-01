@@ -33,7 +33,7 @@ default
     {
         key bot = botCreateBot(""Bot"", ""One"", """", <128, 128, 25>, 0);
         llSay(0, ""bot ["" + (string)bot + ""]"");
-        string n = llGetUsername(""" + slow + @""");
+        string n = iwGetAgentData(""" + slow + @""", DATA_NAME);
         llSay(0, ""next ["" + n + ""]"");
     }
 }");

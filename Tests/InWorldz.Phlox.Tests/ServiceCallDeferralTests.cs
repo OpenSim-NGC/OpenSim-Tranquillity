@@ -147,7 +147,7 @@ default
     state_entry()
     {
         llSay(0, ""A asks"");
-        string n = llGetUsername(""" + slow + @""");
+        string n = iwGetAgentData(""" + slow + @""", DATA_NAME);
         llSay(0, ""A got ["" + n + ""]"");
     }
 }");
@@ -188,7 +188,7 @@ default
     state_entry()
     {
         llSay(0, ""A asks"");
-        string n = llGetUsername(""" + slow + @""");
+        string n = iwGetAgentData(""" + slow + @""", DATA_NAME);
         llSay(0, ""A got ["" + n + ""]"");
     }
 }");
@@ -253,9 +253,9 @@ default
 {
     state_entry()
     {
-        string a = llGetUsername(""" + first + @""");
+        string a = iwGetAgentData(""" + first + @""", DATA_NAME);
         llSay(0, ""T1 ["" + a + ""]"");
-        string b = llGetUsername(""" + second + @""");
+        string b = iwGetAgentData(""" + second + @""", DATA_NAME);
         llSay(0, ""T2 ["" + b + ""]"");
         llSay(0, ""done"");
     }
@@ -296,7 +296,7 @@ default
 {
     state_entry()
     {
-        string n = llGetUsername(llGetObjectDesc());
+        string n = iwGetAgentData(llGetObjectDesc(), DATA_NAME);
         llSay(0, ""got ["" + n + ""]"");
     }
 }");
@@ -329,7 +329,7 @@ default
         for (int i = 0; i < ids.Count; i++) UserAccountHelpers.CreateUserWithInventory(h.Scene, "Storm", "User" + i, ids[i], "pw");
         InstallAccountGate(h, _ => gate);
         foreach (var id in ids)
-            h.RezScript(@"default { state_entry() { llSay(0, ""storm "" + llGetUsername(""" + id + @""")); } }");
+            h.RezScript(@"default { state_entry() { llSay(0, ""storm "" + iwGetAgentData(""" + id + @""", DATA_NAME)); } }");
 
         var exe = typeof(global::Phlox.ScriptEngine.PhloxEngine).GetField("m_ExeScheduler", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(h.Engine)!;
         var count = exe.GetType().GetProperty("ServiceThreadCount", BindingFlags.NonPublic | BindingFlags.Instance)!;

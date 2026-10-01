@@ -55,20 +55,27 @@ namespace Phlox.ScriptEngine
             {
                 switch (fn)
                 {
-                    case "llGetDisplayName":
                     case "llGetUsername":
+                        return false;                                          // the region's own presences only
+                    case "llGetDisplayName":
                     {
+                        // An avatar the region does not know answers "" with no lookup; one it knows asks the
+                        // display-name module, which may call out.
                         if (!UUID.TryParse(a[0] as string, out UUID id)) return false;
-                        ScenePresence sp = World?.GetScenePresence(id);
-                        if (sp != null && !sp.IsChildAgent) return false;
-                        return !AccountCached(id, requireAccount: false);
+                        if (World?.GetScenePresence(id) == null) return false;
+                        return World.RequestModuleInterface<IDisplayNameModule>() != null;
                     }
                     case "iwGetAgentData":
                     {
                         if (!UUID.TryParse(a[0] as string, out UUID id)) return false;
                         int data = Convert.ToInt32(a[1]);
-                        if (data != 2 && data != 3) return false;              // no account lookup
-                        if (data == 2 && World?.GetScenePresence(id) != null) return false;
+                        if (data == DATA_ONLINE)                               // presence, friends and preferences services
+                        {
+                            ScenePresence sp = World?.GetScenePresence(id);
+                            return sp == null || sp.IsChildAgent;
+                        }
+                        if (data != DATA_NAME && data != DATA_BORN && data != DATA_ACCOUNT_TYPE) return false;   // no account lookup
+                        if (data == DATA_NAME && World?.GetScenePresence(id) != null) return false;
                         return !AccountCached(id, requireAccount: false);
                     }
                     case "llName2Key":
@@ -1079,7 +1086,8 @@ namespace Phlox.ScriptEngine
             if (dm == null) return;
             // Halcyon LSLSystemAPI.cs:5779-5783, its text naming llDialog.
             if (!UUID.TryParse(avatar, out UUID av)) { LSLError("First parameter to llDialog needs to be a key"); return; }
-            if (av == UUID.Zero) return;
+            // Halcyon sends NULL_KEY's text box to no one and still takes the 1 s (LSLSystemAPI.cs:5780-5791).
+            if (av == UUID.Zero) { ScriptSleep(1000); return; }
             if (message != null && message.Length > 1024) message = message.Substring(0, 1024);
             dm.SendTextBoxToUser(av, message, chat_channel, m_host.Name, m_host.UUID, m_host.OwnerID);
             ScriptSleep(1000);
@@ -1205,9 +1213,12 @@ namespace Phlox.ScriptEngine
             llResetTime();
             return elapsed;
         }
-        public int llGetLocalTime() => 0;
-        public int iwGetLocalTime() => 0;
-        public int iwGetLocalTimeOffset() => 0;
+        // The server's local wall clock, as Halcyon's iwGetLocalTime and iwGetLocalTimeOffset return it
+        // (LSLSystemAPI.cs:2666-2674; Util.LocalUnixTimeSinceEpoch, Util.LocalTimeOffset): Unix seconds of the local
+        // clock reading, and its offset from UTC in seconds. iwFormatTime's local branch prints the same clock.
+        public int llGetLocalTime() => iwGetLocalTime();
+        public int iwGetLocalTime() => (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() + iwGetLocalTimeOffset();
+        public int iwGetLocalTimeOffset() => (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow).TotalSeconds;
         public string iwFormatTime(int unixtime, int isUTC, string format)
         {
             DateTime date = OpenSim.Framework.Util.UnixEpoch.AddSeconds(unixtime);
@@ -3877,15 +3888,21 @@ namespace Phlox.ScriptEngine
             m_log.LogDebug("[PhloxAPI]: llResetAnimationOverride: cleared {0} for {1}",
                 anim_state, sp.Name);
         }
+        /// <summary>
+        /// SL wiki llGetUsername: "id must specify a valid avatar key, present in or otherwise known to the sim ...,
+        /// otherwise an empty string is returned"; llGetDisplayName answers for child agents too. As Halcyon
+        /// (ReturnUserFirstLastIfOnSim, LSLSystemAPI.cs:14821-14843) and YEngine (LSL_Api.cs:16024-16027, 16071-16089):
+        /// an avatar the region holds, root or child, else "", with no grid lookup. The display name comes from the
+        /// grid's display-name module where it has one, as YEngine reads it. llRequestUsername and llRequestDisplayName
+        /// answer for absent avatars.
+        /// </summary>
         public string llGetDisplayName(string id)
         {
-            // In OpenSim display names aren't separate from usernames — return avatar name if in region
-            if (!UUID.TryParse(id, out UUID key)) return string.Empty;
+            if (!UUID.TryParse(id, out UUID key) || key == UUID.Zero) return string.Empty;
             ScenePresence sp = World?.GetScenePresence(key);
-            if (sp != null && !sp.IsChildAgent) return sp.Name;
-            // Try user account service for offline users
-            UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
-            return acct != null ? acct.FirstName + " " + acct.LastName : string.Empty;
+            if (sp == null) return string.Empty;
+            IDisplayNameModule names = World.RequestModuleInterface<IDisplayNameModule>();
+            return names != null ? names.GetDisplayName(key) ?? string.Empty : sp.Name;
         }
 
         public void llRequestDisplayName(string id)
@@ -3895,18 +3912,16 @@ namespace Phlox.ScriptEngine
 
         public string llGetUsername(string id)
         {
-            if (!UUID.TryParse(id, out UUID key)) return string.Empty;
-            ScenePresence sp = World?.GetScenePresence(key);
-            if (sp != null && !sp.IsChildAgent) return sp.Name;
-            UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
-            return acct != null ? acct.FirstName + " " + acct.LastName : string.Empty;
+            if (!UUID.TryParse(id, out UUID key) || key == UUID.Zero) return string.Empty;
+            return World?.GetScenePresence(key)?.Name ?? string.Empty;
         }
 
         public void llRequestUsername(string id)
         {
             if (!UUID.TryParse(id, out UUID key)) { ReturnQueryKey(UUID.Zero); return; }
             UUID requestID = NewDataserverQuery();   // On the one dataserver path
-            ReturnQueryKey(requestID);
+            // Halcyon's 100 ms (LSLSystemAPI.cs:14852-14857).
+            m_ScriptEngine.SysReturn(m_itemID, requestID.ToString(), 100);
 
             // Fire the dataserver event with the name (synchronous in Phlox)
             string name = string.Empty;
@@ -3923,6 +3938,22 @@ namespace Phlox.ScriptEngine
 
             PostDataserverEvent(requestID, name);
         }
+
+        /// <summary>InWorldz's DATA_ACCOUNT_TYPE (11001): Halcyon's profile CustomType; here the account's UserTitle.</summary>
+        private const int DATA_ACCOUNT_TYPE = 11001;
+
+        /// <summary>DATA_BORN for an agent with no account: Halcyon's epoch date (LSLSystemAPI.cs:5591-5595).</summary>
+        private string BornOf(UUID agent)
+        {
+            UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, agent);
+            long created = acct?.Created ?? 0;
+            return DateTimeOffset.FromUnixTimeSeconds(created).UtcDateTime.ToString("yyyy-MM-dd");
+        }
+
+        /// <summary>DATA_ACCOUNT_TYPE: the account's UserTitle, the label the viewer's profile shows; "" with no account.</summary>
+        private string AccountTypeOf(UUID agent)
+            => World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, agent)?.UserTitle ?? string.Empty;
+
         public string iwGetAgentData(string id, int data)
         {
             // Synchronous version of llRequestAgentData — faithful port from Halcyon
@@ -3932,8 +3963,9 @@ namespace Phlox.ScriptEngine
                 switch (data)
                 {
                     case DATA_ONLINE:
-                        ScenePresence sp = World?.GetScenePresence(agentId);
-                        return (sp != null && !sp.IsChildAgent) ? "1" : "0";
+                        // llRequestAgentData's rule (Halcyon GetAgentData): online elsewhere counts, subject to
+                        // the owner, friend or "only friends know I'm online" test. NeedsService defers it.
+                        return IsOnlineToThisScript(agentId) ? "1" : "0";
                     case DATA_NAME:
                     {
                         ScenePresence sp2 = World?.GetScenePresence(agentId);
@@ -3943,20 +3975,13 @@ namespace Phlox.ScriptEngine
                         return acct != null ? acct.FirstName + " " + acct.LastName : string.Empty;
                     }
                     case DATA_BORN:
-                    {
-                        UserAccount acct = World?.UserAccountService?.GetUserAccount(
-                            World.RegionInfo.ScopeID, agentId);
-                        if (acct != null)
-                        {
-                            var born = DateTimeOffset.FromUnixTimeSeconds(acct.Created).UtcDateTime;
-                            return born.ToString("yyyy-MM-dd");
-                        }
-                        return string.Empty;
-                    }
+                        return BornOf(agentId);
                     case DATA_RATING: // DATA_RATING — deprecated
                         return "0,0,0,0,0,0";
                     case DATA_PAYINFO:
                         return PayInfo(agentId);
+                    case DATA_ACCOUNT_TYPE:
+                        return AccountTypeOf(agentId);
                     default:
                         return string.Empty;
                 }
@@ -15062,10 +15087,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llRequestAgentData(string id, int data)
         {
             if (m_host == null) { ReturnQueryKey(UUID.Zero); return; }   // Every path returns
-            if (!UUID.TryParse(id, out UUID agentId)) { ReturnQueryKey(UUID.Zero); return; }
 
             UUID queryID = NewDataserverQuery();
             ReturnQueryKey(queryID);
+            // Halcyon (LSLSystemAPI.cs:5639-5651): a key that does not parse still gets a query key and an empty answer.
+            if (!UUID.TryParse(id, out UUID agentId))
+            {
+                PostDataserverEvent(queryID, string.Empty);
+                ScriptSleep(100);
+                return;
+            }
             UUID capturedQuery = queryID;
             UUID capturedAgent = agentId;
             int capturedData = data;
@@ -15098,16 +15129,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             break;
                         }
                         case DATA_BORN: // DATA_BORN — account creation date as "YYYY-MM-DD"
-                        {
-                            UserAccount acct = World?.UserAccountService?.GetUserAccount(
-                                World.RegionInfo.ScopeID, capturedAgent);
-                            if (acct != null)
-                            {
-                                var born = DateTimeOffset.FromUnixTimeSeconds(acct.Created).UtcDateTime;
-                                result = born.ToString("yyyy-MM-dd");
-                            }
+                            result = BornOf(capturedAgent);
                             break;
-                        }
+                        case DATA_ACCOUNT_TYPE:
+                            result = AccountTypeOf(capturedAgent);
+                            break;
                         case DATA_RATING: // DATA_RATING — removed from SL, always return zeroes
                             result = "0,0,0,0,0,0";
                             break;
@@ -15561,7 +15587,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             // Faithful port from Halcyon — look up animation in inventory and return metadata via dataserver
             if (m_host == null) return UUID.Zero.ToString();
             TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.Animation);
-            if (item == null) { ScriptSleep(1000); return UUID.Zero.ToString(); }
+            if (item == null) { ScriptSleep(1000); return string.Empty; }   // Halcyon LSLSystemAPI.cs:5738-5739
 
             UUID queryID = NewDataserverQuery();
             UUID assetId = item.AssetID;
