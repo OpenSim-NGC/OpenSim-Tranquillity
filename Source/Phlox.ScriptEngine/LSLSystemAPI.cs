@@ -5711,8 +5711,29 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             if (any) World.RequestModuleInterface<ITerrainModule>()?.TaintTerrain();
         }
-        public int llCheckRezError(Vector3 pos, int isTemp, int landImpact) { /* InWorldz Scene.CheckRezError not in OpenSim */ return 0; }
-        public int iwCheckRezError(Vector3 pos, int isTemp, int landImpact) { /* InWorldz Scene.CheckRezError not in OpenSim */ return 0; }
+        public int llCheckRezError(Vector3 pos, int isTemp, int landImpact) => iwCheckRezError(pos, isTemp, landImpact);
+
+        // The IW_REZ_* values of Halcyon's compiler, which scripts compare against (DefaultConstants.cs). Halcyon's
+        // Scene.CheckRezError returned its own REZ_* codes, numbered differently, so there only IW_REZ_OK and
+        // IW_REZ_NOT_PERMITTED ever matched by name; Phlox answers in the scripts' numbering.
+        private const int IW_REZ_OK = 0, IW_REZ_NOT_PERMITTED = 1, IW_REZ_NO_LAND_PARCEL = 3, IW_REZ_PARCEL_LAND_IMPACT = 4;
+
+        /// <summary>
+        /// Could the owner rez <paramref name="landImpact"/> prims at <paramref name="pos"/>? Halcyon's Scene.CheckRezError
+        /// (Scene.cs:2341-2367), answered by the checks a rez itself goes through: no parcel there; the region's rez
+        /// permission (CanRezObject, asked with no prims as Halcyon asked it); the same permission asked with the prims the
+        /// rez would add (the prim-limit checks hang off it). IW_REZ_REGION_SCENIC and IW_REZ_REGION_LAND_IMPACT are never
+        /// returned: there are no scenic regions, and no region-wide total is checked apart from the parcels'. isTemp is
+        /// not used, as in Halcyon.
+        /// </summary>
+        public int iwCheckRezError(Vector3 pos, int isTemp, int landImpact)
+        {
+            if (World?.LandChannel?.GetLandObject(pos.X, pos.Y) == null) return IW_REZ_NO_LAND_PARCEL;
+            UUID owner = m_host.OwnerID;
+            if (!World.Permissions.CanRezObject(0, owner, pos)) return IW_REZ_NOT_PERMITTED;
+            if (landImpact > 0 && !World.Permissions.CanRezObject(landImpact, owner, pos)) return IW_REZ_PARCEL_LAND_IMPACT;
+            return IW_REZ_OK;
+        }
         /// <summary>[YEngine] AutomaticLinkPermission, as YEngine reads it (PhloxEngine.AutomaticLinkPermission).</summary>
         private bool AutomaticLinkPermission => m_ScriptEngine != null && m_ScriptEngine.AutomaticLinkPermission;
 
