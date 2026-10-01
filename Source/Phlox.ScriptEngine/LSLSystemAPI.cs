@@ -1044,7 +1044,7 @@ namespace Phlox.ScriptEngine
         public void llSetObjectName(string name)
         {
             if (m_host == null) return;
-            m_host.Name = name;
+            m_host.Name = CapPrimName(name);
             if (m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
             m_host.SendPropertiesToAllClients();
         }
@@ -1053,9 +1053,34 @@ namespace Phlox.ScriptEngine
         public void llSetObjectDesc(string name)
         {
             if (m_host == null) return;
-            m_host.Description = name;
+            m_host.Description = CapPrimDesc(name);
             if (m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
             m_host.SendPropertiesToAllClients();
+        }
+
+        /// <summary>
+        /// A prim name as llSetObjectName and PRIM_NAME store it. SL wiki llSetObjectName: "The name is limited to 63
+        /// characters. Longer prim names are cut short." Halcyon cut it the same way (LimitLength(name, MAX_OBJ_NAME)).
+        /// </summary>
+        private static string CapPrimName(string name)
+        {
+            name ??= string.Empty;
+            return name.Length <= 63 ? name : name.Substring(0, 63);
+        }
+
+        /// <summary>
+        /// A prim description as llSetObjectDesc and PRIM_DESC store it. SL wiki llSetObjectDesc: "The prim
+        /// description is limited to 127 bytes; any string longer then that will be truncated." Bytes of UTF-8 are
+        /// counted, and a character the cut would split is dropped whole.
+        /// </summary>
+        private static string CapPrimDesc(string desc)
+        {
+            desc ??= string.Empty;
+            byte[] utf8 = Encoding.UTF8.GetBytes(desc);
+            if (utf8.Length <= 127) return desc;
+            int cut = 127;
+            while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--; // back to the start of the split character
+            return Encoding.UTF8.GetString(utf8, 0, cut);
         }
         /// <summary>Halcyon llGetNumberOfPrims: LinkCount, the prims plus the avatars seated on them.</summary>
         public int llGetNumberOfPrims()
@@ -1063,7 +1088,8 @@ namespace Phlox.ScriptEngine
             SceneObjectGroup group = m_host?.ParentGroup;
             return group == null ? 1 : group.PrimCount + group.GetSittingAvatarsCount();
         }
-        public int llGetLinkNumber() => m_host?.LinkNum ?? 0;
+        // SL: 0 in an unlinked prim. Halcyon checks PartCount, so a root left alone by a break reads 0 whatever LinkNum it kept.
+        public int llGetLinkNumber() => m_host?.ParentGroup != null && m_host.ParentGroup.PrimCount > 1 ? m_host.LinkNum : 0;
         public int llGetNumberOfSides() => m_host?.GetNumberOfSides() ?? 0;
         public string llGetScriptName() => GetInventorySelf()?.Name ?? string.Empty;
         public string llGetRegionName() => World?.RegionInfo?.RegionName ?? string.Empty;
@@ -2958,7 +2984,7 @@ namespace Phlox.ScriptEngine
             {
                 part.SitTargetPosition = new Vector3(Math.Clamp(offset.X, -300f, 300f),
                     Math.Clamp(offset.Y, -300f, 300f), Math.Clamp(offset.Z, -300f, 300f));
-                part.SitTargetOrientation = rot;
+                part.SitTargetOrientation = NormalizedRot(rot);   // Halcyon Rot2Quaternion; core assumes a unit rotation
             }
             else
             {
@@ -5500,14 +5526,30 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (m_host?.ParentGroup == null || m_host.ParentGroup.IsAttachment) return;
             SceneObjectGroup parentGroup = m_host.ParentGroup;
 
-            if (linknum == LINK_ROOT) // break all children off, leave root alone
+            if (linknum == LINK_ROOT)
             {
+                // Take the root out and keep the rest linked (Halcyon :4858-4877; SL: the other prims stay linked).
+                // Every child is delinked, then the others are linked again to the first of them, its new root.
                 var parts = new List<SceneObjectPart>(parentGroup.Parts);
                 parts.RemoveAll(p => p.LocalId == parentGroup.RootPart.LocalId);
                 if (parts.Count == 0) return;
+                parts.Sort((a, b) => a.LinkNum.CompareTo(b.LinkNum));
+                var groups = new List<SceneObjectGroup>();
                 foreach (SceneObjectPart p in parts)
-                    parentGroup.DelinkFromGroup(p, true);
+                {
+                    SceneObjectGroup g = parentGroup.DelinkFromGroup(p, true);
+                    if (g != null) groups.Add(g);
+                }
                 parentGroup.TriggerScriptChangedEvent(Changed.LINK);
+                if (groups.Count > 1)
+                {
+                    SceneObjectGroup newRoot = groups[0];
+                    for (int i = 1; i < groups.Count; i++)
+                        newRoot.LinkToGroup(groups[i]);
+                    newRoot.TriggerScriptChangedEvent(Changed.LINK);
+                    newRoot.HasGroupChanged = true;
+                    newRoot.ScheduleGroupForFullUpdate();
+                }
                 return;
             }
 
@@ -5715,8 +5757,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         private UUID KeyOrName(string k)
         {
             if (string.IsNullOrEmpty(k)) return UUID.Zero;
-            if (UUID.TryParse(k, out UUID id)) return id;
-            // Not a UUID — search the host prim's inventory for a matching item name.
+            // The prim's inventory first, then a key (Halcyon :692-717): "no-one can name an inventory item with a
+            // UUID string and have this code return the UUID in the name instead of the inventory item's UUID".
             lock (m_host.TaskInventory)
             {
                 foreach (var kvp in m_host.TaskInventory)
@@ -5725,7 +5767,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         return kvp.Value.AssetID;
                 }
             }
-            return UUID.Zero;
+            return UUID.TryParse(k, out UUID id) ? id : UUID.Zero;
         }
 
         /// <summary>
@@ -6499,10 +6541,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     int face; float glow;
                     try { face = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
                     try { glow = (float)Convert.ToDouble(data[idx++]); } catch { break; }
-                    glow = Math.Max(0f, Math.Min(1f, glow));
+                    glow = Math.Max(0f, Math.Min(1f, glow));   // SL: glow is 0.0 to 1.0
+                    // Halcyon SetGlow (:1805-1826): the prim's own faces, and with ALL_SIDES the default face too; a
+                    // face the prim does not have is ignored.
+                    int sides = part.GetNumberOfSides();
                     Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
-                    if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) te.CreateFace((uint)i).Glow = glow; }
-                    else { try { te.CreateFace((uint)face).Glow = glow; } catch { } }
+                    if (face == ALL_SIDES)
+                    {
+                        for (int i = 0; i < sides; i++) te.CreateFace((uint)i).Glow = glow;
+                        te.DefaultTexture.Glow = glow;
+                    }
+                    else if (face >= 0 && face < sides) te.CreateFace((uint)face).Glow = glow;
+                    else break;
                     part.UpdateTextureEntry(te.GetBytes());
                     break;
                 }
@@ -6547,6 +6597,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     if (idx >= data.Length) break;
                     int mat;
                     try { mat = Convert.ToInt32(data[idx++]); } catch { break; }
+                    // PRIM_MATERIAL_STONE (0) to PRIM_MATERIAL_LIGHT (7); Halcyon refused anything else.
+                    if (mat < 0 || mat > 7) break;
                     part.Material = (byte)mat;
                     if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
                     part.ScheduleFullUpdate();
@@ -6680,6 +6732,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     try { wind      = (float)Convert.ToDouble(data[idx++]); } catch { idx += 2; break; }
                     try { tension   = (float)Convert.ToDouble(data[idx++]); } catch { idx++; break; }
                     try { force     = (Vector3)data[idx++]; } catch { break; }
+                    SceneObjectGroup sog = part.ParentGroup;
+                    if (sog != null && (sog.IsDeleted || sog.inTransit)) break;
                     var shape = part.Shape;
                     shape.FlexiEntry    = flex;
                     shape.FlexiSoftness = softness;
@@ -6690,8 +6744,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     shape.FlexiForceX   = force.X;
                     shape.FlexiForceY   = force.Y;
                     shape.FlexiForceZ   = force.Z;
+                    // The path curve is what makes a prim flexible (Halcyon :2027: the FlexiEntry setting alone "isn't
+                    // working"): Flexible on, Straight off, for a straight unsculpted prim (YEngine SetFlexi). Flexible
+                    // prims are phantom, so the object becomes phantom (YEngine; Halcyon for a root).
+                    bool phantom = false;
+                    if (!shape.SculptEntry && (shape.PathCurve == (byte)Extrusion.Straight || shape.PathCurve == (byte)Extrusion.Flexible))
+                    {
+                        shape.PathCurve = flex ? (byte)Extrusion.Flexible : (byte)Extrusion.Straight;
+                        phantom = flex && sog != null && !sog.IsPhantom;
+                    }
                     part.Shape = shape;
-                    if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
+                    if (phantom) sog.ScriptSetPhantomStatus(true);
+                    if (sog != null) sog.HasGroupChanged = true;
                     part.ScheduleFullUpdate();
                     break;
                 }
@@ -6705,14 +6769,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     try { intensity = (float)Convert.ToDouble(data[idx++]); } catch { idx += 2; break; }
                     try { radius    = (float)Convert.ToDouble(data[idx++]); } catch { idx++; break; }
                     try { falloff   = (float)Convert.ToDouble(data[idx++]); } catch { break; }
+                    // SL wiki PRIM_POINT_LIGHT ranges: colour 0..1, intensity 0..1, radius 0.1..20, falloff 0.01..2
+                    // (YEngine SetPointLight; Halcyon clipped the colour).
                     var shape = part.Shape;
                     shape.LightEntry     = enabled;
-                    shape.LightColorR    = color.X;
-                    shape.LightColorG    = color.Y;
-                    shape.LightColorB    = color.Z;
-                    shape.LightIntensity = intensity;
-                    shape.LightRadius    = radius;
-                    shape.LightFalloff   = falloff;
+                    shape.LightColorR    = Math.Clamp(color.X, 0f, 1f);
+                    shape.LightColorG    = Math.Clamp(color.Y, 0f, 1f);
+                    shape.LightColorB    = Math.Clamp(color.Z, 0f, 1f);
+                    shape.LightIntensity = Math.Clamp(intensity, 0f, 1f);
+                    shape.LightRadius    = Math.Clamp(radius, 0.1f, 20f);
+                    shape.LightFalloff   = Math.Clamp(falloff, 0.01f, 2f);
                     part.Shape = shape;
                     if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
                     part.ScheduleFullUpdate();
@@ -7043,7 +7109,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 {
                     if (idx >= data.Length) break;
                     string name = data[idx++].ToString();
-                    part.Name = name;
+                    part.Name = CapPrimName(name);
                     break;
                 }
 
@@ -7051,7 +7117,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 {
                     if (idx >= data.Length) break;
                     string desc = data[idx++].ToString();
-                    part.Description = desc;
+                    part.Description = CapPrimDesc(desc);
                     break;
                 }
 
@@ -7264,13 +7330,24 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
 
                 int end = target < 0 ? data.Length : target;
-                var segment = new object[end - start];
-                Array.Copy(data, start, segment, 0, segment.Length);
-                var segmentRules = new LSLList(segment);
-                foreach (var part in parts)
-                    result += GetPrimParams(part, segmentRules);
-                foreach (var sp in sitters)
-                    result += GetSitterPrimParams(sp, segmentRules);
+                // Each rule for every prim (and seated avatar) before the next rule, as Halcyon's GetPrimParams walks
+                // them: [r1(p1), r1(p2), r2(p1), r2(p2)].
+                var partList = parts as IList<SceneObjectPart> ?? parts.ToList();
+                var sitterList = sitters as IList<ScenePresence> ?? sitters.ToList();
+                int r = start;
+                while (r < end)
+                {
+                    int len = data[r] is int rc ? 1 + PrimParamRules.GetValueCount(rc) : end - r;
+                    if (r + len > end) len = end - r;
+                    var one = new object[len];
+                    Array.Copy(data, r, one, 0, len);
+                    var oneRule = new LSLList(one);
+                    foreach (var part in partList)
+                        result += GetPrimParams(part, oneRule);
+                    foreach (var sp in sitterList)
+                        result += GetSitterPrimParams(sp, oneRule);
+                    r += len;
+                }
 
                 if (target < 0 || target + 1 >= data.Length || data[target + 1] is not int link) break;
                 parts = GetLinkParts(link).ToList();
@@ -7632,6 +7709,22 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// has one, so the walk goes on with the next rule. PRIM_LINK_TARGET takes its link and changes nothing
         /// here: the walk above (and osGetPrimitiveParams' one prim) decides which prims a rule reads.
         /// </summary>
+        /// <summary>
+        /// The faces a per-face read reports: every face of the prim in turn for ALL_SIDES, the one face asked for, or
+        /// none for a face the prim does not have (Halcyon GetPrimParams; SL: ALL_SIDES gives one entry per face). An
+        /// entry is null when the prim has no texture entry at all.
+        /// </summary>
+        private static IEnumerable<Primitive.TextureEntryFace> FacesRead(SceneObjectPart part, int face)
+        {
+            int sides = part.GetNumberOfSides();
+            int first = face == ALL_SIDES ? 0 : face;
+            int last = face == ALL_SIDES ? sides - 1 : face;
+            if (first < 0 || last >= sides) yield break;
+            Primitive.TextureEntry te = part.Shape.Textures;
+            for (int f = first; f <= last; f++)
+                yield return te?.GetFace((uint)f);
+        }
+
         private LSLList GetPrimParams(SceneObjectPart part, LSLList parms)
         {
             if (part == null || parms == null) return new LSLList();
@@ -7655,12 +7748,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        if (te == null) { result.Add(Vector3.One); result.Add(1f); break; }
-                        Primitive.TextureEntryFace f = face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face);
-                        if (f == null) f = te.DefaultTexture;
-                        result.Add(new Vector3(f.RGBA.R, f.RGBA.G, f.RGBA.B));
-                        result.Add(f.RGBA.A);
+                        foreach (var f in FacesRead(part, face))
+                        {
+                            if (f == null) { result.Add(Vector3.One); result.Add(1f); continue; }
+                            result.Add(new Vector3(f.RGBA.R, f.RGBA.G, f.RGBA.B));
+                            result.Add(f.RGBA.A);
+                        }
                         break;
                     }
 
@@ -7668,15 +7761,15 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        if (te == null) { result.Add(UUID.Zero.ToString()); result.Add(new Vector3(1,1,0)); result.Add(Vector3.Zero); result.Add(0f); break; }
-                        Primitive.TextureEntryFace f = face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face);
-                        if (f == null) f = te.DefaultTexture;
-                        // Halcyon's name / full-perm key / NULL_KEY rule.
-                        result.Add(ConditionalTextureNameOrUUID(part, f.TextureID));
-                        result.Add(new Vector3(f.RepeatU, f.RepeatV, 0));
-                        result.Add(new Vector3(f.OffsetU, f.OffsetV, 0));
-                        result.Add(f.Rotation);
+                        foreach (var f in FacesRead(part, face))
+                        {
+                            if (f == null) { result.Add(UUID.Zero.ToString()); result.Add(new Vector3(1,1,0)); result.Add(Vector3.Zero); result.Add(0f); continue; }
+                            // Halcyon's name / full-perm key / NULL_KEY rule.
+                            result.Add(ConditionalTextureNameOrUUID(part, f.TextureID));
+                            result.Add(new Vector3(f.RepeatU, f.RepeatV, 0));
+                            result.Add(new Vector3(f.OffsetU, f.OffsetV, 0));
+                            result.Add(f.Rotation);
+                        }
                         break;
                     }
 
@@ -7684,9 +7777,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        Primitive.TextureEntryFace f = te == null ? null : (face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face));
-                        result.Add(f?.Glow ?? 0f);
+                        foreach (var f in FacesRead(part, face))
+                            result.Add(f?.Glow ?? 0f);
                         break;
                     }
 
@@ -7694,9 +7786,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        Primitive.TextureEntryFace f = te == null ? null : (face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face));
-                        result.Add(f?.Fullbright == true ? 1 : 0);
+                        foreach (var f in FacesRead(part, face))
+                            result.Add(f?.Fullbright == true ? 1 : 0);
                         break;
                     }
 
@@ -7704,10 +7795,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        Primitive.TextureEntryFace f = te == null ? null : (face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face));
-                        result.Add((int)(f?.Shiny ?? Shininess.None) >> 6);   // Back to PRIM_SHINY_* 0..3
-                        result.Add((int)(f?.Bump  ?? Bumpiness.None));
+                        foreach (var f in FacesRead(part, face))
+                        {
+                            result.Add((int)(f?.Shiny ?? Shininess.None) >> 6);   // Back to PRIM_SHINY_* 0..3
+                            result.Add((int)(f?.Bump  ?? Bumpiness.None));
+                        }
                         break;
                     }
 
@@ -8076,20 +8168,39 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return UUID.Zero.ToString();
         }
 
+        /// <summary>
+        /// SL: "If link is out of bounds, NULL_KEY is returned." The rest is Halcyon's table (:4924-5010):
+        /// - in an unlinked prim only 0 and LINK_THIS name it;
+        /// - from the root, LINK_THIS and LINK_ROOT name the root, 0 is NULL_KEY, and the other negative numbers name
+        ///   link 2;
+        /// - from a child, LINK_THIS names it, and 0, LINK_ROOT and the other negative numbers name the root;
+        /// - a number past the prims is a seated avatar, by its name.
+        /// </summary>
         public string llGetLinkName(int linknumber)
         {
-            if (m_host == null) return string.Empty;
+            string nullKey = UUID.Zero.ToString();
+            if (m_host == null) return nullKey;
             SceneObjectGroup group = m_host.ParentGroup;
-            if (group == null) return string.Empty;
-            SceneObjectPart part = GetSingleLinkPart(linknumber);
-            if (part != null) return part.Name;
-            // Halcyon: a number past the prims is a seated avatar, named by its legacy name.
+            if (group == null) return nullKey;
             if (linknumber > group.PrimCount)
             {
                 var sitters = GetLinkSitters(linknumber);
-                if (sitters.Count == 1) return sitters[0].Name;
+                return sitters.Count == 1 ? sitters[0].Name : nullKey;
             }
-            return string.Empty;
+
+            SceneObjectPart part;
+            if (group.PrimCount == 1)
+                part = linknumber == 0 || linknumber == LINK_THIS ? m_host : null;
+            else if (m_host == group.RootPart)
+                part = linknumber == LINK_THIS || linknumber == LINK_ROOT ? m_host
+                     : linknumber < 0 ? group.GetLinkNumPart(2)
+                     : linknumber == 0 ? null
+                     : group.GetLinkNumPart(linknumber);
+            else
+                part = linknumber == LINK_THIS ? m_host
+                     : linknumber <= 1 ? group.RootPart
+                     : group.GetLinkNumPart(linknumber);
+            return part?.Name ?? nullKey;
         }
 
         public int llGetLinkNumberOfSides(int link)

@@ -315,7 +315,7 @@ public class SeatedAvatarLinkTests
                          "llSay(0, \"k=\" + (string)llGetLinkKey(LINK_SET));");
         Assert.Equal("2", Line(h, "n="));
         Assert.Equal(UUID.Zero.ToString(), Line(h, "k3="));
-        Assert.Equal("", Line(h, "n3="));
+        Assert.Equal(UUID.Zero.ToString(), Line(h, "n3="));   // SL: "If link is out of bounds, NULL_KEY is returned."
         Assert.Equal("p1,p2", Line(h, "set="));
         Assert.Equal(UUID.Zero.ToString(), Line(h, "k="));
     }
