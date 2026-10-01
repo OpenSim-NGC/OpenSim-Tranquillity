@@ -268,4 +268,66 @@ public class ScriptExperiencePersistenceTests : OpenSimTestCase
         Assert.NotNull(item);
         Assert.Equal(s_experience, item.ExperienceID);
     }
+
+    // ---- script copied from one prim to another ------------------------------------------------------------------
+
+    // The link belongs to the compiled script, so a copy of the script carries it.
+
+    private static (TestScene scene, SceneObjectPart src, SceneObjectPart dest, TaskInventoryItem withExperience,
+        TaskInventoryItem withoutExperience) NewPrimsWithScripts()
+    {
+        TestScene scene = new SceneHelpers().SetupScene();
+        UUID owner = UUID.Random();
+        SceneObjectPart src = SceneHelpers.AddSceneObject(scene, "source", owner).RootPart;
+        SceneObjectPart dest = SceneHelpers.AddSceneObject(scene, "destination", owner).RootPart;
+
+        TaskInventoryItem withExperience = NewScriptItem(src, s_experience);
+        withExperience.Name = "with experience";
+        TaskInventoryItem withoutExperience = NewScriptItem(src, UUID.Zero);
+        withoutExperience.Name = "without experience";
+        src.Inventory.AddInventoryItem(withExperience, false);
+        src.Inventory.AddInventoryItem(withoutExperience, false);
+        return (scene, src, dest, withExperience, withoutExperience);
+    }
+
+    private static TaskInventoryItem CopiedItem(SceneObjectPart dest, string name)
+    {
+        TaskInventoryItem item = dest.Inventory.GetInventoryItem(name);
+        Assert.NotNull(item);
+        return item;
+    }
+
+    /// <summary>llGiveInventory, llGiveInventoryList and osGiveLinkInventory(List) to a prim.</summary>
+    [Fact]
+    public void MoveTaskInventoryItem_ToAnotherPrim_KeepsExperienceID()
+    {
+        (TestScene scene, SceneObjectPart src, SceneObjectPart dest, TaskInventoryItem withExperience,
+            TaskInventoryItem withoutExperience) = NewPrimsWithScripts();
+
+        scene.MoveTaskInventoryItem(dest.UUID, src, withExperience.ItemID);
+        scene.MoveTaskInventoryItems(dest.UUID, "ignored", src, new List<UUID> { withoutExperience.ItemID });
+
+        TaskInventoryItem copied = CopiedItem(dest, "with experience");
+        Assert.NotEqual(withExperience.ItemID, copied.ItemID);
+        Assert.Equal(s_experience, copied.ExperienceID);
+        Assert.Equal(UUID.Zero, CopiedItem(dest, "without experience").ExperienceID);
+    }
+
+    /// <summary>llRemoteLoadScriptPin.</summary>
+    [Fact]
+    public void RezScriptFromPrim_KeepsExperienceID()
+    {
+        (TestScene scene, SceneObjectPart src, SceneObjectPart dest, TaskInventoryItem withExperience,
+            TaskInventoryItem withoutExperience) = NewPrimsWithScripts();
+        const int pin = 4711;
+        dest.ScriptAccessPin = pin;
+
+        scene.RezScriptFromPrim(withExperience.ItemID, src, dest.UUID, pin, 0, 0);
+        scene.RezScriptFromPrim(withoutExperience.ItemID, src, dest.UUID, pin, 0, 0);
+
+        TaskInventoryItem copied = CopiedItem(dest, "with experience");
+        Assert.NotEqual(withExperience.ItemID, copied.ItemID);
+        Assert.Equal(s_experience, copied.ExperienceID);
+        Assert.Equal(UUID.Zero, CopiedItem(dest, "without experience").ExperienceID);
+    }
 }
