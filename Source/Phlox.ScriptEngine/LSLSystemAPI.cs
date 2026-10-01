@@ -2336,6 +2336,18 @@ namespace Phlox.ScriptEngine
             if (m_host.ParentGroup.HasSittingAvatar(agentID))
                 return SlConst.PERMISSION_TAKE_CONTROLS | SlConst.PERMISSION_TRIGGER_ANIMATION |
                        SlConst.PERMISSION_TRACK_CAMERA | SlConst.PERMISSION_CONTROL_CAMERA;
+            // Halcyon LSLSystemAPI.cs:4446-4460: a bot cannot answer a permission dialog, so one the object's owner
+            // owns, or one sitting on an object the owner owns, grants PERMISSION_TRIGGER_ANIMATION.
+            ScenePresence bot = World.GetScenePresence(agentID);
+            if (bot != null && bot.IsNPC && !bot.IsChildAgent)
+            {
+                UUID botOwner = World.RequestModuleInterface<INPCModule>()?.GetOwner(agentID) ?? UUID.Zero;
+                if (botOwner != UUID.Zero && botOwner == m_host.OwnerID)
+                    return SlConst.PERMISSION_TRIGGER_ANIMATION;
+                SceneObjectPart seat = bot.ParentPart;
+                if (seat != null && seat.OwnerID == m_host.OwnerID)
+                    return SlConst.PERMISSION_TRIGGER_ANIMATION;
+            }
             return 0;
         }
 
@@ -2683,6 +2695,16 @@ namespace Phlox.ScriptEngine
             for (int i = 0; i + 1 < data.Length; i += 2)
             {
                 if (!int.TryParse(data[i].ToString(), out int camType)) continue;
+                // The vector rules CAMERA_FOCUS_OFFSET (9), CAMERA_POSITION (13) and CAMERA_FOCUS (17) go to the viewer
+                // as three floats, type + 1 .. type + 3 (Halcyon LSLSystemAPI.cs:13617-13626).
+                if (camType == 9 || camType == 13 || camType == 17)
+                {
+                    if (data[i + 1] is not Vector3 v) continue;
+                    parameters[camType + 1] = v.X;
+                    parameters[camType + 2] = v.Y;
+                    parameters[camType + 3] = v.Z;
+                    continue;
+                }
                 if (!float.TryParse(data[i + 1].ToString(), System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out float camVal)) continue;
                 parameters[camType] = camVal;
@@ -2916,11 +2938,15 @@ namespace Phlox.ScriptEngine
             }
             // YEngine (LSL_Api.llAttachToAvatar): only the object's owner can be attached to.
             if (item.PermsGranter != m_host.OwnerID) return;
+            // SL: "If the object is already attached the function fails silently" (Halcyon :3780-3781, YEngine :4148-4150).
+            if (m_host.ParentGroup.IsAttachment) return;
             IAttachmentsModule attachMod = World.RequestModuleInterface<IAttachmentsModule>();
             if (attachMod == null) return;
             ScenePresence sp = World.GetScenePresence(item.PermsGranter);
             if (sp == null || sp.IsChildAgent) return;
-            attachMod.AttachObject(sp, m_host.ParentGroup, (uint)attach_point, false, true, false, GetScriptExperienceId());
+            // SL: "Attach points can be occupied by multiple attachments": append, never knock off what is already worn
+            // there (Halcyon :3819-3823, YEngine :4115).
+            attachMod.AttachObject(sp, m_host.ParentGroup, (uint)attach_point, false, true, true, GetScriptExperienceId());
         }
 
         /// <summary>
@@ -3008,6 +3034,8 @@ namespace Phlox.ScriptEngine
                 ShoutError("llDetachFromAvatar: PERMISSION_ATTACH not granted.");
                 return;
             }
+            // The permission must be the owner's (SL; Halcyon LSLSystemAPI.cs:3847-3848, silently otherwise).
+            if (item.PermsGranter != m_host.OwnerID) return;
             IAttachmentsModule attachMod = World.RequestModuleInterface<IAttachmentsModule>();
             if (attachMod == null) return;
             ScenePresence sp = World.GetScenePresence(m_host.ParentGroup.AttachedAvatar);
@@ -3065,12 +3093,11 @@ namespace Phlox.ScriptEngine
 			ScenePresence sp = World?.GetScenePresence(targetId);
 			if (sp == null || sp.ParentID == 0) return;
 
-			// Only unsit if they're sitting on this object, or script owner is unsitting them
+			// Only unsit if they're sitting on this object, or by the land rules below. The owner is no exception
+			// (SL; Halcyon :7957-7990 and YEngine :7506-7539 have no owner case).
 			SceneObjectPart seatPart = World.GetSceneObjectPart(sp.ParentID);
 			if (seatPart != null && seatPart.ParentGroup?.UUID == m_host.ParentGroup?.UUID)
 				sp.StandUp();
-			else if (m_host.OwnerID == sp.UUID)
-				sp.StandUp(); // owner can always stand themselves up
 			else
 			{
 				// Halcyon LSLSystemAPI.cs:7981-7990: the object's owner owns the avatar's parcel, the object is deeded
@@ -3104,10 +3131,12 @@ namespace Phlox.ScriptEngine
         public void iwLinkStandTarget(int link, Vector3 offset, Quaternion rot)
         {
             // Faithful port from Halcyon, adapted for this tree.
-            // This tree's SOP only has StandOffset (Vector3), no StandTargetRot.
+            // This tree's SOP only has StandOffset (Vector3), no StandTargetRot: the rotation is not used.
             foreach (SceneObjectPart part in GetLinkParts(link))
             {
                 part.StandOffset = offset;
+                // Saved with the object, as OSSL's osSetStandTarget marks it (OSSL_Api.cs:6051-6082).
+                if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
             }
         }
         public void llSetSitText(string text)
@@ -3193,6 +3222,23 @@ namespace Phlox.ScriptEngine
             if ((ctrlFlags & 0x00400000u) != 0) flags |= AGENT_AWAY;
             if ((ctrlFlags & 0x00020000u) != 0) flags |= AGENT_MOUSELOOK;
 
+            // Halcyon LSLSystemAPI.cs:7173-7212 (and YEngine llGetAgentInfo): typing from the agent state; busy from
+            // the BUSY animation (there is no server-side busy mode); crouching and walking from the movement
+            // animation (SL: AGENT_WALKING is "walking, running or crouch walking"); a ground sit is sitting.
+            const int AGENT_TYPING = 0x0200, AGENT_CROUCHING = 0x0400, AGENT_BUSY = 0x0800;
+            if ((sp.State & (byte)AgentState.Typing) != 0) flags |= AGENT_TYPING;
+            if (sp.Animator != null)
+            {
+                if (sp.Animator.HasAnimation(OpenSim.Region.Framework.Scenes.Animation.DefaultAvatarAnimations.GetDefaultAnimation("BUSY")))
+                    flags |= AGENT_BUSY;
+                string movement = sp.Animator.CurrentMovementAnimation;
+                if (movement == "CROUCH") flags |= AGENT_CROUCHING;
+                if (movement == "WALK" || movement == "CROUCHWALK" || movement == "RUN") flags |= AGENT_WALKING;
+                UUID groundSit = OpenSim.Region.Framework.Scenes.Animation.DefaultAvatarAnimations.GetDefaultAnimation("SIT_GROUND_CONSTRAINED");
+                if (groundSit != UUID.Zero && sp.Animator.Animations.ImplicitDefaultAnimation.AnimID == groundSit)
+                    flags |= AGENT_SITTING;
+            }
+
             // Sitting detection
             if (sp.ParentPart != null)
             {
@@ -3200,7 +3246,7 @@ namespace Phlox.ScriptEngine
                 flags |= AGENT_SITTING;
             }
 
-            // Flying / in-air (only if not sitting)
+            // Flying / in-air (only if not sitting); not in the air while walking or crouching (Halcyon :7233-7238)
             if ((flags & AGENT_SITTING) == 0)
             {
                 if (sp.Flying)
@@ -3208,18 +3254,10 @@ namespace Phlox.ScriptEngine
                     flags |= AGENT_FLYING;
                     flags |= AGENT_IN_AIR;
                 }
-                else if (sp.PhysicsActor != null && !sp.PhysicsActor.IsColliding)
+                else if ((flags & (AGENT_WALKING | AGENT_CROUCHING)) == 0 && sp.PhysicsActor != null && !sp.PhysicsActor.IsColliding)
                 {
                     flags |= AGENT_IN_AIR;
                 }
-            }
-
-            // Walking/crouching — use control flags
-            // AGENT_CONTROL_AT_POS=0x01, AGENT_CONTROL_AT_NEG=0x02
-            if (!sp.Flying && (flags & AGENT_SITTING) == 0)
-            {
-                if ((ctrlFlags & 0x03u) != 0)
-                    flags |= AGENT_WALKING;
             }
 
             return flags;
@@ -3243,16 +3281,20 @@ namespace Phlox.ScriptEngine
         }
         public int llSameGroup(string id)
         {
+            // Halcyon llSameGroup and HasMatchingGroup (LSLSystemAPI.cs:7919-7954): NULL_KEY matches a prim with no
+            // group; an object or avatar matches when its group (an avatar's active group) is the prim's, no group
+            // matching no group; a child agent never matches.
             if (!UUID.TryParse(id, out UUID key)) return 0;
             UUID hostGroup = m_host.GroupID;
+            if (key == UUID.Zero) return hostGroup == UUID.Zero ? 1 : 0;
             // Check objects
             SceneObjectPart part = World?.GetSceneObjectPart(key);
             if (part != null)
-                return (part.GroupID == hostGroup && hostGroup != UUID.Zero) ? 1 : 0;
+                return part.GroupID == hostGroup ? 1 : 0;
             // Check avatars
             ScenePresence sp = World?.GetScenePresence(key);
             if (sp != null)
-                return (sp.ControllingClient.ActiveGroupId == hostGroup && hostGroup != UUID.Zero) ? 1 : 0;
+                return !sp.IsChildAgent && sp.ControllingClient.ActiveGroupId == hostGroup ? 1 : 0;
             return 0;
         }
         public int llIsFriend(string agent)
@@ -3652,67 +3694,70 @@ namespace Phlox.ScriptEngine
             return new LSLList(l);
         }
 
-        public void llStartAnimation(string anim)
+        /// <summary>
+        /// The animation a start form plays: one in <paramref name="part"/>'s inventory by name, else a built-in animation
+        /// by name (SL wiki llStartAnimation: "an item in the inventory of the prim this script is in or built-in
+        /// animation"). Never a key: Halcyon and YEngine both say "Do NOT try to parse UUID, animations cannot be
+        /// triggered by ID" (YEngine LSL_Api.llStartAnimation), so a script cannot play animations it does not hold.
+        /// Nothing found shouts Halcyon's text on DEBUG_CHANNEL (SL: "an error is shouted on DEBUG_CHANNEL") and gives
+        /// UUID.Zero.
+        /// </summary>
+        private UUID AnimationToStart(SceneObjectPart part, string anim)
         {
-            TaskInventoryItem item = GetInventorySelf();
-            if (item == null || item.PermsGranter == UUID.Zero) return;
-            if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0) return;
-
-            ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
-            if (sp == null || sp.IsChildAgent) { AnimationGranterAbsent(); return; }
-
-            // Resolve to UUID: try inventory first, then direct parse
-            UUID animID = FindInventoryItem(anim, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
-            if (animID == UUID.Zero) UUID.TryParse(anim, out animID);
-            if (animID == UUID.Zero) return;
-
-            sp.Animator.AddAnimation(animID, m_host.UUID);
-            sp.TriggerScenePresenceUpdated();
+            UUID animID = InventoryAnimation(part, anim);
+            if (animID == UUID.Zero && !string.IsNullOrEmpty(anim))
+                animID = OpenSim.Region.Framework.Scenes.Animation.DefaultAvatarAnimations.GetDefaultAnimation(anim);
+            if (animID == UUID.Zero) ScriptShoutError("Could not find animation '" + anim + "'");
+            return animID;
         }
 
-        public void llStopAnimation(string anim)
+        /// <summary>
+        /// The animation a stop form stops: a key as given, else one in <paramref name="part"/>'s inventory by name,
+        /// else a built-in animation by name (Halcyon StopAnimation; YEngine llStopAnimation). UUID.Zero if none.
+        /// </summary>
+        private UUID AnimationToStop(SceneObjectPart part, string anim)
         {
-            TaskInventoryItem item = GetInventorySelf();
-            if (item == null || item.PermsGranter == UUID.Zero) return;
-            if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0) return;
-
-            ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
-            if (sp == null || sp.IsChildAgent) { AnimationGranterAbsent(); return; }
-
-            UUID animID;
-            if (!UUID.TryParse(anim, out animID))
-                animID = FindInventoryItem(anim, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
-            if (animID == UUID.Zero) return;
-
-            sp.Animator.RemoveAnimation(animID, false);
-            sp.TriggerScenePresenceUpdated();
+            if (UUID.TryParse(anim, out UUID animID)) return animID;
+            animID = InventoryAnimation(part, anim);
+            if (animID == UUID.Zero && !string.IsNullOrEmpty(anim))
+                animID = OpenSim.Region.Framework.Scenes.Animation.DefaultAvatarAnimations.GetDefaultAnimation(anim);
+            return animID;
         }
+
+        private static UUID InventoryAnimation(SceneObjectPart part, string name)
+        {
+            if (part == null) return UUID.Zero;
+            lock (part.TaskInventory)
+                foreach (var kvp in part.TaskInventory)
+                    if (kvp.Value.Name == name && kvp.Value.Type == (int)AssetType.Animation)
+                        return kvp.Value.AssetID;
+            return UUID.Zero;
+        }
+
+        /// <summary>
+        /// The one prim an iw*LinkAnimation reads: Halcyon's iwStartLinkAnimation and iwStopLinkAnimation ignore a
+        /// negative link number and use one prim (GetLinkOnePrimOnly, LSLSystemAPI.cs:4140-4146, :4263-4270).
+        /// </summary>
+        private SceneObjectPart LinkAnimationPart(int link)
+            => link < 0 ? null : GetLinkParts(link).FirstOrDefault();
+
+        public void llStartAnimation(string anim) => StartAnimation(m_host, anim);
+
+        public void llStopAnimation(string anim) => StopAnimation(m_host, anim);
+
         public void iwStartLinkAnimation(int link, string anim)
         {
-            TaskInventoryItem item = GetInventorySelf();
-            if (item == null || item.PermsGranter == UUID.Zero) return;
-            if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0) return;
-
-            ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
-            if (sp == null || sp.IsChildAgent) { AnimationGranterAbsent(); return; }
-
-            // Find animation in the specified link's inventory
-            UUID animID = UUID.Zero;
-            foreach (SceneObjectPart part in GetLinkParts(link))
-            {
-                lock (part.TaskInventory)
-                    foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Name == anim && kvp.Value.Type == (int)AssetType.Animation)
-                        { animID = kvp.Value.AssetID; break; }
-                if (animID != UUID.Zero) break;
-            }
-            if (animID == UUID.Zero) UUID.TryParse(anim, out animID);
-            if (animID == UUID.Zero) return;
-
-            sp.Animator.AddAnimation(animID, m_host.UUID);
-            sp.TriggerScenePresenceUpdated();
+            SceneObjectPart part = LinkAnimationPart(link);
+            if (part != null) StartAnimation(part, anim);
         }
+
         public void iwStopLinkAnimation(int link, string anim)
+        {
+            SceneObjectPart part = LinkAnimationPart(link);
+            if (part != null) StopAnimation(part, anim);
+        }
+
+        private void StartAnimation(SceneObjectPart part, string anim)
         {
             TaskInventoryItem item = GetInventorySelf();
             if (item == null || item.PermsGranter == UUID.Zero) return;
@@ -3721,18 +3766,23 @@ namespace Phlox.ScriptEngine
             ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
             if (sp == null || sp.IsChildAgent) { AnimationGranterAbsent(); return; }
 
-            UUID animID = UUID.Zero;
-            if (!UUID.TryParse(anim, out animID))
-            {
-                foreach (SceneObjectPart part in GetLinkParts(link))
-                {
-                    lock (part.TaskInventory)
-                        foreach (var kvp in part.TaskInventory)
-                            if (kvp.Value.Name == anim && kvp.Value.Type == (int)AssetType.Animation)
-                            { animID = kvp.Value.AssetID; break; }
-                    if (animID != UUID.Zero) break;
-                }
-            }
+            UUID animID = AnimationToStart(part, anim);
+            if (animID == UUID.Zero) return;
+
+            sp.Animator.AddAnimation(animID, m_host.UUID);
+            sp.TriggerScenePresenceUpdated();
+        }
+
+        private void StopAnimation(SceneObjectPart part, string anim)
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || item.PermsGranter == UUID.Zero) return;
+            if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0) return;
+
+            ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
+            if (sp == null || sp.IsChildAgent) { AnimationGranterAbsent(); return; }
+
+            UUID animID = AnimationToStop(part, anim);
             if (animID == UUID.Zero) return;
 
             sp.Animator.RemoveAnimation(animID, false);
@@ -11339,7 +11389,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IAttachmentsModule attachMod = World?.RequestModuleInterface<IAttachmentsModule>();
             ScenePresence sp = World?.GetScenePresence(m_host.OwnerID);
             if (attachMod == null || sp == null || sp.IsChildAgent) return;
-            attachMod.AttachObject(sp, m_host.ParentGroup, (uint)attachmentPoint, false, true, false, GetScriptExperienceId());
+            if (m_host.ParentGroup.IsAttachment) return;   // as llAttachToAvatar: already attached fails silently
+            attachMod.AttachObject(sp, m_host.ParentGroup, (uint)attachmentPoint, false, true, true, GetScriptExperienceId());   // appends
         }
 
         /// <summary>OSSL_Api.cs:4213-4252 ForceAttachToAvatarFromInventory: the object moves from the prim's inventory to the avatar's and is rezzed as an attachment.</summary>
@@ -11548,17 +11599,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             sp.Scene.CloseAgent(id, false);
         }
 
-        /// <summary>OSSL_Api.cs:1178-1206 - VeryHigh. An animation from the prim's inventory by name, else a key (this tree, like the stop form), else a default animation by name, on any presence.</summary>
+        /// <summary>OSSL_Api.cs:1178-1206 - VeryHigh. An animation from the prim's inventory by name, else a default animation by name, on any presence; never a key, as in OSSL and llStartAnimation.</summary>
         public void osAvatarPlayAnimation(string avatar, string animation)
         {
             OsslCheck(TlVeryHigh, "osAvatarPlayAnimation");
             if (!UUID.TryParse(avatar, out UUID avatarID)) return;
             ScenePresence target = World?.GetScenePresence(avatarID);
             if (target?.Animator == null) return;
-            UUID animID = FindInventoryItem(animation, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
-            if (animID == UUID.Zero && !UUID.TryParse(animation, out animID)) animID = UUID.Zero;   // a key as well, as the stop form and llStartAnimation take
-            if (animID == UUID.Zero) target.Animator.AddAnimation(animation, m_host.UUID);          // a default animation by name
-            else target.Animator.AddAnimation(animID, m_host.UUID);
+            UUID animID = AnimationToStart(m_host, animation);
+            if (animID == UUID.Zero) return;
+            target.Animator.AddAnimation(animID, m_host.UUID);
             target.TriggerScenePresenceUpdated();
         }
 
@@ -17244,8 +17294,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
             {
-                UUID animID = FindInventoryItem(animation, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
-                if (animID == UUID.Zero) UUID.TryParse(animation, out animID);
+                // Inventory or built-in name, never a key (Halcyon LSLSystemAPI.cs:17841-17842, as llStartAnimation).
+                UUID animID = AnimationToStart(m_host, animation);
+                if (animID == UUID.Zero) return;
                 manager.StartBotAnimation(id, animID, animation, m_host.UUID, m_host.OwnerID);
             }
         }

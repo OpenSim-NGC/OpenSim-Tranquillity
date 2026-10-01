@@ -108,6 +108,20 @@ public class PermissionLifecycleTests
         Assert.True(PumpUntil(h, () => h.Said.Count(s => s == "rtp=" + mask) > rtp));
     }
 
+    /// <summary>
+    /// The animation the script starts, in the prim's inventory under its key as the name: llStartAnimation plays
+    /// an inventory or built-in animation, never a raw key (SL wiki llStartAnimation; YEngine LSL_Api.llStartAnimation).
+    /// </summary>
+    private static void StockAnim(SchedulerHarness h)
+    {
+        if (h.Prim.Inventory.GetInventoryItem(Anim.ToString()) != null) return;
+        h.Prim.Inventory.AddInventoryItem(new TaskInventoryItem
+        {
+            ItemID = UUID.Random(), AssetID = Anim, Name = Anim.ToString(),
+            Type = (int)AssetType.Animation, InvType = (int)InventoryType.Animation,
+        }, false);
+    }
+
     /// <summary>A script holding TAKE_CONTROLS | TRIGGER_ANIMATION | CONTROL_CAMERA from <paramref name="sp"/>, controls taken, the animation playing.</summary>
     private static UUID Armed(SchedulerHarness h, out ScenePresence sp, out TestClient client)
     {
@@ -117,6 +131,7 @@ public class PermissionLifecycleTests
         sp = h.Scene.GetScenePresence(client.AgentId);
         Grant(h, client, id, SEAT_PERMS);
         Command(h, "take", "took");
+        StockAnim(h);
         Command(h, "anim", "animated");
         Assert.True(Holds(sp, id));
         Assert.True(HasControlRecord(h, id));
@@ -423,6 +438,7 @@ public class PermissionLifecycleTests
 
         // Halcyon :4117-4126, "Emulate SL's behavior of clearing this permission when this is called for an agent
         // outside this region": TRIGGER_ANIMATION goes and run_time_permissions says what is left
+        StockAnim(h);
         Command(h, "anim", "animated");
         // the event comes after the call that raised it
         Assert.True(PumpUntil(h, () => h.Said.Contains("rtp=" + CONTROL_CAMERA)), "said=[" + string.Join(" | ", h.Said) + "]");
@@ -482,6 +498,7 @@ public class PermissionLifecycleTests
         // implicit for a sitter: no dialog
         Command(h, "ask " + sp.UUID + " " + SEAT_PERMS, "rtp=" + SEAT_PERMS);
         Command(h, "take", "took");
+        StockAnim(h);
         Command(h, "anim", "animated");
         Assert.True(Holds(sp, id));
         return (id, sp, seat);

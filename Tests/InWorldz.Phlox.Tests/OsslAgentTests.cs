@@ -115,6 +115,13 @@ public class OsslAgentTests
         using var h = Scene();
         var sp = h.Scene.GetScenePresence(h.AddClient().AgentId);
         var anim = UUID.Random();
+        // osAvatarPlayAnimation plays an inventory or built-in animation, never a raw key (OSSL_Api.osAvatarPlayAnimation):
+        // the animation is in the prim's inventory, named by its key.
+        h.Prim.Inventory.AddInventoryItem(new TaskInventoryItem
+        {
+            ItemID = UUID.Random(), AssetID = anim, Name = anim.ToString(),
+            Type = (int)AssetType.Animation, InvType = (int)InventoryType.Animation,
+        }, false);
         h.RezScript("default { state_entry() { osAvatarPlayAnimation(\"" + sp.UUID + "\", \"" + anim + "\"); llSay(0, \"playing=\" + (string)llGetListLength(llGetAnimationList(\"" + sp.UUID + "\"))); llSetTimerEvent(1.0); } timer() { llSetTimerEvent(0); osAvatarStopAnimation(\"" + sp.UUID + "\", \"" + anim + "\"); llSay(0, \"stopped\"); } }");
         PumpUntil(h, () => h.Said.Any(x => x.StartsWith("playing")));
         Assert.Contains(h.Said, x => x.StartsWith("playing"));

@@ -161,7 +161,10 @@ public class SlConstantsTests
         var client = h.AddClient();
         var sp = h.Scene.GetScenePresence(client.AgentId);
         sp.Flying = false;
-        sp.AgentControlFlags = 1;   // AGENT_CONTROL_AT_POS: walking forward
+        // Walking is the movement animation (SL: AGENT_WALKING is "walking, running or crouch walking"; Halcyon
+        // llGetAgentInfo reads the movement animation), not a held key.
+        typeof(OpenSim.Region.Framework.Scenes.Animation.ScenePresenceAnimator)
+            .GetProperty("CurrentMovementAnimation")!.SetValue(sp.Animator, "WALK");
         h.RezScript($"default {{ state_entry() {{ llSay(0, \"walk=\" + (string)((llGetAgentInfo(\"{sp.UUID}\") & {Sl("AGENT_WALKING")}) != 0)); }} }}");
         h.PumpUntil(() => h.Said.Any(s => s.StartsWith("walk=")));
         Assert.True(h.Said.Contains("walk=1"), Said(h));
