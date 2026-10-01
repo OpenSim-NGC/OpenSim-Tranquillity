@@ -34,18 +34,23 @@ public class NullAuthenticationData : IAuthenticationData
     private static Dictionary<UUID, AuthenticationData> m_DataByUUID = new Dictionary<UUID, AuthenticationData>();
     private static Dictionary<UUID, string> m_Tokens = new Dictionary<UUID, string>();
 
+    // Both dictionaries are shared by every instance in the process; serialise every access.
+    private static readonly object s_lock = new object();
+
     public NullAuthenticationData(string connectionString, string realm)
     {
     }
 
     public AuthenticationData Get(UUID principalID)
     {
-         return m_DataByUUID.TryGetValue(principalID, out AuthenticationData ad) ? ad :null;
+        lock (s_lock)
+            return m_DataByUUID.TryGetValue(principalID, out AuthenticationData ad) ? ad :null;
     }
 
     public bool Store(AuthenticationData data)
     {
-        m_DataByUUID[data.PrincipalID] = data;
+        lock (s_lock)
+            m_DataByUUID[data.PrincipalID] = data;
         return true;
     }
 
@@ -57,12 +62,14 @@ public class NullAuthenticationData : IAuthenticationData
 
     public bool SetToken(UUID principalID, string token, int lifetime)
     {
-        m_Tokens[principalID] = token;
+        lock (s_lock)
+            m_Tokens[principalID] = token;
         return true;
     }
 
     public bool CheckToken(UUID principalID, string token, int lifetime)
     {
-        return m_Tokens.TryGetValue(principalID, out string tk) ? tk == token : false;
+        lock (s_lock)
+            return m_Tokens.TryGetValue(principalID, out string tk) ? tk == token : false;
     }
 }
