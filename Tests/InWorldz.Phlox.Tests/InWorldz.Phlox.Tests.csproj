@@ -46,8 +46,8 @@
       <Private>true</Private>
     </Reference>
     <!-- The XML-RPC cross-engine test calls XMLRPCModule.XmlRpcRemoteData, which takes Nwc.XmlRpc types. -->
-    <Reference Include="XMLRPC">
-      <HintPath>..\..\Library\XMLRPC.dll</HintPath>
+    <Reference Include="xmlrpc">
+      <HintPath>..\..\Library\xmlrpc.dll</HintPath>
     </Reference>
   </ItemGroup>
 
