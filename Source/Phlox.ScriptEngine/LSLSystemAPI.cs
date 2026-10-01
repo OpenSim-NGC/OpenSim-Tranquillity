@@ -8877,7 +8877,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             Vector3 pos = m_host.AbsolutePosition + offset;
             IWindModule windMod = World.RequestModuleInterface<IWindModule>();
             if (windMod == null) return Vector3.Zero;
-            return windMod.WindSpeed((int)pos.X, (int)pos.Y, (int)pos.Z);
+            // llWind has no vertical part (Halcyon :1426-1435 "llWind's legacy behavior is that is does not return
+            // any z-data"; YEngine LSL_Api.llWind); iwWind keeps it.
+            Vector3 wind = windMod.WindSpeed((int)pos.X, (int)pos.Y, (int)pos.Z);
+            wind.Z = 0f;
+            return wind;
         }
 
         public Vector3 llGetSunDirection()
@@ -8893,43 +8897,102 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return envModule.GetSunDir(m_host.GetWorldPosition());
         }
        
+        // The ground vectors are Halcyon's (LSLSystemAPI.cs:7998-8036, TerrainChannel.cs:416-531). The SL wiki says of
+        // llGroundNormal "This function does not return a unit vector"; the slope's length gives the steepness.
+
+        /// <summary>Halcyon llGroundNormal: &lt;slope.x, slope.y, 1.0&gt;, not normalised.</summary>
         public Vector3 llGroundNormal(Vector3 offset)
         {
-            if (World == null || m_host == null) return Vector3.UnitZ;
-            Vector3 pos = m_host.AbsolutePosition + offset;
-            float hC = World.GetGroundHeight(pos.X,       pos.Y);
-            float hX = World.GetGroundHeight(pos.X + 1f,  pos.Y);
-            float hY = World.GetGroundHeight(pos.X,       pos.Y + 1f);
-            Vector3 normal = new Vector3(hC - hX, hC - hY, 1f);
-            normal.Normalize();
-            return normal;
+            Vector3 slope = llGroundSlope(offset);
+            return new Vector3(slope.X, slope.Y, 1f);
         }
 
+        /// <summary>
+        /// Halcyon llGroundSlope: the downhill vector of the heightmap triangle under the point, not normalised, with
+        /// a negative z on sloped ground (NormalToSlope(CalculateNormalAt)); zero on flat ground.
+        /// </summary>
         public Vector3 llGroundSlope(Vector3 offset)
         {
-            // Slope is the horizontal component of the ground normal
-            Vector3 n = llGroundNormal(offset);
-            Vector3 slope = new Vector3(n.X, n.Y, 0f);
-            slope.Normalize();
+            if (World == null || m_host == null) return Vector3.Zero;
+            Vector3 pos = GroundPoint(offset);
+            return NormalToSlope(TriangleNormalAt(World.Heightmap, pos.X, pos.Y));
+        }
+
+        /// <summary>Halcyon llGroundContour: &lt;-slope.y, slope.x, 0&gt; over the unnormalised slope.</summary>
+        public Vector3 llGroundContour(Vector3 offset)
+        {
+            Vector3 slope = llGroundSlope(offset);
+            return new Vector3(-slope.Y, slope.X, 0f);
+        }
+
+        /// <summary>The prim's position plus the offset, held on the heightmap (Halcyon ValidLocation).</summary>
+        private Vector3 GroundPoint(Vector3 offset)
+        {
+            Vector3 pos = m_host.GetWorldPosition() + offset;
+            ITerrainChannel map = World.Heightmap;
+            pos.X = Math.Clamp(pos.X, 0f, map.Width - 0.01f);
+            pos.Y = Math.Clamp(pos.Y, 0f, map.Height - 0.01f);
+            return pos;
+        }
+
+        /// <summary>Halcyon TerrainChannel.TriangleNormal: the cross product of two edge deltas.</summary>
+        private static Vector3 TriangleNormal(Vector3 delta1, Vector3 delta2)
+        {
+            if (delta1 == Vector3.Zero) return new Vector3(0f, delta2.Y * -delta1.Z, 1f);
+            if (delta2 == Vector3.Zero) return new Vector3(delta1.X * -delta1.Z, 0f, 1f);
+            return new Vector3(
+                delta1.Y * delta2.Z - delta1.Z * delta2.Y,
+                delta1.Z * delta2.X - delta1.X * delta2.Z,
+                delta1.X * delta2.Y - delta1.Y * delta2.X);
+        }
+
+        /// <summary>Halcyon TerrainChannel.NormalToSlope.</summary>
+        private static Vector3 NormalToSlope(Vector3 normal)
+        {
+            Vector3 slope = normal;
+            slope.Z = normal.Z == 0f ? 1f : (normal.X * normal.X + normal.Y * normal.Y) / (-1f * normal.Z);
             return slope;
         }
 
-        public Vector3 llGroundContour(Vector3 offset)
+        /// <summary>The four heightmap points of the cell under (x, y): P0 (x, y), P1 (x+1, y), P2 (x, y+1), P3 (x+1, y+1).</summary>
+        private static void CellCorners(ITerrainChannel map, float xPos, float yPos,
+            out Vector3 p0, out Vector3 p1, out Vector3 p2, out Vector3 p3)
         {
-            // Contour is perpendicular to slope in the XY plane
-            Vector3 slope = llGroundSlope(offset);
-            return new Vector3(-slope.Y, slope.X, 0f);
+            int x = (int)xPos, y = (int)yPos;
+            int x1 = Math.Min(x + 1, map.Width - 1), y1 = Math.Min(y + 1, map.Height - 1);
+            p0 = new Vector3(x, y, map[x, y]);
+            p1 = new Vector3(x1, y, map[x1, y]);
+            p2 = new Vector3(x, y1, map[x, y1]);
+            p3 = new Vector3(x1, y1, map[x1, y1]);
+        }
+
+        /// <summary>
+        /// Halcyon TerrainChannel.CalculateNormalAt: the normal of the triangle the point is in. Cells are split like
+        /// [/] (P2 - P3 over P0 - P1), as LL's terrain is.
+        /// </summary>
+        private static Vector3 TriangleNormalAt(ITerrainChannel map, float xPos, float yPos)
+        {
+            CellCorners(map, xPos, yPos, out Vector3 p0, out Vector3 p1, out Vector3 p2, out Vector3 p3);
+            float xOffset = xPos - (int)xPos, yOffset = yPos - (int)yPos;
+            return xOffset + (1f - yOffset) < 1f
+                ? TriangleNormal(p2 - p3, p0 - p2)    // upper left (NW) triangle
+                : TriangleNormal(p0 - p1, p1 - p3);   // lower right (SE) triangle
         }
 
         public float llWater(Vector3 offset)
         {
             return (float)(World?.RegionInfo?.RegionSettings?.WaterHeight ?? 20.0);
         }
+        /// <summary>
+        /// Not implemented: core's IWindModule has no way to set the wind at a point (Halcyon's WindSet). Halcyon let
+        /// estate managers and gods call it (:1459-1472) and ignored everyone else, so those callers are told on
+        /// DEBUG_CHANNEL; anyone else still gets nothing.
+        /// </summary>
         public void iwSetWind(int type, Vector3 offset, Vector3 speed)
         {
-            // Halcyon's IWindModule.WindSet(type, pos, speed) does not exist in this tree.
-            // This tree only has WindParamSet(plugin, param, value) which is a different API.
-            // Keeping as no-op.
+            if (m_host == null || World == null) return;
+            if (World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false) || World.Permissions.IsGod(m_host.OwnerID))
+                NotImplemented("iwSetWind");
         }
         public Vector3 iwWind(Vector3 offset)
         {
@@ -8943,13 +9006,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public Vector3 iwGroundSurfaceNormal(Vector3 offset)
         {
-            // Faithful port: returns the terrain surface normal at the given offset
+            // Halcyon TerrainChannel.Calculate4PointNormalAt (:487-531): the unit normal averaged over the cell's two
+            // triangles; on a perfectly balanced ridge or valley, the triangle the point is in.
             if (World == null || m_host == null) return Vector3.UnitZ;
-            Vector3 pos = m_host.AbsolutePosition + offset;
-            float hC = World.GetGroundHeight(pos.X,       pos.Y);
-            float hX = World.GetGroundHeight(pos.X + 1f,  pos.Y);
-            float hY = World.GetGroundHeight(pos.X,       pos.Y + 1f);
-            Vector3 normal = new Vector3(hC - hX, hC - hY, 1f);
+            Vector3 pos = GroundPoint(offset);
+            CellCorners(World.Heightmap, pos.X, pos.Y, out Vector3 p0, out Vector3 p1, out Vector3 p2, out Vector3 p3);
+            Vector3 normal0 = TriangleNormal(p2 - p3, p0 - p2);
+            Vector3 normal1 = TriangleNormal(p1 - p0, p3 - p1);
+            Vector3 normal = (normal0 + normal1) / 2f;
+            if (normal.X == 0f && normal.Y == 0f)
+                normal = pos.X - (int)pos.X + (1f - (pos.Y - (int)pos.Y)) <= 1f ? normal0 : normal1;
             normal.Normalize();
             return normal;
         }
@@ -9299,42 +9365,41 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
             }
 
+            // With PARCEL_MEDIA_COMMAND_AGENT the command goes to that agent only and the parcel's media settings
+            // stay as they are (SL wiki llParcelMediaCommandList; Halcyon :13161-13201: "if we did get a presence, we
+            // only send to the agent specified, and *don't change the land settings*!"). Without it the parcel is
+            // updated and every agent on it told.
+            List<ScenePresence> receivers;
+            if (presence != null)
+                receivers = presence.IsChildAgent || presence.IsDeleted || presence.IsInTransit
+                    || presence.currentParcelUUID != landData.GlobalID
+                    ? new List<ScenePresence>() : new List<ScenePresence> { presence };
+            else
+                receivers = World.GetScenePresences().FindAll(
+                    a => !a.IsChildAgent && !a.IsDeleted && a.currentParcelUUID == landData.GlobalID);
+
             if (update)
             {
-                landData.MediaID = textureID;
-                landData.MediaAutoScale = autoAlign ? (byte)1 : (byte)0;
-                landData.MediaDescription = description;
-                landData.MediaWidth = width;
-                landData.MediaHeight = height;
-                landData.MediaType = mediaType;
-                landData.MediaURL = url;
-                World.EventManager.TriggerLandObjectUpdated((uint)landData.LocalID, landObject);
-
-                List<ScenePresence> agents = World.GetScenePresences();
-                foreach (ScenePresence agent in agents)
+                if (presence == null)
                 {
-                    if (agent.IsChildAgent || agent.IsDeleted) continue;
-                    ScenePresence target = presence ?? agent;
-                    if (target == agent && agent.currentParcelUUID == landData.GlobalID)
-                        agent.ControllingClient.SendParcelMediaUpdate(landData.MediaURL,
-                            landData.MediaID, landData.MediaAutoScale,
-                            mediaType, description, width, height, loop);
-                    if (presence != null) break;
+                    landData.MediaID = textureID;
+                    landData.MediaAutoScale = autoAlign ? (byte)1 : (byte)0;
+                    landData.MediaDescription = description;
+                    landData.MediaWidth = width;
+                    landData.MediaHeight = height;
+                    landData.MediaType = mediaType;
+                    landData.MediaURL = url;
+                    World.EventManager.TriggerLandObjectUpdated((uint)landData.LocalID, landObject);
                 }
+                foreach (ScenePresence agent in receivers)
+                    agent.ControllingClient.SendParcelMediaUpdate(url, textureID, autoAlign ? (byte)1 : (byte)0,
+                        mediaType, description, width, height, loop);
             }
 
             if (commandToSend != null)
             {
-                List<ScenePresence> agents = World.GetScenePresences();
-                foreach (ScenePresence agent in agents)
-                {
-                    if (agent.IsChildAgent || agent.IsDeleted) continue;
-                    ScenePresence target = presence ?? agent;
-                    if (target == agent && agent.currentParcelUUID == landData.GlobalID)
-                        agent.ControllingClient.SendParcelMediaCommand(0x4,
-                            (ParcelMediaCommandEnum)commandToSend, time);
-                    if (presence != null) break;
-                }
+                foreach (ScenePresence agent in receivers)
+                    agent.ControllingClient.SendParcelMediaCommand(0x4, (ParcelMediaCommandEnum)commandToSend, time);
             }
             ScriptSleep(2000);
         }
@@ -9774,10 +9839,36 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 new Vector3(maxX, maxY, maxZ)
             });
         }
+        /// <summary>
+        /// Halcyon iwGetWorldBoundingBox (:10757-10790): the box in region coordinates. llGetBoundingBox's corners are
+        /// relative to the root in the root's frame, so the eight corners are turned by the root's rotation and moved
+        /// to its position, and the box around them returned. An avatar's box is moved to the avatar's position.
+        /// </summary>
         public LSLList iwGetWorldBoundingBox(string obj)
         {
-            // Faithful port: same as llGetBoundingBox but returns world coordinates
-            return llGetBoundingBox(obj);
+            LSLList rel = llGetBoundingBox(obj);
+            if (!UUID.TryParse(obj, out UUID id) || rel.Length < 2) return rel;
+            Vector3 lo = (Vector3)rel.Data[0], hi = (Vector3)rel.Data[1];
+            Vector3 pos;
+            Quaternion rot = Quaternion.Identity;
+            ScenePresence sp = World?.GetScenePresence(id);
+            if (sp != null && sp.ParentPart == null) pos = sp.AbsolutePosition;
+            else
+            {
+                SceneObjectGroup group = sp?.ParentPart?.ParentGroup ?? World?.GetSceneObjectPart(id)?.ParentGroup;
+                if (group == null) return rel;
+                pos = group.AbsolutePosition;
+                rot = group.GroupRotation;
+            }
+            Vector3 min = new Vector3(float.MaxValue), max = new Vector3(float.MinValue);
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 c = new Vector3((i & 1) == 0 ? lo.X : hi.X, (i & 2) == 0 ? lo.Y : hi.Y, (i & 4) == 0 ? lo.Z : hi.Z);
+                c = c * rot + pos;
+                min = Vector3.Min(min, c);
+                max = Vector3.Max(max, c);
+            }
+            return new LSLList(new object[] { min, max });
         }
         public int llGetObjectPermMask(int mask)
         {
