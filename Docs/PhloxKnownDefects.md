@@ -218,6 +218,9 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   object's owner may edit both objects (the same check as editing them by hand). If not,
   nothing is linked, no error is shown and the call returns without its delay. YEngine
   does not make this check.
+- **`llInstantMessage` length.** A message longer than 1023 bytes of UTF-8 is cut to 1023
+  bytes, as SL documents ([LlInstantMessage](https://wiki.secondlife.com/wiki/LlInstantMessage)).
+  A character the cut would split is dropped whole. YEngine cuts at 1024 characters.
 
 ---
 

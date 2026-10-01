@@ -853,7 +853,7 @@ namespace Phlox.ScriptEngine
                 imSessionID    = m_host.UUID.Guid,
                 timestamp      = (uint)Util.UnixTimeSinceEpoch(),
                 fromAgentName  = m_host.Name,
-                message        = message ?? string.Empty,
+                message        = CapInstantMessage(message),
                 dialog         = (byte)InstantMessageDialog.MessageFromObject,
                 fromGroup      = false,
                 offline        = 0,
@@ -864,7 +864,25 @@ namespace Phlox.ScriptEngine
             };
 
             tr.SendInstantMessage(msg, success => {});
-        } 
+        }
+
+        private const int MaxInstantMessageBytes = 1023;
+
+        /// <summary>
+        /// llInstantMessage's message cut to SL's limit: "Messages longer than 1023 bytes will be truncated to 1023
+        /// bytes. This can convey 1023 ASCII characters, or fewer if non-ASCII characters are present."
+        /// (https://wiki.secondlife.com/wiki/LlInstantMessage). Bytes of UTF-8 are counted, and a multibyte character
+        /// the cut would split is dropped whole, as PrimSetText cuts floating text.
+        /// </summary>
+        private static string CapInstantMessage(string message)
+        {
+            message ??= string.Empty;
+            byte[] utf8 = Encoding.UTF8.GetBytes(message);
+            if (utf8.Length <= MaxInstantMessageBytes) return message;
+            int cut = MaxInstantMessageBytes;
+            while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--; // back to the start of the split character
+            return Encoding.UTF8.GetString(utf8, 0, cut);
+        }
 		public void llDialog(string avatar, string message, LSLList buttons, int chat_channel)
 		{
 			if (m_host == null) return;
