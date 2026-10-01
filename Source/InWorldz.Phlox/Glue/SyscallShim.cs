@@ -7039,7 +7039,12 @@ private static string ConvToString(object o)
         {
             LSLList p1 = ConvToLSLList(self._interpreter.ScriptState.Operands.Pop());
             string p0 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
-            self._systemAPI.llRezObjectWithParams(p0, p1);
+
+            // A rez, like llRezObject: async, and the key reaches the script through SysReturn.
+            RunAsync(self, delegate()
+            {
+                self._systemAPI.llRezObjectWithParams(p0, p1);
+            });
         }
 		static private void Shim_llGetMaterialOverride(SyscallShim self)
         {

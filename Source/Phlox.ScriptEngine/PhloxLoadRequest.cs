@@ -30,7 +30,5 @@ namespace Phlox.ScriptEngine
     {
         public uint LocalID;
         public UUID ItemID;
-        /// <summary>The item is another engine's now - also delete its Phlox state row, after any save.</summary>
-        public bool Disown;
     }
 }

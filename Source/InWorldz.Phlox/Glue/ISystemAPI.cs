@@ -1035,7 +1035,7 @@ namespace InWorldz.Phlox.Glue
         void llOpenFloater(string name, string url, LSLList paramList);
         void llCloseFloater(string name);
         int llSitOnLink(string agentID, int link);
-        void llRezObjectWithParams(string inventory, LSLList paramList);
+        string llRezObjectWithParams(string inventory, LSLList paramList);
         string llGetMaterialOverride(int face, LSLList paramList);
 
         // ── Phase 31: 19 new functions (TableIndex 643–661) ──

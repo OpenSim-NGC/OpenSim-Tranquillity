@@ -53,7 +53,7 @@ namespace Phlox.ScriptEngine
 
         #region INonSharedRegionModule
 
-        public string Name => "InWorldz.Phlox";
+        public string Name => PhloxEngineHeader.PhloxName;
         public Type ReplaceableInterface => null;
 
         /// <summary>
@@ -611,7 +611,7 @@ namespace Phlox.ScriptEngine
         {
             // Every engine of the region gets every rez, with the region's default engine name; the script's
             // first line can name another. Phlox runs it exactly when YEngine's rule picks Phlox, so on a region running
-            // both a script runs in one. A script that is not Phlox's leaves nothing of Phlox behind (Disown).
+            // both a script runs in one. A script that is not Phlox's has no Phlox instance or load (Disown); its saved state is kept.
             if (!IsPhloxScript(script, engine))
             {
                 m_ScriptLoader?.Disown(localID, itemID);

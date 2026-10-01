@@ -353,10 +353,10 @@ namespace InWorldz.Phlox.Types
             }},
 
             // wiki.secondlife.com/wiki/On_damage - "on_damage( integer num_detected )", fired BEFORE
-            // damage is applied. COMPILE-ONLY: the region applies damage inline in
-            // ScenePresence.PhysicsCollisionUpdate and LSLSystemAPI.llAdjustDamage / llSetHealth
-            // with no event raised before or after; the hook for this event would live in
-            // PhysicsCollisionUpdate where Health is decremented, batched per frame.
+            // damage is applied. DELIVERED: the region raises EventManager.OnAvatarDamage with each
+            // batch of pending damage before applying it, and PhloxEngine.OnAvatarDamage posts this
+            // event to every script in the avatar's attachments, waiting (bounded by OnDamageWaitMs)
+            // for the handlers so an llAdjustDamage lands before the damage does.
             {"on_damage", new FunctionSig {
                 FunctionName = "on_damage",
                 ReturnType = VarType.Void,
@@ -365,8 +365,9 @@ namespace InWorldz.Phlox.Types
             }},
 
             // wiki.secondlife.com/wiki/Final_damage - "final_damage( integer num_detected )", fired
-            // AFTER all on_damage handlers ran and the damage was applied. COMPILE-ONLY, same reason
-            // and same future hook as on_damage.
+            // AFTER all on_damage handlers ran and the damage was applied. DELIVERED: the region raises
+            // EventManager.OnAvatarDamageApplied with what landed, and PhloxEngine.OnAvatarDamageApplied
+            // posts this event to the same attachment scripts, without waiting.
             {"final_damage", new FunctionSig {
                 FunctionName = "final_damage",
                 ReturnType = VarType.Void,

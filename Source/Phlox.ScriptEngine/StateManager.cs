@@ -243,36 +243,6 @@ namespace Phlox.ScriptEngine
             }
         }
 
-        /// <summary>
-        /// <see cref="DeleteState"/> when the item has a row (or unsaved state). Reading first keeps the common
-        /// case - another engine's script that never had a row - off the writer. A read that fails deletes anyway.
-        /// </summary>
-        public void DeleteStateIfPresent(UUID itemId)
-        {
-            bool present = true;
-            try
-            {
-                bool pending;
-                lock (m_Lock) pending = m_Dirty.ContainsKey(itemId) || m_Live.ContainsKey(itemId) || m_LoadFailed.Contains(itemId);
-                if (!pending)
-                {
-                    lock (m_ReadLock)
-                    {
-                        using var cmd = Reader().CreateCommand();
-                        cmd.CommandText = "SELECT 1 FROM script_state WHERE item_id = @id";
-                        cmd.Parameters.AddWithValue("@id", itemId.ToString());
-                        using var reader = cmd.ExecuteReader();
-                        present = reader.Read();
-                    }
-                }
-            }
-            catch (Exception e)
-            {
-                m_log.LogWarning("[PhloxState]: Could not check for a state row of {0}, deleting: {1}", itemId, e.Message);
-            }
-            if (present) DeleteState(itemId);
-        }
-
         public void DeleteState(UUID itemId)
         {
             try

@@ -13297,7 +13297,17 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             public void LSLError(string msg) => m_api.ScriptShoutError("LSL Runtime Error: " + msg);
             public void ScriptSleep(int delay) => m_api.ScriptSleep(delay);
         }
-        public string iwReverseString(string src) => new string(src?.ToCharArray() ?? Array.Empty<char>());
+        /// <summary>
+        /// Halcyon (InWorldz.Phlox.Engine/LSLSystemAPI.cs iwReverseString): the UTF-16 code units in
+        /// reverse order, so a surrogate pair comes back with its halves swapped and a combining mark
+        /// lands before the character it followed. Kept as Halcyon has it.
+        /// </summary>
+        public string iwReverseString(string src)
+        {
+            if (src == null) return String.Empty;
+            if (src.Length <= 1) return src;
+            return new string(src.Reverse().ToArray());
+        }
         public int iwChar2Int(string src, int index)
         {
             if (String.IsNullOrEmpty(src)) return 0;
@@ -18391,13 +18401,28 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
         }
 
-        public void llRezObjectWithParams(string inventory, LSLList paramList)
+        /// <summary>
+        /// SL wiki (LlRezObjectWithParams): "Returns a key which will be the key of the object when it
+        /// is successfully rezzed in the world. On failure, returns (key)"" (in LSL)". The key is the
+        /// rezzed root's, the one object_rez reports (upstream LSL_Api returns the rezzed group's id too,
+        /// but NULL_KEY on failure; SL's "" is kept here). The shim runs this async, so the script gets
+        /// its value only from SysReturn, handed over on every path, a throw included.
+        /// </summary>
+        public string llRezObjectWithParams(string inventory, LSLList paramList)
+        {
+            string result = String.Empty;
+            try { result = RezWithParams(inventory, paramList); }
+            finally { m_ScriptEngine.SysReturn(m_itemID, result, 0); }
+            return result;
+        }
+
+        private string RezWithParams(string inventory, LSLList paramList)
         {
             // Extended rez function from SL Combat2 system.
             // Parse the params list for REZ_POS, REZ_ROT, REZ_VEL, REZ_FLAGS, etc.
             // For now, extract basic position/rotation/velocity and delegate to existing rez logic.
 
-            if (string.IsNullOrEmpty(inventory)) return;
+            if (string.IsNullOrEmpty(inventory)) return String.Empty;
 
             // These were 1,2,3,8,4,7 - a private numbering that matched neither SL nor
             // upstream, so a script written to the SL constants had every rule misread. Now the
@@ -18487,11 +18512,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (posRelative)
                 pos = m_host.AbsolutePosition + pos * m_host.GetWorldRotation();
 
-            // Delegate to existing rez infrastructure
-            if (atRoot)
-                RezObjectInternal(inventory, pos, vel, rot, param, true, startString);
-            else
-                RezObjectInternal(inventory, pos, vel, rot, param, false, startString);
+            // Delegate to existing rez infrastructure; its NULL_KEY failure is SL's "" here.
+            string key = RezObjectInternal(inventory, pos, vel, rot, param, atRoot, startString);
+            return key == UUID.Zero.ToString() ? String.Empty : key;
         }
 
         public string llGetMaterialOverride(int face, LSLList paramList)

@@ -120,10 +120,11 @@ public class CacheSchemaBumpTests
         "        llSay(0, \"touch \" + (string)count + \" saved \" + (string)(integer)big + \" now \" + (string)(integer)2147483520.0); }\n" +
         "}\n";
 
+    /// <summary>Schema 4 to 5 changed the float literals; a cache still stamped 4 is purged by any later schema too.</summary>
     [Fact]
     public void AScriptSavedUnderSchema4KeepsItsGlobalsAndStateUnder5()
     {
-        Assert.Equal(5, CurrentSchema);
+        Assert.True(CurrentSchema >= 5);
         var assetId = UUID.Random();
         var itemId = UUID.Random();
 
@@ -139,10 +140,10 @@ public class CacheSchemaBumpTests
             h1.SaveState(itemId);
         }
 
-        StampPreviousSchema();
+        File.WriteAllText(VersionFile, "4");
         using var h2 = new SchedulerHarness(bytecodeDir: CacheDir);
         Assert.False(File.Exists(CachePath(assetId)), "the bump did not purge the old bytecode");
-        Assert.Equal("5", File.ReadAllText(VersionFile).Trim());
+        Assert.Equal(CurrentSchema.ToString(), File.ReadAllText(VersionFile).Trim());
 
         h2.RezScript(FloatStateScript, assetId, itemId);
         Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemId) != null, TimeSpan.FromSeconds(20)),
@@ -158,6 +159,78 @@ public class CacheSchemaBumpTests
         Assert.Contains("touch 28 saved -2147483648 now 2147483520", h2.Said);
         Assert.DoesNotContain(h2.Said, s => s.StartsWith("entry"));
         Assert.True(File.Exists(CachePath(assetId)), "the recompiled bytecode was not cached");
+    }
+
+    private const string CountScript =
+        "integer n;\n" +
+        "default {\n" +
+        "    state_entry() { llSay(0, \"entry {0}\"); }\n" +
+        "    touch_start(integer t) { ++n; llSay(0, \"{0} \" + (string)n); }\n" +
+        "}\n";
+
+    /// <summary>
+    /// Schema 5 to 6: an earlier loader could store one save's bytecode in the cache file of another save's asset, so a
+    /// restart ran the wrong code. A cache stamped 5 is purged once at the first start: every script compiles again from
+    /// its own source, once, and keeps its saved state; the next start purges nothing and compiles nothing.
+    /// </summary>
+    [Fact]
+    public void ACacheStamped5IsPurgedOnceAndEveryScriptRecompilesOnceKeepingItsState()
+    {
+        Assert.True(CurrentSchema >= 6);
+        string Src(string tag) => CountScript.Replace("{0}", tag);
+        var (assetA, itemA, assetB, itemB) = (UUID.Random(), UUID.Random(), UUID.Random(), UUID.Random());
+
+        using (var h1 = new SchedulerHarness(bytecodeDir: CacheDir))
+        {
+            h1.RezScript(Src("alpha"), assetA, itemA);
+            h1.RezScript(Src("beta"), assetB, itemB);
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("entry alpha") && h1.Said.Contains("entry beta"), TimeSpan.FromSeconds(20)),
+                string.Join(" | ", h1.Said));
+            h1.PostTouch(itemA);
+            h1.PostTouch(itemB);
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("alpha 1") && h1.Said.Contains("beta 1"), TimeSpan.FromSeconds(20)),
+                string.Join(" | ", h1.Said));
+            h1.SaveState(itemA);
+            h1.SaveState(itemB);
+        }
+
+        // What the old loader could leave: alpha's cache file holding another save's bytecode, under a schema-5 stamp.
+        WriteCache(assetA, Src("stale"));
+        File.WriteAllText(VersionFile, "5");
+
+        var compiled = new System.Collections.Concurrent.ConcurrentBag<string>();
+        using (var h2 = new SchedulerHarness(bytecodeDir: CacheDir))
+        {
+            Assert.True(((global::Phlox.ScriptEngine.PhloxScriptLoader)h2.Loader).PurgedCache);
+            Assert.False(File.Exists(CachePath(assetA)), "the bump did not purge the entry");
+            Assert.Equal(CurrentSchema.ToString(), File.ReadAllText(VersionFile).Trim());
+            ((global::Phlox.ScriptEngine.PhloxScriptLoader)h2.Loader).BeforeCompileForTest = compiled.Add;
+
+            h2.RezScript(Src("alpha"), assetA, itemA);
+            h2.RezScript(Src("beta"), assetB, itemB);
+            Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemA) != null && h2.InterpreterFor(itemB) != null, TimeSpan.FromSeconds(20)),
+                h2.Diagnose(itemA) + " / " + h2.Diagnose(itemB));
+            h2.Pump(20);
+            h2.PostTouch(itemA);
+            h2.PostTouch(itemB);
+            Assert.True(PumpUntil(h2, () => h2.Said.Contains("alpha 2") && h2.Said.Contains("beta 2"), TimeSpan.FromSeconds(20)),
+                "state not kept or the wrong code ran: " + string.Join(" | ", h2.Said));
+            _out.WriteLine("after the bump: " + string.Join(" | ", h2.Said));
+            Assert.DoesNotContain(h2.Said, s => s.StartsWith("entry") || s.StartsWith("stale"));
+            Assert.Equal(1, compiled.Count(t => t == Src("alpha")));
+            Assert.Equal(1, compiled.Count(t => t == Src("beta")));
+            Assert.Equal(2, compiled.Count);
+        }
+
+        compiled.Clear();
+        using var h3 = new SchedulerHarness(bytecodeDir: CacheDir);
+        Assert.False(((global::Phlox.ScriptEngine.PhloxScriptLoader)h3.Loader).PurgedCache);
+        ((global::Phlox.ScriptEngine.PhloxScriptLoader)h3.Loader).BeforeCompileForTest = compiled.Add;
+        h3.RezScript(Src("alpha"), assetA, itemA);
+        h3.RezScript(Src("beta"), assetB, itemB);
+        Assert.True(PumpUntil(h3, () => h3.InterpreterFor(itemA) != null && h3.InterpreterFor(itemB) != null, TimeSpan.FromSeconds(20)),
+            h3.Diagnose(itemA) + " / " + h3.Diagnose(itemB));
+        Assert.Empty(compiled);   // both from the cache the first start wrote
     }
 
     [Fact]
