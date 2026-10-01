@@ -26,6 +26,7 @@
  */
 
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Interfaces;
 
 using Microsoft.Extensions.Logging;
@@ -43,10 +44,11 @@ public class HttpRequest
 
     public void CheckHttpRequests()
     {
-        if (m_CmdManager.m_ScriptEngine.World == null)
+        Scene scene = m_CmdManager.m_ScriptEngine.World;
+        if (scene == null)
             return;
 
-        IHttpRequestModule iHttpReq = m_CmdManager.m_ScriptEngine.World.RequestModuleInterface<IHttpRequestModule>();
+        IHttpRequestModule iHttpReq = scene.RequestModuleInterface<IHttpRequestModule>();
         if(iHttpReq == null)
             return;
 
@@ -64,22 +66,52 @@ public class HttpRequest
             // implemented here yet anyway.  Should be fixed if/when maxsize
             // is supported
 
-            object[] resobj = new object[]
+            // The region's completed queue is drained by every script engine's pump, and this
+            // pump took the response: the scripts in the prim may run in any engine of the region.
+            // As in SL, every script in the prim gets it: each engine is offered it once and posts
+            // it to its own scripts in that prim. The prim is in this region (the module is per
+            // region), so no other region's engine is offered it: local ids are per region.
+            IScriptEngine[] listed = m_CmdManager.ScriptEngines;
+            foreach (IScriptEngine e in RegionScriptEngines(scene))
             {
-                new LSL_Types.LSLString(httpInfo.ReqID.ToString()),
-                new LSL_Types.LSLInteger(httpInfo.Status),
-                new LSL_Types.list(),
-                new LSL_Types.LSLString(httpInfo.ResponseBody)
-            };
+                // Built for each engine: an engine may convert the arguments in place. The engines
+                // this pump serves get the LSL_Types they always got; any other engine gets plain
+                // values, as core modules post to any engine (UrlModule): string, int, object[].
+                object[] resobj = Array.IndexOf(listed, e) >= 0
+                    ? new object[]
+                    {
+                        new LSL_Types.LSLString(httpInfo.ReqID.ToString()),
+                        new LSL_Types.LSLInteger(httpInfo.Status),
+                        new LSL_Types.list(),
+                        new LSL_Types.LSLString(httpInfo.ResponseBody)
+                    }
+                    : new object[]
+                    {
+                        httpInfo.ReqID.ToString(),
+                        httpInfo.Status,
+                        new object[0],
+                        httpInfo.ResponseBody
+                    };
 
-            foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
-            {
-                if (e.PostObjectEvent(httpInfo.LocalID,
+                e.PostObjectEvent(httpInfo.LocalID,
                         new EventParams("http_response",
-                        resobj, new DetectParams[0])))
-                    break;
+                        resobj, new DetectParams[0]));
             }
             httpInfo = iHttpReq.GetNextCompletedRequest();
         }
+    }
+
+    /// <summary>
+    /// This pump's engine and the region's other script engines, each once.
+    /// </summary>
+    private List<IScriptEngine> RegionScriptEngines(Scene scene)
+    {
+        List<IScriptEngine> engines = new List<IScriptEngine> { m_CmdManager.m_ScriptEngine };
+        foreach (IScriptModule m in scene.RequestModuleInterfaces<IScriptModule>())
+        {
+            if (m is IScriptEngine e && !engines.Contains(e))
+                engines.Add(e);
+        }
+        return engines;
     }
 }
