@@ -33,4 +33,14 @@ public interface IProfileModule
 {
     void RequestAvatarProperties(IClientAPI remoteClient, UUID avatarID);
 
+    /// <summary>
+    /// A user's preferences as the profiles service holds them. Visible is false when the user has
+    /// ticked "Only friends and groups know I'm online".
+    /// </summary>
+    /// <remarks>
+    /// This is a service call: do not make it on a thread the region cannot afford to block.
+    /// </remarks>
+    /// <returns>null if they cannot be read.</returns>
+    UserPreferences GetUserPreferences(UUID userID) => null;
+
 }

@@ -145,7 +145,7 @@ public enum scriptEvents : ulong
     linkset_data = 1UL << 41,
     experience_permissions = 1UL << 42,
     experience_permissions_denied = 1UL << 43,
-    // PHLOX-6: so a script's on_damage / final_damage / on_death / game_control handlers show in
+    // So a script's on_damage / final_damage / on_death / game_control handlers show in
     // the part's aggregated mask (what 'phlox status' prints). path_update already had bit 40.
     on_damage = 1UL << 44,
     final_damage = 1UL << 45,
@@ -545,7 +545,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
 
     // Phlox: tracks whether this group was moving on the previous heartbeat so
     // Scene.CheckMovingTransitions() can fire moving_start/moving_end on general
-    // (non-keyframed) movement. Ported from Legion Grid SceneObjectGroup.cs.
+    // (non-keyframed) movement. Added with the Phlox port.
     public bool WasMoving { get; set; }
 
     // Phlox seam: linkset data is per-linkset (per-group) in SL, but Tranquillity
