@@ -15301,56 +15301,137 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             return new LSLList(results);
         }
+        // ── JSON ───────────────────────────────────────────────────────────────
+        // The getters read the text with System.Text.Json. A leading byte-order mark is skipped, as Halcyon's
+        // StripBOM does (LSLSystemAPI.cs:15272); an integer specifier indexes an array and a string specifier names an
+        // object member, anything else is JSON_INVALID (Halcyon JsonGetSpecific, :15585-15598; YEngine JsonFind).
+
         public string llJsonGetValue(string json, LSLList specifiers)
         {
-            if (string.IsNullOrEmpty(json) || specifiers == null) return JSON_INVALID;
-            try
+            if (specifiers == null || !TryJsonFind(json, specifiers.Data, out var el)) return JSON_INVALID;
+            // SL: llJsonGetValue("true", []) is JSON_TRUE; a null value gives JSON_NULL. A string comes back unquoted;
+            // numbers, objects and arrays as their JSON text.
+            return el.ValueKind switch
             {
-                var node = SimpleJsonNavigate(json, specifiers.Data);
-                return node ?? JSON_INVALID;
-            }
-            catch { return JSON_INVALID; }
+                System.Text.Json.JsonValueKind.String => el.GetString() ?? string.Empty,
+                System.Text.Json.JsonValueKind.True   => JSON_TRUE,
+                System.Text.Json.JsonValueKind.False  => JSON_FALSE,
+                System.Text.Json.JsonValueKind.Null   => JSON_NULL,
+                _                                     => el.GetRawText()
+            };
         }
 
         public string llJsonValueType(string json, LSLList specifiers)
         {
-            const string JSON_OBJECT  = "\uFDD1";
-            const string JSON_ARRAY   = "\uFDD2";
-            const string JSON_NUMBER  = "\uFDD3";
-            const string JSON_STRING  = "\uFDD4";
-            const string JSON_NULL    = "\uFDD5";
-            const string JSON_TRUE    = "\uFDD6";
-            const string JSON_FALSE   = "\uFDD7";
-            if (string.IsNullOrEmpty(json)) return JSON_INVALID;
+            if (!TryJsonFind(json, specifiers?.Data ?? Array.Empty<object>(), out var el)) return JSON_INVALID;
+            return el.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.Object => JSON_OBJECT,
+                System.Text.Json.JsonValueKind.Array  => JSON_ARRAY,
+                System.Text.Json.JsonValueKind.Number => JSON_NUMBER,
+                System.Text.Json.JsonValueKind.String => JSON_STRING,
+                System.Text.Json.JsonValueKind.True   => JSON_TRUE,
+                System.Text.Json.JsonValueKind.False  => JSON_FALSE,
+                System.Text.Json.JsonValueKind.Null   => JSON_NULL,
+                _                                     => JSON_INVALID
+            };
+        }
+
+        /// <summary>Parse <paramref name="json"/> and follow <paramref name="path"/>; false when either fails.</summary>
+        private static bool TryJsonFind(string json, object[] path, out System.Text.Json.JsonElement found)
+        {
+            found = default;
+            if (!TryJsonParse(json, out var cur)) return false;
+            foreach (object seg in path)
+            {
+                if (cur.ValueKind == System.Text.Json.JsonValueKind.Array && seg is int idx)
+                {
+                    if (idx < 0 || idx >= cur.GetArrayLength()) return false;
+                    cur = cur[idx];
+                }
+                else if (cur.ValueKind == System.Text.Json.JsonValueKind.Object && seg is string key)
+                {
+                    if (!cur.TryGetProperty(key, out var next)) return false;
+                    cur = next;
+                }
+                else return false;
+            }
+            found = cur;
+            return true;
+        }
+
+        /// <summary>The JSON text as an element that outlives its document; false when it is not JSON.</summary>
+        private static bool TryJsonParse(string json, out System.Text.Json.JsonElement root)
+        {
+            root = default;
+            json = StripBom(json);
+            if (string.IsNullOrWhiteSpace(json)) return false;
             try
             {
-                string val = SimpleJsonNavigate(json, specifiers?.Data ?? Array.Empty<object>());
-                if (val == null) return JSON_INVALID;
-                if (val == "null") return JSON_NULL;
-                if (val == "true") return JSON_TRUE;
-                if (val == "false") return JSON_FALSE;
-                if (val.StartsWith("{")) return JSON_OBJECT;
-                if (val.StartsWith("[")) return JSON_ARRAY;
-                if (val.StartsWith("\"")) return JSON_STRING;
-                if (double.TryParse(val, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _)) return JSON_NUMBER;
-                return JSON_INVALID;
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                root = doc.RootElement.Clone();
+                return true;
             }
-            catch { return JSON_INVALID; }
+            catch (System.Text.Json.JsonException) { return false; }
         }
+
+        private static string StripBom(string s) => s?.TrimStart('﻿');
+
+        /// <summary>
+        /// A string as a JSON string: quoted, with the quote, the backslash and every control character escaped. Other
+        /// characters are written as they are (System.Text.Json's serializer would write non-ASCII as \u escapes).
+        /// </summary>
+        private static string JsonQuote(string s)
+        {
+            var sb = new StringBuilder(s.Length + 2);
+            sb.Append('"');
+            foreach (char c in s)
+            {
+                switch (c)
+                {
+                    case '"': sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\b': sb.Append("\\b"); break;
+                    case '\f': sb.Append("\\f"); break;
+                    case '\n': sb.Append("\\n"); break;
+                    case '\r': sb.Append("\\r"); break;
+                    case '\t': sb.Append("\\t"); break;
+                    default:
+                        if (c < ' ') sb.Append("\\u").Append(((int)c).ToString("x4"));
+                        else sb.Append(c);
+                        break;
+                }
+            }
+            sb.Append('"');
+            return sb.ToString();
+        }
+
+        /// <summary>A number as JSON writes one (RFC 8259): no NaN, Infinity, thousands separators or spaces.</summary>
+        private static readonly System.Text.RegularExpressions.Regex JsonNumber =
+            new(@"^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
         // LSL JSON special constants — values match Phlox DefaultConstants.cs
         private const string JSON_INVALID = "\uFDD0";
+        private const string JSON_OBJECT  = "\uFDD1";
+        private const string JSON_ARRAY   = "\uFDD2";
+        private const string JSON_NUMBER  = "\uFDD3";
+        private const string JSON_STRING  = "\uFDD4";
+        private const string JSON_NULL    = "\uFDD5";
+        private const string JSON_TRUE    = "\uFDD6";
+        private const string JSON_FALSE   = "\uFDD7";
         private const string JSON_DELETE  = "\uFDD8";
 
         public string llJsonSetValue(string json, LSLList specifiers, string value)
         {
             if (specifiers == null || specifiers.Data.Length == 0)
                 return JSON_INVALID;
-            if (string.IsNullOrEmpty(json))
-                json = "{}";  // default to empty object per LSL spec
+            json = StripBom(json);
             try
             {
+                // Empty input: the specifiers build the whole value, so an index starts an array, as Halcyon and
+                // YEngine start one (llJsonSetValue("", [0], "x") is ["x"]), and a key starts an object.
+                if (string.IsNullOrEmpty(json))
+                    return JsonNodeSerialize(JsonBuildRest(specifiers.Data, 0, value));
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
                 // Clone root into a mutable structure, apply the set, serialize back
                 var root = JsonElementToNode(doc.RootElement);
@@ -15419,7 +15500,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 for (int i = 0; i < obj.Members.Count; i++)
                 {
                     if (i > 0) sb.Append(',');
-                    sb.Append(System.Text.Json.JsonSerializer.Serialize(obj.Members[i].Key));
+                    sb.Append(JsonQuote(obj.Members[i].Key));
                     sb.Append(':');
                     sb.Append(JsonNodeSerialize(obj.Members[i].Value));
                 }
@@ -15441,14 +15522,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return "null";
         }
 
-        /// <summary>Convert an LSL value string to a JNode for insertion into the tree.</summary>
+        /// <summary>
+        /// Convert an LSL value string to a JNode for insertion into the tree. JSON_TRUE, JSON_FALSE and JSON_NULL, and
+        /// the plain words true, false and null, are literals (Halcyon DetectJson and YEngine JsonSetSpecific agree);
+        /// framed JSON objects and arrays are parsed; a number is written bare only when it is a JSON number; anything
+        /// else, quoted values included, is a JSON string.
+        /// </summary>
         private static JNode JsonValueToNode(string value)
         {
             if (value == null) return new JValue("null");
-            // LSL special sentinel constants are stored as bare words
-            if (value == "\uFDD6") return new JValue("true");   // JSON_TRUE
-            if (value == "\uFDD7") return new JValue("false");  // JSON_FALSE
-            if (value == "\uFDD5") return new JValue("null");   // JSON_NULL
+            if (value == JSON_TRUE || value == "true") return new JValue("true");
+            if (value == JSON_FALSE || value == "false") return new JValue("false");
+            if (value == JSON_NULL || value == "null") return new JValue("null");
             // If it looks like JSON structure, parse it
             string trimmed = value.Trim();
             if ((trimmed.StartsWith("{") && trimmed.EndsWith("}")) ||
@@ -15461,12 +15546,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
                 catch { /* fall through to string */ }
             }
-            // Numeric?
-            if (double.TryParse(trimmed, System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out _))
-                return new JValue(trimmed);
-            // Plain string — quote it
-            return new JValue(System.Text.Json.JsonSerializer.Serialize(value));
+            if (JsonNumber.IsMatch(trimmed)) return new JValue(trimmed);
+            return new JValue(JsonQuote(value));
         }
 
         /// <summary>
@@ -15580,43 +15661,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
         }
 
-        private static string SimpleJsonNavigate(string json, object[] path)
+        /// <summary>
+        /// SL (llList2Json): string items "are interpreted as JSON"; true, false and null (and JSON_TRUE, JSON_FALSE,
+        /// JSON_NULL) become literals; strings are trimmed; JSON objects, arrays and quoted strings are kept as they are;
+        /// "Strings containing valid JSON numbers convert to JSON strings"; a JSON_OBJECT list must be strided key, value
+        /// pairs, else JSON_INVALID (Halcyon :15438-15444).
+        /// </summary>
+        public string llList2Json(string type, LSLList values)
         {
-            // Minimal JSON navigator — walks path keys/indices into a JSON string
-            string cur = json.Trim();
-            foreach (object seg in path)
-            {
-                cur = cur.Trim();
-                if (cur.StartsWith("{"))
-                {
-                    string key = seg.ToString();
-                    var doc = System.Text.Json.JsonDocument.Parse(cur);
-                    if (!doc.RootElement.TryGetProperty(key, out var el)) return null;
-                    cur = el.GetRawText();
-                }
-                else if (cur.StartsWith("["))
-                {
-                    if (!int.TryParse(seg.ToString(), out int idx)) return null;
-                    var doc = System.Text.Json.JsonDocument.Parse(cur);
-                    var arr = doc.RootElement;
-                    if (idx < 0 || idx >= arr.GetArrayLength()) return null;
-                    cur = arr[idx].GetRawText();
-                }
-                else return null;
-            }
-            // Unwrap string quotes
-            if (cur.StartsWith("\"") && cur.EndsWith("\""))
-                return System.Text.Json.JsonSerializer.Deserialize<string>(cur);
-            return cur;
-        }
-            public string llList2Json(string type, LSLList values)
-        {
-            const string LSL_JSON_ARRAY   = "\uFDD2";  // Phlox JSON_ARRAY constant
-            const string LSL_JSON_OBJECT  = "\uFDD1";  // Phlox JSON_OBJECT constant
             if (values == null) return JSON_INVALID;
             try
             {
-                if (type == LSL_JSON_ARRAY)
+                if (type == JSON_ARRAY)
                 {
                     var sb = new System.Text.StringBuilder("[");
                     for (int i = 0; i < values.Data.Length; i++)
@@ -15627,18 +15683,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     sb.Append(']');
                     return sb.ToString();
                 }
-                else if (type == LSL_JSON_OBJECT)
+                else if (type == JSON_OBJECT)
                 {
+                    if (values.Data.Length % 2 != 0) return JSON_INVALID;
                     var sb = new System.Text.StringBuilder("{");
-                    bool first = true;
-                    for (int i = 0; i + 1 < values.Data.Length; i += 2)
+                    for (int i = 0; i < values.Data.Length; i += 2)
                     {
-                        if (!(values.Data[i] is string)) return JSON_INVALID;
-                        if (!first) sb.Append(',');
-                        first = false;
-                        sb.Append('"');
-                        sb.Append(((string)values.Data[i]).Replace("\\", "\\\\").Replace("\"", "\\\""));
-                        sb.Append("\":");
+                        if (!(values.Data[i] is string key)) return JSON_INVALID;
+                        if (i > 0) sb.Append(',');
+                        sb.Append(JsonQuote(key));
+                        sb.Append(':');
                         sb.Append(JsonValueFromObject(values.Data[i + 1]));
                     }
                     sb.Append('}');
@@ -15649,44 +15703,67 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             catch { return JSON_INVALID; }
         }
 
+        /// <summary>One llList2Json item as JSON text.</summary>
         private static string JsonValueFromObject(object o)
         {
             if (o == null) return "null";
-            if (o is int iv)    return iv.ToString();
-            if (o is float fv)  return fv.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            if (o is double dv) return dv.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (o is int iv) return iv.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (o is float || o is double)
+            {
+                double d = Convert.ToDouble(o);
+                // JSON has no NaN or infinity; they go as strings, as YEngine writes them (LSL_Api.cs ListToJson).
+                if (double.IsNaN(d)) return "\"NaN\"";
+                if (double.IsInfinity(d)) return d > 0 ? "\"Inf\"" : "\"-Inf\"";
+                return o is float fv ? fv.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                                     : d.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
             if (o is string sv)
             {
-                if (sv == "true" || sv == "false" || sv == "null") return sv;
-                if (double.TryParse(sv, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _)) return sv;
-                return "\"" + sv.Replace("\\","\\\\").Replace("\"","\\\"") + "\"";
+                string t = sv.Trim();
+                if (t == JSON_TRUE || t == "true") return "true";
+                if (t == JSON_FALSE || t == "false") return "false";
+                if (t == JSON_NULL || t == "null") return "null";
+                if (IsFramedJson(t)) return t;
+                return JsonQuote(t);
             }
-            return "\"" + o.ToString() + "\"";
+            return JsonQuote(ListElementStrings(new LSLList(new object[] { o })).First());
         }
+
+        /// <summary>An object, an array or a quoted string that is valid JSON, which llList2Json keeps as it is.</summary>
+        private static bool IsFramedJson(string t)
+        {
+            if (t.Length < 2) return false;
+            char first = t[0], last = t[t.Length - 1];
+            if (!((first == '{' && last == '}') || (first == '[' && last == ']') || (first == '"' && last == '"'))) return false;
+            return TryJsonParse(t, out _);
+        }
+
+        /// <summary>
+        /// SL (llJson2List): a single value gives "a list with 1 item"; an object "a strided list of key, value pairs";
+        /// nested objects and arrays "are returned as json strings". true, false and null give JSON_TRUE, JSON_FALSE and
+        /// JSON_NULL. Text that is not JSON comes back as a one-item list of itself, as Halcyon (:15296-15305) and
+        /// YEngine return it.
+        /// </summary>
         public LSLList llJson2List(string src)
         {
             if (string.IsNullOrEmpty(src)) return new LSLList();
-            try
+            if (!TryJsonParse(src, out var root)) return new LSLList(new object[] { StripBom(src) });
+            var result = new System.Collections.Generic.List<object>();
+            if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
             {
-                var doc = System.Text.Json.JsonDocument.Parse(src);
-                var result = new System.Collections.Generic.List<object>();
-                if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    foreach (var el in doc.RootElement.EnumerateArray())
-                        result.Add(JsonElementToLSL(el));
-                }
-                else if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object)
-                {
-                    foreach (var prop in doc.RootElement.EnumerateObject())
-                    {
-                        result.Add(prop.Name);
-                        result.Add(JsonElementToLSL(prop.Value));
-                    }
-                }
-                return new LSLList(result.ToArray());
+                foreach (var el in root.EnumerateArray())
+                    result.Add(JsonElementToLSL(el));
             }
-            catch { return new LSLList(); }
+            else if (root.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                foreach (var prop in root.EnumerateObject())
+                {
+                    result.Add(prop.Name);
+                    result.Add(JsonElementToLSL(prop.Value));
+                }
+            }
+            else result.Add(JsonElementToLSL(root));
+            return new LSLList(result.ToArray());
         }
 
         private static object JsonElementToLSL(System.Text.Json.JsonElement el)
@@ -15696,9 +15773,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 System.Text.Json.JsonValueKind.Number =>
                     el.TryGetInt32(out int i) ? (object)i : (object)el.GetSingle(),
                 System.Text.Json.JsonValueKind.String  => el.GetString() ?? string.Empty,
-                System.Text.Json.JsonValueKind.True    => 1,
-                System.Text.Json.JsonValueKind.False   => 0,
-                System.Text.Json.JsonValueKind.Null    => "null",
+                System.Text.Json.JsonValueKind.True    => JSON_TRUE,
+                System.Text.Json.JsonValueKind.False   => JSON_FALSE,
+                System.Text.Json.JsonValueKind.Null    => JSON_NULL,
                 _                                      => el.GetRawText()
             };
         }
