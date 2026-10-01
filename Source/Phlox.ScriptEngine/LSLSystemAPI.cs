@@ -442,7 +442,26 @@ namespace Phlox.ScriptEngine
             ReleaseScriptResources(ScriptEnd.Unload);
             // Halcyon OnScriptUnloaded "silently release controls". The permissions and the Control record stay
             // with the item and its saved state (a crossing object takes them with it); only an avatar still here is let go.
-            EndPermissions(0, releaseControls: true, forgetControls: false);
+            ReleaseControlsOnUnload();
+        }
+
+        /// <summary>
+        /// The unload's release of taken controls, from what the script and the region hold, never from the part's
+        /// inventory: a derez queues the unload (Scene.DeleteSceneObject -> RemoveScriptInstances) and then disposes the
+        /// object, which takes the part's inventory away (SceneObjectPart.Dispose), so the unload can run after the item
+        /// is gone. Controls are registered under this script's item id only by llTakeControls, which also writes the
+        /// Control record, so the record says whether there is anything to release and the avatar holding them is found
+        /// by that id. No record, or no avatar still here holding them: nothing to do.
+        /// </summary>
+        private void ReleaseControlsOnUnload()
+        {
+            var misc = m_thisScript?.ScriptState?.MiscAttributes;
+            if (misc == null || !misc.ContainsKey((int)RuntimeState.MiscAttr.Control)) return;
+            ScenePresence holder = ControlsHolder(UUID.Zero, hadRecord: true);
+            if (holder != null)
+                using (PhloxEngine.OwnControlChange())
+                    holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+            m_ScriptEngine?.RequestParcelCheck(m_itemID);
         }
         // ── What ends with the script ──────────────────────────────────────────
 
@@ -2183,7 +2202,8 @@ namespace Phlox.ScriptEngine
         /// The one place a script's permissions end, with what they started. Every lifecycle path comes here: reset,
         /// llRequestPermissions (release, another avatar, no TAKE_CONTROLS, absent, muted), a dialog answer without
         /// TAKE_CONTROLS, llReleaseControls, the core's release of controls on a stand, Release Keys, detach or drop, an
-        /// owner change, unload, and an animation call for a granter who is not here.
+        /// owner change, and an animation call for a granter who is not here. Unload ends no permission and releases
+        /// controls without the item (<see cref="ReleaseControlsOnUnload"/>).
         /// </summary>
         /// <param name="revoke">The bits that end; <see cref="ALL_PERMISSIONS"/> clears the grant. The granter is cleared
         /// when nothing is left (Halcyon: "if (item.PermsMask == 0) item.PermsGranter = UUID.Zero").</param>

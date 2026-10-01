@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using InWorldz.Phlox.Types;
 using InWorldz.Phlox.VM;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
+using Phlox.ScriptEngine;
 using Xunit;
 
 namespace InWorldz.Phlox.Tests;
@@ -538,5 +540,54 @@ public class PermissionLifecycleTests
         var id = Armed(h, out var a, out _);
         h.Scene.EventManager.TriggerRemoveScript(h.Prim.LocalId, id);
         Assert.True(PumpUntil(h, () => !Holds(a, id)), "the avatar still has controls taken by a removed script");
+    }
+
+    private static LSLSystemAPI ApiOf(SchedulerHarness h, UUID item)
+    {
+        var exe = (PhloxExecutionScheduler)Field(h.Engine, "m_ExeScheduler");
+        return ((Dictionary<UUID, LSLSystemAPI>)Field(exe, "m_Apis"))[item];
+    }
+
+    private static object Field(object o, string name)
+        => o.GetType().GetField(name, BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(o);
+
+    /// <summary>
+    /// A derez queues the engine's unload (Scene.DeleteSceneObject -> RemoveScriptInstances) and then disposes the
+    /// object (SceneObjectGroup.Dispose), which takes each part's inventory away. The engine's unload can run after
+    /// that, so the unload hook cannot rely on reading the script's item from the part.
+    /// </summary>
+    private static void DisposeLikeADerez(SchedulerHarness h)
+    {
+        h.Prim.ParentGroup.Dispose();
+        Assert.Null(h.Prim.Inventory);
+    }
+
+    [Fact]
+    public void TheUnloadHookReleasesControlsWhenThePartInventoryIsAlreadyGone()
+    {
+        using var h = new SchedulerHarness();
+        var id = Armed(h, out var a, out _);
+        var api = ApiOf(h, id);
+        DisposeLikeADerez(h);
+
+        var thrown = Record.Exception(() => api.OnScriptUnloaded(ScriptUnloadReason.Unloaded, RuntimeState.LocalDisableFlag.None));
+
+        Assert.Null(thrown);
+        Assert.False(Holds(a, id), "the avatar still has controls taken by a script whose object was deleted");
+    }
+
+    [Fact]
+    public void TheUnloadHookIsQuietWhenTheGrantingAvatarHasAlreadyLeft()
+    {
+        using var h = new SchedulerHarness();
+        var id = Armed(h, out var a, out _);
+        var api = ApiOf(h, id);
+        h.Scene.CloseAgent(a.UUID, false);
+        Assert.Null(h.Scene.GetScenePresence(a.UUID));
+        DisposeLikeADerez(h);
+
+        var thrown = Record.Exception(() => api.OnScriptUnloaded(ScriptUnloadReason.Unloaded, RuntimeState.LocalDisableFlag.None));
+
+        Assert.Null(thrown);
     }
 }
