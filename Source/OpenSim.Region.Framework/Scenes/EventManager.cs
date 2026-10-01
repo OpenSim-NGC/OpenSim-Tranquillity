@@ -815,6 +815,29 @@ public class EventManager
     public delegate void ParcelPrimCountTainted();
     public event ParcelPrimCountTainted OnParcelPrimCountTainted;
 
+    /// <summary>
+    /// Triggered when a scene object's position lands on a different parcel than the last one recorded for it.
+    /// </summary>
+    /// <remarks>
+    /// Raised for every kind of move (position setter, physics, keyframed motion, edits) whether or not anyone
+    /// is in the region, and once when the object is added to the scene (rez, region start, arrival), with
+    /// <c>oldParcel</c> null. Not raised for attachments. <c>oldParcel</c> is the parcel object recorded at the
+    /// previous crossing, which may since have been joined away.
+    /// Triggered in <see cref="SceneObjectGroup.CheckParcelCrossing"/>.
+    /// </remarks>
+    public event GroupCrossedToNewParcel OnGroupCrossedToNewParcel;
+    public delegate void GroupCrossedToNewParcel(SceneObjectGroup group, ILandObject oldParcel, ILandObject newParcel);
+
+    /// <summary>
+    /// Triggered when the owner or the group of a scene object that is in the scene changes.
+    /// </summary>
+    /// <remarks>
+    /// Raised from SceneObjectGroup.SetOwnerId, SetOwner and SetGroup (god set owner, deed to group, set group,
+    /// buy as original, llAttachToAvatarTemp), only when the root part's owner or group actually changed.
+    /// </remarks>
+    public event ObjectOwnerOrGroupChanged OnObjectOwnerOrGroupChanged;
+    public delegate void ObjectOwnerOrGroupChanged(SceneObjectGroup group, UUID oldOwner, UUID newOwner, UUID oldGroup, UUID newGroup);
+
     public event GetScriptRunning OnGetScriptRunning;
 
     public delegate void ThrottleUpdate(ScenePresence scenePresence);
@@ -2637,6 +2660,48 @@ public class EventManager
                 {
                     m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerParcelPrimCountTainted failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerGroupCrossedToNewParcel(SceneObjectGroup group, ILandObject oldParcel, ILandObject newParcel)
+    {
+        GroupCrossedToNewParcel handler = OnGroupCrossedToNewParcel;
+        if (handler is not null)
+        {
+            foreach (GroupCrossedToNewParcel d in handler.GetInvocationList())
+            {
+                try
+                {
+                    d(group, oldParcel, newParcel);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerGroupCrossedToNewParcel failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerObjectOwnerOrGroupChanged(SceneObjectGroup group, UUID oldOwner, UUID newOwner, UUID oldGroup, UUID newGroup)
+    {
+        ObjectOwnerOrGroupChanged handler = OnObjectOwnerOrGroupChanged;
+        if (handler is not null)
+        {
+            foreach (ObjectOwnerOrGroupChanged d in handler.GetInvocationList())
+            {
+                try
+                {
+                    d(group, oldOwner, newOwner, oldGroup, newGroup);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerObjectOwnerOrGroupChanged failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
             }

@@ -3088,6 +3088,10 @@ public class SceneObjectPart : EntityBase, IDisposable
                 return;
             }
             //ParentGroup.RootPart.m_groupPosition = newpos;
+
+            // physics moves the body without the position setter; the group's parcel follows the root
+            if (_parentID == 0)
+                ParentGroup.CheckParcelCrossing();
         }
 
         ScheduleTerseUpdate();

@@ -83,6 +83,57 @@ public partial class Scene
     }
 
     /// <summary>
+    /// True if any loaded script engine enforces the parcel script rules itself (see IParcelScriptPolicyEngine).
+    /// </summary>
+    public bool AnyScriptEngineEnforcesParcelRules()
+    {
+        foreach (IScriptModule engine in RequestModuleInterfaces<IScriptModule>())
+        {
+            if (engine is IParcelScriptPolicyEngine policy && policy.EnforcesParcelScriptRules)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// The script engine that will run a script: the engine named on the script's first line
+    /// ("//engine:language") if that engine is loaded, otherwise the default engine; null if neither is loaded.
+    /// </summary>
+    /// <param name="defaultEngine">the engine name the caller passes to CreateScriptInstance (DefaultScriptEngine)</param>
+    /// <param name="scriptSource">the script source, or null if not known</param>
+    public IScriptModule ResolveScriptEngine(string defaultEngine, string scriptSource)
+    {
+        IScriptModule[] engines = RequestModuleInterfaces<IScriptModule>();
+
+        // the same first-line parse YEngine uses to pick its engine
+        if (scriptSource is not null && scriptSource.StartsWith("//"))
+        {
+            int lineEnd = scriptSource.IndexOf('\n');
+            if (lineEnd > 5)
+            {
+                string firstline = scriptSource[2..lineEnd].Trim();
+                int colon = firstline.IndexOf(':');
+                if (colon >= 3)
+                {
+                    string named = firstline[..colon].TrimEnd();
+                    foreach (IScriptModule engine in engines)
+                    {
+                        if (engine.ScriptEngineName == named)
+                            return engine;
+                    }
+                }
+            }
+        }
+
+        foreach (IScriptModule engine in engines)
+        {
+            if (engine.ScriptEngineName == defaultEngine)
+                return engine;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// Lets the script engines start processing scripts.
     /// </summary>
     public void StartScripts()
