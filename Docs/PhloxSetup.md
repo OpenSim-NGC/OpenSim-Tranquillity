@@ -31,7 +31,9 @@ Two settings decide which engine runs a script:
 - **`[InWorldz.Phlox] Enabled`** loads Phlox. When the section is missing, or `Enabled` is
   false, Phlox does nothing at all.
 - **`[Startup] DefaultScriptEngine`** names the engine that runs every script without an
-  engine header. The code default, when no ini file sets it, is `"YEngine"`.
+  engine header. The shipped `OpenSimDefaults.ini` sets it to `"InWorldz.Phlox"`, with
+  both engines enabled. The code default, used only when no ini file sets it, is
+  `"YEngine"`.
 - **Keep YEngine enabled.** With Phlox the default and YEngine still loaded, YEngine is the
   backup: any script whose first line is `//YEngine:` stays on YEngine. With Phlox loaded but
   YEngine the default, Phlox runs only scripts whose first line is `//InWorldz.Phlox:`.

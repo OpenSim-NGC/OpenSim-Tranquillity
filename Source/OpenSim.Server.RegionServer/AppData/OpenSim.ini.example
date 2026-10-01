@@ -264,15 +264,15 @@
     ; script opensim-ode-sh starts opensim setting that limit. You may need to increase it even more on large regions
     ; edit the line ulimit -s 262144, and change this last value
 
-    ;# {DefaultScriptEngine} {} {Default script engine} {YEngine}
-    ;; Default script engine to use. Options: "YEngine" or "InWorldz.Phlox".
+    ;# {DefaultScriptEngine} {} {Default script engine} {InWorldz.Phlox YEngine} InWorldz.Phlox
+    ;; Default script engine to use. Options: "InWorldz.Phlox" (default) or "YEngine".
     ;; The engine named here runs every script whose first line does not name an engine.
     ;; A first-line header pins a script to an engine: //YEngine: or //InWorldz.Phlox:
     ;; Changing this setting moves every script without a header to the new default the
     ;; next time it starts, and it starts fresh (from state_entry): the engines do not share
     ;; saved script state. Both engines can be loaded together; the default engine must be
     ;; enabled ([InWorldz.Phlox] Enabled = true for Phlox). See Docs/PhloxSetup.md.
-    ; DefaultScriptEngine = "YEngine"
+    ; DefaultScriptEngine = "InWorldz.Phlox"
     
     ;# {HttpProxy} {} {Proxy URL for llHTTPRequest and dynamic texture loading} {} http://proxy.com:8080
     ;; Http proxy setting for llHTTPRequest and dynamic texture loading, if
