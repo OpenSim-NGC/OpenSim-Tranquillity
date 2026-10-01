@@ -423,3 +423,8 @@ COMMIT;
 BEGIN;
 ALTER TABLE `prims` ADD COLUMN `StartStr` TEXT;
 COMMIT;
+
+:VERSION 44         #----- add script experience link to primitems
+BEGIN;
+ALTER TABLE primitems ADD COLUMN experienceID char(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+COMMIT;

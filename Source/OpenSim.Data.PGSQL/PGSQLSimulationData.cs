@@ -496,9 +496,9 @@ public class PGSQLSimulationData : ISimulationDataStore
         sql =
             @"INSERT INTO primitems (
             ""itemID"",""primID"",""assetID"",""parentFolderID"",""invType"",""assetType"",""name"",""description"",""creationDate"",""creatorID"",""ownerID"",""lastOwnerID"",""groupID"",
-            ""nextPermissions"",""currentPermissions"",""basePermissions"",""everyonePermissions"",""groupPermissions"",""flags"")
+            ""nextPermissions"",""currentPermissions"",""basePermissions"",""everyonePermissions"",""groupPermissions"",""flags"",""experienceID"")
             VALUES (:itemID,:primID,:assetID,:parentFolderID,:invType,:assetType,:name,:description,:creationDate,:creatorID,:ownerID,
-            :lastOwnerID,:groupID,:nextPermissions,:currentPermissions,:basePermissions,:everyonePermissions,:groupPermissions,:flags)";
+            :lastOwnerID,:groupID,:nextPermissions,:currentPermissions,:basePermissions,:everyonePermissions,:groupPermissions,:flags,:experienceID)";
 
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
@@ -1505,6 +1505,7 @@ public class PGSQLSimulationData : ISimulationDataStore
         taskItem.EveryonePermissions = Convert.ToUInt32(inventoryRow["everyonePermissions"]);
         taskItem.GroupPermissions = Convert.ToUInt32(inventoryRow["groupPermissions"]);
         taskItem.Flags = Convert.ToUInt32(inventoryRow["flags"]);
+        taskItem.ExperienceID = DBGuid.FromDB(inventoryRow["experienceID"]);
 
         return taskItem;
     }
@@ -1542,6 +1543,7 @@ public class PGSQLSimulationData : ISimulationDataStore
         parameters.Add(_Database.CreateParameter("everyonePermissions", taskItem.EveryonePermissions));
         parameters.Add(_Database.CreateParameter("groupPermissions", taskItem.GroupPermissions));
         parameters.Add(_Database.CreateParameter("flags", taskItem.Flags));
+        parameters.Add(_Database.CreateParameter("experienceID", taskItem.ExperienceID));
 
         return parameters.ToArray();
     }
