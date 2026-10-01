@@ -1238,6 +1238,7 @@ public class MySQLSimulationData : ISimulationDataStore
             taskItem.EveryonePermissions  = Convert.ToUInt32(row["everyonePermissions"]);
             taskItem.GroupPermissions     = Convert.ToUInt32(row["groupPermissions"]);
             taskItem.Flags         = Convert.ToUInt32(row["flags"]);
+            taskItem.ExperienceID  = DBGuid.FromDB(row["experienceID"]);
 
             return taskItem;
         }
@@ -1687,6 +1688,7 @@ public class MySQLSimulationData : ISimulationDataStore
         cmd.Parameters.AddWithValue("everyonePermissions", taskItem.EveryonePermissions);
         cmd.Parameters.AddWithValue("groupPermissions", taskItem.GroupPermissions);
         cmd.Parameters.AddWithValue("flags", taskItem.Flags);
+        cmd.Parameters.AddWithValue("experienceID", taskItem.ExperienceID.ToString());
     }
 
     /// <summary>
@@ -1958,14 +1960,14 @@ public class MySQLSimulationData : ISimulationDataStore
                             "everyonePermissions, groupPermissions, " +
                             "flags, itemID, primID, assetID, " +
                             "parentFolderID, creatorID, ownerID, " +
-                            "groupID, lastOwnerID) values (?invType, " +
+                            "groupID, lastOwnerID, experienceID) values (?invType, " +
                             "?assetType, ?name, ?description, " +
                             "?creationDate, ?nextPermissions, " +
                             "?currentPermissions, ?basePermissions, " +
                             "?everyonePermissions, ?groupPermissions, " +
                             "?flags, ?itemID, ?primID, ?assetID, " +
                             "?parentFolderID, ?creatorID, ?ownerID, " +
-                            "?groupID, ?lastOwnerID)";
+                            "?groupID, ?lastOwnerID, ?experienceID)";
 
                     foreach (TaskInventoryItem item in items)
                     {

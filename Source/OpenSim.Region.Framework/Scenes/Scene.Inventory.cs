@@ -1664,7 +1664,10 @@ public partial class Scene
             GroupPermissions = srcTaskItem.GroupPermissions,
             CurrentPermissions = srcTaskItem.CurrentPermissions,
             NextPermissions = srcTaskItem.NextPermissions,
-            Flags = srcTaskItem.Flags
+            Flags = srcTaskItem.Flags,
+
+            // The Experience belongs to the compiled script, so the copy keeps it.
+            ExperienceID = srcTaskItem.ExperienceID
         };
 
         if (destPart.OwnerID.NotEqual(part.OwnerID))
@@ -2235,7 +2238,10 @@ public partial class Scene
             GroupPermissions = srcTaskItem.GroupPermissions,
             CurrentPermissions = srcTaskItem.CurrentPermissions,
             NextPermissions = srcTaskItem.NextPermissions,
-            Flags = srcTaskItem.Flags
+            Flags = srcTaskItem.Flags,
+
+            // The Experience belongs to the compiled script, so the copy keeps it.
+            ExperienceID = srcTaskItem.ExperienceID
         };
 
         if (destPart.OwnerID.NotEqual(srcPart.OwnerID))

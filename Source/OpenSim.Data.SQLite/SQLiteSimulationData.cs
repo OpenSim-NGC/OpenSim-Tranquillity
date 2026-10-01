@@ -1327,6 +1327,7 @@ public class SQLiteSimulationData : ISimulationDataStore
         createCol(items, "everyonePermissions", typeof(UInt32));
         createCol(items, "groupPermissions", typeof(UInt32));
         createCol(items, "flags", typeof(UInt32));
+        createCol(items, "experienceID", typeof(String));
 
         items.PrimaryKey = new DataColumn[] { items.Columns["itemID"] };
 
@@ -1850,6 +1851,7 @@ public class SQLiteSimulationData : ISimulationDataStore
         taskItem.EveryonePermissions = Convert.ToUInt32(row["everyonePermissions"]);
         taskItem.GroupPermissions = Convert.ToUInt32(row["groupPermissions"]);
         taskItem.Flags = Convert.ToUInt32(row["flags"]);
+        taskItem.ExperienceID = DBGuid.FromDB(row["experienceID"]);
 
         return taskItem;
     }
@@ -2259,6 +2261,7 @@ public class SQLiteSimulationData : ISimulationDataStore
         row["everyonePermissions"] = taskItem.EveryonePermissions;
         row["groupPermissions"] = taskItem.GroupPermissions;
         row["flags"] = taskItem.Flags;
+        row["experienceID"] = taskItem.ExperienceID.ToString();
     }
 
     /// <summary>

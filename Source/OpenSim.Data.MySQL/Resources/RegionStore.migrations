@@ -578,3 +578,8 @@ ALTER TABLE `prims`
 BEGIN;
 ALTER TABLE `prims` ADD COLUMN `StartStr` text default NULL;
 COMMIT;
+
+:VERSION 69         #----- add script experience link to primitems
+BEGIN;
+ALTER TABLE `primitems` ADD COLUMN `experienceID` char(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+COMMIT;
