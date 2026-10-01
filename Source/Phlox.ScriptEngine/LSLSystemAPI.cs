@@ -13597,8 +13597,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IHttpRequestModule httpMod = World.RequestModuleInterface<IHttpRequestModule>();
             if (httpMod == null) return UUID.Zero.ToString();
 
+            bool backPressure = m_ScriptEngine?.HttpInFlightThrottle ?? false;
+            if (backPressure) HttpQueuePressureSleep();
+
             if (!httpMod.CheckThrottle(m_localID, m_host.OwnerID))
+            {
+                // SL: HTTP_VERBOSE_THROTTLE "If TRUE, shout error messages to DEBUG_CHANNEL if the outgoing request
+                // rate exceeds the server limit", TRUE unless the script sets it.
+                if (VerboseThrottle(parameters))
+                    ShoutError("llHTTPRequest: request throttled: too many HTTP requests from this object or owner.");
+                if (backPressure) ScriptSleep(HTTP_CAPPED_DELAY);
                 return UUID.Zero.ToString();
+            }
 
             // The operator's outbound filter, where and as YEngine applies it (after the throttle, before the
             // parameters are read).
@@ -13610,6 +13620,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             var paramList  = new List<string>();
             var headers    = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var data       = parameters.Data;
+            int customHeaders = 0;
 
             for (int i = 0; i < data.Length; i += 2)
             {
@@ -13652,6 +13663,27 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         case CustomHeader.Dropped:
                             continue;
                     }
+                    // YEngine's limits (LSL_Api.llHTTPRequest): at most 8 custom headers, its forbidden-header table, and a
+                    // name and value of at most 253 characters, each with its text, so both engines refuse alike.
+                    if (customHeaders >= 8)
+                    {
+                        YEngineError("llHTTPRequest", "Max number of custom headers is 8, excess ignored");
+                        continue;
+                    }
+                    if (headerName.StartsWith("proxy-", StringComparison.OrdinalIgnoreCase)
+                        || headerName.StartsWith("sec-", StringComparison.OrdinalIgnoreCase)
+                        || (HttpForbiddenHeaders.TryGetValue(headerName, out bool fatal) && fatal))
+                    {
+                        YEngineError("llHTTPRequest", "Name is invalid as a custom header at parameter " + i);
+                        return string.Empty;
+                    }
+                    if (HttpForbiddenHeaders.ContainsKey(headerName)) continue;   // left out silently
+                    if (headerName.Length + headerValue.Length > 253)
+                    {
+                        YEngineError("llHTTPRequest", "name and value length exceds 253 characters for custom header at parameter " + i);
+                        return string.Empty;
+                    }
+                    customHeaders++;
                     // Halcyon: "In SL, duplicate headers add to the existing header after a comma+space"
                     headers[headerName] = headers.TryGetValue(headerName, out string earlier) ? earlier + ", " + headerValue : headerValue;
                     continue;
@@ -13684,9 +13716,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             UUID reqID = httpPlugin != null
                 ? httpPlugin.Start(m_itemID, objectID, () => httpMod.StartHttpRequest(m_localID, m_itemID, url, paramList, headers, body), out capped)
                 : httpMod.StartHttpRequest(m_localID, m_itemID, url, paramList, headers, body);
-            // Halcyon's in-flight caps refuse with NULL_KEY and no error; its llHTTPRequest then sleeps
-            // ERROR_DELAY, 80 ms (LSLSystemAPI.cs:13762, 13845-13846). HttpInFlightThrottle = false, never capped.
-            if (capped) ScriptSleep(HTTP_CAPPED_DELAY);
+            // Halcyon's in-flight caps refuse with NULL_KEY and no error; its llHTTPRequest sleeps ERROR_DELAY, 80 ms,
+            // after any request that returns NULL_KEY (LSLSystemAPI.cs:13762, 13855-13856). HttpInFlightThrottle = false:
+            // never capped, no sleep.
+            if (backPressure && (capped || reqID == UUID.Zero)) ScriptSleep(HTTP_CAPPED_DELAY);
             return reqID == UUID.Zero ? UUID.Zero.ToString() : reqID.ToString();
         }
         /// <summary>
@@ -13724,6 +13757,59 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 m_host.ParentGroup.RootPart.AbsolutePosition, m_host.Name, m_host.UUID, false);
             ChatToWorldComm(ChatTypeEnum.Shout, DEBUG_CHANNEL, text);
         }
+
+        /// <summary>
+        /// Halcyon llHTTPRequest's queue pressure (LSLSystemAPI.cs:13757-13774): when the script's own event queue is 60%
+        /// or more full, a sleep that grows to 50 ms as it fills, so a script flooded with responses slows its requests.
+        /// </summary>
+        private void HttpQueuePressureSleep()
+        {
+            const float EVENT_LOW_SPACE_THRESHOLD = 0.4f;
+            const int LOW_SPACE_DELAY = 50;
+            float free = m_ScriptEngine.GetEventQueueFreeSpacePercentage(m_itemID);
+            if (free <= EVENT_LOW_SPACE_THRESHOLD)
+            {
+                int delay = (int)((1.0f - free / EVENT_LOW_SPACE_THRESHOLD) * LOW_SPACE_DELAY);
+                if (delay > 0) ScriptSleep(delay);
+            }
+        }
+
+        /// <summary>HTTP_VERBOSE_THROTTLE's value in the options list: TRUE unless the script sets it FALSE.</summary>
+        private static bool VerboseThrottle(LSLList parameters)
+        {
+            object[] data = parameters?.Data;
+            if (data == null) return true;
+            bool verbose = true;
+            for (int i = 0; i + 1 < data.Length; i += 2)
+            {
+                if (!int.TryParse(parameters.GetLSLStringItem(i), out int option)) return verbose;
+                if (option == (int)HttpRequestConstants.HTTP_VERBOSE_THROTTLE)
+                    verbose = int.TryParse(parameters.GetLSLStringItem(i + 1), out int v) ? v != 0 : verbose;
+                if (option == (int)HttpRequestConstants.HTTP_CUSTOM_HEADER) i++;   // its name and value
+            }
+            return verbose;
+        }
+
+        /// <summary>
+        /// YEngine's HttpForbiddenHeaders (LSL_Api.cs:295-379): true stops the request with an error, false leaves the
+        /// header out silently. Content-Type and the X-SecondLife-* names are refused before this table is read
+        /// (<see cref="CustomHeaderRule"/>).
+        /// </summary>
+        private static readonly Dictionary<string, bool> HttpForbiddenHeaders = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Accept", true }, { "Accept-Charset", true }, { "Accept-CH", false }, { "Accept-CH-Lifetime", false },
+            { "Access-Control-Request-Headers", false }, { "Access-Control-Request-Method", false },
+            { "Accept-Encoding", false }, { "Accept-Patch", false }, { "Accept-Post", false }, { "Accept-Ranges", false },
+            { "Cache-Control", false }, { "Connection", false }, { "Content-Length", false }, { "Content-Type", true },
+            { "Cookie", false }, { "Cookie2", false }, { "Date", false }, { "Device-Memory", false }, { "DTN", false },
+            { "Early-Data", false }, { "Expect", false }, { "Feature-Policy", false }, { "From", true }, { "Host", true },
+            { "Keep-Alive", false }, { "If-Match", false }, { "If-Modified-Since", false }, { "If-None-Match", false },
+            { "If-Unmodified-Since", false }, { "Max-Forwards", false }, { "Origin", false }, { "Pragma", false },
+            { "Referer", true }, { "Server", false }, { "Set-Cookie", false }, { "Set-Cookie2", false }, { "TE", true },
+            { "Trailer", true }, { "Transfer-Encoding", false }, { "Upgrade", true }, { "User-Agent", true },
+            { "Vary", false }, { "Via", true }, { "Viewport-Width", false }, { "Warning", false }, { "Width", false },
+            { "X-Forwarded-For", false }, { "X-Forwarded-Host", false }, { "X-Forwarded-Proto", false },
+        };
 
         private enum CustomHeader { Allowed, Dropped, RuntimeError }
 
