@@ -195,7 +195,7 @@ public class ErrorPauseTests
         new("iwMatchList IW_MATCH_COUNT", a => a.iwMatchList(L("a"), L("a"), 3)),
         new("iwMatchList IW_MATCH_COUNT_REGEX", a => a.iwMatchList(L("a"), L("a"), 4)),
         new("iwReverseList stride", a => a.iwReverseList(L(1, 2, 3), 2)),
-        new("llGiveMoney no PERMISSION_DEBIT", a => a.llGiveMoney(UUID.Random().ToString(), 5), Later: 3000),
+        new("llGiveMoney no PERMISSION_DEBIT", a => a.llGiveMoney(UUID.Random().ToString(), 5)),   // no sleep since SL's forced delay 0.0
         new("llCastRay no hits asked", a => a.llCastRay(Vector3.Zero, Vector3.UnitX, L(SlConst.RC_MAX_HITS, 0))),
         new("iwGroupInvite not creator", a => a.iwGroupInvite(UUID.Random().ToString(), UUID.Random().ToString(), ""),
             Setup: r => r.Self.CreatorID = UUID.Random()),

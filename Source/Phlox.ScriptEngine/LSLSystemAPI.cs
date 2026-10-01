@@ -15340,48 +15340,160 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public int llGiveMoney(string destination, int amount)
         {
-            // Halcyon's order (LSLSystemAPI.cs:2978-3014). Phlox moves no money; every path still sleeps 3 s.
+            // SL: "Returns an integer that is always zero", forced delay 0.0. Halcyon's checks and texts
+            // (LSLSystemAPI.cs:2978-3014), without a sleep; with a money module the transfer is queued as YEngine's is
+            // (LSL_Api.llGiveMoney), from the root prim and its owner.
             TaskInventoryItem item = GetInventorySelf();
-            if (item == null) { ScriptSleep(3000); return 0; }
+            if (item == null) { LSLError("No item found from which to give money"); return 0; }
 
             // PERMISSION_DEBIT (0x02), granted by the owner: Halcyon CheckRuntimePerms(item, item.OwnerID, PERMISSION_DEBIT)
             // (:2993, :4467-4473); SL: "it must be granted by the owner". Phlox's text, as before.
             if ((item.PermsMask & PERMISSION_DEBIT) == 0 || item.PermsGranter != item.OwnerID)
             {
                 ScriptShoutError("llGiveMoney: PERMISSION_DEBIT not granted.");
-                ScriptSleep(3000);
                 return 0;
             }
 
             // Halcyon :2999-3003.
-            if (!UUID.TryParse(destination, out UUID destId)) { LSLError("Bad key in llGiveMoney"); ScriptSleep(3000); return 0; }
-            if (destId == UUID.Zero || amount <= 0) { ScriptSleep(3000); return 0; }
+            if (!UUID.TryParse(destination, out UUID destId)) { LSLError("Bad key in llGiveMoney"); return 0; }
+            if (destId == UUID.Zero || amount <= 0) return 0;
 
-            // Halcyon :3006-3010 - no money module is "not implemented". With one, Phlox still
-            // returns 0 (it has no money support).
-            if (World?.RequestModuleInterface<IMoneyModule>() == null) NotImplemented("llGiveMoney");
-            ScriptSleep(3000);
+            // Halcyon :3006-3010 - no money module is "not implemented".
+            IMoneyModule money = World?.RequestModuleInterface<IMoneyModule>();
+            if (money == null) { NotImplemented("llGiveMoney"); return 0; }
+
+            SceneObjectPart root = m_host.ParentGroup.RootPart;
+            UUID fromObject = root.UUID, fromOwner = root.OwnerID;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                ObjectGiveMoney(money, fromObject, fromOwner, destId, amount, UUID.Zero, out string _));
             return 0;
         }
+
+        /// <summary>
+        /// Halcyon's GiveMoney checks (LSLSystemAPI.cs:3018-3062), shared by llTransferLindenDollars and iwGiveMoney: the
+        /// script item, PERMISSION_DEBIT granted by the owner, a parsable destination, a positive amount and a money module,
+        /// in that order, each failure said with Halcyon's text. Returns the money module, or null with the error tag
+        /// in <paramref name="data"/> (SERVICE_ERROR, MISSING_PERMISSION_DEBIT, INVALID_DESTINATION; INVALID_AMOUNT is
+        /// SL's tag for an amount Halcyon left to its money module).
+        /// </summary>
+        private IMoneyModule CheckGiveMoney(string destination, int amount, out UUID toId, out string data)
+        {
+            toId = UUID.Zero;
+            data = null;
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null)
+            {
+                LSLError("No item found from which to give money");
+                data = "SERVICE_ERROR";
+                return null;
+            }
+            if ((item.PermsMask & PERMISSION_DEBIT) == 0 || item.PermsGranter != item.OwnerID)
+            {
+                LSLError("No permissions to give money");
+                data = "MISSING_PERMISSION_DEBIT";
+                return null;
+            }
+            if (!UUID.TryParse(destination, out toId))
+            {
+                LSLError("Bad key in llGiveMoney");
+                data = "INVALID_DESTINATION";
+                return null;
+            }
+            if (amount <= 0)
+            {
+                data = "INVALID_AMOUNT";
+                return null;
+            }
+            IMoneyModule money = World?.RequestModuleInterface<IMoneyModule>();
+            if (money == null)
+            {
+                NotImplemented("llGiveMoney");
+                data = "SERVICE_ERROR";
+            }
+            return money;
+        }
+
+        /// <summary>One transfer from the root prim and its owner: true on success, else the module's reason.</summary>
+        private bool ObjectGiveMoney(IMoneyModule money, UUID fromObject, UUID fromOwner, UUID toId, int amount, UUID txn, out string reason)
+        {
+            try
+            {
+                if (money.ObjectGiveMoney(fromObject, fromOwner, toId, amount, txn, out reason)) return true;
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxAPI]: money transfer failed: {0}", e.Message);
+                reason = null;
+            }
+            if (string.IsNullOrEmpty(reason)) reason = "SERVICE_ERROR";
+            return false;
+        }
+
+        /// <summary>
+        /// SL: returns the key of the transaction_result(key id, integer success, string data) event that reports the
+        /// transfer; data is a CSV on success (YEngine's "destination,amount") and an error tag on failure. Halcyon posted
+        /// that event from its finally (LSLSystemAPI.cs:3083-3085). The transfer runs off the script's thread, as
+        /// YEngine's does.
+        /// </summary>
         public string llTransferLindenDollars(string destination, int amount)
         {
-            // No economy module available in this tree
-            UUID txnId = NewDataserverQuery();
-            PostDataserverEvent(txnId, "LINDENDOLLAR_INSUFFICIENTFUNDS");
-            return txnId.ToString();
+            UUID txn = UUID.Random();
+            UUID itemId = m_itemID;
+            IMoneyModule money = CheckGiveMoney(destination, amount, out UUID toId, out string data);
+            if (money == null)
+            {
+                PostTransactionResult(itemId, txn, 0, data);
+                return txn.ToString();
+            }
+            SceneObjectPart root = m_host.ParentGroup.RootPart;
+            UUID fromObject = root.UUID, fromOwner = root.OwnerID;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                bool ok = ObjectGiveMoney(money, fromObject, fromOwner, toId, amount, txn, out string reason);
+                PostTransactionResult(itemId, txn, ok ? 1 : 0, ok ? toId + "," + amount : reason);
+            });
+            return txn.ToString();
         }
+
+        private void PostTransactionResult(UUID itemId, UUID txn, int success, string data)
+        {
+            m_ScriptEngine.PostScriptEvent(itemId, new EventParams("transaction_result",
+                new object[] { txn.ToString(), success, data ?? string.Empty }, new DetectParams[0]));
+        }
+
+        /// <summary>
+        /// Halcyon's iwGiveMoney (LSLSystemAPI.cs:3096-3100, GiveMoney with no event): the transaction id on success,
+        /// else the error tag or the money module's reason. No event. The transfer runs in the call, as Halcyon's did,
+        /// because its answer is the return value.
+        /// </summary>
         public string iwGiveMoney(string destination, int amount)
         {
-            return llTransferLindenDollars(destination, amount);
+            IMoneyModule money = CheckGiveMoney(destination, amount, out UUID toId, out string data);
+            if (money == null) return data;
+            SceneObjectPart root = m_host.ParentGroup.RootPart;
+            UUID txn = UUID.Random();
+            return ObjectGiveMoney(money, root.UUID, root.OwnerID, toId, amount, txn, out string reason) ? txn.ToString() : reason;
         }
+
+        /// <summary>SL's PAY_HIDE: the pay dialog does not show that button.</summary>
+        private const int PAY_HIDE = -1;
+
+        /// <summary>
+        /// Halcyon (LSLSystemAPI.cs:13348-13362) and YEngine (LSL_Api.llSetPayPrice): the prices go on the root prim,
+        /// which the money modules read for the pay dialog; a button the list leaves out is PAY_HIDE; the object is
+        /// marked changed so the prices persist. A call from a child prim sets the root's prices, as Halcyon's did
+        /// (SL and YEngine ignore a child prim's call).
+        /// </summary>
         public void llSetPayPrice(int price, LSLList quick_pay_buttons)
         {
-            if (m_host == null) return;
-            m_host.PayPrice[0] = price;
-            if (quick_pay_buttons.Length > 0) m_host.PayPrice[1] = quick_pay_buttons.GetLSLIntegerItem(0);
-            if (quick_pay_buttons.Length > 1) m_host.PayPrice[2] = quick_pay_buttons.GetLSLIntegerItem(1);
-            if (quick_pay_buttons.Length > 2) m_host.PayPrice[3] = quick_pay_buttons.GetLSLIntegerItem(2);
-            if (quick_pay_buttons.Length > 3) m_host.PayPrice[4] = quick_pay_buttons.GetLSLIntegerItem(3);
+            SceneObjectPart root = m_host?.ParentGroup?.RootPart;
+            if (root == null) return;
+            int[] prices = new int[5];
+            prices[0] = price;
+            for (int i = 0; i < 4; i++)
+                prices[i + 1] = i < quick_pay_buttons.Length ? quick_pay_buttons.GetLSLIntegerItem(i) : PAY_HIDE;
+            root.PayPrice = prices;
+            m_host.ParentGroup.HasGroupChanged = true;
         }
         public float llGetEnergy() => 1.0f; // Halcyon: always 1.0
 

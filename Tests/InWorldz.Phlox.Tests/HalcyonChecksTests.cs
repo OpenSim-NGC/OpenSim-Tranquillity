@@ -211,9 +211,9 @@ public class HalcyonChecksTests
         new("llGodLikeRezObject", a => { a.llGodLikeRezObject("x", V); return null; }, NotImpl + "llGodLikeRezObject"),
         new("llCollisionSprite", a => { a.llCollisionSprite("x"); return null; }, NotImpl + "llCollisionSprite"),
         new("botChangeOwner", a => { a.botChangeOwner(UUID.Random().ToString(), UUID.Random().ToString()); return null; }, NotImpl + "botChangeOwner"),
-        new("llGiveMoney bad key", a => a.llGiveMoney("not a key", 5), LslErr + "Bad key in llGiveMoney", Later: 3000, Setup: GrantDebitByOwner, Returns: 0),
-        new("llGiveMoney no money module", a => a.llGiveMoney(UUID.Random().ToString(), 5), NotImpl + "llGiveMoney", Later: 3000, Setup: GrantDebitByOwner, Returns: 0),
-        new("llGiveMoney DEBIT granted by another", a => a.llGiveMoney(UUID.Random().ToString(), 5), "Script error: llGiveMoney: PERMISSION_DEBIT not granted.", Later: 3000,
+        new("llGiveMoney bad key", a => a.llGiveMoney("not a key", 5), LslErr + "Bad key in llGiveMoney", Setup: GrantDebitByOwner, Returns: 0),
+        new("llGiveMoney no money module", a => a.llGiveMoney(UUID.Random().ToString(), 5), NotImpl + "llGiveMoney", Setup: GrantDebitByOwner, Returns: 0),
+        new("llGiveMoney DEBIT granted by another", a => a.llGiveMoney(UUID.Random().ToString(), 5), "Script error: llGiveMoney: PERMISSION_DEBIT not granted.",
             Setup: r => { r.Self.PermsGranter = UUID.Random(); r.Self.PermsMask = SlConst.PERMISSION_DEBIT; }, Returns: 0),
         new("llParcelMediaCommandList unsupported", a => { a.llParcelMediaCommandList(L(13, 1.0f)); return null; },
             NotImpl + "llParcelMediaCommandList parameter not supported yet: " + ((ParcelMediaCommandEnum)13), Later: 2000, Setup: OwnLand),
@@ -599,7 +599,7 @@ public class HalcyonChecksTests
         var (ms, ret) = r.Accounted(a => a.llGiveMoney(UUID.Random().ToString(), 5));
         Assert.Equal(0, ret);
         Assert.Equal(new[] { NotImpl + "llGiveMoney" }, r.Errors);
-        Assert.Equal(3015, ms);
+        Assert.Equal(15, ms);   // no sleep (SL forced delay 0.0): its 15 ms error pause only
         // NULL_KEY and a non-positive amount stay silent refusals.
         r.Accounted(a => a.llGiveMoney(UUID.Zero.ToString(), 5));
         Assert.Empty(r.Errors);
