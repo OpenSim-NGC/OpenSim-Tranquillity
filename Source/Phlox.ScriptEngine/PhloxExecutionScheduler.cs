@@ -1,8 +1,8 @@
 /*
- * Legion Grid — Phlox Script Engine Integration
+ * Phlox Script Engine Integration
  * Adapted from InWorldz Halcyon ExecutionScheduler.cs
  * Copyright (c) InWorldz Halcyon Developers (original)
- * Adapted 2026 for Legion Grid / OpenSim 0.9.3 .NET 8
+ * Adapted 2026 by Legion Builds for OpenSim 0.9.3 .NET 8
  */
 
 using System;
@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using InWorldz.Phlox.VM;
 using InWorldz.Phlox.Glue;
@@ -41,6 +42,8 @@ namespace Phlox.ScriptEngine
 
         private readonly WorkArrivedDelegate m_WorkArrived;
         private readonly PhloxEngine m_Engine;
+        /// <summary>Scripts loaded with the item's Running flag off and never started; enabling one owes it a state_entry.</summary>
+        private readonly HashSet<UUID> m_HeldFresh = new HashSet<UUID>();
         private readonly IWorldComm m_WorldComm;
 
         // All scripts regardless of run state
@@ -60,7 +63,7 @@ namespace Phlox.ScriptEngine
             public UUID ItemId;
             public ulong ReadyOn;
             public WakeEvent Event;
-            public enum WakeEvent { None, Timer, Touch }
+            public enum WakeEvent { None, Timer, Touch, MinDelay }
 
             public int CompareTo(SleepEntry other)
                 => ReadyOn < other.ReadyOn ? -1 : ReadyOn > other.ReadyOn ? 1 : 0;
@@ -70,6 +73,13 @@ namespace Phlox.ScriptEngine
         private readonly System.Collections.Generic.Dictionary<UUID, C5.IPriorityQueueHandle<SleepEntry>> m_StdSleepHandles = new();
         private readonly System.Collections.Generic.Dictionary<UUID, C5.IPriorityQueueHandle<SleepEntry>> m_TimerHandles = new();
         private readonly System.Collections.Generic.Dictionary<UUID, C5.IPriorityQueueHandle<SleepEntry>> m_TouchHandles = new();
+        /// <summary>One pending llMinEventDelay wake per script.</summary>
+        private readonly System.Collections.Generic.Dictionary<UUID, C5.IPriorityQueueHandle<SleepEntry>> m_MinDelayHandles = new();
+        /// <summary>
+        /// The milliseconds a parcel-paused script's timer had left at the pause (Halcyon's InjectScript keeps
+        /// them). Scheduler-thread only, transient: never saved, dropped on resume, on a new timer and on unload.
+        /// </summary>
+        private readonly System.Collections.Generic.Dictionary<UUID, ulong> m_ParcelTimerLeft = new();
 
         // Pending events (posted from outside thread)
         private readonly Queue<PendingEvent> m_PendingEvents = new();
@@ -93,9 +103,50 @@ namespace Phlox.ScriptEngine
         // Reset requests
         private readonly Queue<UUID> m_PendingResets = new();
 
+        // No Scripts parcels enforced live. Scene events only ask for a check; the check and the
+        // pause/resume it leads to run here, on the scheduler thread, like enable/disable. Nothing polls.
+        private enum ParcelCheckKind { Item, Group, Parcel, ControlHolders }
+        private struct ParcelCheckReq { public ParcelCheckKind Kind; public UUID ItemId; public SceneObjectGroup Group; public int ParcelLocalId; }
+        private readonly Queue<ParcelCheckReq> m_ParcelChecks = new();
+        /// <summary>Each script's API, for its host prim and its sensor. Scheduler thread only.</summary>
+        private readonly System.Collections.Generic.Dictionary<UUID, LSLSystemAPI> m_Apis = new();
+        /// <summary>Scripts whose last check allowed them only because they held taken controls - the ones to
+        /// ask again when the core clears controls. The check itself always asks the avatar. Scheduler thread only.</summary>
+        private readonly HashSet<UUID> m_ControlsExempt = new();
+
+        // Permission ends the scene reports (the core's release of controls on an avatar still here, a new
+        // owner). Queued from region threads; EndPermissions runs here, on the scheduler thread, like every script call.
+        private struct PermsEndReq { public UUID ItemId; public UUID AgentId; public SceneObjectGroup Group; }
+        private readonly Queue<PermsEndReq> m_PermsEnds = new();
+
+        /// <summary>What the parcel checks have done, for tests and the cost report.</summary>
+        internal struct ParcelStats { public long Scanned, Evaluated, Paused, Resumed; }
+        private ParcelStats m_ParcelStats;
+        internal ParcelStats ParcelCounters => m_ParcelStats;
+
         // Syscall returns
         private readonly Queue<SyscallReturn> m_SyscallReturns = new();
-        private struct SyscallReturn { public UUID ItemId; public object RetValue; public int Delay; }
+        /// <summary>Seq is the call's syscall sequence number (-1 = unsequenced, accepted while in Syscall);
+        /// Fault is an exception from a deferred service call, re-raised inside the script's next tick.</summary>
+        private struct SyscallReturn { public UUID ItemId; public object RetValue; public int Delay; public int Seq; public Exception Fault; }
+
+        // ── The service lane ─────────────────────────────────────────────
+        // Syscalls that can leave the process (user accounts, grid, assets, experience, groups,
+        // teleport, ...) run here instead of inline on this region's scheduler thread, so a slow
+        // service stalls only the script that asked. Dedicated threads, not pool threads: at most
+        // ServiceCallThreads per region, started on demand and exiting after ServiceThreadIdleMs idle,
+        // so an idle region holds none. A call that has not answered by its deadline resumes the script
+        // with the function's failure value; the late answer is then dropped (sequence number).
+        private readonly ConcurrentQueue<DeferredServiceCall> m_ServiceQueue = new();
+        private readonly SemaphoreSlim m_ServiceSignal = new(0);
+        private int m_ServiceThreadCount;
+        private int m_ServiceThreadsIdle;
+        private int m_ServiceThreadSeq;
+        /// <summary>Calls handed to the lane and not yet swept; scheduler thread only.</summary>
+        private readonly List<DeferredServiceCall> m_OutstandingServiceCalls = new();
+        internal int ServiceCallTimeoutMs = 35000;
+        internal int ServiceCallThreads = 4;
+        internal int ServiceThreadIdleMs = 30000;
 
         // Async syscall dispatcher (for long-running syscalls like HTTP, dataserver, etc.).
         // Replaces the vendored SmartThreadPool ("Phlox Async", MinWorkerThreads=0,
@@ -107,8 +158,16 @@ namespace Phlox.ScriptEngine
         private readonly ConcurrentQueue<SyscallShim.LongRunSyscallDelegate> m_AsyncQueue = new();
         private int m_AsyncWorkers;
 
-        // Deferred events for scripts not yet loaded
-        private readonly System.Collections.Generic.Dictionary<UUID, List<PostedEvent>> m_DeferredEvents = new();
+        // Deferred events for scripts not yet loaded. Only for an item whose Phlox load is in flight, at most
+        // MaxDeferredEventsPerItem per item, and for at most DeferredEventLifetimeMs from the first one (Halcyon
+        // DeferredEventManager: MAX_DEFERRED_EVENTS = 32, EXPIRATION_SECONDS = 60). Every other event for an item that is
+        // not loaded is dropped at once and counted in m_DroppedForUnloaded. Scheduler thread only.
+        internal const int MaxDeferredEventsPerItem = 32;
+        internal const ulong DeferredEventLifetimeMs = 60_000;
+        private sealed class DeferredEvents { public ulong ExpiresOn; public readonly List<PostedEvent> Events = new(); }
+        private readonly System.Collections.Generic.Dictionary<UUID, DeferredEvents> m_DeferredEvents = new();
+        private long m_DroppedForUnloaded;
+        private ulong m_NextDeferredExpiry;
 
         private readonly System.Diagnostics.Stopwatch m_SliceWatch = new();
 
@@ -117,6 +176,14 @@ namespace Phlox.ScriptEngine
             m_WorkArrived = workArrived;
             m_Engine = engine;
             m_WorldComm = worldComm;
+
+            // [InWorldz.Phlox] ServiceCallTimeoutMs (35000), ServiceCallThreads (4 per region).
+            var cfg = engine?.Config;
+            if (cfg != null)
+            {
+                ServiceCallTimeoutMs = Math.Max(1, cfg.GetInt("ServiceCallTimeoutMs", ServiceCallTimeoutMs));
+                ServiceCallThreads = Math.Max(1, cfg.GetInt("ServiceCallThreads", ServiceCallThreads));
+            }
         }
 
         // ── Called by ScriptLoader once a script is ready to run ──────────────
@@ -135,15 +202,31 @@ namespace Phlox.ScriptEngine
             }
 
             SyscallShim shim = new SyscallShim(PerformAsyncCall);
+            // Service-reaching calls go to the lane unless the operator turned deferral off.
+            if (m_Engine?.ServiceCallDeferral != ServiceCallDeferralMode.Never)
+                shim.DeferServiceCall = DeferServiceCall;
             LSLSystemAPI sysApi = new LSLSystemAPI(m_Engine, req.Prim, req.Prim.LocalId, req.ItemID);
             shim.SystemAPI = sysApi;
 
             Interpreter interp;
             bool freshStart;
+            bool holdStateLoadFailed = false;
 
             try
             {
-                var savedState = m_Engine.StateManager?.LoadState(req.ItemID, compiled.AssetId);
+                InWorldz.Phlox.Serialization.SerializedRuntimeState savedState = null;
+                try
+                {
+                    savedState = m_Engine.StateManager?.LoadState(req.ItemID, compiled.AssetId);
+                }
+                catch (StateLoadFailedException e)
+                {
+                    // The row may be there and unreadable right now. A fresh start here would
+                    // save over it at the next flush. Hold the script instead: loaded, visible in
+                    // `phlox status` as StateLoadFailed, never run, never saved. A restart retries.
+                    m_log.LogError("[PhloxExe]: Holding {0} DISABLED (state load failed, row kept): {1}", req.ItemID, e.Message);
+                    holdStateLoadFailed = true;
+                }
                 if (savedState != null)
                 {
                     try
@@ -184,13 +267,41 @@ namespace Phlox.ScriptEngine
 
             lock (m_AllScriptsLock)
                 m_AllScripts[interp.ItemId] = interp;
+            m_Apis[interp.ItemId] = sysApi;
             interp.SetScriptEventFlags();
+
+            if (holdStateLoadFailed)
+            {
+                interp.ScriptState.LocalDisable |= RuntimeState.LocalDisableFlag.StateLoadFailed;
+                interp.ScriptState.RunState = RuntimeState.Status.Waiting;
+                return;   // no state_entry, no run queue - and StateManager refuses to save it
+            }
 
             if (freshStart)
             {
-                // New script — fire state_entry to run the script's initialization
-                interp.ScriptState.RunState = RuntimeState.Status.Running;
-                sysApi.OnScriptReset();
+                // New script — fire state_entry to run the script's initialization.
+                //
+                // PHLOX-2d: this MUST be Waiting, not Running. ProcessEventQueue only starts an
+                // event when the script is Waiting (:681); anything else is queued (:687), and the
+                // queue is drained by TransitionToWait, which runs only when a script that is
+                // already on the run queue finishes an event. A fresh script set to Running was
+                // therefore never started by anything: its state_entry sat in the queue for ever,
+                // with no error and no log line. The restored-state branch below has always set
+                // Waiting, which is why scripts restored from state ran and freshly compiled ones
+                // did not - the manhole script, and every new script.
+                interp.ScriptState.RunState = RuntimeState.Status.Waiting;
+                var invItem = req.Prim.Inventory?.GetInventoryItem(req.ItemID);
+                if (invItem != null && !invItem.ScriptRunning)
+                {
+                    // The item's Running flag is off - unticked in the viewer, llSetScriptState(FALSE), or a
+                    // crash before this restart. Loaded and held: no state_entry until a reset or the checkbox.
+                    interp.ScriptState.GeneralEnable = false;
+                    lock (m_AllScriptsLock) m_HeldFresh.Add(req.ItemID);
+                    m_log.LogInformation("[PhloxExe]: {0} loaded STOPPED (item Running flag off); no state_entry until reset or Running is ticked", req.ItemID);
+                    EvaluateParcelRule(req.ItemID);   // So the owner starting it on disallowed land leaves it paused
+                    return;
+                }
+                sysApi.OnFreshStart();   // Not a reset - the item's grant is the core's (CreateScriptInstance)
                 PostEvent(req.ItemID, new PostedEvent
                 {
                     EventType = SupportedEventList.Events.STATE_ENTRY,
@@ -199,13 +310,83 @@ namespace Phlox.ScriptEngine
             }
            else
             {
-                // Restored from saved state — don't re-run init, just wait for events
-                interp.ScriptState.RunState = RuntimeState.Status.Waiting;
+                // Resume where the script stopped, instead of forcing Waiting.
+                //
+                // The saved state carries RunState, Calls, TopFrame, RunningEvent, EventQueue and a
+                // relative NextWakeup, and all of it used to be restored and then thrown away by an
+                // unconditional `RunState = Waiting`. Nothing re-armed a sleep and nothing put a
+                // running script back on the run queue, so an interrupted handler simply never
+                // finished. Worse than never: the stale frame stays on the stack, so the next
+                // unrelated event pushes on top of it (RuntimeState.cs:335-336) and the interrupted
+                // handler resumes NESTED inside the new event, after it.
+                //
+                // The flush loop and StateManager.Stop() at shutdown save whatever is dirty (ScriptUnloaded
+                // is the OnRemoveScript path, not shutdown), so a script mid-llSleep when the
+                // region stopped was saved in exactly the state that never resumed.
+                var restoredRunState = interp.ScriptState.RunState;
+                switch (restoredRunState)
+                {
+                    case RuntimeState.Status.Running:
+                        // Mid-event with time left on the clock. Put it back on the run
+                        // queue and it continues from its own TopFrame.
+                        AddToRunQueue(interp);
+                        break;
+
+                    case RuntimeState.Status.Sleeping:
+                        // NextWakeup was already restored relative to now by
+                        // SerializedRuntimeState.ToRuntimeState, so it is a tick value on this run's
+                        // basis and can be tracked directly.
+                        //
+                        // This arm was once DELETED by an edit - the Running block was
+                        // replaced by slicing from `case Running` to `case Syscall`, and Sleeping sat
+                        // between them. A sleeping script then fell to `default` and was restored
+                        // Waiting, so the script never resumed. The dispatch is
+                        // on RunState ONLY; LastSyscallIndex is read inside the Syscall arm and
+                        // nowhere else, whatever value it holds.
+                        TrackSleep(interp, interp.ScriptState.NextWakeup);
+                        break;
+
+                    case RuntimeState.Status.Syscall:
+                        // A syscall in flight when the region stopped has NO completion
+                        // coming - whatever was going to call SysReturn died with the old process. So
+                        // the only way back is to supply the return value ourselves, which is what
+                        // LastSyscallIndex is persisted for.
+                        ResumeFromSyscall(interp, req.ItemID);
+                        break;
+
+                    default:
+                        interp.ScriptState.RunState = RuntimeState.Status.Waiting;
+                        break;
+                }
+
+                if (!interp.ScriptState.GeneralEnable)
+                {
+                    // The row says stopped (a crash, or the checkbox) but the item came out of the region DB
+                    // with its Running flag at the default, true - the DB never stores it. Push it off so the viewer's
+                    // checkbox and `phlox status` agree with the state, and say why, as "loaded STOPPED" does.
+                    m_Engine.SetItemRunningFlag(req.Prim.LocalId, req.ItemID, false);
+                    m_log.LogInformation("[PhloxExe]: {0} restored STOPPED ({1}); no run until reset or Running is ticked",
+                        req.ItemID, interp.ScriptState.TerminatedReason != null ? "terminated: " + interp.ScriptState.TerminatedReason : "Running flag off");
+                }
+
+                // A script saved while Waiting can still hold events on its OWN queue
+                // (ScriptState.EventQueue). ProcessEventQueue reads only m_PendingEvents, and that
+                // queue is drained by TransitionToWait - which runs only for a script already on the
+                // run queue. A restored script is on neither, so without this the queued events sit
+                // there for ever.
+                if (interp.ScriptState.RunState == RuntimeState.Status.Waiting)
+                {
+                    bool hasQueued;
+                    lock (interp.ScriptState.EventQueueLock)
+                        hasQueued = interp.ScriptState.EventQueue != null && interp.ScriptState.EventQueue.Count > 0;
+                    if (hasQueued)
+                        DeliverNextQueuedEvent(interp);
+                }
 
                 // Re-register timer if the script had one running
                 if (interp.ScriptState.TimerInterval > 0)
                 {
-                    ulong readyOn = (ulong)Util.EnvironmentTickCount() + (ulong)interp.ScriptState.TimerInterval;
+                    ulong readyOn = InWorldz.Phlox.Util.Clock.Now + (ulong)interp.ScriptState.TimerInterval;
                     TrackTimer(interp, readyOn, true);
                 }
 
@@ -272,7 +453,11 @@ namespace Phlox.ScriptEngine
             // Only add to run queue if fresh — restored scripts wait for events
             if (freshStart)
                 AddToRunQueue(interp);
-            
+
+            // Every start (rez, region start, arrival, duplicate) is checked against the parcel. A script the
+            // parcel does not allow starts paused - never refused - with everything above in place for its resume.
+            EvaluateParcelRule(req.ItemID);
+
             m_WorkArrived();
         }
 
@@ -338,8 +523,18 @@ namespace Phlox.ScriptEngine
             if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
 
             UnregisterFromNotifications(script);
+            DropPendingEvents(itemId);   // SL llResetScript "The event queue is cleared" - posted, not yet queued, too
             m_Engine.StateManager?.DeleteState(itemId);
+            bool wasCrashed = script.ScriptState.TerminatedReason != null;
+            lock (m_AllScriptsLock) m_HeldFresh.Remove(itemId);   // A reset of a held script owes it nothing more
             script.Reset();
+            if (wasCrashed)
+            {
+                // A reset is how a crashed script comes back - fresh, and running again
+                script.ScriptState.TerminatedReason = null;
+                script.ScriptState.GeneralEnable = true;
+                m_Engine.SetItemRunningFlag(script.HostLocalId, itemId, true);
+            }
             script.SetScriptEventFlags();
 
             PostEvent(itemId, new PostedEvent
@@ -349,15 +544,60 @@ namespace Phlox.ScriptEngine
             });
 
             if (!m_RunIndex.ContainsKey(itemId) && script.ScriptState.Enabled)
-                AddToRunQueue(script);
+            {
+                // The reset throttle (LSLSystemAPI.OnScriptReset) may have put the fresh script to sleep; it
+                // wakes and runs state_entry then. Inside the script's own slice CheckRunstateChange does the same.
+                if (script.ScriptState.RunState == RuntimeState.Status.Sleeping)
+                    TrackSleep(script, script.ScriptState.NextWakeup);
+                else
+                    AddToRunQueue(script);
+            }
 
             return true;
         }
 
+        /// <summary>Events posted to this item and not yet moved into its queue are dropped (reset).</summary>
+        private void DropPendingEvents(UUID itemId)
+        {
+            lock (m_PendingEvents)
+            {
+                if (m_PendingEvents.Count == 0) return;
+                var keep = new List<PendingEvent>(m_PendingEvents.Count);
+                foreach (var pe in m_PendingEvents)
+                {
+                    if (pe.ItemId == itemId) pe.Evt.SignalCompleted();   // No waiter waits for a dropped event
+                    else keep.Add(pe);
+                }
+                if (keep.Count == m_PendingEvents.Count) return;
+                m_PendingEvents.Clear();
+                foreach (var pe in keep) m_PendingEvents.Enqueue(pe);
+            }
+        }
+
+        /// <summary>
+        /// The Running checkbox and llGetScriptState: the owner's setting. A pause by the parcel is not the
+        /// owner's, so it does not untick the box; any other hold (StateLoadFailed, CrossingWait) still does.
+        /// </summary>
         public bool GetScriptRunning(UUID itemId)
         {
             Interpreter script;
-            return m_AllScripts.TryGetValue(itemId, out script) && script.ScriptState.Enabled;
+            if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
+            var st = script.ScriptState;
+            return st.GeneralEnable && (st.LocalDisable & ~RuntimeState.LocalDisableFlag.Parcel) == RuntimeState.LocalDisableFlag.None;
+        }
+
+        /// <summary>Is this script paused by the parcel rule?</summary>
+        internal bool IsParcelPaused(UUID itemId)
+        {
+            lock (m_AllScriptsLock)
+                return m_AllScripts.TryGetValue(itemId, out Interpreter s)
+                       && (s.ScriptState.LocalDisable & RuntimeState.LocalDisableFlag.Parcel) != 0;
+        }
+
+        /// <summary>Is the script loaded here? Safe from any thread.</summary>
+        internal bool IsLoaded(UUID itemId)
+        {
+            lock (m_AllScriptsLock) return m_AllScripts.ContainsKey(itemId);
         }
 
         public Interpreter FindScript(UUID itemId)
@@ -396,14 +636,219 @@ namespace Phlox.ScriptEngine
             return list;
         }
 
+        /// <summary>
+        /// A read-only view of one script for the console. Everything the last four
+        /// sessions had to reach for with a debugger or infer from silence - what state the script
+        /// is in, whether anything is queued for it, and what the region thinks it handles.
+        /// </summary>
+        internal struct ScriptStatus
+        {
+            public bool Found;
+            public UUID ItemId;
+            public uint HostLocalId;
+            public string RunState;
+            public bool Enabled;
+            public bool GeneralEnable;
+            public bool Suspended;
+            public int QueuedEvents;
+            public int LslState;
+            public int TimerIntervalMs;
+            public ulong EventMask;
+            public string PendingSyscall;
+            /// <summary>Why the simulator holds it, if it does (e.g. StateLoadFailed).</summary>
+            public string LocalDisable;
+            /// <summary>The error a crashed script stopped on, or null.</summary>
+            public string TerminatedReason;
+        }
+
+        /// <summary>Test seam: is this script on the run queue right now?</summary>
+        internal bool IsOnRunQueue(UUID itemId)
+        {
+            lock (m_AllScriptsLock) return m_RunIndex.ContainsKey(itemId);
+        }
+
+        internal ScriptStatus GetStatus(UUID itemId)
+        {
+            lock (m_AllScriptsLock)
+            {
+                if (!m_AllScripts.TryGetValue(itemId, out Interpreter interp))
+                    return new ScriptStatus { Found = false, ItemId = itemId };
+
+                var st = interp.ScriptState;
+                int queued;
+                lock (st.EventQueueLock) queued = st.EventQueue.Count;
+
+                return new ScriptStatus
+                {
+                    Found = true,
+                    ItemId = itemId,
+                    HostLocalId = interp.HostLocalId,
+                    RunState = st.RunState.ToString(),
+                    Enabled = st.Enabled,
+                    GeneralEnable = st.GeneralEnable,
+                    Suspended = m_Suspended.Contains(itemId),
+                    QueuedEvents = queued,
+                    LslState = st.LSLState,
+                    TimerIntervalMs = st.TimerInterval,
+                    EventMask = 0,
+                    // Which syscall the script is sitting in. One word, and it is the
+                    // difference between "RunState=Syscall" telling you nothing and telling you
+                    // everything - this is what made the manhole a half-hour trace instead of a
+                    // five-minute one.
+                    PendingSyscall = st.RunState == RuntimeState.Status.Syscall
+                        ? DescribeCurrentSyscall(interp) : null,
+                    LocalDisable = st.LocalDisable == RuntimeState.LocalDisableFlag.None ? null : st.LocalDisable.ToString(),
+                    TerminatedReason = st.TerminatedReason,
+                };
+            }
+        }
+
+        /// <summary>Every item this scheduler holds, for a whole-object status listing.</summary>
+        /// <summary>
+        /// The built-in the script is currently inside, by name. The interpreter's instruction
+        /// pointer sits just past the syscall opcode, so the operand it carries is the function's
+        /// TableIndex; that is looked back up in the table it was emitted from.
+        /// </summary>
+        private static string DescribeCurrentSyscall(Interpreter interp)
+        {
+            try
+            {
+                int idx = interp.ScriptState.LastSyscallIndex;
+                if (idx < 0) return "(unknown)";
+                foreach (var sig in InWorldz.Phlox.Types.Defaults.AllMethods)
+                    if (sig.TableIndex == idx) return sig.FunctionName;
+                return "(index " + idx + ")";
+            }
+            catch { return "(unknown)"; }
+        }
+
+        internal List<UUID> AllItemIds()
+        {
+            lock (m_AllScriptsLock) return new List<UUID>(m_AllScripts.Keys);
+        }
+
         // ── Syscall returns ────────────────────────────────────────────────────
 
         public void PostSyscallReturn(UUID itemId, object retValue, int delay)
+            => PostSyscallReturn(itemId, retValue, delay, -1, null);
+
+        /// <summary>A return carrying the call's sequence number, and a fault if the body threw.</summary>
+        public void PostSyscallReturn(UUID itemId, object retValue, int delay, int seq, Exception fault)
         {
             lock (m_SyscallReturns)
-                m_SyscallReturns.Enqueue(new SyscallReturn { ItemId = itemId, RetValue = retValue, Delay = delay });
+                m_SyscallReturns.Enqueue(new SyscallReturn { ItemId = itemId, RetValue = retValue, Delay = delay, Seq = seq, Fault = fault });
             m_WorkArrived();
         }
+
+        // ── Service lane ───────────────────────────────────────────────
+
+        /// <summary>Called by a shim on this scheduler's thread, inside the script's tick.</summary>
+        private void DeferServiceCall(DeferredServiceCall call)
+        {
+            call.Deadline = InWorldz.Phlox.Util.Clock.Now + (ulong)ServiceCallTimeoutMs;
+            m_OutstandingServiceCalls.Add(call);
+            m_ServiceQueue.Enqueue(call);
+            EnsureServiceThread();
+            m_ServiceSignal.Release();
+        }
+
+        private void EnsureServiceThread()
+        {
+            if (Volatile.Read(ref m_ServiceThreadsIdle) > 0) return;
+            while (true)
+            {
+                int cur = Volatile.Read(ref m_ServiceThreadCount);
+                if (cur >= ServiceCallThreads) return;
+                if (Interlocked.CompareExchange(ref m_ServiceThreadCount, cur + 1, cur) != cur) continue;
+                var t = new Thread(ServiceLoop)
+                {
+                    IsBackground = true,
+                    Name = "Phlox service " + (m_Engine?.World?.RegionInfo?.RegionName ?? "?") + " #" + Interlocked.Increment(ref m_ServiceThreadSeq),
+                };
+                t.Start();
+                return;
+            }
+        }
+
+        private void ServiceLoop()
+        {
+            try
+            {
+                while (true)
+                {
+                    Interlocked.Increment(ref m_ServiceThreadsIdle);
+                    bool signalled;
+                    try { signalled = m_ServiceSignal.Wait(ServiceThreadIdleMs); }
+                    finally { Interlocked.Decrement(ref m_ServiceThreadsIdle); }
+                    if (!signalled)
+                    {
+                        if (m_ServiceQueue.IsEmpty) break;   // idle long enough: give the thread back
+                        continue;
+                    }
+                    if (m_ServiceQueue.TryDequeue(out DeferredServiceCall call))
+                        RunServiceCall(call);
+                }
+            }
+            finally
+            {
+                Interlocked.Decrement(ref m_ServiceThreadCount);
+                // A call can land between the empty check and the decrement; never strand it.
+                if (!m_ServiceQueue.IsEmpty) EnsureServiceThread();
+            }
+        }
+
+        private void RunServiceCall(DeferredServiceCall call)
+        {
+            // The deadline already answered the script: do not perform the call after the fact.
+            if (call.IsFinished) return;
+
+            var ctx = call.Context;
+            object result = null;
+            Exception fault = null;
+            ctx.Enter();
+            try { result = call.Body(); }
+            catch (Exception e) { fault = e; }
+            finally { SyscallContext.Exit(); }
+
+            if (!call.TryFinish())
+            {
+                m_log.LogInformation("[PhloxExe]: {0} for {1} answered after its {2} ms deadline; the late result is dropped",
+                    call.FunctionName, ctx.ItemId, ServiceCallTimeoutMs);
+                return;
+            }
+            PostSyscallReturn(ctx.ItemId, fault == null ? result : null, ctx.DelayMs, ctx.Seq, fault);
+        }
+
+        /// <summary>Scheduler thread: answer every call past its deadline with its failure value.</summary>
+        private void ProcessServiceDeadlines()
+        {
+            if (m_OutstandingServiceCalls.Count == 0) return;
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            for (int i = m_OutstandingServiceCalls.Count - 1; i >= 0; i--)
+            {
+                var call = m_OutstandingServiceCalls[i];
+                if (call.IsFinished) { m_OutstandingServiceCalls.RemoveAt(i); continue; }
+                if (now < call.Deadline) continue;
+                if (call.TryFinish())
+                {
+                    m_log.LogWarning("[PhloxExe]: {0} for {1} did not answer in {2} ms; the script resumes with the call's failure value and a late answer will be dropped",
+                        call.FunctionName, call.Context.ItemId, ServiceCallTimeoutMs);
+                    PostSyscallReturn(call.Context.ItemId, call.FailureValue, 0, call.Context.Seq, null);
+                }
+                m_OutstandingServiceCalls.RemoveAt(i);
+            }
+        }
+
+        private ulong EarliestServiceDeadline()
+        {
+            ulong min = ulong.MaxValue;
+            foreach (var c in m_OutstandingServiceCalls)
+                if (!c.IsFinished && c.Deadline < min) min = c.Deadline;
+            return min;
+        }
+
+        /// <summary>Diagnostics/tests: service threads alive right now.</summary>
+        internal int ServiceThreadCount => Volatile.Read(ref m_ServiceThreadCount);
 
         // ── Timer ──────────────────────────────────────────────────────────────
 
@@ -413,6 +858,7 @@ namespace Phlox.ScriptEngine
             if (!m_AllScripts.TryGetValue(itemId, out script)) return;
 
             script.ScriptState.TimerInterval = (int)(sec * 1000);
+            m_ParcelTimerLeft.Remove(itemId);   // A new timer replaces the time a parcel pause kept
 
             // Remove any existing timer handle
             C5.IPriorityQueueHandle<SleepEntry> existing;
@@ -425,7 +871,7 @@ namespace Phlox.ScriptEngine
 
             if (script.ScriptState.TimerInterval > 0)
             {
-                ulong readyOn = (ulong)Util.EnvironmentTickCount() + (ulong)script.ScriptState.TimerInterval;
+                ulong readyOn = InWorldz.Phlox.Util.Clock.Now + (ulong)script.ScriptState.TimerInterval;
                 TrackTimer(script, readyOn, false);
             }
         }
@@ -440,34 +886,54 @@ namespace Phlox.ScriptEngine
             RemoveFromRunQueue(itemId);
             m_Suspended.Remove(itemId);
             UnregisterFromNotifications(script);
-           script.OnUnload(ScriptUnloadReason.Unloaded, RuntimeState.LocalDisableFlag.None);
+            // Whatever the API's unload hook throws, the script still leaves the scheduler - a throw here used to
+            // abort the unload and keep the script (and everything it held) loaded for the life of the region.
+            try { script.OnUnload(ScriptUnloadReason.Unloaded, RuntimeState.LocalDisableFlag.None); }
+            catch (Exception e) { m_log.LogError(e, "[PhloxExe]: unload hook of {0} failed; unloading it anyway", itemId); }
             m_Engine.StateManager?.ScriptUnloaded(script);
             lock (m_AllScriptsLock)
+            {
                 m_AllScripts.Remove(itemId);
+                m_HeldFresh.Remove(itemId);
+            }
+            m_Apis.Remove(itemId);
+            m_ControlsExempt.Remove(itemId);
         }
 
         // ── Main work loop ─────────────────────────────────────────────────────
 
+        /// <summary>The managed thread id of whoever last drove DoWork - the script thread.
+        /// A region-side wait on a script event must never block this thread.</summary>
+        public int WorkerThreadId { get; private set; } = -1;
+
         public WorkStatus DoWork()
         {
+            WorkerThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
             CheckSleepingScripts();
             ProcessEventQueue();
+            ExpireDeferredEvents();
+            ProcessPermsEnds();      // Before the parcel checks it may call for
+            ProcessParcelChecks();
             ProcessEnableDisable();
             ProcessSuspendResume();
             ProcessResets();
+            ProcessServiceDeadlines();
             ProcessSyscallReturns();
 
             bool hadRunnable = m_NextScript != null;
             DoTimeslices();
 
+            ulong nextWake = m_SleepHeap.Count > 0 ? m_SleepHeap.FindMin().ReadyOn : ulong.MaxValue;
             return new WorkStatus
             {
                 WorkWasDone = hadRunnable,
                 WorkIsPending = HasWork(),
-                NextWakeUpTime = m_SleepHeap.Count > 0 ? m_SleepHeap.FindMin().ReadyOn : ulong.MaxValue
+                NextWakeUpTime = Math.Min(nextWake, EarliestServiceDeadline())
             };
         }
 
+        // The service-lane threads need no stop - they are background threads that give
+        // themselves back after ServiceThreadIdleMs with nothing to do.
         internal void Stop() { }
 
         // ── Private helpers ────────────────────────────────────────────────────
@@ -477,6 +943,8 @@ namespace Phlox.ScriptEngine
             if (m_RunQueue.Count > 0) return true;
             lock (m_PendingEvents) if (m_PendingEvents.Count > 0) return true;
             lock (m_EnableDisableQueue) if (m_EnableDisableQueue.Count > 0) return true;
+            lock (m_ParcelChecks) if (m_ParcelChecks.Count > 0) return true;
+            lock (m_PermsEnds) if (m_PermsEnds.Count > 0) return true;
             lock (m_SuspendResumeQueue) if (m_SuspendResumeQueue.Count > 0) return true;
             lock (m_PendingResets) if (m_PendingResets.Count > 0) return true;
             lock (m_SyscallReturns) if (m_SyscallReturns.Count > 0) return true;
@@ -496,10 +964,24 @@ namespace Phlox.ScriptEngine
                 m_SliceWatch.Restart();
                 while (ticks < SCRIPT_TIMESLICE)
                 {
+                    // A script put to sleep while it sat on the run queue (the reset throttle, on a reset from
+                    // outside its own slice) goes to the sleep heap untouched - its first opcode would overwrite the sleep.
+                    if (m_NextScript.Value.ScriptState.RunState == RuntimeState.Status.Sleeping)
+                    {
+                        CheckRunstateChange();
+                        break;
+                    }
                     try { m_NextScript.Value.Tick(); }
                     catch (Exception e)
                     {
+                        // TerminateWithError marks the script Killed, but this path broke out of
+                        // the timeslice WITHOUT the Killed arm of CheckRunstateChange, so the node stayed on
+                        // the run queue and the next pass ticked the dead script again on a torn operand
+                        // stack - the "Unable to cast" and "Stack empty" stops that followed every OSSL
+                        // denial. Off the queue here, once.
                         TerminateWithError(m_NextScript.Value, e);
+                        m_RunIndex.Remove(m_NextScript.Value.ItemId);
+                        m_RunQueue.Remove(m_NextScript);
                         terminated = true;
                     }
 
@@ -556,6 +1038,7 @@ namespace Phlox.ScriptEngine
         private void TransitionToWait()
         {
             Interpreter script = m_NextScript.Value;
+            script.ScriptState.RunningEvent?.SignalCompleted();
             script.ScriptState.RunningEvent = null;
 
             while (true)
@@ -569,8 +1052,18 @@ namespace Phlox.ScriptEngine
                 PhloxEventInfo info = FindEventHandler(nextEvt, script);
                 if (info != null)
                 {
+                    // The floor applies to a queued start as much as a fresh one. Put
+                    // the event back at the front, arm the wake, and let the script go idle.
+                    if (MinDelayHolds(script))
+                    {
+                        lock (script.ScriptState.EventQueueLock)
+                            script.ScriptState.EventQueue.InsertFirst(nextEvt);
+                        TrackMinDelayWake(script);
+                        break;
+                    }
                     try
                     {
+                        ArmMinDelay(script);
                         script.ScriptState.DoEvent(info, nextEvt, nextEvt.Args);
                         CheckAndResetTimer(script, info);
                         return; // stay on run queue
@@ -592,7 +1085,7 @@ namespace Phlox.ScriptEngine
 
         private void CheckSleepingScripts()
         {
-            ulong now = (ulong)Util.EnvironmentTickCount();
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
             while (m_SleepHeap.Count > 0)
             {
                 SleepEntry s = m_SleepHeap.FindMin();
@@ -605,6 +1098,7 @@ namespace Phlox.ScriptEngine
                     case SleepEntry.WakeEvent.None: m_StdSleepHandles.Remove(s.ItemId); break;
                     case SleepEntry.WakeEvent.Timer: m_TimerHandles.Remove(s.ItemId); break;
                     case SleepEntry.WakeEvent.Touch: m_TouchHandles.Remove(s.ItemId); break;
+                    case SleepEntry.WakeEvent.MinDelay: m_MinDelayHandles.Remove(s.ItemId); break;
                 }
 
                 Interpreter script;
@@ -622,6 +1116,17 @@ namespace Phlox.ScriptEngine
                             EventType = SupportedEventList.Events.TIMER,
                             Args = Array.Empty<object>()
                         });
+                        break;
+                    case SleepEntry.WakeEvent.MinDelay:
+                        // The floor has elapsed; if the script is idle with events it was
+                        // made to hold, start the next one now.
+                        if (script.ScriptState.RunState == RuntimeState.Status.Waiting)
+                        {
+                            bool queued;
+                            lock (script.ScriptState.EventQueueLock)
+                                queued = script.ScriptState.EventQueue != null && script.ScriptState.EventQueue.Count > 0;
+                            if (queued) DeliverNextQueuedEvent(script);
+                        }
                         break;
                     case SleepEntry.WakeEvent.Touch:
                         if (script.ScriptState.TouchActive)
@@ -651,15 +1156,34 @@ namespace Phlox.ScriptEngine
                 Interpreter script;
                 if (!m_AllScripts.TryGetValue(pe.ItemId, out script))
                 {
-                    AddDeferredEvent(pe.ItemId, pe.Evt);
+                    pe.Evt.SignalCompleted();   // A waiter must not wait for a script that is not here
+                    // Held only while this item's Phlox load is in flight; anything else - a deleted or reset-away
+                    // script's late sensor, HTTP or dataserver event, another engine's script, a failed compile - is dropped.
+                    if (m_Engine != null && m_Engine.IsLoading(pe.ItemId)) AddDeferredEvent(pe.ItemId, pe.Evt);
+                    else m_DroppedForUnloaded++;
                     continue;
                 }
 
-                if (!script.ScriptState.Enabled && pe.Evt.EventType != SupportedEventList.Events.STATE_ENTRY)
+                // A script paused by the parcel keeps what belongs to its own state change - Halcyon queues
+                // state_entry for a disabled script - and runs it on resume. Everything else is dropped below.
+                if ((script.ScriptState.LocalDisable & RuntimeState.LocalDisableFlag.Parcel) != 0
+                    && (pe.Evt.EventType == SupportedEventList.Events.STATE_ENTRY || pe.Evt.EventType == SupportedEventList.Events.STATE_EXIT))
+                {
+                    pe.Evt.SignalCompleted();
+                    script.ScriptState.QueueEvent(pe.Evt);
                     continue;
+                }
+
+                // Halcyon (ExecutionScheduler, pending events): "killed and disabled scripts should no longer respond
+                // to outside stimuli". That is also what a parcel pause does with an event that arrives.
+                if (!script.ScriptState.Enabled && pe.Evt.EventType != SupportedEventList.Events.STATE_ENTRY)
+                {
+                    pe.Evt.SignalCompleted();
+                    continue;
+                }
 
                 PhloxEventInfo info = FindEventHandler(pe.Evt, script);
-                if (info == null) continue;
+                if (info == null) { pe.Evt.SignalCompleted(); continue; }
 
                 // Flood protection: drop events if the script's queue is full
                 int queueDepth = script.ScriptState.EventQueue.Count;
@@ -667,6 +1191,7 @@ namespace Phlox.ScriptEngine
                 {
                     m_log.LogWarning("[PhloxExe]: Event queue full ({0} events) for script {1}, dropping {2} event",
                         queueDepth, pe.ItemId, pe.Evt.EventType);
+                    pe.Evt.SignalCompleted();
                     continue;
                 }
 
@@ -677,13 +1202,23 @@ namespace Phlox.ScriptEngine
                 // accumulates exactly one pending TIMER event — no flood.
                 if (m_Suspended.Contains(pe.ItemId))
                 {
+                    pe.Evt.SignalCompleted();   // It will run on resume, but nobody waits that long
                     script.ScriptState.QueueEvent(pe.Evt);
                     continue;
                 }
 
                 if (script.ScriptState.RunState == RuntimeState.Status.Waiting)
                 {
-                    StartEvent(pe.Evt, script, info);
+                    // llMinEventDelay - a floor between handler STARTS. wiki: events
+                    // inside the window are queued and processed after it, not dropped (YEngine
+                    // drops some; the wiki is the parity rule here). Hold it and arm a wake.
+                    if (MinDelayHolds(script))
+                    {
+                        script.ScriptState.QueueEvent(pe.Evt);
+                        TrackMinDelayWake(script);
+                    }
+                    else
+                        StartEvent(pe.Evt, script, info);
                 }
                 else
                 {
@@ -714,7 +1249,16 @@ namespace Phlox.ScriptEngine
 
                 if (req.Enable)
                 {
+                    // Ticking Running on a crashed script starts it fresh, never from its dead frame
+                    if (script.ScriptState.TerminatedReason != null) { ResetNow(req.ItemId); continue; }
                     script.ScriptState.GeneralEnable = true;
+                    bool heldFresh;
+                    lock (m_AllScriptsLock) heldFresh = m_HeldFresh.Remove(req.ItemId);
+                    if (heldFresh)
+                    {
+                        // Loaded with the Running flag off and never started - its state_entry is owed now
+                        PostEvent(req.ItemId, new PostedEvent { EventType = SupportedEventList.Events.STATE_ENTRY, Args = Array.Empty<object>() });
+                    }
                     if (!m_RunIndex.ContainsKey(req.ItemId))
                         AddToRunQueue(script);
                 }
@@ -723,6 +1267,7 @@ namespace Phlox.ScriptEngine
                     script.ScriptState.GeneralEnable = false;
                     RemoveFromRunQueue(req.ItemId);
                     UnregisterFromNotifications(script);
+                    m_Engine.StateManager?.ScriptChanged(script);   // A stopped script never runs again to get itself saved
                 }
                 script.SetScriptEventFlags();
             }
@@ -806,6 +1351,253 @@ namespace Phlox.ScriptEngine
             }
         }
 
+        // ── Permission lifecycle ───────────────────────────────────────────────
+
+        /// <summary>The core released this script's controls on an avatar still in the region (stand, Release Keys, detach, drop).</summary>
+        internal void RequestControlsReleasedByCore(UUID itemId, UUID agentId) => EnqueuePermsEnd(new PermsEndReq { ItemId = itemId, AgentId = agentId });
+
+        /// <summary>The object has a new owner.</summary>
+        internal void RequestOwnerChanged(SceneObjectGroup group)
+        {
+            if (group != null) EnqueuePermsEnd(new PermsEndReq { Group = group });
+        }
+
+        private void EnqueuePermsEnd(PermsEndReq req)
+        {
+            lock (m_PermsEnds) m_PermsEnds.Enqueue(req);
+            m_WorkArrived?.Invoke();
+        }
+
+        private void ProcessPermsEnds()
+        {
+            List<PermsEndReq> batch;
+            lock (m_PermsEnds)
+            {
+                if (m_PermsEnds.Count == 0) return;
+                batch = new List<PermsEndReq>(m_PermsEnds);
+                m_PermsEnds.Clear();
+            }
+            foreach (var req in batch)
+            {
+                if (req.Group == null)
+                {
+                    if (m_Apis.TryGetValue(req.ItemId, out LSLSystemAPI api)) api.ControlsReleasedByCore(req.AgentId);
+                    continue;
+                }
+                if (req.Group.IsDeleted) continue;
+                foreach (SceneObjectPart part in req.Group.Parts)
+                    foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                        if (m_Apis.TryGetValue(item.ItemID, out LSLSystemAPI owned)) owned.OwnerChanged();
+            }
+        }
+
+        // ── No Scripts parcels ────────────────────────────────────────────────
+
+        /// <summary>A script's parcel standing may have changed (it took or released controls).</summary>
+        internal void RequestParcelCheckForItem(UUID itemId) => EnqueueParcelCheck(new ParcelCheckReq { Kind = ParcelCheckKind.Item, ItemId = itemId });
+
+        /// <summary>An object moved to another parcel, changed owner or group, or was attached or dropped.</summary>
+        internal void RequestParcelCheck(SceneObjectGroup group)
+        {
+            if (group == null) return;
+            EnqueueParcelCheck(new ParcelCheckReq { Kind = ParcelCheckKind.Group, Group = group });
+        }
+
+        /// <summary>A parcel's flags, owner, group or shape changed (EventManager.OnLandObjectAdded).</summary>
+        internal void RequestParcelCheckForParcel(int parcelLocalId)
+            => EnqueueParcelCheck(new ParcelCheckReq { Kind = ParcelCheckKind.Parcel, ParcelLocalId = parcelLocalId });
+
+        /// <summary>The core may have cleared an avatar's taken controls: ask again for the scripts running only by them.</summary>
+        internal void RequestControlHoldersCheck() => EnqueueParcelCheck(new ParcelCheckReq { Kind = ParcelCheckKind.ControlHolders });
+
+        private void EnqueueParcelCheck(ParcelCheckReq req)
+        {
+            lock (m_ParcelChecks) m_ParcelChecks.Enqueue(req);
+            m_WorkArrived?.Invoke();
+        }
+
+        private void ProcessParcelChecks()
+        {
+            List<ParcelCheckReq> batch;
+            lock (m_ParcelChecks)
+            {
+                if (m_ParcelChecks.Count == 0) return;
+                batch = new List<ParcelCheckReq>(m_ParcelChecks);
+                m_ParcelChecks.Clear();
+            }
+
+            var done = new HashSet<UUID>();   // one decision per script per pass
+            foreach (var req in batch)
+            {
+                switch (req.Kind)
+                {
+                    case ParcelCheckKind.Item:
+                        if (done.Add(req.ItemId)) EvaluateParcelRule(req.ItemId);
+                        break;
+
+                    case ParcelCheckKind.Group:
+                        // the object's own scripts only
+                        var group = req.Group;
+                        if (group.IsDeleted || !group.ContainsScripts()) break;
+                        foreach (SceneObjectPart part in group.Parts)
+                            foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                                if (m_AllScripts.ContainsKey(item.ItemID) && done.Add(item.ItemID))
+                                    EvaluateParcelRule(item.ItemID);
+                        break;
+
+                    case ParcelCheckKind.Parcel:
+                        // This engine's own scripts, one parcel lookup per object, and a decision only for the scripts
+                        // whose object stands on the parcel that changed. Attachments are always allowed; skipped.
+                        var onParcel = new System.Collections.Generic.Dictionary<UUID, bool>();
+                        foreach (var kv in m_Apis)
+                        {
+                            SceneObjectGroup g = kv.Value.HostPart?.ParentGroup;
+                            if (g == null || g.IsDeleted || g.IsAttachment) continue;
+                            m_ParcelStats.Scanned++;
+                            if (!onParcel.TryGetValue(g.UUID, out bool on))
+                            {
+                                on = m_Engine != null && m_Engine.ParcelLocalIdAt(g) == req.ParcelLocalId;
+                                onParcel[g.UUID] = on;
+                            }
+                            if (on && done.Add(kv.Key)) EvaluateParcelRule(kv.Key);
+                        }
+                        break;
+
+                    case ParcelCheckKind.ControlHolders:
+                        foreach (UUID id in new List<UUID>(m_ControlsExempt))
+                            if (done.Add(id)) EvaluateParcelRule(id);
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        /// "May this script run here", asked of the engine (PhloxEngine.ScriptMayRunHere), and the pause or resume it
+        /// calls for. Scheduler thread.
+        /// </summary>
+        private void EvaluateParcelRule(UUID itemId)
+        {
+            if (!m_AllScripts.TryGetValue(itemId, out Interpreter script)) return;
+            if (!m_Apis.TryGetValue(itemId, out LSLSystemAPI api)) return;
+            SceneObjectPart part = api.HostPart;
+            if (part?.ParentGroup == null || part.ParentGroup.IsDeleted || m_Engine == null) return;
+
+            m_ParcelStats.Evaluated++;
+            bool allowed = m_Engine.ScriptMayRunHere(part, itemId, out bool onlyByControls);
+            if (onlyByControls) m_ControlsExempt.Add(itemId); else m_ControlsExempt.Remove(itemId);
+
+            if (allowed) ResumeForParcel(script, api);
+            else PauseForParcel(script, api);
+        }
+
+        /// <summary>
+        /// Pause, never stop or reset: RunState, the frame, globals and the script's own queued events stay as they are.
+        /// Its wakes (sleep, timer, touch repeat, event-delay floor) come off the heap and its sensor repeat stops;
+        /// listens stay registered and what they deliver is dropped (ProcessEventQueue).
+        /// </summary>
+        private void PauseForParcel(Interpreter script, LSLSystemAPI api)
+        {
+            var st = script.ScriptState;
+            if ((st.LocalDisable & RuntimeState.LocalDisableFlag.Parcel) != 0) return;
+            st.LocalDisable |= RuntimeState.LocalDisableFlag.Parcel;
+            m_ParcelStats.Paused++;
+
+            RemoveFromRunQueue(script.ItemId);
+            RemoveWake(m_StdSleepHandles, script.ItemId);
+            KeepTimerLeftForParcel(script);
+            RemoveWake(m_TimerHandles, script.ItemId);
+            RemoveWake(m_TouchHandles, script.ItemId);
+            RemoveWake(m_MinDelayHandles, script.ItemId);
+            api.PauseSensorForParcel();
+            script.SetScriptEventFlags();   // no events while LocalDisable is set: the prim stops advertising touch etc.
+            m_log.LogDebug("[PhloxExe]: {0} paused: the parcel does not allow it", script.ItemId);
+        }
+
+        /// <summary>
+        /// Clear the parcel pause. A script its owner stopped stays stopped: nothing is re-armed unless it is enabled
+        /// once the parcel bit is off.
+        /// </summary>
+        private void ResumeForParcel(Interpreter script, LSLSystemAPI api)
+        {
+            var st = script.ScriptState;
+            if ((st.LocalDisable & RuntimeState.LocalDisableFlag.Parcel) == 0) return;
+            st.LocalDisable &= ~RuntimeState.LocalDisableFlag.Parcel;
+            m_ParcelStats.Resumed++;
+            script.SetScriptEventFlags();
+            bool hadLeft = m_ParcelTimerLeft.Remove(script.ItemId, out ulong left);
+            if (!st.Enabled) return;
+
+            if (st.TimerInterval > 0 && !m_TimerHandles.ContainsKey(script.ItemId))
+            {
+                if (hadLeft) ResumeTimerWithTimeLeft(script, left);
+                else TrackTimer(script, InWorldz.Phlox.Util.Clock.Now + (ulong)st.TimerInterval, false);
+            }
+            api.RestoreSensorAfterParcel();
+
+            switch (st.RunState)
+            {
+                case RuntimeState.Status.Running:
+                    AddToRunQueue(script);
+                    break;
+                case RuntimeState.Status.Sleeping:
+                    if (!m_StdSleepHandles.ContainsKey(script.ItemId))
+                        TrackSleep(script, st.NextWakeup);
+                    break;
+                case RuntimeState.Status.Waiting:
+                    bool queued;
+                    lock (st.EventQueueLock) queued = st.EventQueue != null && st.EventQueue.Count > 0;
+                    if (queued) DeliverNextQueuedEvent(script);
+                    break;
+                // Syscall: the return arrives as usual and queues it.
+            }
+            m_log.LogDebug("[PhloxExe]: {0} resumed: the parcel allows it", script.ItemId);
+        }
+
+        private void RemoveWake(System.Collections.Generic.Dictionary<UUID, C5.IPriorityQueueHandle<SleepEntry>> handles, UUID itemId)
+        {
+            if (handles.TryGetValue(itemId, out var h))
+            {
+                handles.Remove(itemId);
+                m_SleepHeap.Delete(h);
+            }
+        }
+
+        /// <summary>
+        /// At a parcel pause, keep the time the timer has left. Halcyon (ExecutionScheduler.InjectScript):
+        /// readyOn = now + (TimerInterval - (StateCapturedOn - TimerLastScheduledOn)), StateCapturedOn being the pause,
+        /// so only the time waited before the pause counts and the pause's own length does not. A timer whose event is
+        /// already posted and not yet delivered (no wake armed) has nothing left: it fires at once on resume, as
+        /// Halcyon's remainder of zero or less does.
+        /// </summary>
+        private void KeepTimerLeftForParcel(Interpreter script)
+        {
+            if (script.ScriptState.TimerInterval <= 0) return;
+            ulong left = 0;
+            if (m_TimerHandles.TryGetValue(script.ItemId, out var h))
+            {
+                ulong readyOn = m_SleepHeap[h].ReadyOn;
+                ulong now = InWorldz.Phlox.Util.Clock.Now;
+                left = readyOn > now ? readyOn - now : 0;
+            }
+            m_ParcelTimerLeft[script.ItemId] = left;
+        }
+
+        /// <summary>
+        /// The next timer event comes after the time that was left at the pause, then CheckAndResetTimer re-arms
+        /// it at the full interval as usual. TimerLastScheduledOn is set as if the timer had been scheduled that long ago,
+        /// so a save or a second pause measures from the same schedule (Halcyon left it at the old value, which counts
+        /// the first pause again on a second one).
+        /// </summary>
+        private void ResumeTimerWithTimeLeft(Interpreter script, ulong left)
+        {
+            ulong interval = (ulong)script.ScriptState.TimerInterval;
+            if (left > interval) left = interval;
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            TrackTimer(script, now + left, true);
+            ulong waited = interval - left;
+            script.ScriptState.TimerLastScheduledOn = now > waited ? now - waited : 0;
+        }
+
         private void ProcessResets()
         {
             // Drain the entire queue in one pass (see ProcessEnableDisable note).
@@ -835,6 +1627,22 @@ namespace Phlox.ScriptEngine
                 Interpreter script;
                 if (!m_AllScripts.TryGetValue(ret.ItemId, out script)) continue;
                 if (script.ScriptState.RunState != RuntimeState.Status.Syscall) continue;
+                // A return for an earlier call (the script was reset, changed state, or the call
+                // was already answered by its deadline and the script has since parked in another).
+                if (ret.Seq >= 0 && ret.Seq != script.ScriptState.SyscallSeq) continue;
+
+                // The call is over; the script is no longer parked in it (now on this thread).
+                script.ScriptState.LastSyscallIndex = -1;
+
+                if (ret.Fault != null)
+                {
+                    // The deferred body threw. Resume the script and re-raise the exception inside
+                    // its next tick, where the inline call would have thrown it.
+                    script.SetPendingFault(ret.Fault);
+                    script.ScriptState.RunState = RuntimeState.Status.Running;
+                    AddToRunQueue(script);
+                    continue;
+                }
 
                 if (ret.RetValue != null)
                     script.ScriptState.Operands.Push(ret.RetValue);
@@ -847,7 +1655,7 @@ namespace Phlox.ScriptEngine
                 else
                 {
                     script.ScriptState.RunState = RuntimeState.Status.Sleeping;
-                    script.ScriptState.NextWakeup = (ulong)Util.EnvironmentTickCount() + (ulong)ret.Delay;
+                    script.ScriptState.NextWakeup = InWorldz.Phlox.Util.Clock.Now + (ulong)ret.Delay;
                     TrackSleep(script, script.ScriptState.NextWakeup);
                 }
             }
@@ -891,6 +1699,8 @@ namespace Phlox.ScriptEngine
         {
             try
             {
+                ArmMinDelay(script);
+                script.ScriptState.SampleMemoryPeak();   // Event boundary
                 script.ScriptState.DoEvent(info, evt, evt.Args);
                 CheckAndResetTimer(script, info);
                 AddToRunQueue(script);
@@ -901,19 +1711,59 @@ namespace Phlox.ScriptEngine
             }
         }
 
+        // ── llMinEventDelay ─────────────────────────────────────────────────────
+
+        /// <summary>True while this script's floor has not elapsed since its last handler start.</summary>
+        private static bool MinDelayHolds(Interpreter script)
+            => script.ScriptState.MinEventDelayMs > 0
+               && InWorldz.Phlox.Util.Clock.Now < script.ScriptState.NextEventAllowedOn;
+
+        /// <summary>A handler is starting now: the next may not start before now + floor.</summary>
+        private static void ArmMinDelay(Interpreter script)
+        {
+            if (script.ScriptState.MinEventDelayMs > 0)
+                script.ScriptState.NextEventAllowedOn = InWorldz.Phlox.Util.Clock.Now + (ulong)script.ScriptState.MinEventDelayMs;
+        }
+
+        /// <summary>Wake at the end of the floor so the held event is delivered without a poke.</summary>
+        private void TrackMinDelayWake(Interpreter script)
+        {
+            if (m_MinDelayHandles.ContainsKey(script.ItemId)) return;
+            var entry = new SleepEntry { ItemId = script.ItemId, ReadyOn = script.ScriptState.NextEventAllowedOn, Event = SleepEntry.WakeEvent.MinDelay };
+            C5.IPriorityQueueHandle<SleepEntry> h = null;
+            m_SleepHeap.Add(ref h, entry);
+            m_MinDelayHandles[script.ItemId] = h;
+            m_WorkArrived?.Invoke();
+        }
+
+        /// <summary>llMinEventDelay(delay): the floor, applied from the next handler start on.</summary>
+        public void SetMinEventDelay(UUID itemId, float seconds)
+        {
+            if (!m_AllScripts.TryGetValue(itemId, out Interpreter script)) return;
+            int ms = seconds <= 0f ? 0 : (int)(seconds * 1000f);
+            script.ScriptState.MinEventDelayMs = ms;
+            if (ms == 0) script.ScriptState.NextEventAllowedOn = 0;
+        }
+
         private void CheckAndResetTimer(Interpreter script, PhloxEventInfo info)
         {
             if (info.EventType == (int)SupportedEventList.Events.TIMER &&
                 script.ScriptState.TimerInterval > 0 &&
                 !m_TimerHandles.ContainsKey(script.ItemId))
             {
-                ulong readyOn = (ulong)Util.EnvironmentTickCount() + (ulong)script.ScriptState.TimerInterval;
+                ulong readyOn = InWorldz.Phlox.Util.Clock.Now + (ulong)script.ScriptState.TimerInterval;
                 TrackTimer(script, readyOn, false);
             }
         }
 
         private void AddToRunQueue(Interpreter script)
         {
+            // A script paused by the parcel is never queued. RunState is left as it is (a syscall return has
+            // already set Running), and ResumeForParcel queues it by that RunState. This one gate covers a syscall
+            // return, a reset, the owner's Running checkbox and a queued-event delivery.
+            if ((script.ScriptState.LocalDisable & RuntimeState.LocalDisableFlag.Parcel) != 0)
+                return;
+
             // Suspended scripts never enter the run queue (removal at suspend + this gate
             // keeps DoTimeslices' hot path free of per-slice flag checks and keeps
             // HasWork() honest — a run queue holding only suspended scripts would make
@@ -955,6 +1805,7 @@ namespace Phlox.ScriptEngine
 
         private void UnregisterFromNotifications(Interpreter script)
         {
+            m_ParcelTimerLeft.Remove(script.ItemId);
             C5.IPriorityQueueHandle<SleepEntry> h;
             if (m_StdSleepHandles.TryGetValue(script.ItemId, out h))
             {
@@ -975,6 +1826,66 @@ namespace Phlox.ScriptEngine
             m_WorldComm.DeleteListener(script.ItemId);
         }
 
+        /// <summary>
+        /// Bring a script back that was captured mid-syscall.
+        /// <para>
+        /// The interrupted call cannot be re-issued and its completion will never arrive, so the
+        /// function's return value is pushed here and the script continues from the instruction after
+        /// the call. A Void function pushes nothing, which is exactly what its caller expects.
+        /// </para>
+        /// <para>
+        /// A state saved before <c>LastSyscallIndex</c> existed has -1 and cannot be resumed - there is
+        /// no way to know what value to push - so it falls back to the old behaviour and says so.
+        /// </para>
+        /// </summary>
+        private void ResumeFromSyscall(Interpreter interp, UUID itemId)
+        {
+            int index = interp.ScriptState.LastSyscallIndex;
+            // FunctionSig is a struct, so "not found" needs its own flag.
+            InWorldz.Phlox.Types.FunctionSig sig = default;
+            bool found = false;
+            if (index >= 0)
+            {
+                foreach (var m in InWorldz.Phlox.Types.Defaults.AllMethods)
+                {
+                    if (m.TableIndex == index) { sig = m; found = true; break; }
+                }
+            }
+
+            if (!found)
+            {
+                m_log.LogWarning(
+                    "[PhloxExe]: {Item} was saved mid-syscall with no recorded function (index {Index}); restored as Waiting - the interrupted call does not resume",
+                    itemId, index);
+                interp.ScriptState.RunState = RuntimeState.Status.Waiting;
+                return;
+            }
+
+            if (sig.ReturnType != InWorldz.Phlox.Types.VarType.Void)
+                interp.ScriptState.Operands.Push(DefaultValueFor(sig.ReturnType));
+
+            m_log.LogInformation(
+                "[PhloxExe]: {Item} was saved inside {Function}; resuming with that call's default return value",
+                itemId, sig.FunctionName);
+
+            AddToRunQueue(interp);
+        }
+
+        /// <summary>The value an interrupted call of this return type contributes.</summary>
+        private static object DefaultValueFor(InWorldz.Phlox.Types.VarType type)
+        {
+            switch (type)
+            {
+                case InWorldz.Phlox.Types.VarType.Integer: return 0;
+                case InWorldz.Phlox.Types.VarType.Float:   return 0.0f;
+                case InWorldz.Phlox.Types.VarType.Vector:  return OpenMetaverse.Vector3.Zero;
+                case InWorldz.Phlox.Types.VarType.Rotation:return OpenMetaverse.Quaternion.Identity;
+                case InWorldz.Phlox.Types.VarType.List:    return new InWorldz.Phlox.Types.LSLList(new System.Collections.Generic.List<object>());
+                case InWorldz.Phlox.Types.VarType.Key:     return OpenMetaverse.UUID.Zero.ToString();
+                case InWorldz.Phlox.Types.VarType.String:  return string.Empty;
+                default:                                   return null;
+            }
+        }
         private void TrackSleep(Interpreter script, ulong readyOn)
         {
             C5.IPriorityQueueHandle<SleepEntry> h = null;
@@ -999,13 +1910,28 @@ namespace Phlox.ScriptEngine
             });
             m_TimerHandles[script.ItemId] = h;
             if (!fromRestore)
-                script.ScriptState.TimerLastScheduledOn = (ulong)Util.EnvironmentTickCount();
+                script.ScriptState.TimerLastScheduledOn = InWorldz.Phlox.Util.Clock.Now;
             script.ScriptState.RemovePendingTimerEvent();
         }
 
         private void TerminateWithError(Interpreter script, Exception e)
         {
+            script.ScriptState.RunningEvent?.SignalCompleted();
             script.ScriptState.RunState = RuntimeState.Status.Killed;
+            script.ScriptState.LastSyscallIndex = -1;   // Not parked in anything any more
+            // A crashed script stays stopped until reset. The Running flag goes off the way
+            // llSetScriptState(FALSE) and the viewer's checkbox take it off - GeneralEnable in the state, which
+            // is persisted, and the item's flag - so a restore holds it and `phlox status` says why.
+            script.ScriptState.GeneralEnable = false;
+            script.ScriptState.TerminatedReason = e.Message;
+            UnregisterFromNotifications(script);
+            m_Engine.SetItemRunningFlag(script.HostLocalId, script.ItemId, false);
+            // The crash branch of RunNextScript returns before its ScriptChanged, so a script that died in
+            // its first slice was never dirty - and a region stop calls StateManager.Stop(), which flushes the DIRTY
+            // set only (no ScriptUnloaded at shutdown). The killed state never reached the row; the next start found
+            // the previous asset's row, discarded it as stale, and ran state_entry again (item 9262c036).
+            // The item's Running flag cannot carry it either: the region DB does not store it. Mark it dirty here.
+            m_Engine.StateManager?.ScriptChanged(script);
             m_log.LogError("[PhloxExe]: Script {0} asset {1} terminated: {2}",
                 script.ItemId, script.Script.AssetId, e);
             try
@@ -1062,10 +1988,10 @@ namespace Phlox.ScriptEngine
 
         private void InjectDeferredEvents(Interpreter script)
         {
-            List<PostedEvent> deferred;
+            DeferredEvents deferred;
             if (!m_DeferredEvents.TryGetValue(script.ItemId, out deferred)) return;
             m_DeferredEvents.Remove(script.ItemId);
-            foreach (var evt in deferred)
+            foreach (var evt in deferred.Events)
                 PostEvent(script.ItemId, evt);
         }
 
@@ -1073,10 +1999,49 @@ namespace Phlox.ScriptEngine
         {
             if (!m_DeferredEvents.TryGetValue(itemId, out var list))
             {
-                list = new List<PostedEvent>();
+                list = new DeferredEvents { ExpiresOn = InWorldz.Phlox.Util.Clock.Now + DeferredEventLifetimeMs };
                 m_DeferredEvents[itemId] = list;
             }
-            list.Add(evt);
+            if (list.Events.Count < MaxDeferredEventsPerItem) list.Events.Add(evt);   // Halcyon: the first 32 are kept
+            else m_DroppedForUnloaded++;
         }
+
+        /// <summary>Halcyon DeferredEventManager.DoExpirations - an item that has not loaded within 60 s loses its events. Checked once a second.</summary>
+        private void ExpireDeferredEvents()
+        {
+            if (m_DeferredEvents.Count == 0) return;
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            if (now < m_NextDeferredExpiry) return;
+            m_NextDeferredExpiry = now + 1000;
+            List<UUID> expired = null;
+            foreach (var kvp in m_DeferredEvents)
+                if (now >= kvp.Value.ExpiresOn) (expired ??= new List<UUID>()).Add(kvp.Key);
+            if (expired == null) return;
+            foreach (UUID id in expired)
+            {
+                m_DroppedForUnloaded += m_DeferredEvents[id].Events.Count;
+                m_DeferredEvents.Remove(id);
+            }
+        }
+
+        /// <summary>The item's load was cancelled (removed while compiling) - its held events go with it.</summary>
+        internal void DropDeferred(UUID itemId)
+        {
+            if (m_DeferredEvents.Remove(itemId, out var list)) m_DroppedForUnloaded += list.Events.Count;
+        }
+
+        /// <summary>The item is another engine's script now - its Phlox state row must never be restored.</summary>
+        internal void DeleteStateRowIfAny(UUID itemId) => m_Engine?.StateManager?.DeleteStateIfPresent(itemId);
+
+        /// <summary>Held events for items not loaded, and events dropped because their item was not loaded (tests, leak check).</summary>
+        internal (int Items, int Events, long Dropped) DeferredStats()
+        {
+            int events = 0;
+            foreach (var kvp in m_DeferredEvents) events += kvp.Value.Events.Count;
+            return (m_DeferredEvents.Count, events, m_DroppedForUnloaded);
+        }
+
+        /// <summary>Events posted and not yet taken by ProcessEventQueue (tests, leak check).</summary>
+        internal int PendingEventCount { get { lock (m_PendingEvents) return m_PendingEvents.Count; } }
     }
 }

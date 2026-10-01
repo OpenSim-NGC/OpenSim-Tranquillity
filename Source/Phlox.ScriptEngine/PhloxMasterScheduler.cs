@@ -1,8 +1,8 @@
 /*
- * Legion Grid — Phlox Script Engine Integration
+ * Phlox Script Engine Integration
  * Adapted from InWorldz Halcyon MasterScheduler.cs
  * Copyright (c) InWorldz Halcyon Developers (original)
- * Adapted 2026 for Legion Grid / OpenSim 0.9.3 .NET 8
+ * Adapted 2026 by Legion Builds for OpenSim 0.9.3 .NET 8
  */
 
 using System;
@@ -44,11 +44,20 @@ namespace Phlox.ScriptEngine
 
         public void Stop()
         {
+            StopThread();
+            m_ScriptLoader.Stop();
+            m_ExeScheduler.Stop();
+        }
+
+        /// <summary>
+        /// Stop only this scheduler's own thread. The test harness drives DoWork itself and needs the
+        /// loader's compile thread to keep running; region shutdown is <see cref="Stop"/>.
+        /// </summary>
+        internal void StopThread()
+        {
             m_Stop = true;
             WorkArrived();
             m_Thread?.Join(5000);
-            m_ScriptLoader.Stop();
-            m_ExeScheduler.Stop();
         }
 
         public void WorkArrived()
@@ -79,6 +88,12 @@ namespace Phlox.ScriptEngine
                         // which could be 60+ seconds later if nothing else was happening.
                         m_ActionEvent.Reset();
 
+                        // StopThread sets m_Stop and then signals. A stop that landed after the loop's
+                        // m_Stop check and before the Reset above had its signal erased, and with no work queued the
+                        // loop then waited forever (StopThread's 5 s join timed out). m_Stop is written before the
+                        // signal, so reading it again after the Reset can never miss that stop.
+                        if (m_Stop) break;
+
                         WorkStatus exeStatus = m_ExeScheduler.DoWork();
                         WorkStatus loadStatus = m_ScriptLoader.DoWork();
 
@@ -90,11 +105,12 @@ namespace Phlox.ScriptEngine
 
                         if (wakeAt != ulong.MaxValue)
                         {
-                            // Both wakeAt and EnvironmentTickCount are based on the same
-                            // 30-bit masked tick value (see OpenSim.Framework.Util).
-                            // Cast Int32 to long directly — the value is always non-negative
-                            // (masked to 0x3FFFFFFF), so this is safe.
-                            long now = (long)(uint)Util.EnvironmentTickCount();
+                            // wakeAt and now are both InWorldz.Phlox.Util.Clock, so there is
+                            // one basis for the whole engine. This used to read a 30-bit MASKED uptime
+                            // tick (OpenSim.Framework.Util.EnvironmentTickCount), which drops back to
+                            // near zero every 12.4 days - below every queued wakeAt, making waitMs
+                            // enormous and stalling every timer and sleep until it climbed back.
+                            long now = (long)InWorldz.Phlox.Util.Clock.Now;
                             long waitMs = (long)wakeAt - now;
                             if (waitMs > 0)
                                 m_ActionEvent.WaitOne((int)Math.Min(waitMs, int.MaxValue));

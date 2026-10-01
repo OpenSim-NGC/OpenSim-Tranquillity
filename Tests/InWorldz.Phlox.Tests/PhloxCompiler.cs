@@ -8,7 +8,9 @@ namespace InWorldz.Phlox.Tests;
 ///
 /// <para>
 /// <see cref="CompilerFrontend"/> takes an <see cref="ILSLListener"/> and a template path it
-/// stores but never reads, so a compile needs no scene, no region and no disk.
+/// stores but never reads, so a compile needs no scene, no region and no disk. This is the
+/// harness whose absence once meant reporting YEngine's overload verdict from reading the
+/// source instead of running a compile.
 /// </para>
 /// </summary>
 public sealed class PhloxCompiler : ILSLListener
@@ -35,15 +37,15 @@ public sealed class PhloxCompiler : ILSLListener
         }
         catch (Exception ex)
         {
-            // A throw is a compile failure too.
+            // A throw is a compile failure too, and one the log path also turns into an error.
             listener._errors.Add(ex.Message);
         }
         return listener;
     }
 
     /// <summary>
-    /// The compiled script itself, for tests that need to RUN it rather than only compile it.
-    /// Null when the compile failed; the listener's errors say why.
+    /// The compiled script itself, for tests that need to RUN it rather than only compile
+    /// it. Null when the compile failed; the listener's errors say why.
     /// </summary>
     public static InWorldz.Phlox.VM.CompiledScript CompileTo(string source, out PhloxCompiler listener)
     {

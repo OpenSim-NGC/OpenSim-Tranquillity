@@ -123,7 +123,11 @@ namespace InWorldz.Phlox.ByteCompiler
 
             foreach (FunctionSig sig in systemMethods)
             {
-                _functions.Add(sig.FunctionName, new FunctionSymbol(sig.FunctionName, sig.TableIndex));
+                // Keyed by the symbol name the compiler emitted, which is the bare
+                // function name for a single-signature built-in and name$arity for an overload.
+                // Derived from Defaults so the assembler and the symbol table cannot disagree.
+                string symbolName = Defaults.SymbolNameFor(sig);
+                _functions.Add(symbolName, new FunctionSymbol(symbolName, sig.TableIndex));
             }
         }
 
@@ -282,7 +286,7 @@ namespace InWorldz.Phlox.ByteCompiler
             switch (operand.Type)
             {
                 case AssemblerParser.INT: val = ConvertToInt(operand.Text); break;
-                case AssemblerParser.FLOAT: val = GetConstantPoolIndex(Convert.ToSingle(operand.Text)); break;
+                case AssemblerParser.FLOAT: val = GetConstantPoolIndex(Convert.ToSingle(operand.Text, System.Globalization.CultureInfo.InvariantCulture)); break;
                 case AssemblerParser.STRING: val = GetConstantPoolIndex(UnescapeStringChars(operand.Text)); break;
                 case AssemblerParser.VECTOR: val = GetConstantPoolIndex(Vector3.Parse(operand.Text)); break;
                 case AssemblerParser.ROTATION: val = GetConstantPoolIndex(Quaternion.Parse(operand.Text)); break;

@@ -112,31 +112,112 @@ namespace InWorldz.Phlox.Util
             return value;
         }
 
+        // SL wiki Typecast: (string) of a float has 6 decimals - `(string) -PI; // "-3.141593" with
+        // precision set to 6 decimal places by zero padding or rounding` - and of a vector or rotation 5 - `(string) <1.0,
+        // 2.3, 4.56>; // "<1.00000, 2.30000, 4.56000>"`; lists use 6 for all three (wiki List). The float's own value is
+        // written: formatting a float keeps only 7 significant digits on .NET (2147483520.0 printed "2147484000.000000"),
+        // so each value is widened to double first, which is exact. Halcyon's rule: -0 prints as 0 (any value
+        // that rounds to all zeros has no sign, as .NET Framework wrote it; .NET Core 3.0+ writes "-0.000000"). The
+        // invariant culture gives Halcyon's "Infinity", "-Infinity" and "NaN" and a '.' whatever the host's culture.
+        private static string Fixed(float f, string format)
+        {
+            string s = ((double)f).ToString(format, CultureInfo.InvariantCulture);
+            if (s.Length > 1 && s[0] == '-' && s.IndexOfAny(NonZeroDigits) < 0) s = s.Substring(1);
+            return s;
+        }
+
+        private static readonly char[] NonZeroDigits = { '1', '2', '3', '4', '5', '6', '7', '8', '9', 'I', 'N' };
+
+        // "F": .NET Core 3.0+ writes a double's exact digits with it (a custom "0.000000" stops at 15 significant digits).
+        private const string Five = "F5", Six = "F6";
+
         public static string Vector3ToStringWith5FractionalDigits(Vector3 vPrimitive)
         {
-            return String.Format("<{0:0.00000}, {1:0.00000}, {2:0.00000}>", vPrimitive.X, vPrimitive.Y, vPrimitive.Z);
+            return "<" + Fixed(vPrimitive.X, Five) + ", " + Fixed(vPrimitive.Y, Five) + ", " + Fixed(vPrimitive.Z, Five) + ">";
         }
 
         public static string QuaternionToStringWith5FractionalDigits(Quaternion rPrimitive)
         {
-            return String.Format("<{0:0.00000}, {1:0.00000}, {2:0.00000}, {3:0.00000}>",
-                rPrimitive.X, rPrimitive.Y, rPrimitive.Z, rPrimitive.W);
+            return "<" + Fixed(rPrimitive.X, Five) + ", " + Fixed(rPrimitive.Y, Five) + ", " + Fixed(rPrimitive.Z, Five)
+                + ", " + Fixed(rPrimitive.W, Five) + ">";
         }
 
         public static string Vector3ToStringWith6FractionalDigits(Vector3 vPrimitive)
         {
-            return String.Format("<{0:0.000000}, {1:0.000000}, {2:0.000000}>", vPrimitive.X, vPrimitive.Y, vPrimitive.Z);
+            return "<" + Fixed(vPrimitive.X, Six) + ", " + Fixed(vPrimitive.Y, Six) + ", " + Fixed(vPrimitive.Z, Six) + ">";
         }
 
         public static string QuaternionToStringWith6FractionalDigits(Quaternion rPrimitive)
         {
-            return String.Format("<{0:0.000000}, {1:0.000000}, {2:0.000000}, {3:0.000000}>",
-                rPrimitive.X, rPrimitive.Y, rPrimitive.Z, rPrimitive.W);
+            return "<" + Fixed(rPrimitive.X, Six) + ", " + Fixed(rPrimitive.Y, Six) + ", " + Fixed(rPrimitive.Z, Six)
+                + ", " + Fixed(rPrimitive.W, Six) + ">";
         }
 
         public static string FloatToStringWith6FractionalDigits(float f)
         {
-            return f.ToString("0.000000");
+            return Fixed(f, Six);
+        }
+
+        // Halcyon's string -> vector / rotation, its libomv Vector3.Parse / Quaternion.Parse
+        // under TryParse (ThirdParty/libopenmetaverse/OpenMetaverseTypes/Vector3.cs:355-377, Quaternion.cs:664-697): every
+        // '<' and '>' removed, split on ',', each part trimmed and parsed as .NET Framework's Single.Parse with en-US; too
+        // few parts or a bad part fails. A vector takes the first three parts of any longer list; a rotation of exactly
+        // three parts is Quaternion(x, y, z), W = sqrt(1 - x*x - y*y - z*z) or 0. The callers keep their failure values
+        // (ZERO_VECTOR, ZERO_ROTATION).
+        public static bool TryParseLslVector(string s, out Vector3 result)
+        {
+            result = Vector3.Zero;
+            string[] split = SplitLslTuple(s);
+            if (split == null || split.Length < 3) return false;
+            if (!TryParseFrameworkSingle(split[0], out float x) || !TryParseFrameworkSingle(split[1], out float y)
+                || !TryParseFrameworkSingle(split[2], out float z))
+                return false;
+            result = new Vector3(x, y, z);
+            return true;
+        }
+
+        public static bool TryParseLslRotation(string s, out Quaternion result)
+        {
+            result = Quaternion.Identity;
+            string[] split = SplitLslTuple(s);
+            if (split == null || split.Length < 3) return false;
+            if (!TryParseFrameworkSingle(split[0], out float x) || !TryParseFrameworkSingle(split[1], out float y)
+                || !TryParseFrameworkSingle(split[2], out float z))
+                return false;
+            if (split.Length == 3)
+            {
+                float xyzsum = 1 - x * x - y * y - z * z;
+                result = new Quaternion(x, y, z, (xyzsum > 0) ? (float)Math.Sqrt(xyzsum) : 0);
+                return true;
+            }
+            if (!TryParseFrameworkSingle(split[3], out float w)) return false;
+            result = new Quaternion(x, y, z, w);
+            return true;
+        }
+
+        private static string[] SplitLslTuple(string s)
+            => s == null ? null : s.Replace("<", String.Empty).Replace(">", String.Empty).Split(',');
+
+        /// <summary>
+        /// .NET Framework Single.Parse(s, en-US) as a Try: NumberStyles.Float | AllowThousands, surrounding white space
+        /// allowed. Differences from .NET 10 kept out: a value too large for a float fails (Framework threw
+        /// OverflowException; .NET Core 3.0+ gives infinity), and the only symbols are en-US Framework's exact
+        /// "Infinity", "-Infinity" and "NaN" (.NET 10 also takes "∞" and any letter case).
+        /// </summary>
+        private static bool TryParseFrameworkSingle(string part, out float value)
+        {
+            value = 0;
+            string t = part.Trim();
+            if (t == "Infinity") { value = float.PositiveInfinity; return true; }
+            if (t == "-Infinity") { value = float.NegativeInfinity; return true; }
+            if (t == "NaN") { value = float.NaN; return true; }
+            foreach (char c in t)
+                if (char.IsLetter(c) && c != 'e' && c != 'E') return false;
+            if (!double.TryParse(t, NumberStyles.Float | NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out double d)) return false;
+            float f = (float)d;
+            if (float.IsInfinity(f)) return false;
+            value = f;
+            return true;
         }
     }
 }

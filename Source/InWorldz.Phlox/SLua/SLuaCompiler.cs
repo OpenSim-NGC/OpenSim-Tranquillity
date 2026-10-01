@@ -10,10 +10,19 @@
  *   - types:      Luau `number` == double  -> Phlox Float; coerce to a function's declared
  *                 param type at the call boundary using the EXISTING cast opcodes (icast/fcast).
  *
- * Scope: locals, number arithmetic + coercion, if/elseif/else, while, comparison, event-named
- * global functions, top-level code, ll.* calls. Everything else (tables, closures, LLEvents:on
- * object model, metatables, multiple states, user functions) is Tier-2 and intentionally rejected
- * with a clear error rather than mis-compiled.
+ * Scope: Tier-1 is locals, number arithmetic + coercion, if/elseif/else, while, comparison,
+ * event-named global functions, top-level code, ll.* calls.
+ *
+ * Tier-2 IS IMPLEMENTED, not rejected - this header previously said otherwise and was stale.
+ * Table literals, indexing and length, for-in, table.insert, setmetatable/getmetatable, user
+ * functions and closures all compile. Each has documented edges that throw SLuaException rather
+ * than mis-compile: for-in requires pairs/ipairs/string.gmatch; table.insert requires a simple
+ * variable as its first argument and only table.insert is supported; LLEvents:on requires a
+ * literal event name; capturing a loop variable in a nested function, and multi-assignment to a
+ * captured variable, are not supported. Unknown stdlib functions and unsupported type annotations
+ * also throw. Grep SLuaException in this file for the current authoritative list.
+ *
+ * NOTE: the SLUA_SURFACE.md referenced above does not exist in this tree.
  *
  * NO VM/opcode change: this is pure front-end codegen, mirroring what the LSL GenVisitor emits.
  */
@@ -58,6 +67,12 @@ namespace InWorldz.Phlox.SLua
             }
             catch (SLuaException e)
             {
+                if (listener != null) listener.Error(string.Format("SLua: {0} (line {1})", e.Message, e.Line));
+                return null;
+            }
+            catch (InWorldz.Phlox.Compiler.NestingTooDeepException e)
+            {
+                // Nesting deeper than the stack can walk is a compile error, not a crash.
                 if (listener != null) listener.Error(string.Format("SLua: {0} (line {1})", e.Message, e.Line));
                 return null;
             }
@@ -292,6 +307,13 @@ namespace InWorldz.Phlox.SLua
 
         public SLuaParser(List<Tok> toks) { _t = toks; }
 
+        // The counted nesting limits (NestingLimits) - expressions in ParseUnary and the '..' chain,
+        // blocks in ParseBlock (every then/else/loop/function body), else-if chains per 'elseif' link. The stack
+        // guard (DepthGuard) stays as the backstop.
+        private readonly InWorldz.Phlox.Compiler.NestingCounter _nest = new InWorldz.Phlox.Compiler.NestingCounter();
+        private void Nest(InWorldz.Phlox.Compiler.NestingKind k) => _nest.Enter(k, Cur.Line, 0);
+        private void Unnest(InWorldz.Phlox.Compiler.NestingKind k) => _nest.Exit(k);
+
         private Tok Cur => _t[_p];
         private Tok Next => _t[Math.Min(_p + 1, _t.Count - 1)];
         private bool IsOp(string s) => Cur.Type == TT.Op && Cur.Text == s;
@@ -312,15 +334,21 @@ namespace InWorldz.Phlox.SLua
         // Parse a block until a terminator keyword (end/else/elseif) or EOF.
         private List<Stmt> ParseBlock()
         {
-            var stmts = new List<Stmt>();
-            while (Cur.Type != TT.EOF && !IsKw("end") && !IsKw("else") && !IsKw("elseif"))
-                stmts.Add(ParseStat());
-            return stmts;
+            Nest(InWorldz.Phlox.Compiler.NestingKind.Block);   // every caller parses a nested body; the chunk does not come here
+            try
+            {
+                var stmts = new List<Stmt>();
+                while (Cur.Type != TT.EOF && !IsKw("end") && !IsKw("else") && !IsKw("elseif"))
+                    stmts.Add(ParseStat());
+                return stmts;
+            }
+            finally { Unnest(InWorldz.Phlox.Compiler.NestingKind.Block); }
         }
 
         private Stmt ParseStat()
         {
             int line = Cur.Line;
+            InWorldz.Phlox.Compiler.DepthGuard.Check(line, 0);
             if (IsOp(";")) { Eat(); return ParseStatNonEmpty(); } // skip stray ';'
             return ParseStatNonEmpty();
         }
@@ -579,12 +607,20 @@ namespace InWorldz.Phlox.SLua
             if (IsKw("elseif"))
             {
                 // desugar elseif into a nested if in the else branch
-                els = new List<Stmt> { ParseElseIf() };
+                els = new List<Stmt> { ParseElseIfLink() };
                 return new IfStmt { Cond = cond, Then = then, Else = els, Line = line };
             }
             if (IsKw("else")) { Eat(); els = ParseBlock(); }
             ExpectKw("end");
             return new IfStmt { Cond = cond, Then = then, Else = els, Line = line };
+        }
+
+        /// <summary>One more link of an else-if chain (its own limit, not a block).</summary>
+        private Stmt ParseElseIfLink()
+        {
+            Nest(InWorldz.Phlox.Compiler.NestingKind.ElseIfChain);
+            try { return ParseElseIf(); }
+            finally { Unnest(InWorldz.Phlox.Compiler.NestingKind.ElseIfChain); }
         }
 
         private Stmt ParseElseIf()
@@ -594,7 +630,7 @@ namespace InWorldz.Phlox.SLua
             ExpectKw("then");
             var then = ParseBlock();
             List<Stmt> els = null;
-            if (IsKw("elseif")) { els = new List<Stmt> { ParseElseIf() }; return new IfStmt { Cond = cond, Then = then, Else = els, Line = line }; }
+            if (IsKw("elseif")) { els = new List<Stmt> { ParseElseIfLink() }; return new IfStmt { Cond = cond, Then = then, Else = els, Line = line }; }
             if (IsKw("else")) { Eat(); els = ParseBlock(); }
             ExpectKw("end");
             return new IfStmt { Cond = cond, Then = then, Else = els, Line = line };
@@ -620,7 +656,7 @@ namespace InWorldz.Phlox.SLua
         }
 
         // ---- expressions (Lua precedence: or < and < comparison < .. < add < mul < unary) ----
-        private Expr ParseExpr() { return ParseOr(); }
+        private Expr ParseExpr() { InWorldz.Phlox.Compiler.DepthGuard.Check(Cur.Line, 0); return ParseOr(); }
 
         private Expr ParseOr()
         {
@@ -654,7 +690,10 @@ namespace InWorldz.Phlox.SLua
             if (IsOp(".."))   // right-associative
             {
                 Eat();
-                var r = ParseConcat();
+                Nest(InWorldz.Phlox.Compiler.NestingKind.Expression);   // Each '..' link is a level
+                Expr r;
+                try { r = ParseConcat(); }
+                finally { Unnest(InWorldz.Phlox.Compiler.NestingKind.Expression); }
                 return new Binary { Op = "..", L = l, R = r, Line = l.Line };
             }
             return l;
@@ -684,8 +723,17 @@ namespace InWorldz.Phlox.SLua
             return l;
         }
 
+        /// <summary>Every expression level passes through here once (see NestingCounter).</summary>
         private Expr ParseUnary()
         {
+            Nest(InWorldz.Phlox.Compiler.NestingKind.Expression);
+            try { return ParseUnaryCore(); }
+            finally { Unnest(InWorldz.Phlox.Compiler.NestingKind.Expression); }
+        }
+
+        private Expr ParseUnaryCore()
+        {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(Cur.Line, 0);
             if (IsOp("-"))
             {
                 int line = Cur.Line; Eat();
@@ -1052,6 +1100,7 @@ namespace InWorldz.Phlox.SLua
         }
         private static void ScanStmtForNested(Stmt s, HashSet<string> names)
         {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(s?.Line ?? 0, 0);
             switch (s)
             {
                 case LocalDecl ld: ScanExprForNested(ld.Init, names); break;
@@ -1072,6 +1121,7 @@ namespace InWorldz.Phlox.SLua
         }
         private static void ScanExprForNested(Expr e, HashSet<string> names)
         {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(e?.Line ?? 0, 0);
             switch (e)
             {
                 case FuncExpr fe: AllNamesList(fe.Body, names); break;
@@ -1094,6 +1144,7 @@ namespace InWorldz.Phlox.SLua
         private static void AllNamesList(List<Stmt> body, HashSet<string> names) { foreach (var s in body) AllNamesStmt(s, names); }
         private static void AllNamesStmt(Stmt s, HashSet<string> names)
         {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(s?.Line ?? 0, 0);
             switch (s)
             {
                 case LocalDecl ld: AllNamesExpr(ld.Init, names); break;
@@ -1114,6 +1165,7 @@ namespace InWorldz.Phlox.SLua
         }
         private static void AllNamesExpr(Expr e, HashSet<string> names)
         {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(e?.Line ?? 0, 0);
             switch (e)
             {
                 case NameRef nr: names.Add(nr.Name); break;
@@ -1139,6 +1191,7 @@ namespace InWorldz.Phlox.SLua
         private static void CollectLLEvents(List<Stmt> body, HashSet<string> evs) { foreach (var s in body) LLEStmt(s, evs); }
         private static void LLEStmt(Stmt s, HashSet<string> evs)
         {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(s?.Line ?? 0, 0);
             switch (s)
             {
                 case LocalDecl ld: LLEExpr(ld.Init, evs); break;
@@ -1159,6 +1212,7 @@ namespace InWorldz.Phlox.SLua
         }
         private static void LLEExpr(Expr e, HashSet<string> evs)
         {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(e?.Line ?? 0, 0);
             switch (e)
             {
                 case MethodCall mc:
@@ -1383,6 +1437,7 @@ namespace InWorldz.Phlox.SLua
             int max = 0;
             void Walk(List<Stmt> list)
             {
+                InWorldz.Phlox.Compiler.DepthGuard.Check(list.Count > 0 ? list[0].Line : 0, 0);
                 foreach (var s in list)
                 {
                     if (s is ReturnStmt r) max = Math.Max(max, r.Values.Count);
@@ -1438,6 +1493,7 @@ namespace InWorldz.Phlox.SLua
 
         private void EmitStmt(Stmt s)
         {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(s?.Line ?? 0, 0);
             switch (s)
             {
                 case LocalDecl ld:
@@ -1832,6 +1888,7 @@ namespace InWorldz.Phlox.SLua
         // ---- expressions ----
         private VarType EmitExpr(Expr e)
         {
+            InWorldz.Phlox.Compiler.DepthGuard.Check(e?.Line ?? 0, 0);
             switch (e)
             {
                 case NumberLit n:
@@ -2106,7 +2163,7 @@ namespace InWorldz.Phlox.SLua
         private VarType EmitLlCall(LlCall c, bool statementLevel)
         {
             string phloxName = "ll" + c.Member; // ll.Say -> llSay
-            if (!Defaults.SystemMethods.TryGetValue(phloxName, out FunctionSig sig))
+            if (!Defaults.TryGetMethod(phloxName, out FunctionSig sig))
                 throw new SLuaException("unknown ll function 'll." + c.Member + "' (-> " + phloxName + ")", c.Line);
 
             if (c.Args.Count != sig.ParamTypes.Length)

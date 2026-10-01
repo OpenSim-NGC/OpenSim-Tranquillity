@@ -128,7 +128,7 @@ expr
     ;
 
 assignmentExpression
-    : booleanExpression (('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '<<=' | '>>=') assignmentExpression)*
+    : booleanExpression (('=' | '+=' | '-=' | '*=' | '/=' | '%=' | '<<=' | '>>=') assignmentExpression)*    // <<= / >>= accepted as an extension (Halcyon compiled them; integer only)
     ;
 
 booleanExpression
@@ -226,6 +226,7 @@ TYPE
     | 'key'
     | 'vector'
     | 'rotation'
+    | 'quaternion'   // SL keyword, interchangeable with rotation (wiki: Quaternion)
     | 'string'
     | 'list'
     ;

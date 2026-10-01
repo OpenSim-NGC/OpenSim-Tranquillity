@@ -17,7 +17,7 @@ namespace Phlox.ScriptEngine
         public Interpreter Interp;
         public readonly List<string> Records = new List<string>();
         private readonly Dictionary<int, FunctionSig> _byIndex = new Dictionary<int, FunctionSig>();
-        public RecordingShim() { foreach (var sig in Defaults.SystemMethods.Values) _byIndex[sig.TableIndex] = sig; }
+        public RecordingShim() { foreach (var sig in Defaults.AllMethods) _byIndex[sig.TableIndex] = sig; }
         public void Call(int funcid)
         {
             var sig = _byIndex[funcid];
