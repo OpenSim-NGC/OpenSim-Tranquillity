@@ -303,6 +303,13 @@ namespace Phlox.ScriptEngine
         // ── Called by PhloxEngine's chat hook ─────────────────────────────────
 
         /// <summary>
+        /// The chat type a Phlox script spoke with, set by the API around its Scene.SimChat call. The scene raises
+        /// OnChatFromWorld on the calling thread, so <see cref="DeliverChat(ChatTypeEnum, int, string, UUID, string, Vector3, UUID)"/>
+        /// reads it during that delivery; null at any other time.
+        /// </summary>
+        [ThreadStatic] internal static ChatTypeEnum? SpokenType;
+
+        /// <summary>
         /// Region-wide chat with no target: every matching listen hears it, as llRegionSay does.
         /// </summary>
         public void DeliverChat(int channel, string speakerName, UUID speakerKey, string message)
@@ -324,17 +331,24 @@ namespace Phlox.ScriptEngine
         public void DeliverChat(ChatTypeEnum type, int channel, string speakerName, UUID speakerKey,
                                 string message, Vector3 speakerPosition, UUID destId)
         {
-            if (string.IsNullOrEmpty(message)) return;
+            // Empty chat is delivered, as Halcyon's and YEngine's WorldCommModule.DeliverMessage deliver it: an
+            // llSay(ch, "") wake-up reaches a Phlox listen as it reaches a YEngine listen beside it.
+            message ??= string.Empty;
+
+            // The chat module rewrites object chat on DEBUG_CHANNEL to DebugChannel before this sees it
+            // (ChatModule.DeliverChatToAvatars runs first). A Phlox script's own chat keeps the type it was spoken
+            // with (SpokenType); other DebugChannel chat - another engine's run-time errors - goes as far as llSay,
+            // SL's distance for errors (wiki, DEBUG_CHANNEL: "Server-generated errors are broadcast the same distance
+            // as llSay").
+            if (type == ChatTypeEnum.DebugChannel)
+                type = SpokenType ?? ChatTypeEnum.Say;
 
             float range;
             switch (type)
             {
                 case ChatTypeEnum.Whisper: range = m_WhisperDistance; break;
                 case ChatTypeEnum.Say: range = m_SayDistance; break;
-                // The chat module rewrites chat on DEBUG_CHANNEL to DebugChannel before this sees it
-                // (ChatModule.DeliverChatToAvatars); script errors are shouted there.
-                case ChatTypeEnum.Shout:
-                case ChatTypeEnum.DebugChannel: range = m_ShoutDistance; break;
+                case ChatTypeEnum.Shout: range = m_ShoutDistance; break;
                 case ChatTypeEnum.Region:
                 case ChatTypeEnum.Direct: range = float.PositiveInfinity; break;
                 default: return;

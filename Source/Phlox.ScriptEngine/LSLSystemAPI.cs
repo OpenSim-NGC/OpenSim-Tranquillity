@@ -408,13 +408,32 @@ namespace Phlox.ScriptEngine
         /// script debugging and error messages"; viewers route it to the script-error window and filter
         /// out other owners' objects) - not shouted on channel 0, where every avatar in range read them
         /// in local chat. The text is unchanged. ChatModule turns the channel into ChatTypeEnum.DebugChannel.
+        /// They reach scripts listening on DEBUG_CHANNEL as far as llSay reaches (SL wiki, DEBUG_CHANNEL: "Server-generated
+        /// errors are broadcast the same distance as llSay"), and are cut as llSay's text is.
         /// </summary>
         public void ShoutError(string errorText)
         {
-            m_host?.ParentGroup?.Scene?.SimChat(
-                "Script error: " + errorText,
-                ChatTypeEnum.Shout, DEBUG_CHANNEL,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            HostSimChat(CapChatBytes("Script error: " + errorText), ChatTypeEnum.Say, DEBUG_CHANNEL);
+        }
+
+        /// <summary>
+        /// The host prim's chat through Scene.SimChat. Phlox's listens hear it through OnChatFromWorld, after the chat
+        /// module has rewritten chat on DEBUG_CHANNEL to ChatTypeEnum.DebugChannel; the type spoken is recorded for that
+        /// delivery (<see cref="PhloxListenManager.SpokenType"/>), so the listens still get the spoken distance.
+        /// </summary>
+        private void HostSimChat(string msg, ChatTypeEnum type, int channel)
+        {
+            Scene scene = m_host?.ParentGroup?.Scene;
+            if (scene == null) return;
+            PhloxListenManager.SpokenType = type;
+            try
+            {
+                scene.SimChat(msg, type, channel, m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            }
+            finally
+            {
+                PhloxListenManager.SpokenType = null;
+            }
         }
 
 
@@ -741,28 +760,64 @@ namespace Phlox.ScriptEngine
 
         // ── Chat ───────────────────────────────────────────────────────────────
 
+        // llSay, llShout, llWhisper and llRegionSayTo send at most 1024 bytes (SL wiki, llSay: "msg can be a maximum of
+        // 1024 bytes"; llShout and llWhisper: "Text can be a maximum of 1024 bytes"); llRegionSay at most 1024 characters
+        // (llRegionSay: "If msg is longer than 1024 characters it is truncated to 1024 characters"). Avatars and every
+        // engine's listens hear the same cut text.
+
         public void llSay(int channel, string msg)
         {
-            m_host?.ParentGroup?.Scene?.SimChat(msg, ChatTypeEnum.Say, channel,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            msg = CapChatBytes(msg);
+            HostSimChat(msg, ChatTypeEnum.Say, channel);
             ChatToWorldComm(ChatTypeEnum.Say, channel, msg);
             ChatSleep();
         }
 
         public void llShout(int channel, string msg)
         {
-            m_host?.ParentGroup?.Scene?.SimChat(msg, ChatTypeEnum.Shout, channel,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            msg = CapChatBytes(msg);
+            HostSimChat(msg, ChatTypeEnum.Shout, channel);
             ChatToWorldComm(ChatTypeEnum.Shout, channel, msg);
             ChatSleep();
         }
 
         public void llWhisper(int channel, string msg)
         {
-            m_host?.ParentGroup?.Scene?.SimChat(msg, ChatTypeEnum.Whisper, channel,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            msg = CapChatBytes(msg);
+            HostSimChat(msg, ChatTypeEnum.Whisper, channel);
             ChatToWorldComm(ChatTypeEnum.Whisper, channel, msg);
             ChatSleep();
+        }
+
+        private const int MaxChatBytes = 1024;
+        private const int MaxRegionSayCharacters = 1024;
+
+        /// <summary>
+        /// Chat cut to SL's 1024 bytes of UTF-8. SL (llSay): "If a multibyte character ends up on the 1024 byte boundary,
+        /// it is discarded and not split into invalid bytes."
+        /// </summary>
+        private static string CapChatBytes(string msg) => CapUtf8Bytes(msg, MaxChatBytes);
+
+        /// <summary>Text cut to <paramref name="max"/> bytes of UTF-8; a multibyte character the cut would split is dropped whole.</summary>
+        private static string CapUtf8Bytes(string text, int max)
+        {
+            text ??= string.Empty;
+            if (text.Length <= max / 4) return text;   // can't exceed the cap even at four bytes a character
+            byte[] utf8 = Encoding.UTF8.GetBytes(text);
+            if (utf8.Length <= max) return text;
+            int cut = max;
+            while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--; // back to the start of the split character
+            return Encoding.UTF8.GetString(utf8, 0, cut);
+        }
+
+        /// <summary>Text cut to <paramref name="max"/> characters; a surrogate pair the cut would split is dropped whole.</summary>
+        private static string CapCharacters(string text, int max)
+        {
+            text ??= string.Empty;
+            if (text.Length <= max) return text;
+            int cut = max;
+            if (char.IsHighSurrogate(text[cut - 1])) cut--;
+            return text.Substring(0, cut);
         }
 
         public void llOwnerSay(string msg)
@@ -785,8 +840,8 @@ namespace Phlox.ScriptEngine
 				ScriptShoutError("llRegionSay: cannot use channel 0");
 				return;
 			}
-			m_host?.ParentGroup?.Scene?.SimChat(msg, ChatTypeEnum.Region, channel,
-				m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+			msg = CapCharacters(msg, MaxRegionSayCharacters);
+			HostSimChat(msg, ChatTypeEnum.Region, channel);
 			ChatToWorldComm(ChatTypeEnum.Region, channel, msg);
 			ChatSleep();
 		}
@@ -821,6 +876,7 @@ namespace Phlox.ScriptEngine
 				return;
 			}
 			if (!UUID.TryParse(destId, out UUID targetId) || targetId == UUID.Zero) return;
+			msg = CapChatBytes(msg);
 
 			ScenePresence sp = World?.GetScenePresence(targetId);
 			if (channel == 0 && sp != null && !sp.IsChildAgent)
@@ -868,11 +924,16 @@ namespace Phlox.ScriptEngine
                 message        = CapInstantMessage(message),
                 dialog         = (byte)InstantMessageDialog.MessageFromObject,
                 fromGroup      = false,
-                offline        = 0,
+                // Kept for a recipient who is offline, and carrying the object's location ("Region/x/y/z", which
+                // viewers show as a link), as Halcyon (LSLSystemAPI.cs:3910-3916) and YEngine (LSL_Api.cs llInstantMessage)
+                // send it. SL: "If the specified user is not signed in, the messages will be delivered to their email
+                // just like a regular instant message".
+                offline        = 1,
                 ParentEstateID = World.RegionInfo.EstateSettings.ParentEstateID,
                 Position       = m_host.AbsolutePosition,
                 RegionID       = World.RegionInfo.RegionID.Guid,
-                binaryBucket   = new byte[0]
+                binaryBucket   = Util.StringToBytes256(
+                    $"{World.RegionInfo.RegionName}/{(int)m_host.AbsolutePosition.X}/{(int)m_host.AbsolutePosition.Y}/{(int)m_host.AbsolutePosition.Z}")
             };
 
             tr.SendInstantMessage(msg, success => {});
@@ -886,15 +947,7 @@ namespace Phlox.ScriptEngine
         /// (https://wiki.secondlife.com/wiki/LlInstantMessage). Bytes of UTF-8 are counted, and a multibyte character
         /// the cut would split is dropped whole, as PrimSetText cuts floating text.
         /// </summary>
-        private static string CapInstantMessage(string message)
-        {
-            message ??= string.Empty;
-            byte[] utf8 = Encoding.UTF8.GetBytes(message);
-            if (utf8.Length <= MaxInstantMessageBytes) return message;
-            int cut = MaxInstantMessageBytes;
-            while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--; // back to the start of the split character
-            return Encoding.UTF8.GetString(utf8, 0, cut);
-        }
+        private static string CapInstantMessage(string message) => CapUtf8Bytes(message, MaxInstantMessageBytes);
 		public void llDialog(string avatar, string message, LSLList buttons, int chat_channel)
 		{
 			if (m_host == null) return;

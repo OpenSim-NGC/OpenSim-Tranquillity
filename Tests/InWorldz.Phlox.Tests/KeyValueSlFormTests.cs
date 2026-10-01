@@ -99,7 +99,10 @@ public class KeyValueSlFormTests
         public UUID[] GetExperiencesForGroups(UUID[] groups) => Array.Empty<UUID>();
     }
 
-    /// <summary>A script that asks on touch; every answer is said as "tag|data", matched to its call by the returned key.</summary>
+    /// <summary>
+    /// A script that asks on touch; every answer is said as "tag|data", matched to its call by the returned key. Chat
+    /// carries at most 1024 bytes (SL llSay), so an answer over 1000 characters is said as "tag|first field,#fields/characters".
+    /// </summary>
     private static string Script(string calls) => @"
 list q;
 ask(key k, string tag) { q += [k, tag]; if (k) return; llSay(0, ""not-a-key|"" + tag); }
@@ -114,6 +117,12 @@ default
     {
         integer i = llListFindList(q, [id]);
         if (i < 0) llSay(0, ""unknown|"" + data);
+        else if (llStringLength(data) > 1000)
+        {
+            list f = llParseStringKeepNulls(data, ["",""], []);
+            llSay(0, llList2String(q, i + 1) + ""|"" + llList2String(f, 0) + "",#"" + (string)llGetListLength(f)
+                + ""/"" + (string)llStringLength(data));
+        }
         else llSay(0, llList2String(q, i + 1) + ""|"" + data);
     }
 }";
@@ -325,9 +334,8 @@ default
         var d = store.Data.GetOrAdd(Exp, _ => new SortedDictionary<string, string>(StringComparer.Ordinal));
         for (int i = 0; i < 10; i++) d["k" + i + new string('x', 998)] = "v";   // 1000 characters each
         using var r = Ask(store, @"ask(llKeysKeyValue(0, 10), ""keys"");", 1);
-        string[] keys = r.Answer("keys").Split(',');
-        Assert.Equal("1", keys[0]);
-        Assert.Equal(4, keys.Length - 1);                       // 4 x 1000 + 3 commas = 4003; a fifth would pass 4096
+        // "1" and four keys: 2 + 4 x 1000 + 3 commas = 4005 characters; a fifth key would pass 4096.
+        Assert.Equal("1,#5/4005", r.Answer("keys"));
     }
 
     [Fact]
