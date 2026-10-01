@@ -233,6 +233,57 @@ public class CacheSchemaBumpTests
         Assert.Empty(compiled);   // both from the cache the first start wrote
     }
 
+    // Schema 6 -> 7: string literals keep their characters, and a name used before a local of that name is declared
+    // means the global. The schema-6 compiler dropped the non-ASCII letters of the second string ("Gre") and read the
+    // unset local instead of the global.
+    private const string TextScript =
+        "integer count = 5;\n" +
+        "default {\n" +
+        "    state_entry() { llSay(0, \"x\\\\\"); }\n" +
+        "    touch_start(integer t) { llSay(0, \"Grüße \" + (string)count); integer count = 1; ++count; llSay(0, \"local \" + (string)count); }\n" +
+        "}\n";
+
+    /// <summary>Schema 6 to 7: a cache stamped 6 is purged once; each script recompiles from its source and keeps its globals.</summary>
+    [Fact]
+    public void ACacheStamped6IsPurgedAndTheScriptRecompilesKeepingItsGlobals()
+    {
+        Assert.True(CurrentSchema >= 7);
+        const string setUp = "default { state_entry() { count = 9; llSay(0, \"set\"); } touch_start(integer t) { } }";
+        var assetId = UUID.Random();
+        var itemId = UUID.Random();
+
+        using (var h1 = new SchedulerHarness(bytecodeDir: CacheDir))
+        {
+            // Stands in for the schema-6 bytecode of TextScript: same globals, and it sets the global to 9 so the test
+            // can see that the saved global is kept across the recompile.
+            WriteCache(assetId, "integer count = 5;\n" + setUp);
+            h1.RezScript(TextScript, assetId, itemId);
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("set"), TimeSpan.FromSeconds(20)),
+                "the old bytecode did not run from the cache: " + h1.Diagnose(itemId));
+            h1.SaveState(itemId);
+        }
+
+        File.WriteAllText(VersionFile, "6");
+        using var h2 = new SchedulerHarness(bytecodeDir: CacheDir);
+        Assert.True(((global::Phlox.ScriptEngine.PhloxScriptLoader)h2.Loader).PurgedCache);
+        Assert.False(File.Exists(CachePath(assetId)), "the bump did not purge the old bytecode");
+        Assert.Equal(CurrentSchema.ToString(), File.ReadAllText(VersionFile).Trim());
+
+        h2.RezScript(TextScript, assetId, itemId);
+        Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemId) != null, TimeSpan.FromSeconds(20)),
+            "not recompiled: " + h2.Diagnose(itemId));
+        h2.Pump(20);
+        h2.PostTouch(itemId);
+        Assert.True(PumpUntil(h2, () => h2.Said.Any(s => s.StartsWith("local ")), TimeSpan.FromSeconds(20)),
+            "no touch after the recompile: " + h2.Diagnose(itemId));
+        _out.WriteLine("after the bump: " + string.Join(" | ", h2.Said));
+
+        Assert.Contains("Grüße 9", h2.Said);       // the kept global, read before the local of that name
+        Assert.Contains("local 2", h2.Said);
+        Assert.DoesNotContain(h2.Said, s => s.StartsWith("x"));   // no state_entry: the saved state was restored
+        Assert.True(File.Exists(CachePath(assetId)), "the recompiled bytecode was not cached");
+    }
+
     [Fact]
     public void AScriptWhoseBytecodeDidNotChangeResumesItsSleepAcrossTheBump()
     {

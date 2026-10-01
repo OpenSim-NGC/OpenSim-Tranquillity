@@ -53,7 +53,12 @@ namespace Phlox.ScriptEngine
         //       asset (a script saved again while its previous save was still loading), so a restart ran the wrong code.
         //       The loader no longer does; this bump purges such entries once. Every script recompiles once from its own
         //       source at the first start; saved state is kept as in 4.
-        private const int CACHE_SCHEMA_VERSION = 6;
+        //   7 — one recompile for two compiler changes that alter the bytecode of some valid scripts: a string literal
+        //       keeps its non-ASCII characters after a literal ending in an escaped backslash or a comment holding a
+        //       quote (the paste clean-up lost track of strings there), and a name used before a local of that name is
+        //       declared, or inside its own initialiser, means the parameter or global of that name (it read the unset
+        //       local). Every script recompiles once from its own source at the first start; saved state is kept as in 4.
+        private const int CACHE_SCHEMA_VERSION = 7;
         private const string VERSION_FILE_NAME = ".schema_version";
 
         // CACHE_DIR and its stamp, unless the engine was given another folder (a test seam; production never
