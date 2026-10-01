@@ -2114,28 +2114,40 @@ namespace Phlox.ScriptEngine
                 return 0;
             }
 
-            // The rest of the permission checks are done in RezScript, so check the pin there as well.
+            // Halcyon's Scene.RezScript returned why it refused, and RemoteLoadScriptPin reported it (LSLSystemAPI.cs:8977-8993):
+            // "PIN" is -1, "NO PIN" -2, anything else 0 with the reason. Core's RezScriptFromPrim (Scene.Inventory.cs) makes
+            // the same checks but returns nothing, so they are made here first. The owners already match (above), so the
+            // destination needs Modify for its owner.
             int ret = 1;
-            try
+            if ((part.OwnerMask & (uint)OpenSim.Framework.PermissionMask.Modify) == 0)
             {
-                // This tree's signature: RezScriptFromPrim(UUID srcId, SceneObjectPart srcPart, UUID destId, int pin, int running, int start_param)
-                World.RezScriptFromPrim(srcId, m_host, destId, pin, running, start_param);
+                ScriptShoutError("llRemoteLoadScriptPin: Destination lacks Modify permission.");
+                ret = 0;
             }
-            catch (Exception e)
+            else if (part.ScriptAccessPin == 0)
             {
-                string msg = e.Message;
-                if (msg.Contains("PIN"))
+                if (doShout) ShoutError("llRemoteLoadScriptPin: Script update denied - PIN not set.");
+                ret = -2;
+            }
+            else if (part.ScriptAccessPin != pin)
+            {
+                if (doShout) ShoutError("llRemoteLoadScriptPin: Script update denied - PIN mismatch.");
+                ret = -1;
+            }
+            else
+            {
+                try
                 {
-                    if (doShout) ShoutError("llRemoteLoadScriptPin: Script update denied - PIN mismatch.");
-                    ret = -1;
+                    World.RezScriptFromPrim(srcId, m_host, destId, pin, running, start_param);
                 }
-                else
+                catch (Exception e)
                 {
-                    m_log.LogWarning("[PhloxAPI]: RemoteLoadScriptPin failed: {0}", msg);
-                    if (doShout) ShoutError("llRemoteLoadScriptPin: " + msg);
+                    m_log.LogWarning("[PhloxAPI]: RemoteLoadScriptPin failed: {0}", e.Message);
+                    ScriptShoutError("llRemoteLoadScriptPin: " + e.Message);
                     ret = 0;
                 }
             }
+            // Halcyon: "this will cause the delay even if the script pin or permissions were wrong".
             ScriptSleep(3000);
             return ret;
         }
@@ -3355,17 +3367,25 @@ namespace Phlox.ScriptEngine
 
         public void llTeleportAgentHome(string agent)
         {
-            if (!UUID.TryParse(agent, out UUID agentId)) return;
+            // SL: "This function causes the script to sleep for 5.0 seconds" - on every path, as Halcyon's finally
+            // (LSLSystemAPI.cs:5749-5770), so a refused call cannot be retried in a tight loop.
+            try
+            {
+                if (!UUID.TryParse(agent, out UUID agentId)) return;
 
-            ScenePresence presence = World?.GetScenePresence(agentId);
-            if (presence == null) return;
+                ScenePresence presence = World?.GetScenePresence(agentId);
+                if (presence == null) return;
 
-            if (!IsTeleportAuthorized(presence))
-                return;
+                if (!IsTeleportAuthorized(presence))
+                    return;
 
-            presence.ControllingClient.SendTeleportStart((uint)OpenMetaverse.TeleportFlags.DisableCancel);
-            World.TeleportClientHome(agentId, presence.ControllingClient);
-            ScriptSleep(5000);
+                presence.ControllingClient.SendTeleportStart((uint)OpenMetaverse.TeleportFlags.DisableCancel);
+                World.TeleportClientHome(agentId, presence.ControllingClient);
+            }
+            finally
+            {
+                ScriptSleep(5000);
+            }
         }
 
         public void iwTeleportAgent(string agent, string region, Vector3 pos, Vector3 lookAt)
