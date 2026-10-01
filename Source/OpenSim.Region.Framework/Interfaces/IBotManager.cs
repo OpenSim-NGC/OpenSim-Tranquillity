@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Legion Grid Contributors
+ * Copyright (c) Legion Builds
  * IBotManager.cs — Bot/NPC management interface for Phlox script engine
  * Bridges InWorldz-style bot* LSL functions to OpenSim's INPCModule infrastructure.
  */
