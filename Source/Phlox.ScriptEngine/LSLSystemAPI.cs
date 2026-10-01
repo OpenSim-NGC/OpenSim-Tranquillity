@@ -728,22 +728,42 @@ namespace Phlox.ScriptEngine
         public Quaternion llAxisAngle2Rot(Vector3 axis, float angle)
             => Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), angle);
 
+        // llRot2Axis, llRot2Angle and llAngleBetween are YEngine's (LSL_Api.cs llRot2Axis / llRot2Angle /
+        // llAngleBetween): the input's scale does not matter and there is no small-angle cut-off. OpenMetaverse's GetAxisAngle,
+        // used before, answered angle 0 and axis <1,0,0> below about 0.02 rad and did not normalise.
+
+        /// <summary>The axis that goes with llRot2Angle's angle; ZERO_VECTOR for no rotation.</summary>
+        // sin(angle/2) is taken from x, y and z rather than as sqrt(1 - w^2), which loses most of its digits for a
+        // small angle when w is a float (0.01 rad read its axis 0.07% short).
+
+        /// <summary>The axis that goes with llRot2Angle's angle; ZERO_VECTOR for no rotation.</summary>
         public Vector3 llRot2Axis(Quaternion rot)
         {
-            rot.GetAxisAngle(out Vector3 axis, out float angle);
-            return axis;
+            double s = Math.Sqrt((double)rot.X * rot.X + (double)rot.Y * rot.Y + (double)rot.Z * rot.Z);
+            if (s < 1e-12) return Vector3.Zero;
+            double invS = rot.W < 0 ? -1.0 / s : 1.0 / s;   // the axis of the turn of PI or less
+            return new Vector3((float)(rot.X * invS), (float)(rot.Y * invS), (float)(rot.Z * invS));
         }
 
+        /// <summary>SL: "a positive angle &lt;= PI radians, that is, it is the unsigned minimum angle".</summary>
         public float llRot2Angle(Quaternion rot)
         {
-            rot.GetAxisAngle(out Vector3 axis, out float angle);
-            return angle;
+            // 2 atan2(|xyz|, |w|) is 2 acos(w) of the normalised rotation, folded into [0, PI], at any scale.
+            double s = Math.Sqrt((double)rot.X * rot.X + (double)rot.Y * rot.Y + (double)rot.Z * rot.Z);
+            return (float)(2 * Math.Atan2(s, Math.Abs((double)rot.W)));
         }
 
+        /// <summary>Halcyon's and YEngine's formula: acos(2 (a.b)^2 / (|a|^2 |b|^2) - 1), 0 for a zero quaternion.</summary>
         public float llAngleBetween(Quaternion a, Quaternion b)
         {
-            float dotProduct = Quaternion.Dot(a, b);
-            return (float)(2.0 * Math.Acos(Math.Abs(Math.Max(-1.0, Math.Min(1.0, dotProduct)))));
+            double aa = (double)a.X * a.X + (double)a.Y * a.Y + (double)a.Z * a.Z + (double)a.W * a.W;
+            double bb = (double)b.X * b.X + (double)b.Y * b.Y + (double)b.Z * b.Z + (double)b.W * b.W;
+            double aa_bb = aa * bb;
+            if (aa_bb == 0) return 0f;
+            double ab = (double)a.X * b.X + (double)a.Y * b.Y + (double)a.Z * b.Z + (double)a.W * b.W;
+            double quotient = (ab * ab) / aa_bb;
+            if (quotient >= 1.0) return 0f;
+            return (float)Math.Acos(2 * quotient - 1);
         }
 
         public int llModPow(int a, int b, int c)
@@ -13495,7 +13515,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 else break;
                 if (str.Length > 32768)
                 {
-                    ScriptShoutError("Return value from iwFormatString is greater than 64kb");
+                    LSLError("Return value from iwFormatString is greater than 64kb");   // Halcyon :15955
                     return String.Empty;
                 }
                 if (throttle)
@@ -13551,10 +13571,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public string llStringTrim(string src, int trim_type)
         {
+            // SL documents STRING_TRIM_HEAD (1), STRING_TRIM_TAIL (2) and STRING_TRIM (3); any other type returns the
+            // string as it is, as Halcyon's does (LSLSystemAPI.cs:14109-14115).
             if (src == null) return string.Empty;
-            if (trim_type == 1) return src.TrimStart();
-            if (trim_type == 2) return src.TrimEnd();
-            return src.Trim();
+            if (trim_type == 1) return src.TrimStart();   // STRING_TRIM_HEAD
+            if (trim_type == 2) return src.TrimEnd();     // STRING_TRIM_TAIL
+            if (trim_type == 3) return src.Trim();        // STRING_TRIM
+            return src;
         }
 
         public string llStringToBase64(string str) => Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(str ?? ""));
@@ -13814,11 +13837,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public string llList2Key(LSLList src, int index)
         {
-            if (src == null || src.Length == 0) return UUID.Zero.ToString();
+            // SL: "If index describes a location not in src then null string is returned"; an element that "cannot be
+            // typecast" to a key gives the null string too. Keys are strings in Phlox's lists, so a string element is
+            // returned as it is and anything else is "", as Halcyon (:6563-6580) and YEngine answer.
+            if (src == null || src.Length == 0) return string.Empty;
             int i = index < 0 ? src.Length + index : index;
-            if (i < 0 || i >= src.Length) return UUID.Zero.ToString();
-            var v = src.Data[i];
-            return v?.ToString() ?? UUID.Zero.ToString();
+            if (i < 0 || i >= src.Length) return string.Empty;
+            return src.Data[i] is string s ? s : string.Empty;
         }
         // Halcyon's llList2Vector / llList2Rot (:6582-6600), a string element read by Halcyon's parser.
         public Vector3 llList2Vector(LSLList src, int index)
@@ -13863,7 +13888,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             var v = src.Data[i];
             if (v is int)       return TYPE_INTEGER;
             if (v is float || v is double) return TYPE_FLOAT;
-            if (v is string)    return TYPE_STRING;
+            // Keys are strings in Phlox's lists: a string that parses as a UUID reports TYPE_KEY, as Halcyon
+            // (:6626-6636) and YEngine report it.
+            if (v is string sv) return UUID.TryParse(sv, out _) ? TYPE_KEY : TYPE_STRING;
             if (v is UUID)      return TYPE_KEY;
             if (v is Vector3)   return TYPE_VECTOR;
             if (v is Quaternion) return TYPE_ROTATION;
@@ -14119,6 +14146,17 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             return new LSLList(result);
         }
+        // llListStatistics operations, as the compiler's DefaultConstants.cs numbers them (SL's values).
+        private const int LIST_STAT_RANGE = 0, LIST_STAT_MIN = 1, LIST_STAT_MAX = 2, LIST_STAT_MEAN = 3,
+            LIST_STAT_MEDIAN = 4, LIST_STAT_STD_DEV = 5, LIST_STAT_SUM = 6, LIST_STAT_SUM_SQUARES = 7,
+            LIST_STAT_NUM_COUNT = 8, LIST_STAT_GEOMETRIC_MEAN = 9, LIST_STAT_HARMONIC_MEAN = 100;
+
+        /// <summary>
+        /// SL: STD_DEV "Calculates the _sample_ standard deviation"; "Geometric mean applies only to numbers of the same
+        /// sign." The geometric and harmonic means are Halcyon's and YEngine's (LSL_Types.cs GeometricMean,
+        /// HarmonicMean): exp(log(product) / n), NaN when the product is negative, and n / sum(1/x), 0 when an entry is 0.
+        /// The standard deviation of one number is 0 (the sample formula divides 0 by 0 there).
+        /// </summary>
         public float llListStatistics(int operation, LSLList src)
         {
             if (src == null || src.Length == 0) return 0f;
@@ -14129,22 +14167,31 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             nums.Sort();
             switch (operation)
             {
-                case 0: return (float)(nums[nums.Count - 1] - nums[0]);                   // RANGE
-                case 1: return (float)nums[0];                                             // MIN
-                case 2: return (float)nums[nums.Count - 1];                               // MAX
-                case 3: { double s = 0; foreach (var n in nums) s += n; return (float)(s / nums.Count); } // MEAN
-                case 4: { int m = nums.Count / 2; return (nums.Count % 2 == 0) ? (float)((nums[m-1]+nums[m])/2.0) : (float)nums[m]; } // MEDIAN
-                case 5:
+                case LIST_STAT_RANGE: return (float)(nums[nums.Count - 1] - nums[0]);
+                case LIST_STAT_MIN: return (float)nums[0];
+                case LIST_STAT_MAX: return (float)nums[nums.Count - 1];
+                case LIST_STAT_MEAN: return (float)(nums.Sum() / nums.Count);
+                case LIST_STAT_MEDIAN: { int m = nums.Count / 2; return (nums.Count % 2 == 0) ? (float)((nums[m-1]+nums[m])/2.0) : (float)nums[m]; }
+                case LIST_STAT_STD_DEV:
                 {
-                    double s = 0; foreach (var n in nums) s += n; double mean = s / nums.Count;
+                    if (nums.Count < 2) return 0f;
+                    double mean = nums.Sum() / nums.Count;
                     double v = 0; foreach (var n in nums) v += (n - mean) * (n - mean);
-                    return (float)Math.Sqrt(v / nums.Count);
-                } // STD_DEV
-                case 6: { double s = 0; foreach (var n in nums) s += n; return (float)s; }          // SUM
-                case 7: { double s = 0; foreach (var n in nums) s += n * n; return (float)s; }      // SUM_SQUARES
-                case 8: return nums.Count;                                                 // NUM_COUNT
-                case 9: { double p = 1.0; foreach (var n in nums) p *= Math.Abs(n); return (float)Math.Pow(p, 1.0/nums.Count); } // GEOMETRIC_MEAN
-                case 10: { double s = 0; foreach (var n in nums) { if (n != 0) s += 1.0/n; } return s == 0 ? 0f : (float)(nums.Count/s); } // HARMONIC_MEAN
+                    return (float)Math.Sqrt(v / (nums.Count - 1));
+                }
+                case LIST_STAT_SUM: return (float)nums.Sum();
+                case LIST_STAT_SUM_SQUARES: { double s = 0; foreach (var n in nums) s += n * n; return (float)s; }
+                case LIST_STAT_NUM_COUNT: return nums.Count;
+                case LIST_STAT_GEOMETRIC_MEAN:
+                {
+                    double p = 1.0; foreach (var n in nums) p *= n;
+                    return (float)Math.Exp(Math.Log(p) / nums.Count);
+                }
+                case LIST_STAT_HARMONIC_MEAN:
+                {
+                    double s = 0; foreach (var n in nums) s += 1.0 / n;
+                    return (float)(nums.Count / s);
+                }
                 default: return 0f;
             }
         }
@@ -14259,8 +14306,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             ret.Add(autoCast > 0 ? AutoCastString(temp) : (object)temp);
                         }
                     }
-                    else if (keepNulls)
+                    else if (cindex == 0 || keepNulls)
                     {
+                        // Halcyon (:7714-7718): an empty field at a leading or doubled separator is always kept.
                         totalSplits++;
                         ret.Add(string.Empty);
                     }
@@ -15059,7 +15107,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         // ── Misc ───────────────────────────────────────────────────────────────
 
         public void llSetPrimURL(string url) { /* Deprecated */ }
-        public void llRefreshPrimURL() { /* Deprecated - not supported */ }
+        /// <summary>SL: deprecated, "This functions currently does nothing." Halcyon's error (LSLSystemAPI.cs:13444-13449).</summary>
+        public void llRefreshPrimURL() => ScriptShoutError("llRefreshPrimURL - not yet supported");
         public void llMapDestination(string simname, Vector3 pos, Vector3 look_at)
         {
             UUID targetAvatar = UUID.Zero;
@@ -15892,7 +15941,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (max < min) return Math.Min(min, Math.Max(value, max));
             return Math.Min(max, Math.Max(value, min));
         }
-        public int iwIntRand(int max) { return new Random().Next(max < 0 ? max : 0, Math.Abs(max) + 1); }
+        /// <summary>Halcyon (LSLSystemAPI.cs:792-795): 0..max, or max..0 for a negative max.</summary>
+        public int iwIntRand(int max)
+        {
+            if (max < 0) return -ThreadRandom.Next((int)Math.Min(-(long)max + 1, int.MaxValue));
+            return ThreadRandom.Next((int)Math.Min((long)max + 1, int.MaxValue));
+        }
         public int iwIntRandRange(int min, int max) { if (min == max) return min; if (max < min) { int t = min; min = max; max = t; } return new Random().Next(min, max + 1); }
         public float iwFrandRange(float min, float max) { if (min == max) return min; if (max < min) { float t = min; min = max; max = t; } return (float)(new Random().NextDouble() * (max - min) + min); }
         public LSLList iwSearchLinksByName(string pattern, int matchType, int linksOnly)
