@@ -391,9 +391,10 @@ namespace Phlox.ScriptEngine
                     if (ranged && Vector3.DistanceSquared(hostPosition, speakerPosition) >= rangeSq) continue;
                 }
 
-                // Name filter (empty = wildcard)
+                // Name filter (empty = wildcard). An exact, case-sensitive match: the SL wiki's llListen page
+                // says the speaker's name "must match name exactly (case sensitive)".
                 if (entry.NameRegex != null ? !RegexMatches(entry, entry.NameRegex, speakerName)
-                    : entry.FilterName.Length > 0 && !string.Equals(entry.FilterName, speakerName, StringComparison.OrdinalIgnoreCase))
+                    : entry.FilterName.Length > 0 && !string.Equals(entry.FilterName, speakerName, StringComparison.Ordinal))
                     continue;
 
                 // Key filter (UUID.Zero = wildcard)

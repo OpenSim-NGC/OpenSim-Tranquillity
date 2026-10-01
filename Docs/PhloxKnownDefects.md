@@ -55,8 +55,6 @@ SL behaviour is cited from the SL wiki (`https://wiki.secondlife.com/wiki/<Page>
 - Past the limit, `llListen` returns -1 and raises **no** error. SL raises a run-time
   "Too Many Listens" error ([LlListen](https://wiki.secondlife.com/wiki/LlListen)).
 - An `llListen` identical to one the script already holds active returns the existing handle.
-- The `name` filter is **case-insensitive**. SL requires an exact, case-sensitive match
-  ([LlListen](https://wiki.secondlife.com/wiki/LlListen)).
 - A prim never hears its own chat.
 - `llRegionSayTo` refuses `DEBUG_CHANNEL` with the error "Cannot use llRegionSayTo() on
   DEBUG_CHANNEL.". Only its target hears it: the target prim's listens, or, for an avatar,
