@@ -1456,9 +1456,42 @@ namespace Phlox.ScriptEngine
             // returns true *before* events are actually delivered. No current caller
             // (OnScriptChangedEvent, OnSceneObjectPartUpdated, PostTouchEvent,
             //  PostObjectLinksetDataEvent) inspects the return value, so this is safe.
+            //
+            // One pool work item per call delivered a prim's events in whatever order the pool ran them (a burst of
+            // link_message or changed events arrived shuffled). Each prim has one lane instead: its events wait in
+            // order and a single work item delivers them one after another, as Halcyon's synchronous posting did.
             Interlocked.Increment(ref m_ObjectPostsInFlight);   // Counted only, see ObjectPostsInFlight
-            ThreadPool.UnsafeQueueUserWorkItem(_ =>
+            lock (m_PrimLanes)
             {
+                if (m_PrimLanes.TryGetValue(localID, out var lane))
+                {
+                    lane.Enqueue((part, parms));   // the lane's work item is already running and will take it
+                    return true;
+                }
+                lane = new Queue<(SceneObjectPart, EventParams)>();
+                lane.Enqueue((part, parms));
+                m_PrimLanes[localID] = lane;
+            }
+            ThreadPool.UnsafeQueueUserWorkItem(DrainPrimLane, localID, false);
+
+            return true;
+        }
+
+        /// <summary>Object events waiting for delivery, one queue per prim local id, present while its work item runs.</summary>
+        private readonly Dictionary<uint, Queue<(SceneObjectPart Part, EventParams Parms)>> m_PrimLanes = new();
+
+        private void DrainPrimLane(uint localID)
+        {
+            while (true)
+            {
+                SceneObjectPart part;
+                EventParams parms;
+                lock (m_PrimLanes)
+                {
+                    var lane = m_PrimLanes[localID];
+                    if (lane.Count == 0) { m_PrimLanes.Remove(localID); return; }
+                    (part, parms) = lane.Dequeue();
+                }
                 try
                 {
                     TaskInventoryDictionary scripts;
@@ -1483,9 +1516,7 @@ namespace Phlox.ScriptEngine
                 {
                     Interlocked.Decrement(ref m_ObjectPostsInFlight);
                 }
-            }, null);
-
-            return true;
+            }
         }
 
         private int m_ObjectPostsInFlight;
