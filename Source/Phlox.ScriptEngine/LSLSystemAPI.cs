@@ -1142,7 +1142,24 @@ namespace Phlox.ScriptEngine
 
         // ── Position / rotation ────────────────────────────────────────────────
 
-        public Vector3 llGetPos() => m_host?.AbsolutePosition ?? Vector3.Zero;
+        public Vector3 llGetPos() => m_host == null ? Vector3.Zero : SlCompatiblePosition(m_host);
+
+        /// <summary>
+        /// llGetPos and PRIM_POSITION: the prim's region position, except for a child prim of an attachment, which
+        /// gives its offset from the root turned by the wearer's rotation plus the wearer's position (Halcyon
+        /// SceneObjectPart.GetSLCompatiblePosition: "return the child prim offset applied to the avatar pos + rot";
+        /// SL: "position is always in region coordinates, even if the prim is a child or the root prim of an
+        /// attachment"). The plain AbsolutePosition turns the offset by the attachment root's rotation instead, so it
+        /// did not follow the wearer turning.
+        /// </summary>
+        private Vector3 SlCompatiblePosition(SceneObjectPart part)
+        {
+            SceneObjectGroup group = part.ParentGroup;
+            if (group == null || part == group.RootPart || !group.IsAttachment) return part.AbsolutePosition;
+            ScenePresence wearer = World?.GetScenePresence(group.AttachedAvatar);
+            if (wearer == null) return part.AbsolutePosition;
+            return part.OffsetPosition * wearer.Rotation + wearer.AbsolutePosition;
+        }
         // Halcyon GetPartLocalPos and SL: a root's region position (an attachment's, its offset from the attach
         // point), a child's offset from the root. The same read as PRIM_POS_LOCAL.
         public Vector3 llGetLocalPos() => m_host == null ? Vector3.Zero : PartLocalPos(m_host);
@@ -1163,24 +1180,47 @@ namespace Phlox.ScriptEngine
         // root prim". The root's PRIM_ROTATION read, so it matches llGetRot on the root.
         public Quaternion llGetRootRotation()
             => m_host?.ParentGroup?.RootPart is SceneObjectPart root ? PartRegionRot(root) : Quaternion.Identity;
+        /// <summary>
+        /// SL: "If the prim is not the root prim it is offset by the root's rotation." A child's rotation is the
+        /// root's times the one given (Halcyon :2452-2459, YEngine LSL_Api.llSetRot); the rotation is normalised first
+        /// (Halcyon Rot2Quaternion), and an object in transit is left alone (Halcyon).
+        /// </summary>
         public void llSetRot(Quaternion rot)
         {
             if (m_host == null) return;
             SceneObjectGroup group = m_host.ParentGroup;
             if (group == null || group.IsDeleted) return;
-            if (m_host.LinkNum < 2) group.UpdateGroupRotationR(rot);
-            else m_host.UpdateRotation(rot);
+            if (!group.inTransit)
+            {
+                rot = NormalizedRot(rot);
+                if (m_host == group.RootPart) group.UpdateGroupRotationR(rot);
+                else m_host.UpdateRotation(group.RootPart.RotationOffset * rot);
+            }
             ScriptSleep(200);
         }
+        /// <summary>Halcyon llSetLocalRot: the normalised rotation, then SL's 0.2 s delay.</summary>
         public void llSetLocalRot(Quaternion rot)
         {
             if (m_host == null) return;
-            m_host.UpdateRotation(rot);
+            m_host.UpdateRotation(NormalizedRot(rot));
+            ScriptSleep(200);
+        }
+
+        /// <summary>Halcyon Rot2Quaternion: the rotation as a unit quaternion (a zero one reads as no rotation).</summary>
+        private static Quaternion NormalizedRot(Quaternion rot)
+        {
+            float len = rot.Length();
+            return len < 1e-6f || float.IsNaN(len) ? Quaternion.Identity : new Quaternion(rot.X / len, rot.Y / len, rot.Z / len, rot.W / len);
         }
         public Vector3 llGetScale() => m_host?.Scale ?? Vector3.One;
+        /// <summary>
+        /// SL wiki llSetScale: "Does not work on physical prims." Otherwise each component is rounded into
+        /// [0.01, 64.0] ("rounded to the nearest endpoint").
+        /// </summary>
         public void llSetScale(Vector3 scale)
         {
             if (m_host == null) return;
+            if (m_host.ParentGroup != null && m_host.ParentGroup.UsesPhysics) { PhySleep(); return; }
             scale.X = Math.Max(0.01f, Math.Min(64f, scale.X));
             scale.Y = Math.Max(0.01f, Math.Min(64f, scale.Y));
             scale.Z = Math.Max(0.01f, Math.Min(64f, scale.Z));
@@ -1308,31 +1348,60 @@ namespace Phlox.ScriptEngine
             // Return Firestorm default (roughly 60 degrees).
             return 1.0472f;
         }
+        /// <summary>
+        /// llSetRegionPos as the SL wiki documents it (https://wiki.secondlife.com/wiki/LlSetRegionPos):
+        /// - "Returns FALSE and does not move the object if position is more than 10m off region or above 4096m";
+        /// - FALSE for a dynamic (physical) object, for an avatar attachment, and for parcel or region refusals;
+        /// - below ground the object goes to ground level, and the call is FALSE if that is more than 0.1 m up.
+        /// A position up to 10 m past the edge moves the object into the region there: core crosses an object whose
+        /// position leaves the region (SceneObjectGroup.AbsolutePosition). With no region there it is FALSE and the
+        /// object stays. Inside the region the object takes core's object-entry check, and the rez check when it
+        /// changes parcel (YEngine LSL_Api.llSetRegionPos); the region it crosses into applies its own.
+        /// Halcyon kept the object in the region and teleported the wearer from an attachment.
+        /// </summary>
         public int llSetRegionPos(Vector3 position)
         {
-            // Halcyon used ValidLocation() + SetPos() helpers; this port uses direct group position update.
-            // Clamp to region bounds (allow up to 10m outside for cross-region placement per SL spec)
-            float regionSize = World?.RegionInfo?.RegionSizeX ?? 256f;
-            position.X = Math.Max(-10f, Math.Min(regionSize + 10f, position.X));
-            position.Y = Math.Max(-10f, Math.Min(regionSize + 10f, position.Y));
-            position.Z = Math.Max(0f, Math.Min(4096f, position.Z));
+            SceneObjectGroup group = m_host?.ParentGroup;
+            if (group == null || group.IsDeleted || group.inTransit) return 0;
+            if (group.IsAttachment || group.UsesPhysics) return 0;
 
-            if (m_host.ParentGroup.IsAttachment)
+            float sizeX = World.RegionInfo.RegionSizeX, sizeY = World.RegionInfo.RegionSizeY;
+            if (position.X < -10f || position.X > sizeX + 10f || position.Y < -10f || position.Y > sizeY + 10f
+                || position.Z > 4096f || float.IsNaN(position.X) || float.IsNaN(position.Y) || float.IsNaN(position.Z))
+                return 0;
+
+            bool inRegion = position.X >= 0f && position.X < sizeX && position.Y >= 0f && position.Y < sizeY;
+            float ground = World.GetGroundHeight(Math.Clamp(position.X, 0f, sizeX - 0.01f), Math.Clamp(position.Y, 0f, sizeY - 0.01f));
+            bool deepBelowGround = position.Z < ground - 0.1f;
+            if (position.Z < ground) position.Z = ground;
+
+            if (inRegion)
             {
-                ScenePresence avatar = World?.GetScenePresence(m_host.ParentGroup.AttachedAvatar);
-                if (avatar == null)
+                if (!World.Permissions.CanObjectEntry(group, false, position)) return 0;
+                LandData here = World.GetLandData(group.AbsolutePosition);
+                LandData there = World.GetLandData(position);
+                if (here != null && there != null && here.GlobalID != there.GlobalID
+                    && !World.Permissions.CanRezObject(group.PrimCount, group.OwnerID, position))
                     return 0;
-                avatar.StandUp();
-                avatar.Teleport(position);
             }
-            else
+            else if (!RegionExistsAt(position))
             {
-                // Move the root prim (entire linkset)
-                SceneObjectGroup group = m_host.ParentGroup;
-                if (group == null || group.IsDeleted) return 0;
-                group.UpdateGroupPosition(position);
+                return 0;
             }
-            return 1;
+
+            group.UpdateGroupPosition(position);
+            if (deepBelowGround) return 0;
+            if (!inRegion) return group.inTransit || group.IsDeleted ? 1 : 0;
+            return Vector3.DistanceSquared(group.AbsolutePosition, position) <= 0.01f ? 1 : 0;
+        }
+
+        /// <summary>Whether the grid has a region at this position, given in this region's coordinates.</summary>
+        private bool RegionExistsAt(Vector3 pos)
+        {
+            double x = World.RegionInfo.WorldLocX + (double)pos.X;
+            double y = World.RegionInfo.WorldLocY + (double)pos.Y;
+            if (x < 0 || y < 0) return false;
+            return World.GridService?.GetRegionByPosition(World.RegionInfo.ScopeID, (int)x, (int)y) != null;
         }
 
         // ── Physics ────────────────────────────────────────────────────────────
@@ -1378,12 +1447,17 @@ namespace Phlox.ScriptEngine
             llSetTorque(torque, local);
         }
 
+        /// <summary>
+        /// A physical object takes the impulse; from an attachment it pushes the wearer (Halcyon
+        /// SceneObjectGroup.ApplyImpulse, and core's SceneObjectGroup.applyImpulse, which YEngine reaches). The SL wiki
+        /// says nothing about attachments here.
+        /// </summary>
         public void llApplyImpulse(Vector3 force, int local)
         {
             try
             {
                 if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-                if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
+                if (!m_host.ParentGroup.IsAttachment && (m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
                 if (force.LengthSquared() > 20000f * 20000f)
                     force = Vector3.Normalize(force) * 20000f;
                 m_host.ApplyImpulse(force, local != 0);
@@ -1401,9 +1475,20 @@ namespace Phlox.ScriptEngine
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }
+        /// <summary>
+        /// Halcyon :2580-2585: a target outside the region with no region there is brought back inside it, so a
+        /// physical object is not driven off the edge into the void. A target in a neighbouring region is kept.
+        /// </summary>
         public void llMoveToTarget(Vector3 target, float tau)
         {
             if (m_host?.ParentGroup == null) return;
+            float sizeX = World.RegionInfo.RegionSizeX, sizeY = World.RegionInfo.RegionSizeY;
+            bool inRegion = target.X >= 0f && target.X < sizeX && target.Y >= 0f && target.Y < sizeY;
+            if (!inRegion && !RegionExistsAt(target))
+            {
+                target.X = Math.Clamp(target.X, 0f, sizeX - 0.01f);
+                target.Y = Math.Clamp(target.Y, 0f, sizeY - 0.01f);
+            }
             m_host.ParentGroup.MoveToTarget(target, tau);
         }
 
@@ -6526,6 +6611,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     // rotation times the one given, SL's child-prim quirk (SVC-93: "If the prim is not the root
                     // prim it is offset by the root's rotation").
                     if (data[idx] is not Quaternion rot) break;
+                    rot = NormalizedRot(rot);   // as llSetRot (Halcyon Rot2Quaternion)
                     SceneObjectGroup group = part.ParentGroup;
                     if (group == null || part == group.RootPart) part.UpdateRotation(rot);
                     else part.UpdateRotation(group.RootPart.RotationOffset * rot);
@@ -7746,7 +7832,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         break;
 
                     case PRIM_POSITION:
-                        result.Add(part.AbsolutePosition);
+                        result.Add(SlCompatiblePosition(part));   // as llGetPos
                         break;
 
                     case PRIM_POS_LOCAL:
@@ -9352,35 +9438,34 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             if (m_host?.ParentGroup == null) return;
 
-            // Compute the rotation needed to face the target, then delegate to llRotLookAt.
-            // This mirrors Halcyon's approach: calculate the target quaternion and hand off.
+            // SL: "Cause object to point its up axis (positive z) towards target, while keeping its forward axis
+            // (positive x) below the horizon." The left axis (+y) is kept level, as Halcyon's levelling rotation does
+            // (:3524-3545). Straight above or below, the current turn about z is kept (Halcyon's rotstart cases).
             Vector3 from = m_host.ParentGroup.AbsolutePosition;
             Vector3 toTarget = target - from;
 
             if (toTarget.LengthSquared() < 0.0001f)
                 return; // target is at same position, nothing to do
 
-            // Build a rotation that points our +Z axis toward the target (LSL convention)
-            toTarget = Vector3.Normalize(toTarget);
-            Vector3 forward = Vector3.UnitZ;
-
-            float dot = Vector3.Dot(forward, toTarget);
-            Quaternion newRot;
-
-            if (dot > 0.9999f)
+            Vector3 up = Vector3.Normalize(toTarget);
+            Quaternion current = m_host.ParentGroup.GroupRotation;
+            Vector3 left = Vector3.Cross(Vector3.UnitZ, up);
+            if (left.LengthSquared() < 1e-8f)
             {
-                newRot = Quaternion.Identity;
+                // Straight above or below: keep the current left axis, made horizontal.
+                left = Vector3.UnitY * current;
+                left.Z = 0f;
+                if (left.LengthSquared() < 1e-8f) left = Vector3.UnitY;
+                if (up.Z < 0f) left = -left;
             }
-            else if (dot < -0.9999f)
-            {
-                newRot = new Quaternion(Vector3.UnitY, (float)Math.PI);
-            }
-            else
-            {
-                Vector3 axis = Vector3.Normalize(Vector3.Cross(forward, toTarget));
-                float angle = (float)Math.Acos(Math.Max(-1f, Math.Min(1f, dot)));
-                newRot = Quaternion.CreateFromAxisAngle(axis, angle);
-            }
+            left = Vector3.Normalize(left);
+            Vector3 fwd = Vector3.Cross(left, up);
+            Quaternion newRot = Quaternion.CreateFromRotationMatrix(new Matrix4(
+                fwd.X, fwd.Y, fwd.Z, 0f,
+                left.X, left.Y, left.Z, 0f,
+                up.X, up.Y, up.Z, 0f,
+                0f, 0f, 0f, 1f));
+            newRot.Normalize();
 
             llRotLookAt(newRot, strength, damping);
         }
@@ -15160,19 +15245,30 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public int llEdgeOfWorld(Vector3 pos, Vector3 dir)
         {
-            // Returns 1 if following dir from pos reaches the edge of the region
-            if (World == null) return 0;
+            // SL: TRUE when the border dir crosses from pos has no region beyond it, FALSE when it has; "If the x and y
+            // components of dir are zero (like with ZERO_VECTOR), TRUE is always returned"; "The z component of dir is
+            // ignored". The length of dir does not matter. The ray is followed to just past the border it reaches
+            // first and the grid asked for a region there (YEngine LSL_Api.llEdgeOfWorld).
+            if (World == null) return 1;
+            if (dir.X == 0f && dir.Y == 0f) return 1;
             float sx = World.RegionInfo.RegionSizeX;
             float sy = World.RegionInfo.RegionSizeY;
-            // Step along dir until we leave the region or hit a known neighbour
-            Vector3 cur = pos;
-            for (int i = 0; i < 256; i++)
+            float px = Math.Clamp(pos.X, 0.5f, sx - 0.5f);
+            float py = Math.Clamp(pos.Y, 0.5f, sy - 0.5f);
+            float ex, ey;
+            if (dir.X == 0f) { ex = px; ey = dir.Y > 0f ? sy + 1f : -1f; }
+            else if (dir.Y == 0f) { ex = dir.X > 0f ? sx + 1f : -1f; ey = py; }
+            else
             {
-                cur += dir;
-                if (cur.X < 0 || cur.X >= sx || cur.Y < 0 || cur.Y >= sy)
-                    return 1;
+                float len = (float)Math.Sqrt(dir.X * dir.X + dir.Y * dir.Y);
+                float dx = dir.X / len, dy = dir.Y / len;
+                float tx = dx > 0f ? (sx + 1f - px) / dx : -(px + 1f) / dx;
+                float ty = dy > 0f ? (sy + 1f - py) / dy : -(py + 1f) / dy;
+                float t = Math.Min(tx, ty);
+                ex = px + t * dx;
+                ey = py + t * dy;
             }
-            return 0;
+            return RegionExistsAt(new Vector3(ex, ey, 0f)) ? 0 : 1;
         }
         public string llGetObjectPermMask2(int mask) { /* Halcyon-2 variant — not standard LSL */ return "0"; }
         public int llGetParcelFlags2(Vector3 pos) { /* Halcyon-2 variant — not standard LSL */ return 0; }
