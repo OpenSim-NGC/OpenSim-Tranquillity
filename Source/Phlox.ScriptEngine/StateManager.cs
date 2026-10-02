@@ -323,6 +323,9 @@ namespace Phlox.ScriptEngine
             FinishPendingWrites(itemId);
             NoteLive(itemId);
 
+            SerializedRuntimeState carried = TakeCarried(itemId, assetId);
+            if (carried != null) return carried;
+
             byte[] blob = null;
             bool read = false;
             Exception last = null;
@@ -367,6 +370,71 @@ namespace Phlox.ScriptEngine
                 RejectRow(itemId, "the saved state does not decode: " + e.Message);
                 return null;
             }
+        }
+
+        // State that came with the object (a rez from inventory, an attach, a crossing or a teleport), by the item id it
+        // has in this region. It is used before the database row, as YEngine's SetXMLState writes the carried state over
+        // the state file its load then reads (XMREngine.SetXMLState).
+        private readonly Dictionary<UUID, (UUID AssetId, byte[] Blob)> m_Carried = new Dictionary<UUID, (UUID, byte[])>();
+
+        /// <summary>The object brought this script's state with it; the next load of the item uses it.</summary>
+        internal void Carry(UUID itemId, UUID assetId, byte[] blob)
+        {
+            lock (m_Lock) m_Carried[itemId] = (assetId, blob);
+        }
+
+        internal bool HasCarried(UUID itemId)
+        {
+            lock (m_Lock) return m_Carried.ContainsKey(itemId);
+        }
+
+        /// <summary>
+        /// The carried state for this item, once: null when none came, or when it was saved for another asset (the script
+        /// was edited since), which is dropped so the database row is consulted as before.
+        /// </summary>
+        private SerializedRuntimeState TakeCarried(UUID itemId, UUID assetId)
+        {
+            (UUID AssetId, byte[] Blob) c;
+            lock (m_Lock)
+            {
+                if (!m_Carried.TryGetValue(itemId, out c)) return null;
+                m_Carried.Remove(itemId);
+            }
+            if (c.AssetId != assetId)
+            {
+                m_log.LogDebug("[PhloxState]: Dropping the state {0} brought for asset {1}; the script is now asset {2}", itemId, c.AssetId, assetId);
+                return null;
+            }
+            try { return Decode(c.Blob); }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxState]: The state {0} brought with its object does not decode; it starts fresh: {1}", itemId, e.Message);
+                return null;
+            }
+        }
+
+        /// <summary>A saved state, as the state database and the object envelope hold it.</summary>
+        internal static SerializedRuntimeState Decode(byte[] blob)
+        {
+            using var ms = new MemoryStream(blob);
+            return ProtoBuf.Serializer.Deserialize<SerializedRuntimeState>(ms)
+                   ?? throw new InvalidDataException("the saved state is empty");
+        }
+
+        /// <summary>The script's state as the state database and the object envelope hold it. Scheduler thread.</summary>
+        internal static byte[] CaptureBlob(Interpreter interp) => Capture(interp);
+
+        /// <summary>
+        /// Save every given script now: captured here (the caller is the scheduler thread, or the scheduler is not running)
+        /// and written before this returns.
+        /// </summary>
+        internal void SaveNow(IEnumerable<Interpreter> scripts)
+        {
+            lock (m_Lock)
+                foreach (var interp in scripts)
+                    if (!m_LoadFailed.Contains(interp.ItemId)) m_Dirty[interp.ItemId] = interp;
+            CaptureDirty(self: false);
+            WaitForWrites();
         }
 
         /// <summary>The row's blob; null when there is no row or it is for another asset. InvalidDataException: not a blob.</summary>

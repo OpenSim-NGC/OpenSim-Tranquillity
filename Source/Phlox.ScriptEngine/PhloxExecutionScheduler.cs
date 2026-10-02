@@ -973,6 +973,8 @@ namespace Phlox.ScriptEngine
                 }
                 stateManager.CaptureRequestedStates();
             }
+            ProcessObjectStateRequests();
+            ProcessArrivedAvatars();
             CheckSleepingScripts();
             ProcessEventQueue();
             ExpireDeferredEvents();
@@ -1009,6 +1011,8 @@ namespace Phlox.ScriptEngine
             lock (m_EnableDisableQueue) if (m_EnableDisableQueue.Count > 0) return true;
             lock (m_ParcelChecks) if (m_ParcelChecks.Count > 0) return true;
             lock (m_PermsEnds) if (m_PermsEnds.Count > 0) return true;
+            lock (m_ObjectStateRequests) if (m_ObjectStateRequests.Count > 0) return true;
+            lock (m_ArrivedAvatars) if (m_ArrivedAvatars.Count > 0) return true;
             lock (m_SuspendResumeQueue) if (m_SuspendResumeQueue.Count > 0) return true;
             lock (m_PendingResets) if (m_PendingResets.Count > 0) return true;
             lock (m_SyscallReturns) if (m_SyscallReturns.Count > 0) return true;
@@ -1594,6 +1598,140 @@ namespace Phlox.ScriptEngine
                     TerminateWithError(script, e);
                 }
                 return;
+            }
+        }
+
+        // ── State that travels with objects ─────────────────────────────────────
+
+        /// <summary>A capture asked for by a region thread (GetXMLState, SaveAllState), answered on this thread.</summary>
+        private sealed class ObjectStateRequest
+        {
+            public UUID ItemId;          // UUID.Zero: save every loaded script (SaveAllState)
+            public byte[] Blob;
+            public UUID AssetId;
+            public readonly ManualResetEventSlim Done = new ManualResetEventSlim(false);
+        }
+        private readonly Queue<ObjectStateRequest> m_ObjectStateRequests = new();
+        private readonly Queue<UUID> m_ArrivedAvatars = new();
+
+        /// <summary>
+        /// The script's state for its object to carry, captured here: the caller is this scheduler's thread, or the thread
+        /// is not running. False when the script is not loaded here, or is held because its saved row could not be read
+        /// (its state is unknown, and the row stays the only copy).
+        /// </summary>
+        internal bool CaptureForObject(UUID itemId, out byte[] blob, out UUID assetId)
+        {
+            blob = null;
+            assetId = UUID.Zero;
+            Interpreter interp = FindScript(itemId);
+            if (interp == null) return false;
+            if ((interp.ScriptState.LocalDisable & RuntimeState.LocalDisableFlag.StateLoadFailed) != 0) return false;
+            try { blob = StateManager.CaptureBlob(interp); }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxExe]: Could not capture {0} for its object: {1}", itemId, e.Message);
+                return false;
+            }
+            assetId = interp.Script.AssetId;
+            return true;
+        }
+
+        /// <summary>
+        /// As <see cref="CaptureForObject"/>, from a region thread while this scheduler's thread runs: the capture is
+        /// taken on the scheduler thread, between timeslices, and this waits for it (Halcyon EngineInterface.GetXMLState:
+        /// RequestStateData, then WaitForData with a 10 s timeout). False on timeout.
+        /// </summary>
+        internal bool RequestCaptureForObject(UUID itemId, int timeoutMs, out byte[] blob, out UUID assetId)
+        {
+            var req = new ObjectStateRequest { ItemId = itemId };
+            lock (m_ObjectStateRequests) m_ObjectStateRequests.Enqueue(req);
+            m_WorkArrived?.Invoke();
+            bool done = req.Done.Wait(timeoutMs);
+            blob = done ? req.Blob : null;
+            assetId = done ? req.AssetId : UUID.Zero;
+            if (!done) m_log.LogError("[PhloxExe]: Timed out after {0} ms capturing {1} for its object; it travels without its state", timeoutMs, itemId);
+            return blob != null;
+        }
+
+        /// <summary>Every loaded script saved to the state database now (SaveAllState), on the scheduler thread; waits for it.</summary>
+        internal bool RequestSaveAll(int timeoutMs)
+        {
+            var req = new ObjectStateRequest { ItemId = UUID.Zero };
+            lock (m_ObjectStateRequests) m_ObjectStateRequests.Enqueue(req);
+            m_WorkArrived?.Invoke();
+            return req.Done.Wait(timeoutMs);
+        }
+
+        /// <summary>Save every loaded script now, on this thread (the caller is the scheduler thread, or it is not running).</summary>
+        internal void SaveAllHere()
+        {
+            List<Interpreter> all;
+            lock (m_AllScriptsLock) all = new List<Interpreter>(m_AllScripts.Values);
+            m_Engine?.StateManager?.SaveNow(all);
+        }
+
+        private void ProcessObjectStateRequests()
+        {
+            List<ObjectStateRequest> batch;
+            lock (m_ObjectStateRequests)
+            {
+                if (m_ObjectStateRequests.Count == 0) return;
+                batch = new List<ObjectStateRequest>(m_ObjectStateRequests);
+                m_ObjectStateRequests.Clear();
+            }
+            foreach (var req in batch)
+            {
+                try
+                {
+                    if (req.ItemId == UUID.Zero) SaveAllHere();
+                    else if (CaptureForObject(req.ItemId, out byte[] blob, out UUID assetId))
+                    {
+                        req.Blob = blob;
+                        req.AssetId = assetId;
+                    }
+                }
+                finally { req.Done.Set(); }
+            }
+        }
+
+        /// <summary>
+        /// An avatar became a root agent here (an arrival by crossing or teleport, a login). Scripts it granted
+        /// TAKE_CONTROLS to, in the object it sits on or in its attachments, that hold a Control record and are not
+        /// registered on it take their controls again (Halcyon EngineInterface.OnCrossedAvatarReady).
+        /// </summary>
+        internal void RequestAvatarArrived(UUID agentId)
+        {
+            lock (m_ArrivedAvatars) m_ArrivedAvatars.Enqueue(agentId);
+            m_WorkArrived?.Invoke();
+        }
+
+        private void ProcessArrivedAvatars()
+        {
+            List<UUID> batch;
+            lock (m_ArrivedAvatars)
+            {
+                if (m_ArrivedAvatars.Count == 0) return;
+                batch = new List<UUID>(m_ArrivedAvatars);
+                m_ArrivedAvatars.Clear();
+            }
+            Scene world = m_Engine?.World;
+            if (world == null) return;
+            foreach (UUID agentId in batch)
+            {
+                ScenePresence sp = world.GetScenePresence(agentId);
+                if (sp == null || sp.IsChildAgent || sp.IsDeleted) continue;
+                var groups = new List<SceneObjectGroup>();
+                SceneObjectGroup seat = sp.ParentPart?.ParentGroup;
+                if (seat != null) groups.Add(seat);
+                groups.AddRange(sp.GetAttachments());
+                foreach (SceneObjectGroup g in groups)
+                {
+                    if (g == null || g.IsDeleted) continue;
+                    foreach (SceneObjectPart part in g.Parts)
+                        foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                            if (m_Apis.TryGetValue(item.ItemID, out LSLSystemAPI api))
+                                api.OnGroupCrossedAvatarReady(agentId);
+                }
             }
         }
 

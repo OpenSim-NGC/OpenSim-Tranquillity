@@ -322,6 +322,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnLandObjectAdded           += OnLandObjectChanged;
             m_Scene.EventManager.OnScriptControlsReleased    += OnScriptControlsReleased;
             m_Scene.EventManager.OnRemovePresence            += OnRemovePresenceForControls;
+            m_Scene.EventManager.OnMakeRootAgent             += OnMakeRootAgentForControls;
             if (PhysicsThrottle) m_Scene.EventManager.OnFrame += OnFrameForPhysicsTime;
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
@@ -586,6 +587,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnLandObjectAdded           -= OnLandObjectChanged;
             m_Scene.EventManager.OnScriptControlsReleased    -= OnScriptControlsReleased;
             m_Scene.EventManager.OnRemovePresence            -= OnRemovePresenceForControls;
+            m_Scene.EventManager.OnMakeRootAgent             -= OnMakeRootAgentForControls;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
             m_MasterScheduler?.Stop();
             AsyncCommands?.Shutdown();
@@ -1083,6 +1085,15 @@ namespace Phlox.ScriptEngine
         // ScenePresence.Dispose in RemoveClient's finally block, which an earlier exception there would skip.
         private void OnRemovePresenceForControls(UUID agentId) => m_ExeScheduler?.RequestControlHoldersCheck();
 
+        // An avatar became a root agent here: a crossing, a teleport, a login. The core carries taken controls in the
+        // agent's data for every engine (ScenePresence CopyTo / CopyFrom Controllers); this re-takes those a script holds
+        // a record of and the avatar arrived without, on the object it sits on or in its attachments (Halcyon
+        // EngineInterface.OnCrossedAvatarReady -> OnGroupCrossedAvatarReady). The seat is set before the core raises it.
+        private void OnMakeRootAgentForControls(ScenePresence sp)
+        {
+            if (sp != null) m_ExeScheduler?.RequestAvatarArrived(sp.UUID);
+        }
+
         /// <summary>A script took or released controls.</summary>
         internal void RequestParcelCheck(UUID itemId) => m_ExeScheduler?.RequestParcelCheckForItem(itemId);
 
@@ -1229,8 +1240,98 @@ namespace Phlox.ScriptEngine
         public event ScriptRemoved OnScriptRemoved;
         public event ObjectRemoved OnObjectRemoved;
 
-        public string GetXMLState(UUID itemID) => string.Empty;
-        public bool SetXMLState(UUID itemID, string xml) => false;
+        // ── State that travels with objects ──────────────────────────────────────
+        //
+        // The core asks every engine for a script's state when it serializes an object (take, take copy, detach, a
+        // crossing, a teleport's attachments) and hands it back when the object arrives, before the scripts are started
+        // (SceneObjectPartInventory.GetScriptStates / RestoreSavedScriptState, SceneObjectGroup.GetStateSnapshot /
+        // SetState). Phlox's answer is the same protobuf state its state database holds, in YEngine's envelope:
+        //   <State Engine="InWorldz.Phlox" UUID="item" Asset="asset" Version="1"><ScriptState>base64</ScriptState></State>
+        // The UUID attribute is the item id the core keys a crossing's state by. SL: "A script will NOT automatically
+        // re-enter the default state state_entry event when the task is rezzed or attached (even by a new owner), nor if
+        // the task is moved to another SIM" (wiki, State).
+
+        /// <summary>The version of the carried-state envelope this build writes and reads.</summary>
+        internal const string CarriedStateVersion = "1";
+
+        /// <summary>How long a region thread waits for the scheduler to capture a script (Halcyon STATE_REQUEST_TIMEOUT).</summary>
+        internal int CarriedStateTimeoutMs = 10 * 1000;
+
+        /// <summary>
+        /// The script's state for its object to carry, or "" when it is not a Phlox script loaded here (or is held
+        /// because its saved row could not be read). The capture is taken on the scheduler thread, between timeslices,
+        /// as the state database's are; a caller that is the scheduler thread, or a region whose scheduler thread is not
+        /// running, captures directly.
+        /// </summary>
+        public string GetXMLState(UUID itemID)
+        {
+            if (m_ExeScheduler == null || !m_ExeScheduler.IsLoaded(itemID)) return string.Empty;
+            bool here = m_MasterScheduler == null || !m_MasterScheduler.IsRunning
+                        || Thread.CurrentThread.ManagedThreadId == m_ExeScheduler.WorkerThreadId;
+            byte[] blob;
+            UUID assetId;
+            bool got = here
+                ? m_ExeScheduler.CaptureForObject(itemID, out blob, out assetId)
+                : m_ExeScheduler.RequestCaptureForObject(itemID, CarriedStateTimeoutMs, out blob, out assetId);
+            if (!got) return string.Empty;
+            return CarriedStateXml(itemID, assetId, blob);
+        }
+
+        internal static string CarriedStateXml(UUID itemID, UUID assetId, byte[] blob)
+        {
+            var doc = new System.Xml.XmlDocument();
+            System.Xml.XmlElement state = doc.CreateElement("", "State", "");
+            doc.AppendChild(state);
+            state.SetAttribute("Engine", PhloxEngineHeader.PhloxName);
+            state.SetAttribute("UUID", itemID.ToString());
+            state.SetAttribute("Asset", assetId.ToString());
+            state.SetAttribute("Version", CarriedStateVersion);
+            System.Xml.XmlElement data = doc.CreateElement("", "ScriptState", "");
+            data.InnerText = Convert.ToBase64String(blob);
+            state.AppendChild(data);
+            return doc.OuterXml;
+        }
+
+        /// <summary>
+        /// The object brought this script's state. True only for Phlox's own envelope whose state decodes: it is kept for
+        /// the item's load, which uses it before the state database's row. Anything else is false, so the core asks the
+        /// next engine: another engine's state (YEngine's, XEngine's), a newer envelope version, XML that does not parse,
+        /// or a state that does not decode. A Phlox script given no state starts fresh; nothing is written or moved aside.
+        /// </summary>
+        public bool SetXMLState(UUID itemID, string xml)
+        {
+            if (string.IsNullOrEmpty(xml) || StateManager == null) return false;
+            System.Xml.XmlElement state;
+            try
+            {
+                var doc = new System.Xml.XmlDocument();
+                doc.LoadXml(xml);
+                state = doc.DocumentElement;
+            }
+            catch (System.Xml.XmlException) { return false; }
+            if (state == null || state.Name != "State") return false;
+            if (state.GetAttribute("Engine") != PhloxEngineHeader.PhloxName) return false;
+
+            if (state.GetAttribute("Version") != CarriedStateVersion)
+            {
+                m_log.LogWarning("[PhloxEngine]: {0} brought state in envelope version '{1}', which this build does not read; it starts fresh",
+                    itemID, state.GetAttribute("Version"));
+                return false;
+            }
+            if (!UUID.TryParse(state.GetAttribute("Asset"), out UUID assetId)) return false;
+            try
+            {
+                byte[] blob = Convert.FromBase64String(state["ScriptState"]?.InnerText ?? string.Empty);
+                StateManager.Decode(blob);
+                StateManager.Carry(itemID, assetId, blob);
+                return true;
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxEngine]: The state {0} brought with its object cannot be read; it starts fresh: {1}", itemID, e.Message);
+                return false;
+            }
+        }
 
         public bool PostScriptEvent(UUID itemID, string name, object[] args)
             => PostScriptEvent(itemID, new EventParams(name, args, null));
@@ -1645,7 +1746,16 @@ namespace Phlox.ScriptEngine
             running = m_ExeScheduler.GetScriptRunning(itemID);
             return true;
         }
-        public void SaveAllState() { }
+        /// <summary>Every loaded script's state is written to the state database before this returns.</summary>
+        public void SaveAllState()
+        {
+            if (m_ExeScheduler == null || StateManager == null) return;
+            bool here = m_MasterScheduler == null || !m_MasterScheduler.IsRunning
+                        || Thread.CurrentThread.ManagedThreadId == m_ExeScheduler.WorkerThreadId;
+            if (here) m_ExeScheduler.SaveAllHere();
+            else if (!m_ExeScheduler.RequestSaveAll(CarriedStateTimeoutMs))
+                m_log.LogError("[PhloxEngine]: SaveAllState timed out after {0} ms", CarriedStateTimeoutMs);
+        }
         public void StartProcessing()
         {
             // Phlox compiles asynchronously (OnRezScript enqueues; PhloxScriptLoader
