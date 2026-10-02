@@ -160,8 +160,11 @@ public class OutboundConnectAddressTests
         Network net = new Network().Host("rebind.example.org", new[] { Public1 }, new[] { Blocked });
         using HttpClient client = Client(Filter(net), net);
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync("http://rebind.example.org/"));
+        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(
+            () => client.GetAsync("http://rebind.example.org/"));
 
+        Assert.IsType<OutboundUrlFilterRefusedException>(e);
+        Assert.Equal("Request to rebind.example.org disallowed by filter", e.Message);
         Assert.Empty(net.Connected);
     }
 
@@ -174,7 +177,7 @@ public class OutboundConnectAddressTests
             .Serves(Public1, RedirectToB);
         using HttpClient client = Client(Filter(net), net);
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/"));
 
         Assert.Equal(new[] { Public1 }, net.Connected);
     }
@@ -188,7 +191,7 @@ public class OutboundConnectAddressTests
             .Serves(Public1, RedirectToB);
         using HttpClient client = Client(Filter(net), net);
 
-        HttpRequestException e = await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/"));
+        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/"));
 
         Assert.StartsWith(OutboundUrlFilterRedirectHandler.RedirectBlockedPrefix, e.Message);
         Assert.Equal(new[] { Public1 }, net.Connected);
@@ -202,13 +205,13 @@ public class OutboundConnectAddressTests
         using HttpClient client = Client(filter, net);
 
         Assert.False(filter.CheckAllowed(new Uri("http://mapped.example.org/")));
-        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync("http://mapped.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://mapped.example.org/"));
 
         // Through the connect step alone, with the address check passing: the lookup answers a public address
         // first and the mapped form second.
         Network rebind = new Network().Host("m2.example.org", new[] { Public1 }, new[] { "::ffff:127.0.0.1" });
         using HttpClient client2 = Client(Filter(rebind), rebind);
-        await Assert.ThrowsAsync<HttpRequestException>(() => client2.GetAsync("http://m2.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client2.GetAsync("http://m2.example.org/"));
 
         Assert.Empty(net.Connected);
         Assert.Empty(rebind.Connected);
@@ -259,8 +262,8 @@ public class OutboundConnectAddressTests
         using (HttpResponseMessage r2 = await client.GetAsync("http://port.example.org:8080/"))
             Assert.True(r2.IsSuccessStatusCode);
 
-        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync("http://other.example.org/"));
-        await Assert.ThrowsAsync<HttpRequestException>(() => client.GetAsync("http://port.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://other.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://port.example.org/"));
 
         Assert.Equal(new[] { "10.1.2.3", "10.0.0.9" }, net.Connected);
     }
@@ -316,5 +319,113 @@ public class OutboundConnectAddressTests
 
         Assert.NotNull(direct.ConnectCallback);
         Assert.Null(viaProxy.ConnectCallback);
+    }
+
+    [Fact]
+    public async Task AnIPv4MappedAddressMatchingAnExceptionIsAllowedAndOneMatchingNoneIsRefused()
+    {
+        Network net = new Network()
+            .Host("ok.example.org", new[] { "::ffff:10.1.2.3" })
+            .Host("no.example.org", new[] { "::ffff:10.2.0.1" })
+            .Host("late-ok.example.org", new[] { Public1 }, new[] { "::ffff:10.1.2.3" })
+            .Host("late-no.example.org", new[] { Public1 }, new[] { "::ffff:10.2.0.1" });
+        OutboundUrlFilter filter = Filter(net, "10.1.0.0/16");
+        using HttpClient client = Client(filter, net);
+
+        // At the early check and at the connect step alike.
+        using (HttpResponseMessage r1 = await client.GetAsync("http://ok.example.org/"))
+            Assert.True(r1.IsSuccessStatusCode);
+        using (HttpResponseMessage r2 = await client.GetAsync("http://late-ok.example.org/"))
+            Assert.True(r2.IsSuccessStatusCode);
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://no.example.org/"));
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://late-no.example.org/"));
+
+        Assert.True(filter.CheckAllowed(new Uri("http://ok.example.org/")));
+        Assert.False(filter.CheckAllowed(new Uri("http://no.example.org/")));
+        Assert.Equal(new[] { "10.1.2.3", "10.1.2.3" }, net.Connected);
+    }
+
+    [Fact]
+    public async Task TheLookupHonoursTheHandlersConnectTimeout()
+    {
+        int lookups = 0;
+        bool cancelled = false;
+        IConfigSource config = new IniConfigSource();
+        config.AddConfig("Network").Set("OutboundDisallowForUserScripts", "10.0.0.0/8|127.0.0.0/8");
+        OutboundUrlFilter filter = new("Test", config, async (host, ct) =>
+        {
+            if (Interlocked.Increment(ref lookups) > 1)
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    cancelled = true;
+                    throw;
+                }
+            }
+            return new[] { IPAddress.Parse(Public1) };
+        });
+        Network net = new();
+        SocketsHttpHandler inner = new()
+        {
+            UseProxy = false,
+            ConnectTimeout = TimeSpan.FromMilliseconds(300),
+            ConnectCallback = filter.CreateConnectCallback(net.Connect),
+        };
+        using HttpClient client = new(new OutboundUrlFilterRedirectHandler(filter, inner, 10)) { Timeout = TimeSpan.FromSeconds(30) };
+
+        // The first lookup is the early check; the second is the connect step, which never answers.
+        await Assert.ThrowsAnyAsync<Exception>(() => client.GetAsync("http://slow.example.org/"));
+
+        Assert.True(cancelled, "the lookup was not cancelled by the handler's connect timeout");
+        Assert.Empty(net.Connected);
+    }
+
+    private sealed class FakeProxy : IWebProxy
+    {
+        private readonly bool m_bypass;
+        public FakeProxy(bool bypass) => m_bypass = bypass;
+        public ICredentials Credentials { get; set; }
+        public Uri GetProxy(Uri destination) => new("http://proxy.example.org:3128/");
+        public bool IsBypassed(Uri host) => m_bypass;
+    }
+
+    [Fact]
+    public void AProxyThatCarriesTheUrlLeavesOnlyTheEarlyCheck()
+    {
+        OutboundUrlFilter filter = Filter(new Network());
+        Uri url = new("http://a.example.org/");
+        FakeProxy carrying = new(bypass: false);
+
+        SocketsHttpHandler none = filter.CreateHandler(url, null);
+        SocketsHttpHandler bypassed = filter.CreateHandler(url, new FakeProxy(bypass: true));
+        SocketsHttpHandler proxied = filter.CreateHandler(url, carrying);
+
+        Assert.False(none.UseProxy);
+        Assert.NotNull(none.ConnectCallback);
+        Assert.False(bypassed.UseProxy);
+        Assert.NotNull(bypassed.ConnectCallback);
+        Assert.True(proxied.UseProxy);
+        Assert.Same(carrying, proxied.Proxy);
+        Assert.Null(proxied.ConnectCallback);
+        Assert.False(none.AllowAutoRedirect);
+        Assert.False(proxied.AllowAutoRedirect);
+    }
+
+    [Fact]
+    public async Task AHandlerFromCreateHandlerRefusesAHostThatTurnsBlockedAtTheConnect()
+    {
+        // The refused answer is blocked, so nothing is connected and no network is needed.
+        Network net = new Network().Host("rebind.example.org", new[] { Public1 }, new[] { Blocked });
+        OutboundUrlFilter filter = Filter(net);
+        Uri url = new("http://rebind.example.org/");
+        using HttpClient client = new(new OutboundUrlFilterRedirectHandler(filter, filter.CreateHandler(url, null), 10));
+
+        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync(url));
+
+        Assert.IsType<OutboundUrlFilterRefusedException>(e);
     }
 }

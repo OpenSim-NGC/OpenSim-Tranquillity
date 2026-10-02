@@ -685,7 +685,7 @@ public class HttpRequestClass : IHttpServiceRequest
         catch (HttpRequestException e)
         {              
             Status = e.StatusCode is null ? 499 : (int)e.StatusCode;
-            ResponseBody = e.Message;
+            ResponseBody = OutboundUrlFilterRefusedException.Unwrap(e).Message;
         }
         //catch (Exception e)
         catch

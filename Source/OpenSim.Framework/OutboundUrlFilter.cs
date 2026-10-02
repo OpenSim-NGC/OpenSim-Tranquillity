@@ -36,6 +36,20 @@ using IPNetwork = LukeSkywalker.IPNetwork.IPNetwork;
 
 namespace OpenSim.Framework;
 
+/// <summary>
+/// The outbound filter refused every address a host answered when a connection was made. SocketsHttpHandler wraps
+/// what its connect callback throws in an <see cref="HttpRequestException"/> whose message is generic; this one
+/// is that inner exception, so a caller can report the filter's own message.
+/// </summary>
+public sealed class OutboundUrlFilterRefusedException : HttpRequestException
+{
+    public OutboundUrlFilterRefusedException(string message) : base(message) { }
+
+    /// <summary>The filter's refusal if <paramref name="e"/> wraps one, otherwise <paramref name="e"/>.</summary>
+    public static HttpRequestException Unwrap(HttpRequestException e)
+        => e.InnerException as OutboundUrlFilterRefusedException ?? e;
+}
+
 public class OutboundUrlFilter
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
@@ -316,6 +330,27 @@ public class OutboundUrlFilter
     }
 
     /// <summary>
+    /// A handler for a request whose first URL is <paramref name="firstUrl"/>, to be placed under an
+    /// <see cref="OutboundUrlFilterRedirectHandler"/>. If <paramref name="proxy"/> is given and does not bypass the
+    /// first URL, a proxy carries the request: the handler uses that proxy and only the early check applies.
+    /// Otherwise the handler uses no proxy and connects only to addresses this filter allows. The choice is made
+    /// once, from the first URL; a redirect then follows the same route.
+    /// </summary>
+    /// <param name="proxy">The proxy that would apply by default, such as <see cref="HttpClient.DefaultProxy"/>.</param>
+    public SocketsHttpHandler CreateHandler(Uri firstUrl, IWebProxy proxy)
+    {
+        SocketsHttpHandler handler = new() { AllowAutoRedirect = false };
+
+        bool viaProxy = proxy is not null && !proxy.IsBypassed(firstUrl);
+        handler.UseProxy = viaProxy;
+        if (viaProxy)
+            handler.Proxy = proxy;
+        ApplyTo(handler, viaProxy);
+
+        return handler;
+    }
+
+    /// <summary>
     /// A <see cref="SocketsHttpHandler.ConnectCallback"/> that looks the host up when it connects and connects only
     /// to an address <see cref="IsAddressAllowed"/> accepts, so the address that was judged is the address used,
     /// on the first request and on every redirect. The handler still uses the host name for TLS and the Host header.
@@ -360,7 +395,7 @@ public class OutboundUrlFilter
         }
 
         if (!anyAllowed)
-            throw new HttpRequestException(string.Format("Request to {0} disallowed by filter", endPoint.Host));
+            throw new OutboundUrlFilterRefusedException(string.Format("Request to {0} disallowed by filter", endPoint.Host));
 
         throw new HttpRequestException("Connection failed", lastError);
     }

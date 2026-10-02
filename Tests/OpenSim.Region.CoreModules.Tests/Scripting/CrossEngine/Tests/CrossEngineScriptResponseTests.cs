@@ -59,6 +59,7 @@ namespace OpenSim.Region.CoreModules.Scripting.CrossEngine.Tests;
 /// pump (Shared/Api/Plugins) serves it. The "other" engine is only an IScriptModule of the region, as a second engine
 /// is. No network is used: completed requests are handed to the real core modules directly.
 /// </summary>
+[Collection("OutboundProcessWideState")]
 public class CrossEngineScriptResponseTests : OpenSimTestCase
 {
     private static readonly TimeSpan Limit = TimeSpan.FromSeconds(30);

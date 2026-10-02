@@ -44,6 +44,7 @@ namespace OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests;
 /// The destination is a listener this test runs on 127.0.0.1, which the test's configuration excepts from the
 /// outbound filter because the module connects only to addresses the filter allows.
 /// </remarks>
+[Collection("OutboundProcessWideState")]
 public class HttpMimeTypeTests : OpenSimTestCase
 {
     private const string ForgedOwner = "00000000-0000-0000-0000-00000000dead";
