@@ -132,4 +132,33 @@ public class DebugChannelDistanceTests
             Check(h, "DebugChannel chat", Say);
         }
     }
+
+    [Fact]
+    public void AYEngineStyleErrorReachesTheOtherEnginesListensAtSayDistance()
+    {
+        // Phlox's errors in YEngine's own words (an llHTTPRequest custom header YEngine refuses) also go to the core
+        // WorldComm, which holds YEngine's listens. They are server-generated errors too, so they go as far as llSay.
+        using var r = new ApiCallRig();
+        r.H.Scene.RegisterModuleInterface(Fake<OpenSim.Region.Framework.Interfaces.IHttpRequestModule>.Create((m, a) =>
+            m.Name == "CheckThrottle" || m.Name == "CheckAllowed" ? true : null));
+        FieldInfo f = typeof(global::Phlox.ScriptEngine.PhloxEngine).GetField("m_WorldComm", BindingFlags.NonPublic | BindingFlags.Instance);
+        Assert.NotNull(f);
+        object real = f.GetValue(r.H.Engine);
+        var sent = new System.Collections.Concurrent.ConcurrentQueue<(ChatTypeEnum Type, int Channel, string Text)>();
+        f.SetValue(r.H.Engine, Fake<OpenSim.Region.Framework.Interfaces.IWorldComm>.Create((m, a) =>
+        {
+            if (m.Name == "DeliverMessage" && a.Length == 6) sent.Enqueue(((ChatTypeEnum)a[0], (int)a[1], (string)a[4]));
+            return null;
+        }));
+        try
+        {
+            var (_, ret) = r.Accounted(api => api.llHTTPRequest("http://example.org/", ApiCallRig.L(5, "Host", "v"), ""));
+            Assert.Equal("", ret);
+            var error = Assert.Single(sent);
+            Assert.Equal(DEBUG_CHANNEL, error.Channel);
+            Assert.Equal("llHTTPRequest: Name is invalid as a custom header at parameter 1", error.Text);
+            Assert.Equal(ChatTypeEnum.Say, error.Type);
+        }
+        finally { f.SetValue(r.H.Engine, real); }
+    }
 }

@@ -13769,6 +13769,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// YEngine's LSL_Api.Error (LSL_Api.cs:15684-15696) as a script sees it: "command: message", cut to 1023
         /// characters, on DEBUG_CHANNEL through the scene (viewers, Phlox's listens) and through WorldComm (YEngine's
         /// listens). Unlike <see cref="ShoutError"/> there is no "Script error: " prefix, so both engines say the same text.
+        /// YEngine's listens hear it as far as llSay reaches, as ShoutError's errors are heard (SL wiki, DEBUG_CHANNEL:
+        /// "Server-generated errors are broadcast the same distance as llSay").
         /// </summary>
         private void YEngineError(string command, string message)
         {
@@ -13776,7 +13778,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (text.Length > 1023) text = text.Substring(0, 1023);
             m_host?.ParentGroup?.Scene?.SimChat(text, ChatTypeEnum.DebugChannel, DEBUG_CHANNEL,
                 m_host.ParentGroup.RootPart.AbsolutePosition, m_host.Name, m_host.UUID, false);
-            ChatToWorldComm(ChatTypeEnum.Shout, DEBUG_CHANNEL, text);
+            ChatToWorldComm(ChatTypeEnum.Say, DEBUG_CHANNEL, text);
         }
 
         /// <summary>
