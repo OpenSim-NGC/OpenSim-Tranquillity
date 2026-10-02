@@ -266,18 +266,75 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   YEngine resets a script whose state file is bad. When the database itself fails (busy or
   locked), the script is held stopped and its row kept, and the next restart tries again.
 - **When rows go.** Deleting a script from a prim deletes its row. A derez, take or crossing
-  keeps it, so an object back in the same simulator process restores. `[InWorldz.Phlox]
+  keeps it; an object that comes back carrying its state uses that state first. `[InWorldz.Phlox]
   StateRowMaxAgeDays` (default 0, off) deletes rows not saved or loaded for that many days
   whose scripts are not loaded in the simulator.
-- **State is not carried inside objects.** YEngine embeds script state in the serialized
-  object; Phlox does not (its `GetXMLState` returns nothing). Phlox scripts therefore start
-  fresh after:
-  - an OAR or IAR export and load;
-  - taking an object into inventory and rezzing it in another simulator process;
-  - a region crossing or a teleport with attachments to another simulator process, including
-    Hypergrid.
+- **State carried inside objects.** Phlox puts a script's saved state in its serialized
+  object, in YEngine's envelope
+  (`<State Engine="InWorldz.Phlox" UUID="item" Asset="asset" Version="1"><ScriptState>...`),
+  so a script carries on where it was, with no `state_entry`, after:
+  - taking an object (or a copy) into inventory and rezzing it, in any simulator; it gets
+    `on_rez` with the rez's parameter;
+  - detaching and wearing it again, and logging in or teleporting while wearing it;
+  - a region crossing, also into a region of another simulator process; its start parameter
+    is then 0.
 
-  Phlox finds a script's state only in the database of the simulator process that saved it.
+  The SL wiki ([State](https://wiki.secondlife.com/wiki/State)): "A script will NOT
+  automatically re-enter the default state state_entry event when the task is rezzed or
+  attached (even by a new owner), nor if the task is moved to another SIM, nor on SIM
+  restart." Carried state is used before the state database's row; carried state saved for
+  another asset (the script was edited) gives way to the row.
+
+  Limits:
+  - The simulator offers a crossing's states, and a teleport's attachment states, only to
+    the region's default script engine (`[Startup] DefaultScriptEngine`). In a region whose
+    default is not Phlox, a Phlox script arrives that way with a fresh start. Take, rez,
+    attach and login are not affected.
+  - An OAR export and load carries no script state, for any engine.
+  - State another engine wrote (YEngine, XEngine), state in a newer envelope version, and
+    state that cannot be read are refused: the script starts fresh and the object always
+    rezzes. YEngine refuses Phlox's state the same way.
+  - Events that arrive while an object is between regions are not held for it (no crossing
+    wait).
+  - A script held stopped because its row could not be read carries no state.
+  - Objects saved by an earlier Phlox build carry no Phlox state and start fresh as before.
+- **Carried state is checked as input from outside.** It can come from anywhere: inventory
+  from another grid, a Hypergrid visitor's attachments, an object another resident made.
+  - It must fit the compiled script it is loaded for: its state index, its number of
+    globals, its execution position, call frames and return addresses inside the script's
+    code, its queued events (known types, the script's states, as many arguments as the
+    handler takes) and its records (the shapes the script's own calls write). A state that
+    does not fit is refused with one warning in the log; the script starts fresh and nothing
+    is moved aside.
+  - A global holding another type than the script declared cannot be told from the state:
+    the first instruction that uses it stops that one script with its usual error ("Script
+    ... encountered a problem and was stopped"), as any runtime error does.
+  - Memory in use is recomputed from the restored values, never taken from the state, and a
+    state above the 128 KiB script memory limit is refused. The event queue keeps what a
+    running script's queue lets in (64 events), the timer is held to `MinTimerInterval` as
+    `llSetTimerEvent` is, and listens to `[LL-Functions] max_listens_per_script` and
+    `max_listens_per_region`.
+  - An envelope above 65 x 128 KiB of state (the memory limit, plus 64 queued events) is
+    refused before anything is decoded, and Phlox does not carry a state above it.
+- **No grant comes back with a state.** The simulator clears a script item's grant every
+  time it starts the script and when the object changes owner, and a restore never puts one
+  back (YEngine restores the grant from its own state; Phlox does not). After a restart, a
+  rez, an attach, a crossing or a teleport, `llGetPermissions` is 0 until the script asks
+  again. The records of taken controls and of `PERMISSION_SILENT_ESTATE_MANAGEMENT` come
+  back only while the item holds that grant, so nothing saved before an owner change acts
+  later. SL: a script loses `PERMISSION_TAKE_CONTROLS` "on reset, or if the object is
+  deleted, detached, or dropped" ([llTakeControls](https://wiki.secondlife.com/wiki/LlTakeControls)).
+  A seated driver's taken controls still travel with a crossing in the simulator's own agent
+  data.
+- **The capture wait is per object.** The simulator asks for an object's script states on a
+  region thread, one script at a time. Phlox captures all of the object's scripts in one
+  pass of its scheduler and waits at most 10 seconds for that object, however many scripts
+  it holds. On a timeout every script of the object travels without its state and starts
+  fresh where it arrives, with one warning in the log.
+- **Halcyon script-state databases are not imported.** Phlox's state database
+  (`ScriptEngines/Phlox/state/script_state.db`, table `script_state`) differs from
+  Halcyon's in file and table, and Phlox does not read Halcyon's; there is no importer.
+  Scripts from a Halcyon simulator start fresh on a Phlox region.
 
 ### Language
 - YEngine's XMR extensions are not available: `switch`, `break`, `continue`, `constant`,
