@@ -111,11 +111,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Item has copy permissions so original should stay intact.
             List<TaskInventoryItem> originalItems = so1.RootPart.Inventory.GetInventoryItems();
-            Assert.Equal(,);
+            Assert.Equal(1, originalItems.Count);
 
             List<TaskInventoryItem> copiedItems = so2.RootPart.Inventory.GetInventoryItems(inventoryItemName);
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(1, copiedItems.Count);
+            Assert.Equal(inventoryItemName, copiedItems[0].Name);
         }
 
         /// <summary>
@@ -152,11 +152,11 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 // Item has copy permissions so original should stay intact.
                 List<TaskInventoryItem> originalItems = so1.RootPart.Inventory.GetInventoryItems();
-                Assert.Equal(,);
+                Assert.Equal(1, originalItems.Count);
 
                 // Should have not copied
                 List<TaskInventoryItem> copiedItems = so2.RootPart.Inventory.GetInventoryItems(inventoryItemName);
-                Assert.Equal(,);
+                Assert.Equal(0, copiedItems.Count);
             }
 
             // *** Secondly, we turn on allow inventory drop in the target and retest. ***
@@ -166,12 +166,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 // Item has copy permissions so original should stay intact.
                 List<TaskInventoryItem> originalItems = so1.RootPart.Inventory.GetInventoryItems();
-                Assert.Equal(,);
+                Assert.Equal(1, originalItems.Count);
 
                 // Should now have copied.
                 List<TaskInventoryItem> copiedItems = so2.RootPart.Inventory.GetInventoryItems(inventoryItemName);
-                Assert.Equal(,);
-                Assert.Equal(,);
+                Assert.Equal(1, copiedItems.Count);
+                Assert.Equal(inventoryItemName, copiedItems[0].Name);
             }
         }
 

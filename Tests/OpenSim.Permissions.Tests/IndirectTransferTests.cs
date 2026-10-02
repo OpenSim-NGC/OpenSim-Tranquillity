@@ -41,6 +41,11 @@ namespace OpenSim.Tests.Permissions
     /// </summary>
     public class IndirectTransferTests
     {
+        public IndirectTransferTests()
+        {
+            SetUp();
+        }
+
 
         public void SetUp()
         {
@@ -82,7 +87,7 @@ namespace OpenSim.Tests.Permissions
             Thread.Sleep(6000);
 
             List<InventoryItemBase> items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[1].UUID, objsFolder.ID);
-            Assert.Equal(,);
+            Assert.Equal(0, items.Count);
 
             // A1 makes the objects copyable
             for (int i = 0; i < 6; i++)
@@ -95,12 +100,12 @@ namespace OpenSim.Tests.Permissions
             Thread.Sleep(6000);
 
             items = Common.TheScene.InventoryService.GetFolderItems(Common.TheAvatars[1].UUID, objsFolder.ID);
-            Assert.Equal(,);
+            Assert.Equal(6, items.Count);
 
             for (int i = 0; i < 6; i++)
             {
                 InventoryItemBase item = Common.TheInstance.GetItemFromInventory(Common.TheAvatars[1].UUID, "Objects", names[i]);
-                // TODO: Fix this assertion
+                Assert.NotNull(item);
                 Common.TheInstance.AssertPermissions(perms[i], (PermissionMask)item.BasePermissions, Common.TheInstance.IdStr(item));
             }
         }
@@ -109,7 +114,7 @@ namespace OpenSim.Tests.Permissions
         {
             // Find the object inworld
             SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID);
-            Assert.True(box);
+            Assert.NotNull(box);
 
             // A2's inventory (index 1)
             Common.TheInstance.TakeCopyToInventory(1, box);
@@ -118,7 +123,7 @@ namespace OpenSim.Tests.Permissions
         private void MakeCopyable(List<SceneObjectGroup> objs, string name)
         {
             SceneObjectGroup box = objs.Find(sog => sog.Name == name && sog.OwnerID == Common.TheAvatars[0].UUID);
-            Assert.True(box);
+            Assert.NotNull(box);
 
             // field = 8 is Everyone 
             // set = 1 means add the permission; set = 0 means remove permission

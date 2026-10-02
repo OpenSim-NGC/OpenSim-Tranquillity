@@ -41,7 +41,12 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         private LLImageManager llim;
         private TestClient tc;
 
-        [OneTimeSetUp]
+        public LLImageManagerTests()
+        {
+            // xunit builds a new instance for every test, so the NUnit one-time setup runs here.
+            FixtureInit();
+        }
+
         public void FixtureInit()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
@@ -66,7 +71,12 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             }
         }
 
-        [OneTimeTearDown]
+        public override void Dispose()
+        {
+            TearDown();
+            base.Dispose();
+        }
+
         public void TearDown()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
@@ -108,7 +118,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             llim.EnqueueReq(args);
             llim.ProcessImageQueue(20);
 
-            Assert.Equal(,);
+            Assert.Equal(1, tc.SentImageDataPackets.Count);
         }
 
         [Fact]
@@ -138,7 +148,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 
             llim.ProcessImageQueue(20);
 
-            Assert.Equal(,);
+            Assert.Equal(0, tc.SentImageDataPackets.Count);
         }
 
         [Fact]
@@ -157,8 +167,8 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             llim.EnqueueReq(args);
             llim.ProcessImageQueue(20);
 
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.Equal(0, tc.SentImageDataPackets.Count);
+            Assert.Equal(1, tc.SentImageNotInDatabasePackets.Count);
         }
     }
 }

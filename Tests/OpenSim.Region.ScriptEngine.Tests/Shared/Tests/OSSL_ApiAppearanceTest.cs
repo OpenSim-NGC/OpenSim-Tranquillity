@@ -102,13 +102,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             osslApi.osOwnerSaveAppearance(notecardName);
 
             IList<TaskInventoryItem> items = part.Inventory.GetInventoryItems(notecardName);
-            Assert.Equal(,);
+            Assert.Equal(1, items.Count);
 
             TaskInventoryItem ncItem = items[0];
-            Assert.Equal(,);
+            Assert.Equal(notecardName, ncItem.Name);
 
             AssetBase ncAsset = m_scene.AssetService.Get(ncItem.AssetID.ToString());
-            // TODO: Fix this assertion
+            Assert.NotNull(ncAsset);
 
             AssetNotecard anc = new AssetNotecard(UUID.Zero, ncAsset.Data);
             anc.Decode();
@@ -116,7 +116,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             AvatarAppearance savedAppearance = new AvatarAppearance();
             savedAppearance.Unpack(appearanceOsd);
 
-            Assert.Equal(,);
+            Assert.Equal(sp.Appearance.AvatarHeight, savedAppearance.AvatarHeight);
         }
 
         [Fact]
@@ -143,13 +143,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             osslApi.osAgentSaveAppearance(new LSL_Types.LSLString(nonOwnerId.ToString()), notecardName);
 
             IList<TaskInventoryItem> items = part.Inventory.GetInventoryItems(notecardName);
-            Assert.Equal(,);
+            Assert.Equal(1, items.Count);
 
             TaskInventoryItem ncItem = items[0];
-            Assert.Equal(,);
+            Assert.Equal(notecardName, ncItem.Name);
 
             AssetBase ncAsset = m_scene.AssetService.Get(ncItem.AssetID.ToString());
-            // TODO: Fix this assertion
+            Assert.NotNull(ncAsset);
 
             AssetNotecard anc = new AssetNotecard(UUID.Zero, ncAsset.Data);
             anc.Decode();
@@ -157,7 +157,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             AvatarAppearance savedAppearance = new AvatarAppearance();
             savedAppearance.Unpack(appearanceOsd);
 
-            Assert.Equal(,);
+            Assert.Equal(sp.Appearance.AvatarHeight, savedAppearance.AvatarHeight);
         }
         */
     }

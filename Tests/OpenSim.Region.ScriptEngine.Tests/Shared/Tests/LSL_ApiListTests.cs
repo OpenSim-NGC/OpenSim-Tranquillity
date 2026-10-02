@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Nini.Config;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -62,7 +63,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Scene scene = new SceneHelpers().SetupScene();
             SceneObjectPart part = SceneHelpers.AddSceneObject(scene).RootPart;
 
-            XEngine.XEngine engine = new XEngine.XEngine();
+            MockScriptEngine engine = new MockScriptEngine();
             engine.Initialise(initConfigSource);
             engine.AddRegion(scene);
 
@@ -80,37 +81,37 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 // Test for a single item that should be found
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_Integer(4)));
-                Assert.Equal(,);
+                Assert.Equal(-1, result);
             }
 
             {
                 // Test for a single item that should be found
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_Integer(2)));
-                Assert.Equal(,);
+                Assert.Equal(1, result);
             }
 
             {
                 // Test for a constant that should be found
                 int result = m_lslApi.llListFindList(src, new LSL_List(ScriptBaseClass.AGENT));
-                Assert.Equal(,);
+                Assert.Equal(0, result);
             }
 
             {
                 // Test for a list that should be found
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_Integer(2), new LSL_Integer(3)));
-                Assert.Equal(,);
+                Assert.Equal(1, result);
             }
 
             {
                 // Test for a single item not in the list
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_Integer(4)));
-                Assert.Equal(,);
+                Assert.Equal(-1, result);
             }
 
             {
                 // Test for something that should not be cast
                 int result = m_lslApi.llListFindList(src, new LSL_List(new LSL_String("4")));
-                Assert.Equal(,);
+                Assert.Equal(-1, result);
             }
 
             {
@@ -118,7 +119,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 int result
                     = m_lslApi.llListFindList(
                         src, new LSL_List(new LSL_Integer(2), new LSL_Integer(3), new LSL_Integer(4)));
-                Assert.Equal(,);
+                Assert.Equal(-1, result);
             }
 
             {
@@ -129,7 +130,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 int result
                     = m_lslApi.llListFindList(srcWithConstants, new LSL_List(new LSL_Integer(1), new LSL_Integer(2)));
 
-                Assert.Equal(,);
+                Assert.Equal(1, result);
             }
          }
      }
