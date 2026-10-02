@@ -17513,6 +17513,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 Dictionary<int, object> dictOptions = new Dictionary<int, object>();
                 for (int i = 0; i < options.Length; i += 2)
                 {
+                    // Halcyon: an integer key, then an integer, float or vector value, else BOT_ERROR
+                    if (!BotOptionTypesOk(options, i, allowVector: true)) return -3; // BOT_ERROR
                     int option = options.GetLSLIntegerItem(i);
                     if (dictOptions.ContainsKey(option))
                     {
@@ -17549,14 +17551,20 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             UUID id = ParseBotID(botID);
             if (id == UUID.Zero) return;
 
+            // Halcyon: a vector is a point; a number is BOT_TRAVELMODE_WAIT's duration in seconds, passed as <seconds, 0, 0>;
+            // anything else cancels the call. A point below the ground is lifted to it.
             List<Vector3> positionsMap = new List<Vector3>();
             for (int i = 0; i < positions.Length; i++)
             {
-                Vector3 pos = positions.GetVector3Item(i);
+                Vector3 pos;
+                VarType type = positions.GetItemType(i);
+                if (type == VarType.Vector) pos = positions.GetVector3Item(i);
+                else if (type == VarType.Float || type == VarType.Integer) pos = new Vector3(positions.GetLSLFloatItem(i), 0f, 0f);
+                else return;
                 pos.X = Math.Clamp(pos.X, 0f, 256f);
                 pos.Y = Math.Clamp(pos.Y, 0f, 256f);
                 pos.Z = Math.Max(pos.Z, 0f);
-                float zmin = (float)World.Heightmap[(int)Math.Clamp(pos.X, 0, 255), (int)Math.Clamp(pos.Y, 0, 255)];
+                float zmin = World.Heightmap.GetHeight(Math.Clamp(pos.X, 0f, 255.99f), Math.Clamp(pos.Y, 0f, 255.99f));
                 if (pos.Z < zmin) pos.Z = zmin;
                 positionsMap.Add(pos);
             }
@@ -17564,6 +17572,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             List<TravelMode> travelMap = new List<TravelMode>();
             for (int i = 0; i < movementTypes.Length; i++)
             {
+                if (movementTypes.GetItemType(i) != VarType.Integer) return;
                 int travel = movementTypes.GetLSLIntegerItem(i);
                 travelMap.Add((TravelMode)travel);
             }
@@ -17573,6 +17582,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             Dictionary<int, object> dictOptions = new Dictionary<int, object>();
             for (int i = 0; i < options.Length; i += 2)
             {
+                if (!BotOptionTypesOk(options, i, allowVector: false)) return;
                 int option = options.GetLSLIntegerItem(i);
                 if (dictOptions.ContainsKey(option))
                 {
@@ -17587,6 +17597,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 manager.SetBotNavigationPoints(id, positionsMap, travelMap, dictOptions, m_host.OwnerID);
         }
 
+        /// <summary>A bot navigation option pair as Halcyon took it: an integer key, then an integer or float value (or a vector, for botFollowAvatar).</summary>
+        private static bool BotOptionTypesOk(LSLList options, int i, bool allowVector)
+        {
+            if (options.GetItemType(i) != VarType.Integer) return false;
+            VarType value = options.GetItemType(i + 1);
+            return value == VarType.Integer || value == VarType.Float || (allowVector && value == VarType.Vector);
+        }
+
         public void botWanderWithin(string botID, Vector3 origin, float xDistance, float yDistance, LSLList options)
         {
             UUID id = ParseBotID(botID);
@@ -17597,6 +17615,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             Dictionary<int, object> dictOptions = new Dictionary<int, object>();
             for (int i = 0; i < options.Length; i += 2)
             {
+                if (!BotOptionTypesOk(options, i, allowVector: false)) return;
                 int option = options.GetLSLIntegerItem(i);
                 if (dictOptions.ContainsKey(option))
                 {
@@ -17773,7 +17792,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 if (id == UUID.Zero) return;
 
                 UUID destId = UUID.Zero;
-                if (!UUID.TryParse(destination, out destId)) return;
+                if (!UUID.TryParse(destination, out destId))
+                {
+                    // Halcyon said it on the public channel
+                    llSay(0, "Could not parse key " + destination);
+                    return;
+                }
 
                 bool found = false;
                 UUID objId = UUID.Zero;
