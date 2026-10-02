@@ -83,7 +83,7 @@ namespace Phlox.ScriptEngine
 
         // Pending events (posted from outside thread)
         private readonly Queue<PendingEvent> m_PendingEvents = new();
-        private struct PendingEvent { public UUID ItemId; public PostedEvent Evt; }
+        private struct PendingEvent { public UUID ItemId; public PostedEvent Evt; public bool GrabUpdate; }
 
         // Enable/disable requests
         private readonly Queue<EnableDisableReq> m_EnableDisableQueue = new();
@@ -476,6 +476,17 @@ namespace Phlox.ScriptEngine
         {
             lock (m_PendingEvents)
                 m_PendingEvents.Enqueue(new PendingEvent { ItemId = itemId, Evt = evt });
+            m_WorkArrived();
+        }
+
+        /// <summary>
+        /// A grab update (a touch() with the latest detect data). In order with the prim's other events, so it meets the
+        /// touch_start before it; FoldGrabUpdate decides on the scheduler thread whether it is an event or only data.
+        /// </summary>
+        public void PostGrabUpdate(UUID itemId, PostedEvent evt)
+        {
+            lock (m_PendingEvents)
+                m_PendingEvents.Enqueue(new PendingEvent { ItemId = itemId, Evt = evt, GrabUpdate = true });
             m_WorkArrived();
         }
 
@@ -1109,6 +1120,7 @@ namespace Phlox.ScriptEngine
                     nextEvt = script.ScriptState.EventQueue.Dequeue();
                 }
                 PhloxEventInfo info = FindEventHandler(nextEvt, script);
+                CheckAndResetTouchWait(script, nextEvt);
                 if (info != null)
                 {
                     // The floor applies to a queued start as much as a fresh one. Put
@@ -1200,6 +1212,82 @@ namespace Phlox.ScriptEngine
             }
         }
 
+        // ── touch() repeat while held ───────────────────────────────────────────
+        //
+        // SL touch(): "Triggered on touch start, each minimum event delay while held, and touch end." Halcyon's scheduler
+        // (ExecutionScheduler.CheckAndResetTouchWait, ResetTouchInterval, ProcessTouchInfoUpdates): touch_start starts a
+        // touch() every 100 ms for a script whose state has a touch() handler, carrying the latest detect data; a grab
+        // update only replaces that data; touch_end stops it.
+
+        private static bool HandlesTouch(Interpreter script)
+            => script.Script.FindEvent(script.ScriptState.LSLState, (int)SupportedEventList.Events.TOUCH) != null;
+
+        /// <summary>Called for every event a script is offered, before its handler is looked at, as Halcyon did.</summary>
+        private void CheckAndResetTouchWait(Interpreter script, PostedEvent evt)
+        {
+            RuntimeState st = script.ScriptState;
+            switch (evt.EventType)
+            {
+                case SupportedEventList.Events.TOUCH_START:
+                    if (!HandlesTouch(script)) return;
+                    st.TouchActive = true;
+                    st.CurrentTouchDetectVars = evt.DetectVars;
+                    ResetTouchInterval(script);
+                    break;
+                case SupportedEventList.Events.TOUCH_END:
+                    if (!st.TouchActive) return;
+                    st.TouchActive = false;
+                    st.CurrentTouchDetectVars = null;
+                    RemoveWake(m_TouchHandles, script.ItemId);
+                    break;
+                case SupportedEventList.Events.TOUCH:
+                    if (!st.TouchActive) return;
+                    if (!HandlesTouch(script))
+                    {
+                        // A state change took the handler away: nothing is left to repeat
+                        st.TouchActive = false;
+                        st.CurrentTouchDetectVars = null;
+                        return;
+                    }
+                    evt.DetectVars = st.CurrentTouchDetectVars;
+                    ResetTouchInterval(script);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// The next repeat, 100 ms on. One wake per script, and none while a touch() already waits in the script's queue:
+        /// a busy script gets the next repeat when it takes that one, not a backlog (Halcyon's own comment: one touch event
+        /// on the queue at once).
+        /// </summary>
+        private void ResetTouchInterval(Interpreter script)
+        {
+            if (m_TouchHandles.ContainsKey(script.ItemId)) return;
+            lock (script.ScriptState.EventQueueLock)
+                if (script.ScriptState.IsEventQueued(SupportedEventList.Events.TOUCH)) return;
+            C5.IPriorityQueueHandle<SleepEntry> h = null;
+            m_SleepHeap.Add(ref h, new SleepEntry
+            {
+                ItemId = script.ItemId,
+                ReadyOn = InWorldz.Phlox.Util.Clock.Now + TOUCH_INTERVAL,
+                Event = SleepEntry.WakeEvent.Touch
+            });
+            m_TouchHandles[script.ItemId] = h;
+        }
+
+        /// <summary>
+        /// A grab update for a script whose touch is active only refreshes the data the next repeat carries (Halcyon
+        /// UpdateTouchData), and re-arms a repeat a reset or a parcel pause took away. True when it was taken that way.
+        /// A script whose touch was never started stays on the region's grab updates: it gets this one as a touch().
+        /// </summary>
+        private bool FoldGrabUpdate(Interpreter script, PostedEvent evt)
+        {
+            if (!script.ScriptState.TouchActive || !HandlesTouch(script)) return false;
+            script.ScriptState.CurrentTouchDetectVars = evt.DetectVars;
+            ResetTouchInterval(script);
+            return true;
+        }
+
         private void ProcessEventQueue()
         {
             List<PendingEvent> events;
@@ -1242,7 +1330,10 @@ namespace Phlox.ScriptEngine
                     continue;
                 }
 
+                if (pe.GrabUpdate && FoldGrabUpdate(script, pe.Evt)) { pe.Evt.SignalCompleted(); continue; }
+
                 PhloxEventInfo info = FindEventHandler(pe.Evt, script);
+                CheckAndResetTouchWait(script, pe.Evt);
                 if (info == null) { pe.Evt.SignalCompleted(); continue; }
 
                 // Flood protection: drop events if the script's queue is full - but never on_rez, state_entry,
@@ -1490,6 +1581,7 @@ namespace Phlox.ScriptEngine
                     nextEvt = script.ScriptState.EventQueue.Dequeue();
                 }
                 PhloxEventInfo info = FindEventHandler(nextEvt, script);
+                CheckAndResetTouchWait(script, nextEvt);
                 if (info == null) continue;
                 try
                 {

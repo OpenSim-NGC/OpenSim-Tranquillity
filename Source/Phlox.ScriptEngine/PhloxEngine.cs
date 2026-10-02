@@ -801,30 +801,39 @@ namespace Phlox.ScriptEngine
 
         // ── Touch events ───────────────────────────────────────────────────────
 
+        // The region has already chosen the prim (Scene.ProcessObjectGrab and friends): the touched prim when it handles
+        // the touch, the root as well on llPassTouches or when the touched prim has no handler. originalID is the touched
+        // prim when the root takes a child's touch. Each touch goes to the scripts of that one prim, as Halcyon's
+        // EngineInterface.PostObjectEvent did and as SL's llPassTouches describes.
+
         private void OnObjectGrab(uint localID, uint originalID, Vector3 offsetPos,
             IClientAPI remoteClient, SurfaceTouchEventArgs surfaceArgs)
         {
             SceneObjectPart part = m_Scene?.GetSceneObjectPart(localID);
             if (part == null) return;
 
-            var dp = BuildTouchDetectParams(part, remoteClient, offsetPos, surfaceArgs);
+            // SL llDetectedGrab: "only works in the touch event"; Halcyon's touch_start carried no offset.
+            var dp = BuildTouchDetectParams(TouchedPart(part, originalID), remoteClient, Vector3.Zero, surfaceArgs);
 
-            PostTouchEvent(part.ParentGroup,
-                InWorldz.Phlox.Types.SupportedEventList.Events.TOUCH_START,
-                "touch_start", dp);
+            PostTouchEvent(part.LocalId, "touch_start", dp);
         }
 
+        /// <summary>
+        /// A grab update while the mouse is held. A script whose touch is active (touch_start started its 100 ms touch()
+        /// repeat) only takes the new detect data for its next repeat, as Halcyon's UpdateTouchData did; any other script
+        /// gets it as a touch(), because the region never gives touch_start to a prim whose scripts have no touch_start
+        /// handler, so its touch is never started (PhloxExecutionScheduler.FoldGrabUpdate).
+        /// </summary>
         private void OnObjectGrabbing(uint localID, uint originalID, Vector3 offsetPos,
             IClientAPI remoteClient, SurfaceTouchEventArgs surfaceArgs)
         {
             SceneObjectPart part = m_Scene?.GetSceneObjectPart(localID);
             if (part == null) return;
 
-            var dp = BuildTouchDetectParams(part, remoteClient, offsetPos, surfaceArgs);
+            var dp = BuildTouchDetectParams(TouchedPart(part, originalID), remoteClient, offsetPos, surfaceArgs);
 
-            PostTouchEvent(part.ParentGroup,
-                InWorldz.Phlox.Types.SupportedEventList.Events.TOUCH,
-                "touch", dp);
+            if (part.ParentGroup == null || part.ParentGroup.IsDeleted) return;
+            PostObjectEvent(part.LocalId, new GrabUpdateParams(dp));
         }
 
         private void OnObjectDeGrab(uint localID, uint originalID,
@@ -833,81 +842,49 @@ namespace Phlox.ScriptEngine
             SceneObjectPart part = m_Scene?.GetSceneObjectPart(localID);
             if (part == null) return;
 
-            var dp = BuildTouchDetectParams(part, remoteClient, Vector3.Zero, surfaceArgs);
+            var dp = BuildTouchDetectParams(TouchedPart(part, originalID), remoteClient, Vector3.Zero, surfaceArgs);
 
-            PostTouchEvent(part.ParentGroup,
-                InWorldz.Phlox.Types.SupportedEventList.Events.TOUCH_END,
-                "touch_end", dp);
+            PostTouchEvent(part.LocalId, "touch_end", dp);
         }
 
+        /// <summary>The prim the avatar touched: the one the region names in originalID when the root takes a child's touch.</summary>
+        private SceneObjectPart TouchedPart(SceneObjectPart target, uint originalID)
+            => originalID != 0 && originalID != target.LocalId ? m_Scene.GetSceneObjectPart(originalID) ?? target : target;
+
         /// <summary>
-        /// Builds a DetectParams for a touch event from the grabbing avatar's data.
-        /// DetectParams uses LSL_Types for position/rotation/velocity, and exposes
-        /// touch surface data only via the SurfaceTouchArgs write-only setter.
+        /// The toucher's detect data, from the avatar as Halcyon's EventRouter built it (DetectParams.Populate): name,
+        /// position, rotation, velocity and active group, and llDetectedType AGENT, plus ACTIVE while the avatar moves
+        /// (SL llDetectedType). llDetectedLinkNumber is the touched prim's. Touch surface data comes only through the
+        /// write-only SurfaceTouchArgs setter; null leaves TOUCH_INVALID_FACE and TOUCH_INVALID_TEXCOORD.
         /// </summary>
-        private DetectParams BuildTouchDetectParams(SceneObjectPart part,
+        private DetectParams BuildTouchDetectParams(SceneObjectPart touched,
             IClientAPI remoteClient, Vector3 offsetPos, SurfaceTouchEventArgs surfaceArgs)
         {
+            var dp = new DetectParams { Key = remoteClient.AgentId };
             ScenePresence sp = m_Scene?.GetScenePresence(remoteClient.AgentId);
-
-            var dp = new DetectParams
+            if (sp != null)
+                dp.Populate(m_Scene);
+            else
             {
-                Key     = remoteClient.AgentId,
-                Name    = remoteClient.Name,
-                Owner   = remoteClient.AgentId,
-                Group   = UUID.Zero,
-                Type    = DetectParams.AGENT,
-                LinkNum = part.LinkNum,
-                OffsetPos = new LSL_Types.Vector3(
-                    offsetPos.X, offsetPos.Y, offsetPos.Z),
-                Position = sp != null
-                    ? new LSL_Types.Vector3(
-                        sp.AbsolutePosition.X,
-                        sp.AbsolutePosition.Y,
-                        sp.AbsolutePosition.Z)
-                    : new LSL_Types.Vector3(),
-                Velocity = sp != null
-                    ? new LSL_Types.Vector3(
-                        sp.Velocity.X,
-                        sp.Velocity.Y,
-                        sp.Velocity.Z)
-                    : new LSL_Types.Vector3(),
-                Rotation = sp != null
-                    ? new LSL_Types.Quaternion(
-                        sp.Rotation.X,
-                        sp.Rotation.Y,
-                        sp.Rotation.Z,
-                        sp.Rotation.W)
-                    : new LSL_Types.Quaternion(),
-            };
-
-            // SurfaceTouchArgs is a write-only setter that populates all the
-            // read-only Touch* properties (TouchFace, TouchPos, TouchNormal, etc.)
-            // Passing null resets them to safe defaults (-1 face, zero vectors).
+                dp.Name = remoteClient.Name;
+                dp.Owner = remoteClient.AgentId;
+            }
+            // Populate types an NPC 0x20; a touch comes from an avatar, a bot's too (Halcyon: AGENT)
+            dp.Type = DetectParams.AGENT | (sp != null && sp.Velocity != Vector3.Zero ? DetectParams.ACTIVE : 0);
+            dp.LinkNum = touched.LinkNum;
+            dp.OffsetPos = new LSL_Types.Vector3(offsetPos.X, offsetPos.Y, offsetPos.Z);
             dp.SurfaceTouchArgs = surfaceArgs;
-
             return dp;
         }
 
-        /// <summary>
-        /// Posts a touch event to every script in the linkset that has that
-        /// event handler registered in its current state.
-        /// </summary>
-        private void PostTouchEvent(SceneObjectGroup group,
-            InWorldz.Phlox.Types.SupportedEventList.Events eventType,
-            string eventName, DetectParams dp)
+        /// <summary>Posts touch_start or touch_end to the scripts of the prim the region routed the touch to.</summary>
+        private void PostTouchEvent(uint localID, string eventName, DetectParams dp)
+            => PostObjectEvent(localID, new EventParams(eventName, new object[] { 1 }, new DetectParams[] { dp }));
+
+        /// <summary>A grab update on its way to a prim's scripts: it reaches the scheduler as a touch() it may fold into the active touch.</summary>
+        private sealed class GrabUpdateParams : EventParams
         {
-            if (group == null || group.IsDeleted) return;
-
-            var parms = new EventParams(
-                eventName,
-                new object[] { 1 },
-                new DetectParams[] { dp });
-
-            // Post to every prim in the linkset — scripts that don't handle
-            // the event will have it dropped by FindEventHandler in the scheduler.
-            foreach (SceneObjectPart part in group.Parts)
-                PostObjectEvent(part.LocalId, parms);
+            public GrabUpdateParams(DetectParams dp) : base("touch", new object[] { 1 }, new DetectParams[] { dp }) { }
         }
 
         // ── Changed event ──────────────────────────────────────────────────────
@@ -980,9 +957,26 @@ namespace Phlox.ScriptEngine
                 DetectParams d = new DetectParams();
                 d.Key = detobj.keyUUID;
                 d.Populate(m_Scene, detobj);
+                // A collider that left the region between the physics step and now: Populate finds nothing, so the
+                // entry keeps what physics saw, as Halcyon's DetectParams.FromDetectedObject copied it.
+                if (string.IsNullOrEmpty(d.Name) && detobj.keyUUID.IsNotZero() && m_Scene?.GetScenePresence(detobj.keyUUID) == null
+                    && m_Scene?.GetSceneObjectPart(detobj.keyUUID) == null)
+                    FromDetectedObject(d, detobj);
                 det.Add(d);
             }
             return det.ToArray();
+        }
+
+        private static void FromDetectedObject(DetectParams d, DetectedObject detobj)
+        {
+            d.Name = detobj.nameStr ?? string.Empty;
+            d.Owner = detobj.ownerUUID;
+            d.Group = detobj.groupUUID;
+            d.Position = new LSL_Types.Vector3(detobj.posVector);
+            d.Rotation = new LSL_Types.Quaternion(detobj.rotQuat);
+            d.Velocity = new LSL_Types.Vector3(detobj.velVector);
+            d.LinkNum = detobj.linkNumber;
+            d.Type = detobj.colliderType;
         }
 
         // ── Land collision events ──────────────────────────────────────────────
@@ -1206,6 +1200,9 @@ namespace Phlox.ScriptEngine
             SceneObjectPart part = m_Scene.GetSceneObjectPart(objectID);
             if (part == null) return;
 
+            // Halcyon EventRouter.HandleObjectPaid: llDetectedLinkNumber is the prim that was paid, also when the root's
+            // money() takes it
+            int paidLink = part.LinkNum;
             if ((part.ScriptEvents & scriptEvents.money) == 0)
                 part = part.ParentGroup.RootPart;
 
@@ -1215,6 +1212,7 @@ namespace Phlox.ScriptEngine
             det[0] = new DetectParams();
             det[0].Key = agentID;
             det[0].Populate(m_Scene);
+            det[0].LinkNum = paidLink;
 
             PostObjectEvent(part.LocalId, new EventParams(
                 "money", new object[] { agentID.ToString(), amount },
@@ -1259,7 +1257,8 @@ namespace Phlox.ScriptEngine
                 Completed = completed
             };
             evt.Normalize();
-            m_ExeScheduler.PostEvent(itemID, evt);
+            if (parms is GrabUpdateParams) m_ExeScheduler.PostGrabUpdate(itemID, evt);
+            else m_ExeScheduler.PostEvent(itemID, evt);
             return true;
         }
 

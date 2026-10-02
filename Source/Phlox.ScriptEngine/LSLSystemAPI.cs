@@ -4227,12 +4227,21 @@ namespace Phlox.ScriptEngine
 
 		private DetectVariables GetDetect(int n)
 		{
-			var state = m_thisScript?.ScriptState;
-			if (state == null) return new DetectVariables();
-			var vars = state.RunningEvent.DetectVars;
-			if (vars == null) return new DetectVariables();
-			return n >= 0 && n < vars.Length ? vars[n] : new DetectVariables();
+			var vars = m_thisScript?.ScriptState?.RunningEvent?.DetectVars;
+			return vars != null && n >= 0 && n < vars.Length ? vars[n] : InvalidDetect();
 		}
+
+		/// <summary>
+		/// What an index outside the detected set reads: TOUCH_INVALID_FACE and TOUCH_INVALID_TEXCOORD for the touch
+		/// surface (SL llDetectedTouchFace, llDetectedTouchST, llDetectedTouchUV; Halcyon and YEngine alike), NULL_KEY
+		/// for keys, zero and "" for the rest.
+		/// </summary>
+		private static DetectVariables InvalidDetect() => new DetectVariables
+		{
+			TouchFace = -1,
+			TouchST = new Vector3(-1f, -1f, 0f),
+			TouchUV = new Vector3(-1f, -1f, 0f),
+		};
 
         public string llDetectedName(int n) => GetDetect(n).Name ?? string.Empty;
         public string llDetectedKey(int n) => GetDetect(n).Key ?? UUID.Zero.ToString();
@@ -4249,6 +4258,12 @@ namespace Phlox.ScriptEngine
             if (string.IsNullOrEmpty(keyStr)) return 0;
             if (!UUID.TryParse(keyStr, out UUID detectedId)) return 0;
             UUID hostGroup = m_host.GroupID;
+
+            // The group captured with the event, as Halcyon and YEngine compare it: it still answers after the toucher
+            // or collider has left. No group on either side counts as the same group, as SL's llSameGroup counts it.
+            if (!string.IsNullOrEmpty(detect.Group) && UUID.TryParse(detect.Group, out UUID captured))
+                return captured == hostGroup ? 1 : 0;
+
             if (hostGroup == UUID.Zero) return 0;
 
             SceneObjectPart part = World?.GetSceneObjectPart(detectedId);

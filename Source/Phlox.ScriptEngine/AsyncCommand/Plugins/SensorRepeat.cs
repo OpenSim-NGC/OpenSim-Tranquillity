@@ -295,7 +295,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                 SceneObjectPart part = sog.RootPart;
                 if (sog.AttachmentPoint != 0) continue;
 
-                if (part.Inventory.ContainsScripts())
+                // SL SCRIPTED: "objects containing any active script"; Halcyon tested the whole linkset (IsScripted)
+                if (sog.ContainsScripts())
                     objtype |= ACTIVE | SCRIPTED;
                 else if (part.Velocity.Equals(ZeroVector))
                     objtype |= PASSIVE;
