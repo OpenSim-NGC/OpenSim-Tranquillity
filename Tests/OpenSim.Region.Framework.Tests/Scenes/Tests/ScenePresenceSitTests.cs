@@ -438,5 +438,131 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.Equal(UUID.Zero, child.SitTargetAvatar);
             Assert.NotNull(m_sp.PhysicsActor);
         }
+
+        // --- Stand-up, Release Keys and llSitOnLink (SL wiki llSetCameraParams, llTakeControls, llRequestPermissions) ---
+
+        private const int TakeControls = 4;     // PERMISSION_TAKE_CONTROLS
+        private const int ControlCamera = 2048; // PERMISSION_CONTROL_CAMERA
+
+        private static TaskInventoryItem AddGrantedScript(SceneObjectPart part, UUID granter, int mask)
+        {
+            TaskInventoryItem item = new TaskInventoryItem
+            {
+                Name = "script", ItemID = UUID.Random(), AssetID = UUID.Random(),
+                Type = (int)AssetType.LSLText, InvType = (int)InventoryType.LSL,
+                PermsGranter = granter, PermsMask = mask,
+            };
+            part.Inventory.AddInventoryItem(item, true);
+            return item;
+        }
+
+        private List<UUID> ClearedCameras => ((TestClient)m_sp.ControllingClient).ReceivedClearFollowCams;
+
+        [Fact]
+        public void StandingRevokesCameraAndControlsFromScriptsInEveryPrimOfTheObject()
+        {
+            // SL: "The PERMISSION_CONTROL_CAMERA permission is automatically revoked when the avatar stands up from
+            // or detaches the object, and any scripted camera parameters are automatically cleared."
+            m_sp.AbsolutePosition = new Vector3(1, 1, 1);
+            SceneObjectGroup so = SceneHelpers.AddSceneObject(m_scene, 2, m_sp.UUID, "car", 0x10);
+            SceneObjectPart child = so.GetLinkNumPart(2);
+            TaskInventoryItem inSeat = AddGrantedScript(so.RootPart, m_sp.UUID, TakeControls | ControlCamera | 16);
+            TaskInventoryItem inChild = AddGrantedScript(child, m_sp.UUID, ControlCamera);
+
+            SitManually(so.RootPart);
+            Assert.Equal(so.RootPart.LocalId, m_sp.ParentID);
+            m_sp.StandUp();
+
+            Assert.Equal(16, inSeat.PermsMask);
+            Assert.Equal(m_sp.UUID, inSeat.PermsGranter);
+            Assert.Equal(0, inChild.PermsMask);
+            Assert.Contains(so.UUID, ClearedCameras);
+        }
+
+        [Fact]
+        public void StandingLeavesAnotherAvatarsGrantAlone()
+        {
+            // SL llRequestPermissions: "Scripts may hold permissions for only one agent at a time." A grant from
+            // someone else is not the standing avatar's to lose.
+            ScenePresence other = SceneHelpers.AddScenePresence(m_scene, TestHelpers.ParseTail(0x2));
+            m_sp.AbsolutePosition = new Vector3(1, 1, 1);
+            SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene, 1, m_sp.UUID, "seat", 0x10).RootPart;
+            TaskInventoryItem othersGrant = AddGrantedScript(part, other.UUID, TakeControls | ControlCamera);
+
+            SitManually(part);
+            m_sp.StandUp();
+
+            Assert.Equal(TakeControls | ControlCamera, othersGrant.PermsMask);
+            Assert.Equal(other.UUID, othersGrant.PermsGranter);
+        }
+
+        [Fact]
+        public void ReleaseKeysStandsASeatedAvatarUp()
+        {
+            // Halcyon ScenePresence.HandleForceReleaseControls: "SL stands up the user on a forced controls release".
+            m_sp.AbsolutePosition = new Vector3(1, 1, 1);
+            SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene, 1, m_sp.UUID, "seat", 0x10).RootPart;
+            SitManually(part);
+            Assert.Equal(part.LocalId, m_sp.ParentID);
+
+            m_sp.HandleForceReleaseControls(m_sp.ControllingClient, m_sp.UUID);
+
+            Assert.Equal(0u, m_sp.ParentID);
+            Assert.Equal(0, part.GetSittingAvatarsCount());
+        }
+
+        [Fact]
+        public void ReleaseKeysRevokesTakeControlsFromTheScriptsThatHeldThem()
+        {
+            // SL llTakeControls: the permission "can be revoked ... if the user chooses Release Keys from the viewer."
+            m_sp.AbsolutePosition = new Vector3(1, 1, 1);
+            SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene, 1, m_sp.UUID, "hud", 0x10).RootPart;
+            TaskInventoryItem item = AddGrantedScript(part, m_sp.UUID, TakeControls | 16);
+            m_sp.RegisterControlEventsToScript(1, 1, 0, part.LocalId, item.ItemID);
+            Assert.True(m_sp.HasScriptControls(item.ItemID));
+
+            m_sp.HandleForceReleaseControls(m_sp.ControllingClient, m_sp.UUID);
+
+            Assert.False(m_sp.HasScriptControls(item.ItemID));
+            Assert.Equal(16, item.PermsMask);
+            Assert.Equal(m_sp.UUID, item.PermsGranter);
+        }
+
+        [Fact]
+        public void ReleaseKeysDoesNotStandAnAvatarAnExperienceHoldsInItsSeat()
+        {
+            // SL PRIM_ALLOW_UNSIT: the seated avatar "will be unable to stand"; Release Keys is not on SL's list of
+            // what lifts it.
+            UUID experience = TestHelpers.ParseTail(0xE1);
+            FakeExperiencePermissions fake = AddExperienceModule();
+            fake.Permissions[(m_sp.UUID, experience)] = ExperiencePermission.Allowed;
+            m_sp.AbsolutePosition = new Vector3(1, 1, 1);
+            SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene, 1, m_sp.UUID, "seat", 0x10).RootPart;
+            part.SitTargetPosition = new Vector3(0, 0, 1);
+            part.AllowUnsit = false;
+            m_sp.ScriptedSit(part, m_sp.UUID, experience);
+            Assert.Equal(part.LocalId, m_sp.ParentID);
+
+            m_sp.HandleForceReleaseControls(m_sp.ControllingClient, m_sp.UUID);
+
+            Assert.Equal(part.LocalId, m_sp.ParentID);
+        }
+
+        [Fact]
+        public void AScriptedSitOntoThePrimTheAvatarAlreadySitsOnDoesNotStandItUp()
+        {
+            // HandleAgentRequestSit ignores a sit on the prim the avatar already sits on; llSitOnLink does the same.
+            m_sp.AbsolutePosition = new Vector3(1, 1, 1);
+            SceneObjectPart part = SceneHelpers.AddSceneObject(m_scene, 1, m_sp.UUID, "seat", 0x10).RootPart;
+            TaskInventoryItem item = AddGrantedScript(part, m_sp.UUID, ControlCamera);
+            SitManually(part);
+            Assert.Equal(part.LocalId, m_sp.ParentID);
+
+            m_sp.ScriptedSit(part, m_sp.UUID, UUID.Zero);
+
+            Assert.Equal(part.LocalId, m_sp.ParentID);
+            Assert.Equal(ControlCamera, item.PermsMask);
+            Assert.Empty(ClearedCameras);
+        }
     }
 }

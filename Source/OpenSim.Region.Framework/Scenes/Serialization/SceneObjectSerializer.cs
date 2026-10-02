@@ -525,7 +525,8 @@ public class SceneObjectSerializer
         {"SitActRange", ProcessSitActRange },
         {"LinksetData", ProcessLinksetData },
         {"AllowUnsit", ProcessAllowUnsit },
-        {"ScriptedSitOnly", ProcessScriptedSitOnly }
+        {"ScriptedSitOnly", ProcessScriptedSitOnly },
+        {"SitTargetActive", ProcessSitTargetActive }
     }.ToFrozenDictionary();
 
     private static readonly FrozenDictionary<string, Action<TaskInventoryItem, XmlReader>> m_TaskInventoryXmlProcessors = new Dictionary<string, Action<TaskInventoryItem, XmlReader>>()
@@ -834,6 +835,12 @@ public class SceneObjectSerializer
     private static void ProcessScriptedSitOnly(SceneObjectPart obj, XmlReader reader)
     {
         obj.ScriptedSitOnly = Util.ReadBoolean(reader);
+    }
+
+    // Written after SitTargetPosition and SitTargetOrientation, whose setters reset the state to derived.
+    private static void ProcessSitTargetActive(SceneObjectPart obj, XmlReader reader)
+    {
+        obj.SitTargetActive = Util.ReadBoolean(reader);
     }
 
     private static void ProcessLinksetData(SceneObjectPart obj, XmlReader reader)
@@ -1718,6 +1725,11 @@ public class SceneObjectSerializer
 
         writer.WriteElementString("AllowUnsit", sop.AllowUnsit.ToString().ToLower());
         writer.WriteElementString("ScriptedSitOnly", sop.ScriptedSitOnly.ToString().ToLower());
+
+        // Only a state the offset and rotation do not already give (an active target at a zero offset), so other
+        // objects serialize as before.
+        if (sop.SitTargetActiveIsExplicit)
+            writer.WriteElementString("SitTargetActive", sop.SitTargetActive.ToString().ToLower());
 
         writer.WriteEndElement();
     }

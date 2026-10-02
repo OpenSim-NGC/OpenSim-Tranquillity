@@ -883,10 +883,21 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
 
         // Attach (NULL) stops scripts. We don't want that. Resume them.
         so.RemoveScriptsPermissions(4 | 2048); // take controls and camera control
+        ClearScriptedCamera(sp, so);
         so.ResumeScripts();
         so.HasGroupChanged = true;
         so.RootPart.ScheduleFullUpdate();
         so.ScheduleGroupForTerseUpdate();
+    }
+
+    /// <summary>
+    /// SL llSetCameraParams: "The PERMISSION_CONTROL_CAMERA permission is automatically revoked when the avatar stands
+    /// up from or detaches the object, and any scripted camera parameters are automatically cleared." The id is the
+    /// one llSetCameraParams sends, the object's root prim.
+    /// </summary>
+    private static void ClearScriptedCamera(IScenePresence sp, SceneObjectGroup so)
+    {
+        sp.ControllingClient?.SendClearFollowCamProperties(so.UUID);
     }
 
     public void DetachSingleAttachmentToInv(IScenePresence sp, SceneObjectGroup so)
@@ -901,6 +912,7 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
         }
 
         so.RemoveScriptsPermissions(4 | 2048); // take controls and camera control
+        ClearScriptedCamera(sp, so);
 
         // If this didn't come from inventory, it also shouldn't go there
         // on detach. It's likely a temp attachment.

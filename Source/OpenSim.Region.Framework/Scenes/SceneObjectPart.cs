@@ -150,15 +150,63 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// <summary>
     /// Is an explicit sit target set for this part?
     /// </summary>
+    /// <remarks>
+    /// SetSitTarget records the answer explicitly: SL PRIM_SIT_TARGET "If it is nonzero the prim's sit target is set
+    /// to the indicated offset and rotation" and "Unlike llLinkSitTarget(), an offset of &lt;0.0, 0.0, 0.0&gt; may be
+    /// explicitly set". Otherwise, and after the offset or rotation is assigned on its own, a target is set when the
+    /// offset is not zero or the rotation is not the identity, as before.
+    /// </remarks>
     public bool IsSitTargetSet
     {
         get
         {
+            bool? active = m_sitTargetActive;
+            if (active.HasValue)
+                return active.Value;
+
             // assume SitTargetOrientation is normalized (as needed elsewhere)
             if (!SitTargetPosition.IsZero() || !SitTargetOrientation.IsIdentityOrZero())
                 return true;
             return false;
         }
+    }
+
+    /// <summary>
+    /// The sit target's on/off state, independent of its offset and rotation. Reads IsSitTargetSet; assigning it
+    /// records the state explicitly, so a target at a zero offset can be active.
+    /// </summary>
+    [XmlIgnore]
+    public bool SitTargetActive
+    {
+        get { return IsSitTargetSet; }
+        set { m_sitTargetActive = value; }
+    }
+
+    /// <summary>
+    /// True when SitTargetActive was set explicitly to a state the offset and rotation alone would not give
+    /// (an active target at a zero offset and identity rotation). Only then does the serializer write it.
+    /// </summary>
+    [XmlIgnore]
+    internal bool SitTargetActiveIsExplicit
+    {
+        get
+        {
+            bool? active = m_sitTargetActive;
+            if (!active.HasValue)
+                return false;
+            bool derived = !SitTargetPosition.IsZero() || !SitTargetOrientation.IsIdentityOrZero();
+            return active.Value != derived;
+        }
+    }
+
+    /// <summary>
+    /// Sets the sit target's state, offset and rotation together (SL PRIM_SIT_TARGET).
+    /// </summary>
+    public void SetSitTarget(bool active, Vector3 offset, Quaternion orientation)
+    {
+        m_sitTargetPosition = offset;
+        m_sitTargetOrientation = orientation;
+        m_sitTargetActive = active;
     }
 
     #region Fields
@@ -307,9 +355,9 @@ public class SceneObjectPart : EntityBase, IDisposable
     private Dictionary<UUID, scriptEvents> m_scriptEvents = new Dictionary<UUID, scriptEvents>();
     private Quaternion m_sitTargetOrientation = Quaternion.Identity;
     private Vector3 m_sitTargetPosition;
+    private bool? m_sitTargetActive; // null: derived from the offset and rotation (IsSitTargetSet)
     private bool m_scriptedSitOnly = false;
     private bool m_allowUnsit = true;
-    private UUID m_experienceUsedForSit = UUID.Zero;
     private string m_sitAnimation = "SIT";
     private UndoRedoState m_UndoRedo = null;
     private readonly object m_UndoLock = new object();
@@ -1308,6 +1356,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         set
         {
             m_sitTargetOrientation = value;
+            m_sitTargetActive = null;
             //                m_log.LogDebug("[SCENE OBJECT PART]: Set sit target orientation {0} for {1} {2}", m_sitTargetOrientation, Name, LocalId);
         }
     }
@@ -1320,6 +1369,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         set
         {
             m_sitTargetPosition = value;
+            m_sitTargetActive = null;
             //                m_log.LogDebug("[SCENE OBJECT PART]: Set sit target position to {0} for {1} {2}", m_sitTargetPosition, Name, LocalId);
         }
     }
@@ -1374,16 +1424,6 @@ public class SceneObjectPart : EntityBase, IDisposable
 
             if (ParentGroup != null)
                 ParentGroup.HasGroupChanged = true;
-        }
-    }
-
-    [XmlIgnore]
-    public UUID ExperienceUsedForSit
-    {
-        get { return m_experienceUsedForSit; }
-        set
-        {
-            m_experienceUsedForSit = value;
         }
     }
 

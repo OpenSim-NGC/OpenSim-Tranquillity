@@ -45,6 +45,7 @@ public class TestClient : IClientAPI, IClientCore
 
     // Properties so that we can get at received data for test purposes
     public List<uint> ReceivedKills { get; private set; }
+    public List<UUID> ReceivedClearFollowCams { get; private set; }
     public List<UUID> ReceivedOfflineNotifications { get; private set; }
     public List<UUID> ReceivedOnlineNotifications { get; private set; }
     public List<UUID> ReceivedFriendshipTerminations { get; private set; }
@@ -492,6 +493,7 @@ public class TestClient : IClientAPI, IClientCore
         CapsSeedUrl = agentData.CapsPath;
 
         ReceivedKills = new List<uint>();
+        ReceivedClearFollowCams = new List<UUID>();
         ReceivedOfflineNotifications = new List<UUID>();
         ReceivedOnlineNotifications = new List<UUID>();
         ReceivedFriendshipTerminations = new List<UUID>();
@@ -1179,6 +1181,7 @@ public class TestClient : IClientAPI, IClientCore
 
     public void SendClearFollowCamProperties (UUID objectID)
     {
+        ReceivedClearFollowCams.Add(objectID);
     }
 
     public void SendRegionHandle (UUID regoinID, ulong handle)
