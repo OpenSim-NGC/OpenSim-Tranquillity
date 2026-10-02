@@ -12,6 +12,14 @@ namespace InWorldz.Phlox.Glue
 	public interface ISystemAPI
 	{
         void SetScriptEventFlags();
+
+        /// <summary>
+        /// Signal that a long-running syscall has finished, so the scheduler can take the
+        /// script out of <c>Status.Syscall</c>. An implementation that already posts its own return
+        /// may call this too - a return that arrives when the script is no longer in Syscall is
+        /// ignored (<c>PhloxExecutionScheduler.ProcessSyscallReturns:897</c>).
+        /// </summary>
+        void CompleteSyscall();
         void ShoutError(string errorText);
         void OnScriptReset();
         void OnStateChange();
@@ -402,7 +410,335 @@ namespace InWorldz.Phlox.Glue
         string iwSHA256String(string src);
         void iwTeleportAgent(string agent, string region, Vector3 pos, Vector3 lookat);
         void osTeleportAgent(string agent, string region, Vector3 pos, Vector3 lookat);
+
+        /// <summary>OSSL_Api.cs:1051 - teleport within the current region.</summary>
+        void osTeleportAgent(string agent, Vector3 pos, Vector3 lookat);
+
+        /// <summary>OSSL_Api.cs:1015 - teleport to a region named by grid coordinates.</summary>
+        void osTeleportAgent(string agent, int regionGridX, int regionGridY, Vector3 pos, Vector3 lookat);
         LSLList osGetAvatarList();
+        // OSSL information functions
+        string osGetGridName();
+        string osGetGridNick();
+        string osGetGridHomeURI();
+        string osGetGridLoginURI();
+        string osGetGridGatekeeperURI();
+        string osGetGridCustom(string key);
+        Vector3 osGetRegionSize();
+        LSLList osGetRegionStats();
+        string osGetSimulatorVersion();
+        LSLList osGetAgents();
+        string osGetMapTexture();
+        string osGetPhysicsEngineType();
+        string osGetPhysicsEngineName();
+        int osGetSimulatorMemory();
+        int osGetSimulatorMemoryKB();
+        float osGetHealth(string agent);
+        string osGetScriptEngineName();
+        // OSSL pure helpers
+        string osAESEncrypt(string secret, string plainText);
+        string osAESDecrypt(string secret, string encryptedText);
+        string osAESEncryptTo(string secret, string plainText, string ivString);
+        string osAESDecryptFrom(string secret, string encryptedText, string ivString);
+        float osAngleBetween(Vector3 a, Vector3 b);
+
+        // ── OSSL sit target, misc and list functions ───────────────────────────────
+        /// <summary>OSSL_Api.cs:5985 - this prim's sit target offset.</summary>
+        Vector3 osGetSitTargetPos();
+        /// <summary>OSSL_Api.cs:5990 - this prim's sit target rotation.</summary>
+        Quaternion osGetSitTargetRot();
+        /// <summary>OSSL_Api.cs:2721 - Low.</summary>
+        string osLoadedCreationDate();
+        /// <summary>OSSL_Api.cs:2728 - Low.</summary>
+        string osLoadedCreationTime();
+        /// <summary>OSSL_Api.cs:2735 - Low.</summary>
+        string osLoadedCreationID();
+        /// <summary>OSSL_Api.cs:6660 - blackbody temperature to linear sRGB.</summary>
+        Vector3 osTemperature2sRGB(float dtemp);
+        /// <summary>OSSL_Api.cs:6477 - the pre-2010 llList2ListStrided semantics.</summary>
+        LSLList osOldList2ListStrided(LSLList src, int start, int end, int stride);
+        /// <summary>OSSL_Api.cs:6695 - the nth occurrence of a sublist within a range.</summary>
+        int osListFindListNext(LSLList lsrc, LSLList ltest, int lstart, int lend, int linstance);
+        /// <summary>OSSL_Api.cs:6417 - sorts the caller's list itself.</summary>
+        void osListSortInPlace(LSLList src, int stride, int ascending);
+        /// <summary>OSSL_Api.cs:6422 - the same, keyed on one element of the stride.</summary>
+        void osListSortInPlaceStrided(LSLList src, int stride, int strideIndex, int ascending);
+        /// <summary>OSSL_Api.cs:6318 - llParticleSystem without the 0.1 s sleep.</summary>
+        void osParticleSystem(LSLList rules);
+        /// <summary>OSSL_Api.cs:6324 - the same for a link.</summary>
+        void osLinkParticleSystem(int linknumber, LSLList rules);
+        /// <summary>OSSL_Api.cs:5150 - llPreloadSound for a link, without its sleep.</summary>
+        void osPreloadSound(int linknum, string sound);
+        /// <summary>OSSL_Api.cs:4704 - mass, centre of mass, inertia, aux.</summary>
+        LSLList osGetInertiaData();
+        /// <summary>OSSL_Api.cs:3988 - None. Every NPC in the region.</summary>
+        LSLList osGetNPCList();
+        /// <summary>OSSL_Api.cs:5724 - removes an item from a linked prim.</summary>
+        void osRemoveLinkInventory(int linkNumber, string name);
+        /// <summary>OSSL_Api.cs:6313 - TerrainUtil's Perlin noise.</summary>
+        float osPerlinNoise2D(float x, float y, int octaves, float persistence);
+        /// <summary>OSSL_Api.cs:3489 - VeryHigh. Saves another agent's outfit.</summary>
+        string osAgentSaveAppearance(string avatarKey, string notecard);
+        /// <summary>OSSL_Api.cs:3499 - VeryHigh.</summary>
+        string osAgentSaveAppearance(string avatarKey, string notecard, int includeHuds);
+
+        int osApproxEquals(float a, float b);
+        int osApproxEquals(float a, float b, float margin);
+        /// <summary>OSSL_Api.cs:5432 - the vector form, chosen by type over the float pair.</summary>
+        int osApproxEquals(Vector3 va, Vector3 vb);
+        /// <summary>OSSL_Api.cs:5469 - the rotation form.</summary>
+        int osApproxEquals(Quaternion ra, Quaternion rb);
+        /// <summary>OSSL_Api.cs:5450 - the vector form with a margin.</summary>
+        int osApproxEquals(Vector3 va, Vector3 vb, float margin);
+        /// <summary>OSSL_Api.cs:5491 - the rotation form with a margin.</summary>
+        int osApproxEquals(Quaternion ra, Quaternion rb, float margin);
+        int osCheckODE();
+        string osFormatString(string str, LSLList strings);
+        int osIsNotValidNumber(float v);
+        int osIsUUID(string thing);
+        float osListAsFloat(LSLList src, int index);
+        int osListAsInteger(LSLList src, int index);
+        string osListAsString(LSLList src, int index);
+        Vector3 osListAsVector(LSLList src, int index);
+        Quaternion osListAsRotation(LSLList src, int index);
+        LSLList osMatchString(string src, string pattern, int start);
+        float osMax(float a, float b);
+        float osMin(float a, float b);
+        int osRegexIsMatch(string input, string pattern);
+        float osRound(float value, int ndigits);
+        string osSHA256(string input);
+        Quaternion osSlerp(Quaternion a, Quaternion b, float amount);
+        /// <summary>OSSL_Api.cs:5931 - the vector form, chosen by type over the rotation one.</summary>
+        Vector3 osSlerp(Vector3 a, Vector3 b, float amount);
+        int osStringStartsWith(string src, string value, int ignorecase);
+        int osStringEndsWith(string src, string value, int ignorecase);
+        int osStringIndexOf(string src, string value, int ignorecase);
+        int osStringIndexOf(string src, string value, int offset, int count, int ignorecase);
+        int osStringLastIndexOf(string src, string value, int ignorecase);
+        int osStringLastIndexOf(string src, string value, int offset, int count, int ignorecase);
+        string osStringRemove(string src, int offset, int count);
+        string osStringReplace(string src, string oldvalue, string newvalue);
+        string osStringSubString(string src, int offset);
+        string osStringSubString(string src, int offset, int length);
+        string osUnixTimeToTimestamp(int time);
+        float osVecDistSquare(Vector3 a, Vector3 b);
+        float osVecMagSquare(Vector3 a);
+        // osNpc* on top of BotManager
+        int osIsNpc(string npc);
+        string osNpcCreate(string firstname, string lastname, Vector3 position, string notecard);
+        string osNpcCreate(string firstname, string lastname, Vector3 position, string notecard, int options);
+        string osNpcSaveAppearance(string npc, string notecard);
+        string osNpcSaveAppearance(string npc, string notecard, int includeHuds);
+        void osNpcLoadAppearance(string npc, string notecard);
+        string osNpcGetOwner(string npc);
+        Vector3 osNpcGetPos(string npc);
+        void osNpcMoveTo(string npc, Vector3 pos);
+        void osNpcMoveToTarget(string npc, Vector3 target, int options);
+        Quaternion osNpcGetRot(string npc);
+        void osNpcSetRot(string npc, Quaternion rotation);
+        void osNpcStopMoveToTarget(string npc);
+        void osNpcSetProfileAbout(string npc, string about);
+        void osNpcSetProfileImage(string npc, string image);
+        void osNpcSay(string npc, string message);
+        void osNpcSay(string npc, int channel, string message);
+        void osNpcShout(string npc, int channel, string message);
+        void osNpcWhisper(string npc, int channel, string message);
+        void osNpcSit(string npc, string target, int options);
+        void osNpcStand(string npc);
+        void osNpcRemove(string npc);
+        void osNpcPlayAnimation(string npc, string animation);
+        void osNpcStopAnimation(string npc, string animation);
+        void osNpcTouch(string npc, string object_key, int link_num);
+        // OSSL side-effect functions (prim, sound, links, attachments, misc)
+        void osSetRot(string target, Quaternion rotation);
+        void osForceCreateLink(string target, int parent);
+        void osForceBreakLink(int linknum);
+        void osForceBreakAllLinks();
+        int osTeleportObject(string objectUUID, Vector3 targetPos, Quaternion rotation, int flags);
+        void osSetSpeed(string ID, float SpeedModifier);
+        void osSetOwnerSpeed(float SpeedModifier);
+        void osSetContentType(string id, string type);
+        void osSetPrimFloatOnWater(int floatYN);
+        void osVolumeDetect(int detect);
+        void osSetPrimitiveParams(string prim, LSLList rules);
+        LSLList osGetPrimitiveParams(string prim, LSLList rules);
+        LSLList osGetLinkPrimitiveParams(int linknumber, LSLList rules);
+        void osSetProjectionParams(int projection, string texture, float fov, float focus, float amb);
+        void osSetProjectionParams(int linknum, int projection, string texture, float fov, float focus, float amb);
+        /// <summary>OSSL_Api.cs:3921 - the prim-by-key form, arity 6 like the link form and told apart by type.</summary>
+        void osSetProjectionParams(string prim, int projection, string texture, float fov, float focus, float amb);
+        void osSetInertia(float mass, Vector3 centerOfMass, Vector3 principalInertiaScaled, Quaternion lslrot);
+        void osSetInertiaAsBox(float mass, Vector3 boxSize, Vector3 centerOfMass, Quaternion lslrot);
+        void osSetInertiaAsSphere(float mass, float radius, Vector3 centerOfMass);
+        void osSetInertiaAsCylinder(float mass, float radius, float length, Vector3 centerOfMass, Quaternion lslrot);
+        void osClearInertia();
+        void osSetSitActiveRange(float v);
+        void osSetLinkSitActiveRange(int linkNumber, float v);
+        void osSetStandTarget(Vector3 v);
+        void osSetLinkStandTarget(int linkNumber, Vector3 v);
+        void osAdjustSoundVolume(int linknum, float volume);
+        void osSetSoundRadius(int linknum, float radius);
+        void osPlaySound(int linknum, string sound, float volume);
+        void osLoopSound(int linknum, string sound, float volume);
+        void osLoopSoundMaster(int linknum, string sound, float volume);
+        void osLoopSoundSlave(int linknum, string sound, float volume);
+        void osPlaySoundSlave(int linknum, string sound, float volume);
+        void osTriggerSound(int linknum, string sound, float volume);
+        void osTriggerSoundLimited(int linknum, string sound, float volume, Vector3 top_north_east, Vector3 bottom_south_west);
+        void osStopSound(int linknum);
+        void osTriggerSoundAtPos(string sound, Vector3 position, float gain);
+        void osCollisionSound(string impact_sound, float impact_volume);
+        void osForceAttachToAvatar(int attachmentPoint);
+        void osForceAttachToAvatarFromInventory(string itemName, int attachmentPoint);
+        void osForceAttachToOtherAvatarFromInventory(string rawAvatarId, string itemName, int attachmentPoint);
+        void osForceDetachFromAvatar();
+        void osForceDropAttachment();
+        void osForceDropAttachmentAt(Vector3 pos, Quaternion rot);
+        void osMessageObject(string objectUUID, string message);
+        void osResetAllScripts(int linkset);
+        string osRequestURL(LSLList options);
+        string osRequestSecureURL(LSLList options);
+        string osReplaceString(string src, string pattern, string replace, int count, int start);
+        int osClearObjectAnimations();
+        void osLocalTeleportAgent(string agent, Vector3 position, Vector3 velocity, Vector3 lookat, int flags);
+        int osConsoleCommand(string command);
+        // OSSL agent, teleport, kick, animation and group functions
+        void osTeleportOwner(string regionName, Vector3 position, Vector3 lookat);
+        void osTeleportOwner(int regionGridX, int regionGridY, Vector3 position, Vector3 lookat);
+        void osTeleportOwner(Vector3 position, Vector3 lookat);
+        void osKickAvatar(string FirstName, string SurName, string alert);
+        void osKickAvatar(string agentKey, string alert);
+        void osAvatarPlayAnimation(string avatar, string animation);
+        void osAvatarStopAnimation(string avatar, string animation);
+        string osAvatarName2Key(string firstname, string lastname);
+        string osKey2Name(string id);
+        string osGetAgentIP(string agent);
+        string osOwnerSaveAppearance(string notecard);
+        string osOwnerSaveAppearance(string notecard, int includeHuds);
+        void osCauseDamage(string avatar, float damage);
+        void osCauseHealing(string avatar, float healing);
+        void osSetHealth(string avatar, float health);
+        void osSetHealRate(string avatar, float healrate);
+        void osForceOtherSit(string avatar);
+        void osForceOtherSit(string avatar, string target);
+        void osDie(string objectUUID);
+        void osDropAttachment();
+        void osDropAttachmentAt(Vector3 pos, Quaternion rot);
+        int osInviteToGroup(string agentId);
+        int osEjectFromGroup(string agentId);
+        int osAvatarType(string avkey);
+        int osAvatarType(string sFirstName, string sLastName);
+        // OSSL parcel, estate, terrain, wind and sun functions
+        int osSetTerrainHeight(int x, int y, float val);
+        int osTerrainSetHeight(int x, int y, float val);
+        float osGetTerrainHeight(int x, int y);
+        float osTerrainGetHeight(int x, int y);
+        void osTerrainFlush();
+        int osRegionRestart(float seconds);
+        int osRegionRestart(float seconds, string msg);
+        void osRegionNotice(string msg);
+        void osRegionNotice(string agentID, string msg);
+        void osSetRegionWaterHeight(float height);
+        void osSetRegionSunSettings(int useEstateSun, int sunFixed, float sunHour);
+        void osSetEstateSunSettings(int sunFixed, float sunHour);
+        float osGetCurrentSunHour();
+        float osGetSunParam(string param);
+        float osSunGetParam(string param);
+        void osSetSunParam(string param, float value);
+        void osSunSetParam(string param, float value);
+        string osWindActiveModelPluginName();
+        void osSetWindParam(string plugin, string param, float value);
+        float osGetWindParam(string plugin, string param);
+        void osParcelJoin(Vector3 pos1, Vector3 pos2);
+        void osParcelSubdivide(Vector3 pos1, Vector3 pos2);
+        void osSetParcelDetails(Vector3 pos, LSLList rules);
+        void osParcelSetDetails(Vector3 pos, LSLList rules);
+        void osSetParcelMusicURL(string url);
+        void osSetParcelMediaURL(string url);
+        void osSetParcelSIPAddress(string SIPAddress);
+        void osSetTerrainTexture(int level, string texture);
+        void osSetTerrainTextures(LSLList textures, int ltypes);
+        void osSetTerrainTextureHeight(int corner, float low, float high);
+        LSLList osGetParcelDetails(string id, LSLList param);
+        // OSSL draw and dynamic-texture functions
+        string osSetDynamicTextureURL(string dynamicID, string contentType, string url, string extraParams, int timer);
+        string osSetDynamicTextureURLBlend(string dynamicID, string contentType, string url, string extraParams, int timer, int alpha);
+        string osSetDynamicTextureURLBlendFace(string dynamicID, string contentType, string url, string extraParams, int blend, int disp, int timer, int alpha, int face);
+        string osSetDynamicTextureData(string dynamicID, string contentType, string data, string extraParams, int timer);
+        /// <summary>OSSL_Api.cs:790 - the face form, arity 6 like DataBlend and told apart by nothing but its name.</summary>
+        string osSetDynamicTextureDataFace(string dynamicID, string contentType, string data, string extraParams, int timer, int face);
+        string osSetDynamicTextureDataBlend(string dynamicID, string contentType, string data, string extraParams, int timer, int alpha);
+        string osSetDynamicTextureDataBlendFace(string dynamicID, string contentType, string data, string extraParams, int blend, int disp, int timer, int alpha, int face);
+        string osDrawResetTransform(string drawList);
+        string osDrawRotationTransform(string drawList, float x);
+        string osDrawScaleTransform(string drawList, float x, float y);
+        string osDrawTranslationTransform(string drawList, float x, float y);
+        string osMovePen(string drawList, int x, int y);
+        string osDrawLine(string drawList, int startX, int startY, int endX, int endY);
+        string osDrawLine(string drawList, int endX, int endY);
+        string osDrawText(string drawList, string text);
+        string osDrawEllipse(string drawList, int width, int height);
+        string osDrawFilledEllipse(string drawList, int width, int height);
+        string osDrawRectangle(string drawList, int width, int height);
+        string osDrawFilledRectangle(string drawList, int width, int height);
+        string osDrawFilledPolygon(string drawList, LSLList x, LSLList y);
+        string osDrawPolygon(string drawList, LSLList x, LSLList y);
+        string osSetFontSize(string drawList, int fontSize);
+        string osSetFontName(string drawList, string fontName);
+        string osSetPenSize(string drawList, int penSize);
+        string osSetPenColor(string drawList, string color);
+        /// <summary>OSSL_Api.cs:1400 - the vector form, arity 2 like the colour-name one.</summary>
+        string osSetPenColor(string drawList, Vector3 color);
+        string osSetPenColor(string drawList, Vector3 color, float alpha);
+        string osSetPenColour(string drawList, string colour);
+        string osSetPenCap(string drawList, string direction, string type);
+        string osDrawImage(string drawList, int width, int height, string imageUrl);
+        Vector3 osGetDrawStringSize(string contentType, string text, string fontName, int fontSize);
+        // OSSL read-only remainder
+        string osGetNotecardLine(string name, int line);
+        string osGetNotecard(string name);
+        int osGetNumberOfNotecardLines(string name);
+        string osGetAvatarHomeURI(string uuid);
+        LSLList osGetNumberOfAttachments(string avatar, LSLList attachmentPoints);
+        string osGetRegionMapTexture(string regionNameOrID);
+        int osGetLinkNumber(string name);
+        string osGetRezzingObject();
+        int osListenRegex(int channelID, string name, string ID, string msg, int regexBitfield);
+        string osDetectedCountry(int number);
+        string osGetAgentCountry(string id);
+        string osGetGender(string rawAvatarId);
+        float osGetHealRate(string avatar);
+        float osGetApparentTime();
+        string osGetApparentTimeString(int format24);
+        float osGetApparentRegionTime();
+        string osGetApparentRegionTimeString(int format24);
+        float osGetPSTWallclock();
+        string osGetLastChangedEventKey();
+        Vector3 osGetLinkColor(int link, int face);
+        float osGetSitActiveRange();
+        float osGetLinkSitActiveRange(int linkNumber);
+        Vector3 osGetStandTarget();
+        Vector3 osGetLinkStandTarget(int linkNumber);
+        int osGetPrimCount();
+        int osGetPrimCount(string object_id);
+        int osGetSittingAvatarsCount();
+        int osGetSittingAvatarsCount(string object_id);
+        int osGetParcelDwell(Vector3 pos);
+        string osGetParcelID();
+        LSLList osGetParcelIDs();
+        string osGetInventoryLastOwner(string itemNameorid);
+        string osGetInventoryItemKey(string name);
+        string osGetInventoryName(string itemId);
+        string osGetInventoryDesc(string itemNameorid);
+        LSLList osGetInventoryItemKeys(int type);
+        LSLList osGetInventoryNames(int type);
+        string osGetLinkInventoryName(int linkNumber, string itemId);
+        string osGetLinkInventoryDesc(int linkNumber, string itemNameorid);
+        string osGetLinkInventoryKey(int linkNumber, string name, int type);
+        LSLList osGetLinkInventoryKeys(int linkNumber, int type);
+        string osGetLinkInventoryItemKey(int linkNumber, string name);
+        LSLList osGetLinkInventoryItemKeys(int linkNumber, int type);
+        LSLList osGetLinkInventoryNames(int linkNumber, int type);
         string llAvatarOnLinkSitTarget(int linknumber);
         string iwGetLastOwner();
         void iwRemoveLinkInventory(int linknumber, string item);
@@ -561,7 +897,7 @@ namespace InWorldz.Phlox.Glue
 		// === ADD THESE LINES to ISystemAPI.cs ===
 		// Insert BEFORE the closing "}" of the interface, after "void llResetAnimationOverride(string anim_state);"
 
-        // ── Batch 10: SL compatibility functions ──
+        // ── SL compatibility functions ──
         string llChar(int unicode);
         int llOrd(string src, int index);
         string llComputeHash(string src, string algorithm);
@@ -576,7 +912,7 @@ namespace InWorldz.Phlox.Glue
         string llGetObjectLinkKey(string objectId, int linknumber);
         void llDerezObject(string id);
 
-        // ── Batch 11: Medium-effort SL compatibility ──
+        // ── Medium-effort SL compatibility ──
         void llTeleportAgent(string agent, string landmark, Vector3 pos, Vector3 lookAt);
         void llTeleportAgentGlobalCoords(string agent, Vector3 globalCoords, Vector3 regionPos, Vector3 lookAt);
         int llScaleByFactor(float factor);
@@ -594,7 +930,7 @@ namespace InWorldz.Phlox.Glue
         int llGetLinkSitFlags(int link);
         void llSetLinkSitFlags(int link, int flags);
 
-        // ── Batch 12: String/List/Crypto SL compatibility ──
+        // ── String/List/Crypto SL compatibility ──
         string llReplaceSubString(string src, string pattern, string replacement, int count);
         int llListFindStrided(LSLList src, LSLList test, int start, int end, int stride);
         LSLList llList2ListSlice(LSLList src, int start, int end, int stride, int slice_index);
@@ -603,11 +939,14 @@ namespace InWorldz.Phlox.Glue
         string llHMAC(string msg, string privateKey, string algorithm);
         string llSHA256String(string src, int nonce);
         void llLinkPlaySound(int link, string sound, float volume, int flags);
+
+        /// <summary>LSL_Api.cs:2939 - the three-argument form, flags defaulted to 0.</summary>
+        void llLinkPlaySound(int link, string sound, float volume);
         Vector3 llLinear2sRGB(Vector3 color);
         Vector3 llSRGB2Linear(Vector3 color);
 		Vector3 llWorldPosToHUD(Vector3 worldPos);
 
-        // ── Batch 13: Linkset Data ──
+        // ── Linkset Data ──
         int llLinksetDataAvailable();
         int llLinksetDataCountKeys();
         string llLinksetDataRead(string name);
@@ -645,7 +984,7 @@ namespace InWorldz.Phlox.Glue
 
         // ── Tier 3: Combat 2.0 ──
         float llGetHealth(string id);
-        void llAdjustDamage(string id, float amount);
+        void llAdjustDamage(int number, float newDamage);
         void llSetHealth(string id, float health);
 
 		// ── Tier 4: Pathfinding Shims ──
@@ -664,13 +1003,13 @@ namespace InWorldz.Phlox.Glue
 		void llPatrolPoints(LSLList points, LSLList options);
 		
 		// ── Tier 5: Experience KVP Store ──
-        int llCreateKeyValue(string key, string value);
+        string llCreateKeyValue(string key, string value);
         string llReadKeyValue(string key);
-        int llUpdateKeyValue(string key, string value, string check);
-        int llDeleteKeyValue(string key);
-        int llKeyCountKeyValue();
-        LSLList llKeysKeyValue(int start, int count);
-        int llDataSizeKeyValue();
+        string llUpdateKeyValue(string key, string value, string check);
+        string llDeleteKeyValue(string key);
+        string llKeyCountKeyValue();
+        string llKeysKeyValue(int start, int count);
+        string llDataSizeKeyValue();
         int llClearKeyValue();
         string llCreateKeyValueSL(string key, string value);
         string llReadKeyValueSL(string key);
@@ -696,7 +1035,7 @@ namespace InWorldz.Phlox.Glue
         void llOpenFloater(string name, string url, LSLList paramList);
         void llCloseFloater(string name);
         int llSitOnLink(string agentID, int link);
-        void llRezObjectWithParams(string inventory, LSLList paramList);
+        string llRezObjectWithParams(string inventory, LSLList paramList);
         string llGetMaterialOverride(int face, LSLList paramList);
 
         // ── Phase 31: 19 new functions (TableIndex 643–661) ──
@@ -711,8 +1050,16 @@ namespace InWorldz.Phlox.Glue
         string llGetStartString();
         void llSetGroundTexture(string texture, int corner);
         void llTargetedEmail(int targetType, string address, string subject, string message);
+
+        // ---- SL names and arities. Older spellings above stay as aliases. ----
+        Vector3 llsRGB2Linear(Vector3 srgb);
+        LSLList llListSortStrided(LSLList src, int stride, int stride_index, int ascending);
+        string llSHA256String(string src);
+        void llTargetedEmail(int target, string subject, string message);
+        string llUpdateKeyValue(string k, string v, int isChecked, string original_value);
+        int llDerezObject(string id, int flag);
         int llTransferOwnership(string destination);
-        float llDetectedDamage(int number);
+        LSLList llDetectedDamage(int number);
         void llDamage(string target, float amount, int damageType);
         void llSetLinkRenderMaterial(int link, string materialId, int face);
         string llXorBase64(string s1, string s2);

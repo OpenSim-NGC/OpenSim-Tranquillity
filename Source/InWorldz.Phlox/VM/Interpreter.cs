@@ -26,6 +26,12 @@ namespace InWorldz.Phlox.VM
 
         public UUID ItemId;
 
+        /// <summary>An exception from a deferred service call, raised by the next Tick.</summary>
+        private Exception _pendingFault;
+
+        /// <summary>The scheduler hands a deferred call's exception back to the script here.</summary>
+        public void SetPendingFault(Exception fault) { _pendingFault = fault; }
+
         // Host prim LocalId, stamped at load; used off the hot path to resolve the owning
         // linkset's root LocalId for the estate per-object script stats (Top Scripts).
         public uint HostLocalId;
@@ -199,6 +205,16 @@ namespace InWorldz.Phlox.VM
         /// </summary>
         public void Tick()
         {
+            // A deferred service call threw on its worker. Raise it here, inside the
+            // script's own tick, so the scheduler handles it exactly as it would have handled the
+            // same exception thrown inline by the shim.
+            var fault = _pendingFault;
+            if (fault != null)
+            {
+                _pendingFault = null;
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(fault).Throw();
+            }
+
             OpCode opcode = (OpCode)_script.ByteCode[_state.IP];
 
             if (_outputFullExecutionTrace)

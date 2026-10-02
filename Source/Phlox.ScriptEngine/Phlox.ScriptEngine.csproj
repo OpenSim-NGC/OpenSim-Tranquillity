@@ -47,18 +47,27 @@
     <Compile Include="PhloxExperienceAdapter.cs" />
     <Compile Include="LinksetDataPhloxExtensions.cs" />
     <Compile Include="PhloxEngine.cs" />
+    <Compile Include="PhloxEngineHeader.cs" />
+    <Compile Include="OsslGate.cs" />
     <Compile Include="SluaBackHalfProof.cs" />
     <Compile Include="PhloxExecutionScheduler.cs" />
     <Compile Include="PhloxLoadRequest.cs" />
     <Compile Include="PhloxMasterScheduler.cs" />
     <Compile Include="PhloxScriptLoader.cs" />
     <Compile Include="WorkStatus.cs" />
+    <Compile Include="SlConst.cs" />
+    <Compile Include="ScriptRegex.cs" />
     <Compile Include="PhloxListenManager.cs" />
+    <Compile Include="PhloxNotecardCache.cs" />
     <Compile Include="AsyncCommand\AsyncCommandManager.cs" />
     <Compile Include="AsyncCommand\Plugins\SensorRepeat.cs" />
     <Compile Include="AsyncCommand\Plugins\HttpRequest.cs" />
     <Compile Include="AsyncCommand\Plugins\XmlRequest.cs" />
     <Compile Include="StateManager.cs" />
+    <Compile Include="Codecs\HalcyonStringCodec.cs" />
+    <Compile Include="Codecs\FrameworkGzip.cs" />
+    <Compile Include="Codecs\ZlibDeflate.cs" />
+    <Compile Include="Codecs\FrameworkText.cs" />
   </ItemGroup>
 
 </Project>

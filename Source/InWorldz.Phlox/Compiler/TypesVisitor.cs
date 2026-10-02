@@ -20,6 +20,35 @@ namespace InWorldz.Phlox.Compiler
     /// </summary>
     public class TypesVisitor : LSLBaseVisitor<ISymbolType>
     {
+        // The recursive dispatch runs out of stack before a deeply nested tree does (DepthGuard).
+        // The counted limits (NestingLimits) are the rule, the same levels the parser counted;
+        // DepthGuard stays as the backstop. VisitChildren goes through Visit so every child is counted.
+        private readonly NestingCounter _nesting = new NestingCounter();
+
+        public override ISymbolType Visit(Antlr4.Runtime.Tree.IParseTree tree)
+        {
+            DepthGuard.Check(tree);
+            NestingKind? kind = NestingCounter.Classify(tree);
+            if (!kind.HasValue) return base.Visit(tree);
+            var start = (tree as Antlr4.Runtime.ParserRuleContext)?.Start;
+            _nesting.Enter(kind.Value, start?.Line ?? 0, start?.Column ?? 0);
+            try { return base.Visit(tree); }
+            finally { _nesting.Exit(kind.Value); }
+        }
+
+        public override ISymbolType VisitChildren(Antlr4.Runtime.Tree.IRuleNode node)
+        {
+            DepthGuard.Check(node);
+            ISymbolType result = DefaultResult;
+            int n = node.ChildCount;
+            for (int i = 0; i < n; i++)
+            {
+                if (!ShouldVisitNextChild(node, result)) break;
+                result = AggregateResult(result, Visit(node.GetChild(i)));
+            }
+            return result;
+        }
+
         private readonly SymbolTable _symtab;
         private readonly LSLNodeAnnotations _annotations;
 
@@ -61,7 +90,7 @@ namespace InWorldz.Phlox.Compiler
         /// </summary>
         private ISymbolType ResolveType(string typeName)
         {
-            Symbol s = _symtab.Globals.Resolve(typeName);
+            Symbol s = _symtab.Globals.Resolve(SymbolTable.CanonicalTypeName(typeName));
             if (s is ISymbolType t) return t;
             return SymbolTable.VOID;
         }
@@ -250,11 +279,20 @@ namespace InWorldz.Phlox.Compiler
         public override ISymbolType VisitStateChangeStmt([NotNull] LSLParser.StateChangeStmtContext context)
         {
             // Verify the target state exists.
-            string stateName = context.ID().GetText();
+            //
+            // `state default;` is valid LSL - the wiki's own example does it - and the
+            // grammar matches `default` as a KEYWORD, not an ID (LSL.g4:87,
+            // `stateNode='state' (ID | 'default') SEMI`). So ID() is null for exactly that case and
+            // this dereferenced it, throwing a NullReferenceException out of the whole compile.
+            // GenVisitor already had this right (`context.ID()?.GetText()`, GenVisitor.cs:237) and
+            // ByteCodeEmitter.StateChange reads a null id as the default state, so the back end was
+            // never wrong - only this check was.
+            var id = context.ID();
+            string stateName = id?.GetText() ?? "default";
             string key = stateName == "default" ? "default(*)" : stateName + "(*)";
             if (_symtab.Globals.Resolve(key) == null)
             {
-                Error(context.ID().Symbol, $"Unknown state '{stateName}'");
+                Error(id?.Symbol ?? context.stateNode, $"Unknown state '{stateName}'");
             }
             return null;
         }
@@ -362,7 +400,15 @@ namespace InWorldz.Phlox.Compiler
                 return t;
             }
             // &&  ||  — result is always integer (boolean)
-            foreach (var c in children) Visit(c);
+            // SL refuses a key operand at compile time (LL's operator table, as Tailslide's types.cc has it:
+            // OP_BOOLEAN_AND / OP_BOOLEAN_OR take LST_INTEGER, LST_INTEGER only); Phlox compiled it and the script
+            // stopped at run time. Only the key is refused here: the other non-integer operands keep compiling.
+            for (int i = 0; i < children.Length; i++)
+            {
+                ISymbolType t = Visit(children[i]);
+                if (t == SymbolTable.KEY)
+                    ErrorAtContext(children[i], $"Type mismatch: '{GetOpAt(context, i == 0 ? 1 : i)}' cannot be applied to a key");
+            }
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
         }
@@ -524,7 +570,11 @@ namespace InWorldz.Phlox.Compiler
 
         public override ISymbolType VisitUnaryBoolNot([NotNull] LSLParser.UnaryBoolNotContext context)
         {
-            Visit(context.unaryExpression());
+            ISymbolType t = Visit(context.unaryExpression());
+            // SL refuses '!' on a key at compile time (Tailslide types.cc: {'!', LST_INTEGER, LST_NONE,
+            // LST_BOOLEAN}); Phlox compiled it and the script stopped at run time.
+            if (t == SymbolTable.KEY)
+                ErrorAtContext(context, "Type mismatch: '!' cannot be applied to a key");
             // ! always produces integer (boolean)
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
@@ -639,17 +689,17 @@ namespace InWorldz.Phlox.Compiler
 
             // Resolve the function symbol.
             string funcName = GetCallName(context.postfixExpression());
-            MethodSymbol methSym = funcName != null
-                ? _symtab.Globals.Resolve(funcName + "()") as MethodSymbol
-                : null;
 
-            // Visit each argument expression.
+            // Visit each argument expression first: the arity chooses the overload.
             List<ISymbolType> argTypes = new List<ISymbolType>();
             if (context.callParamList() != null)
             {
                 foreach (var expr in context.callParamList().expr())
                     argTypes.Add(Visit(expr));
             }
+
+            MethodSymbol methSym = ResolveCall(context, funcName, argTypes);
+            if (methSym != null) _annotations.SetSymbol(context, methSym);   // The gen pass reads this choice
 
             if (methSym == null)
             {
@@ -662,8 +712,10 @@ namespace InWorldz.Phlox.Compiler
             var paramSymbols = new List<Symbol>(methSym.Members.Values);
             if (argTypes.Count != paramSymbols.Count)
             {
-                ErrorAtContext(context,
-                    $"Function '{funcName}' expects {paramSymbols.Count} arguments, got {argTypes.Count}");
+                string accepted = AcceptedSignatures(funcName);
+                ErrorAtContext(context, accepted == null
+                    ? $"Function '{funcName}' expects {paramSymbols.Count} arguments, got {argTypes.Count}"
+                    : $"Function '{funcName}' got {argTypes.Count} arguments; it accepts {accepted}");
             }
             else
             {
@@ -789,12 +841,17 @@ namespace InWorldz.Phlox.Compiler
         public override ISymbolType VisitFuncCall([NotNull] LSLParser.FuncCallContext context)
         {
             string funcName = context.ID().GetText();
-            MethodSymbol methSym = _symtab.Globals.Resolve(funcName + "()") as MethodSymbol;
 
+            // Arguments first, because the arity chooses the overload. A
+            // statement-level call reaches this visitor rather than VisitMethodCallPostfix, and
+            // missing that is why 2b resolved nothing - both paths must use the same rule.
             List<ISymbolType> argTypes = new List<ISymbolType>();
             if (context.callParamList() != null)
                 foreach (var expr in context.callParamList().expr())
                     argTypes.Add(Visit(expr));
+
+            MethodSymbol methSym = ResolveCall(context, funcName, argTypes);
+            if (methSym != null) _annotations.SetSymbol(context, methSym);   // The gen pass reads this choice
 
             if (methSym == null)
             {
@@ -805,8 +862,10 @@ namespace InWorldz.Phlox.Compiler
             var paramSymbols = new List<Symbol>(methSym.Members.Values);
             if (argTypes.Count != paramSymbols.Count)
             {
-                ErrorAtContext(context,
-                    $"Function '{funcName}' expects {paramSymbols.Count} arguments, got {argTypes.Count}");
+                string accepted = AcceptedSignatures(funcName);
+                ErrorAtContext(context, accepted == null
+                    ? $"Function '{funcName}' expects {paramSymbols.Count} arguments, got {argTypes.Count}"
+                    : $"Function '{funcName}' got {argTypes.Count} arguments; it accepts {accepted}");
             }
             else
             {
@@ -912,5 +971,69 @@ namespace InWorldz.Phlox.Compiler
             }
             return null;
         }
+
+        /// <summary>
+        /// Resolve a call to a method symbol, choosing among a built-in's overloads by
+        /// the number of arguments at the call site. The bare name is tried first, so a
+        /// single-signature built-in and every user function resolve exactly as they did; only a
+        /// name that has a <c>name$&lt;arity&gt;</c> sibling can pick anything else.
+        ///
+        /// <para>Argument TYPES are checked by the caller afterwards, through the tree's existing
+        /// implicit-conversion rule - <c>SymbolTable.promoteFromTo</c> plus <c>CanAssignTo</c>,
+        /// which is LSL's integer-to-float widening and its interchangeable key and string.</para>
+        /// </summary>
+        private MethodSymbol ResolveCall(ParserRuleContext context, string funcName, List<ISymbolType> argTypes)
+        {
+            if (funcName == null) return null;
+
+            MethodSymbol bare = _symtab.Globals.Resolve(funcName + "()") as MethodSymbol;
+            if (bare == null) return null;
+
+            int argCount = argTypes.Count;
+
+            // A user function or a built-in with one signature: exactly the old path, no selection.
+            if (!Defaults.SystemMethods.TryGetValue(funcName, out var sigs) || sigs.Count < 2)
+                return bare;
+
+            // Among the signatures of this arity, the argument TYPES choose.
+            var argVarTypes = new List<VarType?>(argCount);
+            foreach (ISymbolType t in argTypes)
+            {
+                int i = Idx(t);
+                argVarTypes.Add(i >= 0 && i < (int)VarType.Void ? (VarType?)i : null);
+            }
+
+            FunctionSig? chosen = Defaults.SelectOverload(funcName, argVarTypes, out FunctionSig? other);
+            if (!chosen.HasValue)
+            {
+                // No signature of this arity at all, or none whose types can be reached: fall back
+                // to the arity sibling so the argument-count / argument-type error below reads as it
+                // always did, against a signature of the right size where one exists.
+                if (bare.Members.Count == argCount) return bare;
+                if (_symtab.Globals.Resolve(funcName + Defaults.OverloadSeparator + argCount + "()") is MethodSymbol byArity)
+                    return byArity;
+                return bare;
+            }
+
+            if (other.HasValue)
+            {
+                ErrorAtContext(context,
+                    $"Call to '{funcName}' is ambiguous between {Defaults.DescribeSignature(chosen.Value)} and {Defaults.DescribeSignature(other.Value)}");
+            }
+
+            return _symtab.Globals.Resolve(Defaults.SymbolNameFor(chosen.Value) + "()") as MethodSymbol ?? bare;
+        }
+
+        /// <summary>Every arity a built-in accepts, for the error message when none of them match.</summary>
+        private string AcceptedSignatures(string funcName)
+        {
+            if (funcName == null || !Defaults.SystemMethods.TryGetValue(funcName, out var sigs))
+                return null;
+            var forms = new List<string>();
+            foreach (var sig in sigs)
+                forms.Add(funcName + "(" + string.Join(", ", Array.ConvertAll(sig.ParamTypes, t => t.ToString().ToLowerInvariant())) + ")");
+            return string.Join("; ", forms);
+        }
+
     }
 }

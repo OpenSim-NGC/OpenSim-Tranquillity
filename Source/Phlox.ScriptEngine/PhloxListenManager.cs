@@ -1,5 +1,5 @@
 /*
- * Legion Grid — Phlox Script Engine Integration
+ * Phlox Script Engine Integration
  * PhloxListenManager — implements llListen / llListenControl / llListenRemove
  * and delivers chat events to registered scripts.
  *
@@ -20,6 +20,7 @@ using InWorldz.Phlox.VM;
 using InWorldz.Phlox.Types;
 
 using Microsoft.Extensions.Logging;
+using Nini.Config;
 using OpenSim.Framework;
 
 namespace Phlox.ScriptEngine
@@ -38,6 +39,10 @@ namespace Phlox.ScriptEngine
         public string FilterName;   // empty string = wildcard
         public UUID FilterKey;      // UUID.Zero = wildcard
         public string FilterMsg;    // empty string = wildcard
+        /// <summary>osListenRegex: when set, the name / message filter is a regular expression instead of an exact match.</summary>
+        public System.Text.RegularExpressions.Regex NameRegex;
+        public System.Text.RegularExpressions.Regex MsgRegex;
+        public int RegexBitfield;   // as osListenRegex was given it; 0 for llListen
         public bool Active;
     }
 
@@ -56,22 +61,151 @@ namespace Phlox.ScriptEngine
         // All active listens, keyed by (itemID, handle) for fast removal
         private readonly Dictionary<UUID, Dictionary<int, ListenEntry>> m_ByItem = new();
 
+        /// <summary>
+        /// The most listens one script may hold, active or switched off, with no [LL-Functions] max_listens_per_script:
+        /// SL's 65, and the core WorldCommModule's default (m_maxhandles = 65). Halcyon's ListenerManager allowed 64.
+        /// </summary>
+        public const int DefaultMaxListensPerScript = 65;
+
+        /// <summary>The most listens all of this engine's scripts in the region may hold with no [LL-Functions]
+        /// max_listens_per_region: WorldCommModule's default (m_maxlisteners = 1000).</summary>
+        public const int DefaultMaxListensPerRegion = 1000;
+
+        /// <summary>The per-script cap in force; int.MaxValue when the config asks for no limit.</summary>
+        public int MaxListensPerScript { get; }
+
+        /// <summary>The per-region cap in force, never below <see cref="MaxListensPerScript"/>.</summary>
+        public int MaxListensPerRegion { get; }
+
+        // Every listen this engine holds in the region, active or switched off, for the per-region cap.
+        private int m_ListenCount;
+
+        /// <summary>How many listens this engine's scripts hold in the region.</summary>
+        public int ListenCount { get { lock (m_Lock) return m_ListenCount; } }
+
+        /// <summary>
+        /// [LL-Functions] max_listens_per_region and max_listens_per_script, read as the core WorldCommModule
+        /// reads them for YEngine (WorldCommModule.Initialise), so one config value means the same to both engines:
+        /// one GetInt each, the region's first, with WorldComm's defaults 1000 and 65; a value that does not parse ends
+        /// the read there and keeps the defaults for it and the key after it, as WorldComm's single try does; a value
+        /// below 1 means no limit (int.MaxValue); a region cap below the script cap is raised to it. WorldComm swallows
+        /// a value that does not parse; here <paramref name="warning"/> says so, for the engine to log once.
+        /// </summary>
+        public static (int PerScript, int PerRegion) ReadListenCaps(IConfigSource config, out string warning)
+        {
+            warning = null;
+            int perRegion = DefaultMaxListensPerRegion;
+            int perScript = DefaultMaxListensPerScript;
+            IConfig ll = config?.Configs["LL-Functions"];
+            if (ll != null)
+            {
+                string key = "max_listens_per_region";
+                try
+                {
+                    perRegion = ll.GetInt(key, perRegion);
+                    key = "max_listens_per_script";
+                    perScript = ll.GetInt(key, perScript);
+                }
+                catch (Exception e)
+                {
+                    warning = $"[LL-Functions] {key} = '{ll.GetString(key)}' is not an integer ({e.GetType().Name}); " +
+                              $"Phlox keeps max_listens_per_script = {perScript} and max_listens_per_region = {perRegion}, " +
+                              "as the core WorldCommModule does";
+                }
+            }
+            if (perRegion < 1) perRegion = int.MaxValue;
+            if (perScript < 1) perScript = int.MaxValue;
+            if (perRegion < perScript) perRegion = perScript;
+            return (perScript, perRegion);
+        }
+
         // Next handle value (per-script counter would be cleaner but a global
         // int is fine for thousands of scripts — wraps around after 2^31)
         private int m_NextHandle = 1;
 
+        // Where listeners are, to measure chat range from. Null only in a manager built without a scene.
+        private readonly Scene m_Scene;
+
+        // [Chat] whisper_distance / say_distance / shout_distance: the keys and defaults the chat module,
+        // WorldComm and YEngine's LSL_Api read, so every listener in a region hears the same range.
+        public const int DefaultWhisperDistance = 10;
+        public const int DefaultSayDistance = 20;
+        public const int DefaultShoutDistance = 100;
+        private readonly float m_WhisperDistance;
+        private readonly float m_SayDistance;
+        private readonly float m_ShoutDistance;
+
         public PhloxListenManager(PhloxExecutionScheduler scheduler)
+            : this(scheduler, null, DefaultWhisperDistance, DefaultSayDistance, DefaultShoutDistance)
         {
+        }
+
+        public PhloxListenManager(PhloxExecutionScheduler scheduler, Scene scene,
+                                  int whisperDistance, int sayDistance, int shoutDistance)
+            : this(scheduler, scene, whisperDistance, sayDistance, shoutDistance,
+                   DefaultMaxListensPerScript, DefaultMaxListensPerRegion)
+        {
+        }
+
+        /// <param name="maxListensPerScript">From <see cref="ReadListenCaps"/>.</param>
+        /// <param name="maxListensPerRegion">From <see cref="ReadListenCaps"/>.</param>
+        public PhloxListenManager(PhloxExecutionScheduler scheduler, Scene scene,
+                                  int whisperDistance, int sayDistance, int shoutDistance,
+                                  int maxListensPerScript, int maxListensPerRegion)
+        {
+            MaxListensPerScript = maxListensPerScript < 1 ? int.MaxValue : maxListensPerScript;
+            MaxListensPerRegion = Math.Max(maxListensPerRegion < 1 ? int.MaxValue : maxListensPerRegion, MaxListensPerScript);
             m_Scheduler = scheduler;
+            m_Scene = scene;
+            m_WhisperDistance = whisperDistance;
+            m_SayDistance = sayDistance;
+            m_ShoutDistance = shoutDistance;
         }
 
         // ── Called from llListen ───────────────────────────────────────────────
 
         public int Add(uint localID, UUID itemID, UUID hostID,
                        int channel, string name, UUID key, string msg)
+            => Add(localID, itemID, hostID, channel, name, key, msg, 0);
+
+        /// <summary>osListenRegex - bit 1 (OS_LISTEN_REGEX_NAME) makes the name a regex, bit 2 (OS_LISTEN_REGEX_MESSAGE) the message; the caller has validated them.</summary>
+        public int Add(uint localID, UUID itemID, UUID hostID,
+                       int channel, string name, UUID key, string msg, int regexBitfield)
         {
+            name ??= string.Empty;
+            msg ??= string.Empty;
             lock (m_Lock)
             {
+                m_ByItem.TryGetValue(itemID, out var existing);
+                if (existing != null)
+                {
+                    // Halcyon's AddListener: "called with same filter settings, return same handle" - an active
+                    // listen of this script with the same channel, name, key and message; one switched off with
+                    // llListenControl is not reused. The filters must be the same, not merely overlapping.
+                    foreach (var held in existing.Values)
+                        if (held.Active && held.Channel == channel && held.HostID == hostID && held.FilterKey == key
+                            && held.RegexBitfield == regexBitfield
+                            && string.Equals(held.FilterName, name, StringComparison.Ordinal)
+                            && string.Equals(held.FilterMsg, msg, StringComparison.Ordinal))
+                            return held.Handle;
+
+                    // Halcyon returns -1 with no script error when a script has no handle left.
+                    if (existing.Count >= MaxListensPerScript)
+                    {
+                        m_log.LogDebug("[PhloxListen]: item {0} already holds {1} listens; llListen returns -1",
+                            itemID, existing.Count);
+                        return -1;
+                    }
+                }
+
+                // WorldCommModule.Listen: `if (m_curlisteners < m_maxlisteners)`, after the reuse check; -1 otherwise.
+                if (m_ListenCount >= MaxListensPerRegion)
+                {
+                    m_log.LogDebug("[PhloxListen]: the region already holds {0} Phlox listens; llListen returns -1",
+                        m_ListenCount);
+                    return -1;
+                }
+
                 int handle = m_NextHandle++;
                 if (m_NextHandle <= 0) m_NextHandle = 1; // wrap
 
@@ -82,18 +216,22 @@ namespace Phlox.ScriptEngine
                     ItemID      = itemID,
                     HostID      = hostID,
                     Channel     = channel,
-                    FilterName  = name  ?? string.Empty,
+                    FilterName  = name,
                     FilterKey   = key,
-                    FilterMsg   = msg   ?? string.Empty,
+                    FilterMsg   = msg,
+                    NameRegex   = (regexBitfield & 1) != 0 && !string.IsNullOrEmpty(name) ? ScriptRegex.Create(name) : null,
+                    MsgRegex    = (regexBitfield & 2) != 0 && !string.IsNullOrEmpty(msg) ? ScriptRegex.Create(msg) : null,
+                    RegexBitfield = regexBitfield,
                     Active      = true
                 };
 
-                if (!m_ByItem.TryGetValue(itemID, out var byHandle))
+                if (existing == null)
                 {
-                    byHandle = new Dictionary<int, ListenEntry>();
-                    m_ByItem[itemID] = byHandle;
+                    existing = new Dictionary<int, ListenEntry>();
+                    m_ByItem[itemID] = existing;
                 }
-                byHandle[handle] = entry;
+                existing[handle] = entry;
+                m_ListenCount++;
 
                 m_log.LogDebug("[PhloxListen]: Registered listen handle {0} ch={1} item={2}",
                     handle, channel, itemID);
@@ -115,6 +253,14 @@ namespace Phlox.ScriptEngine
             }
         }
 
+        /// <summary>Is this listen registered and active? Null if it is not registered.</summary>
+        internal bool? IsActive(UUID itemID, int handle)
+        {
+            lock (m_Lock)
+                return m_ByItem.TryGetValue(itemID, out var byHandle) && byHandle.TryGetValue(handle, out var entry)
+                    ? entry.Active : (bool?)null;
+        }
+
         // ── Called from llListenRemove ─────────────────────────────────────────
 
         /// <summary>Remove a single handle for a script.</summary>
@@ -124,31 +270,88 @@ namespace Phlox.ScriptEngine
             {
                 if (m_ByItem.TryGetValue(itemID, out var byHandle))
                 {
-                    byHandle.Remove(handle);
+                    if (byHandle.Remove(handle)) m_ListenCount--;
                     if (byHandle.Count == 0)
                         m_ByItem.Remove(itemID);
                 }
             }
         }
 
-        /// <summary>Remove ALL listens for a script (called on unload / reset).</summary>
+        /// <summary>Remove ALL listens for a script: on a reset, a state change, when it stops and when it unloads.</summary>
         public void Remove(UUID itemID)
         {
             lock (m_Lock)
             {
-                m_ByItem.Remove(itemID);
+                if (m_ByItem.Remove(itemID, out var byHandle)) m_ListenCount -= byHandle.Count;
             }
         }
+
+        /// <summary>The script is unloaded - its listens and its listen-rate record go (the record was never freed).</summary>
+        public void Forget(UUID itemID)
+        {
+            lock (m_Lock)
+            {
+                if (m_ByItem.Remove(itemID, out var byHandle)) m_ListenCount -= byHandle.Count;
+                m_RateTracker.Remove(itemID);
+            }
+        }
+
+        /// <summary>Scripts with a listen, and scripts with a rate record (tests and the leak check).</summary>
+        internal int ScriptsWithListens { get { lock (m_Lock) return m_ByItem.Count; } }
+        internal int RateRecords { get { lock (m_Lock) return m_RateTracker.Count; } }
 
         // ── Called by PhloxEngine's chat hook ─────────────────────────────────
 
         /// <summary>
-        /// Evaluate all registered listens against an incoming chat message.
-        /// Dispatches a listen event into any matching script's queue.
+        /// Region-wide chat with no target: every matching listen hears it, as llRegionSay does.
         /// </summary>
         public void DeliverChat(int channel, string speakerName, UUID speakerKey, string message)
+            => DeliverChat(ChatTypeEnum.Region, channel, speakerName, speakerKey, message, Vector3.Zero, UUID.Zero);
+
+        /// <summary>
+        /// Evaluate all registered listens against an incoming chat message, as Halcyon's
+        /// WorldCommModule.DeliverMessage does, and dispatch a listen event into each matching script's queue.
+        /// <list type="bullet">
+        /// <item>A prim never hears its own chat (the listen's prim is the speaker); other prims of the same
+        /// object do.</item>
+        /// <item>With a <paramref name="destId"/> (llRegionSayTo), only that prim's listens hear it, or, when
+        /// it is an avatar, the listens in that avatar's attachments (<see cref="DestIdMatches"/>).</item>
+        /// <item>Whisper, say and shout reach listeners closer than the configured [Chat] distance; region
+        /// chat and llRegionSayTo reach the whole region. Other chat types reach no listen.</item>
+        /// </list>
+        /// Distance runs from the speaker to the listening prim; an attachment speaks and listens at its avatar.
+        /// </summary>
+        public void DeliverChat(ChatTypeEnum type, int channel, string speakerName, UUID speakerKey,
+                                string message, Vector3 speakerPosition, UUID destId)
         {
             if (string.IsNullOrEmpty(message)) return;
+
+            float range;
+            switch (type)
+            {
+                case ChatTypeEnum.Whisper: range = m_WhisperDistance; break;
+                case ChatTypeEnum.Say: range = m_SayDistance; break;
+                // The chat module rewrites chat on DEBUG_CHANNEL to DebugChannel before this sees it
+                // (ChatModule.DeliverChatToAvatars); script errors are shouted there.
+                case ChatTypeEnum.Shout:
+                case ChatTypeEnum.DebugChannel: range = m_ShoutDistance; break;
+                case ChatTypeEnum.Region:
+                case ChatTypeEnum.Direct: range = float.PositiveInfinity; break;
+                default: return;
+            }
+            bool ranged = !float.IsPositiveInfinity(range);
+            if (ranged)
+            {
+                // Where the speaker is now: an attachment's own position is its attach-point offset, so it
+                // speaks from its avatar, and an avatar speaks from where it stands.
+                SceneObjectPart speakerPart = m_Scene?.GetSceneObjectPart(speakerKey);
+                ScenePresence speakerAvatar;
+                if (speakerPart != null)
+                    speakerPosition = ChatPosition(speakerPart);
+                else if ((speakerAvatar = m_Scene?.GetScenePresence(speakerKey)) != null)
+                    speakerPosition = speakerAvatar.AbsolutePosition;
+            }
+            float rangeSq = range * range;
 
             // Snapshot under lock so delivery doesn't hold the lock
             List<ListenEntry> candidates;
@@ -165,9 +368,32 @@ namespace Phlox.ScriptEngine
                 if (!entry.Active) continue;
                 if (entry.Channel != channel) continue;
 
+                // A prim does not hear its own chat.
+                if (entry.HostID == speakerKey) continue;
+
+                if (ranged || destId != UUID.Zero)
+                {
+                    // A listen's host is its prim, or for botListen the bot's avatar.
+                    Vector3 hostPosition;
+                    SceneObjectPart host = m_Scene?.GetSceneObjectPart(entry.HostID);
+                    if (host != null)
+                    {
+                        if (destId != UUID.Zero && !DestIdMatches(destId, host)) continue;
+                        hostPosition = ChatPosition(host);
+                    }
+                    else
+                    {
+                        ScenePresence bot = m_Scene?.GetScenePresence(entry.HostID);
+                        if (bot == null) continue;
+                        if (destId != UUID.Zero && destId != bot.UUID) continue;
+                        hostPosition = bot.AbsolutePosition;
+                    }
+                    if (ranged && Vector3.DistanceSquared(hostPosition, speakerPosition) >= rangeSq) continue;
+                }
+
                 // Name filter (empty = wildcard)
-                if (entry.FilterName.Length > 0 &&
-                    !string.Equals(entry.FilterName, speakerName, StringComparison.OrdinalIgnoreCase))
+                if (entry.NameRegex != null ? !RegexMatches(entry, entry.NameRegex, speakerName)
+                    : entry.FilterName.Length > 0 && !string.Equals(entry.FilterName, speakerName, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 // Key filter (UUID.Zero = wildcard)
@@ -175,8 +401,8 @@ namespace Phlox.ScriptEngine
                     continue;
 
                 // Message filter (empty = wildcard)
-                if (entry.FilterMsg.Length > 0 &&
-                    !string.Equals(entry.FilterMsg, message, StringComparison.Ordinal))
+                if (entry.MsgRegex != null ? !RegexMatches(entry, entry.MsgRegex, message)
+                    : entry.FilterMsg.Length > 0 && !string.Equals(entry.FilterMsg, message, StringComparison.Ordinal))
                     continue;
 
                 // Rate limit: drop if this script has received too many listens this second
@@ -186,6 +412,64 @@ namespace Phlox.ScriptEngine
                 PostListenEvent(entry, channel, speakerName, speakerKey, message);
             }
         }
+
+        /// <summary>
+        /// Halcyon's WorldCommModule.DestIdMatches: a listen hears an addressed message when its prim is the
+        /// destination, or when its prim is an attachment and the destination is the attachment's owner.
+        /// </summary>
+        private static bool DestIdMatches(UUID destId, SceneObjectPart part)
+        {
+            if (destId == part.UUID)
+                return true;
+            if (part.ParentGroup == null || !part.ParentGroup.IsAttachment)
+                return false;
+            return destId == part.OwnerID;
+        }
+
+        /// <summary>Where a prim speaks and listens from: its avatar's position when it is worn.</summary>
+        private Vector3 ChatPosition(SceneObjectPart part)
+        {
+            SceneObjectGroup group = part.ParentGroup;
+            if (group != null && group.IsAttachment)
+            {
+                ScenePresence sp = m_Scene?.GetScenePresence(group.AttachedAvatar);
+                if (sp != null)
+                    return sp.AbsolutePosition;
+            }
+            return part.AbsolutePosition;
+        }
+
+        /// <summary>
+        /// An osListenRegex filter that times out (ScriptRegex.MatchTimeout) does not match,
+        /// and delivery to every other listener carries on.
+        /// It also switches the listener off, exactly as llListenControl(handle, FALSE)
+        /// would, so the pattern cannot cost a timeout on every later line of the channel. The owner
+        /// is told once on DEBUG_CHANNEL and the region logs it once; llListenControl(handle, TRUE)
+        /// turns it back on.
+        /// </summary>
+        private bool RegexMatches(ListenEntry entry, System.Text.RegularExpressions.Regex regex, string input)
+        {
+            try { return regex.IsMatch(input ?? string.Empty); }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+            {
+                bool disabledNow;
+                lock (m_Lock)
+                {
+                    disabledNow = entry.Active;
+                    entry.Active = false;
+                }
+                if (disabledNow)
+                {
+                    m_log.LogWarning("[PhloxListen]: {0} for listen handle {1} of item {2}; listener disabled",
+                        ScriptRegex.TimedOutMessage, entry.Handle, entry.ItemID);
+                    try { m_Scheduler.FindScript(entry.ItemID)?.ShoutError(ListenRegexTimedOutNotice); }
+                    catch (Exception e) { m_log.LogWarning("[PhloxListen]: could not tell the owner: {0}", e.Message); }
+                }
+                return false;
+            }
+        }
+
+        internal const string ListenRegexTimedOutNotice = "osListenRegex: pattern timed out; listener disabled";
 
         private bool IsRateLimited(UUID itemID)
         {

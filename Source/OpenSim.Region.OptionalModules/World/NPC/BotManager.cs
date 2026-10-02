@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Legion Grid Contributors
+ * Copyright (c) Legion Builds
  * BotManager.cs — Bot/NPC management module for Phlox script engine
  * Wraps OpenSim's INPCModule with additional tracking for tags, profiles,
  * outfits, navigation, speed, and event registration.
@@ -266,7 +266,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             return data.BotScene.GetScenePresence(data.BotID);
         }
 
-        public static UUID OutfitKey(UUID ownerID, string outfitName)   // PHLOX-16: osOwnerSaveAppearance returns it
+        public static UUID OutfitKey(UUID ownerID, string outfitName)   // osOwnerSaveAppearance returns it
         {
             // Deterministic UUID from owner + outfit name for dictionary keying
             return UUID.Parse(Utils.MD5String(ownerID.ToString() + ":" + outfitName.ToLowerInvariant()));
@@ -317,7 +317,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             if (engines == null) return;
 
             object[] args = new object[] { data.BotID.ToString(), eventType, new object[0] };
-            // PHLOX-6: the same outcome as SL's path_update(integer type, list reserved), for a
+            // The same outcome as SL's path_update(integer type, list reserved), for a
             // script that speaks SL pathfinding (llCreateCharacter / llNavigateTo) rather than the
             // InWorldz bot API. Posted beside bot_update rather than instead of it - a script
             // declares one handler or the other, and an engine drops an event the script has no
@@ -342,7 +342,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             string outfitName, UUID scriptItemID, UUID ownerID, out string reason)
             => CreateBot(firstName, lastName, startPos, outfitName, scriptItemID, ownerID, true, true, out reason);
 
-        /// <summary>PHLOX-14: the osNpcCreate door. Same bot, same BotData; ownership and sensing per the OS_NPC_* flags.</summary>
+        /// <summary>The osNpcCreate door. Same bot, same BotData; ownership and sensing per the OS_NPC_* flags.</summary>
         public UUID CreateBot(string firstName, string lastName, Vector3 startPos,
             string outfitName, UUID scriptItemID, UUID ownerID, bool owned, bool senseAsAgent, out string reason)
         {
@@ -392,7 +392,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 }
             }
 
-            // PHLOX-14: the bot* door always senses as agent and is always owned; osNpcCreate chooses.
+            // The bot* door always senses as agent and is always owned; osNpcCreate chooses.
             UUID npcOwner = owned ? ownerID : UUID.Zero;
             UUID botID = m_npcModule.CreateNPC(firstName, lastName, startPos,
                 npcOwner, senseAsAgent, ownerScene, appearance);
@@ -1209,7 +1209,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             m_log.LogInformation("[BotManager] Saved outfit '{0}' for {1}", outfitName, ownerID);
         }
 
-        /// <summary>PHLOX-14: osNpcSaveAppearance - the bot's own appearance into the caller's outfit store.</summary>
+        /// <summary>osNpcSaveAppearance - the bot's own appearance into the caller's outfit store.</summary>
         public UUID SaveBotOutfit(UUID botID, string outfitName, UUID ownerID, out string reason)
         {
             reason = null;
@@ -1320,7 +1320,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
         public List<UUID> GetBotsWithTag(string tag)
         {
-            // PHLOX-14: an empty tag means every bot - no bot carries "" as a tag, so this was an
+            // An empty tag means every bot - no bot carries "" as a tag, so this was an
             // always-empty query; it is how botGetBotsWithTag("") lists an osNpcCreate'd NPC.
             if (string.IsNullOrEmpty(tag)) return GetAllBots();
             List<UUID> result = new List<UUID>();

@@ -262,6 +262,25 @@ public class FriendsModule : ISharedRegionModule, IFriendsModule
         return false;
     }
 
+    public bool IsFriendInService(UUID principalID, UUID friendID)
+    {
+        FriendInfo[] friends;
+        try
+        {
+            friends = FriendsService?.GetFriends(principalID);
+        }
+        catch (Exception e)
+        {
+            m_log.LogWarning("[FRIENDS]: Could not read the friends of {0}: {1}", principalID, e.Message);
+            return false;
+        }
+        if (friends is null || friends.Length == 0)
+            return false;
+
+        FriendInfo finfo = GetFriend(friends, friendID);
+        return (finfo is not null && finfo.TheirFlags != -1);
+    }
+
     public bool IsFriendOnline(UUID userID, UUID friendID)
     {
         if(m_OnlineFriendsCache.TryGetValue(userID, out HashSet<UUID> friends))

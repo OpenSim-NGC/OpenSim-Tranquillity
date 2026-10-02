@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Ported from Halcyon/InWorldz to Legion Grid (dotnet10-modernization)
+// Ported from Halcyon/InWorldz to this engine
 // Adaptations:
 //   - ThreadTracker removed (not present in modern OpenSim)
 //   - IScriptEngine is PhloxEngine which already implements the interface
@@ -126,15 +126,33 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
             }
         }
 
+        private static readonly object m_cmdHandlerThreadLock = new object();
+
+        /// <summary>
+        /// Found in world: this was a race. The IsAlive check and the assignment
+        /// were unguarded, so two engines constructing at once could both pass the check, the second
+        /// overwrite the static before the first reached Start(), and one of them then call Start()
+        /// on a thread the other had already started - "Thread is running or terminated; it cannot
+        /// restart", thrown out of PhloxEngine.RegionLoaded. Every region in a process builds its own
+        /// AsyncCommandManager, so a multi-region simulator loading regions concurrently is exactly
+        /// the shape that hits it. The lock makes check-create-start atomic, and the thread that is
+        /// started is the one this call created.
+        /// </summary>
         private static void StartThread()
         {
-            if (cmdHandlerThread != null && cmdHandlerThread.IsAlive)
-                return;
+            lock (m_cmdHandlerThreadLock)
+            {
+                if (cmdHandlerThread != null && cmdHandlerThread.IsAlive)
+                    return;
 
-            cmdHandlerThread = new Thread(CmdHandlerThreadLoop);
-            cmdHandlerThread.Name = "PhloxAsyncCmdHandlerThread";
-            cmdHandlerThread.IsBackground = true;
-            cmdHandlerThread.Start();
+                Thread t = new Thread(CmdHandlerThreadLoop)
+                {
+                    Name = "PhloxAsyncCmdHandlerThread",
+                    IsBackground = true,
+                };
+                cmdHandlerThread = t;
+                t.Start();
+            }
         }
 
         private static void CmdHandlerThreadLoop()
@@ -196,23 +214,17 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api
         }
 
         /// <summary>
-        /// Remove a specific script and all its pending async commands.
+        /// Remove a specific script and all its pending async commands (Halcyon AsyncCommandManager.RemoveScript).
+        /// Reached through LSLSystemAPI.ReleaseScriptResources on unload; each plugin forgets the item as well as stopping it.
         /// </summary>
         public static void RemoveScript(IScriptEngine engine, uint localID, UUID itemID)
         {
             if (m_SensorRepeat.TryGetValue(engine, out SensorRepeat sr))
-                sr.UnSetSenseRepeaterEvents(localID, itemID);
-
-            IHttpRequestModule iHttpReq =
-                engine.World.RequestModuleInterface<IHttpRequestModule>();
-            iHttpReq?.StopHttpRequest(localID, itemID);
-
-            IXMLRPC xmlrpc = engine.World.RequestModuleInterface<IXMLRPC>();
-            if (xmlrpc != null)
-            {
-                xmlrpc.DeleteChannels(itemID);
-                xmlrpc.CancelSRDRequests(itemID);
-            }
+                sr.RemoveScript(itemID);
+            if (m_HttpRequest.TryGetValue(engine, out HttpRequest http))
+                http.RemoveEvents(localID, itemID);
+            if (m_XmlRequest.TryGetValue(engine, out XmlRequest xml))
+                xml.RemoveEvents(localID, itemID);
         }
 
         /// <summary>

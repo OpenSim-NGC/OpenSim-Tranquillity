@@ -23,6 +23,14 @@ namespace InWorldz.Phlox.Compiler
             = new BuiltInTypeSymbol("rotation", (int)VarType.Rotation);
         public static readonly BuiltInTypeSymbol LIST
             = new BuiltInTypeSymbol("list", (int)VarType.List);
+
+        /// <summary>
+        /// <c>quaternion</c> is an SL keyword "interchangeable with rotation" (wiki: Quaternion).
+        /// The lexer accepts it as a TYPE token; every place that turns TYPE text into a type goes
+        /// through here, so the alias resolves to the one ROTATION instance the type tables compare by.
+        /// </summary>
+        public static string CanonicalTypeName(string typeName)
+            => typeName == "quaternion" ? "rotation" : typeName;
         public static readonly BuiltInTypeSymbol KEY
             = new BuiltInTypeSymbol("key", (int)VarType.Key);
         public static readonly BuiltInTypeSymbol STRING
@@ -171,7 +179,9 @@ namespace InWorldz.Phlox.Compiler
             {
                 foreach (FunctionSig fn in systemFunctions)
                 {
-                    MethodSymbol sysMethod = new MethodSymbol(fn.FunctionName, indexToType[(int)fn.ReturnType], _globals);
+                    // A built-in with several signatures is several symbols - the first
+                    // under the bare name, the rest mangled - so defining them cannot collide.
+                    MethodSymbol sysMethod = new MethodSymbol(Defaults.SymbolNameFor(fn), indexToType[(int)fn.ReturnType], _globals);
                     sysMethod.IsSyscall = true;
                     for (int i = 0; i < fn.ParamNames.Length; i++)
                     {

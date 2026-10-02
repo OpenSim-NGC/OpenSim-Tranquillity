@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/legion-grid-source/OpenSim/Addons/Phlox/grammar/LSL.g4 by ANTLR 4.13.1
+// Generated from LSL.g4 by ANTLR 4.13.1
 
 // Unreachable code detected
 #pragma warning disable 0162

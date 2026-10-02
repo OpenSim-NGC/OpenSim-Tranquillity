@@ -53,7 +53,15 @@ namespace InWorldz.Phlox.Types
             TRANSACTION_RESULT,
             LINKSET_DATA,
             EXPERIENCE_PERMISSIONS,
-            EXPERIENCE_PERMISSIONS_DENIED
+            EXPERIENCE_PERMISSIONS_DENIED,
+            // Five SL events Phlox did not recognise: a script declaring any handler below
+            // failed to compile. Appended so no existing value moves (the enum value is the event's
+            // TableIndex and a saved PostedEvent carries it).
+            PATH_UPDATE,
+            ON_DAMAGE,
+            FINAL_DAMAGE,
+            ON_DEATH,
+            GAME_CONTROL
         }
 
         private Dictionary<string, FunctionSig> _supportedEvents = new Dictionary<string, FunctionSig>()
@@ -330,6 +338,63 @@ namespace InWorldz.Phlox.Types
                 ReturnType = VarType.Void,
                 ParamTypes = new VarType[] {VarType.Key, VarType.Integer},
                 TableIndex = (int) Events.EXPERIENCE_PERMISSIONS_DENIED
+            }},
+
+            // ----------------------------------------------------------------
+            // wiki.secondlife.com/wiki/Path_update - "path_update( integer type, list reserved )".
+            // DELIVERED: BotManager.FirePathEvent posts it beside bot_update for every bot path
+            // outcome, type mapped to PU_* (BOT_MOVE_COMPLETE -> PU_GOAL_REACHED, BOT_MOVE_FAILED ->
+            // PU_FAILURE_UNREACHABLE).
+            {"path_update", new FunctionSig {
+                FunctionName = "path_update",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] {VarType.Integer, VarType.List},
+                TableIndex = (int) Events.PATH_UPDATE
+            }},
+
+            // wiki.secondlife.com/wiki/On_damage - "on_damage( integer num_detected )", fired BEFORE
+            // damage is applied. DELIVERED: the region raises EventManager.OnAvatarDamage with each
+            // batch of pending damage before applying it, and PhloxEngine.OnAvatarDamage posts this
+            // event to every script in the avatar's attachments, waiting (bounded by OnDamageWaitMs)
+            // for the handlers so an llAdjustDamage lands before the damage does.
+            {"on_damage", new FunctionSig {
+                FunctionName = "on_damage",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] {VarType.Integer},
+                TableIndex = (int) Events.ON_DAMAGE
+            }},
+
+            // wiki.secondlife.com/wiki/Final_damage - "final_damage( integer num_detected )", fired
+            // AFTER all on_damage handlers ran and the damage was applied. DELIVERED: the region raises
+            // EventManager.OnAvatarDamageApplied with what landed, and PhloxEngine.OnAvatarDamageApplied
+            // posts this event to the same attachment scripts, without waiting.
+            {"final_damage", new FunctionSig {
+                FunctionName = "final_damage",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] {VarType.Integer},
+                TableIndex = (int) Events.FINAL_DAMAGE
+            }},
+
+            // wiki.secondlife.com/wiki/On_death - "on_death( )", "triggered on all attachments worn
+            // by an avatar when that avatar's health reaches 0". DELIVERED: PhloxEngine subscribes
+            // EventManager.OnAvatarKilled and posts it to every script on every attachment of the
+            // dead avatar.
+            {"on_death", new FunctionSig {
+                FunctionName = "on_death",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] {},
+                TableIndex = (int) Events.ON_DEATH
+            }},
+
+            // wiki.secondlife.com/wiki/Game_control - "game_control( key id, integer button_levels,
+            // list axes )" - THREE parameters per the wiki, not four. COMPILE-ONLY, and it stays so:
+            // it is "triggered when compatible viewer sends fresh GameControlInput message", a
+            // viewer->sim message Tranquillity does not carry. Nothing here fakes a trigger.
+            {"game_control", new FunctionSig {
+                FunctionName = "game_control",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] {VarType.Key, VarType.Integer, VarType.List},
+                TableIndex = (int) Events.GAME_CONTROL
             }},
         };
 

@@ -68,7 +68,7 @@ public class ExpressionConformanceTests
 
     public static readonly IReadOnlyList<Case> Cases = new List<Case>
     {
-        // ── The six live probes, verbatim ────────────────────────────────────
+        // ── The six in-world probes, verbatim ────────────────────────────────
         C("P1 for-init on a reused counter", AssignExpr, "FOR",
             "integer i = 5; for (i = 0; i < 3; i++) {} llOwnerSay((string)i);", "3"),
         C("P2 a = b = 7", AssignExpr, "ASSIGN",

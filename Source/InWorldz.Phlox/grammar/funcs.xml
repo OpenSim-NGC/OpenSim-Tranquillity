@@ -1683,6 +1683,8 @@
   <string name="LSLTipText_iwHasParcelPowers" translate="false">
     integer iwHasParcelPowers( integer groupPower );
     This function returns non-zero if the script owner has the specific group power (see IW_POWER_* constants).
+    IW_POWER_MANAGE_PASSES and the powers after it (IW_POWER_FREEZE_EJECT ... IW_POWER_OBJECT_RETURN) cannot be
+    combined with | : ask for each of them in its own call. The powers before it can be combined, and any one held is enough.
   </string>
   <string name="LSLTipText_iwGroundSurfaceNormal" translate="false">
     vector iwGroundSurfaceNormal(vector offset)

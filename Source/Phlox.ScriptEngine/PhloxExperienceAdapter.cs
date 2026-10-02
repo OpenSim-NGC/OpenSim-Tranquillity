@@ -1,4 +1,4 @@
-/* Copyright (c) 2026 Legion Grid / Tranquillity integration
+/* Copyright (c) 2026 Legion Builds
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -19,14 +19,14 @@ namespace Phlox.ScriptEngine
     /// Stable seam between Phlox's experience LSL surface and Tranquillity's NGC
     /// experience subsystem.
     ///
-    /// Phlox's LSLSystemAPI calls the Legion-shaped experience surface it has always
+    /// Phlox's LSLSystemAPI calls the experience surface it has always
     /// used (ReadKeyValue/CreateKeyValue→bool/IsAgentGranted/GetExperience/...). This
     /// adapter exposes exactly that surface and maps each call onto Tranquillity's NGC
     /// <see cref="IExperienceService"/> / <see cref="IExperienceModule"/>.
     ///
     /// The NGC service is AUTHORITATIVE for storage and is never modified. All
     /// translation lives here — this is the single place where the team will later
-    /// evolve experience behaviour toward Legion/SL semantics (search TODO(legion-semantics)).
+    /// evolve experience behaviour toward SL semantics (search TODO(sl-semantics)).
     /// Do NOT introduce a second experience store.
     /// </summary>
     public class PhloxExperienceAdapter
@@ -48,7 +48,7 @@ namespace Phlox.ScriptEngine
         public bool IsAvailable => m_service != null || m_module != null;
 
         /// <summary>
-        /// Minimal Legion-shaped experience record carrying only the fields Phlox reads
+        /// Minimal experience record carrying only the fields Phlox reads
         /// (Name/OwnerId/Description/GroupId/Maturity). Mapped from NGC ExperienceInfo
         /// (snake_case) so LSLSystemAPI call sites stay unchanged.
         /// </summary>
@@ -61,14 +61,14 @@ namespace Phlox.ScriptEngine
             public int Maturity;
             // Viewer property bitmask (PROPERTY_DISABLED/PROPERTY_PRIVATE/…). Mapped from NGC
             // ExperienceInfo.properties so the Phlox surface (llGetExperienceDetails state) can
-            // report enabled/disabled — T1/SS-1.
+            // report enabled/disabled.
             public int Properties;
         }
 
         // ────────────────────────── Key-Value store ──────────────────────────
-        // NGC GetKeyValue returns the value or null (same contract as Legion ReadKeyValue).
+        // NGC GetKeyValue returns the value or null (the same contract as Phlox's ReadKeyValue).
         // NGC mutators return status strings ("success"/"exists"/"missing"/"mismatch"/"full"/...);
-        // Legion expects bool, so we translate "success" => true.
+        // Phlox expects bool, so we translate "success" => true.
 
         public string ReadKeyValue(UUID experienceId, string key)
             => m_service?.GetKeyValue(experienceId, key);
@@ -80,13 +80,31 @@ namespace Phlox.ScriptEngine
         {
             if (m_service == null)
                 return false;
-            // Legion: a non-empty 'check' means compare-and-set against that original value.
+            // A non-empty 'check' means compare-and-set against that original value.
             bool doCheck = !string.IsNullOrEmpty(check);
             return m_service.UpdateKeyValue(experienceId, key, value, doCheck, check ?? string.Empty) == "success";
         }
 
         public bool DeleteKeyValue(UUID experienceId, string key)
             => m_service != null && m_service.DeleteKey(experienceId, key) == "success";
+
+        // The SL-form calls answer with an XP_ERROR_* per NGC status, so they need the status itself, not the
+        // bool above. Same service calls; null means there is no key-value store.
+
+        /// <summary>True when the NGC key-value store (IExperienceService) is present.</summary>
+        public bool HasKeyValueStore => m_service != null;
+
+        /// <summary>NGC CreateKeyValue: "success" / "exists" / "full" / "error".</summary>
+        public string CreateKeyValueStatus(UUID experienceId, string key, string value)
+            => m_service?.CreateKeyValue(experienceId, key, value);
+
+        /// <summary>NGC UpdateKeyValue: "success" / "mismatch" / "missing" / "full" / "error". It never creates a key.</summary>
+        public string UpdateKeyValueStatus(UUID experienceId, string key, string value, bool check, string original)
+            => m_service?.UpdateKeyValue(experienceId, key, value, check, original ?? string.Empty);
+
+        /// <summary>NGC DeleteKey: "success" / "missing" / "failed".</summary>
+        public string DeleteKeyValueStatus(UUID experienceId, string key)
+            => m_service?.DeleteKey(experienceId, key);
 
         public int KeyCountKeyValue(UUID experienceId)
             => m_service?.GetKeyCount(experienceId) ?? 0;
@@ -113,12 +131,12 @@ namespace Phlox.ScriptEngine
 
         public bool IsAgentBlocked(UUID experienceId, UUID agentId)
         {
-            // T4: block enforcement read. The module's per-agent cache (loaded on login, updated on
+            // Block enforcement read. The module's per-agent cache (loaded on login, updated on
             // the ExperiencePreferences PUT) is authoritative when it HAS the entry. On a cache MISS
             // (None) — or when only the service is available — consult the service: Tranquillity's
             // single permissions table stores block as allow=FALSE, so a present entry with allow=false
             // is a BLOCK and an ABSENT entry is not-granted. FetchExperiencePermissions returns both,
-            // so a persisted block IS distinguishable here (closes the earlier legion-semantics TODO).
+            // so a persisted block IS distinguishable here (closes the earlier sl-semantics TODO).
             if (m_module != null)
             {
                 ExperiencePermission p = m_module.GetExperiencePermission(agentId, experienceId);
@@ -136,7 +154,7 @@ namespace Phlox.ScriptEngine
             // Prefer the MODULE's setter: it writes the service AND updates the per-agent cache that
             // the read path (GetExperiencePermission) uses — so an accepted grant is immediately seen
             // as already-granted (no re-prompt on the next request). Service-only would persist the DB
-            // but leave the cache stale until the next login reload. (T4 coherency; NGC storage untouched.)
+            // but leave the cache stale until the next login reload. (NGC storage untouched.)
             if (m_module != null)
                 return m_module.SetExperiencePermissions(agentId, experienceId, true);
             if (m_service != null)
@@ -148,7 +166,7 @@ namespace Phlox.ScriptEngine
 
         public List<UUID> GetAllowedExperiences(UUID regionId)
         {
-            // TODO(legion-semantics): Legion's allow-list is per-REGION. NGC exposes estate-scoped
+            // TODO(sl-semantics): the port source's allow-list is per-REGION. NGC exposes estate-scoped
             // (GetEstateAllowedExperiences) and avatar-scoped lists, not a direct per-region list.
             // Estate scope is the closest analogue for gating an experience inside the region.
             UUID[] allowed = m_module?.GetEstateAllowedExperiences();
@@ -157,9 +175,9 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// Region-TRUSTED experiences. Tranquillity's trusted list = the estate "key" experiences
-        /// (EstateKeyExperience) — NOT a dedicated table (Legion uses experience_trusted; we do not
-        /// port Legion's storage). A trusted experience grants consent silently (no dialog). This is
-        /// the T3 consent SEAM; full trusted ENFORCEMENT (admission/consent-bypass) is T5.
+        /// (EstateKeyExperience) — NOT a dedicated table (the port source uses experience_trusted; its
+        /// storage is not ported). A trusted experience grants consent silently (no dialog). This is
+        /// the consent SEAM; full trusted ENFORCEMENT (admission/consent-bypass) is in LSLSystemAPI.
         /// </summary>
         public List<UUID> GetTrustedExperiences(UUID regionId)
         {
@@ -168,7 +186,7 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// Region-BLOCKED experiences (T5b) — estate `BlockedExperiences` (the third list next to
+        /// Region-BLOCKED experiences — estate `BlockedExperiences` (the third list next to
         /// allowed + key/trusted). The block-wins tier of the admission ladder: a region-blocked
         /// experience is denied regardless of allow/trusted/prior-grant.
         /// </summary>
@@ -208,7 +226,7 @@ namespace Phlox.ScriptEngine
         public UUID GetScriptExperience(UUID scriptItemId)
         {
             // SL-canonical source: the script's task-inventory item carries its ExperienceID,
-            // set when the script is compiled under an experience. This replaces Legion's
+            // set when the script is compiled under an experience. This replaces the port source's
             // in-memory ExperienceModule.m_ScriptExperiences map with the persisted item field.
             TaskInventoryItem item = m_host?.Inventory?.GetInventoryItem(scriptItemId);
             return item?.ExperienceID ?? UUID.Zero;
@@ -216,7 +234,7 @@ namespace Phlox.ScriptEngine
 
         public void InvalidatePermission(UUID experienceId, UUID agentId)
         {
-            // TODO(legion-semantics): Legion's ExperienceModule kept a permission cache that this
+            // TODO(sl-semantics): the port source's ExperienceModule kept a permission cache that this
             // call flushed. The NGC path reads permissions live, so there is nothing to invalidate.
             // Intentionally a no-op — must NOT call ForgetExperiencePermissions (that would REVOKE
             // the grant rather than just drop a cache entry).

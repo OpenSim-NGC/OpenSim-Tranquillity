@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Ported from Halcyon/InWorldz to Legion Grid (dotnet10-modernization)
+// Ported from Halcyon/InWorldz to this engine
 // Adaptations:
 //   - OpenSim.Framework.Communications.Cache removed (not present in modern OpenSim)
 //   - Bot/ScenePresence scanning paths removed (iw* bot functions not ported)
@@ -133,6 +133,21 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                     ts => ts.localID != m_localID || ts.itemID != m_itemID);
             }
         }
+
+        /// <summary>
+        /// The script is gone or reset - its repeat ends whatever prim it was set from (Halcyon
+        /// RemoveAllAsyncHandlers / AsyncCommandManager.RemoveScript). Keyed on the item alone, so a repeat set before a
+        /// link change cannot outlive it.
+        /// </summary>
+        public void RemoveScript(UUID itemID)
+        {
+            lock (SenseRepeatListLock)
+                SenseRepeaters = SenseRepeaters.FindAll(ts => ts.itemID != itemID);
+        }
+
+        /// <summary>Repeats held, in all or for one item (tests and the leak check).</summary>
+        internal int RepeaterCount { get { lock (SenseRepeatListLock) return SenseRepeaters.Count; } }
+        internal int RepeatersFor(UUID itemID) { lock (SenseRepeatListLock) return SenseRepeaters.FindAll(ts => ts.itemID == itemID).Count; }
 
         public void CheckSenseRepeaterEvents()
         {

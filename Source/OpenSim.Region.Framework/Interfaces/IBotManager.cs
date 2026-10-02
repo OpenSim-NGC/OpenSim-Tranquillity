@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Legion Grid Contributors
+ * Copyright (c) Legion Builds
  * IBotManager.cs — Bot/NPC management interface for Phlox script engine
  * Bridges InWorldz-style bot* LSL functions to OpenSim's INPCModule infrastructure.
  */
@@ -51,7 +51,7 @@ namespace OpenSim.Region.Framework.Interfaces
             string outfitName, UUID scriptItemID, UUID ownerID, out string reason);
 
         /// <summary>
-        /// PHLOX-14. The osNpcCreate door onto the same bots: <paramref name="ownerID"/> supplies the scene
+        /// The osNpcCreate door onto the same bots: <paramref name="ownerID"/> supplies the scene
         /// and the appearance as before, but the NPC (and its BotData) is owned by nobody when
         /// <paramref name="owned"/> is false (OS_NPC_NOT_OWNED), and <paramref name="senseAsAgent"/> is
         /// OS_NPC_SENSE_AS_AGENT rather than the always-true the bot* door passes.
@@ -60,7 +60,7 @@ namespace OpenSim.Region.Framework.Interfaces
             string outfitName, UUID scriptItemID, UUID ownerID, bool owned, bool senseAsAgent, out string reason);
 
         /// <summary>
-        /// PHLOX-14. osNpcSaveAppearance's door: capture the BOT's current appearance into the caller's
+        /// osNpcSaveAppearance's door: capture the BOT's current appearance into the caller's
         /// outfit store under <paramref name="outfitName"/> (SaveOutfitToDatabase captures the owner's).
         /// Returns the outfit's key, UUID.Zero with a reason on failure.
         /// </summary>

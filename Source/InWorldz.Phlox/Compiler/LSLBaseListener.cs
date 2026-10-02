@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/legion-grid-source/OpenSim/Addons/Phlox/grammar/LSL.g4 by ANTLR 4.13.1
+// Generated from LSL.g4 by ANTLR 4.13.1
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -27,7 +27,7 @@ using IToken = Antlr4.Runtime.IToken;
 using ParserRuleContext = Antlr4.Runtime.ParserRuleContext;
 
 /// <summary>
-/// This class provides an empty implementation of <see cref="ILSLListener"/>,
+/// This class provides an empty implementation of <see cref="ILSLParseTreeListener"/>,
 /// which can be extended to create a listener which only needs to handle a subset
 /// of the available methods.
 /// </summary>

@@ -216,7 +216,7 @@ namespace InWorldz.Phlox.VM
                             subScriptValue = vlocal.X - 1;
                         }
 
-                        destList[destIndex] = new Vector3((float)subScriptValue, vlocal.Y, vlocal.Z);
+                        destList[destIndex] = new Vector3(ConvToFloat(subScriptValue), vlocal.Y, vlocal.Z);
                         return vlocal.X;
 
                     case 1:
@@ -229,7 +229,7 @@ namespace InWorldz.Phlox.VM
                             subScriptValue = vlocal.Y - 1;
                         }
 
-                        destList[destIndex] = new Vector3(vlocal.X, (float)subScriptValue, vlocal.Z);
+                        destList[destIndex] = new Vector3(vlocal.X, ConvToFloat(subScriptValue), vlocal.Z);
                         return vlocal.Y;
 
                     case 2:
@@ -242,7 +242,7 @@ namespace InWorldz.Phlox.VM
                             subScriptValue = vlocal.Z - 1;
                         }
 
-                        destList[destIndex] = new Vector3(vlocal.X, vlocal.Y, (float)subScriptValue);
+                        destList[destIndex] = new Vector3(vlocal.X, vlocal.Y, ConvToFloat(subScriptValue));
                         return vlocal.Z;
 
                     default:
@@ -264,7 +264,7 @@ namespace InWorldz.Phlox.VM
                             subScriptValue = qlocal.X - 1;
                         }
 
-                        destList[destIndex] = new Quaternion((float)subScriptValue, qlocal.Y, qlocal.Z, qlocal.W);
+                        destList[destIndex] = new Quaternion(ConvToFloat(subScriptValue), qlocal.Y, qlocal.Z, qlocal.W);
                         return qlocal.X;
 
                     case 1:
@@ -277,7 +277,7 @@ namespace InWorldz.Phlox.VM
                             subScriptValue = qlocal.Y - 1;
                         }
 
-                        destList[destIndex] = new Quaternion(qlocal.X, (float)subScriptValue, qlocal.Z, qlocal.W);
+                        destList[destIndex] = new Quaternion(qlocal.X, ConvToFloat(subScriptValue), qlocal.Z, qlocal.W);
                         return qlocal.Y;
 
                     case 2:
@@ -290,7 +290,7 @@ namespace InWorldz.Phlox.VM
                             subScriptValue = qlocal.Z - 1;
                         }
 
-                        destList[destIndex] = new Quaternion(qlocal.X, qlocal.Y, (float)subScriptValue, qlocal.W);
+                        destList[destIndex] = new Quaternion(qlocal.X, qlocal.Y, ConvToFloat(subScriptValue), qlocal.W);
                         return qlocal.Z;
 
                     case 3:
@@ -303,7 +303,7 @@ namespace InWorldz.Phlox.VM
                             subScriptValue = qlocal.W - 1;
                         }
 
-                        destList[destIndex] = new Quaternion(qlocal.X, qlocal.Y, qlocal.Z, (float)subScriptValue);
+                        destList[destIndex] = new Quaternion(qlocal.X, qlocal.Y, qlocal.Z, ConvToFloat(subScriptValue));
                         return qlocal.W;
 
                     default:
@@ -1089,9 +1089,23 @@ namespace InWorldz.Phlox.VM
             SafeOperandsPush(a - b);
         }
 
-        private Quaternion _QuatMul(Quaternion b, Quaternion a)
+        /// <summary>
+        /// Exact quaternion multiply: LSL's <c>lhs * rhs</c> with SL's operand order and formula.
+        /// LL's operator*(a, b) (llquaternion.cpp) is x = b.w*a.x + b.x*a.w + b.y*a.z - b.z*a.y, ..., w = b.w*a.w -
+        /// b.x*a.x - b.y*a.y - b.z*a.z: the Hamilton product rhs (x) lhs, unnormalised, no sign change (SL wiki Rotation:
+        /// "rotation r3 = r1 * r2;" applies r1, then r2). YEngine's LSL_Types operator * is the same. The package's
+        /// operator * returned one operand unchanged when the other's |W| > 0.999999 (rotations under about 0.16 degrees
+        /// were lost) and Halcyon negated the product (the same rotation with every sign flipped).
+        /// </summary>
+        private static Quaternion _QuatMul(Quaternion lhs, Quaternion rhs)
         {
-            return Quaternion.Negate(a * b);
+            return Quaternion.Multiply(in rhs, in lhs);
+        }
+
+        /// <summary>LSL's <c>lhs / rhs</c>: lhs * the conjugate of rhs (SL: "The divide operation does a negative rotation"; YEngine's operator /).</summary>
+        private static Quaternion _QuatDiv(Quaternion lhs, Quaternion rhs)
+        {
+            return _QuatMul(lhs, new Quaternion(-rhs.X, -rhs.Y, -rhs.Z, rhs.W));
         }
 
         private void Op_Rmul()
@@ -1107,8 +1121,7 @@ namespace InWorldz.Phlox.VM
             Quaternion b = (Quaternion)_state.Operands.Pop();
             Quaternion a = (Quaternion)_state.Operands.Pop();
 
-            Quaternion binv = new Quaternion(b.X, b.Y, b.Z, -b.W);
-            SafeOperandsPush(Quaternion.Negate(_QuatMul(a, binv)));
+            SafeOperandsPush(_QuatDiv(a, b));
         }
 
         private void Op_Req()
@@ -1303,7 +1316,7 @@ namespace InWorldz.Phlox.VM
             }
             else if (a is float)
             {
-                SafeOperandsPush((int)(float)a);
+                SafeOperandsPush(Util.LslConvert.FloatToInteger((float)a));   // NaN and out of range give -2147483648, as SL
             }
             else if (a is int)
             {
@@ -1424,7 +1437,7 @@ namespace InWorldz.Phlox.VM
             if (a is string)
             {
                 Vector3 ret;
-                if (Vector3.TryParse((string)a, out ret))
+                if (Util.Encoding.TryParseLslVector((string)a, out ret))   // Halcyon's parser
                 {
                     SafeOperandsPush(ret);
                 }
@@ -1452,7 +1465,7 @@ namespace InWorldz.Phlox.VM
             {
                 Quaternion ret;
 
-                if (Quaternion.TryParse((string)a, out ret))
+                if (Util.Encoding.TryParseLslRotation((string)a, out ret))   // Halcyon's parser
                 {
                     SafeOperandsPush(ret);
                 }
@@ -2008,7 +2021,7 @@ namespace InWorldz.Phlox.VM
             if (_detMethods == null)
             {
                 var map = new Dictionary<string, int>();
-                void Add(string method, string ll) { if (Defaults.SystemMethods.TryGetValue(ll, out var s)) map[method] = s.TableIndex; }
+                void Add(string method, string ll) { if (Defaults.TryGetMethod(ll, out var s)) map[method] = s.TableIndex; }
                 Add("getKey", "llDetectedKey"); Add("getName", "llDetectedName"); Add("getPos", "llDetectedPos");
                 Add("getOwner", "llDetectedOwner"); Add("getGroup", "llDetectedGroup"); Add("getType", "llDetectedType");
                 Add("getVel", "llDetectedVel"); Add("getRot", "llDetectedRot"); Add("getLinkNumber", "llDetectedLinkNumber");
@@ -2220,8 +2233,7 @@ namespace InWorldz.Phlox.VM
                     }
                     else if (a is Quaternion aq3 && b is Quaternion bq3b)
                     {
-                        Quaternion binv = new Quaternion(bq3b.X, bq3b.Y, bq3b.Z, -bq3b.W);
-                        return Quaternion.Negate(_QuatMul(aq3, binv));
+                        return _QuatDiv(aq3, bq3b);
                     }
                     break;
                 case 4: // % -> cross (vectors)
@@ -2561,12 +2573,17 @@ namespace InWorldz.Phlox.VM
             _state.TopFrame.Locals[lidx] = newVal;
         }
 
+        /// <summary>
+        /// SL: <c>a != b</c> on lists is <c>llGetListLength(a) - llGetListLength(b)</c> - the length
+        /// difference, not 0/1 ("Equality test on lists does not compare contents, only the length").
+        /// <c>==</c> (Op_Leq) stays 0/1: TRUE when the lengths match.
+        /// </summary>
         private void Op_Lneq()
         {
             LSLList rhs = (LSLList)_state.Operands.Pop();
             LSLList lhs = (LSLList)_state.Operands.Pop();
 
-            SafeOperandsPush(lhs.Members.Count == rhs.Members.Count ? 0 : 1);
+            SafeOperandsPush(lhs.Members.Count - rhs.Members.Count);
         }
 
         private const string ZERO_GUID = "00000000-0000-0000-0000-000000000000";

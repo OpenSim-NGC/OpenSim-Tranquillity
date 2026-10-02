@@ -1,8 +1,8 @@
 /*
- * Legion Grid — Phlox Script Engine Integration
+ * Phlox Script Engine Integration
  * Adapted from InWorldz Halcyon EngineInterface.cs
  * Copyright (c) InWorldz Halcyon Developers (original)
- * Adapted 2026 for Legion Grid / OpenSim 0.9.3 .NET 8
+ * Adapted 2026 by Legion Builds for OpenSim 0.9.3 .NET 8
  */
 
 using System;
@@ -28,7 +28,10 @@ namespace Phlox.ScriptEngine
     // No Mono.Addins [assembly: Addin]/[Extension] registration: develop discovers
     // region modules by interface reflection (IPluginDiscovery scans for
     // INonSharedRegionModule implementers), same as the other engine modules.
-    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule
+    /// <summary>Where syscalls that can reach a service run.</summary>
+    public enum ServiceCallDeferralMode { Auto, Always, Never }
+
+    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -50,12 +53,103 @@ namespace Phlox.ScriptEngine
 
         #region INonSharedRegionModule
 
-        public string Name => "InWorldz.Phlox";
+        public string Name => PhloxEngineHeader.PhloxName;
         public Type ReplaceableInterface => null;
+
+        /// <summary>
+        /// The shipped floor for <c>llSetTimerEvent</c>, in seconds. Matches
+        /// <c>OpenSimDefaults.ini</c> <c>[YEngine] MinTimerInterval = 0.1</c>, which is what this grid
+        /// already applies to the other engine.
+        /// </summary>
+        public const float DefaultMinTimerInterval = 0.1f;
+
+        /// <summary>
+        /// The floor a positive <c>llSetTimerEvent</c> request is raised to, in seconds. Config key
+        /// <c>MinTimerInterval</c> in <c>[InWorldz.Phlox]</c>; 0 disables the floor entirely.
+        /// </summary>
+        public float MinTimerInterval { get; private set; } = DefaultMinTimerInterval;
+
+        /// <summary>[InWorldz.Phlox] AllowGodFunctions if set, else YEngine's [YEngine] AllowGodFunctions (default false).</summary>
+        public bool AllowGodFunctions { get; private set; }
+
+        /// <summary>
+        /// YEngine's [YEngine] AutomaticLinkPermission (default false; LSL_Api.LoadConfig, LSL_Api.cs:519), read
+        /// from the same key so one setting means the same for both engines: when true, llCreateLink and llBreakLink need no
+        /// PERMISSION_CHANGE_LINKS and llGetPermissions reports it (as YEngine and Halcyon).
+        /// </summary>
+        public bool AutomaticLinkPermission { get; private set; }
+
+        /// <summary>
+        /// Halcyon's reset throttle (LSLSystemAPI.ThrottleScriptResets): more than 5 resets of one script in one
+        /// second puts it to sleep for 5 s, with a warning once an hour. [InWorldz.Phlox] ResetThrottle, default true: one of
+        /// Halcyon's anti-abuse slowdowns, restored on by default with an operator setting, as the others are.
+        /// </summary>
+        public bool ResetThrottle { get; private set; } = true;
+
+        // The rest of Halcyon's anti-abuse slowdowns, each on by default under its own [InWorldz.Phlox] key;
+        // false is exactly the behaviour without them. The rules and their Halcyon sources are on the LSLSystemAPI helpers.
+
+        /// <summary>15 ms after llSay, llShout, llWhisper, llRegionSay, llRegionSayTo and llOwnerSay. [InWorldz.Phlox] ChatThrottle.</summary>
+        public bool ChatThrottle { get; private set; } = true;
+        /// <summary>15 ms after the bot chat, typing, sit, stand and touch calls. [InWorldz.Phlox] BotThrottle.</summary>
+        public bool BotThrottle { get; private set; } = true;
+        /// <summary>Halcyon's PhySleep on the physics setters. [InWorldz.Phlox] PhysicsThrottle.</summary>
+        public bool PhysicsThrottle { get; private set; } = true;
+        /// <summary>50 ms back-pressure on llMessageLinked / botMessageLinked. [InWorldz.Phlox] LinkMessageThrottle.</summary>
+        public bool LinkMessageThrottle { get; private set; } = true;
+        /// <summary>Halcyon's notecard read delays. [InWorldz.Phlox] NotecardThrottle.</summary>
+        public bool NotecardThrottle { get; private set; } = true;
+        /// <summary>The parsed-notecard cache (Halcyon's NotecardCache). [InWorldz.Phlox] NotecardCache.</summary>
+        public bool NotecardCacheEnabled { get; private set; } = true;
+        /// <summary>iwFormatString's 100 ms. [InWorldz.Phlox] FormatStringThrottle.</summary>
+        public bool FormatStringThrottle { get; private set; } = true;
+        /// <summary>
+        /// The HTTP in-flight caps (Halcyon's, 10 per object and 200 per region, a refused llHTTPRequest
+        /// gives NULL_KEY after 80 ms). [InWorldz.Phlox] HttpInFlightThrottle, default true; false removes both caps and
+        /// the 80 ms.
+        /// </summary>
+        public bool HttpInFlightThrottle { get; private set; } = true;
+
+        /// <summary>This region's notecard cache (used only while <see cref="NotecardCacheEnabled"/>).</summary>
+        internal PhloxNotecardCache NotecardCache { get; } = new PhloxNotecardCache();
+
+        /// <summary>
+        /// Halcyon's PhysicsScene.SimulationFrameTimeAvg - a MovingIntegerAverage(10) of the physics frame time
+        /// (InWorldz.PhysxPhysics/PhysxScene.cs:134, 192-197, 413). Fed once per heartbeat frame from the scene's own
+        /// timings (UpdatePhysics + UpdatePreparePhysics, which the sim stats add up as the physics ms), while
+        /// PhysicsThrottle is on.
+        /// </summary>
+        private readonly MovingIntegerAverage m_PhysicsFrameTimes = new MovingIntegerAverage(10);
+        internal int PhysicsFrameTimeAvg => m_PhysicsFrameTimes.CalculateAverage();
+
+        private void OnFrameForPhysicsTime()
+        {
+            Scene scene = m_Scene;
+            if (scene == null) return;
+            m_PhysicsFrameTimes.AddValue(scene.MonitorPhysicsUpdateTime + scene.MonitorPhysicsSyncTime);
+        }
+
+        /// <summary>
+        /// Halcyon's EngineInterface.GetEventQueueFreeSpacePercentage (EngineInterface.cs:814-824): 1.0 for a
+        /// script this engine does not run, 0 when the queue is full, else 1 - queued / MAX_EVENT_QUEUE_SIZE.
+        /// </summary>
+        internal float GetEventQueueFreeSpacePercentage(UUID itemID)
+        {
+            InWorldz.Phlox.VM.Interpreter script = m_ExeScheduler?.FindScript(itemID);
+            if (script == null) return 1.0f;
+            int queued;
+            lock (script.ScriptState.EventQueueLock) queued = script.ScriptState.EventQueue.Count;
+            if (queued >= InWorldz.Phlox.VM.RuntimeState.MAX_EVENT_QUEUE_SIZE) return 0.0f;
+            return 1.0f - (float)queued / InWorldz.Phlox.VM.RuntimeState.MAX_EVENT_QUEUE_SIZE;
+        }
+
+        /// <summary>The [OSSL] permission gate, read from the same config YEngine reads.</summary>
+        internal OsslGate Ossl { get; private set; } = new OsslGate(null);
 
         public void Initialise(IConfigSource config)
         {
             m_ConfigSource = config;
+            Ossl = new OsslGate(config);
             m_Config = config.Configs["InWorldz.Phlox"];
             if (m_Config == null)
             {
@@ -64,6 +158,67 @@ namespace Phlox.ScriptEngine
             }
             m_Enabled = m_Config.GetBoolean("Enabled", false);
             m_log.LogInformation("[PhloxEngine]: Enabled = {0}", m_Enabled);
+
+            // The floor for llSetTimerEvent. Same key name and same default as the
+            // other engine on this grid, so an operator sets one number and both agree:
+            // LSL_Api.llSetTimerEvent clamps at m_MinTimerInterval (LSL_Api.cs:4005-4011) and
+            // OpenSimDefaults.ini ships [YEngine] MinTimerInterval = 0.1. Neither SL nor
+            // InWorldz clamps at all - the SL wiki documents no minimum, and Halcyon assigns
+            // TimerInterval = (int)(sec * 1000) with none - so 0.1 is this grid's number, not
+            // an upstream-of-Phlox one, and it is written down here rather than inferred.
+            MinTimerInterval = m_Config.GetFloat("MinTimerInterval", DefaultMinTimerInterval);
+            // Chat ranges for Phlox listens: the region's [Chat] distances, read with the same keys and
+            // defaults as the chat module, WorldComm and YEngine, so every listener hears the same range.
+            IConfig chatConfig = config.Configs["Chat"];
+            if (chatConfig != null)
+            {
+                m_WhisperDistance = chatConfig.GetInt("whisper_distance", m_WhisperDistance);
+                m_SayDistance = chatConfig.GetInt("say_distance", m_SayDistance);
+                m_ShoutDistance = chatConfig.GetInt("shout_distance", m_ShoutDistance);
+            }
+            // Listen caps from [LL-Functions] max_listens_per_script / max_listens_per_region, read as the
+            // core WorldCommModule reads them for YEngine, so both engines take one config value the same way.
+            (m_MaxListensPerScript, m_MaxListensPerRegion) = PhloxListenManager.ReadListenCaps(config, out string listenCapWarning);
+            if (listenCapWarning != null) m_log.LogWarning("[PhloxEngine]: {0}", listenCapWarning);
+            m_log.LogInformation("[PhloxEngine]: max_listens_per_script = {0}, max_listens_per_region = {1}",
+                m_MaxListensPerScript == int.MaxValue ? "no limit" : m_MaxListensPerScript.ToString(),
+                m_MaxListensPerRegion == int.MaxValue ? "no limit" : m_MaxListensPerRegion.ToString());
+            // YEngine's switch for god functions (llSetInventoryPermMask and llSetObjectPermMask), off by
+            // default. Read as YEngine reads it - [YEngine] AllowGodFunctions, default false (LSL_Api.LoadConfig
+            // takes it from m_ScriptEngine.Config, which is config.Configs["YEngine"]) - so one value gates both engines.
+            // An [InWorldz.Phlox] AllowGodFunctions, where set, still wins, as it did before.
+            AllowGodFunctions = m_Config.GetBoolean("AllowGodFunctions",
+                config.Configs["YEngine"]?.GetBoolean("AllowGodFunctions", false) ?? false);
+            AutomaticLinkPermission = config.Configs["YEngine"]?.GetBoolean("AutomaticLinkPermission", false) ?? false;
+            if (MinTimerInterval < 0f) MinTimerInterval = 0f;
+            m_log.LogInformation("[PhloxEngine]: MinTimerInterval = {0}s", MinTimerInterval);
+            ResetThrottle = m_Config.GetBoolean("ResetThrottle", true);
+            // Halcyon's anti-abuse slowdowns, on by default; one line per region with every value.
+            ChatThrottle = m_Config.GetBoolean("ChatThrottle", true);
+            BotThrottle = m_Config.GetBoolean("BotThrottle", true);
+            PhysicsThrottle = m_Config.GetBoolean("PhysicsThrottle", true);
+            LinkMessageThrottle = m_Config.GetBoolean("LinkMessageThrottle", true);
+            NotecardThrottle = m_Config.GetBoolean("NotecardThrottle", true);
+            NotecardCacheEnabled = m_Config.GetBoolean("NotecardCache", true);
+            FormatStringThrottle = m_Config.GetBoolean("FormatStringThrottle", true);
+            HttpInFlightThrottle = m_Config.GetBoolean("HttpInFlightThrottle", true);
+            m_log.LogInformation("[PhloxEngine]: Anti-abuse slowdowns: ResetThrottle = {0}, ChatThrottle = {1}, BotThrottle = {2}, " +
+                "PhysicsThrottle = {3}, LinkMessageThrottle = {4}, NotecardThrottle = {5}, NotecardCache = {6}, FormatStringThrottle = {7}, " +
+                "HttpInFlightThrottle = {8}",
+                ResetThrottle, ChatThrottle, BotThrottle, PhysicsThrottle, LinkMessageThrottle, NotecardThrottle,
+                NotecardCacheEnabled, FormatStringThrottle, HttpInFlightThrottle);
+
+            // Syscalls that can reach a service run off the scheduler thread.
+            // auto (default) = inline when the answer is local or cached, deferred otherwise;
+            // always = defer every such call; never = everything inline.
+            string deferral = m_Config.GetString("ServiceCallDeferral", "auto").Trim().ToLowerInvariant();
+            ServiceCallDeferral = deferral switch
+            {
+                "always" => ServiceCallDeferralMode.Always,
+                "never" => ServiceCallDeferralMode.Never,
+                _ => ServiceCallDeferralMode.Auto,
+            };
+            m_log.LogInformation("[PhloxEngine]: ServiceCallDeferral = {0}", ServiceCallDeferral);
 
             // Deploy-hygiene guard: Phlox is compiled against the tree's Library/C5.dll
             // (1.1 identity). If the runtime resolves a different C5 (e.g. a NuGet 3.x
@@ -117,10 +272,12 @@ namespace Phlox.ScriptEngine
                 m_Enabled = false;
                 return;
             }
+            m_WorldComm = worldComm;
             m_ExeScheduler = new PhloxExecutionScheduler(WorkArrived, this, worldComm);
             m_ScriptLoader = new PhloxScriptLoader(scene.AssetService, m_ExeScheduler, WorkArrived, this);
             m_MasterScheduler = new PhloxMasterScheduler(m_ExeScheduler, m_ScriptLoader);
-            ListenManager = new PhloxListenManager(m_ExeScheduler);
+            ListenManager = new PhloxListenManager(m_ExeScheduler, scene,
+                m_WhisperDistance, m_SayDistance, m_ShoutDistance, m_MaxListensPerScript, m_MaxListensPerRegion);
             AsyncCommands = new AsyncCommandManager(this);
             StateManager = new StateManager(this);
             StateManager.Start();
@@ -134,10 +291,15 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnGetScriptRunning += OnGetScriptRunning;
             m_Scene.EventManager.OnChatFromWorld += OnChatFromWorld;
             m_Scene.EventManager.OnChatFromClient += OnChatFromClient;
+            m_Scene.EventManager.OnChatBroadcast += OnChatBroadcast;
+            m_WorldComm.OnMessageDelivered += OnWorldCommMessage;
             m_Scene.EventManager.OnObjectGrab += OnObjectGrab;
             m_Scene.EventManager.OnObjectGrabbing += OnObjectGrabbing;
             m_Scene.EventManager.OnObjectDeGrab += OnObjectDeGrab;
             m_Scene.EventManager.OnScriptChangedEvent += OnScriptChangedEvent;
+            m_Scene.EventManager.OnAvatarKilled += OnAvatarKilled;   // on_death
+            m_Scene.EventManager.OnAvatarDamage += OnAvatarDamage;   // on_damage (synchronous)
+            m_Scene.EventManager.OnAvatarDamageApplied += OnAvatarDamageApplied;   // final_damage
             m_Scene.EventManager.OnScriptControlEvent += OnScriptControlEvent;
 			m_Scene.EventManager.OnShutdown += OnShutdown;
             m_Scene.EventManager.OnScriptColliderStart     += OnScriptColliderStart;
@@ -154,6 +316,13 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptAtRotTargetEvent    += OnScriptAtRotTargetEvent;
             m_Scene.EventManager.OnScriptNotAtRotTargetEvent += OnScriptNotAtRotTargetEvent;
             m_Scene.EventManager.OnObjectBeingRemovedFromScene += OnObjectBeingRemovedFromScene;
+            // The triggers for the No Scripts parcel check (the scene's parcel-crossing events and the land events)
+            m_Scene.EventManager.OnGroupCrossedToNewParcel   += OnGroupCrossedToNewParcel;
+            m_Scene.EventManager.OnObjectOwnerOrGroupChanged += OnObjectOwnerOrGroupChanged;
+            m_Scene.EventManager.OnLandObjectAdded           += OnLandObjectChanged;
+            m_Scene.EventManager.OnScriptControlsReleased    += OnScriptControlsReleased;
+            m_Scene.EventManager.OnRemovePresence            += OnRemovePresenceForControls;
+            if (PhysicsThrottle) m_Scene.EventManager.OnFrame += OnFrameForPhysicsTime;
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
                 moneyModule.OnObjectPaid += HandleObjectPaid;
@@ -171,6 +340,11 @@ namespace Phlox.ScriptEngine
                     "phlox suspend <script-item-uuid | object-name>",
                     "Transiently pause Phlox script(s): timers/listens/state survive; no timeslices until 'phlox resume'. Not persisted — a region restart clears it. Does NOT touch the Running flag.",
                     HandleSuspendCommand);
+                MainConsole.Instance.Commands.AddCommand("Phlox", false,
+                    "phlox status",
+                    "phlox status <script-item-uuid | object-name>",
+                    "Read-only: what state a Phlox script is in - RunState, enabled flags, queued events, LSL state, timer interval, the event mask the region holds for the prim, and the item's Running flag. Changes nothing.",
+                    HandleStatusCommand);
                 MainConsole.Instance.Commands.AddCommand("Phlox", false,
                     "phlox resume",
                     "phlox resume <script-item-uuid | object-name>",
@@ -191,6 +365,121 @@ namespace Phlox.ScriptEngine
 
         private void HandleSuspendCommand(string module, string[] args) => HandleSuspendResume(args, true);
         private void HandleResumeCommand(string module, string[] args) => HandleSuspendResume(args, false);
+
+        private void HandleStatusCommand(string module, string[] args)
+        {
+            if (WrongConsoleScene()) return;
+            if (args.Length < 3)
+            {
+                MainConsole.Instance.Output("Usage: phlox status <script-item-uuid | object-name>");
+                return;
+            }
+            if (m_ExeScheduler == null)
+            {
+                MainConsole.Instance.Output("Script engine not running.");
+                return;
+            }
+
+            string target = string.Join(" ", args, 2, args.Length - 2);
+
+            if (UUID.TryParse(target, out UUID itemId))
+            {
+                ReportStatus(itemId);
+                return;
+            }
+
+            int found = 0;
+            foreach (var sog in m_Scene.GetSceneObjectGroups())
+            {
+                if (!string.Equals(sog.Name, target, StringComparison.OrdinalIgnoreCase)) continue;
+                foreach (var part in sog.Parts)
+                    foreach (var item in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                    {
+                        ReportStatus(item.ItemID);
+                        found++;
+                    }
+            }
+            if (found == 0)
+                MainConsole.Instance.Output($"No object named '{target}' with scripts found in this region.");
+        }
+
+        /// <summary>
+        /// Everything the last four sessions had to infer from silence, in one line-set:
+        /// whether the scheduler even has the script, what state it is in, what is queued for it,
+        /// and - the one that mattered - the event mask the REGION holds for the prim, which is
+        /// what decides whether a touch ever reaches the script at all.
+        /// </summary>
+        private void ReportStatus(UUID itemId)
+        {
+            var st = m_ExeScheduler.GetStatus(itemId);
+            var o = MainConsole.Instance;
+
+            if (!st.Found)
+            {
+                o.Output($"{itemId}: NOT LOADED by Phlox in this region (no interpreter).");
+                LogLoadContext(itemId);
+                return;
+            }
+
+            SceneObjectPart part = m_Scene.GetSceneObjectPart(st.HostLocalId);
+            TaskInventoryItem item = part?.Inventory.GetInventoryItem(itemId);
+
+            o.Output($"{itemId}");
+            o.Output($"  prim          : {part?.Name ?? "(unknown)"} localId={st.HostLocalId}");
+            o.Output($"  script name   : {item?.Name ?? "(not in prim inventory)"}");
+            o.Output($"  RunState      : {st.RunState}" + (st.PendingSyscall is null ? "" : $"  (in {st.PendingSyscall})"));
+            o.Output($"  enabled       : Enabled={st.Enabled} GeneralEnable={st.GeneralEnable} suspended={st.Suspended}"
+                + HeldText(st.LocalDisable));
+            o.Output($"  Running flag  : {(item is null ? "(unknown)" : item.ScriptRunning.ToString())}");
+            if (st.TerminatedReason is not null)
+                o.Output(TerminatedLine(st.TerminatedReason));
+            o.Output($"  queued events : {st.QueuedEvents}");
+            o.Output($"  LSL state     : {st.LslState}");
+            o.Output($"  timer         : {(st.TimerIntervalMs > 0 ? st.TimerIntervalMs + " ms" : "not set")}");
+            o.Output($"  region mask   : part.ScriptEvents={part?.ScriptEvents.ToString() ?? "(no part)"}");
+            o.Output($"  aggregate     : {part?.AggregatedScriptEvents.ToString() ?? "(no part)"}");
+        }
+
+        /// <summary>The status line's note on why a script is held, in words an operator reads.</summary>
+        internal static string HeldText(string localDisable)
+            => localDisable is null ? "" : $"  HELD: {localDisable}"
+                + (localDisable.Contains("StateLoadFailed") ? " (state load failed - row kept, never run or saved this process; restart to retry)" : "")
+                + (localDisable.Contains("Parcel") ? " (the parcel does not allow this script; paused until it does, not stopped)" : "");
+
+        /// <summary>The status line for a script that stopped itself: it stays stopped until reset or set running.</summary>
+        internal static string TerminatedLine(string reason)
+            => $"  terminated    : {reason}  (stays stopped; reset it, or tick Running, to start it fresh)";
+
+        /// <summary>When there is no interpreter, say what the prim still knows about the item.</summary>
+        private void LogLoadContext(UUID itemId)
+        {
+            foreach (var sog in m_Scene.GetSceneObjectGroups())
+                foreach (var part in sog.Parts)
+                {
+                    var item = part.Inventory.GetInventoryItem(itemId);
+                    if (item is null) continue;
+                    // The engine NAME, not the Running flag printed twice.
+                    MainConsole.Instance.Output(
+                        $"  found in prim '{part.Name}' (localId={part.LocalId}): asset={item.AssetID} " +
+                        $"Running flag={item.ScriptRunning} engine='{ScriptEngineNameFor(item)}'");
+                    return;
+                }
+            MainConsole.Instance.Output("  and no prim in this region holds an inventory item with that id.");
+        }
+
+        /// <summary>The engine named in the script's own header if loaded, or this region's default.</summary>
+        private string ScriptEngineNameFor(TaskInventoryItem item)
+        {
+            try
+            {
+                string engine = m_Scene?.DefaultScriptEngine;
+                AssetBase asset = m_Scene?.AssetService?.Get(item.AssetID.ToString());
+                if (asset?.Data != null)
+                    engine = PhloxEngineHeader.Owner(OpenMetaverse.Utils.BytesToString(asset.Data), engine, LoadedEngineNames());
+                return string.IsNullOrEmpty(engine) ? "(unknown)" : engine;
+            }
+            catch { return "(unknown)"; }
+        }
 
         private void HandleSuspendResume(string[] args, bool suspend)
         {
@@ -264,11 +553,17 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnGetScriptRunning -= OnGetScriptRunning;
             m_Scene.EventManager.OnChatFromWorld -= OnChatFromWorld;
             m_Scene.EventManager.OnChatFromClient -= OnChatFromClient;
+            m_Scene.EventManager.OnChatBroadcast -= OnChatBroadcast;
+            if (m_WorldComm != null) m_WorldComm.OnMessageDelivered -= OnWorldCommMessage;
+            m_Scene.EventManager.OnAvatarKilled -= OnAvatarKilled;
+            m_Scene.EventManager.OnAvatarDamage -= OnAvatarDamage;
+            m_Scene.EventManager.OnAvatarDamageApplied -= OnAvatarDamageApplied;
             m_Scene.EventManager.OnObjectGrab -= OnObjectGrab;
             m_Scene.EventManager.OnObjectGrabbing -= OnObjectGrabbing;
             m_Scene.EventManager.OnObjectDeGrab -= OnObjectDeGrab;
             m_Scene.EventManager.OnScriptChangedEvent -= OnScriptChangedEvent;
             m_Scene.EventManager.OnScriptControlEvent -= OnScriptControlEvent;
+            m_Scene.EventManager.OnFrame -= OnFrameForPhysicsTime;
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
                 moneyModule.OnObjectPaid -= HandleObjectPaid;
@@ -286,6 +581,11 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptColliding         -= OnScriptColliding;
             m_Scene.EventManager.OnScriptColliderStart     -= OnScriptColliderStart;
             m_Scene.EventManager.OnObjectBeingRemovedFromScene -= OnObjectBeingRemovedFromScene;
+            m_Scene.EventManager.OnGroupCrossedToNewParcel   -= OnGroupCrossedToNewParcel;
+            m_Scene.EventManager.OnObjectOwnerOrGroupChanged -= OnObjectOwnerOrGroupChanged;
+            m_Scene.EventManager.OnLandObjectAdded           -= OnLandObjectChanged;
+            m_Scene.EventManager.OnScriptControlsReleased    -= OnScriptControlsReleased;
+            m_Scene.EventManager.OnRemovePresence            -= OnRemovePresenceForControls;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
             m_MasterScheduler?.Stop();
             AsyncCommands?.Shutdown();
@@ -309,7 +609,14 @@ namespace Phlox.ScriptEngine
         private void OnRezScript(uint localID, UUID itemID, string script,
             int startParam, bool postOnRez, string engine, int stateSource)
         {
-            if (engine != Name) return;
+            // Every engine of the region gets every rez, with the region's default engine name; the script's
+            // first line can name another. Phlox runs it exactly when YEngine's rule picks Phlox, so on a region running
+            // both a script runs in one. A script that is not Phlox's has no Phlox instance or load (Disown); its saved state is kept.
+            if (!IsPhloxScript(script, engine))
+            {
+                m_ScriptLoader?.Disown(localID, itemID);
+                return;
+            }
 
             SceneObjectPart part = m_Scene.GetSceneObjectPart(localID);
             if (part == null)
@@ -325,11 +632,22 @@ namespace Phlox.ScriptEngine
                 LocalID = localID,
                 ItemID = itemID,
                 ScriptText = script,
+                AssetId = part.Inventory.GetInventoryItem(itemID)?.AssetID ?? UUID.Zero,
                 StartParam = startParam,
                 PostOnRez = postOnRez,
                 StateSource = stateSource,
                 Prim = part,
             });
+        }
+
+        /// <summary>Does the first-line rule (<see cref="PhloxEngineHeader"/>) give this script to Phlox?</summary>
+        private bool IsPhloxScript(string script, string defaultEngine)
+            => PhloxEngineHeader.Owner(script, defaultEngine, LoadedEngineNames()) == Name;
+
+        private IEnumerable<string> LoadedEngineNames()
+        {
+            foreach (IScriptModule m in m_Scene?.RequestModuleInterfaces<IScriptModule>() ?? Array.Empty<IScriptModule>())
+                if (m != null) yield return m.ScriptEngineName;
         }
 
         private void OnRemoveScript(uint localID, UUID itemID)
@@ -341,6 +659,7 @@ namespace Phlox.ScriptEngine
 
         private void OnScriptReset(uint localID, UUID itemID)
         {
+            m_ScriptLoader?.NoteReset(itemID);
             m_ExeScheduler?.ResetScript(itemID);
         }
 
@@ -353,7 +672,7 @@ namespace Phlox.ScriptEngine
 
         private void OnObjectBeingRemovedFromScene(SceneObjectGroup obj)
         {
-            // When a prim leaves the scene, clean up any character it owned (M-14b).
+            // When a prim leaves the scene, clean up any character it owned.
             // BotManager has no per-prim hook, so orphaned bots must be removed here.
             Scene scene = m_Scene;
             if (scene == null) return;
@@ -367,13 +686,26 @@ namespace Phlox.ScriptEngine
             }
         }
 
+        /// <summary>The item's Running flag, as the viewer's checkbox and llSetScriptState persist it.</summary>
+        internal void SetItemRunningFlag(uint localId, UUID itemId, bool running)
+        {
+            SceneObjectPart part = m_Scene?.GetSceneObjectPart(localId);
+            TaskInventoryItem item = part?.Inventory?.GetInventoryItem(itemId);
+            if (item is null || item.ScriptRunning == running) return;
+            item.ScriptRunning = running;
+            part.Inventory.ForceInventoryPersistence();
+            part.ParentGroup.HasGroupChanged = true;
+        }
+
         private void OnStartScript(uint localID, UUID itemID)
         {
+            m_ScriptLoader?.NoteScriptState(itemID, true);   // Still compiling - applied when it starts
             m_ExeScheduler?.ChangeEnabledStatus(itemID, true);
         }
 
         private void OnStopScript(uint localID, UUID itemID)
         {
+            m_ScriptLoader?.NoteScriptState(itemID, false);
             m_ExeScheduler?.ChangeEnabledStatus(itemID, false);
         }
 
@@ -391,12 +723,28 @@ namespace Phlox.ScriptEngine
             controllingClient.SendScriptRunningReply(objectID, itemID, running);
         }
 
+        private int m_WhisperDistance = PhloxListenManager.DefaultWhisperDistance;
+        private int m_SayDistance = PhloxListenManager.DefaultSayDistance;
+        private int m_ShoutDistance = PhloxListenManager.DefaultShoutDistance;
+        private int m_MaxListensPerScript = PhloxListenManager.DefaultMaxListensPerScript;
+        private int m_MaxListensPerRegion = PhloxListenManager.DefaultMaxListensPerRegion;
+
         private void OnChatFromWorld(object sender, OSChatMessage chat)
         {
-            ListenManager?.DeliverChat(chat.Channel, chat.From, chat.SenderUUID, chat.Message);
+            ListenManager?.DeliverChat(chat.Type, chat.Channel, chat.From, chat.SenderUUID, chat.Message,
+                chat.Position, chat.Destination);
         }
 
-        private void OnChatFromClient(object sender, OSChatMessage chat)
+        private void OnChatFromClient(object sender, OSChatMessage chat) => DeliverSceneChat(chat, UUID.Zero);
+
+        /// <summary>
+        /// Broadcast chat (Scene.SimChatBroadcast and EventManager.TriggerOnChatBroadcast): region modules send it -
+        /// bots, the region-ready and concierge modules, the IRC bridge. Nothing else carries it; the core WorldComm
+        /// hears it the same way (OnChatBroadcast, beside OnChatFromClient).
+        /// </summary>
+        private void OnChatBroadcast(object sender, OSChatMessage chat) => DeliverSceneChat(chat, chat.Destination);
+
+        private void DeliverSceneChat(OSChatMessage chat, UUID destination)
         {
             // HandlerScriptDialogReply (LLClientView) sets chat.Sender but leaves
             // chat.SenderUUID at its UUID.Zero default.  A key-filtered llListen
@@ -409,7 +757,42 @@ namespace Phlox.ScriptEngine
             string speakerName = chat.From;
             if (string.IsNullOrEmpty(speakerName) && chat.Sender != null)
                 speakerName = chat.Sender.Name;
-            ListenManager?.DeliverChat(chat.Channel, speakerName, speakerKey, chat.Message);
+            ListenManager?.DeliverChat(chat.Type, chat.Channel, speakerName, speakerKey, chat.Message,
+                chat.Position, destination);
+        }
+
+        // ── Chat with the other script engine's listens ────────────────────────
+
+        private IWorldComm m_WorldComm;
+
+        [ThreadStatic] private static bool t_SendingToWorldComm;
+
+        /// <summary>
+        /// Offer a Phlox script's chat to the listens the core WorldComm holds (YEngine's, on a region running
+        /// both engines), as YEngine's own llSay/llRegionSay/llRegionSayTo do. Phlox's listens have already
+        /// had it, so WorldComm's OnMessageDelivered for it - raised on this thread - is not delivered again.
+        /// </summary>
+        internal void SendToWorldComm(Action<IWorldComm> send)
+        {
+            IWorldComm worldComm = m_WorldComm;
+            if (worldComm == null) return;
+            t_SendingToWorldComm = true;
+            try { send(worldComm); }
+            finally { t_SendingToWorldComm = false; }
+        }
+
+        /// <summary>
+        /// A message another script engine sent through WorldComm (YEngine's llRegionSay and llRegionSayTo, and
+        /// anything else that calls IWorldComm.DeliverMessage or DeliverMessageTo). Region chat and addressed
+        /// messages reach Phlox only this way. Whisper, say and shout also go out as scene chat (Scene.SimChat,
+        /// which OnChatFromWorld and OnChatBroadcast bring here), so taking them here too would deliver them twice.
+        /// </summary>
+        private void OnWorldCommMessage(OSChatMessage chat)
+        {
+            if (t_SendingToWorldComm) return;
+            if (chat.Type != ChatTypeEnum.Region && chat.Type != ChatTypeEnum.Direct) return;
+            ListenManager?.DeliverChat(chat.Type, chat.Channel, chat.From, chat.SenderUUID, chat.Message,
+                chat.Position, chat.Destination);
         }
 
         // ── Touch events ───────────────────────────────────────────────────────
@@ -556,50 +939,46 @@ namespace Phlox.ScriptEngine
 
         private void OnScriptColliderStart(uint localID, ColliderArgs col)
         {
-            int dc = col.Colliders.Count;
-            if (dc == 0) return;
-            DetectParams[] det = new DetectParams[dc];
-            int i = 0;
-            foreach (DetectedObject detobj in col.Colliders)
-            {
-                DetectParams d = new DetectParams();
-                d.Key = detobj.keyUUID;
-                d.Populate(m_Scene, detobj);
-                det[i++] = d;
-            }
-            PostObjectEvent(localID, new EventParams("collision_start", new object[] { dc }, det));
+            DetectParams[] det = FilteredColliders(localID, col);
+            if (det.Length == 0) return;
+            PostObjectEvent(localID, new EventParams("collision_start", new object[] { det.Length }, det));
         }
 
         private void OnScriptColliding(uint localID, ColliderArgs col)
         {
-            int dc = col.Colliders.Count;
-            if (dc == 0) return;
-            DetectParams[] det = new DetectParams[dc];
-            int i = 0;
-            foreach (DetectedObject detobj in col.Colliders)
-            {
-                DetectParams d = new DetectParams();
-                d.Key = detobj.keyUUID;
-                d.Populate(m_Scene, detobj);
-                det[i++] = d;
-            }
-            PostObjectEvent(localID, new EventParams("collision", new object[] { dc }, det));
+            DetectParams[] det = FilteredColliders(localID, col);
+            if (det.Length == 0) return;
+            PostObjectEvent(localID, new EventParams("collision", new object[] { det.Length }, det));
         }
 
         private void OnScriptCollidingEnd(uint localID, ColliderArgs col)
         {
-            int dc = col.Colliders.Count;
-            if (dc == 0) return;
-            DetectParams[] det = new DetectParams[dc];
-            int i = 0;
+            DetectParams[] det = FilteredColliders(localID, col);
+            if (det.Length == 0) return;
+            PostObjectEvent(localID, new EventParams("collision_end", new object[] { det.Length }, det));
+        }
+
+        /// <summary>
+        /// The colliders the host part's llCollisionFilter lets through, as DetectParams.
+        /// The region's own collision path already applies SceneObjectPart.CollisionFilteredOut
+        /// before raising the event (SceneObjectPart.cs:2812-2820, ScenePresence.cs:6462-6470); this
+        /// applies it again here so the filter holds for a collision arriving by any other door, and
+        /// so the count a script sees is the count it was allowed to see.
+        /// </summary>
+        private DetectParams[] FilteredColliders(uint localID, ColliderArgs col)
+        {
+            if (col?.Colliders == null || col.Colliders.Count == 0) return s_emptyDetectParams;
+            SceneObjectPart host = m_Scene?.GetSceneObjectPart(localID);
+            var det = new List<DetectParams>(col.Colliders.Count);
             foreach (DetectedObject detobj in col.Colliders)
             {
+                if (host != null && host.CollisionFilteredOut(detobj.keyUUID, detobj.nameStr)) continue;
                 DetectParams d = new DetectParams();
                 d.Key = detobj.keyUUID;
                 d.Populate(m_Scene, detobj);
-                det[i++] = d;
+                det.Add(d);
             }
-            PostObjectEvent(localID, new EventParams("collision_end", new object[] { dc }, det));
+            return det.ToArray();
         }
 
         // ── Land collision events ──────────────────────────────────────────────
@@ -632,7 +1011,141 @@ namespace Phlox.ScriptEngine
             PostObjectEvent(localID, new EventParams(
                 "attach", new object[] { avatarID.ToString() },
                 s_emptyDetectParams));
+            // Worn, an object's scripts always run; dropped, the parcel under it decides
+            SceneObjectGroup group = m_Scene?.GetGroupByPrim(localID);
+            if (group != null) m_ExeScheduler?.RequestParcelCheck(group);
         }
+
+        // ── No Scripts parcels enforced live ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// IParcelScriptPolicyEngine: the core lets Phlox's scripts start on any parcel and leaves the parcel rule to
+        /// Phlox, which pauses and resumes them live (PhloxExecutionScheduler).
+        /// </summary>
+        public bool EnforcesParcelScriptRules => true;
+
+        private void OnGroupCrossedToNewParcel(SceneObjectGroup group, ILandObject oldParcel, ILandObject newParcel)
+            => m_ExeScheduler?.RequestParcelCheck(group);
+
+        private void OnObjectOwnerOrGroupChanged(SceneObjectGroup group, UUID oldOwner, UUID newOwner, UUID oldGroup, UUID newGroup)
+        {
+            // A new owner ends every grant in the object, and the controls the old grants took
+            if (oldOwner != newOwner) m_ExeScheduler?.RequestOwnerChanged(group);
+            m_ExeScheduler?.RequestParcelCheck(group);
+        }
+
+        /// <summary>Flags, owner, group, sale, subdivide and join all arrive here (LandManagementModule.UpdateLandObject).</summary>
+        private void OnLandObjectChanged(ILandObject parcel)
+        {
+            if (parcel?.LandData != null) m_ExeScheduler?.RequestParcelCheckForParcel(parcel.LandData.LocalID);
+        }
+
+        // The scene raises OnScriptControlsReleased whenever a registration goes away, the script's own release
+        // or the core's (the viewer's release keys, ClearControls on a crossing, a stand-up, a permission revoke, the
+        // avatar leaving the region), after ScenePresence has let go of its lock. Exactly those scripts are asked again.
+        //
+        // A release Phlox did not ask for, on an avatar still here (not a child, not crossing, not leaving), is
+        // the core's stand-up, Release Keys, detach or drop: the script loses TAKE_CONTROLS and CONTROL_CAMERA as in
+        // Halcyon's handleMustReleaseControls. Decided here, on the releasing thread, while the avatar's state is the one
+        // the release happened in; the permission change itself runs on the scheduler thread.
+        private void OnScriptControlsReleased(UUID agentId, UUID[] scriptItemIds)
+        {
+            bool mustRelease = false;
+            if (t_ownControlChange == 0)
+            {
+                ScenePresence sp = m_Scene?.GetScenePresence(agentId);
+                mustRelease = sp != null && !sp.IsDeleted && !sp.IsChildAgent && !sp.IsInTransit;
+            }
+            foreach (UUID itemId in scriptItemIds)
+            {
+                if (mustRelease) m_ExeScheduler?.RequestControlsReleasedByCore(itemId, agentId);
+                m_ExeScheduler?.RequestParcelCheckForItem(itemId);
+            }
+        }
+
+        [ThreadStatic] private static int t_ownControlChange;
+
+        /// <summary>
+        /// Marks a register/unregister Phlox makes itself (llTakeControls, EndPermissions); the core raises
+        /// OnScriptControlsReleased synchronously on the same thread, and that release is already handled.
+        /// </summary>
+        internal static OwnControlChangeScope OwnControlChange()
+        {
+            t_ownControlChange++;
+            return default;
+        }
+
+        internal readonly struct OwnControlChangeScope : IDisposable
+        {
+            public void Dispose() => t_ownControlChange--;
+        }
+
+        // Kept as a backstop: Scene.RemoveClient raises it before the presence goes, and the release event comes from
+        // ScenePresence.Dispose in RemoveClient's finally block, which an earlier exception there would skip.
+        private void OnRemovePresenceForControls(UUID agentId) => m_ExeScheduler?.RequestControlHoldersCheck();
+
+        /// <summary>A script took or released controls.</summary>
+        internal void RequestParcelCheck(UUID itemId) => m_ExeScheduler?.RequestParcelCheckForItem(itemId);
+
+        /// <summary>
+        /// Halcyon's rule (EngineInterface.ScriptsCanRun): the object's owner owns the parcel, or the parcel allows other
+        /// scripts, or it allows group scripts and the object's group is the parcel's group. No parcel: not allowed. The
+        /// group test needs the parcel to have a group, as core's CanRunScript does (Halcyon compared zero with zero).
+        /// </summary>
+        internal static bool ParcelAllowsScripts(LandData land, UUID objectOwner, UUID objectGroup)
+        {
+            if (land == null) return false;
+            if (land.OwnerID == objectOwner) return true;
+            if ((land.Flags & (uint)ParcelFlags.AllowOtherScripts) != 0) return true;
+            return (land.Flags & (uint)ParcelFlags.AllowGroupScripts) != 0
+                   && land.GroupID.IsNotZero() && land.GroupID == objectGroup;
+        }
+
+        /// <summary>The local id of the parcel under an object, the lookup core's CanRunScript uses; -1 for none.</summary>
+        internal int ParcelLocalIdAt(SceneObjectGroup group)
+        {
+            ILandChannel land = m_Scene?.LandChannel;
+            if (land == null) return -1;
+            Vector3 pos = group.AbsolutePosition;
+            return land.GetLandObjectClippedXY(pos.X, pos.Y)?.LandData?.LocalID ?? -1;
+        }
+
+        /// <summary>
+        /// "May this script run here": an attachment may; a script the parcel allows may; a script holding taken
+        /// controls on an avatar right now may (<paramref name="onlyByControls"/>); nothing else. No estate-manager or god
+        /// exemption. A region with no land module has no parcel rules.
+        /// </summary>
+        internal bool ScriptMayRunHere(SceneObjectPart part, UUID itemId, out bool onlyByControls)
+        {
+            onlyByControls = false;
+            SceneObjectGroup group = part?.ParentGroup;
+            if (group == null || group.IsAttachment) return true;
+            ILandChannel landChannel = m_Scene?.LandChannel;
+            if (landChannel == null) return true;
+
+            Vector3 pos = group.AbsolutePosition;
+            ILandObject parcel = landChannel.GetLandObjectClippedXY(pos.X, pos.Y);
+            if (ParcelAllowsScripts(parcel?.LandData, part.OwnerID, part.GroupID)) return true;
+
+            if (ScriptHoldsControls(part, itemId))
+            {
+                onlyByControls = true;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Asks the avatar the script's controls were taken on (the permission granter), never Phlox's own record.</summary>
+        private bool ScriptHoldsControls(SceneObjectPart part, UUID itemId)
+        {
+            TaskInventoryItem item = part.Inventory.GetInventoryItem(itemId);
+            if (item == null || item.PermsGranter.IsZero()) return false;
+            return AvatarHoldsControls(m_Scene.GetScenePresence(item.PermsGranter), itemId);
+        }
+
+        /// <summary>Does this avatar hold taken controls for this script item right now? (ScenePresence.HasScriptControls)</summary>
+        internal static bool AvatarHoldsControls(ScenePresence presence, UUID itemId)
+            => presence != null && presence.HasScriptControls(itemId);
 
         // ── Moving events ──────────────────────────────────────────────────────
 
@@ -722,7 +1235,10 @@ namespace Phlox.ScriptEngine
         public bool PostObjectEvent(UUID localID, string name, object[] args)
             => false;
 
-        public bool PostScriptEvent(UUID itemID, EventParams parms)
+        public bool PostScriptEvent(UUID itemID, EventParams parms) => PostScriptEvent(itemID, parms, null);
+
+        /// <summary>The same, with a completion callback the scheduler fires when the event is done with.</summary>
+        public bool PostScriptEvent(UUID itemID, EventParams parms, Action completed)
         {
             if (m_ExeScheduler == null) return false;
 
@@ -734,12 +1250,170 @@ namespace Phlox.ScriptEngine
             var evt = new InWorldz.Phlox.VM.PostedEvent
             {
                 EventType = (InWorldz.Phlox.Types.SupportedEventList.Events)eventInfo.TableIndex,
-                Args = parms.Params,
-                DetectVars = detectVars
+                Args = ToPhloxArgs(parms.Params),
+                DetectVars = detectVars,
+                Completed = completed
             };
             evt.Normalize();
             m_ExeScheduler.PostEvent(itemID, evt);
             return true;
+        }
+
+        /// <summary>
+        /// Arguments in YEngine's types (OpenSim.Region.ScriptEngine.Shared.LSL_Types) as Phlox's VM takes them:
+        /// string, int, float, OpenMetaverse vectors and rotations, lists as object[] (Normalize makes them LSLList). The
+        /// core's pumps built remote_data that way for every engine, and Phlox's own XML-RPC pump did too, so a Phlox script
+        /// got values its VM does not know. Other arguments, and an array with none of these, are passed on as they are.
+        /// </summary>
+        internal static object[] ToPhloxArgs(object[] args)
+        {
+            if (args == null || !Array.Exists(args, IsLslType)) return args;
+            return Array.ConvertAll(args, ToPhloxValue);
+        }
+
+        private static bool IsLslType(object a) =>
+            a is LSL_Types.LSLString || a is LSL_Types.LSLInteger || a is LSL_Types.LSLFloat || a is LSL_Types.key
+            || a is LSL_Types.Vector3 || a is LSL_Types.Quaternion || a is LSL_Types.list;
+
+        private static object ToPhloxValue(object a) => a switch
+        {
+            LSL_Types.LSLString s => s.m_string,
+            LSL_Types.LSLInteger i => i.value,
+            LSL_Types.LSLFloat f => (float)f.value,
+            LSL_Types.key k => k.value,
+            LSL_Types.Vector3 v => new Vector3((float)v.x, (float)v.y, (float)v.z),
+            LSL_Types.Quaternion q => new Quaternion((float)q.x, (float)q.y, (float)q.z, (float)q.s),
+            LSL_Types.list l => Array.ConvertAll(l.Data, ToPhloxValue),
+            _ => a
+        };
+
+        /// <summary>
+        /// on_death - "triggered on all attachments worn by an avatar when that avatar's
+        /// health reaches 0" (wiki). The region's one death hook is EventManager.OnAvatarKilled,
+        /// raised from ScenePresence.PhysicsCollisionUpdate and from llAdjustDamage / llSetHealth
+        /// when Health falls to 0. Every script on every part of every attachment gets it, with no
+        /// arguments. The killer's local id is not part of the SL event and is not forwarded.
+        /// </summary>
+        private void OnAvatarKilled(uint killerLocalId, ScenePresence dead)
+        {
+            if (dead == null) return;
+            try
+            {
+                foreach (SceneObjectGroup attachment in dead.GetAttachments())
+                {
+                    if (attachment == null || attachment.IsDeleted) continue;
+                    foreach (SceneObjectPart part in attachment.Parts)
+                        PostObjectEvent(part.LocalId, new EventParams("on_death", Array.Empty<object>(), null));
+                }
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxEngine]: on_death delivery for {0} failed: {1}", dead.UUID, e.Message);
+            }
+        }
+
+        /// <summary>
+        /// How long the region waits for every on_damage handler to finish before the damage
+        /// lands. SL is synchronous here; a script that sleeps in on_damage forfeits its adjustment.
+        /// </summary>
+        public const int OnDamageWaitMs = 500;
+
+        /// <summary>
+        /// on_damage - "before damage has been applied" (wiki) - to every script on every
+        /// attachment the presence wears, with one DetectParams per pending entry: llDetectedKey /
+        /// llDetectedOwner name the source, llDetectedDamage(n) is [amount, type, original], and
+        /// llAdjustDamage(n, v) writes the entry's Amount through the AdjustDamage hook. The region
+        /// thread that raised the damage BLOCKS here, bounded by <see cref="OnDamageWaitMs"/>, until the
+        /// scheduler reports every posted event done (handler finished or event dropped) - that is what
+        /// makes the adjustment land before the amount does. The wait is skipped, and the events merely
+        /// posted, when the caller IS the script thread (a synchronous syscall could never be waited on
+        /// from itself); llDamage and llSetHealth are async syscalls for exactly this reason.
+        /// </summary>
+        private void OnAvatarDamage(ScenePresence presence, List<DamageEntry> batch)
+        {
+            if (presence == null || batch == null || batch.Count == 0 || m_ExeScheduler == null) return;
+            try
+            {
+                var det = DamageDetectParams(batch, adjustable: true);
+                bool canWait = System.Threading.Thread.CurrentThread.ManagedThreadId != m_ExeScheduler.WorkerThreadId;
+                using var done = new System.Threading.CountdownEvent(1);
+                int posted = 0;
+                foreach (UUID itemId in AttachmentScripts(presence))
+                {
+                    done.AddCount();
+                    posted++;
+                    if (!PostScriptEvent(itemId, new EventParams("on_damage", new object[] { batch.Count }, det), () => done.Signal()))
+                        done.Signal();
+                }
+                done.Signal();
+                if (posted > 0 && canWait && !done.Wait(OnDamageWaitMs))
+                    m_log.LogWarning("[PhloxEngine]: on_damage for {0}: {1} handler(s) still running after {2} ms; applying the batch as adjusted so far",
+                        presence.UUID, done.CurrentCount, OnDamageWaitMs);
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxEngine]: on_damage delivery for {0} failed: {1}", presence.UUID, e.Message);
+            }
+        }
+
+        /// <summary>final_damage - what landed, to the same scripts, not waited on.</summary>
+        private void OnAvatarDamageApplied(ScenePresence presence, List<DamageEntry> batch)
+        {
+            if (presence == null || batch == null || batch.Count == 0) return;
+            try
+            {
+                var det = DamageDetectParams(batch, adjustable: false);
+                foreach (UUID itemId in AttachmentScripts(presence))
+                    PostScriptEvent(itemId, new EventParams("final_damage", new object[] { batch.Count }, det));
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxEngine]: final_damage delivery for {0} failed: {1}", presence.UUID, e.Message);
+            }
+        }
+
+        private DetectParams[] DamageDetectParams(List<DamageEntry> batch, bool adjustable)
+        {
+            var det = new DetectParams[batch.Count];
+            for (int i = 0; i < batch.Count; i++)
+            {
+                DamageEntry entry = batch[i];
+                SceneObjectPart src = entry.SourceObject.IsZero() ? null : World?.GetSceneObjectPart(entry.SourceObject);
+                det[i] = new DetectParams
+                {
+                    Key = entry.SourceObject,
+                    Owner = entry.SourceOwner,
+                    Group = src?.GroupID ?? UUID.Zero,
+                    Name = src?.Name ?? string.Empty,
+                    Type = src == null ? 0 : (src.ParentGroup.ContainsScripts() ? DetectParams.SCRIPTED | DetectParams.ACTIVE : DetectParams.PASSIVE),
+                    Position = src == null ? new LSL_Types.Vector3() : new LSL_Types.Vector3(src.AbsolutePosition.X, src.AbsolutePosition.Y, src.AbsolutePosition.Z),
+                    Damage = entry.Amount,
+                    DamageType = entry.DamageType,
+                    OriginalDamage = entry.OriginalDamage,
+                    AdjustDamage = adjustable ? (v => entry.Amount = v) : null,
+                };
+            }
+            return det;
+        }
+
+        /// <summary>Every script item on every part of every attachment the presence wears - the on_death set.</summary>
+        private List<UUID> AttachmentScripts(ScenePresence presence)
+        {
+            var items = new List<UUID>();
+            foreach (SceneObjectGroup attachment in presence.GetAttachments())
+            {
+                if (attachment == null || attachment.IsDeleted) continue;
+                foreach (SceneObjectPart part in attachment.Parts)
+                {
+                    TaskInventoryDictionary scripts;
+                    lock (part.TaskInventory)
+                        scripts = (TaskInventoryDictionary)part.TaskInventory.Clone();
+                    foreach (var kvp in scripts)
+                        if (kvp.Value.Type == (int)AssetType.LSLText || kvp.Value.Type == 10)
+                            items.Add(kvp.Value.ItemID);
+                }
+            }
+            return items;
         }
 
         private void OnScriptControlEvent(UUID itemID, UUID agentID, uint held, uint change)
@@ -756,6 +1430,12 @@ namespace Phlox.ScriptEngine
         {
             SceneObjectPart part = World?.GetSceneObjectPart(localID);
             if (part == null) return false;
+
+            // Any engine's pump can take a Phlox script's http_response and offer it here. A reset or removed Phlox
+            // script's late one is dropped, whichever pump took it.
+            if (parms.EventName == "http_response" && parms.Params != null && parms.Params.Length > 0
+                && AsyncCommands?.HttpRequestPlugin is { } http && !http.Offered(parms.Params[0]))
+                return false;
 
             // Defer the inventory snapshot and event dispatch to a thread pool work item.
             //
@@ -776,6 +1456,7 @@ namespace Phlox.ScriptEngine
             // returns true *before* events are actually delivered. No current caller
             // (OnScriptChangedEvent, OnSceneObjectPartUpdated, PostTouchEvent,
             //  PostObjectLinksetDataEvent) inspects the return value, so this is safe.
+            Interlocked.Increment(ref m_ObjectPostsInFlight);   // Counted only, see ObjectPostsInFlight
             ThreadPool.UnsafeQueueUserWorkItem(_ =>
             {
                 try
@@ -798,10 +1479,23 @@ namespace Phlox.ScriptEngine
                         "[PhloxEngine]: PostObjectEvent deferred dispatch failed for localID {0}: {1}",
                         localID, e);
                 }
+                finally
+                {
+                    Interlocked.Decrement(ref m_ObjectPostsInFlight);
+                }
             }, null);
 
             return true;
         }
+
+        private int m_ObjectPostsInFlight;
+
+        /// <summary>
+        /// Test seam, inert in production (a counter nothing acts on): object events handed to the thread pool
+        /// above and not yet posted to their scripts. Until the pool runs the work item the event is in no scheduler
+        /// queue, so a test waiting for "nothing pending" reads this too.
+        /// </summary>
+        internal int ObjectPostsInFlight => Volatile.Read(ref m_ObjectPostsInFlight);
 
         public bool PostObjectLinksetDataEvent(uint localID, int action,
             ReadOnlySpan<char> name, ReadOnlySpan<char> value)
@@ -823,7 +1517,81 @@ namespace Phlox.ScriptEngine
             return any;
         }
 
-        public System.Collections.ArrayList GetScriptErrors(UUID itemID) => new System.Collections.ArrayList();
+        /// <summary>
+        /// The errors of the compile the script editor's Save just started, so they show in the editor's
+        /// error pane - this returned an empty list at once, and the viewer said "compiled" for any script. Mirrors
+        /// YEngine (XMREngine.GetScriptErrors: block until that item's compile has posted its errors, empty for
+        /// success; "(line,col) Error: message"), bounded by the region's own 15 s and its
+        /// "timedout waiting for errors". Called on the caps thread that answers the Save, never the scheduler's.
+        /// </summary>
+        public System.Collections.ArrayList GetScriptErrors(UUID itemID)
+        {
+            var list = new System.Collections.ArrayList();
+            if (m_ScriptLoader == null) return list;
+            // Never wait on the thread that would have to deliver the answer.
+            if (m_ExeScheduler != null && m_ExeScheduler.WorkerThreadId == System.Threading.Thread.CurrentThread.ManagedThreadId) return list;
+            List<string> errors = m_ScriptLoader.WaitForCompileErrors(itemID, PhloxScriptLoader.ErrorWaitTimeout);
+            if (errors == null) return list;   // not a Phlox load: another engine answers for it
+            foreach (string e in PhloxCompileErrorReport.ForEditor(errors)) list.Add(e);
+            return list;
+        }
+        /// <summary>
+        /// Is this item a Phlox script - running, or its load posted, waiting or compiling? Events for anything
+        /// else are dropped, and a late reply for such an item is one its own script asked for before a reset. Any thread.
+        /// </summary>
+        internal bool HasOrIsLoading(UUID itemID)
+            => (m_ExeScheduler?.IsLoaded(itemID) ?? false) || IsLoading(itemID);
+
+        /// <summary>Is a load of this item in flight (so its early events are worth holding)?</summary>
+        internal bool IsLoading(UUID itemID) => m_ScriptLoader?.IsLoading(itemID) ?? false;
+
+        /// <summary>
+        /// A dataserver answer goes to every script in the asking script's prim, as
+        /// SL ("Dataserver requests will trigger dataserver events in all scripts within the same prim where the request
+        /// was made", wiki dataserver) and Halcyon (PostObjectEvent(m_localID, ...)). Never to another prim.
+        /// Phlox's scripts in the prim (running or loading) get it in a stable order, by item name then item id, posted on
+        /// this thread, so one script's answers still arrive in the order it asked (PostObjectEvent's pool hop would not
+        /// keep that). <paramref name="skip"/> is a script that must not get it: the asker, when it is no longer owed the
+        /// answer. Then each other script engine of the region is offered it once, with the values YEngine's own
+        /// dataserver posts (LSLString key, LSLString data); each posts only to its own scripts in that prim (the
+        /// shape of AsyncCommand/Plugins/HttpRequest.cs). Returns how many Phlox scripts it was posted to.
+        /// </summary>
+        internal int PostDataserverToPrim(SceneObjectPart part, UUID skip, string queryId, string data)
+        {
+            if (part?.ParentGroup == null || part.ParentGroup.IsDeleted) return 0;
+
+            TaskInventoryDictionary inventory;
+            lock (part.TaskInventory)
+                inventory = (TaskInventoryDictionary)part.TaskInventory.Clone();
+            var scripts = new List<TaskInventoryItem>();
+            foreach (TaskInventoryItem item in inventory.Values)
+                if (item.Type == (int)AssetType.LSLText || item.Type == 10)
+                    scripts.Add(item);
+            scripts.Sort((a, b) =>
+            {
+                int byName = string.CompareOrdinal(a.Name, b.Name);
+                return byName != 0 ? byName : a.ItemID.CompareTo(b.ItemID);
+            });
+
+            int posted = 0;
+            foreach (TaskInventoryItem item in scripts)
+            {
+                if (item.ItemID == skip || !HasOrIsLoading(item.ItemID)) continue;
+                if (PostScriptEvent(item.ItemID, new EventParams("dataserver", new object[] { queryId, data }, new DetectParams[0])))
+                    posted++;
+            }
+
+            var seen = new List<IScriptEngine>();
+            foreach (IScriptModule m in World?.RequestModuleInterfaces<IScriptModule>() ?? Array.Empty<IScriptModule>())
+            {
+                if (ReferenceEquals(m, this) || m is not IScriptEngine e || seen.Contains(e)) continue;
+                seen.Add(e);
+                e.PostObjectEvent(part.LocalId, new EventParams("dataserver",
+                    new object[] { new LSL_Types.LSLString(queryId), new LSL_Types.LSLString(data) }, new DetectParams[0]));
+            }
+            return posted;
+        }
+
         public bool HasScript(UUID itemID, out bool running)
         {
             running = false;
@@ -881,15 +1649,18 @@ namespace Phlox.ScriptEngine
         public bool SuspendScript(UUID itemID)
             => m_ExeScheduler != null && m_ExeScheduler.RequestSuspend(itemID);
 
-        // Returning TRUE for unknown scripts is deliberate (fe31bac769): Phlox scripts are
-        // never rez-suspended, so "not suspended" IS success — returning false made
+        // Returning TRUE for a Phlox script that is not yet running is deliberate (fe31bac769): Phlox
+        // scripts are never rez-suspended, so "not suspended" IS success — returning false made
         // SceneObjectPartInventory.ResumeScripts() `continue` past the changed(CHANGED_OWNER)
-        // post, swallowing that event on ownership transfer. Known suspended scripts now
-        // actually resume (RequestResume is a cheap no-op for non-suspended ones).
+        // post, swallowing that event on ownership transfer (the load is still compiling then; the
+        // event is held for it). Known suspended scripts now actually resume (RequestResume is a cheap
+        // no-op for non-suspended ones). False for another engine's script - ResumeScripts
+        // clears OwnerChanged after the first engine that answers true, so answering true for a
+        // YEngine script asked of Phlox first took its changed(CHANGED_OWNER) away.
         public bool ResumeScript(UUID itemID)
         {
             m_ExeScheduler?.RequestResume(itemID);
-            return true;
+            return HasOrIsLoading(itemID);
         }
         public int GetScriptsMemory(List<UUID> itemIDs)
         {
@@ -962,6 +1733,14 @@ namespace Phlox.ScriptEngine
         public IConfig Config => m_Config;
         public IConfigSource ConfigSource => m_ConfigSource;
         public string ScriptEnginePath => "ScriptEngines/Phlox";
+
+        /// <summary>
+        /// Test seam, inert in production. The folder for this engine's bytecode cache and its schema stamp,
+        /// read once when <see cref="AddRegion"/> builds the loader. Null (always, outside tests) means the loader's
+        /// constant "ScriptEngines/Phlox/bytecode", exactly as before. Test harnesses running in parallel set it so
+        /// each class has its own folder instead of all sharing one.
+        /// </summary>
+        internal string BytecodeCacheDir { get; set; }
         public string ScriptClassName => "PhloxScript";
         public string ScriptBaseClassName => "InWorldz.Phlox.VM.Interpreter";
         public string[] ScriptReferencedAssemblies => Array.Empty<string>();
@@ -975,7 +1754,10 @@ namespace Phlox.ScriptEngine
         public int GetStartParameter(UUID itemID) => 0;
 
         public void SetScriptState(UUID itemID, bool state, bool self)
-            => m_ExeScheduler?.ChangeEnabledStatus(itemID, state);
+        {
+            m_ScriptLoader?.NoteScriptState(itemID, state);   // Still compiling - applied when it starts
+            m_ExeScheduler?.ChangeEnabledStatus(itemID, state);
+        }
 
         public bool GetScriptState(UUID itemID)
             => m_ExeScheduler?.GetScriptRunning(itemID) ?? false;
@@ -983,10 +1765,16 @@ namespace Phlox.ScriptEngine
         public void SetState(UUID itemID, string newState) { }
 
         public void ApiResetScript(UUID itemID)
-            => m_ExeScheduler?.ResetNow(itemID);
+        {
+            m_ScriptLoader?.NoteReset(itemID);   // llResetOtherScript on an item still compiling
+            m_ExeScheduler?.ResetNow(itemID);
+        }
 
         public void ResetScript(UUID itemID)
-            => m_ExeScheduler?.ResetScript(itemID);
+        {
+            m_ScriptLoader?.NoteReset(itemID);
+            m_ExeScheduler?.ResetScript(itemID);
+        }
 
         public void SleepScript(UUID itemID, int delay) { }
 
@@ -1006,11 +1794,36 @@ namespace Phlox.ScriptEngine
         /// Called by LSLSystemAPI when a long-running syscall completes.
         /// </summary>
         public void SysReturn(UUID itemId, object retValue, int delay)
-            => m_ExeScheduler?.PostSyscallReturn(itemId, retValue, delay);
+        {
+            // Inside an off-thread call for this script, record the result; the call's
+            // single, sequenced return is posted when its body ends (LSLSystemAPI.CompleteSyscall).
+            var ctx = InWorldz.Phlox.Glue.SyscallContext.Current;
+            if (ctx != null && ctx.ItemId == itemId) { ctx.SetResult(retValue, delay); return; }
+            m_ExeScheduler?.PostSyscallReturn(itemId, retValue, delay);
+        }
+
+        /// <summary>Post a call's return with its sequence number (LSLSystemAPI.CompleteSyscall).</summary>
+        internal void SysReturnSequenced(UUID itemId, object retValue, int delay, int seq)
+            => m_ExeScheduler?.PostSyscallReturn(itemId, retValue, delay, seq, null);
+
+        /// <summary>[InWorldz.Phlox] ServiceCallDeferral.</summary>
+        public ServiceCallDeferralMode ServiceCallDeferral { get; private set; } = ServiceCallDeferralMode.Auto;
 
         /// <summary>
         /// Called by LSLSystemAPI.llSetTimerEvent.
         /// </summary>
+        /// <summary>
+        /// Let the API answer an asynchronous call on the script's own event queue - the
+        /// SL contract for llUpdateKeyValue(k, v, checked, original) is a dataserver reply, not a
+        /// return value. The scheduler already has PostEvent; this is the one public door to it.
+        /// </summary>
+        public void PostScriptEvent(UUID itemID, InWorldz.Phlox.VM.PostedEvent evt)
+            => m_ExeScheduler?.PostEvent(itemID, evt);
+
+        /// <summary>llMinEventDelay lands in the execution scheduler.</summary>
+        public void SetMinEventDelay(UUID itemID, float seconds)
+            => m_ExeScheduler?.SetMinEventDelay(itemID, seconds);
+
         public void SetTimerEvent(uint localID, UUID itemID, float sec)
             => m_ExeScheduler?.SetTimer(itemID, sec);
 
@@ -1043,6 +1856,10 @@ namespace Phlox.ScriptEngine
                     TouchPos     = parms[i].TouchPos,
                     TouchST      = parms[i].TouchST,
                     TouchUV      = parms[i].TouchUV,
+                    Damage       = parms[i].Damage,
+                    DamageType   = parms[i].DamageType,
+                    OriginalDamage = parms[i].OriginalDamage,
+                    AdjustDamage = parms[i].AdjustDamage,
                 };
             }
             return result;

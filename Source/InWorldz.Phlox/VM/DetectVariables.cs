@@ -292,5 +292,17 @@ namespace InWorldz.Phlox.VM
         public Vector3 TouchUV;
         [ProtoMember(26)]
         public string BotID;
+
+        // Damage events. The three values persist with a saved event; the adjust hook is a
+        // live callback into the pending batch and does not (an on_damage restored from disk cannot
+        // adjust anything - the batch it belonged to is long applied).
+        [ProtoMember(27)]
+        public float Damage;
+        [ProtoMember(28)]
+        public int DamageType;
+        [ProtoMember(29)]
+        public float OriginalDamage;
+        [ProtoIgnore]
+        public Action<float> AdjustDamage;
     }
 }
