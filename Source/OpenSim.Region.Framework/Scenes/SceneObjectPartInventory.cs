@@ -565,7 +565,19 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         if (m_part.ParentGroup.m_savedScriptState.ContainsKey(stateID))
         {
             XmlDocument doc = new XmlDocument();
-            doc.LoadXml(m_part.ParentGroup.m_savedScriptState[stateID]);
+            try
+            {
+                doc.LoadXml(m_part.ParentGroup.m_savedScriptState[stateID]);
+            }
+            catch (XmlException e)
+            {
+                // Unreadable saved state is dropped: this script starts fresh and the rez goes on.
+                m_log.LogWarning(
+                    "[PRIM INVENTORY]: Ignoring unreadable saved script state for item {0} in part {1} of {2}: {3}",
+                    newID, m_part.Name, m_part.ParentGroup.Name, e.Message);
+                m_part.ParentGroup.m_savedScriptState.Remove(stateID);
+                return stateID;
+            }
 
             ////////// CRUFT WARNING ///////////////////////////////////
             //
