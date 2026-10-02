@@ -346,10 +346,22 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     or a teleport keeps them, and the controls are taken again.
   - The records of taken controls and of `PERMISSION_SILENT_ESTATE_MANAGEMENT` act only
     while the item holds their grant, and wait with a grant that waits.
-  - `llResetScript`, an owner change and a new `llRequestPermissions` clear the saved grant
-    and a waiting one.
-  - Grants from `llRequestExperiencePermissions` are not saved: Phlox does not record that a
-    grant came from an Experience.
+  - `llResetScript`, an owner change and a new `llRequestPermissions` or
+    `llRequestExperiencePermissions` clear the saved grant and a waiting one.
+  - A grant from an Experience: when `llRequestExperiencePermissions` grants (the agent
+    allowed the Experience before, the Experience is trusted here, or the agent accepts the
+    dialog), the script holds the permissions SL lists for it (take controls, trigger
+    animation, attach, track camera, control camera, teleport), granted by that agent, so
+    `llGetPermissions` and `llGetPermissionsKey` answer them as in SL
+    ([llRequestExperiencePermissions](https://wiki.secondlife.com/wiki/LlRequestExperiencePermissions)),
+    and the grant is saved as that Experience's. From the region's own state database it
+    comes back whole, as any grant. From carried state it comes back only when
+    `llRequestExperiencePermissions` would grant it at that moment with no dialog: the script
+    is still in that Experience, the Experience is allowed in the region and not blocked, and
+    the granter is in the region, has not blocked it, and has allowed it (or it is trusted
+    here). A granter who has not arrived yet leaves it waiting; it is decided when that avatar
+    arrives anywhere in the region, as such a grant needs no seat or attachment. Neither
+    `run_time_permissions` nor `experience_permissions` is posted by a restore.
   - States saved by an earlier Phlox build hold no grant and restore without one.
   A seated driver's taken controls also travel with a crossing in the simulator's own agent
   data.
