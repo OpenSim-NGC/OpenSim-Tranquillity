@@ -36,8 +36,7 @@ public class DroppedChecksTests
         while (!done())
         {
             if (DateTime.UtcNow >= until) return false;
-            h.PumpOnce();
-            System.Threading.Thread.Sleep(1);
+            if (!h.PumpOnceBusy()) System.Threading.Thread.Sleep(1);
         }
         return true;
     }

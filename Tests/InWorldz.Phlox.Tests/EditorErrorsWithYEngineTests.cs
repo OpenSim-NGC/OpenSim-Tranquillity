@@ -32,7 +32,7 @@ public class EditorErrorsWithYEngineTests
         var item = TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, UUID.Random(), UUID.Random(), "saved" + Guid.NewGuid().ToString("N").Substring(0, 6), source).ItemID;
         var sw = Stopwatch.StartNew();
         var save = Task.Run(() => h.Prim.Inventory.CreateScriptInstanceEr(item, 0, false, h.Engine.Name, 1));
-        while (!save.IsCompleted && sw.Elapsed < TimeSpan.FromSeconds(20)) { h.PumpOnce(); Thread.Sleep(1); }
+        while (!save.IsCompleted && sw.Elapsed < TimeSpan.FromSeconds(20)) { if (!h.PumpOnceBusy()) Thread.Sleep(1); }
         Assert.True(save.IsCompleted, $"the Save did not return in 20 s ({h.Scene.RequestModuleInterfaces<IScriptModule>().Length} script engines on the scene)");
         return (save.Result, sw.ElapsedMilliseconds);
     }
@@ -40,7 +40,7 @@ public class EditorErrorsWithYEngineTests
     private static void PumpFor(SchedulerHarness h, TimeSpan t)
     {
         var until = DateTime.UtcNow + t;
-        while (DateTime.UtcNow < until) { h.PumpOnce(); Thread.Sleep(1); }
+        while (DateTime.UtcNow < until) { if (!h.PumpOnceBusy()) Thread.Sleep(1); }
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public class EditorErrorsWithYEngineTests
         var item = h.RezScript(Fixture("phlox22-syntaxerror.lsl"));
         PumpFor(h, TimeSpan.FromMilliseconds(500));
         var ask = Task.Run(() => h.Engine.GetScriptErrors(item));   // the caps thread, not the scheduler's
-        while (!ask.IsCompleted) { h.PumpOnce(); Thread.Sleep(1); }
+        while (!ask.IsCompleted) { if (!h.PumpOnceBusy()) Thread.Sleep(1); }
         var errors = await ask;   // already complete, so this continues on the pumping thread
         PumpFor(h, TimeSpan.FromSeconds(3));   // past the owner-alert grace
         _out.WriteLine($"[{string.Join(" | ", errors.Cast<object>())}] alerts=[{string.Join(" | ", rec.Alerts)}]");

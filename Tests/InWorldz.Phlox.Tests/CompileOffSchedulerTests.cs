@@ -26,7 +26,7 @@ public class CompileOffSchedulerTests : IDisposable
     private static void PumpUntil(SchedulerHarness h, Func<bool> done, TimeSpan budget)
     {
         var sw = Stopwatch.StartNew();
-        while (!done() && sw.Elapsed < budget) { h.PumpOnce(); Thread.Sleep(1); }
+        while (!done() && sw.Elapsed < budget) { if (!h.PumpOnceBusy()) Thread.Sleep(1); }
     }
 
     [Fact]

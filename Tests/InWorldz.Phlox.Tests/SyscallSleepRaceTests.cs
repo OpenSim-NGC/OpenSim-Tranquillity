@@ -45,8 +45,7 @@ default
         var until = DateTime.UtcNow + TimeSpan.FromSeconds(60);
         while (!AllSaid() && DateTime.UtcNow < until)
         {
-            h.PumpOnce();
-            System.Threading.Thread.Sleep(1);
+            if (!h.PumpOnceBusy()) System.Threading.Thread.Sleep(1);
         }
 
         int resumed = 0;

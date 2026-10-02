@@ -137,8 +137,7 @@ public class PhloxHttpHeaderTests
             while (DateTime.UtcNow < until)
             {
                 lock (L.Heads) if (L.Heads.Count > 0 && expectSent) break;
-                H.PumpOnce();
-                Thread.Sleep(2);
+                if (!H.PumpOnceBusy()) Thread.Sleep(2);
             }
             // A refused request keeps the fixed window above (nothing arrived); the script's own "req=" line, said after
             // any refusal it reports, is then waited for.

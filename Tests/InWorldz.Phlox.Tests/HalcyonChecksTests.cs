@@ -105,8 +105,7 @@ public class HalcyonChecksTests
         while (h.RunStateOf(item) != "Waiting")
         {
             Assert.True(DateTime.UtcNow < until, "the script never loaded: " + h.RunStateOf(item));
-            h.PumpOnce();
-            System.Threading.Thread.Sleep(1);
+            if (!h.PumpOnceBusy()) System.Threading.Thread.Sleep(1);
         }
     }
 

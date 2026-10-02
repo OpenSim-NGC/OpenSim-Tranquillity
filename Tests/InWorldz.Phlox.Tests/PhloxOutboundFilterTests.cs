@@ -108,13 +108,13 @@ public class PhloxOutboundFilterTests
         public void PumpUntil(Func<bool> done, double seconds)
         {
             var until = DateTime.UtcNow.AddSeconds(seconds);
-            while (DateTime.UtcNow < until && !done()) { H.PumpOnce(); Thread.Sleep(2); }
+            while (DateTime.UtcNow < until && !done()) { if (!H.PumpOnceBusy()) Thread.Sleep(2); }
         }
 
         public void PumpFor(double seconds)
         {
             var until = DateTime.UtcNow.AddSeconds(seconds);
-            while (DateTime.UtcNow < until) { H.PumpOnce(); Thread.Sleep(2); }
+            while (DateTime.UtcNow < until) { if (!H.PumpOnceBusy()) Thread.Sleep(2); }
         }
 
         public void Dispose()

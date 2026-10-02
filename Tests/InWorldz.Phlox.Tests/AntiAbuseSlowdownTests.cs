@@ -66,8 +66,7 @@ public class AntiAbuseSlowdownTests
             while (!done())
             {
                 if (DateTime.UtcNow >= until) return false;
-                H.PumpOnce();
-                System.Threading.Thread.Sleep(1);
+                if (!H.PumpOnceBusy()) System.Threading.Thread.Sleep(1);
             }
             return true;
         }

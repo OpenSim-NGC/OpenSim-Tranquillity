@@ -81,8 +81,7 @@ public class DataserverToPrimTests
             while (!done())
             {
                 if (DateTime.UtcNow >= until) return false;
-                H.PumpOnce();
-                System.Threading.Thread.Sleep(1);
+                if (!H.PumpOnceBusy()) System.Threading.Thread.Sleep(1);
             }
             return true;
         }
@@ -92,7 +91,7 @@ public class DataserverToPrimTests
         {
             var before = prefixes.ToDictionary(p => p, CountStart);
             var until = DateTime.UtcNow.AddMilliseconds(ms);
-            while (DateTime.UtcNow < until) { H.PumpOnce(); System.Threading.Thread.Sleep(2); }
+            while (DateTime.UtcNow < until) { if (!H.PumpOnceBusy()) System.Threading.Thread.Sleep(2); }
             foreach (var p in prefixes)
                 Assert.True(before[p] == CountStart(p), "'" + p + "' was said in the quiet window: " + string.Join(" | ", H.Said));
         }

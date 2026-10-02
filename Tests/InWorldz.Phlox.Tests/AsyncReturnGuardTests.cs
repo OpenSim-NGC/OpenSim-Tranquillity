@@ -109,7 +109,7 @@ public class AsyncReturnGuardTests
 
         var until = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < until && !(h.Said.Contains("S:done") && h.Said.Contains("A:done")))
-        { h.PumpOnce(); Thread.Sleep(1); }
+        { if (!h.PumpOnceBusy()) Thread.Sleep(1); }
         h.Pump(20);   // let each handler finish and the script go idle
         h.PumpUntil(() => h.RunStateOf(stmt) == "Waiting" && h.RunStateOf(asgn) == "Waiting");
 

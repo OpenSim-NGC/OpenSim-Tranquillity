@@ -134,8 +134,7 @@ internal sealed class TeleportRig : IDisposable
         while (!done())
         {
             if (DateTime.UtcNow >= until) return false;
-            H.PumpOnce();
-            Thread.Sleep(1);
+            if (!H.PumpOnceBusy()) Thread.Sleep(1);
         }
         return true;
     }

@@ -109,8 +109,7 @@ public class ReturnObjectsTests
         while (!done())
         {
             if (DateTime.UtcNow >= until) return false;
-            h.PumpOnce();
-            Thread.Sleep(1);
+            if (!h.PumpOnceBusy()) Thread.Sleep(1);
         }
         return true;
     }

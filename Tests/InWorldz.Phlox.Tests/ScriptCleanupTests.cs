@@ -169,8 +169,7 @@ public class ScriptCleanupTests
             while (!done())
             {
                 if (DateTime.UtcNow >= until) return false;
-                H.PumpOnce();
-                System.Threading.Thread.Sleep(1);
+                if (!H.PumpOnceBusy()) System.Threading.Thread.Sleep(1);
             }
             return true;
         }
@@ -290,7 +289,7 @@ public class ScriptCleanupTests
     {
         var before = lines.ToDictionary(l => l, l => r.H.Said.Count(s => s.StartsWith(l, StringComparison.Ordinal)));
         var until = DateTime.UtcNow.AddMilliseconds(ms);
-        while (DateTime.UtcNow < until) { r.H.PumpOnce(); System.Threading.Thread.Sleep(2); }
+        while (DateTime.UtcNow < until) { if (!r.H.PumpOnceBusy()) System.Threading.Thread.Sleep(2); }
         foreach (var l in lines)
             Assert.True(before[l] == r.H.Said.Count(s => s.StartsWith(l, StringComparison.Ordinal)), "'" + l + "' was said after the end");
     }
@@ -585,7 +584,7 @@ public class ScriptCleanupTests
         Assert.True(r.PumpUntil(() => r.Loaded == 0));
         gate.Release.Set();                              // the answer arrives after the delete
         var until = DateTime.UtcNow.AddMilliseconds(1500);
-        while (DateTime.UtcNow < until) { r.H.PumpOnce(); System.Threading.Thread.Sleep(2); }
+        while (DateTime.UtcNow < until) { if (!r.H.PumpOnceBusy()) System.Threading.Thread.Sleep(2); }
         Assert.Equal((0, 0), r.Held);                   // not kept for an item that is gone
         Assert.Equal(0, r.PendingEvents);
     }

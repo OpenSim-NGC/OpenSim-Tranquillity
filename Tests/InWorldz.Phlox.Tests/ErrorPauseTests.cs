@@ -55,8 +55,7 @@ public class ErrorPauseTests
             while (H.RunStateOf(Item) != "Waiting")
             {
                 Assert.True(DateTime.UtcNow < until, "the script never loaded: " + H.RunStateOf(Item));
-                H.PumpOnce();
-                System.Threading.Thread.Sleep(1);
+                if (!H.PumpOnceBusy()) System.Threading.Thread.Sleep(1);
             }
         }
 

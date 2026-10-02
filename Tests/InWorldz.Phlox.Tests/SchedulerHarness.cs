@@ -466,6 +466,17 @@ public sealed class SchedulerHarness : IDisposable
         return sb.ToString();
     }
 
+    /// <summary>
+    /// One DoWork on each scheduler, as <see cref="PumpOnce"/>; true when either still reports work pending, so a polling
+    /// loop pumps again at once instead of sleeping (a 1 ms sleep takes about 15 ms on Windows).
+    /// </summary>
+    public bool PumpOnceBusy()
+    {
+        var l = m_loader.GetType().GetMethod("DoWork")!.Invoke(m_loader, null);
+        var e = m_exe.GetType().GetMethod("DoWork")!.Invoke(m_exe, null);
+        return Pending(l) || Pending(e);
+    }
+
     /// <summary>Exactly one DoWork on each scheduler - one timeslice, no more.</summary>
     public void PumpOnce()
     {
@@ -524,9 +535,10 @@ public sealed class SchedulerHarness : IDisposable
         {
             var l = loaderDoWork!.Invoke(m_loader, null);
             var e = exeDoWork!.Invoke(m_exe, null);
-            quiet = Pending(l) || Pending(e) || Engine.ObjectPostsInFlight > 0 ? 0 : quiet + 1;
+            bool busy = Pending(l) || Pending(e);
+            quiet = busy || Engine.ObjectPostsInFlight > 0 ? 0 : quiet + 1;
             if (quiet >= quietRounds) return true;
-            System.Threading.Thread.Sleep(1);
+            if (!busy) System.Threading.Thread.Sleep(1);   // Quiet rounds still sleep, so a late delivery has time to land
         }
         return false;
     }
@@ -545,9 +557,11 @@ public sealed class SchedulerHarness : IDisposable
         while (!done())
         {
             if (DateTime.UtcNow >= until) return false;
-            loaderDoWork!.Invoke(m_loader, null);
-            exeDoWork!.Invoke(m_exe, null);
-            System.Threading.Thread.Sleep(1);
+            var l = loaderDoWork!.Invoke(m_loader, null);
+            var e = exeDoWork!.Invoke(m_exe, null);
+            // The scheduler threads do not sleep while they have work, and neither does this loop: a 1 ms sleep takes
+            // about 15 ms on Windows, so a script needing many timeslices would otherwise wait 15 ms for each.
+            if (!Pending(l) && !Pending(e)) System.Threading.Thread.Sleep(1);
         }
         return true;
     }
