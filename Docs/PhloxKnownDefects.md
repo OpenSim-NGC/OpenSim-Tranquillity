@@ -69,6 +69,12 @@ SL behaviour is cited from the SL wiki (`https://wiki.secondlife.com/wiki/<Page>
 - Past the limit, `llListen` returns -1 and raises **no** error. SL raises a run-time
   "Too Many Listens" error ([LlListen](https://wiki.secondlife.com/wiki/LlListen)).
 - An `llListen` identical to one the script already holds active returns the existing handle.
+- Handles are each script's own, numbered from 1 with the lowest free one first, as SL, YEngine
+  and the core WorldComm number them; two scripts can hold the same handle number.
+- A script receives at most 20 listen events per second; the rest of that second's are dropped,
+  with one line in the region log per script per second. SL documents no such limit, and YEngine
+  and Halcyon have none. `[InWorldz.Phlox] MaxListenEventsPerSecond` sets the number; 0 turns the
+  limit off.
 - A prim never hears its own chat.
 - `llRegionSayTo` refuses `DEBUG_CHANNEL` with the error "Cannot use llRegionSayTo() on
   DEBUG_CHANNEL.". Only its target hears it: the target prim's listens, or, for an avatar,
@@ -245,8 +251,24 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   Phlox keeps its saved state, as YEngine keeps its own for a script it declines. If the
   script comes back to Phlox unchanged, it resumes from that state. Anything it did on the
   other engine is not carried over.
-- **What survives.** A Phlox script resumes where it was after a region or simulator restart.
-  It starts fresh when its source changes, and when it is reset.
+- **What survives.** A Phlox script resumes where it was after a region or simulator restart,
+  including in the middle of an event (asleep, in a loop or in a blocking call): its globals,
+  state, queued events, listens (with their handles) and timer, which keeps its phase (the next
+  `timer()` comes after the time it had left). A script that was stopped stays stopped. It
+  starts fresh when its source changes, and when it is reset.
+- **What does not.** `llGetStartParameter` is 0 after a restart or a crossing, as SL documents
+  ([LlGetStartParameter](https://wiki.secondlife.com/wiki/LlGetStartParameter): "The start
+  parameter does not survive region restarts ... or region change"); a rez gives it the rez's
+  parameter. A listen switched off with `llListenControl` comes back on, as Halcyon's did.
+  `osListenRegex` and `botListen` listens are not saved and are gone after a restart.
+- **Rows that cannot be read.** A saved row that cannot be decoded is moved to the
+  `script_state_rejected` table of the state database and the script starts fresh, as
+  YEngine resets a script whose state file is bad. When the database itself fails (busy or
+  locked), the script is held stopped and its row kept, and the next restart tries again.
+- **When rows go.** Deleting a script from a prim deletes its row. A derez, take or crossing
+  keeps it, so an object back in the same simulator process restores. `[InWorldz.Phlox]
+  StateRowMaxAgeDays` (default 0, off) deletes rows not saved or loaded for that many days
+  whose scripts are not loaded in the simulator.
 - **State is not carried inside objects.** YEngine embeds script state in the serialized
   object; Phlox does not (its `GetXMLState` returns nothing). Phlox scripts therefore start
   fresh after:
@@ -328,6 +350,18 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   A character the cut would split is dropped whole. YEngine cuts at 1024 characters.
   An object's instant message is kept for a recipient who is offline, and carries the
   object's location (`Region/x/y/z`), which viewers show as a link.
+- **Touches.** A touch reaches only the prim the region routes it to: the touched prim when its scripts handle the
+  touch, and the root as well with `llPassTouches(TRUE)` or when the touched prim has no handler
+  ([LlPassTouches](https://wiki.secondlife.com/wiki/LlPassTouches)). `llDetectedLinkNumber` is the prim that was touched.
+  While the touch is held, `touch()` repeats every 100 ms, as Halcyon did; the viewer's grab updates only change the
+  data the next repeat carries, and `touch_end` stops it. A script whose state has `touch()` but no `touch_start` or
+  `touch_end` repeats the same way, and a child prim with such a script takes its own touch, as SL's `touch()` is
+  "Triggered on touch start, each minimum event delay while held, and touch end"
+  ([Touch](https://wiki.secondlife.com/wiki/Touch)). YEngine raises `touch()` once for each grab update the viewer
+  sends.
+- `llDetectedGroup` compares the group captured with the event, so it still answers after the avatar or object has
+  left. An object with no group and an avatar with no active group count as the same group, as
+  [LlSameGroup](https://wiki.secondlife.com/wiki/LlSameGroup) counts them; YEngine does the same.
 - `llGroundSlope`, `llGroundNormal` and `llGroundContour` give Halcyon's values: the slope is the heightmap
   triangle's downhill vector, not normalised, with a negative z on sloped ground (its length gives the steepness);
   the normal is `<slope.x, slope.y, 1.0>`; the contour is `<-slope.y, slope.x, 0>`. YEngine normalises all three.
@@ -354,6 +388,9 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - `llGetUsername` returns "First Last" where YEngine returns "first.last". Both answer only for
   an avatar the region holds (root or child agent), else `""`; `llRequestUsername` answers for
   anyone.
+- Start-up events come in SL's order: `state_entry` (a new script), then `on_rez`, then
+  `attach` (an attachment worn from inventory), then `changed(CHANGED_REGION_START)`, which every
+  script started by the region's start gets, new or restored. YEngine posts them in the same order.
 
 ---
 
@@ -413,6 +450,13 @@ Scripted bots (NPCs) through the region's bot manager:
 
 They need the region's NPC support (`[NPC] Enabled`, on by default).
 
+`iwDetectedBot` returns the bot's key in the `sensor` and `no_sensor` events of `botSensor` and `botSensorRepeat` and in
+the `listen` events of `botListen`, `NULL_KEY` in other events with detect data, and `""` in events without. A bot
+does not sense itself. The option lists of `botFollowAvatar`, `botSetNavigationPoints` and `botWanderWithin` take an
+integer key and an integer or float value (`botFollowAvatar` also a vector); any other pair makes `botFollowAvatar`
+return `BOT_ERROR` and the other two do nothing. In `botSetNavigationPoints` a number among the points is the wait
+for `BOT_TRAVELMODE_WAIT`, in seconds.
+
 ### Constants
 - `IW_PRIM_ALPHA` and `IW_PRIM_PROJECTOR*` are extra prim-params rules.
 - `IW_OBJECT_SCRIPT_MEMORY_USED` is an extra `llGetObjectDetails` code.
@@ -465,7 +509,6 @@ name) promises.
 | `llGetCameraAspect`, `llGetCameraFOV` | 1.7778 and 1.0472 (the viewer does not send them) |
 | `llGetAgentLanguage` | `""` |
 | `llWorldPosToHUD` | `<0.5, 0.5, 0>` |
-| `iwDetectedBot` | the string `"0"`, not a key |
 
 `llSetPrimURL` and `llCloseFloater` do nothing. `llRefreshPrimURL` does nothing
 and gives the error "llRefreshPrimURL - not yet supported", as Halcyon did; SL documents it as
@@ -525,6 +568,10 @@ message it sends for a refused rez.
   ([LlSetForce](https://wiki.secondlife.com/wiki/LlSetForce): "Used on an attachment, it will apply the force to the
   avatar"); the region has no way to hold a constant force on an avatar. A local force (`local` TRUE) is turned once
   by the object's rotation when it is set, not kept in the object's frame as it turns.
+- `botGetProfileParams` returns `""` for `BOT_EMAIL` and `BOT_PROFILE_URL`, and the about text and image only for a
+  bot in the same region; the bot manager keeps the values `botSetProfileParams` stores but does not hand them out.
+- `botSetNavigationPoints` with `BOT_TRAVELMODE_WAIT`: the bot manager moves on to the next point at once instead of
+  waiting.
 
 ### Prim-params rules
 - `PRIM_HEALTH` and the damage type in `PRIM_DAMAGE` are accepted and dropped. Reading them
