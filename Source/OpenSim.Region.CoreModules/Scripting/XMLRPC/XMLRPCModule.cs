@@ -719,11 +719,32 @@ public class SendRemoteDataRequest: IServiceRequest
         HttpClient hclient = null;
         try
         {
-            // The shared no-redirect handler behind a handler that follows redirects itself and filters every
-            // hop; otherwise as WebUtil.GetNewGlobalHttpClient(-1), whose handler follows up to 10 unfiltered.
-            // Neither handler is disposed with the client: the inner one is shared.
-            hclient = new HttpClient(
-                new OutboundUrlFilterRedirectHandler(UrlFilter, WebUtil.SharedSocketsHttpHandlerNoRedir, 10), false)
+            // A handler that follows redirects itself and filters every hop, over a handler that connects only to
+            // addresses the filter allows; otherwise as WebUtil.GetNewGlobalHttpClient(-1), whose handler follows
+            // up to 10 unfiltered. The shared no-redirect handler is used as it is when a proxy is configured
+            // (the proxy looks the target up), and is then not disposed with the client.
+            SocketsHttpHandler shared = WebUtil.SharedSocketsHttpHandlerNoRedir;
+            bool ownsHandler = !shared.UseProxy;
+            HttpMessageHandler inner = shared;
+            if (ownsHandler)
+            {
+                SocketsHttpHandler own = new()
+                {
+                    AllowAutoRedirect = false,
+                    AutomaticDecompression = DecompressionMethods.None,
+                    ConnectTimeout = shared.ConnectTimeout,
+                    PreAuthenticate = false,
+                    UseCookies = false,
+                    UseProxy = false,
+                    MaxConnectionsPerServer = shared.MaxConnectionsPerServer,
+                    PooledConnectionIdleTimeout = shared.PooledConnectionIdleTimeout,
+                    PooledConnectionLifetime = shared.PooledConnectionLifetime,
+                    SslOptions = shared.SslOptions,
+                };
+                UrlFilter.ApplyTo(own, false);
+                inner = own;
+            }
+            hclient = new HttpClient(new OutboundUrlFilterRedirectHandler(UrlFilter, inner, 10), ownsHandler)
             {
                 Timeout = TimeSpan.FromMilliseconds(30000),
                 MaxResponseContentBufferSize = 250 * 1024 * 1024,

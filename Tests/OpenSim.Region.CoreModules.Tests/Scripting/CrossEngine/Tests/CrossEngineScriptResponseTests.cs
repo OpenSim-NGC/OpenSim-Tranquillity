@@ -67,7 +67,9 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
     {
         IniConfigSource config = new IniConfigSource();
         config.AddConfig("Startup");
-        config.AddConfig("Network");
+        // The module's filter is process-wide and set up by whichever test builds a module first; this matches the
+        // exception the tests that send real requests to a local listener need.
+        config.AddConfig("Network").Set("OutboundDisallowForUserScriptsExcept", "127.0.0.1/32");
         return config;
     }
 

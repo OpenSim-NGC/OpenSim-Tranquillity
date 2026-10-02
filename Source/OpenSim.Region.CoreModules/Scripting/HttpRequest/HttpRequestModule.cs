@@ -162,6 +162,9 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         shhnc.Proxy = proxy;
                         shhnc.UseProxy = true;
                     }
+                    // Connect only to addresses the filter allows, on every request and redirect.
+                    if (proxy is null)
+                        shhnc.ConnectCallback = ConnectToAllowedAddress;
 
                     VeriFyNoCertClient = new HttpClient(shhnc)
                     {
@@ -200,6 +203,8 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         shh.Proxy = proxy;
                         shh.UseProxy = true;
                     }
+                    if (proxy is null)
+                        shh.ConnectCallback = ConnectToAllowedAddress;
                     VeriFyCertClient = new HttpClient(shh)
                     {
                         Timeout = TimeSpan.FromMilliseconds(httpTimeout),
@@ -448,6 +453,14 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
     public bool CheckAllowed(Uri url)
     {
         return m_outboundUrlFilter.CheckAllowed(url);
+    }
+
+    /// <summary>
+    /// The connect step of the shared clients: only to an address the current filter allows.
+    /// </summary>
+    private static ValueTask<Stream> ConnectToAllowedAddress(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+    {
+        return m_outboundUrlFilter.ConnectToAllowedAddress(context, cancellationToken);
     }
 
     public void StopHttpRequest(uint localID, UUID m_itemID)

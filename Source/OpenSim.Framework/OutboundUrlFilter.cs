@@ -26,6 +26,8 @@
  */
 
 using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Reflection;
 using Nini.Config;
 using Microsoft.Extensions.Logging;
@@ -46,12 +48,22 @@ public class OutboundUrlFilter
     private List<IPNetwork> m_blacklistExceptionNetworks;
     private List<IPEndPoint> m_blacklistExceptionEndPoints;
 
+    /// <summary>
+    /// Resolves a host name to its addresses. Dns by default; replaceable so the address handling can be tested
+    /// without a name server.
+    /// </summary>
+    private readonly Func<string, CancellationToken, ValueTask<IPAddress[]>> m_resolver
+        = async (host, ct) => await Dns.GetHostAddressesAsync(host, ct).ConfigureAwait(false);
+
     public OutboundUrlFilter(
         string name,
         List<IPNetwork> blacklistNetworks, List<IPEndPoint> blacklistEndPoints,
-        List<IPNetwork> blacklistExceptionNetworks, List<IPEndPoint> blacklistExceptionEndPoints)
+        List<IPNetwork> blacklistExceptionNetworks, List<IPEndPoint> blacklistExceptionEndPoints,
+        Func<string, CancellationToken, ValueTask<IPAddress[]>> resolver = null)
     {
         Name = name;
+        if (resolver is not null)
+            m_resolver = resolver;
 
         m_blacklistNetworks = blacklistNetworks;
         m_blacklistEndPoints = blacklistEndPoints;
@@ -64,9 +76,13 @@ public class OutboundUrlFilter
     /// </summary>
     /// <param name="name">Name of the filter for logging purposes.</param>
     /// <param name="config">Filter configuration</param>
-    public OutboundUrlFilter(string name, IConfigSource config)
+    /// <param name="resolver">Replaces the name lookup; Dns when null.</param>
+    public OutboundUrlFilter(
+        string name, IConfigSource config, Func<string, CancellationToken, ValueTask<IPAddress[]>> resolver = null)
     {
         Name = name;
+        if (resolver is not null)
+            m_resolver = resolver;
 
         string configBlacklist
             = "0.0.0.0/8|10.0.0.0/8|100.64.0.0/10|127.0.0.0/8|169.254.0.0/16|172.16.0.0/12|192.0.0.0/24|192.0.2.0/24|192.88.99.0/24|192.168.0.0/16|198.18.0.0/15|198.51.100.0/24|203.0.113.0/24|224.0.0.0/4|240.0.0.0/4|255.255.255.255/32";
@@ -200,21 +216,51 @@ public class OutboundUrlFilter
     }
 
     /// <summary>
-    /// Checks whether the given url is allowed by the filter.
+    /// The IPv4 address an answer stands for, or null for an IPv6 answer. An IPv4-mapped IPv6 answer
+    /// (::ffff:a.b.c.d) is the IPv4 address it carries, so it is judged against the same ranges.
+    /// </summary>
+    private static IPAddress AsIPv4(IPAddress addr)
+    {
+        if (addr.AddressFamily == AddressFamily.InterNetwork)
+            return addr;
+        if (addr.AddressFamily == AddressFamily.InterNetworkV6 && addr.IsIPv4MappedToIPv6)
+            return addr.MapToIPv4();
+        return null;
+    }
+
+    /// <summary>
+    /// Is a connection to this address and port allowed? True when the address is IPv4 (or IPv4-mapped IPv6) and is
+    /// either outside the blocked ranges and endpoints or matches an exception. Other IPv6 addresses are never
+    /// allowed, as in <see cref="CheckAllowed"/>.
+    /// </summary>
+    private bool IsAddressAllowed(IPAddress addr, int port)
+    {
+        addr = AsIPv4(addr);
+        if (addr is null)
+            return false;
+
+        if (!OutboundUrlFilter.IsInNetwork(addr, port, m_blacklistNetworks, m_blacklistEndPoints, Name))
+            return true;
+
+        return OutboundUrlFilter.IsInNetwork(addr, port, m_blacklistExceptionNetworks, m_blacklistExceptionEndPoints, Name);
+    }
+
+    /// <summary>
+    /// Checks whether the given url is allowed by the filter. This looks the host up once and refuses early; it does
+    /// not decide where a request connects. A request that must only reach allowed addresses also needs
+    /// <see cref="CreateConnectCallback"/> on the handler that sends it.
     /// </summary>
     /// <returns></returns>
     public bool CheckAllowed(Uri url)
     {
-        bool allowed = true;
-
         // Check that we are permitted to make calls to this endpoint.
         bool foundIpv4Address = false;
 
         IPAddress[] addresses = null;
-        
+
         try
         {
-            addresses = Dns.GetHostAddresses(url.Host);
+            addresses = m_resolver(url.Host, CancellationToken.None).AsTask().GetAwaiter().GetResult();
         }
         catch
         {
@@ -224,40 +270,98 @@ public class OutboundUrlFilter
 
         foreach (IPAddress addr in addresses)
         {
-            if (addr.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-            {
-//                    m_log.LogDebug("[OUTBOUND URL FILTER]: Found address [{0}]", addr);
+            if (AsIPv4(addr) is null)
+                continue;
 
-                foundIpv4Address = true;
-
-                // Check blacklist
-                if (OutboundUrlFilter.IsInNetwork(addr, url.Port, m_blacklistNetworks, m_blacklistEndPoints, Name))
-                {
-//                        m_log.LogDebug("[OUTBOUND URL FILTER]: Found [{0}] in blacklist for {1}", url, Name);
-
-                    // Check blacklist exceptions
-                    allowed
-                        = OutboundUrlFilter.IsInNetwork(
-                            addr, url.Port, m_blacklistExceptionNetworks, m_blacklistExceptionEndPoints, Name);
-
-//                        if (allowed)
-//                            m_log.LogDebug("[OUTBOUND URL FILTER]: Found [{0}] in whitelist for {1}", url, Name);
-                }
-            }
+            foundIpv4Address = true;
 
             // Found at least one address in a blacklist and not a blacklist exception
-            if (!allowed)
+            if (!IsAddressAllowed(addr, url.Port))
                 return false;
-//                else
-//                    m_log.LogDebug("[OUTBOUND URL FILTER]: URL [{0}] not in blacklist for {1}", url, Name);
         }
 
         // We do not know how to handle IPv6 securely yet.
-        if (!foundIpv4Address)
-            return false;
+        return foundIpv4Address;
+    }
 
-//            m_log.LogDebug("[OUTBOUND URL FILTER]: Allowing request [{0}]", url);
+    /// <summary>
+    /// Opens the TCP connection to an address. Replaceable so the connect step can be tested without a network.
+    /// </summary>
+    public delegate ValueTask<Stream> AddressConnector(IPAddress address, int port, CancellationToken cancellationToken);
 
-        return allowed;
+    private static async ValueTask<Stream> ConnectSocket(IPAddress address, int port, CancellationToken cancellationToken)
+    {
+        Socket socket = new(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(new IPEndPoint(address, port), cancellationToken).ConfigureAwait(false);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Makes a handler connect only to addresses this filter allows, unless <paramref name="proxyConfigured"/>.
+    /// A handler with a proxy connects to the proxy, which looks the target up itself, so there is no target
+    /// address to judge; such a request keeps the early <see cref="CheckAllowed"/> check only.
+    /// </summary>
+    public void ApplyTo(SocketsHttpHandler handler, bool proxyConfigured)
+    {
+        if (!proxyConfigured)
+            handler.ConnectCallback = CreateConnectCallback();
+    }
+
+    /// <summary>
+    /// A <see cref="SocketsHttpHandler.ConnectCallback"/> that looks the host up when it connects and connects only
+    /// to an address <see cref="IsAddressAllowed"/> accepts, so the address that was judged is the address used,
+    /// on the first request and on every redirect. The handler still uses the host name for TLS and the Host header.
+    /// A host with several answers is tried in order, skipping those that are refused. If none is allowed the
+    /// connection fails with an <see cref="HttpRequestException"/>.
+    /// </summary>
+    /// <param name="connector">Opens the connection to one address; a socket connect by default.</param>
+    public Func<SocketsHttpConnectionContext, CancellationToken, ValueTask<Stream>> CreateConnectCallback(
+        AddressConnector connector = null)
+    {
+        return (context, cancellationToken) => ConnectToAllowedAddress(context, cancellationToken, connector);
+    }
+
+    /// <summary>
+    /// The connect step behind <see cref="CreateConnectCallback"/>, for a caller that picks its filter when the
+    /// connection is made rather than when the handler is built.
+    /// </summary>
+    public async ValueTask<Stream> ConnectToAllowedAddress(
+        SocketsHttpConnectionContext context, CancellationToken cancellationToken, AddressConnector connector = null)
+    {
+        connector ??= ConnectSocket;
+
+        DnsEndPoint endPoint = context.DnsEndPoint;
+        IPAddress[] addresses = await m_resolver(endPoint.Host, cancellationToken).ConfigureAwait(false);
+
+        Exception lastError = null;
+        bool anyAllowed = false;
+        foreach (IPAddress addr in addresses)
+        {
+            if (!IsAddressAllowed(addr, endPoint.Port))
+                continue;
+
+            anyAllowed = true;
+            try
+            {
+                return await connector(AsIPv4(addr), endPoint.Port, cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception e) when (e is SocketException or IOException)
+            {
+                lastError = e;
+            }
+        }
+
+        if (!anyAllowed)
+            throw new HttpRequestException(string.Format("Request to {0} disallowed by filter", endPoint.Host));
+
+        throw new HttpRequestException("Connection failed", lastError);
     }
 }
