@@ -182,7 +182,7 @@ public class JsonConformanceTests
         Assert.Equal(JSON_STRING, Api().llJsonValueType(got, L(0)));
     }
 
-    // ── llJsonSetValue (Q37 (b)) ────────────────────────────────────────────
+    // ── llJsonSetValue ────────────────────────────────────────────────────────
 
     [Fact]
     public void SetValueOnEmptyInputStartsAnArray()
