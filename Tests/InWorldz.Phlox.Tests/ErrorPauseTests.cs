@@ -144,7 +144,7 @@ public class ErrorPauseTests
         for (int attempt = 0; attempt < 5; attempt++)
         {
             int before = (int)count.GetValue(api);
-            t.GetField("m_resetSecond", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(api, DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+            t.GetField("m_resetSecond", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(api, (long)(Clock.Now / 1000));   // the throttle counts seconds of the engine clock
             t.GetField("m_resetCount", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(api, 5);
             t.GetMethod("ThrottleScriptResets", BindingFlags.NonPublic | BindingFlags.Instance).Invoke(api, null);
             if ((int)count.GetValue(api) > before) return null;
