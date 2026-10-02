@@ -227,29 +227,76 @@ default
         Assert.Equal(after, Count(h, "T "));
     }
 
-    [Fact]
-    public void AGrabUpdateRefreshesTheRepeatsDataAndIsNotAnEventOfItsOwn()
+    /// <summary>
+    /// The repeat is a wake on the engine's clock (Clock), so this test stops that clock and moves it by hand: how many
+    /// touch() repeats arrive then depends only on how far the clock was moved, never on how fast the machine is. The
+    /// clock is process-wide, hence "phlox-state"; the rest of the class runs in parallel.
+    /// </summary>
+    [Collection("phlox-state")]
+    public class WithTheEngineClockDriven : IDisposable
     {
-        using var h = new SchedulerHarness();
-        h.RezScript(Repeater);
-        WaitForMask(h, h.Prim, scriptEvents.touch);
-        var client = h.AddClient();
+        private readonly ITestOutputHelper _out;
+        private bool m_frozen;
+        private ulong m_now;
 
-        h.Scene.ProcessObjectGrab(h.Prim.LocalId, Vector3.Zero, client, Surface());
-        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 1, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+        public WithTheEngineClockDriven(ITestOutputHelper o)
+        {
+            _out = o;
+            InWorldz.Phlox.Util.Clock.SetSourceForTesting(() => m_frozen ? m_now : (ulong)Environment.TickCount64);
+        }
 
-        // Twenty grab updates in one burst: today each became its own touch(). Now they refresh the data only.
-        Vector3 at = h.Prim.AbsolutePosition + new Vector3(0, 0, 1);
-        for (int i = 0; i < 20; i++)
-            h.Scene.ProcessObjectGrabUpdate(h.Prim.UUID, Vector3.Zero, at, client, Surface(face: 4));
+        public void Dispose() => InWorldz.Phlox.Util.Clock.SetSourceForTesting(null);
 
-        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("T <0.00000, 0.00000, 1.00000> 4", StringComparison.Ordinal)),
-            TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
-        h.Scene.ProcessObjectDeGrab(h.Prim.LocalId, client, Surface());
-        Assert.True(h.PumpUntil(() => Count(h, "E") == 1));
-        _out.WriteLine(string.Join(" | ", h.Said));
-        // Not one touch() per grab update: the repeats came at their own pace.
-        Assert.True(Count(h, "T <0.00000, 0.00000, 1.00000>") < 20, string.Join(" | ", h.Said));
+        private void Freeze() { m_now = (ulong)Environment.TickCount64; m_frozen = true; }
+
+        /// <summary>Move the stopped clock on by one repeat interval (100 ms) and run everything that falls due.</summary>
+        private void OneInterval(SchedulerHarness h)
+        {
+            m_now += 100;
+            Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+        }
+
+        private static string LastTouch(SchedulerHarness h) => h.Said.Last(s => s.StartsWith("T ", StringComparison.Ordinal));
+
+        [Fact]
+        public void AGrabUpdateRefreshesTheRepeatsDataAndIsNotAnEventOfItsOwn()
+        {
+            // The chat pause (ChatThrottle) is a sleep on the same clock; off, so it cannot hold a touch() back.
+            using var h = new SchedulerHarness(cfg => cfg.Configs["InWorldz.Phlox"].Set("ChatThrottle", "false"));
+            h.RezScript(Repeater);
+            WaitForMask(h, h.Prim, scriptEvents.touch);
+            var client = h.AddClient();
+
+            h.Scene.ProcessObjectGrab(h.Prim.LocalId, Vector3.Zero, client, Surface());
+            Assert.True(h.PumpUntil(() => Count(h, "T ") >= 1, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+
+            // From here no repeat falls due unless the test moves the clock.
+            Freeze();
+            Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+            int before = Count(h, "T ");
+            Assert.StartsWith("T <0.00000, 0.00000, 0.00000> 2", LastTouch(h));
+
+            // Twenty grab updates in one burst. They refresh the data the next repeat carries; none is a touch() of its own.
+            Vector3 at = h.Prim.AbsolutePosition + new Vector3(0, 0, 1);
+            for (int i = 0; i < 20; i++)
+                h.Scene.ProcessObjectGrabUpdate(h.Prim.UUID, Vector3.Zero, at, client, Surface(face: 4));
+            Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+            _out.WriteLine(string.Join(" | ", h.Said));
+            Assert.Equal(before, Count(h, "T "));
+
+            // Each interval brings exactly one repeat, and it carries the data of the latest grab update.
+            for (int i = 1; i <= 3; i++)
+            {
+                OneInterval(h);
+                Assert.Equal(before + i, Count(h, "T "));
+                Assert.StartsWith("T <0.00000, 0.00000, 1.00000> 4", LastTouch(h));
+            }
+
+            h.Scene.ProcessObjectDeGrab(h.Prim.LocalId, client, Surface());
+            Assert.True(h.PumpUntil(() => Count(h, "E") == 1), string.Join(" | ", h.Said));
+            _out.WriteLine(string.Join(" | ", h.Said));
+            Assert.Equal(before + 3, Count(h, "T "));
+        }
     }
 
     private const string TouchOnly = @"
