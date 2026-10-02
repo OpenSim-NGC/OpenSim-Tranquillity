@@ -40,7 +40,7 @@ public class GiveToAbsentAvatarTests
     private string Run(SchedulerHarness h, string body, string marker)
     {
         h.RezScript("default { state_entry() { " + body + " } }");
-        var until = DateTime.UtcNow.AddSeconds(8);
+        var until = DateTime.UtcNow.AddSeconds(30);   // a first compile on a loaded machine can take longer than 8 s
         while (DateTime.UtcNow < until && !h.Said.Any(s => s.StartsWith(marker))) h.PumpOnce();
         var debug = h.SaidOn.Where(s => s.Channel == 0x7FFFFFFF).Select(s => s.Message);
         _out.WriteLine($"said=[{string.Join(" | ", h.Said)}] debug=[{string.Join(" | ", debug)}]");

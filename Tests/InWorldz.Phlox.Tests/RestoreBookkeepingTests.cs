@@ -159,7 +159,9 @@ public class RestoreBookkeepingTests
     public void AScriptStoppedMidEventStaysStoppedAfterARestoreUntilStarted()
     {
         var asset = UUID.Random(); var item = UUID.Random();
-        using (var h1 = new SchedulerHarness())
+        // Halcyon's 15 ms chat pause (ChatThrottle) would leave the script Sleeping right after "begin", and whether the
+        // check below found it still asleep depended on how fast the test got there; off, the script is in its loop.
+        using (var h1 = new SchedulerHarness(cfg => cfg.Configs["InWorldz.Phlox"].Set("ChatThrottle", "false")))
         {
             h1.RezScript(LoopSrc, asset, item);
             Assert.True(h1.PumpUntil(() => h1.Said.Contains("up")), SavedStateRig.SaidText(h1));
