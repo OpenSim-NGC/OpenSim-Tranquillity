@@ -594,6 +594,16 @@ namespace Phlox.ScriptEngine
             return false;
         }
 
+        /// <summary>
+        /// A listen botListen registered (its host is the bot's avatar, not a prim) carries the bot's key for
+        /// iwDetectedBot, as Halcyon's ExecutionScheduler gave it; a prim's listen has no detect data.
+        /// </summary>
+        private InWorldz.Phlox.VM.DetectVariables[] BotListenDetect(UUID hostID)
+        {
+            if (m_Scene?.GetScenePresence(hostID) == null) return null;
+            return new[] { new InWorldz.Phlox.VM.DetectVariables { BotID = hostID.ToString() } };
+        }
+
         private void PostListenEvent(ListenEntry entry, int channel,
                                      string name, UUID key, string message)
         {
@@ -604,7 +614,7 @@ namespace Phlox.ScriptEngine
                 var evt = new InWorldz.Phlox.VM.PostedEvent
                 {
                     EventType  = SupportedEventList.Events.LISTEN,
-                    DetectVars = null,
+                    DetectVars = BotListenDetect(entry.HostID),
                     Args       = new object[]
                     {
                         channel,

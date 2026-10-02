@@ -1875,6 +1875,15 @@ namespace Phlox.ScriptEngine
 
         #region Helpers
 
+        /// <summary>
+        /// Detect data from a sweep a bot made (botSensor, botSensorRepeat): the shared DetectParams with the scanning bot's
+        /// key, which iwDetectedBot returns. Halcyon kept it as DetectParams.BotID; the shared class here has no such field.
+        /// </summary>
+        internal sealed class BotDetectParams : DetectParams
+        {
+            public UUID BotID;
+        }
+
         private InWorldz.Phlox.VM.DetectVariables[] ConvertDetectParams(DetectParams[] parms)
         {
             if (parms == null) return Array.Empty<InWorldz.Phlox.VM.DetectVariables>();
@@ -1904,6 +1913,8 @@ namespace Phlox.ScriptEngine
                     DamageType   = parms[i].DamageType,
                     OriginalDamage = parms[i].OriginalDamage,
                     AdjustDamage = parms[i].AdjustDamage,
+                    // Halcyon copied the bot flag of every entry: the scanning bot's key, NULL_KEY for anything else
+                    BotID        = (parms[i] is BotDetectParams b ? b.BotID : UUID.Zero).ToString(),
                 };
             }
             return result;

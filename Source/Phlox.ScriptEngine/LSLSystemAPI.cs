@@ -4283,7 +4283,16 @@ namespace Phlox.ScriptEngine
         public Vector3 llDetectedTouchPos(int n) => GetDetect(n).TouchPos;
         public Vector3 llDetectedTouchST(int n) => GetDetect(n).TouchST;
         public Vector3 llDetectedTouchUV(int n) => GetDetect(n).TouchUV;
-        public string iwDetectedBot() { return "0"; }
+        /// <summary>
+        /// The bot a botSensor scanned for or a botListen heard with; NULL_KEY in other detect events; "" in an event with
+        /// no detect data (Halcyon iwDetectedBot reads DetectVariables.BotID of entry 0).
+        /// </summary>
+        public string iwDetectedBot()
+        {
+            var vars = m_thisScript?.ScriptState?.RunningEvent?.DetectVars;
+            if (vars == null || vars.Length == 0) return string.Empty;
+            return vars[0].BotID ?? UUID.Zero.ToString();
+        }
 
         public string llDetectedRezzer(int n)
         {
