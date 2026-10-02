@@ -15,7 +15,7 @@ namespace InWorldz.Phlox.Tests;
 /// </para>
 ///
 /// <para>
-/// <b>Scope, ruled:</b> this is about BUILT-IN overloads only. User-function overloading stays
+/// <b>Scope:</b> this is about BUILT-IN overloads only. User-function overloading stays
 /// rejected — SL rejects it, so Phlox's rule is the parity rule. <see cref="UserFunctionOverloadTests"/>
 /// pins that, with the airship script as the example.
 /// </para>
