@@ -686,9 +686,6 @@ namespace Phlox.ScriptEngine
                     case RuntimeState.MiscAttr.VolumeDetect:
                         llVolumeDetect((int)kvp.Value[0]);
                         break;
-                    case RuntimeState.MiscAttr.SilentEstateManagement:
-                        RestoreSilentEstateBit((int)kvp.Value[0] != 0);
-                        break;
                     case RuntimeState.MiscAttr.Control:
                         // A vehicle's script arriving by a crossing leaves its controls to the core, which carries the
                         // seated avatar's registrations in the agent's data, and to OnGroupCrossedAvatarReady when the
@@ -701,17 +698,22 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// The saved PERMISSION_SILENT_ESTATE_MANAGEMENT record is put back on the item's grant: the bit is set or cleared as
-        /// the record says, and the granter goes when nothing is left (Halcyon OnScriptInjected, SilentEstateManagement).
-        /// The item is written only when its grant changed.
+        /// A restored script's records of grants it used, the taken controls and PERMISSION_SILENT_ESTATE_MANAGEMENT, are
+        /// kept only while the item holds the grant they rest on, from a granter. The core zeroes a script item's grant
+        /// whenever it starts the script (SceneObjectPartInventory.CreateScriptInstance) and when the owner changes
+        /// (ChangeInventoryOwner, ApplyNextOwnerPermissions), and a restore never puts a grant back, so a record saved
+        /// before can neither give a grant nor be acted on later, by an arrival or by a grant the new owner gives. SL:
+        /// the script loses PERMISSION_TAKE_CONTROLS "on reset, or if the object is deleted, detached, or dropped"
+        /// (llTakeControls). Every restore calls this, from carried state or the state database, before anything runs.
         /// </summary>
-        private void RestoreSilentEstateBit(bool silent)
+        internal void DropGrantRecordsWithoutGrant()
         {
+            var misc = m_thisScript?.ScriptState?.MiscAttributes;
+            if (misc == null) return;
             TaskInventoryItem item = GetInventorySelf();
-            if (item == null) return;
-            int mask = silent ? item.PermsMask | PERMISSION_SILENT_ESTATE_MANAGEMENT : item.PermsMask & ~PERMISSION_SILENT_ESTATE_MANAGEMENT;
-            UUID granter = mask == 0 ? UUID.Zero : item.PermsGranter;
-            if (mask != item.PermsMask || granter != item.PermsGranter) PermsChange(item, granter, mask);
+            int mask = item == null || item.PermsGranter == UUID.Zero ? 0 : item.PermsMask;
+            if ((mask & PERMISSION_TAKE_CONTROLS) == 0) misc.Remove((int)RuntimeState.MiscAttr.Control);
+            if ((mask & PERMISSION_SILENT_ESTATE_MANAGEMENT) == 0) misc.Remove((int)RuntimeState.MiscAttr.SilentEstateManagement);
         }
 
         /// <summary>

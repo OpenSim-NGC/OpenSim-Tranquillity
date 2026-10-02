@@ -26,8 +26,9 @@ namespace InWorldz.Phlox.Tests;
 /// A scripted vehicle crosses from one region into the next, each region with its own Phlox engine and scheduler thread,
 /// through the core's crossing (EntityTransferModule, LocalSimulationConnector: GetStateSnapshot, then SetState). The
 /// script carries on in the new region: SL's "A script will NOT automatically re-enter the default state state_entry
-/// event ... if the task is moved to another SIM" (wiki, State). It keeps its globals, its listen and the record of the
-/// controls it took; its start parameter is 0 (llGetStartParameter: it does not survive "region change (SVC-3258,
+/// event ... if the task is moved to another SIM" (wiki, State). It keeps its globals and its listen; the record of
+/// the controls it took does not come back, as the core starts it with no grant; its start parameter is 0
+/// (llGetStartParameter: it does not survive "region change (SVC-3258,
 /// crossing or teleport)"). Taken controls on a seated avatar travel in the core's agent data for every engine.
 /// </summary>
 // Runs in parallel: regions (7310, 7310) and (7310, 7309) are used by no other test; the scenes, engines and items are its own.
@@ -116,7 +117,7 @@ public class VehicleCrossingStateTests
     }
 
     [Fact]
-    public void AScriptedVehicleCrossesWithItsStateGlobalsListenAndControlRecord()
+    public void AScriptedVehicleCrossesWithItsStateGlobalsAndListen()
     {
         var (a, b) = TwoRegions();
         using var ra = a;
@@ -147,7 +148,10 @@ public class VehicleCrossingStateTests
         Assert.True(WaitFor(() => b.Heard("n=7 sp=0")), "region B: " + b.Text());
         Assert.DoesNotContain("entry", b.Said);
 
-        Assert.True(Script(b, item).ScriptState.MiscAttributes.ContainsKey((int)RuntimeState.MiscAttr.Control));
+        // The record of taken controls does not come back: the core starts the script in region B with no grant
+        // (SceneObjectPartInventory.CreateScriptInstance), and a record rests on the grant. A seated driver's
+        // registration travels in the core's agent data instead.
+        Assert.False(Script(b, item).ScriptState.MiscAttributes.ContainsKey((int)RuntimeState.MiscAttr.Control));
         Assert.True(WaitFor(() => Script(a, item) == null), "the script is still loaded in region A");
     }
 }

@@ -333,6 +333,8 @@ namespace Phlox.ScriptEngine
                 // InjectScript did only `if (interp.ScriptState.Enabled)`: nothing goes on the run queue or the
                 // sleep heap and its timer is not armed. Its RunState, frame and timer's time left are kept for
                 // StartAfterStop, which carries on from them when Running is ticked.
+                // The records of grants the script used are kept only while its item holds the grants.
+                sysApi.DropGrantRecordsWithoutGrant();
                 bool enabled = interp.ScriptState.Enabled;
                 var restoredRunState = interp.ScriptState.RunState;
                 switch (restoredRunState)

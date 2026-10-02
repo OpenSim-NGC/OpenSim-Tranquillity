@@ -394,11 +394,11 @@ public class CarriedStateTests
     }
 
     /// <summary>
-    /// The saved PERMISSION_SILENT_ESTATE_MANAGEMENT record is put back on the item's grant at a restore (Halcyon
-    /// OnScriptInjected, SilentEstateManagement).
+    /// A saved PERMISSION_SILENT_ESTATE_MANAGEMENT record never puts the bit on the item's grant: a restore gives no grant
+    /// the item does not hold, and the record goes with it.
     /// </summary>
     [Fact]
-    public void ARestorePutsTheSilentEstateBitBack()
+    public void ARestoreNeverPutsTheSilentEstateBitBack()
     {
         var asset = UUID.Random(); var item = UUID.Random();
         SaveTaker(asset, item, interp =>
@@ -406,21 +406,24 @@ public class CarriedStateTests
         var granter = UUID.Random();
         using var h2 = RestoreTaker(asset, item, granter, TakeControls);
         var inv = h2.Prim.Inventory.GetInventoryItem(item);
-        Assert.Equal(TakeControls | SilentEstate, inv.PermsMask);
+        Assert.Equal(TakeControls, inv.PermsMask);
         Assert.Equal(granter, inv.PermsGranter);
+        Assert.False(((Interpreter)h2.InterpreterFor(item)).ScriptState.MiscAttributes
+            .ContainsKey((int)RuntimeState.MiscAttr.SilentEstateManagement));
     }
 
-    /// <summary>A record of 0 clears the bit, and a grant left empty loses its granter.</summary>
+    /// <summary>A record never changes the item's grant: a grant the item holds stays as it is, whatever the record says.</summary>
     [Fact]
-    public void ARestoreClearsTheSilentEstateBitTheRecordSaysIsOff()
+    public void ARestoreLeavesTheItemsGrantAsTheItemHoldsIt()
     {
         var asset = UUID.Random(); var item = UUID.Random();
         SaveTaker(asset, item, interp =>
             interp.ScriptState.MiscAttributes[(int)RuntimeState.MiscAttr.SilentEstateManagement] = new object[] { 0 });
-        using var h2 = RestoreTaker(asset, item, UUID.Random(), SilentEstate);
+        var granter = UUID.Random();
+        using var h2 = RestoreTaker(asset, item, granter, SilentEstate);
         var inv = h2.Prim.Inventory.GetInventoryItem(item);
-        Assert.Equal(0, inv.PermsMask);
-        Assert.Equal(UUID.Zero, inv.PermsGranter);
+        Assert.Equal(SilentEstate, inv.PermsMask);
+        Assert.Equal(granter, inv.PermsGranter);
     }
 
     /// <summary>
