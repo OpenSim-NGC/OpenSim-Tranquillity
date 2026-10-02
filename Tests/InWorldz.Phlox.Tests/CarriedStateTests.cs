@@ -280,8 +280,22 @@ public class CarriedStateTests
         h.Engine.GetType().GetField("CarriedStateTimeoutMs", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(h.Engine, 200);
         SetMasterRunning(h, true);
         // Asked from a region thread; nothing pumps the scheduler, so the 200 ms must run out.
-        try { Assert.Equal(string.Empty, Task.Run(() => h.Engine.GetXMLState(item)).Result); }
+        try { Assert.Equal(string.Empty, OnOwnThread(() => h.Engine.GetXMLState(item))); }
         finally { SetMasterRunning(h, false); }
+    }
+
+    /// <summary>
+    /// Runs <paramref name="ask"/> on a thread of its own and returns its answer. Not Task.Run(..).Result: a task not yet
+    /// started can run inline on the waiting thread, and the test thread is the one that drove the scheduler, so the
+    /// engine would take it for the scheduler thread and capture directly.
+    /// </summary>
+    internal static T OnOwnThread<T>(Func<T> ask)
+    {
+        T answer = default;
+        var t = new System.Threading.Thread(() => answer = ask()) { IsBackground = true };
+        t.Start();
+        Assert.True(t.Join(TimeSpan.FromSeconds(60)), "the asking thread did not finish");
+        return answer;
     }
 
     /// <summary>SaveAllState writes every loaded script's state now, and a region start restores it.</summary>
