@@ -20,7 +20,7 @@ namespace InWorldz.Phlox.Tests;
 /// The event queue and event routing. Halcyon is the reference where SL says nothing: RuntimeState.QueueEvent lets
 /// on_rez, state_entry, state_exit and timer past the 64-event limit; ExecutionScheduler does not queue a null-change
 /// control() while one is already queued, and queues (does not run) a stopped script's state_entry. control() and the
-/// target events go only to the script they are for, as YEngine does (XMREvents); Phlox does the same.
+/// target events go only to the script they are for, as YEngine does (XMREvents).
 /// <para>
 /// Not in "phlox-state": every test builds its own harness, touches no process-wide seam and counts events rather
 /// than timing them, so the class runs in parallel.
@@ -167,7 +167,7 @@ default
         Assert.Equal(expected, h.Said.Take(n).ToArray());
     }
 
-    // ── who an event is for (the script concerned only) ───────────────────────
+    // ── who an event is for (the script concerned only, as YEngine) ──────────
 
     private const string Listener = @"
 default
@@ -218,7 +218,7 @@ default
         Assert.Equal(4, h.Said.Count);
     }
 
-    // ── a crashed script's message (Halcyon's wording) ─────────────────────────
+    // ── a crashed script's message (Halcyon's wording) ────────────────────────
 
     [Fact]
     public void ACrashedScriptShoutsHalcyonsWording()

@@ -154,7 +154,7 @@ public class SetRegionPosTests
         Near(new Vector3(40, 40, 20), h.Prim.ParentGroup.AbsolutePosition);
     }
 
-    // ---- crossing (does core cross an object moved up to 10 m past the edge?) ----
+    // ---- crossing (SL allows x and y in [-10, 266]: does the core cross an object moved up to 10 m past the edge?) ----
 
     /// <summary>
     /// Region A at (7300, 7300) and region B south of it at (7300, 7299), on one simulator. The test grid service

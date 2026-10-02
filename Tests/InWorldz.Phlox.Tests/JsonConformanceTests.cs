@@ -182,7 +182,7 @@ public class JsonConformanceTests
         Assert.Equal(JSON_STRING, Api().llJsonValueType(got, L(0)));
     }
 
-    // ── llJsonSetValue ────────────────────────────────────────────────────────
+    // ── llJsonSetValue: empty input, bare literals, YEngine's subtree replacement ──
 
     [Fact]
     public void SetValueOnEmptyInputStartsAnArray()
@@ -203,7 +203,8 @@ public class JsonConformanceTests
     [Fact]
     public void SetValueKeepsAQuotedValueAsAString()
     {
-        // Ruled: quoted values stay strings, quotes included (YEngine), not Halcyon's quote-stripping.
+        // A quoted value stays a string, quotes included, as YEngine keeps it (SL: "Double-quotes in string values are
+        // escaped"), not stripped as Halcyon did.
         Assert.Equal("{\"a\":\"\\\"x\\\"\"}", Api().llJsonSetValue("{}", L("a"), "\"x\""));
     }
 
