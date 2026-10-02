@@ -18,7 +18,8 @@ namespace InWorldz.Phlox.Tests;
 /// answers with transaction_result(key, success, data) (SL; Halcyon LSLSystemAPI.cs:3083-3085), with Halcyon's checks
 /// and error tags (:3018-3089); iwGiveMoney returns the transaction id or the tag, with no event (:3096-3100).
 /// llSetPayPrice writes the root prim's prices, hides the buttons the list leaves out and marks the object changed
-/// (Halcyon :13348-13362, YEngine LSL_Api.llSetPayPrice).
+/// (Halcyon :13348-13362, YEngine LSL_Api.llSetPayPrice); from a child prim it does nothing (SL: "Calling it from a
+/// child prim has no effect"; YEngine ignores it too).
 /// </summary>
 // No test reaches a network service: the money module is an in-memory recorder.
 // Test grouping: no process-wide state, so the class runs in parallel.
@@ -111,15 +112,28 @@ public class MoneyTransferTests
     }
 
     [Fact]
-    public void SetPayPriceFromAChildPrimSetsTheRootsPricesAndHidesTheMissingButtons()
+    public void SetPayPriceFromTheRootSetsItsPricesAndHidesTheMissingButtons()
+    {
+        using var r = new InventoryGivesRig();
+        r.H.Prim.ParentGroup.HasGroupChanged = false;
+        r.Accounted(a => { a.llSetPayPrice(10, L(1, 2)); return null; });
+        Assert.Equal(new[] { 10, 1, 2, -1, -1 }, r.H.Prim.ParentGroup.RootPart.PayPrice);
+        Assert.True(r.H.Prim.ParentGroup.HasGroupChanged);
+    }
+
+    [Fact]
+    public void SetPayPriceFromAChildPrimHasNoEffect()
     {
         using var r = new InventoryGivesRig();
         var child = r.AddChild("child");
         UUID childScript = r.H.RezScriptInto(child, "default { state_entry() { } }");
         r.WaitLoaded(childScript);
+        int[] rootBefore = (int[])r.H.Prim.ParentGroup.RootPart.PayPrice.Clone();
+        int[] childBefore = (int[])child.PayPrice.Clone();
         r.H.Prim.ParentGroup.HasGroupChanged = false;
         r.AccountedFor(childScript, a => { a.llSetPayPrice(10, L(1, 2)); return null; });
-        Assert.Equal(new[] { 10, 1, 2, -1, -1 }, r.H.Prim.ParentGroup.RootPart.PayPrice);
-        Assert.True(r.H.Prim.ParentGroup.HasGroupChanged);
+        Assert.Equal(rootBefore, r.H.Prim.ParentGroup.RootPart.PayPrice);
+        Assert.Equal(childBefore, child.PayPrice);
+        Assert.False(r.H.Prim.ParentGroup.HasGroupChanged);
     }
 }

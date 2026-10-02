@@ -16016,13 +16016,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// <summary>
         /// Halcyon (LSLSystemAPI.cs:13348-13362) and YEngine (LSL_Api.llSetPayPrice): the prices go on the root prim,
         /// which the money modules read for the pay dialog; a button the list leaves out is PAY_HIDE; the object is
-        /// marked changed so the prices persist. A call from a child prim sets the root's prices, as Halcyon's did
-        /// (SL and YEngine ignore a child prim's call).
+        /// marked changed so the prices persist. A call from a child prim does nothing, as SL documents ("Calling it from
+        /// a child prim has no effect") and YEngine does; Halcyon set the root's prices.
         /// </summary>
         public void llSetPayPrice(int price, LSLList quick_pay_buttons)
         {
             SceneObjectPart root = m_host?.ParentGroup?.RootPart;
-            if (root == null) return;
+            if (root == null || root != m_host) return;
             int[] prices = new int[5];
             prices[0] = price;
             for (int i = 0; i < 4; i++)
