@@ -16,7 +16,7 @@ namespace InWorldz.Phlox.Tests;
 /// JSON_NULL), llJsonValueType, llJson2List ("a list with 1 item" for a single value; nested values "returned as json
 /// strings"), llList2Json (string items "are interpreted as JSON"; true/false/null become literals; strings are trimmed;
 /// "Strings containing valid JSON numbers convert to JSON strings"; a JSON_OBJECT list must be strided key, value pairs)
-/// and llJsonSetValue as ruled (empty input starts an array; plain true/false/null become literals; a type mismatch
+/// and llJsonSetValue (empty input starts an array; plain true/false/null become literals; a type mismatch
 /// replaces the subtree, as YEngine).
 /// </summary>
 // No process-wide state: the class runs in parallel.
@@ -220,7 +220,7 @@ public class JsonConformanceTests
     [Fact]
     public void SetValueReplacesAMismatchedSubtree()
     {
-        // YEngine's subtree replacement, kept by the ruling.
+        // YEngine's subtree replacement, which Phlox keeps.
         Assert.Equal("{\"a\":[\"x\"]}", Api().llJsonSetValue("{\"a\":5}", L("a", 0), "x"));
     }
 }
