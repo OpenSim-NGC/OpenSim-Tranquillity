@@ -655,7 +655,20 @@ namespace Phlox.ScriptEngine
         /// <summary>Times this script has been put to sleep by the reset throttle (tests).</summary>
         internal int ResetSleepCount { get; private set; }
 
-        public void AddExecutionTime(double ms) => m_host?.ParentGroup?.AddScriptLPS((int)ms);
+        // The last NUM_RUN_SAMPLES timeslice times, for GetAverageScriptTime (Halcyon LSLSystemAPI: the mean of the
+        // last 16 samples, recorded by the run loop after every slice). Scheduler thread only.
+        private const int NUM_RUN_SAMPLES = 16;
+        private readonly double[] m_runSamples = new double[NUM_RUN_SAMPLES];
+        private int m_numRunSamples;
+        private int m_currRunSample;
+
+        public void AddExecutionTime(double ms)
+        {
+            m_host?.ParentGroup?.AddScriptLPS((int)ms);
+            m_runSamples[m_currRunSample++] = ms;
+            if (m_currRunSample > m_numRunSamples) m_numRunSamples = m_currRunSample;
+            if (m_currRunSample >= NUM_RUN_SAMPLES) m_currRunSample = 0;
+        }
         public void OnScriptInjected(bool fromCrossing)
         {
             if (m_thisScript?.ScriptState?.MiscAttributes == null) return;
@@ -687,7 +700,14 @@ namespace Phlox.ScriptEngine
             }
         }
         public void OnGroupCrossedAvatarReady(UUID avatarId) { }
-        public float GetAverageScriptTime() => 0f;
+        /// <summary>The mean of the last timeslice times in milliseconds, 0 before the first.</summary>
+        public float GetAverageScriptTime()
+        {
+            if (m_numRunSamples < 1) return 0f;
+            double total = 0;
+            for (int i = 0; i < m_numRunSamples; i++) total += m_runSamples[i];
+            return (float)(total / m_numRunSamples);
+        }
 
         // ── Math ───────────────────────────────────────────────────────────────
 
