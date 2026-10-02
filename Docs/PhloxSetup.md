@@ -107,13 +107,16 @@ This is every key the engine reads from the section. All of them are optional.
 | `LinkMessageThrottle` | `true` | Anti-abuse: `llMessageLinked` pauses 50 ms when a receiving script's event queue is nearly full. |
 | `NotecardThrottle` | `true` | Anti-abuse: short delays on notecard reads. |
 | `NotecardCache` | `true` | Keeps parsed notecards in memory for notecard reads. |
+| `NotecardLineReadCharsMax` | `[YEngine] NotecardLineReadCharsMax`, else `1024` | Most bytes (UTF-8, not characters) a notecard line read returns, as SL's 1024-byte limit; longer lines are cut without splitting a character. 0 or below means 1024; the most is 65535. |
 | `FormatStringThrottle` | `true` | Anti-abuse: 100 ms pause after `iwFormatString`. |
 | `HttpInFlightThrottle` | `true` | Anti-abuse: at most 10 `llHTTPRequest` calls in flight per object and 200 per region. A refused call returns `NULL_KEY` after 80 ms. |
+| `MaxListenEventsPerSecond` | `20` | Listen events one script may receive per second; the rest of that second's are dropped, with one log line per script per second. `0` or below: no limit (as YEngine and Halcyon). |
 | `ServiceCallDeferral` | `auto` | How script calls that may wait on a grid service run. `auto`: on the scheduler when the answer is local or cached, otherwise on worker threads. `always`: every such call on worker threads. `never`: every call on the scheduler. Any other value means `auto`. |
 | `ServiceCallTimeoutMs` | `35000` | Deadline in milliseconds for a call running on a worker thread (minimum 1). |
 | `ServiceCallThreads` | `4` | Worker threads per region for those calls (minimum 1). |
 | `SensorMaxRange` | `96.0` | Largest range in metres a sensor may use. |
 | `SensorMaxResults` | `16` | Most objects or avatars one sensor reports. |
+| `StateRowMaxAgeDays` | `0` | Deletes saved-state rows not saved or loaded for this many days whose scripts are not loaded in the simulator; checked every 6 hours, first 1 hour after start. `0`: never (the default). |
 
 Setting any anti-abuse switch to `false` removes that slowdown and nothing else.
 
