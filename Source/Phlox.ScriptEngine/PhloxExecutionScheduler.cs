@@ -265,10 +265,10 @@ namespace Phlox.ScriptEngine
             }
 
             interp.OnStateChg += OnStateChange;
-            // A rez gives the script its start parameter; a region start or a crossing carries none, and a restored
-            // script keeps the one it was saved with (Halcyon FinishedLoading: only when the load has a StartParam).
-            if (freshStart || req.PostOnRez)
-                interp.ScriptState.StartParameter = req.StartParam;
+            // A rez gives the script its start parameter. A region start or a crossing carries none, and a restored
+            // script does not keep the one it was saved with: SL's llGetStartParameter "does not survive region
+            // restarts (SVC-2251) or region change (SVC-3258, crossing or teleport)".
+            interp.ScriptState.StartParameter = (freshStart || req.PostOnRez) ? req.StartParam : 0;
             interp.HostLocalId = req.Prim.LocalId;
 
             lock (m_AllScriptsLock)

@@ -55,7 +55,11 @@ public class SavedStateCompatTests
 
         h.PostTouch(item);
         Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("g="))), SavedStateRig.SaidText(h));
-        Assert.Contains("g=7 p=42", h.Said);
+        // The row carries the start parameter (42), but a region start does not restore it: SL's llGetStartParameter
+        // "does not survive region restarts (SVC-2251)".
+        using (var ms = new System.IO.MemoryStream(Convert.FromBase64String(RowWrittenByEarlierBuild)))
+            Assert.Equal(42, ProtoBuf.Serializer.Deserialize<InWorldz.Phlox.Serialization.SerializedRuntimeState>(ms).StartParameter);
+        Assert.Contains("g=7 p=0", h.Said);
 
         // The timer is armed again: that row recorded when it was scheduled, so it keeps (about) its whole 30 s.
         ulong? readyOn = (ulong?)SavedStateRig.Member(SavedStateRig.Exe(h), "TimerReadyOn", item);

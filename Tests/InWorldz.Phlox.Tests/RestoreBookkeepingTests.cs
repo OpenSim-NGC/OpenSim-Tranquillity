@@ -25,14 +25,15 @@ public class RestoreBookkeepingTests
     private readonly ITestOutputHelper _out;
     public RestoreBookkeepingTests(ITestOutputHelper o) => _out = o;
 
-    private const int RegionStart = 0, NewRez = 1, AttachedRez = 4;
+    private const int RegionStart = 0, NewRez = 1, PrimCrossing = 2, AttachedRez = 4;
 
     /// <summary>
-    /// llGetStartParameter after a region start is the parameter the object was rezzed with. The region's load carries
-    /// none (0), and Halcyon set the parameter only when the load had one; the restore used to overwrite it with 0.
+    /// llGetStartParameter after a region start is 0, whatever the object was rezzed with. SL's llGetStartParameter:
+    /// "The start parameter does not survive region restarts (SVC-2251) or region change (SVC-3258, crossing or
+    /// teleport)." The rest of the saved state still comes back.
     /// </summary>
     [Fact]
-    public void TheStartParameterSurvivesARegionStart()
+    public void TheStartParameterDoesNotSurviveARegionStart()
     {
         const string src = "default { state_entry() { llSay(0, \"up\"); } touch_start(integer n) { llSay(0, \"p=\" + (string)llGetStartParameter()); } }";
         var asset = UUID.Random(); var item = UUID.Random();
@@ -47,7 +48,36 @@ public class RestoreBookkeepingTests
         h2.PumpUntilIdle(TimeSpan.FromSeconds(10));
         h2.PostTouch(item);
         Assert.True(h2.PumpUntil(() => h2.Said.Any(s => s.StartsWith("p="))), SavedStateRig.SaidText(h2));
-        Assert.Contains("p=42", h2.Said);
+        Assert.Contains("p=0", h2.Said);
+        Assert.DoesNotContain("up", h2.Said);   // restored, not started fresh
+    }
+
+    /// <summary>
+    /// A crossing restores the script without its start parameter, as a region start does (SL's llGetStartParameter:
+    /// it does not survive "region change (SVC-3258, crossing or teleport)"); a rez that restores a saved state gives the
+    /// script the rez's parameter, as on_rez reports it.
+    /// </summary>
+    [Theory]
+    [InlineData(PrimCrossing, 0, false, "p=0")]
+    [InlineData(NewRez, 17, true, "p=17")]
+    public void ARestoreKeepsOnlyTheStartParameterItsLoadCarries(int stateSource, int startParam, bool postOnRez, string expected)
+    {
+        const string src = "default { state_entry() { llSay(0, \"up\"); } touch_start(integer n) { llSay(0, \"p=\" + (string)llGetStartParameter()); } }";
+        var asset = UUID.Random(); var item = UUID.Random();
+        using (var h1 = new SchedulerHarness())
+        {
+            SavedStateRig.Rez(h1, h1.Prim, src, asset, item, 42, true, NewRez);
+            Assert.True(h1.PumpUntil(() => h1.Said.Contains("up")), SavedStateRig.SaidText(h1));
+            h1.SaveState(item);
+        }
+        using var h2 = new SchedulerHarness();
+        SavedStateRig.Rez(h2, h2.Prim, src, asset, item, startParam, postOnRez, stateSource);
+        Assert.True(h2.PumpUntil(() => h2.InterpreterFor(item) != null, TimeSpan.FromSeconds(15)), "not loaded: " + h2.StatusOf(item));
+        h2.PumpUntilIdle(TimeSpan.FromSeconds(10));
+        h2.PostTouch(item);
+        Assert.True(h2.PumpUntil(() => h2.Said.Any(s => s.StartsWith("p="))), SavedStateRig.SaidText(h2));
+        Assert.Contains(expected, h2.Said);
+        Assert.DoesNotContain("up", h2.Said);   // restored, not started fresh
     }
 
     /// <summary>
