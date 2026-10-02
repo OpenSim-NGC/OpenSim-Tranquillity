@@ -119,9 +119,13 @@ public class ScriptCleanupTests
         public readonly FakeUrl Url = new();
         public readonly FakeXmlRpc Xml = new();
 
-        public Rig(bool resetThrottle = true)
+        public Rig(bool resetThrottle = true, bool chatThrottle = true)
         {
-            H = new SchedulerHarness(cfg => cfg.Configs["InWorldz.Phlox"].Set("ResetThrottle", resetThrottle ? "true" : "false"));
+            H = new SchedulerHarness(cfg =>
+            {
+                cfg.Configs["InWorldz.Phlox"].Set("ResetThrottle", resetThrottle ? "true" : "false");
+                cfg.Configs["InWorldz.Phlox"].Set("ChatThrottle", chatThrottle ? "true" : "false");
+            });
             H.Scene.RegisterModuleInterface<IHttpRequestModule>(Http);
             H.Scene.RegisterModuleInterface<IUrlModule>(Url);
             H.Scene.RegisterModuleInterface<IXMLRPC>(Xml);
@@ -726,24 +730,46 @@ public class ScriptCleanupTests
         return n;
     }
 
+    /// <summary>
+    /// The throttle counts resets per second of the engine's clock (Clock), and its 5 s sleep is on the same clock, so this
+    /// test stops that clock: the whole flood falls in one second, and the throttle must trip at exactly the sixth reset.
+    /// The clock is then moved by hand to show the sleep lasts the full 5 s. The class is already in "phlox-state", which
+    /// the process-wide clock needs.
+    /// </summary>
     [Fact]
     public void TwentyResetsInASecondTriggerTheThrottle()
     {
-        using var r = new Rig();
-        var id = r.Rez(r.H.Prim, @"default { state_entry() { llSay(0, ""entry""); } }");
-        Assert.True(r.PumpUntil(() => r.Count("entry") == 1));
-        int resets = ResetFlood(r, id, 20, untilThrottled: true);
-        _out.WriteLine("throttled at reset " + resets);
-        Assert.True(r.ResetSleeps(id) >= 1, "no throttle after 20 resets");
-        Assert.InRange(resets, 6, 11);   // the sixth in one second; the eleventh at worst when the flood straddles a second
-        Assert.Equal(RuntimeState.Status.Sleeping, r.Interp(id).ScriptState.RunState);
-        Assert.Contains(r.H.SaidOn, s => s.Channel == 0x7FFFFFFF && s.Message.Contains("calling llResetScript too frequently"));
+        bool frozen = false;
+        ulong now = 0;
+        InWorldz.Phlox.Util.Clock.SetSourceForTesting(() => frozen ? now : (ulong)Environment.TickCount64);
+        try
+        {
+            // The chat pause (ChatThrottle) is a sleep on the same clock; off, so only the reset throttle can put it to sleep.
+            using var r = new Rig(chatThrottle: false);
+            var id = r.Rez(r.H.Prim, @"default { state_entry() { llSay(0, ""entry""); } }");
+            Assert.True(r.PumpUntil(() => r.Count("entry") == 1));
+            now = (ulong)Environment.TickCount64;
+            frozen = true;
+            int resets = ResetFlood(r, id, 20, untilThrottled: true);
+            _out.WriteLine("throttled at reset " + resets);
+            Assert.True(r.ResetSleeps(id) >= 1, "no throttle after 20 resets");
+            Assert.Equal(6, resets);   // more than 5 in one second: the sixth
+            Assert.Equal(RuntimeState.Status.Sleeping, r.Interp(id).ScriptState.RunState);
+            Assert.Contains(r.H.SaidOn, s => s.Channel == 0x7FFFFFFF && s.Message.Contains("calling llResetScript too frequently"));
 
-        // it runs its state_entry once the 5 s are up
-        int entries = r.Count("entry");
-        var slept = DateTime.UtcNow;
-        Assert.True(r.PumpUntil(() => r.Count("entry") > entries, 15), "never woke from the throttle");
-        Assert.True((DateTime.UtcNow - slept).TotalMilliseconds >= 4000, "woke after " + (DateTime.UtcNow - slept).TotalMilliseconds + " ms");
+            // it runs its state_entry once the 5 s are up, and not before
+            int entries = r.Count("entry");
+            now += 4999;
+            Assert.True(r.H.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+            Assert.Equal(entries, r.Count("entry"));
+            Assert.Equal(RuntimeState.Status.Sleeping, r.Interp(id).ScriptState.RunState);
+            now += 1;
+            Assert.True(r.PumpUntil(() => r.Count("entry") > entries, 15), "never woke from the throttle 5 s on");
+        }
+        finally
+        {
+            InWorldz.Phlox.Util.Clock.SetSourceForTesting(null);
+        }
     }
 
     /// <summary>The flood Halcyon's throttle is for: a script that resets itself from its own state_entry.</summary>

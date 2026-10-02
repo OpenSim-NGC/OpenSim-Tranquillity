@@ -626,11 +626,13 @@ namespace Phlox.ScriptEngine
         /// <summary>
         /// Halcyon's reset throttle - more than 5 resets of this script in one second and it sleeps 5 s before
         /// its state_entry, with a warning in the log and on DEBUG_CHANNEL once an hour. [InWorldz.Phlox] ResetThrottle.
+        /// The second is counted on the engine's clock (Clock), the clock the 5 s sleep runs on, where Halcyon took the
+        /// Unix second: the same one-second periods, so a test can move both.
         /// </summary>
         private void ThrottleScriptResets()
         {
             if (m_ScriptEngine == null || !m_ScriptEngine.ResetThrottle) return;
-            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long now = (long)(InWorldz.Phlox.Util.Clock.Now / 1000);
             if (m_resetSecond == now)
             {
                 if (++m_resetCount > MAX_RESETS_PER_SECOND)
