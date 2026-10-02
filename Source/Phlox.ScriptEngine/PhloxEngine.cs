@@ -820,9 +820,10 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// A grab update while the mouse is held. A script whose touch is active (touch_start started its 100 ms touch()
-        /// repeat) only takes the new detect data for its next repeat, as Halcyon's UpdateTouchData did; any other script
-        /// gets it as a touch(), because the region never gives touch_start to a prim whose scripts have no touch_start
-        /// handler, so its touch is never started (PhloxExecutionScheduler.FoldGrabUpdate).
+        /// repeat) only takes the new detect data for its next repeat, as Halcyon's UpdateTouchData did. A script whose
+        /// touch was not started (for example, it changed into a state with touch() while the touch was held)
+        /// gets it as a touch() (PhloxExecutionScheduler.FoldGrabUpdate). A state with touch() asks the region for
+        /// touch_start and touch_end too (LSLSystemAPI.MapEventFlag), so its touch is started even without handlers for them.
         /// </summary>
         private void OnObjectGrabbing(uint localID, uint originalID, Vector3 offsetPos,
             IClientAPI remoteClient, SurfaceTouchEventArgs surfaceArgs)

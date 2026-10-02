@@ -259,21 +259,49 @@ default
 }";
 
     [Fact]
-    public void AScriptWithOnlyTouchStillHearsGrabUpdatesAndDoesNotRepeatForEver()
+    public void AScriptWithOnlyTouchRepeatsWhileHeldAndStopsAtRelease()
     {
-        // The region gives touch_start and touch_end only to a prim whose script declares them, so this script's touch
-        // is never started or ended by the region: each grab update stays one touch(), as before.
+        // SL touch: "Triggered on touch start, each minimum event delay while held, and touch end." A state with touch()
+        // asks the region for touch_start and touch_end as well, so a script with touch() alone is started and stopped
+        // like any other: it repeats without grab updates and goes quiet at the release.
         using var h = new SchedulerHarness();
         h.RezScript(TouchOnly);
         WaitForMask(h, h.Prim, scriptEvents.touch);
+        Assert.Equal(scriptEvents.touch_start | scriptEvents.touch_end,
+            h.Prim.ScriptEvents & (scriptEvents.touch_start | scriptEvents.touch_end));
         var client = h.AddClient();
 
         h.Scene.ProcessObjectGrab(h.Prim.LocalId, Vector3.Zero, client, Surface());
-        h.Scene.ProcessObjectGrabUpdate(h.Prim.UUID, Vector3.Zero, h.Prim.AbsolutePosition, client, Surface());
+        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 3, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
 
-        Assert.True(h.PumpUntil(() => Count(h, "T ") == 1), string.Join(" | ", h.Said));
-        h.PumpFor(TimeSpan.FromMilliseconds(500));
+        h.Scene.ProcessObjectDeGrab(h.Prim.LocalId, client, Surface());
         Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
-        Assert.Equal(1, Count(h, "T "));
+        int after = Count(h, "T ");
+        h.PumpFor(TimeSpan.FromMilliseconds(600));   // six repeat intervals: nothing may arrive
+        Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+        Assert.Equal(after, Count(h, "T "));
+    }
+
+    [Fact]
+    public void AChildWithOnlyTouchTakesItsOwnTouch()
+    {
+        // SL llPassTouches: whether a touch passes to the root "may also depend on if there is a script that in the prim
+        // that handles one of the touch events". A child whose script handles touch() takes the touch; the root's
+        // touch_start does not fire.
+        using var h = new SchedulerHarness();
+        var parts = TwoPrims(h);
+        h.RezScriptInto(parts[0], Tagged("R"));
+        h.RezScriptInto(parts[1], TouchOnly);
+        WaitForMask(h, parts[0], scriptEvents.touch_start);
+        WaitForMask(h, parts[1], scriptEvents.touch);
+        var client = h.AddClient();
+
+        h.Scene.ProcessObjectGrab(parts[1].LocalId, Vector3.Zero, client, Surface());
+        Assert.True(h.PumpUntil(() => Count(h, "T ") >= 1, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+        h.Scene.ProcessObjectDeGrab(parts[1].LocalId, client, Surface());
+        h.PumpFor(TimeSpan.FromMilliseconds(500));   // a "did not arrive" window
+        Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+        _out.WriteLine(string.Join(" | ", h.Said));
+        Assert.Equal(0, Count(h, "R ts"));
     }
 }

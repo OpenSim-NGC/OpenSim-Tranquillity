@@ -18107,7 +18107,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 				case SupportedEventList.Events.ATTACH:              return (ulong)scriptEvents.attach;
 				case SupportedEventList.Events.STATE_EXIT:          return (ulong)scriptEvents.state_exit;
 				case SupportedEventList.Events.TIMER:               return (ulong)scriptEvents.timer;
-				case SupportedEventList.Events.TOUCH:               return (ulong)scriptEvents.touch;
+				// touch() also asks for touch_start and touch_end. The region gives a prim each of the three only when it
+				// advertises that one (Scene.ProcessObjectGrab, ProcessObjectDeGrab), and SL's touch() is "Triggered on
+				// touch start, each minimum event delay while held, and touch end": the repeat starts at touch_start and
+				// stops at touch_end even when the state has no handler for them (the scheduler drops those events).
+				case SupportedEventList.Events.TOUCH:
+					return (ulong)(scriptEvents.touch | scriptEvents.touch_start | scriptEvents.touch_end);
 				case SupportedEventList.Events.COLLISION:           return (ulong)scriptEvents.collision;
 				case SupportedEventList.Events.COLLISION_END:       return (ulong)scriptEvents.collision_end;
 				case SupportedEventList.Events.COLLISION_START:     return (ulong)scriptEvents.collision_start;
