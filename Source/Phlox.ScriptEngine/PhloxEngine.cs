@@ -1094,6 +1094,18 @@ namespace Phlox.ScriptEngine
             if (sp != null) m_ExeScheduler?.RequestAvatarArrived(sp.UUID);
         }
 
+        /// <summary>
+        /// The grant a database row saves: the script item's grant now, with the object's owner. When the part has gone (a
+        /// derez) the grant noted last stays.
+        /// </summary>
+        internal void NoteGrantForRow(InWorldz.Phlox.VM.Interpreter interp)
+        {
+            SceneObjectPart part = m_Scene?.GetSceneObjectPart(interp.HostLocalId);
+            TaskInventoryItem item = part?.Inventory?.GetInventoryItem(interp.ItemId);
+            if (item == null) return;
+            LSLSystemAPI.NoteItemGrant(interp.ScriptState, item, part.OwnerID);
+        }
+
         /// <summary>A script took or released controls.</summary>
         internal void RequestParcelCheck(UUID itemId) => m_ExeScheduler?.RequestParcelCheckForItem(itemId);
 

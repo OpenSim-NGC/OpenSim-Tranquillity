@@ -211,6 +211,7 @@ namespace Phlox.ScriptEngine
             Interpreter interp;
             bool freshStart;
             bool holdStateLoadFailed = false;
+            bool restoredFromCarried = false;
 
             try
             {
@@ -256,6 +257,7 @@ namespace Phlox.ScriptEngine
                             if (recompiledNote != null) m_log.LogInformation(recompiledNote);
                             interp = new Interpreter(compiled, restoredRuntimeState, shim);
                             freshStart = false;
+                            restoredFromCarried = carried;
                             m_log.LogDebug("[PhloxExe]: Restored state for {0}", req.ItemID);
                         }
                     }
@@ -347,6 +349,7 @@ namespace Phlox.ScriptEngine
                 // error, and never reaches the loader or the scheduler loop.
                 try
                 {
+                    sysApi.RestoreSavedGrant(restoredFromCarried);
                     sysApi.DropGrantRecordsWithoutGrant();
                     // Resume where the script stopped, instead of forcing Waiting.
                     //
@@ -1668,6 +1671,7 @@ namespace Phlox.ScriptEngine
             Interpreter interp = FindScript(itemId);
             if (interp == null) return false;
             if ((interp.ScriptState.LocalDisable & RuntimeState.LocalDisableFlag.StateLoadFailed) != 0) return false;
+            if (m_Apis.TryGetValue(itemId, out LSLSystemAPI api)) api.NoteGrantForCarry();
             try { blob = StateManager.CaptureBlob(interp); }
             catch (Exception e)
             {

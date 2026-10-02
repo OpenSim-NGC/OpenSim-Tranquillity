@@ -232,7 +232,7 @@ namespace Phlox.ScriptEngine
             foreach (var interp in scripts)
             {
                 byte[] blob;
-                try { blob = Capture(interp); }
+                try { blob = CaptureRow(interp); }
                 catch (Exception e)
                 {
                     Interlocked.Increment(ref FlushFailures);
@@ -244,6 +244,16 @@ namespace Phlox.ScriptEngine
                 else Interlocked.Increment(ref SchedulerCaptures);
                 Queue(new WriteOp { Kind = WriteKind.Save, ItemId = interp.ItemId, AssetId = interp.Script.AssetId, Blob = blob });
             }
+        }
+
+        /// <summary>
+        /// The script's state for its database row, with the grant its item holds now (none held, none saved). A grant
+        /// from carried state still waiting for its granter is not written: a row's grant comes back whole.
+        /// </summary>
+        private byte[] CaptureRow(Interpreter interp)
+        {
+            m_Engine?.NoteGrantForRow(interp);
+            return Capture(interp);
         }
 
         private static byte[] Capture(Interpreter interp)
@@ -274,7 +284,7 @@ namespace Phlox.ScriptEngine
             }
             ForgetLive(interp.ItemId);
             byte[] blob;
-            try { blob = Capture(interp); }
+            try { blob = CaptureRow(interp); }
             catch (Exception e)
             {
                 m_log.LogWarning("[PhloxState]: Failed to capture {0} at unload: {1}", interp.ItemId, e.Message);

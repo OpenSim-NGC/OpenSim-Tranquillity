@@ -26,12 +26,14 @@ namespace InWorldz.Phlox.Tests;
 /// A scripted vehicle crosses from one region into the next, each region with its own Phlox engine and scheduler thread,
 /// through the core's crossing (EntityTransferModule, LocalSimulationConnector: GetStateSnapshot, then SetState). The
 /// script carries on in the new region: SL's "A script will NOT automatically re-enter the default state state_entry
-/// event ... if the task is moved to another SIM" (wiki, State). It keeps its globals and its listen; the record of
-/// the controls it took does not come back, as the core starts it with no grant; its start parameter is 0
-/// (llGetStartParameter: it does not survive "region change (SVC-3258,
-/// crossing or teleport)"). Taken controls on a seated avatar travel in the core's agent data for every engine.
+/// event ... if the task is moved to another SIM" (wiki, State). It keeps its globals and its listen; its start parameter
+/// is 0 (llGetStartParameter: it does not survive "region change (SVC-3258, crossing or teleport)"). Its grant comes back
+/// only as a silent llRequestPermissions would give it, once the granter has arrived seated on it; until then the grant
+/// and the record of the controls it took wait as a claim. Taken controls on a seated avatar travel in the core's agent
+/// data for every engine.
 /// </summary>
-// Runs in parallel: regions (7310, 7310) and (7310, 7309) are used by no other test; the scenes, engines and items are its own.
+// Runs in parallel: regions (7310, 7310), (7310, 7309), (7320, 7320) and (7320, 7319) are used by no other test; the
+// scenes, engines and items are its own.
 public class VehicleCrossingStateTests
 {
     private const string Vehicle = @"
@@ -72,7 +74,7 @@ public class VehicleCrossingStateTests
         return r;
     }
 
-    private static (Region A, Region B) TwoRegions()
+    private static (Region A, Region B) TwoRegions(uint x = 7310)
     {
         var etmA = new EntityTransferModule();
         var etmB = new EntityTransferModule();
@@ -83,8 +85,8 @@ public class VehicleCrossingStateTests
         modules.Set("SimulationServices", lscm.Name);
 
         var sh = new SceneHelpers();
-        TestScene a = sh.SetupScene("Example Region A", UUID.Random(), 7310, 7310);
-        TestScene b = sh.SetupScene("Example Region B", UUID.Random(), 7310, 7309);
+        TestScene a = sh.SetupScene("Example Region A", UUID.Random(), x, x);
+        TestScene b = sh.SetupScene("Example Region B", UUID.Random(), x, x - 1);
         SceneHelpers.SetupSceneModules(new Scene[] { a, b }, config, lscm);
         SceneHelpers.SetupSceneModules(a, config, etmA);
         SceneHelpers.SetupSceneModules(b, config, etmB);
@@ -134,7 +136,11 @@ public class VehicleCrossingStateTests
         a.Scene.SimChat("go", OpenSim.Framework.ChatTypeEnum.Region, 5, sog.AbsolutePosition, "tester", UUID.Random(), false);
         Assert.True(WaitFor(() => a.Heard("n=6 sp=9")), a.Text());
 
-        // The record llTakeControls keeps for a seated driver; the core carries the registration itself.
+        // The grant and the record llTakeControls keeps for a seated driver; the core carries the registration itself.
+        UUID driver = UUID.Random();
+        var invA = sog.RootPart.Inventory.GetInventoryItem(item);
+        invA.PermsGranter = driver;
+        invA.PermsMask = 0x4;   // PERMISSION_TAKE_CONTROLS
         var interpA = Script(a, item);
         lock (interpA.ScriptState.EventQueueLock)
             interpA.ScriptState.MiscAttributes[(int)RuntimeState.MiscAttr.Control] = new object[] { 1, 1, 0 };
@@ -148,10 +154,84 @@ public class VehicleCrossingStateTests
         Assert.True(WaitFor(() => b.Heard("n=7 sp=0")), "region B: " + b.Text());
         Assert.DoesNotContain("entry", b.Said);
 
-        // The record of taken controls does not come back: the core starts the script in region B with no grant
-        // (SceneObjectPartInventory.CreateScriptInstance), and a record rests on the grant. A seated driver's
-        // registration travels in the core's agent data instead.
-        Assert.False(Script(b, item).ScriptState.MiscAttributes.ContainsKey((int)RuntimeState.MiscAttr.Control));
+        // The driver has not arrived in region B: the grant waits as a claim, and the record of taken controls waits with
+        // it. Nothing acts on them: the item holds no grant (the core starts the script with none,
+        // SceneObjectPartInventory.CreateScriptInstance). A seated driver's registration travels in the core's agent data.
+        Assert.True(Script(b, item).ScriptState.MiscAttributes.ContainsKey((int)RuntimeState.MiscAttr.Control));
+        Assert.Equal(0, there.RootPart.Inventory.GetInventoryItem(item).PermsMask);
         Assert.True(WaitFor(() => Script(a, item) == null), "the script is still loaded in region A");
+    }
+
+    private const string Driven = @"
+        default {
+            state_entry() { llSay(0, ""entry""); }
+            control(key id, integer l, integer e) { llSay(0, ""ctl "" + (string)id); }
+            touch_start(integer t) { llSay(0, ""perms="" + (string)llGetPermissions() + "" key="" + (string)llGetPermissionsKey()); }
+        }";
+
+    private static LSLSystemAPI Api(Region r, UUID item)
+    {
+        var exe = SavedStateRig.Field(r.Engine, "m_ExeScheduler");
+        var apis = (Dictionary<UUID, LSLSystemAPI>)SavedStateRig.Field(exe, "m_Apis");
+        lock (apis) return apis.TryGetValue(item, out var api) ? api : null;
+    }
+
+    /// <summary>
+    /// A vehicle crosses before its driver. In region B nothing acts until the driver arrives seated on it: then the bits a
+    /// silent llRequestPermissions gives a sitter come back (debit does not: it needs a dialog), the controls are taken
+    /// again, with no run_time_permissions, and the driver's controls reach the script. The driver's own crossing (agent
+    /// transfer) is not run here: the driver is added to region B, seated, and made a root agent, as the core does at the
+    /// end of an arrival (the seat is set before OnMakeRootAgent).
+    /// </summary>
+    [Fact]
+    public void AVehicleCrossingBeforeItsDriverGetsTheGrantAndControlsBackWhenTheDriverArrivesSeated()
+    {
+        var (a, b) = TwoRegions(7320);
+        using var ra = a;
+        using var rb = b;
+
+        var sog = SceneHelpers.AddSceneObject(a.Scene, "Example Vehicle", UUID.Random());
+        sog.AbsolutePosition = new Vector3(128, 3, 30);
+        UUID objectId = sog.UUID;
+        UUID item = UUID.Random();
+        TaskInventoryHelpers.AddScript(a.Scene.AssetService, sog.RootPart, item, UUID.Random(), "driven", Driven);
+        sog.CreateScriptInstances(0, true, a.Engine.Name, 1);
+        Assert.True(WaitFor(() => a.Heard("entry")), a.Text());
+
+        UUID driver = UUID.Random();
+        var invA = sog.RootPart.Inventory.GetInventoryItem(item);
+        invA.PermsGranter = driver;
+        invA.PermsMask = 0x4 | 0x10 | 0x2;   // TAKE_CONTROLS | TRIGGER_ANIMATION | DEBIT
+        var interpA = Script(a, item);
+        lock (interpA.ScriptState.EventQueueLock)
+            interpA.ScriptState.MiscAttributes[(int)RuntimeState.MiscAttr.Control] = new object[] { 1, 1, 0 };
+
+        sog.UpdateGroupPosition(new Vector3(128, -5, 30));
+        Assert.True(WaitFor(() => b.Scene.GetSceneObjectGroup(objectId) != null), "the vehicle did not reach region B");
+        Assert.True(WaitFor(() => Api(b, item) != null), "the script did not start in region B");
+        var there = b.Scene.GetSceneObjectGroup(objectId);
+        var invB = there.RootPart.Inventory.GetInventoryItem(item);
+
+        // Before the driver arrives: a claim, and nothing acts.
+        Assert.True(WaitFor(() => Api(b, item).HasGrantClaim), "no claim waits in region B");
+        Assert.Equal(0, invB.PermsMask);
+        Assert.Equal(UUID.Zero, invB.PermsGranter);
+
+        var sp = SceneHelpers.AddScenePresence(b.Scene, driver);
+        sp.AbsolutePosition = there.AbsolutePosition + new Vector3(1, 1, 0);
+        sp.HandleAgentRequestSit(sp.ControllingClient, sp.UUID, there.RootPart.UUID, Vector3.Zero);
+        Assert.Equal(there, sp.ParentPart?.ParentGroup);
+        b.Scene.EventManager.TriggerOnMakeRootAgent(sp);
+
+        Assert.True(WaitFor(() => sp.HasScriptControls(item)), "the controls were not taken when the driver arrived");
+        Assert.Equal(driver, invB.PermsGranter);
+        Assert.Equal(0x4 | 0x10, invB.PermsMask);
+        Assert.False(Api(b, item).HasGrantClaim);
+        Assert.DoesNotContain(b.Said, s => s.StartsWith("rtp", StringComparison.Ordinal));
+
+        // The driver presses forward: the control event reaches the script.
+        typeof(ScenePresence).GetMethod("SendControlsToScripts", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(sp, new object[] { 1u });   // AGENT_CONTROL_AT_POS, CONTROL_FWD
+        Assert.True(WaitFor(() => b.Heard("ctl " + driver)), "region B: " + b.Text());
     }
 }

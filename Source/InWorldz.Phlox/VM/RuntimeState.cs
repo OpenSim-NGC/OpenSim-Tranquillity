@@ -212,6 +212,13 @@ namespace InWorldz.Phlox.VM
         public int GrantedPermsMask;
 
         /// <summary>
+        /// The object's owner when <see cref="PermsGranter"/> and <see cref="GrantedPermsMask"/> were noted. These three
+        /// are the grant saved with the state: the script item's grant at capture, or a grant restored from carried state
+        /// that is still waiting for its granter. A restore gives a grant back only while the owner is still this one.
+        /// </summary>
+        public string PermsOwner;
+
+        /// <summary>
         /// Active listens this script has open
         /// </summary>
         public Dictionary<int, ActiveListen> ActiveListens;
@@ -391,6 +398,7 @@ namespace InWorldz.Phlox.VM
             RunningEvent = null;
             PermsGranter = String.Empty;
             GrantedPermsMask = 0;
+            PermsOwner = null;
             ActiveListens.Clear();
             StartParameter = 0;
 

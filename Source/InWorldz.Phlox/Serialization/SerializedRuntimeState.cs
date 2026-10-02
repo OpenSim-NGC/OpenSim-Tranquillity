@@ -58,6 +58,8 @@ namespace InWorldz.Phlox.Serialization
         [ProtoMember(15)]
         public SerializedPostedEvent RunningEvent;
 
+        /// <summary>Tags 16 and 17: the grant saved with the state, with <see cref="PermsOwner"/>. Declared from the
+        /// start but written only since tag 28; an earlier build's ToRuntimeState never reads them.</summary>
         [ProtoMember(16)]
         public string PermsGranter;
 
@@ -109,6 +111,13 @@ namespace InWorldz.Phlox.Serialization
         /// </summary>
         [ProtoMember(27)]
         public string BytecodeIdentity;
+
+        /// <summary>
+        /// Tag 28: the object's owner when the grant in tags 16 and 17 was noted. Absent - null - in every row and carried
+        /// state written before it, and then no grant is restored, whatever 16 and 17 hold. An earlier build skips the tag.
+        /// </summary>
+        [ProtoMember(28)]
+        public string PermsOwner;
 
         public SerializedRuntimeState()
         {
@@ -191,6 +200,9 @@ namespace InWorldz.Phlox.Serialization
             serState.TimerInterval = state.TimerInterval;
             serState.RunningEvent = SerializedPostedEvent.FromPostedEvent(state.RunningEvent);
             serState.BytecodeIdentity = state.BytecodeIdentity;
+            serState.PermsGranter = state.PermsGranter;
+            serState.GrantedPermsMask = state.GrantedPermsMask;
+            serState.PermsOwner = state.PermsOwner;
             serState.ActiveListens = listensSnapshot;
             serState.StartParameter = state.StartParameter;
 
@@ -301,6 +313,9 @@ namespace InWorldz.Phlox.Serialization
             state.OtherRuntime = TotalRuntime;
             state.StartTimeOnSimulator = Util.Clock.GetLongTickCount();
             state.BytecodeIdentity = this.BytecodeIdentity;
+            state.PermsGranter = this.PermsGranter;
+            state.GrantedPermsMask = this.GrantedPermsMask;
+            state.PermsOwner = this.PermsOwner;
 
             return state;
         }

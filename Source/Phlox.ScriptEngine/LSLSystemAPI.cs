@@ -503,6 +503,7 @@ namespace Phlox.ScriptEngine
         public void OnScriptReset()
         {
             ReleaseScriptResources(ScriptEnd.Reset);
+            ClearGrantClaim();
             EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
             ThrottleScriptResets();
         }
@@ -699,12 +700,10 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// A restored script's records of grants it used, the taken controls and PERMISSION_SILENT_ESTATE_MANAGEMENT, are
-        /// kept only while the item holds the grant they rest on, from a granter. The core zeroes a script item's grant
-        /// whenever it starts the script (SceneObjectPartInventory.CreateScriptInstance) and when the owner changes
-        /// (ChangeInventoryOwner, ApplyNextOwnerPermissions), and a restore never puts a grant back, so a record saved
-        /// before can neither give a grant nor be acted on later, by an arrival or by a grant the new owner gives. SL:
-        /// the script loses PERMISSION_TAKE_CONTROLS "on reset, or if the object is deleted, detached, or dropped"
-        /// (llTakeControls). Every restore calls this, from carried state or the state database, before anything runs.
+        /// kept only while the item holds the grant they rest on, from a granter, or while that grant waits for its granter
+        /// as a claim (<see cref="RestoreSavedGrant"/>); they go when the claim goes. A record never gives a grant itself.
+        /// SL: the script loses PERMISSION_TAKE_CONTROLS "on reset, or if the object is deleted, detached, or dropped"
+        /// (llTakeControls). Every restore calls this after the saved grant is decided, before anything runs.
         /// </summary>
         internal void DropGrantRecordsWithoutGrant()
         {
@@ -712,8 +711,141 @@ namespace Phlox.ScriptEngine
             if (misc == null) return;
             TaskInventoryItem item = GetInventorySelf();
             int mask = item == null || item.PermsGranter == UUID.Zero ? 0 : item.PermsMask;
+            if (mask == 0 && m_grantClaim is GrantClaim claim) mask = claim.Mask;
             if ((mask & PERMISSION_TAKE_CONTROLS) == 0) misc.Remove((int)RuntimeState.MiscAttr.Control);
             if ((mask & PERMISSION_SILENT_ESTATE_MANAGEMENT) == 0) misc.Remove((int)RuntimeState.MiscAttr.SilentEstateManagement);
+        }
+
+        /// <summary>A grant from carried state whose granter is not here yet: who gave it, what it held, and the owner then.</summary>
+        private sealed record GrantClaim(UUID Granter, int Mask, UUID Owner);
+
+        /// <summary>Scheduler thread only, as every caller is.</summary>
+        private GrantClaim m_grantClaim;
+
+        /// <summary>A grant from carried state is waiting for its granter to arrive (tests and `phlox status`).</summary>
+        internal bool HasGrantClaim => m_grantClaim != null;
+
+        /// <summary>
+        /// The grant saved with the state, given back to the script item when the object's owner is still the owner noted
+        /// with it; otherwise nothing. No run_time_permissions is posted, and llGetPermissionsKey answers the granter.
+        /// <para>
+        /// From this simulator's own state database (a restart, or an object back in the simulator that saved it with no
+        /// carried state) the grant comes back whole, as YEngine restores its saved grant (XMRInstCtor, the
+        /// &lt;Permissions&gt; node). State carried inside an object is input from outside the simulator: only the bits a
+        /// silent llRequestPermissions would give the granter at that moment come back, by the same decision
+        /// (<see cref="GetImplicitPermissions"/>: the granter wears the object, or sits on it). Every bit that needs a
+        /// dialog, debit among them, is asked for again. A granter who has not arrived yet (a vehicle crossing before its
+        /// rider, attachments rezzing as their wearer arrives) leaves the grant waiting as a claim, decided the same way
+        /// when that avatar arrives on the object or wearing it (<see cref="OnGroupCrossedAvatarReady"/>); a claim never met
+        /// never acts. The SL wiki says nothing on a grant across a restart, rez or crossing; llRequestPermissions says
+        /// "Permissions persist across state changes".
+        /// </para>
+        /// </summary>
+        internal void RestoreSavedGrant(bool carried)
+        {
+            m_grantClaim = null;
+            RuntimeState st = m_thisScript?.ScriptState;
+            if (st == null) return;
+            UUID granter = UUID.Zero, owner = UUID.Zero;
+            bool noted = !string.IsNullOrEmpty(st.PermsGranter) && !string.IsNullOrEmpty(st.PermsOwner)
+                         && UUID.TryParse(st.PermsGranter, out granter) && UUID.TryParse(st.PermsOwner, out owner);
+            int mask = st.GrantedPermsMask;
+            ClearSavedGrant(st);
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || !noted || granter.IsZero() || mask == 0 || owner.IsZero() || owner != m_host.OwnerID) return;
+            if (!carried)
+            {
+                SetRestoredGrant(item, granter, mask);
+                return;
+            }
+            ScenePresence sp = World?.GetScenePresence(granter);
+            if (sp == null || sp.IsChildAgent)
+            {
+                m_grantClaim = new GrantClaim(granter, mask, owner);
+                return;
+            }
+            GrantSilently(item, granter, mask);
+        }
+
+        /// <summary>The bits of <paramref name="mask"/> a silent re-request would give <paramref name="granter"/> now.</summary>
+        private void GrantSilently(TaskInventoryItem item, UUID granter, int mask)
+        {
+            int silent = mask & GetImplicitPermissions(item, granter);
+            if (silent != 0) SetRestoredGrant(item, granter, silent);
+        }
+
+        private void SetRestoredGrant(TaskInventoryItem item, UUID granter, int mask)
+        {
+            lock (m_host.TaskInventory)
+            {
+                item.PermsGranter = granter;
+                item.PermsMask = mask;
+            }
+            NoteGrant(m_thisScript.ScriptState, granter, mask, m_host.OwnerID);
+        }
+
+        /// <summary>
+        /// The claimed granter arrived on this script's object or wearing it: the claim is decided as a silent re-request
+        /// would be, and goes either way. Its records stay only if what came back holds their grant.
+        /// </summary>
+        private void DecideGrantClaim()
+        {
+            GrantClaim claim = m_grantClaim;
+            m_grantClaim = null;
+            TaskInventoryItem item = GetInventorySelf();
+            if (item != null && claim.Owner == m_host.OwnerID && item.PermsGranter == UUID.Zero)
+                GrantSilently(item, claim.Granter, claim.Mask);
+            DropGrantRecordsWithoutGrant();
+        }
+
+        /// <summary>
+        /// The saved grant and any waiting claim go, with the records that rested on the claim: a reset, an owner change,
+        /// and a new llRequestPermissions (whose answer replaces the grant).
+        /// </summary>
+        internal void ClearGrantClaim()
+        {
+            if (m_thisScript?.ScriptState is RuntimeState st) ClearSavedGrant(st);
+            if (m_grantClaim == null) return;
+            m_grantClaim = null;
+            DropGrantRecordsWithoutGrant();
+        }
+
+        /// <summary>
+        /// The grant this script's state carries to its next region: the item's grant, else a claim still waiting for its
+        /// granter, as it was carried here. Scheduler thread, before the capture.
+        /// </summary>
+        internal void NoteGrantForCarry()
+        {
+            RuntimeState st = m_thisScript?.ScriptState;
+            TaskInventoryItem item = GetInventorySelf();
+            if (st == null || item == null) return;
+            if (item.PermsGranter != UUID.Zero && item.PermsMask != 0)
+                NoteGrant(st, item.PermsGranter, item.PermsMask, m_host.OwnerID);
+            else if (m_grantClaim is GrantClaim claim)
+                NoteGrant(st, claim.Granter, claim.Mask, claim.Owner);
+            else
+                ClearSavedGrant(st);
+        }
+
+        /// <summary>The grant a row saves: the item's grant now, with the object's owner; none held, none saved.</summary>
+        internal static void NoteItemGrant(RuntimeState st, TaskInventoryItem item, UUID objectOwner)
+        {
+            if (item.PermsGranter != UUID.Zero && item.PermsMask != 0) NoteGrant(st, item.PermsGranter, item.PermsMask, objectOwner);
+            else ClearSavedGrant(st);
+        }
+
+        private static void NoteGrant(RuntimeState st, UUID granter, int mask, UUID owner)
+        {
+            st.PermsGranter = granter.ToString();
+            st.GrantedPermsMask = mask;
+            st.PermsOwner = owner.ToString();
+        }
+
+        private static void ClearSavedGrant(RuntimeState st)
+        {
+            st.PermsGranter = null;
+            st.GrantedPermsMask = 0;
+            st.PermsOwner = null;
         }
 
         /// <summary>
@@ -742,6 +874,7 @@ namespace Phlox.ScriptEngine
         /// </summary>
         public void OnGroupCrossedAvatarReady(UUID avatarId)
         {
+            if (m_grantClaim is GrantClaim claim && claim.Granter == avatarId) DecideGrantClaim();
             var misc = m_thisScript?.ScriptState?.MiscAttributes;
             if (misc == null || !misc.TryGetValue((int)RuntimeState.MiscAttr.Control, out object[] c)) return;
             if (!m_thisScript.ScriptState.Enabled) return;
@@ -2493,6 +2626,7 @@ namespace Phlox.ScriptEngine
             TaskInventoryItem item;
             lock (m_host.TaskInventory)
                 item = m_host.TaskInventory[invItemID];
+            ClearGrantClaim();   // The answer to this request replaces any grant a restore saved or left waiting
 
             // Halcyon :4518-4527; SL llRequestPermissions "PERMISSION_TELEPORT cannot be held by temporary
             // attachments". The rest of the request goes on (TELEPORT alone becomes a release).
@@ -2688,7 +2822,11 @@ namespace Phlox.ScriptEngine
         /// The object has a new owner. Halcyon clears every item's grant (ApplyNextOwnerPermissions, Rationalize) and so
         /// does the core (ChangeInventoryOwner), but neither lets go of controls the old grant took. Scheduler thread.
         /// </summary>
-        internal void OwnerChanged() => EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
+        internal void OwnerChanged()
+        {
+            ClearGrantClaim();
+            EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
+        }
 
         /// <summary>
         /// Halcyon :4117-4126 (and llStopAnimation, iwStart/StopLinkAnimation): "Emulate SL's behavior of clearing this
