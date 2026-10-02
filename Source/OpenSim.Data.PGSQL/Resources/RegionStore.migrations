@@ -1257,7 +1257,7 @@ COMMIT;
 
 :VERSION 53         #----- add linkset data storage column
 BEGIN;
-ALTER TABLE "public".`prims` ADD COLUMN `linksetdata` varchar default NULL;
+ALTER TABLE "public"."prims" ADD COLUMN "linksetdata" varchar default NULL;
 COMMIT;
 
 :VERSION 54         #----- add pbr terrain storage
@@ -1307,10 +1307,17 @@ COMMIT;
 
 :VERSION 58         #----- add rez start string param column
 BEGIN;
-ALTER TABLE `prims` ADD COLUMN `StartStr` TEXT;
+ALTER TABLE "public"."prims" ADD COLUMN "StartStr" text;
 COMMIT;
 
 :VERSION 59         #----- add script experience link to primitems
 BEGIN;
 ALTER TABLE primitems ADD COLUMN "experienceID" uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+COMMIT;
+
+:VERSION 60         #----- add the prims columns of 53 and 58 where those steps failed
+# 53 and 58 used MySQL backticks, so they failed on PostgreSQL and were still recorded as run.
+BEGIN;
+ALTER TABLE "public"."prims" ADD COLUMN IF NOT EXISTS "linksetdata" varchar default NULL;
+ALTER TABLE "public"."prims" ADD COLUMN IF NOT EXISTS "StartStr" text;
 COMMIT;

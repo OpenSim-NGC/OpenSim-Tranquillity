@@ -1838,7 +1838,8 @@ public class SQLiteSimulationData : ISimulationDataStore
         taskItem.Type = Convert.ToInt32(row["assetType"]);
 
         taskItem.Name = (String)row["name"];
-        taskItem.Description = (String)row["description"];
+        // The column is nullable and a null Description is stored as NULL.
+        taskItem.Description = row["description"] is DBNull ? string.Empty : (String)row["description"];
         taskItem.CreationDate = Convert.ToUInt32(row["creationDate"]);
         taskItem.CreatorIdentification = (String)row["creatorID"];
         taskItem.OwnerID = new UUID((String)row["ownerID"]);
