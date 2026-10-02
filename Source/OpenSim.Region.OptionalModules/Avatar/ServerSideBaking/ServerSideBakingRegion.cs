@@ -56,7 +56,7 @@ public sealed class ServerSideBakingRegion : IServerSideBakingRegion
         m_lastGoodBodyParts.TryRemove(agentId, out _);
     }
 
-    // ------------------------------------------------------------------ S8: the body-part guard
+    // ------------------------------------------------------------------ the body-part guard
 
     /// <summary>
     /// The four body-part slots. A body part is not something a resident takes off: a viewer will not let you
@@ -123,9 +123,9 @@ public sealed class ServerSideBakingRegion : IServerSideBakingRegion
     /// into one save and one event. This window is the second guard, for signals that land either side of a drain
     /// boundary. It is sized against the one interval that is actually measured — the 5 s save delay — and is
     /// deliberately shorter than it, so it cannot suppress a genuinely distinct change that completed its own
-    /// save cycle. The spread between the two signals of a single change has <b>not</b> been measured (Ledger
-    /// Q-6); 2 s is an estimate comfortably above any plausible value and comfortably below the save delay, and
-    /// the S5 live verify is what will replace the estimate.
+    /// save cycle. The spread between the two signals of a single change has <b>not</b> been measured;
+    /// 2 s is an estimate comfortably above any plausible value and comfortably below the save delay, until a
+    /// measurement replaces it.
     /// </para>
     /// </summary>
     public TimeSpan ChangeDebounce { get; init; } = TimeSpan.FromSeconds(2);
@@ -172,7 +172,7 @@ public sealed class ServerSideBakingRegion : IServerSideBakingRegion
     }
 
     /// <summary>
-    /// S12: which config decided this region's flag - <c>"region section"</c> when the region's own section carries
+    /// Which config decided this region's flag - <c>"region section"</c> when the region's own section carries
     /// a <c>ServerSideBaking</c> key, <c>"global"</c> otherwise. Purely for the startup line: an operator who has
     /// just added the two global lines needs the log to say the global path is what turned the region on, and an
     /// operator debugging one wrong region needs to know a section is overriding them.

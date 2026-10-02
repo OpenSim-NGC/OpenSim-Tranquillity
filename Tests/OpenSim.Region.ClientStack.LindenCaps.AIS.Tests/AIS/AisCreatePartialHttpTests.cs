@@ -213,7 +213,7 @@ public class AisCreatePartialHttpTests
     // ------------------------------------------------------------------ (d) the happy path is pinned
 
     /// <summary>
-    /// Full success, pinned against the behaviour that shipped before this session so AIS-SEC-4 cannot quietly
+    /// Full success, pinned against the behaviour that shipped before the fix so AIS-SEC-4 cannot quietly
     /// change it: status 200, the same four delta/content keys, and no error keys.
     /// </summary>
     [Test]

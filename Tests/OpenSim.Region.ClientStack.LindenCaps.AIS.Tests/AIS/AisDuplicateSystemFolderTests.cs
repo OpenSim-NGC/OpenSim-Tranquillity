@@ -28,7 +28,7 @@ public class AisDuplicateSystemFolderTests
     private static readonly UUID DupeCof = new("52c327c4-cb7d-4365-a7f0-62a6f7545265");   // version 1, the one we returned
 
     /// <summary>
-    /// Truly Bazar's inventory as it actually is: a root, two type-46 folders, and a backend whose
+    /// A real account's inventory as it actually was: a root, two type-46 folders, and a backend whose
     /// <c>GetFolderForType</c> returns the version-1 duplicate — which is what the unordered
     /// <c>folders[0]</c> query did on the day.
     /// </summary>

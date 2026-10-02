@@ -6,19 +6,19 @@ using Xunit;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S11. The <c>Avatars</c> writer stops at wearable type 14, so Physics (15) and Universal (16) are never
+/// The <c>Avatars</c> writer stops at wearable type 14, so Physics (15) and Universal (16) are never
 /// persisted — however faithfully the rest of the stack carries them.
 ///
 /// <para>
-/// Observed on Ebony (1.1.258): Truly wears a Ruth2 v4 Physics Default and, since 2026-09-06 20:19 UTC, a
-/// Universal. Both are linked in the COF, both are derived into the presence's wearables by S10, and both reach
+/// Observed on a running region: an avatar wearing a Ruth2 v4 Physics Default and, since 2026-09-06 20:19 UTC, a
+/// Universal. Both are linked in the COF, both are derived into the presence's wearables from it, and both reach
 /// the bake — the 20:27:33 line has <c>LeftArm=Baked</c> and <c>Aux1=Baked</c>, which only a Universal feeds.
 /// The record for <c>a7d2ff2e-dc32-44d8-aa61-3d22070a4964</c> has never held a <c>Wearable 15:*</c> or
 /// <c>Wearable 16:*</c> row, across several deferred saves.
 /// </para>
 ///
 /// <para>
-/// S10 fixed the reader for types at or beyond the initial array length; this is the write-side counterpart it
+/// The reader was already fixed for types at or beyond the initial array length; this is the write-side counterpart it
 /// never had.
 /// </para>
 /// </summary>
@@ -64,7 +64,7 @@ public class AvatarRecordWearableRangeTests
         // Exactly the four worn slots, and nothing invented for the empty ones.
         Assert.Equal(4, data.Data.Keys.Count(k => k.StartsWith("Wearable ")));
 
-        // And it reads back, in index order, at every type (the S10 reader).
+        // And it reads back, in index order, at every type.
         var back = data.ToAvatarAppearance();
 
         Assert.Equal(2, back.Wearables[Shirt].Count);

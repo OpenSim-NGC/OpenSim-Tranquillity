@@ -36,10 +36,9 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
     private int CacheTimeout = 1 * 60;
 
-    // B1 (T7 / Legion DEC-3) — acquire policy: who may create ("Acquire an Experience") via the
-    // viewer. SL gates on Premium; the deliberate Legion deviation is grid-configurable. Same key
-    // name + values + default as Legion ([Experience] ExperienceCreators) so operators moving
-    // between Legion and Tranquillity see the same knob. Values: EstateManagersAndRegionOwners
+    // Acquire policy: who may create ("Acquire an Experience") via the viewer. SL gates on
+    // Premium; here the gate is grid-configurable instead
+    // ([Experience] ExperienceCreators). Values: EstateManagersAndRegionOwners
     // (default) | Anyone | AdminsOnly.
     private string m_AcquirePolicy = "EstateManagersAndRegionOwners";
 
@@ -57,8 +56,8 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         if (!m_Enabled)
             return;
 
-        // B1 — DEC-3 acquire policy (default estate-managers + region-owners), mirroring Legion's
-        // [Experience] ExperienceCreators key/values/default.
+        // Acquire policy (default estate-managers + region-owners), from the
+        // [Experience] ExperienceCreators key.
         m_AcquirePolicy = config.GetString("ExperienceCreators", "EstateManagersAndRegionOwners");
 
         m_log.LogInformation("[Experience] Plugin enabled!");
@@ -134,7 +133,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         caps.RegisterHandler("GetExperiences", new GetExperiencesGetHandler(agent, this));
         caps.RegisterHandler("GetAdminExperiences", new GetAdminExperiencesGetHandler(agent, this));
         caps.RegisterHandler("GetCreatorExperiences", new GetCreatorExperiencesGetHandler(agent, this));
-        // B1 (T7 / Legion Slice 6) — AgentExperiences is GET (Owned tab) AND POST (Acquire).
+        // AgentExperiences is GET (Owned tab) AND POST (Acquire).
         // RegisterSimpleHandler method-dispatches both on one cap URL (like ExperiencePreferences),
         // replacing the former GET-only handler. POST creates an experience owned by the agent when
         // the acquire policy permits; the `purchase` key (emitted only for permitted agents) is what
@@ -152,12 +151,11 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         caps.RegisterHandler("GetMetadata", new GetMetadataPostHandler(agent, this, m_scene));
         caps.RegisterHandler("GroupExperiences", new GroupExperiencesGetHandler(agent, this));
         caps.RegisterHandler("FindExperienceByName", new FindExperienceByNameGetHandler(agent, this));
-        // A1 (Legion Slice 6, D-EEP documented NO-OP): SL uses ExperienceQuery to clear
+        // A documented no-op: SL uses ExperienceQuery to clear
         // experience-driven per-agent ENVIRONMENT injections that are no longer permitted on the
         // agent's new parcel. Tranquillity's per-agent EEP (llSetAgentEnvironment/
         // llReplaceAgentEnvironment) is STUBBED (log-only), so no injection ever exists to police —
         // we answer every queried experience as permitted (true), so the viewer clears nothing.
-        // Matches Legion CoreModules/Experience/ExperienceModule.cs:929 HandleExperienceQuery.
         caps.RegisterHandler("ExperienceQuery", new ExperienceQueryGetHandler(agent, this));
 
         caps.RegisterSimpleHandler("ExperiencePreferences",
@@ -272,12 +270,11 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         response.StatusCode = (int)HttpStatusCode.OK;
     }
 
-    // B1 (T7 / Legion DEC-3) — AgentExperiences GET/POST. GET returns the agent's OWNED experiences
+    // AgentExperiences GET/POST. GET returns the agent's OWNED experiences
     // (viewer Owned tab). POST is "Acquire an Experience": when the acquire policy permits, create a
     // fresh experience owned by the agent; the viewer snapshots its owned ids, POSTs, diffs the
     // returned experience_ids, and opens the profile (edit mode) on the new id for the user to name
-    // it (llfloaterexperiences.cpp:246-264). Mirrors Legion HandleAgentExperiences
-    // (CoreModules/Experience/ExperienceModule.cs:737).
+    // it (llfloaterexperiences.cpp:246-264).
     private void HandleAgentExperiences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
     {
         bool canAcquire = CanAcquireExperience(agentID);
@@ -287,8 +284,8 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
             if (canAcquire)
             {
                 // Fresh random public_id per acquire -> a brand-new experience row. Tranquillity's
-                // uniqueness guard is on the KEY, so — unlike Legion, which uses an EMPTY name to skip
-                // a NAME-uniqueness guard — no name trick is needed here (two acquirers never collide
+                // uniqueness guard is on the KEY, not the name, so no name trick is needed to get past
+                // a name-uniqueness guard (two acquirers never collide
                 // on the random UUID). Empty name is still correct SL behaviour: the user names it in
                 // the profile the viewer opens. Grid-wide + enabled (Disabled bit clear), owner = agent.
                 ExperienceInfo created = new ExperienceInfo
@@ -339,9 +336,8 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         response.StatusCode = (int)HttpStatusCode.OK;
     }
 
-    // B1 — DEC-3 acquire policy check. Default EstateManagersAndRegionOwners uses the estate-command
-    // gate (estate owner/manager OR god), matching Legion CanAcquireExperience
-    // (CoreModules/Experience/ExperienceModule.cs:778). Grid-configurable via [Experience]
+    // Acquire policy check. Default EstateManagersAndRegionOwners uses the estate-command
+    // gate (estate owner/manager OR god). Grid-configurable via [Experience]
     // ExperienceCreators; Anyone -> always, AdminsOnly -> god/administrator only.
     private bool CanAcquireExperience(UUID agentId)
     {
@@ -584,9 +580,8 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
     public bool IsExperienceAdmin(UUID agent_id, UUID experience_id)
     {
         ExperienceInfo info = GetExperienceInfo(experience_id, true);
-        // A2 — guard an unresolved experience (unknown id) so the caps that surface this predicate
-        // return {status:false} rather than NRE'ing into a 500 the viewer can't parse. Matches
-        // Legion IsAgentExperienceAdmin (CoreModules/Experience/ExperienceModule.cs:887).
+        // Guard an unresolved experience (unknown id) so the caps that surface this predicate
+        // return {status:false} rather than NRE'ing into a 500 the viewer can't parse.
         if (info == null || agent_id == UUID.Zero)
             return false;
         if (info.owner_id == agent_id)
@@ -611,9 +606,8 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
     public bool IsExperienceContributor(UUID agent_id, UUID experience_id)
     {
         ExperienceInfo info = GetExperienceInfo(experience_id, true);
-        // A2 — same unresolved-experience guard as IsExperienceAdmin (Legion
-        // IsAgentExperienceContributor:901). owner ∪ GP_EXPERIENCE_CREATOR predicate below already
-        // matches Legion; the cap surface ({status:bool}) is unchanged (already conformant).
+        // The same unresolved-experience guard as IsExperienceAdmin. The owner ∪ GP_EXPERIENCE_CREATOR
+        // predicate below is unchanged, and so is the cap surface ({status:bool}).
         if (info == null || agent_id == UUID.Zero)
             return false;
         if (info.owner_id == agent_id)
@@ -781,8 +775,7 @@ public class FindExperienceByNameGetHandler : BaseStreamHandler
 
         string query_str = query.Get("query") ?? string.Empty;
 
-        // A3 — pagination (Legion Slice 0, CoreModules/Experience/ExperienceModule.cs:584
-        // HandleFindExperienceByName). The picker's `page` param is 1-BASED: it sends page=1 for
+        // Pagination. The picker's `page` param is 1-BASED: it sends page=1 for
         // the first search and onPage() clamps to >=1 (llpanelexperiencepicker.cpp:443-446).
         // Treating it as 0-based dropped every result. Clamp <1 to page one; page_size defaults 30.
         int page = 0, page_size = 30;
@@ -791,8 +784,8 @@ public class FindExperienceByNameGetHandler : BaseStreamHandler
         if (page < 1) page = 1;
 
         // Tranquillity's data-layer FindExperiences has no SQL LIMIT (returns every match), so we
-        // page over the full set in-handler — no row is unreachable (Legion had to fix a 50-row
-        // SQL cap; we don't, honoring "no storage change"). Start of this page, one window wide.
+        // page over the full set in-handler — no row is unreachable, and the storage layer is
+        // unchanged. Start of this page, one window wide.
         ExperienceInfo[] results = m_ExperienceModule.FindExperiencesByName(query_str)
             ?? new ExperienceInfo[0];
         int start = (page - 1) * page_size;
@@ -826,7 +819,7 @@ public class FindExperienceByNameGetHandler : BaseStreamHandler
 
         // The picker enables its page buttons purely on the PRESENCE of these keys
         // (llpanelexperiencepicker.cpp:248-249) and re-requests via ?page=N±1; the values are
-        // never dereferenced, but we emit real re-query URLs for honesty (Legion parity).
+        // never dereferenced, but we emit real re-query URLs so they are correct if one ever is.
         string basePath = httpRequest.Url.AbsolutePath;
         if (hasNext)
             new_str += string.Format("<key>next_page_url</key><string>{0}</string>",
@@ -847,14 +840,13 @@ public class FindExperienceByNameGetHandler : BaseStreamHandler
     }
 }
 
-// A1 — ExperienceQuery cap (Legion Slice 6, D-EEP resolved as a documented NO-OP).
+// ExperienceQuery cap, a documented no-op.
 // SL calls this (llenvironment.cpp testExperiencesOnParcelCoro) to learn which of a set of
 // experiences may still inject a per-agent ENVIRONMENT on the agent's current parcel; a
 // `false` answer makes the viewer clearInjections(). Tranquillity's per-agent EEP
 // (llSetAgentEnvironment / llReplaceAgentEnvironment) is STUBBED (log-only — see
 // Phlox.ScriptEngine/LSLSystemAPI.cs), so no injection ever exists to police. We answer every
-// queried experience as permitted (true) so the viewer clears nothing — identical behaviour to
-// Legion HandleExperienceQuery (CoreModules/Experience/ExperienceModule.cs:929). GET
+// queried experience as permitted (true) so the viewer clears nothing. GET
 // ?experiences=<uuid>,<uuid>,... -> { experiences: { <uuid>: true, ... } }.
 public class ExperienceQueryGetHandler : BaseStreamHandler
 {
@@ -1054,10 +1046,9 @@ public class UpdateExperiencePostHandler : ReadBaseStreamHandler
 
         ExperienceInfo currentInfo = m_ExperienceModule.GetExperienceInfo(public_id);
 
-        // A5 — GATE: only an experience admin (owner OR group ExperienceAdmin) may edit. When NOT
-        // an admin, the update block is skipped and the UNCHANGED experience is echoed back below —
-        // the reject-shaped response Legion uses (CoreModules/Experience/ExperienceModule.cs:987-991
-        // WriteLLSD(BuildUpdateExperienceResponse(info))); the viewer parses it and shows no edit.
+        // GATE: only an experience admin (owner OR group ExperienceAdmin) may edit. When NOT
+        // an admin, the update block is skipped and the UNCHANGED experience is echoed back below
+        // as the rejection; the viewer parses it and shows no edit.
         bool is_admin = m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id);
 
         if(is_admin)
@@ -1065,9 +1056,9 @@ public class UpdateExperiencePostHandler : ReadBaseStreamHandler
             currentInfo.name = name;
             currentInfo.description = desc;
 
-            // A5 — GROUP FIELD IS OWNER-ONLY. SL's explicit rule: any experience administrator may
+            // GROUP FIELD IS OWNER-ONLY. SL's explicit rule: any experience administrator may
             // edit every field EXCEPT the group; only the experience OWNER may change the group.
-            // Previously ANY admin could reassign it. Legion ExperienceModule.cs:1010-1023.
+            // Previously ANY admin could reassign it.
             if (group_id != currentInfo.group_id)
             {
                 if (currentInfo.owner_id == m_AgentID)
@@ -1104,7 +1095,7 @@ public class UpdateExperiencePostHandler : ReadBaseStreamHandler
             "<key>public_id</key><uuid>{0}</uuid>" +
             "<key>description</key><string>{1}</string>" +
             "<key>name</key><string>{2}</string>" +
-            "<key>quota</key><integer>128</integer>" + // A4 — was info.quota (default 16); Legion emits 128 (ExperienceToOSD:375)
+            "<key>quota</key><integer>128</integer>" + // was info.quota (default 16); SL's quota is 128
             "<key>slurl</key><string>{6}</string>" +
             "<key>maturity</key><integer>{7}</integer>" +
             "<key>expiration</key><integer>600</integer>" +
@@ -1234,8 +1225,8 @@ public class RegionExperiencesGetHandler : BaseStreamHandler
         }
         else response_str += "<undef />";
 
-        // A6 — the `blocked` list now surfaces the T5b estate BlockedExperiences (Legion emits it as
-        // a real array, BuildRegionExperiencesLLSD:422-427). It was hardcoded <undef/>, so the
+        // The `blocked` list surfaces the estate's BlockedExperiences as a real array.
+        // It was hardcoded <undef/>, so the
         // Region/Estate > Experiences Blocked editor always rendered empty even when experiences
         // were region-blocked. `default`/`disabled` stay omitted-shaped (Tranquillity models
         // neither; the panel reads them conditionally, so undef/empty is the correct "not set" wire).
@@ -1308,12 +1299,11 @@ public class GetExperienceInfoGetHandler : BaseStreamHandler
 
             if (info != null)
             {
-                // A4 — was hardcoding an EMPTY marketplace (dropping info.marketplace), so the
+                // This was hardcoding an EMPTY marketplace (dropping info.marketplace), so the
                 // profile floater's Marketplace panel never showed a store link. Emit the real
-                // value like FindExperienceByName/UpdateExperience do (Legion BuildExtendedMetadata
-                // always emits logo + marketplace, CoreModules/Experience/ExperienceModule.cs:409).
-                // quota stays the hardcoded 128 below — matching Legion's ExperienceToOSD:375 and
-                // now consistent with the Find/Update handlers (which A4 also moved to 128).
+                // value like FindExperienceByName/UpdateExperience do, logo and marketplace both.
+                // quota stays the hardcoded 128 below, consistent with the Find/Update handlers,
+                // which also emit 128.
                 string extended_meta = string.Format("<llsd><map><key>logo</key><uuid>{0}</uuid><key>marketplace</key>{1}</map></llsd>", info.logo, info.marketplace != string.Empty ? string.Format("<string>{0}</string>", info.marketplace) : "<string />");
 
                 response_str += string.Format("<map>" +

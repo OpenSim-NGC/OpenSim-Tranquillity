@@ -19,7 +19,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
 public sealed record CofWearableLink(UUID LinkItemId, string Description, UUID TargetItemId, int WearableType, UUID AssetId);
 
 /// <summary>
-/// S10. Turns the Current Outfit Folder's wearable links into <see cref="AvatarAppearance.Wearables"/>, keeping
+/// Turns the Current Outfit Folder's wearable links into <see cref="AvatarAppearance.Wearables"/>, keeping
 /// every link of a type and putting them in the order the viewer layers them.
 ///
 /// <para>
@@ -34,8 +34,8 @@ public sealed record CofWearableLink(UUID LinkItemId, string Description, UUID T
 /// </para>
 ///
 /// <para>
-/// Two rules are inherited and must not regress. <b>S0c</b>: a type this COF read says nothing about keeps what
-/// the agent already wears, rather than being emptied by a partial view of the outfit. <b>S8</b>: a link whose
+/// Two rules are inherited and must not regress. <b>Keep</b>: a type this COF read says nothing about keeps what
+/// the agent already wears, rather than being emptied by a partial view of the outfit. <b>Unresolvable</b>: a link whose
 /// target this region cannot resolve is a statement about the inventory lookup, not about what the avatar is
 /// wearing (<c>AvatarFactoryModule.SetAppearanceAssets</c>, AvatarFactoryModule.cs:975-989) — such a link never
 /// reaches here, and because it does not, its type is one this read says nothing about and keeps its contents.
@@ -91,8 +91,8 @@ public static class CofWearables
     /// <see cref="OrderKey"/> ascending, with unnumbered links kept in the order given and sunk below the
     /// numbered ones. Asset ids come from the links; a link may carry <see cref="UUID.Zero"/> and be resolved
     /// later by <c>SetAppearanceAssets</c>, exactly as an <c>AgentIsNowWearing</c> item is.</item>
-    /// <item>A type no link names keeps its current items (S0c), which is also what makes an unresolvable link
-    /// harmless (S8).</item>
+    /// <item>A type no link names keeps its current items, which is also what makes an unresolvable link
+    /// harmless.</item>
     /// <item><see cref="AvatarWearable.Add"/> caps a type at five items and ignores <see cref="UUID.Zero"/> item
     /// ids, so a sixth link of a type and a link to nothing are both dropped here, as they are on every other
     /// path into the wearable table.</item>
@@ -137,7 +137,7 @@ public static class CofWearables
                 continue;
             }
 
-            // Untouched by this read: keep what the agent already wears (S0c / S8).
+            // Untouched by this read: keep what the agent already wears.
             if (type < existing.Length && existing[type] is not null)
                 for (var j = 0; j < existing[type].Count; j++)
                     derived[type].Add(existing[type][j].ItemID, existing[type][j].AssetID);

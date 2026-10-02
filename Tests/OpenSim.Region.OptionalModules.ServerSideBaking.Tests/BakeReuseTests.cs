@@ -11,8 +11,8 @@ using Xunit.Abstractions;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S2 Part 1: persistence in the avatar service's key/value table and the input-hash skip (ADR-004). No Scene, no
-/// SceneHelpers — a fake asset service, a fake avatar service, and Truly Bazar's golden fixtures as the outfit.
+/// Persistence in the avatar service's key/value table and the input-hash skip (ADR-004). No Scene, no
+/// SceneHelpers — a fake asset service, a fake avatar service, and the truly-stock golden fixtures as the outfit.
 /// Every test skips (vacuously, with a console line) when the fixtures have not been fetched.
 /// </summary>
 public class BakeReuseTests
@@ -88,7 +88,7 @@ public class BakeReuseTests
         return new Rig { Assets = assets, Avatars = new FakeAvatarService(), Wearables = wearables, VisualParams = vp, Compositor = new TexLayerCompositor() };
     }
 
-    /// <summary>The channels a bake of Truly's stock outfit produces.</summary>
+    /// <summary>The channels a bake of the truly-stock outfit produces.</summary>
     private static readonly BakeChannel[] Live = { BakeChannel.Head, BakeChannel.Upper, BakeChannel.Lower, BakeChannel.Eyes, BakeChannel.Hair };
 
     /// <summary>
@@ -198,7 +198,7 @@ public class BakeReuseTests
     // ------------------------------------------------------------------ 3. one wearable changed -> only its channels re-bake
 
     /// <summary>
-    /// Truly wears an Undershirt. <c>avatar_lad.xml</c> gives the <c>upper_undershirt</c> local texture to the
+    /// The truly-stock outfit has an Undershirt. <c>avatar_lad.xml</c> gives the <c>upper_undershirt</c> local texture to the
     /// <c>upper_body</c> layer set and to no other, so <see cref="TexLayerCompositor.WearableOf"/> maps that slot
     /// to <see cref="WearableKind.Undershirt"/> and <c>Upper</c> is the only channel the type feeds. Changing the
     /// undershirt must therefore re-bake Upper and reuse Head, Lower, Eyes and Hair — the whole point of hashing

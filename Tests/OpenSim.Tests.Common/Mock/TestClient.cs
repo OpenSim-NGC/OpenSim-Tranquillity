@@ -967,7 +967,7 @@ public class TestClient : IClientAPI, IClientCore
     {
     }
 
-    /// <summary>PROPS-1: every entity this client was sent full ObjectProperties for, in order.</summary>
+    /// <summary>Every entity this client was sent full ObjectProperties for, in order.</summary>
     public readonly List<ISceneEntity> ObjectPropertiesSent = new List<ISceneEntity>();
 
     public void SendObjectPropertiesReply(ISceneEntity entity)

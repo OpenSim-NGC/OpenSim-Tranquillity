@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    T1 (Docs/feature/repo-audit/T1-TEST-FIXTURES.md): the sources use xunit ([Fact], Xunit.Assert) but this file
+    Docs/feature/repo-audit/T1-TEST-FIXTURES.md: the sources use xunit ([Fact], Xunit.Assert) but this file
     referenced NUnit and pinned Microsoft.NET.Test.Sdk / Logging.Console below OpenSim.Tests.Common (NU1605).
     Package set now matches Tests/OpenSim.Tests.Common.
   -->

@@ -32,16 +32,16 @@ follows for the 5th component.
 There is no other reference to `RP_BUMP` in `lltexlayer.cpp` or `lltexlayerparams.cpp`. The bump layers
 (`head bump base`, `bump_head_base.tga`, `wrinkles_shading`, `eyebrowsbump`, `facialhair bump`,
 `base_upperbody bump`, `upper_clothes bump`, …) are parsed, kept in `mLayerList`, and skipped by the
-render loop. **The 5th component of an uploaded bake is not a bump map.** The name in Ledger Q-8 is a
+render loop. **The 5th component of an uploaded bake is not a bump map.** The name "bump" is a
 legacy of the 2009 viewers; the current compositor does not produce one, and neither does this library.
 
 `head_wrinkles_highlights_alpha.tga`, referenced only by the bump layer `wrinkles_shading`
-(`avatar_lad.xml:9192`), does not exist in the viewer's `character/` directory either (checked S0d), so it
+(`avatar_lad.xml:9192`), does not exist in the viewer's `character/` directory either, so it
 cannot be embedded; nothing that is rendered needs it.
 
 ## 2. What the 5th component is: the morph mask
 
-The reference bakes (Truly Bazar, captured 2026-09-03) are five-component J2C. Measured with the library's
+The reference bakes (one test avatar, captured 2026-09-03) are five-component J2C. Measured with the library's
 decoder: component 3 is the visibility alpha (on the head it is the eyelash mask `head_alpha.tga`; on the
 bald hair it is 1 everywhere), and component 4 is a flat 1 on the head and a flat 254 on upper, lower, eyes
 and hair. That is exactly the output of `LLTexLayerSet::gatherMorphMaskAlpha`:
@@ -105,7 +105,7 @@ is exactly `mLocalTexture != -1` (`lltexlayer.cpp:64`): **only layers with a `lo
   that wearable's clone of the layer (`:1678`). Its morph mask, however, contributes **only once, from the
   top (last) worn wearable** — `LLTexLayerTemplate::gatherAlphaMasks` (`:1710-1719`) takes
   `U32 i = num_wearables - 1; getLayer(i)` with the comment *"For rendering morph masks, we only want to use
-  the top wearable"*, unlike `render`, which loops over all of them. (S1c correction: S0d/S0e recorded this as
+  the top wearable"*, unlike `render`, which loops over all of them. (An earlier reading of this had it as
   once per instance.) `upper_clothes` (local texture `upper_shirt`) and
   `lower_pants` (`lower_pants`) are templates.
 - A **plain** layer is rendered exactly once by `LLTexLayer::render` (`:1023-1200`) whatever is worn, with the
@@ -143,14 +143,14 @@ mask is 0, and 255 × (0 + 1) >> 8 = 0. The reference head bake's component 4 is
 A layer whose net colour alpha is ≈ 0 is not rendered in the colour pass (`:1040-1044`) and so has no
 cached mask; `addAlphaMask` then renders it on demand (`:1518-1526`) with the same rules.
 
-### 2.4 A worn wearable with no texture asset still contributes (S1c)
+### 2.4 A worn wearable with no texture asset still contributes
 
-This is the mechanism behind Ledger Q-12. Aleric Fenwood wears a jacket and **no shirt asset** — but his Shirt
+A reference avatar wears a jacket and **no shirt asset** — but its Shirt
 slot is occupied: item `77c41e39-38f9-f75a-0000-585989bf0000` (the default shirt item) with asset id
-`00000000-…`. His reference upper bake carries a real morph mask (31.4% of pixels at 0, 67.0% at 224); the
+`00000000-…`. Its reference upper bake carries a real morph mask (31.4% of pixels at 0, 67.0% at 224); the
 library produced a uniform 255 and logged `upper_clothes morph: no Shirt worn: mask left at 255`.
 
-The authority resolves it, and rules out the other candidate S1b floated:
+The authority resolves it, and rules out the other candidate that was considered:
 
 1. **`<morph_masks>` is the only selector; the jacket never contributes.** `gatherMorphMaskAlpha`
    (`lltexlayer.cpp:460-472`) does walk *every* layer of the set, so the block is not a filter there. But a layer
@@ -161,7 +161,7 @@ The authority resolves it, and rules out the other candidate S1b floated:
    fed from `avatar_lad.xml:17473-17502` at `:971-985`) fills `mBakedTextureDatas[baked].mMaskedMorphs`, and the
    layerset loader looks each one up by name and calls `layer->setHasMorph(true)` (`:1237-1243`).
    `upper_jacket` is **not** in `<morph_masks>`, so `hasMorph()` is false for it and it contributes nothing to
-   the morph mask however it is worn. S1b candidate (a) — "the gather should include `upper_jacket`" — is
+   the morph mask however it is worn. Candidate (a) — "the gather should include `upper_jacket`" — is
    **refuted**. Its five `param_alpha` entries (`jacket Sleeve Length#1020`, `jacket Collar Front#1022`,
    `Collar Back#1024`, `bottom length upper#620`, `open upper#622`) drive the **colour** pass only.
 
@@ -214,6 +214,6 @@ which for an assetless wearable are supplied entirely by the caller's `VisualPar
 5. `J2kCodec.EncodeBake` writes R, G, B, A, M as a five-component single-tile J2C; `Decode` exposes a
    fifth component as `RgbaPlanes.Mask`.
 
-Reference check (S0d golden run, Truly Bazar, 512): head 0 vs reference 1, all other channels 255 vs
-254 — the difference is the reference's lossy coding of the same constants. S0e: the plain-layer rule above
-replaced S0d's per-instance treatment of `facialhair`; Truly wears one hair, so her numbers are unchanged.
+Reference check (golden run against those reference bakes, 512): head 0 vs reference 1, all other channels 255 vs
+254 — the difference is the reference's lossy coding of the same constants. The plain-layer rule above
+replaced an earlier per-instance treatment of `facialhair`; that avatar wears one hair, so its numbers are unchanged.

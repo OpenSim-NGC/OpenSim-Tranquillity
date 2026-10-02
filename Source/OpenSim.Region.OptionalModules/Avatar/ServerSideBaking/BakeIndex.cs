@@ -36,7 +36,7 @@ public sealed record StoredBake(UUID AssetId, string Hash);
 /// <b>Why every key here starts with "Bake".</b> <c>AvatarService.SetAvatar</c> deletes every row for the
 /// principal before rewriting the appearance keys, and it has to: the appearance keys are of variable cardinality
 /// and are read back additively, so a row left behind by a garment that was taken off would put it back on. Until
-/// S3 that delete took this index with it, and every appearance save destroyed it (Ledger Q-14). The service now
+/// that was fixed, the delete took this index with it, and every appearance save destroyed it. The service now
 /// preserves the names <see cref="AvatarDataKeys.IsPreserved"/> accepts, and this class derives its two prefixes
 /// from <see cref="AvatarDataKeys.BakeIndexPrefix"/> so the two cannot drift apart.
 /// </para>
