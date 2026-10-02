@@ -44,9 +44,11 @@ namespace OpenSim.Region.CoreModules.World.Objects.BlockedOwners;
 /// <remarks>
 /// Every rez path in the region asks Scene.Permissions.CanRezObject (viewer rez from user or prim
 /// inventory, a new prim, the object-add and upload capabilities, script rez in every engine, detach to
-/// ground, NPC creation), except duplication, which asks Scene.Permissions.CanDuplicateObject. This module
-/// answers both. It registers its handlers only while the region blocks someone, so a region that blocks
-/// no one runs exactly the code it ran before.
+/// ground, NPC creation), except duplication, which asks Scene.Permissions.CanDuplicateObject. An object
+/// that arrives from another region (a crossing, or an object teleport) is let in only if
+/// Scene.Permissions.CanObjectEntry allows it with enteringRegion set. This module answers all three. It
+/// registers its handlers only while the region can block someone (its list is not empty, or the estate
+/// ban option is on), so a region that blocks no one runs exactly the code it ran before.
 ///
 /// Owners are blocked from the console (block owner / unblock owner / show blocked owners), or, with
 /// [BlockedOwners] BlockEstateBanned = true, by the region's estate ban. Both start empty or off.
@@ -93,7 +95,7 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
         console.Commands.AddCommand(
             "Objects", false, "block owner",
             "block owner <UUID>",
-            "Refuse every rez in this region by objects or avatars of this owner",
+            "Refuse every rez in this region by objects or avatars of this owner, and entry by their objects",
             "Applies to the console's current region, or to every region when none is selected.\n"
                 + "The list is kept in memory and is empty again after a restart.",
             HandleBlockOwner);
@@ -123,6 +125,7 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
             {
                 scene.Permissions.OnRezObject -= CanRezObject;
                 scene.Permissions.OnDuplicateObject -= CanDuplicateObject;
+                scene.Permissions.OnObjectEntry -= CanObjectEntry;
                 m_handlersRegistered = false;
             }
         }
@@ -175,7 +178,9 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
     }
 
     /// <summary>
-    /// Keeps the permission handlers registered exactly while the region can block someone.
+    /// Keeps the permission handlers registered exactly while the region can block someone. With the
+    /// estate ban option on, that is from the moment the region is added: a ban the estate adds later is
+    /// read by IsBlocked on each check.
     /// </summary>
     private void UpdateHandlers()
     {
@@ -193,11 +198,13 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
             {
                 scene.Permissions.OnRezObject += CanRezObject;
                 scene.Permissions.OnDuplicateObject += CanDuplicateObject;
+                scene.Permissions.OnObjectEntry += CanObjectEntry;
             }
             else
             {
                 scene.Permissions.OnRezObject -= CanRezObject;
                 scene.Permissions.OnDuplicateObject -= CanDuplicateObject;
+                scene.Permissions.OnObjectEntry -= CanObjectEntry;
             }
             m_handlersRegistered = wanted;
         }
@@ -226,6 +233,19 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
         return false;
     }
 
+    // enteringRegion is true only for an object arriving from another region (EntityTransferModule's
+    // HandleIncomingSceneObject); a move within the region is not refused.
+    private bool CanObjectEntry(SceneObjectGroup sog, bool enteringRegion, Vector3 newPoint)
+    {
+        if (!enteringRegion || sog is null || !IsBlocked(sog.OwnerID))
+            return true;
+
+        m_log.LogInformation(
+            "[BLOCKED OWNERS]: Refused entry of {0} by blocked owner {1} into {2}",
+            sog.UUID, sog.OwnerID, m_scene?.Name);
+        return false;
+    }
+
     private bool IsForThisRegion()
     {
         ICommandConsole console = MainConsole.Instance;
@@ -246,6 +266,12 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
 
         if (!ConsoleUtil.TryParseConsoleUuid(console, cmdparams[2], out UUID owner))
             return;
+
+        if (owner.IsZero())
+        {
+            console.Output($"ERROR: {owner} is not an owner and cannot be blocked.");
+            return;
+        }
 
         console.Output(Block(owner)
             ? $"Owner {owner} is now blocked from rezzing in {m_scene.Name}."

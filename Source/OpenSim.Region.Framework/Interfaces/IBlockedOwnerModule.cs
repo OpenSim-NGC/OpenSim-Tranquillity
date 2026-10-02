@@ -32,7 +32,8 @@ namespace OpenSim.Region.Framework.Interfaces;
 
 /// <summary>
 /// A region-wide list of owners whose rezzing the region refuses. An owner on the list cannot rez,
-/// create or duplicate objects in the region by any path: viewer, script (any engine) or capability.
+/// create or duplicate objects in the region by any path: viewer, script (any engine) or capability,
+/// and their objects arriving from another region (other than worn attachments) are refused entry.
 /// The list starts empty; only a region operator adds to it.
 /// </summary>
 public interface IBlockedOwnerModule

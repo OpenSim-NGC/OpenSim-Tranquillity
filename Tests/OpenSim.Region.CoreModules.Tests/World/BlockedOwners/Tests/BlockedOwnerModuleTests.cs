@@ -244,6 +244,7 @@ public class BlockedOwnerModuleTests : OpenSimTestCase
 
         Assert.Equal(0, HandlerCount("OnRezObject"));
         Assert.Equal(0, HandlerCount("OnDuplicateObject"));
+        Assert.Equal(0, HandlerCount("OnObjectEntry"));
 
         Assert.NotNull(m_scene.RezObject(host, item, RezPos, null, Vector3.Zero, 0, false));
         Assert.NotNull(RezFromUserInventory(BlockedId, invItem));
@@ -260,6 +261,7 @@ public class BlockedOwnerModuleTests : OpenSimTestCase
         m_module.Block(OtherId);
         Assert.Equal(1, HandlerCount("OnRezObject"));
         Assert.Equal(1, HandlerCount("OnDuplicateObject"));
+        Assert.Equal(1, HandlerCount("OnObjectEntry"));
 
         m_module.Unblock(BlockedId);
         Assert.Equal(1, HandlerCount("OnRezObject"));
@@ -267,6 +269,7 @@ public class BlockedOwnerModuleTests : OpenSimTestCase
         m_module.Unblock(OtherId);
         Assert.Equal(0, HandlerCount("OnRezObject"));
         Assert.Equal(0, HandlerCount("OnDuplicateObject"));
+        Assert.Equal(0, HandlerCount("OnObjectEntry"));
     }
 
     [Fact]
@@ -293,6 +296,33 @@ public class BlockedOwnerModuleTests : OpenSimTestCase
         Assert.Empty(m_module.GetBlockedOwners());
         Assert.Null(m_scene.RezObject(host, item, RezPos, null, Vector3.Zero, 0, false));
         Assert.NotNull(m_scene.RezObject(host2, item2, RezPos, null, Vector3.Zero, 0, false));
+    }
+
+    [Fact]
+    public void WithTheEstateBanOptionOnABanAddedAfterStartupTakesEffectAtOnce()
+    {
+        // With the option on, the handlers are registered when the region is added, before any ban,
+        // and each check reads the estate's ban list as it is at that moment.
+        Setup(blockEstateBanned: true);
+        Assert.Equal(1, HandlerCount("OnRezObject"));
+        Assert.Equal(1, HandlerCount("OnDuplicateObject"));
+        Assert.Equal(1, HandlerCount("OnObjectEntry"));
+
+        (SceneObjectPart host, TaskInventoryItem item) = AddRezzer(BlockedId, "child");
+        Assert.True(m_scene.Permissions.CanRezObject(1, BlockedId, RezPos));
+
+        m_scene.RegionInfo.EstateSettings.AddBan(new EstateBan { BannedUserID = BlockedId });
+        Assert.False(m_scene.Permissions.CanRezObject(1, BlockedId, RezPos));
+        Assert.Null(m_scene.RezObject(host, item, RezPos, null, Vector3.Zero, 0, false));
+
+        m_scene.RegionInfo.EstateSettings.RemoveBan(BlockedId);
+        Assert.True(m_scene.Permissions.CanRezObject(1, BlockedId, RezPos));
+        Assert.NotNull(m_scene.RezObject(host, item, RezPos, null, Vector3.Zero, 0, false));
+
+        // Emptying the console list does not take the handlers away while the option is on.
+        m_module.Block(OtherId);
+        m_module.Unblock(OtherId);
+        Assert.Equal(1, HandlerCount("OnRezObject"));
     }
 
     [Fact]
