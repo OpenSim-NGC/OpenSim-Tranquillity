@@ -686,20 +686,67 @@ namespace Phlox.ScriptEngine
                     case RuntimeState.MiscAttr.VolumeDetect:
                         llVolumeDetect((int)kvp.Value[0]);
                         break;
+                    case RuntimeState.MiscAttr.SilentEstateManagement:
+                        RestoreSilentEstateBit((int)kvp.Value[0] != 0);
+                        break;
                     case RuntimeState.MiscAttr.Control:
-                        // Halcyon calls a 7-arg TakeControlsInternal helper that bypasses the
-                        // permission check by re-using the existing grant on the TaskInventoryItem.
-                        // We call llTakeControls() directly which re-validates PERMISSION_TAKE_CONTROLS.
-                        // If permission state didn't persist alongside the Control entry, restore
-                        // will silently fail. Acceptable for now; revisit if reports of lost
-                        // controls on restart surface.
+                        // A vehicle's script arriving by a crossing leaves its controls to the core, which carries the
+                        // seated avatar's registrations in the agent's data, and to OnGroupCrossedAvatarReady when the
+                        // avatar arrives without them (Halcyon OnScriptInjected: "m_host.IsAttachment || !fromCrossing").
                         if (m_host.ParentGroup.IsAttachment || !fromCrossing)
-                            llTakeControls((int)kvp.Value[0], (int)kvp.Value[1], (int)kvp.Value[2]);
+                            TakeControlsInternal((int)kvp.Value[0], (int)kvp.Value[1], (int)kvp.Value[2], UUID.Zero);
                         break;
                 }
             }
         }
-        public void OnGroupCrossedAvatarReady(UUID avatarId) { }
+
+        /// <summary>
+        /// The saved PERMISSION_SILENT_ESTATE_MANAGEMENT record is put back on the item's grant: the bit is set or cleared as
+        /// the record says, and the granter goes when nothing is left (Halcyon OnScriptInjected, SilentEstateManagement).
+        /// The item is written only when its grant changed.
+        /// </summary>
+        private void RestoreSilentEstateBit(bool silent)
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null) return;
+            int mask = silent ? item.PermsMask | PERMISSION_SILENT_ESTATE_MANAGEMENT : item.PermsMask & ~PERMISSION_SILENT_ESTATE_MANAGEMENT;
+            UUID granter = mask == 0 ? UUID.Zero : item.PermsGranter;
+            if (mask != item.PermsMask || granter != item.PermsGranter) PermsChange(item, granter, mask);
+        }
+
+        /// <summary>
+        /// The script's saved controls taken again without llTakeControls (Halcyon TakeControlsInternal): no error on
+        /// DEBUG_CHANNEL, nothing when the grant no longer holds PERMISSION_TAKE_CONTROLS, when the granter is not a root
+        /// avatar here, or when <paramref name="requiredAvatar"/> is given and is not the granter. The Control record is
+        /// kept either way, so the avatar's later arrival can still take them.
+        /// </summary>
+        internal void TakeControlsInternal(int controls, int accept, int pass_on, UUID requiredAvatar)
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || item.PermsGranter == UUID.Zero) return;
+            if (requiredAvatar != UUID.Zero && item.PermsGranter != requiredAvatar) return;
+            if ((item.PermsMask & PERMISSION_TAKE_CONTROLS) == 0) return;
+            ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
+            if (sp == null || sp.IsChildAgent) return;
+            using (PhloxEngine.OwnControlChange())
+                sp.RegisterControlEventsToScript(controls, accept, pass_on, m_host.LocalId, m_itemID);
+            m_ScriptEngine?.RequestParcelCheck(m_itemID);   // Holding controls exempts it from a No Scripts parcel
+        }
+
+        /// <summary>
+        /// The avatar arrived here (a crossing, a teleport, a login) on this script's object or wearing it: the controls it
+        /// granted are taken again if this script holds a record of them and the avatar came without them (Halcyon
+        /// LSLSystemAPI.OnGroupCrossedAvatarReady). Scheduler thread.
+        /// </summary>
+        public void OnGroupCrossedAvatarReady(UUID avatarId)
+        {
+            var misc = m_thisScript?.ScriptState?.MiscAttributes;
+            if (misc == null || !misc.TryGetValue((int)RuntimeState.MiscAttr.Control, out object[] c)) return;
+            if (!m_thisScript.ScriptState.Enabled) return;
+            ScenePresence sp = World?.GetScenePresence(avatarId);
+            if (sp != null && sp.HasScriptControls(m_itemID)) return;
+            TakeControlsInternal((int)c[0], (int)c[1], (int)c[2], avatarId);
+        }
         /// <summary>The mean of the last timeslice times in milliseconds, 0 before the first.</summary>
         public float GetAverageScriptTime()
         {
