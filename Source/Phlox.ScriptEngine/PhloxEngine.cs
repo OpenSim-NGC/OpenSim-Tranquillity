@@ -1254,7 +1254,10 @@ namespace Phlox.ScriptEngine
         /// <summary>The version of the carried-state envelope this build writes and reads.</summary>
         internal const string CarriedStateVersion = "1";
 
-        /// <summary>How long a region thread waits for the scheduler to capture a script (Halcyon STATE_REQUEST_TIMEOUT).</summary>
+        /// <summary>
+        /// How long a region thread waits for the scheduler to capture an object's scripts (Halcyon STATE_REQUEST_TIMEOUT
+        /// per request; here per object, however many scripts it holds).
+        /// </summary>
         internal int CarriedStateTimeoutMs = 10 * 1000;
 
         /// <summary>
@@ -1269,22 +1272,46 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// The script's state for its object to carry, or "" when it is not a Phlox script loaded here (or is held
-        /// because its saved row could not be read). The capture is taken on the scheduler thread, between timeslices,
-        /// as the state database's are; a caller that is the scheduler thread, or a region whose scheduler thread is not
-        /// running, captures directly.
+        /// because its saved row could not be read, or its state is above <see cref="MaxCarriedStateBytes"/>). The capture
+        /// is taken on the scheduler thread, between timeslices, as the state database's are, for all the object's scripts
+        /// at once (the core asks one script at a time); a caller that is the scheduler thread, or a region whose
+        /// scheduler thread is not running, captures directly.
         /// </summary>
         public string GetXMLState(UUID itemID)
         {
-            if (m_ExeScheduler == null || !m_ExeScheduler.IsLoaded(itemID)) return string.Empty;
+            InWorldz.Phlox.VM.Interpreter interp = m_ExeScheduler?.FindScript(itemID);
+            if (interp == null) return string.Empty;
             bool here = m_MasterScheduler == null || !m_MasterScheduler.IsRunning
                         || Thread.CurrentThread.ManagedThreadId == m_ExeScheduler.WorkerThreadId;
             byte[] blob;
             UUID assetId;
-            bool got = here
-                ? m_ExeScheduler.CaptureForObject(itemID, out blob, out assetId)
-                : m_ExeScheduler.RequestCaptureForObject(itemID, CarriedStateTimeoutMs, out blob, out assetId);
+            bool got;
+            if (here) got = m_ExeScheduler.CaptureForObject(itemID, out blob, out assetId);
+            else
+            {
+                SceneObjectGroup group = m_Scene?.GetSceneObjectPart(interp.HostLocalId)?.ParentGroup;
+                got = m_ExeScheduler.RequestCaptureForObject(itemID, LoadedScriptsOf(group), group?.Name ?? itemID.ToString(),
+                    CarriedStateTimeoutMs, out blob, out assetId);
+            }
             if (!got) return string.Empty;
+            if (blob.Length > MaxCarriedStateBytes)
+            {
+                m_log.LogWarning("[PhloxEngine]: The state of {0} is {1} bytes, above the {2} an object carries; it travels without it",
+                    itemID, blob.Length, MaxCarriedStateBytes);
+                return string.Empty;
+            }
             return CarriedStateXml(itemID, assetId, blob);
+        }
+
+        /// <summary>The item ids of the group's scripts loaded in this engine.</summary>
+        private List<UUID> LoadedScriptsOf(SceneObjectGroup group)
+        {
+            var items = new List<UUID>();
+            if (group == null) return items;
+            foreach (SceneObjectPart part in group.Parts)
+                foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                    if (m_ExeScheduler.IsLoaded(item.ItemID)) items.Add(item.ItemID);
+            return items;
         }
 
         internal static string CarriedStateXml(UUID itemID, UUID assetId, byte[] blob)

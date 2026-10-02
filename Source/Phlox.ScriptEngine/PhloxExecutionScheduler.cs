@@ -1644,13 +1644,17 @@ namespace Phlox.ScriptEngine
         /// <summary>A capture asked for by a region thread (GetXMLState, SaveAllState), answered on this thread.</summary>
         private sealed class ObjectStateRequest
         {
-            public UUID ItemId;          // UUID.Zero: save every loaded script (SaveAllState)
-            public byte[] Blob;
-            public UUID AssetId;
+            public UUID[] Items;         // null: save every loaded script (SaveAllState)
+            public byte[][] Blobs;
+            public UUID[] AssetIds;
             public readonly ManualResetEventSlim Done = new ManualResetEventSlim(false);
         }
         private readonly Queue<ObjectStateRequest> m_ObjectStateRequests = new();
         private readonly Queue<UUID> m_ArrivedAvatars = new();
+
+        // Captures taken for an object's other scripts, by item id, until the core asks for them (it asks one script at a
+        // time, SceneObjectPartInventory.GetScriptStates). A null blob: the script travels without state.
+        private readonly Dictionary<UUID, (byte[] Blob, UUID AssetId, long Taken)> m_CapturedForObject = new();
 
         /// <summary>
         /// The script's state for its object to carry, captured here: the caller is this scheduler's thread, or the thread
@@ -1675,26 +1679,50 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// As <see cref="CaptureForObject"/>, from a region thread while this scheduler's thread runs: the capture is
-        /// taken on the scheduler thread, between timeslices, and this waits for it (Halcyon EngineInterface.GetXMLState:
-        /// RequestStateData, then WaitForData with a 10 s timeout). False on timeout.
+        /// As <see cref="CaptureForObject"/>, from a region thread while this scheduler's thread runs (Halcyon
+        /// EngineInterface.GetXMLState: RequestStateData, then WaitForData). The first script asked for captures every
+        /// script of <paramref name="objectItems"/> (its object's loaded scripts) in one pass on the scheduler thread, and
+        /// the others are answered from that pass, so an object waits at most <paramref name="timeoutMs"/> however many
+        /// scripts it holds. On a timeout none of them carries state: each starts fresh where it arrives, and one warning
+        /// names the object.
         /// </summary>
-        internal bool RequestCaptureForObject(UUID itemId, int timeoutMs, out byte[] blob, out UUID assetId)
+        internal bool RequestCaptureForObject(UUID itemId, IReadOnlyList<UUID> objectItems, string objectName, int timeoutMs,
+                                              out byte[] blob, out UUID assetId)
         {
-            var req = new ObjectStateRequest { ItemId = itemId };
+            long now = Environment.TickCount64;
+            lock (m_CapturedForObject)
+            {
+                foreach (var k in new List<UUID>(m_CapturedForObject.Keys))
+                    if (now - m_CapturedForObject[k].Taken > Math.Max(timeoutMs, 1000) * 2L) m_CapturedForObject.Remove(k);
+                if (m_CapturedForObject.Remove(itemId, out var got))
+                {
+                    blob = got.Blob;
+                    assetId = got.AssetId;
+                    return blob != null;
+                }
+            }
+
+            var items = new List<UUID> { itemId };
+            foreach (UUID other in objectItems) if (other != itemId) items.Add(other);
+            var req = new ObjectStateRequest { Items = items.ToArray(), Blobs = new byte[items.Count][], AssetIds = new UUID[items.Count] };
             lock (m_ObjectStateRequests) m_ObjectStateRequests.Enqueue(req);
             m_WorkArrived?.Invoke();
             bool done = req.Done.Wait(timeoutMs);
-            blob = done ? req.Blob : null;
-            assetId = done ? req.AssetId : UUID.Zero;
-            if (!done) m_log.LogError("[PhloxExe]: Timed out after {0} ms capturing {1} for its object; it travels without its state", timeoutMs, itemId);
+            if (!done)
+                m_log.LogWarning("[PhloxExe]: Timed out after {0} ms capturing the {1} script(s) of {2}; they travel without their state and start fresh where they arrive",
+                    timeoutMs, items.Count, objectName);
+            lock (m_CapturedForObject)
+                for (int i = 1; i < items.Count; i++)
+                    m_CapturedForObject[items[i]] = (done ? req.Blobs[i] : null, done ? req.AssetIds[i] : UUID.Zero, now);
+            blob = done ? req.Blobs[0] : null;
+            assetId = done ? req.AssetIds[0] : UUID.Zero;
             return blob != null;
         }
 
         /// <summary>Every loaded script saved to the state database now (SaveAllState), on the scheduler thread; waits for it.</summary>
         internal bool RequestSaveAll(int timeoutMs)
         {
-            var req = new ObjectStateRequest { ItemId = UUID.Zero };
+            var req = new ObjectStateRequest();
             lock (m_ObjectStateRequests) m_ObjectStateRequests.Enqueue(req);
             m_WorkArrived?.Invoke();
             return req.Done.Wait(timeoutMs);
@@ -1721,12 +1749,14 @@ namespace Phlox.ScriptEngine
             {
                 try
                 {
-                    if (req.ItemId == UUID.Zero) SaveAllHere();
-                    else if (CaptureForObject(req.ItemId, out byte[] blob, out UUID assetId))
-                    {
-                        req.Blob = blob;
-                        req.AssetId = assetId;
-                    }
+                    if (req.Items == null) SaveAllHere();
+                    else
+                        for (int i = 0; i < req.Items.Length; i++)
+                            if (CaptureForObject(req.Items[i], out byte[] blob, out UUID assetId))
+                            {
+                                req.Blobs[i] = blob;
+                                req.AssetIds[i] = assetId;
+                            }
                 }
                 finally { req.Done.Set(); }
             }
