@@ -274,6 +274,39 @@ public class GrantRestoreTests
             .ContainsKey((int)RuntimeState.MiscAttr.SilentEstateManagement));
     }
 
+    /// <summary>
+    /// Release Keys after the script was last saved: TAKE_CONTROLS ends with no event run,
+    /// and the shutdown save (which writes only scripts marked changed) still writes the row again, so a restart does not
+    /// give the released controls back.
+    /// </summary>
+    [Fact]
+    public void AGrantTheCoreEndsWithNoEventIsSavedAtShutdown()
+    {
+        using var h = new SchedulerHarness();
+        UUID item = UUID.Random(), driver = UUID.Random();
+        var inv = TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, item, UUID.Random(), "seat", Seat);
+        Assert.True(h.Prim.Inventory.CreateScriptInstance(item, 0, false, Phlox, RegionStart));
+        h.Prim.ParentGroup.ResumeScripts();
+        Assert.True(h.PumpUntil(() => h.Said.Contains("entry")), SavedStateRig.SaidText(h));
+        var sp = SitOn(h.Scene, driver, h.Prim.ParentGroup);
+        inv.PermsGranter = driver;
+        inv.PermsMask = TakeControls | TriggerAnimation;
+        Command(h, "take", "took");
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));   // the event done, so nothing after this save marks it changed
+        SavedStateRig.States(h).SaveNow(new[] { (Interpreter)h.InterpreterFor(item) });
+        Assert.Equal(TakeControls | TriggerAnimation, StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob).GrantedPermsMask);
+
+        // Release Keys in the viewer: the core lets go of the controls and Phlox ends TAKE_CONTROLS, with no event run.
+        var client = sp.ControllingClient;
+        var release = client.GetType().GetField("OnForceReleaseControls", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+        ((OpenSim.Framework.ForceReleaseControls)release.GetValue(client)!).Invoke(client, sp.UUID);
+        Assert.True(h.PumpUntil(() => !HasControlRecord(h, item)), "Release Keys did not end the controls");
+        Assert.Equal(TriggerAnimation, inv.PermsMask);
+        h.ShutdownStateManager();
+        SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
+        Assert.Equal(0, row.GrantedPermsMask & TakeControls);
+    }
+
     // ── old rows and old carried states ──────────────────────────────────────
 
     /// <summary>A row written before the owner was noted (tag 28) restores the script with no grant, whatever 16 and 17 hold.</summary>

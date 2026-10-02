@@ -782,6 +782,7 @@ namespace Phlox.ScriptEngine
                 item.PermsMask = mask;
             }
             NoteGrant(m_thisScript.ScriptState, granter, mask, m_host.OwnerID);
+            GrantChanged();
         }
 
         /// <summary>
@@ -2536,7 +2537,17 @@ namespace Phlox.ScriptEngine
                 item.PermsMask = mask;
                 m_host.Inventory.ForceInventoryPersistence();
                 m_host.ParentGroup.HasGroupChanged = true;
+                GrantChanged();
             }
+        }
+
+        /// <summary>
+        /// The grant changed, perhaps with no event run (a stand-up, Release Keys, an owner change): the script is saved
+        /// again, so its row never keeps a grant the item no longer holds, which a restart would give back whole.
+        /// </summary>
+        private void GrantChanged()
+        {
+            if (m_thisScript != null) m_ScriptEngine?.StateManager?.ScriptChanged(m_thisScript);
         }
 
         private int GetImplicitPermissions(TaskInventoryItem item, UUID agentID)
