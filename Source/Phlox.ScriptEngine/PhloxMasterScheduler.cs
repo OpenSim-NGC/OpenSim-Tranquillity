@@ -53,11 +53,12 @@ namespace Phlox.ScriptEngine
         /// Stop only this scheduler's own thread. The test harness drives DoWork itself and needs the
         /// loader's compile thread to keep running; region shutdown is <see cref="Stop"/>.
         /// </summary>
-        internal void StopThread()
+        /// <returns>False if the thread was still running when the 5 s join gave up.</returns>
+        internal bool StopThread()
         {
             m_Stop = true;
             WorkArrived();
-            m_Thread?.Join(5000);
+            return m_Thread == null || m_Thread.Join(5000);
         }
 
         public void WorkArrived()

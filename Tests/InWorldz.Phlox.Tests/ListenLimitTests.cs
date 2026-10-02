@@ -168,7 +168,9 @@ public class ListenLimitTests
         Assert.Equal(0, before["bad"]);
         Assert.Equal(0, after["bad"]);
         Assert.Equal(-1, after["over"]);
-        Assert.Null(h.Engine.ListenManager.IsActive(item, before["first"]));
+        // Handles are the script's own and the lowest free comes first, so the reset's listens reuse the old numbers;
+        // the listen the first one named (channel 900) is gone.
+        Assert.Equal(0, h.Engine.ListenManager.ListensOnChannel(item, 900));
     }
 
     [Fact]
@@ -185,7 +187,8 @@ public class ListenLimitTests
         Assert.Equal(0, before["bad"]);
         Assert.Equal(0, after["bad"]);
         Assert.Equal(-1, after["over"]);
-        Assert.Null(h.Engine.ListenManager.IsActive(item, before["first"]));
+        // The new state's listens reuse the handle numbers; the listen the first one named (channel 900) is gone.
+        Assert.Equal(0, h.Engine.ListenManager.ListensOnChannel(item, 900));
     }
 
     [Fact]

@@ -666,6 +666,10 @@ namespace Phlox.ScriptEngine
 		private void OnShutdown()
         {
             m_log.LogInformation("[PhloxEngine]: Shutdown event, flushing script state");
+            // The scheduler stops first, so the final save is of scripts that are no longer running (Halcyon
+            // MasterScheduler.Stop joins the execution thread before the state manager's backup).
+            if (m_MasterScheduler != null && !m_MasterScheduler.StopThread())
+                m_log.LogWarning("[PhloxEngine]: The script scheduler did not stop within 5 s; saving script state anyway");
             StateManager?.Stop();
             StateManager = null;
         }

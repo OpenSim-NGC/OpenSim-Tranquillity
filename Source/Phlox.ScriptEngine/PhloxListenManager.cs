@@ -53,13 +53,27 @@ namespace Phlox.ScriptEngine
         private readonly PhloxExecutionScheduler m_Scheduler;
         private readonly object m_Lock = new();
 
-        // Per-script listen delivery rate limiting: tracks delivery count per second
-        // Prevents a script from receiving more than MAX_LISTENS_PER_SECOND listen events
-        private const int MAX_LISTENS_PER_SECOND = 20;
-        private readonly Dictionary<UUID, (int Count, long WindowStart)> m_RateTracker = new();
+        /// <summary>The listen events per second one script may receive with no [InWorldz.Phlox] MaxListenEventsPerSecond.</summary>
+        public const int DefaultMaxListenEventsPerSecond = 20;
 
-        // All active listens, keyed by (itemID, handle) for fast removal
+        /// <summary>
+        /// [InWorldz.Phlox] MaxListenEventsPerSecond: listen events past this many in one second are dropped for that
+        /// script; 0 or below delivers them all, as Halcyon's and YEngine's WorldCommModule do (SL documents no
+        /// per-script listen rate). The default keeps the 20 per second Phlox has always applied.
+        /// </summary>
+        public int MaxListenEventsPerSecond { get; set; } = DefaultMaxListenEventsPerSecond;
+
+        // Per-script listen delivery count in the current one-second window, and whether that window's drops were logged.
+        private readonly Dictionary<UUID, (int Count, long WindowStart, bool Logged)> m_RateTracker = new();
+
+        /// <summary>Listen events dropped by the rate cap, and the log lines that reported them (tests).</summary>
+        internal long DroppedListenEvents;
+        internal long RateLimitLogLines;
+
+        // All listens, keyed by (itemID, handle) for removal, and by channel for delivery: a line of chat looks only
+        // at the listens on its channel instead of every listen in the region.
         private readonly Dictionary<UUID, Dictionary<int, ListenEntry>> m_ByItem = new();
+        private readonly Dictionary<int, List<ListenEntry>> m_ByChannel = new();
 
         /// <summary>
         /// The most listens one script may hold, active or switched off, with no [LL-Functions] max_listens_per_script:
@@ -119,10 +133,6 @@ namespace Phlox.ScriptEngine
             return (perScript, perRegion);
         }
 
-        // Next handle value (per-script counter would be cleaner but a global
-        // int is fine for thousands of scripts — wraps around after 2^31)
-        private int m_NextHandle = 1;
-
         // Where listeners are, to measure chat range from. Null only in a manager built without a scene.
         private readonly Scene m_Scene;
 
@@ -154,6 +164,8 @@ namespace Phlox.ScriptEngine
                                   int maxListensPerScript, int maxListensPerRegion)
         {
             MaxListensPerScript = maxListensPerScript < 1 ? int.MaxValue : maxListensPerScript;
+            MaxListenEventsPerSecond = scheduler?.EngineConfig?.GetInt("MaxListenEventsPerSecond", DefaultMaxListenEventsPerSecond)
+                                       ?? DefaultMaxListenEventsPerSecond;
             MaxListensPerRegion = Math.Max(maxListensPerRegion < 1 ? int.MaxValue : maxListensPerRegion, MaxListensPerScript);
             m_Scheduler = scheduler;
             m_Scene = scene;
@@ -206,8 +218,11 @@ namespace Phlox.ScriptEngine
                     return -1;
                 }
 
-                int handle = m_NextHandle++;
-                if (m_NextHandle <= 0) m_NextHandle = 1; // wrap
+                // Each script numbers its own listens: the lowest handle it does not hold, from 1 (0 is never a
+                // handle), as the core WorldCommModule's ListenerManager.GetNewHandle and Halcyon's do.
+                int handle = 1;
+                if (existing != null)
+                    while (existing.ContainsKey(handle)) handle++;
 
                 var entry = new ListenEntry
                 {
@@ -232,11 +247,61 @@ namespace Phlox.ScriptEngine
                 }
                 existing[handle] = entry;
                 m_ListenCount++;
+                IndexAdd(entry);
 
                 m_log.LogDebug("[PhloxListen]: Registered listen handle {0} ch={1} item={2}",
                     handle, channel, itemID);
                 return handle;
             }
+        }
+
+        /// <summary>
+        /// A restored script's saved listen, registered again with the handle the script holds (Halcyon Relisten).
+        /// Returns that handle, or -1 when the handle is taken or a cap is full.
+        /// </summary>
+        public int Restore(uint localID, UUID itemID, UUID hostID, int handle,
+                           int channel, string name, UUID key, string msg)
+        {
+            name ??= string.Empty;
+            msg ??= string.Empty;
+            if (handle <= 0) return -1;
+            lock (m_Lock)
+            {
+                m_ByItem.TryGetValue(itemID, out var existing);
+                if (existing != null && (existing.ContainsKey(handle) || existing.Count >= MaxListensPerScript)) return -1;
+                if (m_ListenCount >= MaxListensPerRegion) return -1;
+                var entry = new ListenEntry
+                {
+                    Handle = handle, LocalID = localID, ItemID = itemID, HostID = hostID, Channel = channel,
+                    FilterName = name, FilterKey = key, FilterMsg = msg, Active = true
+                };
+                if (existing == null) m_ByItem[itemID] = existing = new Dictionary<int, ListenEntry>();
+                existing[handle] = entry;
+                m_ListenCount++;
+                IndexAdd(entry);
+                return handle;
+            }
+        }
+
+        private void IndexAdd(ListenEntry entry)
+        {
+            if (!m_ByChannel.TryGetValue(entry.Channel, out var list))
+                m_ByChannel[entry.Channel] = list = new List<ListenEntry>();
+            list.Add(entry);
+        }
+
+        private void IndexRemove(ListenEntry entry)
+        {
+            if (!m_ByChannel.TryGetValue(entry.Channel, out var list)) return;
+            list.Remove(entry);
+            if (list.Count == 0) m_ByChannel.Remove(entry.Channel);
+        }
+
+        private void RemoveAllOf(UUID itemID)
+        {
+            if (!m_ByItem.Remove(itemID, out var byHandle)) return;
+            m_ListenCount -= byHandle.Count;
+            foreach (var entry in byHandle.Values) IndexRemove(entry);
         }
 
         // ── Called from llListenControl ────────────────────────────────────────
@@ -270,7 +335,7 @@ namespace Phlox.ScriptEngine
             {
                 if (m_ByItem.TryGetValue(itemID, out var byHandle))
                 {
-                    if (byHandle.Remove(handle)) m_ListenCount--;
+                    if (byHandle.Remove(handle, out var entry)) { m_ListenCount--; IndexRemove(entry); }
                     if (byHandle.Count == 0)
                         m_ByItem.Remove(itemID);
                 }
@@ -282,7 +347,7 @@ namespace Phlox.ScriptEngine
         {
             lock (m_Lock)
             {
-                if (m_ByItem.Remove(itemID, out var byHandle)) m_ListenCount -= byHandle.Count;
+                RemoveAllOf(itemID);
             }
         }
 
@@ -291,8 +356,20 @@ namespace Phlox.ScriptEngine
         {
             lock (m_Lock)
             {
-                if (m_ByItem.Remove(itemID, out var byHandle)) m_ListenCount -= byHandle.Count;
+                RemoveAllOf(itemID);
                 m_RateTracker.Remove(itemID);
+            }
+        }
+
+        /// <summary>How many listens this script holds on a channel (tests).</summary>
+        internal int ListensOnChannel(UUID itemID, int channel)
+        {
+            lock (m_Lock)
+            {
+                if (!m_ByItem.TryGetValue(itemID, out var byHandle)) return 0;
+                int n = 0;
+                foreach (var entry in byHandle.Values) if (entry.Channel == channel) n++;
+                return n;
             }
         }
 
@@ -371,10 +448,8 @@ namespace Phlox.ScriptEngine
             List<ListenEntry> candidates;
             lock (m_Lock)
             {
-                candidates = new List<ListenEntry>();
-                foreach (var byHandle in m_ByItem.Values)
-                    foreach (var entry in byHandle.Values)
-                        candidates.Add(entry);
+                candidates = m_ByChannel.TryGetValue(channel, out var onChannel)
+                    ? new List<ListenEntry>(onChannel) : new List<ListenEntry>();
             }
 
             foreach (var entry in candidates)
@@ -488,30 +563,32 @@ namespace Phlox.ScriptEngine
 
         private bool IsRateLimited(UUID itemID)
         {
+            int cap = MaxListenEventsPerSecond;
+            if (cap <= 0) return false;
             long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             lock (m_Lock)
             {
-                if (m_RateTracker.TryGetValue(itemID, out var entry))
+                if (m_RateTracker.TryGetValue(itemID, out var entry) && entry.WindowStart == now)
                 {
-                    if (entry.WindowStart == now)
+                    if (entry.Count >= cap)
                     {
-                        if (entry.Count >= MAX_LISTENS_PER_SECOND)
+                        DroppedListenEvents++;
+                        if (!entry.Logged)
                         {
-                            m_log.LogWarning("[PhloxListen]: Rate limit hit for script {0} ({1}/s), dropping listen event",
-                                itemID, entry.Count);
-                            return true;
+                            // One line per script per one-second window, not one per dropped event.
+                            RateLimitLogLines++;
+                            m_RateTracker[itemID] = (entry.Count, now, true);
+                            m_log.LogWarning("[PhloxListen]: script {0} heard more than {1} listen events this second; the rest of this second's are dropped ([InWorldz.Phlox] MaxListenEventsPerSecond)",
+                                itemID, cap);
                         }
-                        m_RateTracker[itemID] = (entry.Count + 1, now);
+                        return true;
                     }
-                    else
-                    {
-                        // New second — reset counter
-                        m_RateTracker[itemID] = (1, now);
-                    }
+                    m_RateTracker[itemID] = (entry.Count + 1, now, entry.Logged);
                 }
                 else
                 {
-                    m_RateTracker[itemID] = (1, now);
+                    // A new second: the count starts again
+                    m_RateTracker[itemID] = (1, now, false);
                 }
             }
             return false;

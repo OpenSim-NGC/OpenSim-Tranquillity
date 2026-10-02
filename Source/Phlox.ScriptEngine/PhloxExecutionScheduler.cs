@@ -241,7 +241,10 @@ namespace Phlox.ScriptEngine
                     }
                     catch (Exception e)
                     {
+                        // Read but not restorable: bad data, not a busy database. Moved aside, and the script starts
+                        // fresh, as Halcyon and YEngine reset a script whose state cannot be loaded.
                         m_log.LogWarning("[PhloxExe]: State restore failed for {0}: {1}", req.ItemID, e.Message);
+                        m_Engine.StateManager?.RejectRow(req.ItemID, "the saved state does not restore: " + e.Message);
                         interp = new Interpreter(compiled, shim);
                         freshStart = true;
                     }
@@ -262,7 +265,10 @@ namespace Phlox.ScriptEngine
             }
 
             interp.OnStateChg += OnStateChange;
-            interp.ScriptState.StartParameter = req.StartParam;
+            // A rez gives the script its start parameter; a region start or a crossing carries none, and a restored
+            // script keeps the one it was saved with (Halcyon FinishedLoading: only when the load has a StartParam).
+            if (freshStart || req.PostOnRez)
+                interp.ScriptState.StartParameter = req.StartParam;
             interp.HostLocalId = req.Prim.LocalId;
 
             lock (m_AllScriptsLock)
@@ -323,13 +329,18 @@ namespace Phlox.ScriptEngine
                 // The flush loop and StateManager.Stop() at shutdown save whatever is dirty (ScriptUnloaded
                 // is the OnRemoveScript path, not shutdown), so a script mid-llSleep when the
                 // region stopped was saved in exactly the state that never resumed.
+                // A script saved stopped (its Running flag off, or crashed) is restored frozen, as Halcyon's
+                // InjectScript did only `if (interp.ScriptState.Enabled)`: nothing goes on the run queue or the
+                // sleep heap and its timer is not armed. Its RunState, frame and timer's time left are kept for
+                // StartAfterStop, which carries on from them when Running is ticked.
+                bool enabled = interp.ScriptState.Enabled;
                 var restoredRunState = interp.ScriptState.RunState;
                 switch (restoredRunState)
                 {
                     case RuntimeState.Status.Running:
                         // Mid-event with time left on the clock. Put it back on the run
                         // queue and it continues from its own TopFrame.
-                        AddToRunQueue(interp);
+                        if (enabled) AddToRunQueue(interp);
                         break;
 
                     case RuntimeState.Status.Sleeping:
@@ -343,15 +354,16 @@ namespace Phlox.ScriptEngine
                         // Waiting, so the script never resumed. The dispatch is
                         // on RunState ONLY; LastSyscallIndex is read inside the Syscall arm and
                         // nowhere else, whatever value it holds.
-                        TrackSleep(interp, interp.ScriptState.NextWakeup);
+                        if (enabled) TrackSleep(interp, interp.ScriptState.NextWakeup);
                         break;
 
                     case RuntimeState.Status.Syscall:
                         // A syscall in flight when the region stopped has NO completion
                         // coming - whatever was going to call SysReturn died with the old process. So
                         // the only way back is to supply the return value ourselves, which is what
-                        // LastSyscallIndex is persisted for.
-                        ResumeFromSyscall(interp, req.ItemID);
+                        // LastSyscallIndex is persisted for. A stopped script gets the value now and
+                        // waits as Running for its start.
+                        ResumeFromSyscall(interp, req.ItemID, enabled);
                         break;
 
                     default:
@@ -374,7 +386,7 @@ namespace Phlox.ScriptEngine
                 // queue is drained by TransitionToWait - which runs only for a script already on the
                 // run queue. A restored script is on neither, so without this the queued events sit
                 // there for ever.
-                if (interp.ScriptState.RunState == RuntimeState.Status.Waiting)
+                if (enabled && interp.ScriptState.RunState == RuntimeState.Status.Waiting)
                 {
                     bool hasQueued;
                     lock (interp.ScriptState.EventQueueLock)
@@ -383,47 +395,41 @@ namespace Phlox.ScriptEngine
                         DeliverNextQueuedEvent(interp);
                 }
 
-                // Re-register timer if the script had one running
+                // The timer keeps its phase: the next timer() comes after what was left of the interval when the
+                // state was captured, at once if that had run out (Halcyon InjectScript). A stopped script keeps
+                // that time for its start.
                 if (interp.ScriptState.TimerInterval > 0)
                 {
-                    ulong readyOn = InWorldz.Phlox.Util.Clock.Now + (ulong)interp.ScriptState.TimerInterval;
-                    TrackTimer(interp, readyOn, true);
+                    ulong left = RestoredTimerLeft(interp.ScriptState);
+                    if (enabled) ResumeTimerWithTimeLeft(interp, left);
+                    else m_StoppedTimerLeft[req.ItemID] = left;
                 }
 
-                // Re-register active listens with the world comm system
-                if (interp.ScriptState.ActiveListens != null && interp.ScriptState.ActiveListens.Count > 0)
+                // The listens the script held come back through this engine's listen manager with the handles the
+                // script was given (Halcyon OnScriptInjected -> Relisten). A stopped script keeps them registered,
+                // as a stop leaves them; what they hear is dropped until it starts.
+                RestoreListens(interp, req);
+
+                if (enabled)
                 {
-                    foreach (var kvp in interp.ScriptState.ActiveListens)
-                    {
-                        var listen = kvp.Value;
-                        UUID filterKey = UUID.Zero;
-                        if (!string.IsNullOrEmpty(listen.Key))
-                            UUID.TryParse(listen.Key, out filterKey);
-                        m_WorldComm.Listen(
-                            req.ItemID,
-                            req.Prim.UUID,
-                            listen.Channel,
-                            listen.Name ?? string.Empty,
-                            filterKey,
-                            listen.Message ?? string.Empty);
-                    }
+                    bool fromCrossing = req.StateSource == (int)StateSource.PrimCrossing;
+                    interp.OnScriptInjected(fromCrossing);
                 }
+            }
 
-                bool fromCrossing = req.StateSource == (int)StateSource.PrimCrossing;
-                interp.OnScriptInjected(fromCrossing);
-
-                if (req.StateSource == (int)StateSource.RegionStart &&
-                    interp.Script.FindEvent(interp.ScriptState.LSLState,
-                        (int)SupportedEventList.Events.CHANGED) != null)
+            // The start-up events, in SL's order: state_entry (a fresh script, posted above) or the restored queue,
+            // then on_rez ("on_rez will be triggered prior to attach when attaching from inventory or during
+            // login"), then attach, then changed(CHANGED_REGION_START) for every script started by the region's start,
+            // fresh or restored (YEngine XMRInstCtor posts them in this order; Halcyon posts on_rez, then changed).
+            // An attachment worn from inventory gets attach from here only: the core starts its scripts with
+            // AttachedRez and raises no OnAttach for it (AttachmentsModule.AttachObjectInternal).
+            if (req.PostOnRez)
+            {
+                PostEvent(req.ItemID, new PostedEvent
                 {
-                    const int CHANGED_REGION_START = 0x400;
-                    PostEvent(req.ItemID, new PostedEvent
-                    {
-                        EventType = SupportedEventList.Events.CHANGED,
-                        Args = new object[] { CHANGED_REGION_START }
-                    });
-                }
-
+                    EventType = SupportedEventList.Events.ON_REZ,
+                    Args = new object[] { interp.ScriptState.StartParameter }
+                });
             }
 
             if (req.StateSource == (int)StateSource.AttachedRez &&
@@ -438,12 +444,15 @@ namespace Phlox.ScriptEngine
                 });
             }
 
-            if (req.PostOnRez)
+            if (req.StateSource == (int)StateSource.RegionStart &&
+                interp.Script.FindEvent(interp.ScriptState.LSLState,
+                    (int)SupportedEventList.Events.CHANGED) != null)
             {
+                const int CHANGED_REGION_START = 0x400;
                 PostEvent(req.ItemID, new PostedEvent
                 {
-                    EventType = SupportedEventList.Events.ON_REZ,
-                    Args = new object[] { req.StartParam }
+                    EventType = SupportedEventList.Events.CHANGED,
+                    Args = new object[] { CHANGED_REGION_START }
                 });
             }
 
@@ -581,7 +590,10 @@ namespace Phlox.ScriptEngine
         public bool GetScriptRunning(UUID itemId)
         {
             Interpreter script;
-            if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
+            // Asked from region threads (the viewer's Running box, llGetScriptState) while this thread adds and
+            // removes scripts: the read takes the lock the writes take.
+            lock (m_AllScriptsLock)
+                if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
             var st = script.ScriptState;
             return st.GeneralEnable && (st.LocalDisable & ~RuntimeState.LocalDisableFlag.Parcel) == RuntimeState.LocalDisableFlag.None;
         }
@@ -600,10 +612,14 @@ namespace Phlox.ScriptEngine
             lock (m_AllScriptsLock) return m_AllScripts.ContainsKey(itemId);
         }
 
+        /// <summary>Safe from any thread: takes the lock this thread's adds and removes take.</summary>
         public Interpreter FindScript(UUID itemId)
         {
-            m_AllScripts.TryGetValue(itemId, out var s);
-            return s;
+            lock (m_AllScriptsLock)
+            {
+                m_AllScripts.TryGetValue(itemId, out var s);
+                return s;
+            }
         }
 
         // Per-script stats snapshot for the estate Top Scripts report. Taken under the
@@ -885,6 +901,7 @@ namespace Phlox.ScriptEngine
             Interpreter script;
             if (!m_AllScripts.TryGetValue(itemId, out script)) return;
 
+            bool itemLeftPrim = ItemLeftItsPrim(itemId);
             RemoveFromRunQueue(itemId);
             m_Suspended.Remove(itemId);
             UnregisterFromNotifications(script);
@@ -892,7 +909,10 @@ namespace Phlox.ScriptEngine
             // abort the unload and keep the script (and everything it held) loaded for the life of the region.
             try { script.OnUnload(ScriptUnloadReason.Unloaded, RuntimeState.LocalDisableFlag.None); }
             catch (Exception e) { m_log.LogError(e, "[PhloxExe]: unload hook of {0} failed; unloading it anyway", itemId); }
-            m_Engine.StateManager?.ScriptUnloaded(script);
+            // The row stays until state travels with objects (a derez, take or crossing may bring the item back with the
+            // same id), except when the item itself left a prim that is still here: that row can never be restored.
+            if (itemLeftPrim) m_Engine.StateManager?.QueueUnloadDelete(itemId);
+            else m_Engine.StateManager?.QueueUnloadSave(script);
             lock (m_AllScriptsLock)
             {
                 m_AllScripts.Remove(itemId);
@@ -902,15 +922,46 @@ namespace Phlox.ScriptEngine
             m_ControlsExempt.Remove(itemId);
         }
 
+        /// <summary>
+        /// The script item was taken out of its prim's inventory (deleted, moved, given away) and the prim is still in the
+        /// scene: the core removes the item before it raises OnRemoveScript (SceneObjectPartInventory.RemoveInventoryItem).
+        /// A derez or crossing leaves the item where it is, in a group that is being deleted.
+        /// </summary>
+        private bool ItemLeftItsPrim(UUID itemId)
+        {
+            if (!m_Apis.TryGetValue(itemId, out LSLSystemAPI api)) return false;
+            SceneObjectPart part = api.HostPart;
+            SceneObjectGroup group = part?.ParentGroup;
+            if (group == null || group.IsDeleted || part.Inventory == null) return false;
+            return part.Inventory.GetInventoryItem(itemId) == null;
+        }
+
         // ── Main work loop ─────────────────────────────────────────────────────
 
         /// <summary>The managed thread id of whoever last drove DoWork - the script thread.
         /// A region-side wait on a script event must never block this thread.</summary>
         public int WorkerThreadId { get; private set; } = -1;
 
+        private StateManager m_AttachedStateManager;
+
+        /// <summary>The engine's [InWorldz.Phlox] section, for the parts built with this scheduler (the listen manager).</summary>
+        internal Nini.Config.IConfig EngineConfig => m_Engine?.Config;
+
         public WorkStatus DoWork()
         {
             WorkerThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            // Script state is captured here, between timeslices, when the state thread asks for it (Halcyon
+            // ExecutionScheduler.RequestStateData); the state thread only writes what it is handed.
+            var stateManager = m_Engine?.StateManager;
+            if (stateManager != null)
+            {
+                if (!ReferenceEquals(m_AttachedStateManager, stateManager))
+                {
+                    stateManager.AttachScheduler(() => m_WorkArrived?.Invoke());
+                    m_AttachedStateManager = stateManager;
+                }
+                stateManager.CaptureRequestedStates();
+            }
             CheckSleepingScripts();
             ProcessEventQueue();
             ExpireDeferredEvents();
@@ -960,6 +1011,7 @@ namespace Phlox.ScriptEngine
             {
                 var followingScript = m_NextScript.Next;
                 var currentNode = m_NextScript;
+                var current = currentNode.Value;
                 int ticks = 0;
                 bool terminated = false;
 
@@ -993,6 +1045,11 @@ namespace Phlox.ScriptEngine
                     if (terminated || CheckRunstateChange()) break;
                 }
                 m_SliceWatch.Stop();
+
+                // Every timeslice marks the script for saving (Halcyon RunNextScript: "tell our state manager that we
+                // changed"), so one in a long loop, an llSleep or a blocking call is saved as it is now. A crash marked
+                // itself in TerminateWithError.
+                if (!terminated) m_Engine?.StateManager?.ScriptChanged(current);
 
                 // Guard against null after termination/removal
 			if (!terminated && m_NextScript != null && m_NextScript == currentNode)
@@ -1762,6 +1819,9 @@ namespace Phlox.ScriptEngine
         {
             UnregisterFromNotifications(script);
             script.ScriptState.StateChangePrep();
+            // SL state: "All listens are released". The API drops them from the listen manager; the saved record goes
+            // with them, so a restore cannot bring back a listen of the state the script left.
+            script.ScriptState.ActiveListens?.Clear();
 
             lock (m_PendingEvents)
             {
@@ -1944,7 +2004,7 @@ namespace Phlox.ScriptEngine
         /// no way to know what value to push - so it falls back to the old behaviour and says so.
         /// </para>
         /// </summary>
-        private void ResumeFromSyscall(Interpreter interp, UUID itemId)
+        private void ResumeFromSyscall(Interpreter interp, UUID itemId, bool enqueue)
         {
             int index = interp.ScriptState.LastSyscallIndex;
             // FunctionSig is a struct, so "not found" needs its own flag.
@@ -1974,8 +2034,49 @@ namespace Phlox.ScriptEngine
                 "[PhloxExe]: {Item} was saved inside {Function}; resuming with that call's default return value",
                 itemId, sig.FunctionName);
 
-            AddToRunQueue(interp);
+            if (enqueue) AddToRunQueue(interp);
+            else interp.ScriptState.RunState = RuntimeState.Status.Running;   // stopped: StartAfterStop queues it
         }
+
+        /// <summary>
+        /// Milliseconds the restored timer had left: the interval less the time it had already waited when the state
+        /// was captured (Halcyon InjectScript: TimerInterval - (StateCapturedOn - TimerLastScheduledOn)), never below
+        /// 0 or above the interval. ToRuntimeState put both times on this run's clock. A row with no schedule time
+        /// gets the whole interval.
+        /// </summary>
+        private static ulong RestoredTimerLeft(RuntimeState st)
+        {
+            ulong interval = (ulong)st.TimerInterval;
+            if (st.TimerLastScheduledOn == 0 || st.StateCapturedOn == 0) return interval;
+            long waited = (long)st.StateCapturedOn - (long)st.TimerLastScheduledOn;
+            if (waited <= 0) return interval;
+            return (ulong)waited >= interval ? 0 : interval - (ulong)waited;
+        }
+
+        /// <summary>
+        /// Register the restored script's saved listens again, each with its own handle. A listen the manager cannot
+        /// take back (the region's cap is full) is dropped from the state too, so the script's handles stay true.
+        /// </summary>
+        private void RestoreListens(Interpreter interp, PhloxLoadRequest req)
+        {
+            var saved = interp.ScriptState.ActiveListens;
+            if (saved == null || saved.Count == 0) return;
+            var listens = m_Engine?.ListenManager;
+            foreach (var kvp in new List<KeyValuePair<int, ActiveListen>>(saved))
+            {
+                var l = kvp.Value;
+                if (l == null) { saved.Remove(kvp.Key); continue; }
+                UUID filterKey = UUID.Zero;
+                if (!string.IsNullOrEmpty(l.Key)) UUID.TryParse(l.Key, out filterKey);
+                int got = listens?.Restore(req.Prim.LocalId, req.ItemID, req.Prim.UUID, l.Handle, l.Channel,
+                    l.Name ?? string.Empty, filterKey, l.Message ?? string.Empty) ?? -1;
+                if (got != l.Handle) saved.Remove(kvp.Key);
+            }
+        }
+
+        /// <summary>Test seam: when the script's timer wakes next, on the engine clock; null with no timer armed.</summary>
+        internal ulong? TimerReadyOn(UUID itemId)
+            => m_TimerHandles.TryGetValue(itemId, out var h) ? m_SleepHeap[h].ReadyOn : (ulong?)null;
 
         /// <summary>The value an interrupted call of this return type contributes.</summary>
         private static object DefaultValueFor(InWorldz.Phlox.Types.VarType type)

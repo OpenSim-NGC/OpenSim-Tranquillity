@@ -4312,10 +4312,19 @@ namespace Phlox.ScriptEngine
             if (m_ScriptEngine.ListenManager == null) { Stub("llListen (no ListenManager)"); return -1; }
             UUID filterKey = UUID.Zero;
             UUID.TryParse(id, out filterKey);
-            return m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channel, name, filterKey, msg);
+            int handle = m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channel, name, filterKey, msg);
+            // Kept in the script's state, so a restore registers the listen again with this handle (Halcyon llListen:
+            // ScriptState.AddActiveListen).
+            if (handle > 0)
+                m_thisScript?.ScriptState?.AddActiveListen(new ActiveListen { Handle = handle, Channel = channel, Name = name, Key = id, Message = msg });
+            return handle;
         }
         public void llListenControl(int number, int active) { m_ScriptEngine.ListenManager?.SetActive(m_itemID, number, active != 0); }
-        public void llListenRemove(int number) { m_ScriptEngine.ListenManager?.Remove(m_itemID, number); }
+        public void llListenRemove(int number)
+        {
+            m_ScriptEngine.ListenManager?.Remove(m_itemID, number);
+            m_thisScript?.ScriptState?.RemoveListen(number);
+        }
 
         // ── Inventory ──────────────────────────────────────────────────────────
 
