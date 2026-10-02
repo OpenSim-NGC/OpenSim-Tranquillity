@@ -215,9 +215,11 @@ namespace Phlox.ScriptEngine
             try
             {
                 InWorldz.Phlox.Serialization.SerializedRuntimeState savedState = null;
+                bool carried = false;
                 try
                 {
-                    savedState = m_Engine.StateManager?.LoadState(req.ItemID, compiled.AssetId);
+                    if (m_Engine.StateManager != null)
+                        savedState = m_Engine.StateManager.LoadState(req.ItemID, compiled.AssetId, out carried);
                 }
                 catch (StateLoadFailedException e)
                 {
@@ -231,13 +233,38 @@ namespace Phlox.ScriptEngine
                 {
                     try
                     {
-                        // A state saved mid-event on bytecode that has since been recompiled
-                        // comes back idle, with its globals, queue and timers.
-                        var restoredRuntimeState = savedState.ToRuntimeStateFor(compiled, req.ItemID, out string recompiledNote);
-                        if (recompiledNote != null) m_log.LogInformation(recompiledNote);
-                        interp = new Interpreter(compiled, restoredRuntimeState, shim);
-                        freshStart = false;
-                        m_log.LogDebug("[PhloxExe]: Restored state for {0}", req.ItemID);
+                        // State that came with the object is input from outside this simulator: it must fit the
+                        // compiled script before anything is built from it, and again once it is.
+                        string misfit = carried ? RestoredStateFit.CheckSerialized(savedState) : null;
+                        RuntimeState restoredRuntimeState = null;
+                        string recompiledNote = null;
+                        if (misfit == null)
+                        {
+                            // A state saved mid-event on bytecode that has since been recompiled
+                            // comes back idle, with its globals, queue and timers.
+                            restoredRuntimeState = savedState.ToRuntimeStateFor(compiled, req.ItemID, out recompiledNote);
+                            if (carried) misfit = RestoredStateFit.Check(restoredRuntimeState, compiled) ?? FitCarriedStateHere(restoredRuntimeState);
+                        }
+                        if (misfit != null)
+                        {
+                            m_log.LogWarning("[PhloxExe]: The state {0} brought with its object does not fit its script ({1}); it starts fresh", req.ItemID, misfit);
+                            interp = new Interpreter(compiled, shim);
+                            freshStart = true;
+                        }
+                        else
+                        {
+                            if (recompiledNote != null) m_log.LogInformation(recompiledNote);
+                            interp = new Interpreter(compiled, restoredRuntimeState, shim);
+                            freshStart = false;
+                            m_log.LogDebug("[PhloxExe]: Restored state for {0}", req.ItemID);
+                        }
+                    }
+                    catch (Exception e) when (carried)
+                    {
+                        // Carried state came with the object, so there is no row of ours to move aside.
+                        m_log.LogWarning("[PhloxExe]: The state {0} brought with its object does not restore; it starts fresh: {1}", req.ItemID, e.Message);
+                        interp = new Interpreter(compiled, shim);
+                        freshStart = true;
                     }
                     catch (Exception e)
                     {
@@ -316,106 +343,115 @@ namespace Phlox.ScriptEngine
             }
            else
             {
-                // Resume where the script stopped, instead of forcing Waiting.
-                //
-                // The saved state carries RunState, Calls, TopFrame, RunningEvent, EventQueue and a
-                // relative NextWakeup, and all of it used to be restored and then thrown away by an
-                // unconditional `RunState = Waiting`. Nothing re-armed a sleep and nothing put a
-                // running script back on the run queue, so an interrupted handler simply never
-                // finished. Worse than never: the stale frame stays on the stack, so the next
-                // unrelated event pushes on top of it (RuntimeState.cs:335-336) and the interrupted
-                // handler resumes NESTED inside the new event, after it.
-                //
-                // The flush loop and StateManager.Stop() at shutdown save whatever is dirty (ScriptUnloaded
-                // is the OnRemoveScript path, not shutdown), so a script mid-llSleep when the
-                // region stopped was saved in exactly the state that never resumed.
-                // A script saved stopped (its Running flag off, or crashed) is restored frozen, as Halcyon's
-                // InjectScript did only `if (interp.ScriptState.Enabled)`: nothing goes on the run queue or the
-                // sleep heap and its timer is not armed. Its RunState, frame and timer's time left are kept for
-                // StartAfterStop, which carries on from them when Running is ticked.
-                // The records of grants the script used are kept only while its item holds the grants.
-                sysApi.DropGrantRecordsWithoutGrant();
-                bool enabled = interp.ScriptState.Enabled;
-                var restoredRunState = interp.ScriptState.RunState;
-                switch (restoredRunState)
+                // Restored values decide what runs next; an exception from them stops this one script with its usual
+                // error, and never reaches the loader or the scheduler loop.
+                try
                 {
-                    case RuntimeState.Status.Running:
-                        // Mid-event with time left on the clock. Put it back on the run
-                        // queue and it continues from its own TopFrame.
-                        if (enabled) AddToRunQueue(interp);
-                        break;
+                    sysApi.DropGrantRecordsWithoutGrant();
+                    // Resume where the script stopped, instead of forcing Waiting.
+                    //
+                    // The saved state carries RunState, Calls, TopFrame, RunningEvent, EventQueue and a
+                    // relative NextWakeup, and all of it used to be restored and then thrown away by an
+                    // unconditional `RunState = Waiting`. Nothing re-armed a sleep and nothing put a
+                    // running script back on the run queue, so an interrupted handler simply never
+                    // finished. Worse than never: the stale frame stays on the stack, so the next
+                    // unrelated event pushes on top of it (RuntimeState.cs:335-336) and the interrupted
+                    // handler resumes NESTED inside the new event, after it.
+                    //
+                    // The flush loop and StateManager.Stop() at shutdown save whatever is dirty (ScriptUnloaded
+                    // is the OnRemoveScript path, not shutdown), so a script mid-llSleep when the
+                    // region stopped was saved in exactly the state that never resumed.
+                    // A script saved stopped (its Running flag off, or crashed) is restored frozen, as Halcyon's
+                    // InjectScript did only `if (interp.ScriptState.Enabled)`: nothing goes on the run queue or the
+                    // sleep heap and its timer is not armed. Its RunState, frame and timer's time left are kept for
+                    // StartAfterStop, which carries on from them when Running is ticked.
+                    bool enabled = interp.ScriptState.Enabled;
+                    var restoredRunState = interp.ScriptState.RunState;
+                    switch (restoredRunState)
+                    {
+                        case RuntimeState.Status.Running:
+                            // Mid-event with time left on the clock. Put it back on the run
+                            // queue and it continues from its own TopFrame.
+                            if (enabled) AddToRunQueue(interp);
+                            break;
 
-                    case RuntimeState.Status.Sleeping:
-                        // NextWakeup was already restored relative to now by
-                        // SerializedRuntimeState.ToRuntimeState, so it is a tick value on this run's
-                        // basis and can be tracked directly.
-                        //
-                        // This arm was once DELETED by an edit - the Running block was
-                        // replaced by slicing from `case Running` to `case Syscall`, and Sleeping sat
-                        // between them. A sleeping script then fell to `default` and was restored
-                        // Waiting, so the script never resumed. The dispatch is
-                        // on RunState ONLY; LastSyscallIndex is read inside the Syscall arm and
-                        // nowhere else, whatever value it holds.
-                        if (enabled) TrackSleep(interp, interp.ScriptState.NextWakeup);
-                        break;
+                        case RuntimeState.Status.Sleeping:
+                            // NextWakeup was already restored relative to now by
+                            // SerializedRuntimeState.ToRuntimeState, so it is a tick value on this run's
+                            // basis and can be tracked directly.
+                            //
+                            // This arm was once DELETED by an edit - the Running block was
+                            // replaced by slicing from `case Running` to `case Syscall`, and Sleeping sat
+                            // between them. A sleeping script then fell to `default` and was restored
+                            // Waiting, so the script never resumed. The dispatch is
+                            // on RunState ONLY; LastSyscallIndex is read inside the Syscall arm and
+                            // nowhere else, whatever value it holds.
+                            if (enabled) TrackSleep(interp, interp.ScriptState.NextWakeup);
+                            break;
 
-                    case RuntimeState.Status.Syscall:
-                        // A syscall in flight when the region stopped has NO completion
-                        // coming - whatever was going to call SysReturn died with the old process. So
-                        // the only way back is to supply the return value ourselves, which is what
-                        // LastSyscallIndex is persisted for. A stopped script gets the value now and
-                        // waits as Running for its start.
-                        ResumeFromSyscall(interp, req.ItemID, enabled);
-                        break;
+                        case RuntimeState.Status.Syscall:
+                            // A syscall in flight when the region stopped has NO completion
+                            // coming - whatever was going to call SysReturn died with the old process. So
+                            // the only way back is to supply the return value ourselves, which is what
+                            // LastSyscallIndex is persisted for. A stopped script gets the value now and
+                            // waits as Running for its start.
+                            ResumeFromSyscall(interp, req.ItemID, enabled);
+                            break;
 
-                    default:
-                        interp.ScriptState.RunState = RuntimeState.Status.Waiting;
-                        break;
+                        default:
+                            interp.ScriptState.RunState = RuntimeState.Status.Waiting;
+                            break;
+                    }
+
+                    if (!interp.ScriptState.GeneralEnable)
+                    {
+                        // The row says stopped (a crash, or the checkbox) but the item came out of the region DB
+                        // with its Running flag at the default, true - the DB never stores it. Push it off so the viewer's
+                        // checkbox and `phlox status` agree with the state, and say why, as "loaded STOPPED" does.
+                        m_Engine.SetItemRunningFlag(req.Prim.LocalId, req.ItemID, false);
+                        m_log.LogInformation("[PhloxExe]: {0} restored STOPPED ({1}); no run until reset or Running is ticked",
+                            req.ItemID, interp.ScriptState.TerminatedReason != null ? "terminated: " + interp.ScriptState.TerminatedReason : "Running flag off");
+                    }
+
+                    // A script saved while Waiting can still hold events on its OWN queue
+                    // (ScriptState.EventQueue). ProcessEventQueue reads only m_PendingEvents, and that
+                    // queue is drained by TransitionToWait - which runs only for a script already on the
+                    // run queue. A restored script is on neither, so without this the queued events sit
+                    // there for ever.
+                    if (enabled && interp.ScriptState.RunState == RuntimeState.Status.Waiting)
+                    {
+                        bool hasQueued;
+                        lock (interp.ScriptState.EventQueueLock)
+                            hasQueued = interp.ScriptState.EventQueue != null && interp.ScriptState.EventQueue.Count > 0;
+                        if (hasQueued)
+                            DeliverNextQueuedEvent(interp);
+                    }
+
+                    // The timer keeps its phase: the next timer() comes after what was left of the interval when the
+                    // state was captured, at once if that had run out (Halcyon InjectScript). A stopped script keeps
+                    // that time for its start.
+                    if (interp.ScriptState.TimerInterval > 0)
+                    {
+                        ulong left = RestoredTimerLeft(interp.ScriptState);
+                        if (enabled) ResumeTimerWithTimeLeft(interp, left);
+                        else m_StoppedTimerLeft[req.ItemID] = left;
+                    }
+
+                    // The listens the script held come back through this engine's listen manager with the handles the
+                    // script was given (Halcyon OnScriptInjected -> Relisten). A stopped script keeps them registered,
+                    // as a stop leaves them; what they hear is dropped until it starts.
+                    RestoreListens(interp, req);
+
+                    if (enabled)
+                    {
+                        bool fromCrossing = req.StateSource == (int)StateSource.PrimCrossing;
+                        interp.OnScriptInjected(fromCrossing);
+                    }
                 }
-
-                if (!interp.ScriptState.GeneralEnable)
+                catch (Exception e)
                 {
-                    // The row says stopped (a crash, or the checkbox) but the item came out of the region DB
-                    // with its Running flag at the default, true - the DB never stores it. Push it off so the viewer's
-                    // checkbox and `phlox status` agree with the state, and say why, as "loaded STOPPED" does.
-                    m_Engine.SetItemRunningFlag(req.Prim.LocalId, req.ItemID, false);
-                    m_log.LogInformation("[PhloxExe]: {0} restored STOPPED ({1}); no run until reset or Running is ticked",
-                        req.ItemID, interp.ScriptState.TerminatedReason != null ? "terminated: " + interp.ScriptState.TerminatedReason : "Running flag off");
-                }
-
-                // A script saved while Waiting can still hold events on its OWN queue
-                // (ScriptState.EventQueue). ProcessEventQueue reads only m_PendingEvents, and that
-                // queue is drained by TransitionToWait - which runs only for a script already on the
-                // run queue. A restored script is on neither, so without this the queued events sit
-                // there for ever.
-                if (enabled && interp.ScriptState.RunState == RuntimeState.Status.Waiting)
-                {
-                    bool hasQueued;
-                    lock (interp.ScriptState.EventQueueLock)
-                        hasQueued = interp.ScriptState.EventQueue != null && interp.ScriptState.EventQueue.Count > 0;
-                    if (hasQueued)
-                        DeliverNextQueuedEvent(interp);
-                }
-
-                // The timer keeps its phase: the next timer() comes after what was left of the interval when the
-                // state was captured, at once if that had run out (Halcyon InjectScript). A stopped script keeps
-                // that time for its start.
-                if (interp.ScriptState.TimerInterval > 0)
-                {
-                    ulong left = RestoredTimerLeft(interp.ScriptState);
-                    if (enabled) ResumeTimerWithTimeLeft(interp, left);
-                    else m_StoppedTimerLeft[req.ItemID] = left;
-                }
-
-                // The listens the script held come back through this engine's listen manager with the handles the
-                // script was given (Halcyon OnScriptInjected -> Relisten). A stopped script keeps them registered,
-                // as a stop leaves them; what they hear is dropped until it starts.
-                RestoreListens(interp, req);
-
-                if (enabled)
-                {
-                    bool fromCrossing = req.StateSource == (int)StateSource.PrimCrossing;
-                    interp.OnScriptInjected(fromCrossing);
+                    StopRestoredScript(interp, e);
+                    return;
                 }
             }
 
@@ -1145,7 +1181,7 @@ namespace Phlox.ScriptEngine
                         CheckAndResetTimer(script, info);
                         return; // stay on run queue
                     }
-                    catch (VMException e)
+                    catch (Exception e)   // not only VMException: restored values can be wrong in ways the VM does not check
                     {
                         TerminateWithError(script, e);
                         m_RunIndex.Remove(m_NextScript.Value.ItemId);
@@ -1595,7 +1631,7 @@ namespace Phlox.ScriptEngine
                     CheckAndResetTimer(script, info);
                     AddToRunQueue(script);
                 }
-                catch (VMException e)
+                catch (Exception e)   // not only VMException: restored values can be wrong in ways the VM does not check
                 {
                     TerminateWithError(script, e);
                 }
@@ -2102,7 +2138,7 @@ namespace Phlox.ScriptEngine
                 CheckAndResetTimer(script, info);
                 AddToRunQueue(script);
             }
-            catch (VMException e)
+            catch (Exception e)   // not only VMException: restored values can be wrong in ways the VM does not check
             {
                 TerminateWithError(script, e);
             }
@@ -2289,6 +2325,49 @@ namespace Phlox.ScriptEngine
         /// Register the restored script's saved listens again, each with its own handle. A listen the manager cannot
         /// take back (the region's cap is full) is dropped from the state too, so the script's handles stay true.
         /// </summary>
+        /// <summary>
+        /// The limits a running script is held to, applied to state that came with its object: the timer as
+        /// llSetTimerEvent sets it (none below 0, the region's MinTimerInterval floor), the event delay as llMinEventDelay
+        /// sets it, and the records OnScriptInjected acts on in the shapes the script's own calls write them. Listens are
+        /// held to the listen caps when they are registered again (PhloxListenManager.Restore). Null when it fits.
+        /// </summary>
+        private string FitCarriedStateHere(RuntimeState st)
+        {
+            if (st.TimerInterval < 0) st.TimerInterval = 0;
+            int floorMs = (int)((m_Engine?.MinTimerInterval ?? 0f) * 1000f);
+            if (st.TimerInterval > 0 && st.TimerInterval < floorMs) st.TimerInterval = floorMs;
+            if (st.MinEventDelayMs < 0) st.MinEventDelayMs = 0;
+
+            if (st.MiscAttributes == null) return null;
+            foreach (var kvp in new List<KeyValuePair<int, object[]>>(st.MiscAttributes))
+            {
+                object[] v = kvp.Value;
+                bool fits = (RuntimeState.MiscAttr)kvp.Key switch
+                {
+                    RuntimeState.MiscAttr.VolumeDetect or RuntimeState.MiscAttr.SilentEstateManagement
+                        => v != null && v.Length == 1 && v[0] is int,
+                    RuntimeState.MiscAttr.Control
+                        => v != null && v.Length == 3 && v[0] is int && v[1] is int && v[2] is int,
+                    RuntimeState.MiscAttr.SensorRepeat
+                        => v != null && v.Length == 6 && v[0] is string && v[1] is string && v[2] is int &&
+                           v[3] is float && v[4] is float && v[5] is float,
+                    _ => false
+                };
+                if (!fits) return $"its record {kvp.Key} is not one a script writes";
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Restored values threw while the script was being put back: it stops with its usual error, as a runtime error
+        /// stops it, off the run queue and the sleep heap.
+        /// </summary>
+        private void StopRestoredScript(Interpreter interp, Exception e)
+        {
+            RemoveFromRunQueue(interp.ItemId);
+            TerminateWithError(interp, e);
+        }
+
         private void RestoreListens(Interpreter interp, PhloxLoadRequest req)
         {
             var saved = interp.ScriptState.ActiveListens;

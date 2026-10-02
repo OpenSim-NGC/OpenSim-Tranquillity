@@ -1258,6 +1258,16 @@ namespace Phlox.ScriptEngine
         internal int CarriedStateTimeoutMs = 10 * 1000;
 
         /// <summary>
+        /// The largest saved state an object may carry, in bytes before base64: a script's values are held to
+        /// <see cref="InWorldz.Phlox.VM.MemoryInfo.MAX_MEMORY"/>, and its queue to <see cref="InWorldz.Phlox.VM.RuntimeState.MAX_EVENT_QUEUE_SIZE"/> events
+        /// whose arguments a sending script also holds within that limit. Checked before anything is decoded.
+        /// </summary>
+        internal const int MaxCarriedStateBytes = (InWorldz.Phlox.VM.RuntimeState.MAX_EVENT_QUEUE_SIZE + 1) * InWorldz.Phlox.VM.MemoryInfo.MAX_MEMORY;
+
+        /// <summary>The longest envelope read: the base64 of <see cref="MaxCarriedStateBytes"/> and room for the attributes.</summary>
+        internal const int MaxCarriedStateXmlChars = (MaxCarriedStateBytes + 2) / 3 * 4 + 1024;
+
+        /// <summary>
         /// The script's state for its object to carry, or "" when it is not a Phlox script loaded here (or is held
         /// because its saved row could not be read). The capture is taken on the scheduler thread, between timeslices,
         /// as the state database's are; a caller that is the scheduler thread, or a region whose scheduler thread is not
@@ -1301,6 +1311,12 @@ namespace Phlox.ScriptEngine
         public bool SetXMLState(UUID itemID, string xml)
         {
             if (string.IsNullOrEmpty(xml) || StateManager == null) return false;
+            if (xml.Length > MaxCarriedStateXmlChars)
+            {
+                m_log.LogWarning("[PhloxEngine]: {0} brought {1} characters of state, above the {2} read; it starts fresh",
+                    itemID, xml.Length, MaxCarriedStateXmlChars);
+                return false;
+            }
             System.Xml.XmlElement state;
             try
             {

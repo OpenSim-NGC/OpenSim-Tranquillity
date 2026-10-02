@@ -318,13 +318,18 @@ namespace Phlox.ScriptEngine
         /// script_state_rejected and null comes back, so the script starts fresh (Halcyon: "Could not load state ...
         /// script will be reset"; YEngine deletes the bad state file and resets).
         /// </summary>
-        public SerializedRuntimeState LoadState(UUID itemId, UUID assetId)
+        public SerializedRuntimeState LoadState(UUID itemId, UUID assetId) => LoadState(itemId, assetId, out _);
+
+        /// <summary>As <see cref="LoadState(UUID, UUID)"/>; <paramref name="carried"/> is true when the state came with the
+        /// object rather than from this simulator's database, and is to be checked as input from outside.</summary>
+        public SerializedRuntimeState LoadState(UUID itemId, UUID assetId, out bool carried)
         {
             FinishPendingWrites(itemId);
             NoteLive(itemId);
 
-            SerializedRuntimeState carried = TakeCarried(itemId, assetId);
-            if (carried != null) return carried;
+            SerializedRuntimeState fromObject = TakeCarried(itemId, assetId);
+            carried = fromObject != null;
+            if (carried) return fromObject;
 
             byte[] blob = null;
             bool read = false;
