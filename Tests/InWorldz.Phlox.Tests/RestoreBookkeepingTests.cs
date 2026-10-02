@@ -6,7 +6,6 @@
  */
 
 using System;
-using System.Diagnostics;
 using System.Linq;
 using OpenMetaverse;
 using Xunit;
@@ -19,7 +18,8 @@ namespace InWorldz.Phlox.Tests;
 /// phase, its listens, its stopped state, and the start-up events in SL's order. Each test saves in one engine and
 /// restores the same item and asset in a second, as a region restart does.
 /// </summary>
-// Runs in parallel: each test has its own items in the shared state file; nothing process-wide is changed.
+// Runs in parallel: each test has its own items in the shared state file; nothing process-wide is changed, except in
+// WithTheEngineClockDriven, which is serial.
 public class RestoreBookkeepingTests
 {
     private readonly ITestOutputHelper _out;
@@ -81,30 +81,69 @@ public class RestoreBookkeepingTests
     }
 
     /// <summary>
-    /// A timer keeps its phase across a restart: 7 s of a 10 s timer had passed when the state was saved, so the first
-    /// timer() comes about 3 s after the restore (Halcyon InjectScript), not a full interval later.
+    /// The restored timer's wake is on the engine's clock (Clock), so this test stops that clock and moves it by hand:
+    /// whether timer() has come then depends only on how far the clock was moved, never on how fast the machine is. The
+    /// clock is process-wide, hence "phlox-state"; the rest of the class runs in parallel.
     /// </summary>
-    [Fact]
-    public void ARestoredTimerFiresAfterTheTimeItHadLeft()
+    [Collection("phlox-state")]
+    public class WithTheEngineClockDriven : IDisposable
     {
-        const string src = "default { state_entry() { llSetTimerEvent(10.0); llSay(0, \"up\"); } timer() { llSay(0, \"tick\"); } }";
-        var asset = UUID.Random(); var item = UUID.Random();
-        using (var h1 = new SchedulerHarness())
+        private readonly ITestOutputHelper _out;
+        private bool m_frozen;
+        private ulong m_now;
+
+        public WithTheEngineClockDriven(ITestOutputHelper o)
         {
-            h1.RezScript(src, asset, item);
-            Assert.True(h1.PumpUntil(() => h1.Said.Contains("up")), SavedStateRig.SaidText(h1));
-            var interp = (InWorldz.Phlox.VM.Interpreter)h1.InterpreterFor(item);
-            interp.ScriptState.TimerLastScheduledOn = InWorldz.Phlox.Util.Clock.Now - 7000;   // scheduled 7 s ago
-            h1.SaveState(item);
+            _out = o;
+            InWorldz.Phlox.Util.Clock.SetSourceForTesting(() => m_frozen ? m_now : (ulong)Environment.TickCount64);
         }
-        using var h2 = new SchedulerHarness();
-        var sw = Stopwatch.StartNew();
-        h2.RezScript(src, asset, item);
-        bool ticked = h2.PumpUntil(() => h2.Said.Contains("tick"), TimeSpan.FromSeconds(7));
-        sw.Stop();
-        _out.WriteLine($"tick after {sw.ElapsedMilliseconds} ms; said {SavedStateRig.SaidText(h2)}");
-        Assert.True(ticked, "no timer() within 7 s of the restore; a full 10 s interval was waited again");
-        Assert.InRange(sw.ElapsedMilliseconds, 1500, 6000);
+
+        public void Dispose() => InWorldz.Phlox.Util.Clock.SetSourceForTesting(null);
+
+        private void Freeze() { m_now = (ulong)Environment.TickCount64; m_frozen = true; }
+
+        /// <summary>
+        /// A timer keeps its phase across a restart: 7 s of a 10 s timer had passed when the state was saved, so the first
+        /// timer() comes 3 s after the restore (Halcyon InjectScript), not a full interval later and not at once.
+        /// The saved state carries its times as wall-clock dates (SerializedRuntimeState), taken a few statements apart
+        /// in real time, which can only add to the 3 s; the test allows a second for that and no more.
+        /// </summary>
+        [Fact]
+        public void ARestoredTimerFiresAfterTheTimeItHadLeft()
+        {
+            const string src = "default { state_entry() { llSetTimerEvent(10.0); llSay(0, \"up\"); } timer() { llSay(0, \"tick\"); } }";
+            var asset = UUID.Random(); var item = UUID.Random();
+            using (var h1 = new SchedulerHarness())
+            {
+                h1.RezScript(src, asset, item);
+                Assert.True(h1.PumpUntil(() => h1.Said.Contains("up")), SavedStateRig.SaidText(h1));
+                Freeze();   // the 7 s below are exactly 7 s when the state is captured
+                var interp = (InWorldz.Phlox.VM.Interpreter)h1.InterpreterFor(item);
+                interp.ScriptState.TimerLastScheduledOn = InWorldz.Phlox.Util.Clock.Now - 7000;   // scheduled 7 s ago
+                h1.SaveState(item);
+            }
+            using var h2 = new SchedulerHarness();
+            Freeze();
+            ulong restoredAt = m_now;
+            h2.RezScript(src, asset, item);
+            Assert.True(h2.PumpUntil(() => h2.InterpreterFor(item) != null, TimeSpan.FromSeconds(15)), "not loaded: " + h2.StatusOf(item));
+            Assert.True(h2.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+
+            // 1 ms short of the 3 s it had left: no timer() yet. Firing here is a restore that lost the phase forwards.
+            m_now = restoredAt + 2999;
+            Assert.True(h2.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+            _out.WriteLine($"at +2999 ms: said {SavedStateRig.SaidText(h2)}");
+            Assert.DoesNotContain("tick", h2.Said);
+
+            // At +4 s, well short of a full 10 s interval, exactly one timer().
+            m_now = restoredAt + 4000;
+            Assert.True(h2.PumpUntil(() => h2.Said.Contains("tick"), TimeSpan.FromSeconds(10)),
+                "no timer() 4 s after the restore; a full 10 s interval was waited again. said " + SavedStateRig.SaidText(h2));
+            Assert.True(h2.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+            _out.WriteLine($"at +4000 ms: said {SavedStateRig.SaidText(h2)}");
+            Assert.Equal(1, h2.Said.Count(s => s == "tick"));
+            Assert.DoesNotContain("up", h2.Said);   // restored, not started fresh
+        }
     }
 
     private const string LoopSrc =
