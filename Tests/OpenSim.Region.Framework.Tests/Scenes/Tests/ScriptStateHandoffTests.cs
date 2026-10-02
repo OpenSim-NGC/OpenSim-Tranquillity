@@ -180,6 +180,25 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             other.Taken.Select(t => t.itemID).Should().Equal(good);
         }
 
+        [Fact]
+        public void AnEngineThatThrowsIsSkippedAndTheOtherScriptsStillGetTheirState()
+        {
+            // The default engine is offered every state first and throws from SetXMLState each time.
+            StateEngine throwing = new(DefaultEngineName) { ThrowOnSet = true };
+            StateEngine other = new(OtherEngineName);
+            TestScene scene = SetUpScene(throwing, other);
+            SceneObjectGroup sog = AddObject(scene, 2);
+            TaskInventoryItem first = AddScriptRunBy(scene, sog.Parts[0], other);
+            TaskInventoryItem second = AddScriptRunBy(scene, sog.Parts[1], other);
+            string snapshot = sog.GetStateSnapshot();
+
+            Action set = () => sog.SetState(snapshot, scene);
+
+            set.Should().NotThrow();
+            throwing.Offered.Should().Be(2);
+            other.Taken.Select(t => t.itemID).Should().BeEquivalentTo(new[] { first.ItemID, second.ItemID });
+        }
+
         // ---- rez and attach: saved state in the object XML ---------------------------------------------------------
 
         private static string SavedState(UUID id, string engine) =>
@@ -264,6 +283,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             /// <summary>Take any state offered, whoever it is tagged for.</summary>
             public bool AcceptsAnyState { get; init; }
 
+            /// <summary>Throw from SetXMLState, as an engine with a fault of its own would.</summary>
+            public bool ThrowOnSet { get; init; }
+
+            /// <summary>How many times SetXMLState was called.</summary>
+            public int Offered { get; private set; }
+
             /// <summary>The states this engine took: the item id they were given for, and the XML.</summary>
             public List<(UUID itemID, string xml)> Taken { get; } = new();
 
@@ -285,6 +310,9 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             public bool SetXMLState(UUID itemID, string xml)
             {
+                Offered++;
+                if (ThrowOnSet)
+                    throw new InvalidOperationException("engine fault");
                 XmlDocument doc = new XmlDocument();
                 try { doc.LoadXml(xml); }
                 catch (XmlException) { return false; }
