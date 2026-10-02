@@ -211,6 +211,17 @@ namespace Phlox.ScriptEngine
             }
         }
 
+        // Loads and unloads are taken in the order they were posted (Halcyon kept them in one list). Each request
+        // gets a number when it is posted; DoWork takes the older of the two lists' heads.
+        private long m_PostSeq;
+        private readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, System.Runtime.CompilerServices.StrongBox<long>> m_PostOrder = new();
+
+        private void NotePosted(object req)
+            => m_PostOrder.AddOrUpdate(req, new System.Runtime.CompilerServices.StrongBox<long>(System.Threading.Interlocked.Increment(ref m_PostSeq)));
+
+        private long PostedAs(object req)
+            => m_PostOrder.TryGetValue(req, out var box) ? box.Value : long.MaxValue;
+
         public void PostLoadRequest(PhloxLoadRequest req)
         {
             lock (m_Outcomes)
@@ -218,6 +229,7 @@ namespace Phlox.ScriptEngine
                 req.Serial = ++m_SerialCounter;
                 m_LatestSerial[req.ItemID] = req.Serial;
             }
+            NotePosted(req);
             // The region rezzes and then asks for the errors on the same thread (CreateScriptInstanceEr): that editor
             // waits for this load, not for one a later save posted in between.
             t_PostedOnThisThread = (req.ItemID, req.Serial);
@@ -228,8 +240,10 @@ namespace Phlox.ScriptEngine
 
         public void PostUnloadRequest(uint localID, UUID itemID)
         {
+            var req = new PhloxUnloadRequest { LocalID = localID, ItemID = itemID };
+            NotePosted(req);
             lock (m_PendingUnloads)
-                m_PendingUnloads.AddLast(new PhloxUnloadRequest { LocalID = localID, ItemID = itemID });
+                m_PendingUnloads.AddLast(req);
             m_WorkArrived();
         }
 
@@ -261,8 +275,10 @@ namespace Phlox.ScriptEngine
                     n = next;
                 }
             }
+            var unload = new PhloxUnloadRequest { LocalID = localID, ItemID = itemID };
+            NotePosted(unload);
             lock (m_PendingUnloads)
-                m_PendingUnloads.AddLast(new PhloxUnloadRequest { LocalID = localID, ItemID = itemID });
+                m_PendingUnloads.AddLast(unload);
             m_WorkArrived();
         }
 
@@ -283,8 +299,10 @@ namespace Phlox.ScriptEngine
             if (m_Stopped) return new WorkStatus { WorkWasDone = false, WorkIsPending = false, NextWakeUpTime = ulong.MaxValue };
             try
             {
-                didWork |= ProcessNextUnload();
-                didWork |= ProcessNextLoad();
+                // Two requests a pass, as before (one unload, one load), now in the order they were posted: a load
+                // posted before an unload of the same item is done first, and the unload then removes it.
+                didWork |= ProcessNextLoadOrUnload();
+                didWork |= ProcessNextLoadOrUnload();
                 didWork |= ProcessNextCompile();
                 didWork |= ProcessFinishedCompiles();
             }
@@ -311,6 +329,18 @@ namespace Phlox.ScriptEngine
                 if (m_WaitingForCompile.Count > 0) return true;
             if (!m_FinishedCompiles.IsEmpty) return true;
             return false;
+        }
+
+        private bool ProcessNextLoadOrUnload()
+        {
+            long loadSeq = long.MaxValue, unloadSeq = long.MaxValue;
+            lock (m_PendingLoads)
+                if (m_PendingLoads.Count > 0) loadSeq = PostedAs(m_PendingLoads.First.Value);
+            lock (m_PendingUnloads)
+                if (m_PendingUnloads.Count > 0) unloadSeq = PostedAs(m_PendingUnloads.First.Value);
+            if (loadSeq == long.MaxValue && unloadSeq == long.MaxValue)
+                return ProcessNextUnload() | ProcessNextLoad();   // nothing numbered (none posted, or posted around NotePosted)
+            return unloadSeq < loadSeq ? ProcessNextUnload() : ProcessNextLoad();
         }
 
         private bool ProcessNextUnload()
@@ -1052,6 +1082,17 @@ namespace Phlox.ScriptEngine
                 if (asset == null)
                 {
                     m_log.LogError("[PhloxLoader]: Asset {0} not found", assetId);
+                    return;
+                }
+
+                // Only script text is compiled (Halcyon ScriptLoader.AssetReceived: "Invalid asset type received from
+                // asset server. Expected LSLText"). Anything else does not start, and a waiting editor is told why.
+                if (asset.Type != (sbyte)AssetType.LSLText)
+                {
+                    m_log.LogError("[PhloxLoader]: Asset {0} is not script text (asset type {1}); the script does not start",
+                        assetId, asset.Type);
+                    foreach (var r in requests)
+                        PublishOutcome(r, new List<string> { "the script's asset is not script text" });
                     return;
                 }
 

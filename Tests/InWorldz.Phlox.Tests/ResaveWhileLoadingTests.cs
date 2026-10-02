@@ -227,17 +227,19 @@ public class ResaveWhileLoadingTests
     }
 
     /// <summary>
-    /// The old load started in the moment between the save's unload and its new asset (the region removes the instance,
-    /// then gives the item the new asset): the save's load replaces that instance instead of being skipped as a duplicate.
+    /// The save's unload is posted while the old load still waits (the region removes the instance, then gives the item
+    /// the new asset): loads and unloads are taken in the order they were posted, so the unload cancels the old load,
+    /// which never starts, and the save's load runs the new asset.
     /// </summary>
     [Fact]
-    public void AnOldInstanceStartedBetweenTheSavesUnloadAndItsNewAssetIsReplaced()
+    public void AnOldLoadPostedBeforeTheSavesUnloadIsCancelledByIt()
     {
         using var h = new SchedulerHarness();
         UUID item = RezQueued(h, Good("k0"));
-        h.Prim.Inventory.RemoveScriptInstance(item, false);   // the save's unload, processed before the old load
+        h.Prim.Inventory.RemoveScriptInstance(item, false);   // the save's unload, posted after the old load
         h.Prim.ParentGroup.ResumeScripts();
-        Assert.True(h.PumpUntil(() => Count(h, "k0 start") >= 1, Cap), "the old load did not start");
+        Assert.True(h.PumpUntil(() => !Loader(h).IsLoading(item), Cap), "the old load did not finish");
+        Assert.Equal(0, Count(h, "k0 start"));
 
         var it = h.Prim.Inventory.GetInventoryItem(item);
         UUID asset = StoreAsset(h, it.OwnerID, Good("k1"));
