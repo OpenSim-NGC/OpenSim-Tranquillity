@@ -316,15 +316,42 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     `max_listens_per_region`.
   - An envelope above 65 x 128 KiB of state (the memory limit, plus 64 queued events) is
     refused before anything is decoded, and Phlox does not carry a state above it.
-- **No grant comes back with a state.** The simulator clears a script item's grant every
-  time it starts the script and when the object changes owner, and a restore never puts one
-  back (YEngine restores the grant from its own state; Phlox does not). After a restart, a
-  rez, an attach, a crossing or a teleport, `llGetPermissions` is 0 until the script asks
-  again. The records of taken controls and of `PERMISSION_SILENT_ESTATE_MANAGEMENT` come
-  back only while the item holds that grant, so nothing saved before an owner change acts
-  later. SL: a script loses `PERMISSION_TAKE_CONTROLS` "on reset, or if the object is
-  deleted, detached, or dropped" ([llTakeControls](https://wiki.secondlife.com/wiki/LlTakeControls)).
-  A seated driver's taken controls still travel with a crossing in the simulator's own agent
+- **A grant comes back with a state, within limits.** The simulator clears a script item's
+  grant every time it starts the script, so Phlox saves the grant with the state (the
+  granter, the mask, and the object's owner then) and puts it back when the script is
+  restored. The SL wiki does not say what happens to a grant across a restart, rez or
+  crossing; [llRequestPermissions](https://wiki.secondlife.com/wiki/LlRequestPermissions)
+  says only "Permissions persist across state changes".
+  - From the region's own state database (a restart): the grant comes back whole, when the
+    object's owner is still the owner saved with it. Otherwise nothing comes back.
+  - From state carried inside an object (take and rez, take copy, attach, login, teleport,
+    crossing): only what `llRequestPermissions` would grant at that moment without a
+    dialog comes back, by the same decision: the granter wears the object (take controls,
+    trigger animation, attach, track camera, control camera, override animations) or sits
+    on it (take controls, trigger animation, track camera, control camera), or is an NPC the
+    object's owner owns, or one seated on an object of that owner's (trigger animation); and
+    the object's owner is still the owner saved with it. A granter who has not arrived yet (a vehicle
+    crossing before its driver) leaves the grant waiting; it is decided the same way when
+    that avatar arrives seated on the object or wearing it, and a grant whose granter never
+    arrives that way never acts.
+  - **Different from YEngine:** permissions Phlox grants only through a dialog (debit,
+    change links, teleport, silent estate management and the others) never come back from
+    carried state; the script asks again. YEngine restores every saved bit from carried state.
+  - A restore posts no `run_time_permissions`; `llGetPermissionsKey` answers the restored
+    granter.
+  - Detaching into inventory loses take controls and control camera, as the simulator
+    removes them before it saves the object (SL: a script loses `PERMISSION_TAKE_CONTROLS`
+    "on reset, or if the object is deleted, detached, or dropped",
+    [llTakeControls](https://wiki.secondlife.com/wiki/LlTakeControls)). A logout and login
+    or a teleport keeps them, and the controls are taken again.
+  - The records of taken controls and of `PERMISSION_SILENT_ESTATE_MANAGEMENT` act only
+    while the item holds their grant, and wait with a grant that waits.
+  - `llResetScript`, an owner change and a new `llRequestPermissions` clear the saved grant
+    and a waiting one.
+  - Grants from `llRequestExperiencePermissions` are not saved: Phlox does not record that a
+    grant came from an Experience.
+  - States saved by an earlier Phlox build hold no grant and restore without one.
+  A seated driver's taken controls also travel with a crossing in the simulator's own agent
   data.
 - **The capture wait is per object.** The simulator asks for an object's script states on a
   region thread, one script at a time. Phlox captures all of the object's scripts in one
