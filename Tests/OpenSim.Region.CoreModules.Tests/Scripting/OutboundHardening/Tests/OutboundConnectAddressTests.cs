@@ -308,17 +308,13 @@ public class OutboundConnectAddressTests
     }
 
     [Fact]
-    public void TheConnectCheckIsLeftOutOnlyWhenAProxyIsConfigured()
+    public void ApplyToInstallsTheConnectStep()
     {
-        OutboundUrlFilter filter = Filter(new Network());
-        SocketsHttpHandler direct = new();
-        SocketsHttpHandler viaProxy = new();
+        SocketsHttpHandler handler = new();
 
-        filter.ApplyTo(direct, proxyConfigured: false);
-        filter.ApplyTo(viaProxy, proxyConfigured: true);
+        Filter(new Network()).ApplyTo(handler);
 
-        Assert.NotNull(direct.ConnectCallback);
-        Assert.Null(viaProxy.ConnectCallback);
+        Assert.NotNull(handler.ConnectCallback);
     }
 
     [Fact]
@@ -384,33 +380,101 @@ public class OutboundConnectAddressTests
         Assert.Empty(net.Connected);
     }
 
+    /// <summary>A proxy that carries every URL except those of the bypassed host.</summary>
     private sealed class FakeProxy : IWebProxy
     {
-        private readonly bool m_bypass;
-        public FakeProxy(bool bypass) => m_bypass = bypass;
+        private readonly string m_bypassedHost;
+        public FakeProxy(string bypassedHost = null) => m_bypassedHost = bypassedHost;
         public ICredentials Credentials { get; set; }
         public Uri GetProxy(Uri destination) => new("http://proxy.example.org:3128/");
-        public bool IsBypassed(Uri host) => m_bypass;
+        public bool IsBypassed(Uri host) => host.Host == m_bypassedHost;
+    }
+
+    private const string RedirectToDirect =
+        "HTTP/1.1 302 Found\r\nLocation: http://direct.example.org/\r\nContent-Length: 0\r\nConnection: close\r\n\r\n";
+
+    /// <summary>
+    /// The chain a script request uses with a proxy that carries every URL but direct.example.org: the proxy
+    /// connection is a stand-in recorded in <paramref name="proxyEndPoints"/>, and answers with <paramref name="proxyReply"/>.
+    /// </summary>
+    private static HttpClient ProxiedClient(OutboundUrlFilter filter, Network net, string proxyReply, List<string> proxyEndPoints)
+    {
+        SocketsHttpHandler inner = new()
+        {
+            AllowAutoRedirect = false,
+            UseProxy = true,
+            Proxy = new FakeProxy("direct.example.org"),
+            ConnectCallback = filter.CreateConnectCallback(net.Connect, (endPoint, ct) =>
+            {
+                proxyEndPoints.Add(endPoint.Host + ":" + endPoint.Port);
+                return new ValueTask<Stream>(new CannedStream(proxyReply));
+            }),
+        };
+        return new HttpClient(new OutboundUrlFilterRedirectHandler(filter, inner, 10)) { Timeout = TimeSpan.FromSeconds(30) };
     }
 
     [Fact]
-    public void AProxyThatCarriesTheUrlLeavesOnlyTheEarlyCheck()
+    public async Task ARequestTheProxyCarriesReachesTheProxyWithOnlyTheEarlyCheck()
+    {
+        Network net = new Network().Host("a.example.org", new[] { Public1 });
+        List<string> proxyEndPoints = new();
+        using HttpClient client = ProxiedClient(Filter(net), net, Ok, proxyEndPoints);
+
+        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/path");
+
+        Assert.Equal("ok", await response.Content.ReadAsStringAsync());
+        Assert.Equal(new[] { "proxy.example.org:3128" }, proxyEndPoints);
+        Assert.Empty(net.Connected);
+    }
+
+    [Fact]
+    public async Task ARedirectHopTheProxyBypassesIsJudgedAtTheConnect()
+    {
+        // The first request is carried by the proxy, which redirects to a host it bypasses. That host turns blocked
+        // at the connect.
+        Network net = new Network()
+            .Host("a.example.org", new[] { Public1 })
+            .Host("direct.example.org", new[] { Public2 }, new[] { Blocked });
+        List<string> proxyEndPoints = new();
+        using HttpClient client = ProxiedClient(Filter(net), net, RedirectToDirect, proxyEndPoints);
+
+        HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync("http://a.example.org/"));
+
+        Assert.IsType<OutboundUrlFilterRefusedException>(e);
+        Assert.Equal(new[] { "proxy.example.org:3128" }, proxyEndPoints);
+        Assert.Empty(net.Connected);
+    }
+
+    [Fact]
+    public async Task ARedirectHopTheProxyBypassesConnectsStraightToItsCheckedAddress()
+    {
+        Network net = new Network()
+            .Host("a.example.org", new[] { Public1 })
+            .Host("direct.example.org", new[] { Public2 });
+        List<string> proxyEndPoints = new();
+        using HttpClient client = ProxiedClient(Filter(net), net, RedirectToDirect, proxyEndPoints);
+
+        using HttpResponseMessage response = await client.GetAsync("http://a.example.org/");
+
+        Assert.Equal("ok", await response.Content.ReadAsStringAsync());
+        Assert.Equal(new[] { "proxy.example.org:3128" }, proxyEndPoints);
+        Assert.Equal(new[] { Public2 }, net.Connected);
+    }
+
+    [Fact]
+    public void CreateHandlerUsesTheGivenProxyAndHasTheConnectStep()
     {
         OutboundUrlFilter filter = Filter(new Network());
-        Uri url = new("http://a.example.org/");
-        FakeProxy carrying = new(bypass: false);
+        FakeProxy proxy = new();
 
-        SocketsHttpHandler none = filter.CreateHandler(url, null);
-        SocketsHttpHandler bypassed = filter.CreateHandler(url, new FakeProxy(bypass: true));
-        SocketsHttpHandler proxied = filter.CreateHandler(url, carrying);
+        SocketsHttpHandler none = filter.CreateHandler(null);
+        SocketsHttpHandler proxied = filter.CreateHandler(proxy);
 
         Assert.False(none.UseProxy);
-        Assert.NotNull(none.ConnectCallback);
-        Assert.False(bypassed.UseProxy);
-        Assert.NotNull(bypassed.ConnectCallback);
         Assert.True(proxied.UseProxy);
-        Assert.Same(carrying, proxied.Proxy);
-        Assert.Null(proxied.ConnectCallback);
+        Assert.Same(proxy, proxied.Proxy);
+        Assert.NotNull(none.ConnectCallback);
+        Assert.NotNull(proxied.ConnectCallback);
         Assert.False(none.AllowAutoRedirect);
         Assert.False(proxied.AllowAutoRedirect);
     }
@@ -422,7 +486,7 @@ public class OutboundConnectAddressTests
         Network net = new Network().Host("rebind.example.org", new[] { Public1 }, new[] { Blocked });
         OutboundUrlFilter filter = Filter(net);
         Uri url = new("http://rebind.example.org/");
-        using HttpClient client = new(new OutboundUrlFilterRedirectHandler(filter, filter.CreateHandler(url, null), 10));
+        using HttpClient client = new(new OutboundUrlFilterRedirectHandler(filter, filter.CreateHandler(null), 10));
 
         HttpRequestException e = await Assert.ThrowsAnyAsync<HttpRequestException>(() => client.GetAsync(url));
 

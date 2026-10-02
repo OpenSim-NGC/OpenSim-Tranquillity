@@ -67,6 +67,7 @@ public class OutboundWiringTests : OpenSimTestCase
         typeof(HttpRequestModule).GetField("m_outboundUrlFilter", BindingFlags.NonPublic | BindingFlags.Static);
 
     private readonly RecordingHttpServer m_server = new();
+    private readonly RecordingHttpServer m_proxyServer = new();
     private readonly OutboundUrlFilter m_savedHttpModuleFilter;
     private readonly IWebProxy m_savedDefaultProxy;
     private readonly ICommandConsole m_savedConsole;
@@ -107,6 +108,7 @@ public class OutboundWiringTests : OpenSimTestCase
         MainConsole.Instance = m_savedConsole;
 
         m_server.Dispose();
+        m_proxyServer.Dispose();
         base.Dispose();
     }
 
@@ -180,11 +182,36 @@ public class OutboundWiringTests : OpenSimTestCase
 
     // ---- llHTTPRequest: HttpRequestModule, both shared clients ----
 
-    private void StartHttpModule(OutboundUrlFilter filter)
+    /// <summary>
+    /// The module builds its shared clients once per process; another test class may have left them (and a job
+    /// engine) behind, so a test that needs its own configuration starts them afresh.
+    /// </summary>
+    private static void ResetHttpModuleStatics()
     {
+        HttpRequestModule.m_jobEngine?.Stop();
+        HttpRequestModule.m_jobEngine = null;
+        foreach (string name in new[] { "VeriFyCertClient", "VeriFyNoCertClient" })
+        {
+            FieldInfo field = typeof(HttpRequestModule).GetField(name, BindingFlags.NonPublic | BindingFlags.Static);
+            (field.GetValue(null) as HttpClient)?.Dispose();
+            field.SetValue(null, null);
+        }
+        typeof(HttpRequestModule).GetField("m_numberScenes", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, 0);
+    }
+
+    /// <param name="viaProxy">Configure the listener in <c>m_proxyServer</c> as the proxy, bypassing "localhost".</param>
+    private void StartHttpModule(OutboundUrlFilter filter, bool viaProxy = false)
+    {
+        ResetHttpModuleStatics();
+        IConfigSource config = ModuleConfig();
+        if (viaProxy)
+        {
+            config.Configs["Startup"].Set("HttpProxy", m_proxyServer.BaseUri.AbsoluteUri);
+            config.Configs["Startup"].Set("HttpProxyExceptions", "localhost");
+        }
         m_scene = new SceneHelpers().SetupScene();
         m_httpModule = new HttpRequestModule();
-        m_httpModule.Initialise(ModuleConfig());
+        m_httpModule.Initialise(config);
         m_httpModule.AddRegion(m_scene);
         m_httpModule.RegionLoaded(m_scene);
         s_httpModuleFilter.SetValue(null, filter);
@@ -253,6 +280,52 @@ public class OutboundWiringTests : OpenSimTestCase
         Assert.Single(m_server.Requests);
     }
 
+    // A proxy is configured but bypasses "localhost": a request to it goes straight out, so it is judged.
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HttpRequestModuleWithAProxyRefusesABypassedHostThatTurnsBlockedAtTheConnect(bool verifyCert)
+    {
+        StartHttpModule(Filter(Rebinding()), viaProxy: true);
+        Assert.True(m_httpModule.CheckAllowed(new Uri(Url("localhost"))), "the early check should see the allowed answer");
+
+        IHttpServiceRequest done = SendHttp(Url("localhost"), verifyCert);
+
+        Assert.Equal(499, done.Status);
+        Assert.Equal("Request to localhost disallowed by filter", done.ResponseBody);
+        Assert.Equal(0, m_server.Connections);
+        Assert.Equal(0, m_proxyServer.Connections);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HttpRequestModuleWithAProxyConnectsABypassedHostStraightToItsAllowedAddress(bool verifyCert)
+    {
+        StartHttpModule(Filter(Control(), except: "127.0.0.1/32"), viaProxy: true);
+
+        IHttpServiceRequest done = SendHttp(Url("localhost"), verifyCert);
+
+        Assert.Equal(200, done.Status);
+        Assert.Single(m_server.Requests);
+        Assert.Equal(0, m_proxyServer.Connections);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HttpRequestModuleSendsARequestTheProxyCarriesToTheProxyWithOnlyTheEarlyCheck(bool verifyCert)
+    {
+        StartHttpModule(Filter(Rebinding()), viaProxy: true);
+
+        IHttpServiceRequest done = SendHttp("http://93.184.215.14/path", verifyCert);
+
+        Assert.Equal(200, done.Status);
+        Assert.Equal("http://93.184.215.14/path", Assert.Single(m_proxyServer.Requests).Target);
+        Assert.Equal(0, m_server.Connections);
+    }
+
     // ---- llSendRemoteData: the XML-RPC request ----
 
     private SendRemoteDataRequest SendXmlRpc(OutboundUrlFilter filter, string dest)
@@ -294,6 +367,29 @@ public class OutboundWiringTests : OpenSimTestCase
 
         Assert.Contains("disallowed by filter", req.Sdata);
         Assert.Single(m_server.Requests);
+    }
+
+    [Fact]
+    public void XmlRpcWithAProxyRefusesABypassedHostThatTurnsBlockedAtTheConnect()
+    {
+        WebUtil.SetupHTTPClients(false, false, new WebProxy(m_proxyServer.BaseUri, true, new[] { "localhost" }), 4);
+
+        SendRemoteDataRequest req = SendXmlRpc(Filter(Rebinding()), Url("localhost", "/rpc"));
+
+        Assert.Contains("disallowed by filter", req.Sdata);
+        Assert.Equal(0, m_server.Connections);
+        Assert.Equal(0, m_proxyServer.Connections);
+    }
+
+    [Fact]
+    public void XmlRpcSendsARequestTheProxyCarriesToTheProxy()
+    {
+        WebUtil.SetupHTTPClients(false, false, new WebProxy(m_proxyServer.BaseUri, true, new[] { "localhost" }), 4);
+
+        SendXmlRpc(Filter(Rebinding()), "http://93.184.215.14/rpc");
+
+        Assert.Equal("http://93.184.215.14/rpc", Assert.Single(m_proxyServer.Requests).Target);
+        Assert.Equal(0, m_server.Connections);
     }
 
     // ---- vector-render image fetch ----
@@ -342,6 +438,41 @@ public class OutboundWiringTests : OpenSimTestCase
 
         Draw(module, Url("127.0.0.1", "/start"));
 
+        Assert.Single(m_server.Requests);
+        module.Close();
+    }
+
+    [Fact]
+    public void VectorRenderRefusesARedirectHopTheProxyBypassesThatTurnsBlockedAtTheConnect()
+    {
+        // The first URL is carried by the default proxy, which redirects to "localhost", a host it bypasses.
+        HttpClient.DefaultProxy = new WebProxy(m_proxyServer.BaseUri, true, new[] { "localhost" });
+        m_proxyServer.Responder = _ => RecordingHttpServer.Reply.Redirect(302, Url("localhost", "/next"));
+        Lookup lookup = new Lookup()
+            .Host(Public, new[] { Public })
+            .Host("localhost", new[] { Public }, new[] { "127.0.0.1" });
+        VectorRenderModule module = StartVectorRender(Filter(lookup));
+
+        Draw(module, $"http://{Public}/start");
+
+        Assert.Single(m_proxyServer.Requests);
+        Assert.Equal(0, m_server.Connections);
+        module.Close();
+    }
+
+    [Fact]
+    public void VectorRenderConnectsARedirectHopTheProxyBypassesStraightToItsAllowedAddress()
+    {
+        HttpClient.DefaultProxy = new WebProxy(m_proxyServer.BaseUri, true, new[] { "localhost" });
+        m_proxyServer.Responder = _ => RecordingHttpServer.Reply.Redirect(302, Url("localhost", "/next"));
+        Lookup lookup = new Lookup()
+            .Host(Public, new[] { Public })
+            .Host("localhost", new[] { Public }, new[] { "127.0.0.1" });
+        VectorRenderModule module = StartVectorRender(Filter(lookup, except: "127.0.0.1/32"));
+
+        Draw(module, $"http://{Public}/start");
+
+        Assert.Single(m_proxyServer.Requests);
         Assert.Single(m_server.Requests);
         module.Close();
     }
@@ -409,8 +540,8 @@ public class OutboundWiringTests : OpenSimTestCase
     [Fact]
     public void ImageUrlLoaderLeavesOnlyTheEarlyCheckWhenTheDefaultProxyCarriesTheUrl()
     {
-        // The default proxy is the listener, which the module's own filter blocks (127.0.0.1): were the connect
-        // step on this handler, the connection to the proxy would be refused. The request arrives in absolute form.
+        // The default proxy is the listener, which the module's own filter blocks (127.0.0.1): were the connection
+        // to the proxy judged, it would be refused. The request arrives in absolute form.
         HttpClient.DefaultProxy = new WebProxy(m_server.BaseUri, false);
 
         LoadImage(null, "http://93.184.215.14/img.png");

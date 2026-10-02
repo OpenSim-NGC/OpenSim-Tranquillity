@@ -721,30 +721,26 @@ public class SendRemoteDataRequest: IServiceRequest
         {
             // A handler that follows redirects itself and filters every hop, over a handler that connects only to
             // addresses the filter allows; otherwise as WebUtil.GetNewGlobalHttpClient(-1), whose handler follows
-            // up to 10 unfiltered. The shared no-redirect handler is used as it is when a proxy is configured
-            // (the proxy looks the target up), and is then not disposed with the client.
+            // up to 10 unfiltered. The new handler takes the shared no-redirect handler's proxy and options, so a
+            // proxy carries the same requests as before.
             SocketsHttpHandler shared = WebUtil.SharedSocketsHttpHandlerNoRedir;
-            bool ownsHandler = !shared.UseProxy;
-            HttpMessageHandler inner = shared;
-            if (ownsHandler)
+            SocketsHttpHandler inner = new()
             {
-                SocketsHttpHandler own = new()
-                {
-                    AllowAutoRedirect = false,
-                    AutomaticDecompression = DecompressionMethods.None,
-                    ConnectTimeout = shared.ConnectTimeout,
-                    PreAuthenticate = false,
-                    UseCookies = false,
-                    UseProxy = false,
-                    MaxConnectionsPerServer = shared.MaxConnectionsPerServer,
-                    PooledConnectionIdleTimeout = shared.PooledConnectionIdleTimeout,
-                    PooledConnectionLifetime = shared.PooledConnectionLifetime,
-                    SslOptions = shared.SslOptions,
-                };
-                UrlFilter.ApplyTo(own, false);
-                inner = own;
-            }
-            hclient = new HttpClient(new OutboundUrlFilterRedirectHandler(UrlFilter, inner, 10), ownsHandler)
+                AllowAutoRedirect = false,
+                AutomaticDecompression = DecompressionMethods.None,
+                ConnectTimeout = shared.ConnectTimeout,
+                PreAuthenticate = false,
+                UseCookies = false,
+                UseProxy = shared.UseProxy,
+                MaxConnectionsPerServer = shared.MaxConnectionsPerServer,
+                PooledConnectionIdleTimeout = shared.PooledConnectionIdleTimeout,
+                PooledConnectionLifetime = shared.PooledConnectionLifetime,
+                SslOptions = shared.SslOptions,
+            };
+            if (shared.UseProxy)
+                inner.Proxy = shared.Proxy;
+            UrlFilter.ApplyTo(inner);
+            hclient = new HttpClient(new OutboundUrlFilterRedirectHandler(UrlFilter, inner, 10), true)
             {
                 Timeout = TimeSpan.FromMilliseconds(30000),
                 MaxResponseContentBufferSize = 250 * 1024 * 1024,

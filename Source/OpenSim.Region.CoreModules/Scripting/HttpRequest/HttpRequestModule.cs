@@ -162,9 +162,9 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         shhnc.Proxy = proxy;
                         shhnc.UseProxy = true;
                     }
-                    // Connect only to addresses the filter allows, on every request and redirect.
-                    if (proxy is null)
-                        shhnc.ConnectCallback = ConnectToAllowedAddress;
+                    // Connect only to addresses the filter allows, on every request and redirect; a connection to the
+                    // proxy is left alone.
+                    shhnc.ConnectCallback = ConnectToAllowedAddress;
 
                     VeriFyNoCertClient = new HttpClient(shhnc)
                     {
@@ -203,8 +203,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         shh.Proxy = proxy;
                         shh.UseProxy = true;
                     }
-                    if (proxy is null)
-                        shh.ConnectCallback = ConnectToAllowedAddress;
+                    shh.ConnectCallback = ConnectToAllowedAddress;
                     VeriFyCertClient = new HttpClient(shh)
                     {
                         Timeout = TimeSpan.FromMilliseconds(httpTimeout),

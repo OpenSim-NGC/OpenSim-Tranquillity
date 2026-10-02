@@ -303,6 +303,45 @@ public class OutboundUrlFilter
     /// </summary>
     public delegate ValueTask<Stream> AddressConnector(IPAddress address, int port, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Opens the TCP connection to a proxy, which is given by name and port. Replaceable so the proxy case can be
+    /// tested without a network.
+    /// </summary>
+    public delegate ValueTask<Stream> ProxyConnector(DnsEndPoint endPoint, CancellationToken cancellationToken);
+
+    private static async ValueTask<Stream> ConnectProxy(DnsEndPoint endPoint, CancellationToken cancellationToken)
+    {
+        Socket socket = new(SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
+        try
+        {
+            await socket.ConnectAsync(endPoint, cancellationToken).ConfigureAwait(false);
+            return new NetworkStream(socket, ownsSocket: true);
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Is this connection going to the request's own host and port, rather than to a proxy that will carry the
+    /// request? The handler asks the callback to connect to the proxy when a proxy carries the request, and to the
+    /// request's host when the request goes straight out (no proxy, or one that bypasses the host). A connection
+    /// whose request is unknown, or whose endpoint is the request's own, is taken as going to its target.
+    /// </summary>
+    private static bool GoesToTarget(SocketsHttpConnectionContext context)
+    {
+        Uri target = context.InitialRequestMessage?.RequestUri;
+        if (target is null || !target.IsAbsoluteUri)
+            return true;
+
+        DnsEndPoint endPoint = context.DnsEndPoint;
+        return endPoint.Port == target.Port
+            && (string.Equals(endPoint.Host, target.IdnHost, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(endPoint.Host, target.DnsSafeHost, StringComparison.OrdinalIgnoreCase));
+    }
+
     private static async ValueTask<Stream> ConnectSocket(IPAddress address, int port, CancellationToken cancellationToken)
     {
         Socket socket = new(address.AddressFamily, SocketType.Stream, ProtocolType.Tcp) { NoDelay = true };
@@ -319,34 +358,29 @@ public class OutboundUrlFilter
     }
 
     /// <summary>
-    /// Makes a handler connect only to addresses this filter allows, unless <paramref name="proxyConfigured"/>.
-    /// A handler with a proxy connects to the proxy, which looks the target up itself, so there is no target
-    /// address to judge; such a request keeps the early <see cref="CheckAllowed"/> check only.
+    /// Makes a handler connect only to addresses this filter allows, whenever the connection goes straight to the
+    /// request's own host. A connection to a proxy is left alone: the proxy looks the target up itself, so there is
+    /// no target address to judge, and the early <see cref="CheckAllowed"/> check is all that applies to a request
+    /// the proxy carries. See <see cref="ConnectToAllowedAddress"/>.
     /// </summary>
-    public void ApplyTo(SocketsHttpHandler handler, bool proxyConfigured)
+    public void ApplyTo(SocketsHttpHandler handler)
     {
-        if (!proxyConfigured)
-            handler.ConnectCallback = CreateConnectCallback();
+        handler.ConnectCallback = CreateConnectCallback();
     }
 
     /// <summary>
-    /// A handler for a request whose first URL is <paramref name="firstUrl"/>, to be placed under an
-    /// <see cref="OutboundUrlFilterRedirectHandler"/>. If <paramref name="proxy"/> is given and does not bypass the
-    /// first URL, a proxy carries the request: the handler uses that proxy and only the early check applies.
-    /// Otherwise the handler uses no proxy and connects only to addresses this filter allows. The choice is made
-    /// once, from the first URL; a redirect then follows the same route.
+    /// A handler for a script's request, to be placed under an <see cref="OutboundUrlFilterRedirectHandler"/>. It
+    /// uses <paramref name="proxy"/> (none if null), which chooses per request, so a redirect hop is routed by the
+    /// proxy's own rules like the first request; and it has the connect step, which judges each connection that
+    /// goes straight to its target.
     /// </summary>
     /// <param name="proxy">The proxy that would apply by default, such as <see cref="HttpClient.DefaultProxy"/>.</param>
-    public SocketsHttpHandler CreateHandler(Uri firstUrl, IWebProxy proxy)
+    public SocketsHttpHandler CreateHandler(IWebProxy proxy)
     {
-        SocketsHttpHandler handler = new() { AllowAutoRedirect = false };
-
-        bool viaProxy = proxy is not null && !proxy.IsBypassed(firstUrl);
-        handler.UseProxy = viaProxy;
-        if (viaProxy)
+        SocketsHttpHandler handler = new() { AllowAutoRedirect = false, UseProxy = proxy is not null };
+        if (proxy is not null)
             handler.Proxy = proxy;
-        ApplyTo(handler, viaProxy);
-
+        ApplyTo(handler);
         return handler;
     }
 
@@ -358,10 +392,11 @@ public class OutboundUrlFilter
     /// connection fails with an <see cref="HttpRequestException"/>.
     /// </summary>
     /// <param name="connector">Opens the connection to one address; a socket connect by default.</param>
+    /// <param name="proxyConnector">Opens the connection to a proxy; a socket connect by default.</param>
     public Func<SocketsHttpConnectionContext, CancellationToken, ValueTask<Stream>> CreateConnectCallback(
-        AddressConnector connector = null)
+        AddressConnector connector = null, ProxyConnector proxyConnector = null)
     {
-        return (context, cancellationToken) => ConnectToAllowedAddress(context, cancellationToken, connector);
+        return (context, cancellationToken) => ConnectToAllowedAddress(context, cancellationToken, connector, proxyConnector);
     }
 
     /// <summary>
@@ -369,11 +404,15 @@ public class OutboundUrlFilter
     /// connection is made rather than when the handler is built.
     /// </summary>
     public async ValueTask<Stream> ConnectToAllowedAddress(
-        SocketsHttpConnectionContext context, CancellationToken cancellationToken, AddressConnector connector = null)
+        SocketsHttpConnectionContext context, CancellationToken cancellationToken,
+        AddressConnector connector = null, ProxyConnector proxyConnector = null)
     {
         connector ??= ConnectSocket;
 
         DnsEndPoint endPoint = context.DnsEndPoint;
+        if (!GoesToTarget(context))
+            return await (proxyConnector ?? ConnectProxy)(endPoint, cancellationToken).ConfigureAwait(false);
+
         IPAddress[] addresses = await m_resolver(endPoint.Host, cancellationToken).ConfigureAwait(false);
 
         Exception lastError = null;

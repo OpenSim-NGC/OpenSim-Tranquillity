@@ -979,13 +979,13 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
             }
 
             // Redirects are followed by the filtering handler (the default handler's 50 hops, each one checked)
-            // instead of by the handler itself, which would follow them unchecked. The connection goes only to an
-            // address the filter allows, unless the default proxy carries this URL.
+            // instead of by the handler itself, which would follow them unchecked. A connection straight to the
+            // target goes only to an address the filter allows; one to the default proxy is left alone.
             if (uri is null)
                 return null;
 
             var handler = new OutboundUrlFilterRedirectHandler(
-                m_outboundUrlFilter, m_outboundUrlFilter.CreateHandler(uri, System.Net.Http.HttpClient.DefaultProxy), 50);
+                m_outboundUrlFilter, m_outboundUrlFilter.CreateHandler(System.Net.Http.HttpClient.DefaultProxy), 50);
             using (var client = new System.Net.Http.HttpClient(handler))
             {
                 using (var response = client.GetAsync(url).Result)
