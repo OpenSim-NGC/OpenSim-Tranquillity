@@ -219,6 +219,21 @@ namespace InWorldz.Phlox.VM
         public string PermsOwner;
 
         /// <summary>
+        /// The Experience the saved grant came from (llRequestExperiencePermissions), noted with <see cref="PermsGranter"/>;
+        /// null for any other grant. A grant from an Experience is restored from carried state only as that Experience
+        /// would grant it again with no dialog.
+        /// </summary>
+        public string PermsExperience;
+
+        /// <summary>
+        /// The Experience whose grant the script item holds now, and that grant's granter; null when the item's grant did
+        /// not come from an Experience. Not saved itself: a capture notes it as <see cref="PermsExperience"/> while the
+        /// item's granter is still <see cref="ExperienceGranter"/>.
+        /// </summary>
+        public string ExperienceGrant;
+        public string ExperienceGranter;
+
+        /// <summary>
         /// Active listens this script has open
         /// </summary>
         public Dictionary<int, ActiveListen> ActiveListens;
@@ -399,6 +414,9 @@ namespace InWorldz.Phlox.VM
             PermsGranter = String.Empty;
             GrantedPermsMask = 0;
             PermsOwner = null;
+            PermsExperience = null;
+            ExperienceGrant = null;
+            ExperienceGranter = null;
             ActiveListens.Clear();
             StartParameter = 0;
 

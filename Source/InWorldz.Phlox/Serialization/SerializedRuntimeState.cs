@@ -119,6 +119,14 @@ namespace InWorldz.Phlox.Serialization
         [ProtoMember(28)]
         public string PermsOwner;
 
+        /// <summary>
+        /// Tag 29: the Experience the grant in tags 16 and 17 came from (llRequestExperiencePermissions). Absent - null - for
+        /// any other grant and in every row and carried state written before it, which then restore as before. An earlier
+        /// build skips the tag.
+        /// </summary>
+        [ProtoMember(29)]
+        public string PermsExperience;
+
         public SerializedRuntimeState()
         {
         }
@@ -203,6 +211,7 @@ namespace InWorldz.Phlox.Serialization
             serState.PermsGranter = state.PermsGranter;
             serState.GrantedPermsMask = state.GrantedPermsMask;
             serState.PermsOwner = state.PermsOwner;
+            serState.PermsExperience = state.PermsExperience;
             serState.ActiveListens = listensSnapshot;
             serState.StartParameter = state.StartParameter;
 
@@ -316,6 +325,7 @@ namespace InWorldz.Phlox.Serialization
             state.PermsGranter = this.PermsGranter;
             state.GrantedPermsMask = this.GrantedPermsMask;
             state.PermsOwner = this.PermsOwner;
+            state.PermsExperience = this.PermsExperience;
 
             return state;
         }

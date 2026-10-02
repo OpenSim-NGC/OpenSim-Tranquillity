@@ -1769,7 +1769,8 @@ namespace Phlox.ScriptEngine
         /// <summary>
         /// An avatar became a root agent here (an arrival by crossing or teleport, a login). Scripts it granted
         /// TAKE_CONTROLS to, in the object it sits on or in its attachments, that hold a Control record and are not
-        /// registered on it take their controls again (Halcyon EngineInterface.OnCrossedAvatarReady).
+        /// registered on it take their controls again (Halcyon EngineInterface.OnCrossedAvatarReady). A grant from an
+        /// Experience waiting for this avatar is decided wherever its object is, as such a grant needs no seat.
         /// </summary>
         internal void RequestAvatarArrived(UUID agentId)
         {
@@ -1796,14 +1797,19 @@ namespace Phlox.ScriptEngine
                 SceneObjectGroup seat = sp.ParentPart?.ParentGroup;
                 if (seat != null) groups.Add(seat);
                 groups.AddRange(sp.GetAttachments());
+                var visited = new HashSet<UUID>();
                 foreach (SceneObjectGroup g in groups)
                 {
                     if (g == null || g.IsDeleted) continue;
                     foreach (SceneObjectPart part in g.Parts)
                         foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
-                            if (m_Apis.TryGetValue(item.ItemID, out LSLSystemAPI api))
+                            if (m_Apis.TryGetValue(item.ItemID, out LSLSystemAPI api) && visited.Add(item.ItemID))
                                 api.OnGroupCrossedAvatarReady(agentId);
                 }
+                var experienceClaims = new List<LSLSystemAPI>();
+                foreach (KeyValuePair<UUID, LSLSystemAPI> kv in m_Apis)
+                    if (!visited.Contains(kv.Key) && kv.Value.HasExperienceClaimFor(agentId)) experienceClaims.Add(kv.Value);
+                foreach (LSLSystemAPI api in experienceClaims) api.OnGroupCrossedAvatarReady(agentId);
             }
         }
 

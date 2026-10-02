@@ -718,14 +718,24 @@ namespace Phlox.ScriptEngine
             if ((mask & PERMISSION_SILENT_ESTATE_MANAGEMENT) == 0) misc.Remove((int)RuntimeState.MiscAttr.SilentEstateManagement);
         }
 
-        /// <summary>A grant from carried state whose granter is not here yet: who gave it, what it held, and the owner then.</summary>
-        private sealed record GrantClaim(UUID Granter, int Mask, UUID Owner);
+        /// <summary>
+        /// A grant from carried state whose granter is not here yet: who gave it, what it held, the owner then, and the
+        /// Experience it came from (zero for any other grant).
+        /// </summary>
+        private sealed record GrantClaim(UUID Granter, int Mask, UUID Owner, UUID Experience);
 
         /// <summary>Scheduler thread only, as every caller is.</summary>
         private GrantClaim m_grantClaim;
 
         /// <summary>A grant from carried state is waiting for its granter to arrive (tests and `phlox status`).</summary>
         internal bool HasGrantClaim => m_grantClaim != null;
+
+        /// <summary>
+        /// A grant from an Experience waits for <paramref name="agentId"/>. Such a grant needs no seat or attachment, so the
+        /// avatar's arrival anywhere in the region decides it. Scheduler thread.
+        /// </summary>
+        internal bool HasExperienceClaimFor(UUID agentId)
+            => m_grantClaim is GrantClaim claim && claim.Granter == agentId && !claim.Experience.IsZero();
 
         /// <summary>
         /// The grant saved with the state, given back to the script item when the object's owner is still the owner noted
@@ -742,49 +752,86 @@ namespace Phlox.ScriptEngine
         /// never acts. The SL wiki says nothing on a grant across a restart, rez or crossing; llRequestPermissions says
         /// "Permissions persist across state changes".
         /// </para>
+        /// <para>
+        /// A grant from an Experience (llRequestExperiencePermissions) is noted with that Experience. From a row it comes
+        /// back whole, as any grant. From carried state it comes back only when llRequestExperiencePermissions would grant
+        /// it now with no dialog, by the same decision (<see cref="DecideExperienceRequest"/>): the script is still in
+        /// that Experience, the Experience is allowed here, and the granter, here, still allows it. Its granter need not
+        /// wear or sit on the object, so a claim for it is decided when that avatar arrives anywhere in the region.
+        /// </para>
         /// </summary>
         internal void RestoreSavedGrant(bool carried)
         {
             m_grantClaim = null;
             RuntimeState st = m_thisScript?.ScriptState;
             if (st == null) return;
-            UUID granter = UUID.Zero, owner = UUID.Zero;
+            UUID granter = UUID.Zero, owner = UUID.Zero, experience = UUID.Zero;
             bool noted = !string.IsNullOrEmpty(st.PermsGranter) && !string.IsNullOrEmpty(st.PermsOwner)
-                         && UUID.TryParse(st.PermsGranter, out granter) && UUID.TryParse(st.PermsOwner, out owner);
+                         && UUID.TryParse(st.PermsGranter, out granter) && UUID.TryParse(st.PermsOwner, out owner)
+                         && (string.IsNullOrEmpty(st.PermsExperience) || UUID.TryParse(st.PermsExperience, out experience));
             int mask = st.GrantedPermsMask;
             ClearSavedGrant(st);
             TaskInventoryItem item = GetInventorySelf();
             if (item == null || !noted || granter.IsZero() || mask == 0 || owner.IsZero() || owner != m_host.OwnerID) return;
             if (!carried)
             {
-                SetRestoredGrant(item, granter, mask);
+                SetRestoredGrant(item, granter, mask, experience);
                 return;
             }
             ScenePresence sp = World?.GetScenePresence(granter);
             if (sp == null || sp.IsChildAgent)
             {
-                m_grantClaim = new GrantClaim(granter, mask, owner);
+                m_grantClaim = new GrantClaim(granter, mask, owner, experience);
                 return;
             }
-            GrantSilently(item, granter, mask);
+            GrantSilently(item, granter, mask, experience);
         }
 
-        /// <summary>The bits of <paramref name="mask"/> a silent re-request would give <paramref name="granter"/> now.</summary>
-        private void GrantSilently(TaskInventoryItem item, UUID granter, int mask)
+        /// <summary>
+        /// The bits of <paramref name="mask"/> a silent re-request would give <paramref name="granter"/> now: from an
+        /// Experience, what llRequestExperiencePermissions would grant with no dialog; otherwise what llRequestPermissions
+        /// would.
+        /// </summary>
+        private void GrantSilently(TaskInventoryItem item, UUID granter, int mask, UUID experience)
         {
+            if (!experience.IsZero())
+            {
+                int bits = mask & EXPERIENCE_PERMISSIONS;
+                if (bits != 0 && GetScriptExperienceId() == experience && GetExperienceAdapter() is PhloxExperienceAdapter expService
+                    && DecideExperienceRequest(expService, experience, granter, out _) is ExperienceAnswer.Granted or ExperienceAnswer.Trusted)
+                    SetRestoredGrant(item, granter, bits, experience);
+                return;
+            }
             int silent = mask & GetImplicitPermissions(item, granter);
-            if (silent != 0) SetRestoredGrant(item, granter, silent);
+            if (silent != 0) SetRestoredGrant(item, granter, silent, UUID.Zero);
         }
 
-        private void SetRestoredGrant(TaskInventoryItem item, UUID granter, int mask)
+        private void SetRestoredGrant(TaskInventoryItem item, UUID granter, int mask, UUID experience)
         {
             lock (m_host.TaskInventory)
             {
                 item.PermsGranter = granter;
                 item.PermsMask = mask;
             }
-            NoteGrant(m_thisScript.ScriptState, granter, mask, m_host.OwnerID);
+            if (experience.IsZero()) ForgetExperienceGrant();
+            else NoteExperienceGrant(experience, granter);
+            NoteGrant(m_thisScript.ScriptState, granter, mask, m_host.OwnerID, experience);
             GrantChanged();
+        }
+
+        /// <summary>The script item's grant now is the one <paramref name="experience"/> gave <paramref name="granter"/>.</summary>
+        private void NoteExperienceGrant(UUID experience, UUID granter)
+        {
+            if (m_thisScript?.ScriptState is not RuntimeState st) return;
+            st.ExperienceGranter = granter.ToString();
+            st.ExperienceGrant = experience.ToString();
+        }
+
+        private void ForgetExperienceGrant()
+        {
+            if (m_thisScript?.ScriptState is not RuntimeState st) return;
+            st.ExperienceGrant = null;
+            st.ExperienceGranter = null;
         }
 
         /// <summary>
@@ -797,7 +844,7 @@ namespace Phlox.ScriptEngine
             m_grantClaim = null;
             TaskInventoryItem item = GetInventorySelf();
             if (item != null && claim.Owner == m_host.OwnerID && item.PermsGranter == UUID.Zero)
-                GrantSilently(item, claim.Granter, claim.Mask);
+                GrantSilently(item, claim.Granter, claim.Mask, claim.Experience);
             DropGrantRecordsWithoutGrant();
         }
 
@@ -823,25 +870,37 @@ namespace Phlox.ScriptEngine
             TaskInventoryItem item = GetInventorySelf();
             if (st == null || item == null) return;
             if (item.PermsGranter != UUID.Zero && item.PermsMask != 0)
-                NoteGrant(st, item.PermsGranter, item.PermsMask, m_host.OwnerID);
+                NoteItemGrant(st, item, m_host.OwnerID);
             else if (m_grantClaim is GrantClaim claim)
-                NoteGrant(st, claim.Granter, claim.Mask, claim.Owner);
+                NoteGrant(st, claim.Granter, claim.Mask, claim.Owner, claim.Experience);
             else
                 ClearSavedGrant(st);
         }
 
-        /// <summary>The grant a row saves: the item's grant now, with the object's owner; none held, none saved.</summary>
+        /// <summary>
+        /// The grant a row saves: the item's grant now, with the object's owner, and the Experience it came from while the
+        /// item's granter is still the one that Experience's grant noted; none held, none saved.
+        /// </summary>
         internal static void NoteItemGrant(RuntimeState st, TaskInventoryItem item, UUID objectOwner)
         {
-            if (item.PermsGranter != UUID.Zero && item.PermsMask != 0) NoteGrant(st, item.PermsGranter, item.PermsMask, objectOwner);
-            else ClearSavedGrant(st);
+            if (item.PermsGranter == UUID.Zero || item.PermsMask == 0)
+            {
+                ClearSavedGrant(st);
+                return;
+            }
+            UUID experience = UUID.Zero;
+            if (st.ExperienceGranter is string g && st.ExperienceGrant is string e
+                && UUID.TryParse(g, out UUID expGranter) && expGranter == item.PermsGranter)
+                UUID.TryParse(e, out experience);
+            NoteGrant(st, item.PermsGranter, item.PermsMask, objectOwner, experience);
         }
 
-        private static void NoteGrant(RuntimeState st, UUID granter, int mask, UUID owner)
+        private static void NoteGrant(RuntimeState st, UUID granter, int mask, UUID owner, UUID experience)
         {
             st.PermsGranter = granter.ToString();
             st.GrantedPermsMask = mask;
             st.PermsOwner = owner.ToString();
+            st.PermsExperience = experience.IsZero() ? null : experience.ToString();
         }
 
         private static void ClearSavedGrant(RuntimeState st)
@@ -849,6 +908,7 @@ namespace Phlox.ScriptEngine
             st.PermsGranter = null;
             st.GrantedPermsMask = 0;
             st.PermsOwner = null;
+            st.PermsExperience = null;
         }
 
         /// <summary>
@@ -2535,6 +2595,10 @@ namespace Phlox.ScriptEngine
                     = new object[] { silentEstateManagement };
             if (item != null)
             {
+                // A grant that came from an Experience stays one while bits of it end (a reset of the controls, a stand);
+                // any other grant, from another granter or with a bit it did not hold, is not that Experience's.
+                if (mask == 0 || granter != item.PermsGranter || (mask & ~item.PermsMask) != 0)
+                    ForgetExperienceGrant();
                 item.PermsGranter = granter;
                 item.PermsMask = mask;
                 m_host.Inventory.ForceInventoryPersistence();
@@ -2640,6 +2704,7 @@ namespace Phlox.ScriptEngine
             lock (m_host.TaskInventory)
                 item = m_host.TaskInventory[invItemID];
             ClearGrantClaim();   // The answer to this request replaces any grant a restore saved or left waiting
+            ForgetExperienceGrant();   // and whatever it grants is not an Experience's grant
 
             // Halcyon :4518-4527; SL llRequestPermissions "PERMISSION_TELEPORT cannot be held by temporary
             // attachments". The rest of the request goes on (TELEPORT alone becomes a release).
@@ -20627,90 +20692,49 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         private readonly object m_pendingExpLock = new object();
         private IClientAPI m_expHookedClient = null;
 
+        /// <summary>
+        /// SL's list for llRequestExperiencePermissions: "equivalent to PERMISSION_TAKE_CONTROLS,
+        /// PERMISSION_TRIGGER_ANIMATION, PERMISSION_ATTACH, PERMISSION_TRACK_CAMERA, PERMISSION_CONTROL_CAMERA, and
+        /// PERMISSION_TELEPORT". The script item holds them, granted by the agent, once the Experience grants.
+        /// </summary>
+        private const int EXPERIENCE_PERMISSIONS = SlConst.PERMISSION_TAKE_CONTROLS | SlConst.PERMISSION_TRIGGER_ANIMATION |
+            SlConst.PERMISSION_ATTACH | SlConst.PERMISSION_TRACK_CAMERA | SlConst.PERMISSION_CONTROL_CAMERA | SlConst.PERMISSION_TELEPORT;
+
+        /// <summary>What llRequestExperiencePermissions does for an agent: deny, grant silently (already granted, or a trusted Experience), or ask.</summary>
+        private enum ExperienceAnswer { Denied, Granted, Trusted, Ask }
+
         // ── 659: llRequestExperiencePermissions ──
         public void llRequestExperiencePermissions(string agent, string name)
         {
             if (m_host == null || World == null) return;
             UUID agentId;
             if (!UUID.TryParse(agent, out agentId)) return;
+            ClearGrantClaim();   // The answer to this request replaces any grant a restore saved or left waiting
 
             var expService = GetExperienceAdapter();
             UUID experienceId = GetScriptExperienceId();
-
-            // No experience associated with this script -> XP_ERROR_NO_EXPERIENCE (5).
-            if (expService == null || experienceId == UUID.Zero)
+            ExperienceAnswer answer = DecideExperienceRequest(expService, experienceId, agentId, out int denial);
+            if (answer == ExperienceAnswer.Denied)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NO_EXPERIENCE },
+                    new object[] { agent, denial },
                     new DetectParams[0]));
                 return;
             }
 
-            // Block wins: a region-BLOCKED experience is denied regardless of allow/trusted/prior-
-            // grant, land-scope XP_ERROR_NOT_PERMITTED_LAND (17). Checked FIRST (before admission,
-            // trusted, and already-granted) so block wins over everything. (The port source also has a parcel-
-            // block tier at this precedence — deferred; Tranquillity has no parcel-experience source.)
-            if (IsExperienceBlockedInRegion(expService, experienceId))
+            // Already granted -> the grant, notified at once, no dialog.
+            if (answer == ExperienceAnswer.Granted)
             {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NOT_PERMITTED_LAND },
-                    new DetectParams[0]));
-                return;
-            }
-
-            // Admission: the experience must be enabled on this land — estate-ALLOWED or region-
-            // TRUSTED (estate KeyExperiences). A trusted experience is a stronger allow, so it admits
-            // here and is silently granted below (previously a trusted-but-not-allowed experience was
-            // wrongly denied 17 before the trusted check). The port source's admission also has grid-wide + parcel-
-            // ALLOW tiers, and a region/parcel BLOCK-wins tier; those have NO source in NGC (no grid-wide
-            // bit, no region-block store, no ILandObject experience methods), so they are not represented.
-            // Not admitted -> land-scope XP_ERROR_NOT_PERMITTED_LAND (17).
-            if (!IsExperienceAdmitted(expService, experienceId))
-            {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NOT_PERMITTED_LAND },
-                    new DetectParams[0]));
-                return;
-            }
-
-            // Target agent must have a ROOT presence here -> else agent-scope XP_ERROR_NOT_PERMITTED (4).
-            ScenePresence sp = World.GetScenePresence(agentId);
-            if (sp == null || sp.IsChildAgent)
-            {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NOT_PERMITTED },
-                    new DetectParams[0]));
-                return;
-            }
-
-            // Gate order (as the port source): the agent's PERSONAL block wins over everything below and is
-            // checked BEFORE the already-granted short-circuit, so a resident who blocked this experience
-            // is never re-granted (SL code 4).
-            if (expService.IsAgentBlocked(experienceId, agentId))
-            {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NOT_PERMITTED }, // 4 — agent's personal block
-                    new DetectParams[0]));
-                return;
-            }
-
-            // Already granted -> notify immediately, no dialog.
-            if (expService.IsAgentGranted(experienceId, agentId))
-            {
+                SetExperienceGrant(experienceId, agentId);
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions", new object[] { agent }, new DetectParams[0]));
                 return;
             }
 
             // Trusted enforcement. A region-TRUSTED experience (Tranquillity estate KeyExperiences)
-            // grants silently — no dialog. Checked AFTER agent-block, so a personally-blocked
-            // experience is denied 4 even if trusted (block wins over trusted — the port source's order).
-            if (expService.GetTrustedExperiences(World.RegionInfo.RegionID).Contains(experienceId))
+            // grants silently — no dialog.
+            if (answer == ExperienceAnswer.Trusted)
             {
                 GrantExperienceAndNotify(expService, experienceId, agentId, agent);
                 return;
@@ -20720,6 +20744,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // The Experience block on the ScriptQuestion (attached only when experienceId != Zero, guarded
             // in LLClientView) makes the viewer show the experience consent dialog. Resolves to
             // experience_permissions on Yes / _denied 4 on No/disconnect / _denied 18 on timeout.
+            ScenePresence sp = World.GetScenePresence(agentId);
             string ownerName = m_host.ParentGroup.RootPart.OwnerID.ToString();
             var ownerAcct = World?.UserAccountService?.GetUserAccount(
                 World.RegionInfo.ScopeID, m_host.ParentGroup.RootPart.OwnerID);
@@ -20732,12 +20757,97 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 PERMISSION_EXPERIENCE, experienceId);
         }
 
+        /// <summary>
+        /// The decision llRequestExperiencePermissions makes for <paramref name="agentId"/> and the script's
+        /// <paramref name="experienceId"/>, and the one a restored Experience grant is held to (<see cref="GrantSilently"/>):
+        /// a silent grant is <see cref="ExperienceAnswer.Granted"/> or <see cref="ExperienceAnswer.Trusted"/>. A denial gives
+        /// its XP_ERROR code. Nothing is written or posted here.
+        /// </summary>
+        private ExperienceAnswer DecideExperienceRequest(PhloxExperienceAdapter expService, UUID experienceId, UUID agentId, out int denial)
+        {
+            denial = XP_ERROR_NONE;
+
+            // No experience associated with this script -> XP_ERROR_NO_EXPERIENCE (5).
+            if (expService == null || experienceId == UUID.Zero)
+            {
+                denial = XP_ERROR_NO_EXPERIENCE;
+                return ExperienceAnswer.Denied;
+            }
+
+            // Block wins: a region-BLOCKED experience is denied regardless of allow/trusted/prior-
+            // grant, land-scope XP_ERROR_NOT_PERMITTED_LAND (17). Checked FIRST (before admission,
+            // trusted, and already-granted) so block wins over everything. (The port source also has a parcel-
+            // block tier at this precedence — deferred; Tranquillity has no parcel-experience source.)
+            if (IsExperienceBlockedInRegion(expService, experienceId))
+            {
+                denial = XP_ERROR_NOT_PERMITTED_LAND;
+                return ExperienceAnswer.Denied;
+            }
+
+            // Admission: the experience must be enabled on this land — estate-ALLOWED or region-
+            // TRUSTED (estate KeyExperiences). A trusted experience is a stronger allow, so it admits
+            // here and is silently granted below (previously a trusted-but-not-allowed experience was
+            // wrongly denied 17 before the trusted check). The port source's admission also has grid-wide + parcel-
+            // ALLOW tiers, and a region/parcel BLOCK-wins tier; those have NO source in NGC (no grid-wide
+            // bit, no region-block store, no ILandObject experience methods), so they are not represented.
+            // Not admitted -> land-scope XP_ERROR_NOT_PERMITTED_LAND (17).
+            if (!IsExperienceAdmitted(expService, experienceId))
+            {
+                denial = XP_ERROR_NOT_PERMITTED_LAND;
+                return ExperienceAnswer.Denied;
+            }
+
+            // Target agent must have a ROOT presence here -> else agent-scope XP_ERROR_NOT_PERMITTED (4).
+            ScenePresence sp = World.GetScenePresence(agentId);
+            if (sp == null || sp.IsChildAgent)
+            {
+                denial = XP_ERROR_NOT_PERMITTED;
+                return ExperienceAnswer.Denied;
+            }
+
+            // Gate order (as the port source): the agent's PERSONAL block wins over everything below and is
+            // checked BEFORE the already-granted short-circuit, so a resident who blocked this experience
+            // is never re-granted (SL code 4).
+            if (expService.IsAgentBlocked(experienceId, agentId))
+            {
+                denial = XP_ERROR_NOT_PERMITTED; // 4 — agent's personal block
+                return ExperienceAnswer.Denied;
+            }
+
+            // Already granted -> no dialog.
+            if (expService.IsAgentGranted(experienceId, agentId))
+                return ExperienceAnswer.Granted;
+
+            // A region-TRUSTED experience grants silently. Checked AFTER agent-block, so a personally-blocked
+            // experience is denied 4 even if trusted (block wins over trusted — the port source's order).
+            if (expService.GetTrustedExperiences(World.RegionInfo.RegionID).Contains(experienceId))
+                return ExperienceAnswer.Trusted;
+
+            return ExperienceAnswer.Ask;
+        }
+
+        /// <summary>
+        /// The script item takes the grant an Experience gives: SL's list, granted by the agent, replacing any grant it held
+        /// (controls taken for another granter are released, as a new llRequestPermissions does), and noted as that
+        /// Experience's so a restore can hold it to the same decision.
+        /// </summary>
+        private void SetExperienceGrant(UUID experienceId, UUID agentId)
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null) return;
+            if (item.PermsGranter != agentId)
+                EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
+            PermsChange(item, agentId, EXPERIENCE_PERMISSIONS);
+            NoteExperienceGrant(experienceId, agentId);
+        }
+
         // Grant + persist an experience permission and post experience_permissions. Shared by the
         // trusted-bypass path and the accepted-answer path.
         private void GrantExperienceAndNotify(PhloxExperienceAdapter expService, UUID experienceId, UUID agentId, string agent)
         {
             expService.GrantPermission(experienceId, agentId);
             expService.InvalidatePermission(experienceId, agentId);
+            SetExperienceGrant(experienceId, agentId);
             m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                 "experience_permissions", new object[] { agent }, new DetectParams[0]));
             var expInfo = expService.GetExperience(experienceId);
