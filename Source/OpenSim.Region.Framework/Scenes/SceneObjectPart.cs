@@ -175,6 +175,10 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// The sit target's on/off state, independent of its offset and rotation. Reads IsSitTargetSet; assigning it
     /// records the state explicitly, so a target at a zero offset can be active.
     /// </summary>
+    /// <remarks>
+    /// The XML serializer keeps it (crossings, take and rez, archives). The region stores do not save it yet: an
+    /// object loaded from the region database has the state derived from its offset and rotation.
+    /// </remarks>
     [XmlIgnore]
     public bool SitTargetActive
     {

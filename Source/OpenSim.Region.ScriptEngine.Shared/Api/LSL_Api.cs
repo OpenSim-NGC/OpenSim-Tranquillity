@@ -8340,24 +8340,6 @@ public void llDetachFromAvatar()
         part.ParentGroup.HasGroupChanged = oldpos.NotEqual(part.SitTargetPosition) || oldrot.NotEqual(part.SitTargetOrientation);
     }
 
-    /// <summary>
-    /// PRIM_SIT_TARGET: sets the target's on/off state with its offset and rotation, so a target at a zero offset
-    /// can be active (llSitTarget and llLinkSitTarget remove the target at a zero offset).
-    /// </summary>
-    protected static void SitTarget(SceneObjectPart part, bool active, LSL_Vector offset, LSL_Rotation rot)
-    {
-        // LSL quaternions can normalize to 0, normal Quaternions can't.
-        if (rot.s == 0 && rot.x == 0 && rot.y == 0 && rot.z == 0)
-            rot.s = 1; // ZERO_ROTATION = 0,0,0,1
-
-        bool oldactive = part.SitTargetActive;
-        Vector3 oldpos = part.SitTargetPosition;
-        Quaternion oldrot = part.SitTargetOrientation;
-        part.SetSitTarget(active, offset, rot);
-        if (oldactive != active || oldpos.NotEqual(part.SitTargetPosition) || oldrot.NotEqual(part.SitTargetOrientation))
-            part.ParentGroup.HasGroupChanged = true;
-    }
-
     public void llSitTarget(LSL_Vector offset, LSL_Rotation rot)
     {
         SitTarget(m_host, offset, rot);
@@ -10789,11 +10771,17 @@ public void llDetachFromAvatar()
 
                         // SL: "If the active value is 0 the sit target is deactivated. If it is nonzero the prim's sit
                         // target is set to the indicated offset and rotation." and "Unlike llLinkSitTarget(), an offset
-                        // of <0.0, 0.0, 0.0> may be explicitly set".
+                        // of <0.0, 0.0, 0.0> may be explicitly set". The region stores do not save
+                        // SceneObjectPart.SitTargetActive, so a target at a zero offset keeps a 1e-5 m offset here:
+                        // without it the target would be lost when the region restarts.
                         if(active != 0)
-                            SitTarget(part, true, offset, sitrot);
+                        {
+                            if(offset.x == 0 && offset.y == 0 && offset.z == 0 && sitrot.s == 1.0)
+                                offset.z = 1e-5f;
+                            SitTarget(part,offset,sitrot);
+                        }
                         else
-                            SitTarget(part, false, Vector3.Zero, Quaternion.Identity);
+                            SitTarget(part, Vector3.Zero , Quaternion.Identity);
 
                         break;
                     case ScriptBaseClass.PRIM_ALLOW_UNSIT:
