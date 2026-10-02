@@ -91,23 +91,69 @@ public class CompileErrorsToEditorTests : IDisposable
         Assert.Contains("failed to compile", rec.Alerts[0]);
     }
 
+    /// <summary>
+    /// Two clocks meet here. The Save's wait is real time on the caps thread (WaitForCompileErrors, bounded by
+    /// ErrorWaitTimeout), so it keeps a real wait. The timer that shows the scheduler still runs is a wake on the
+    /// engine's clock (Clock), which this test stops and moves by hand, so its ticks are counted exactly. The compile
+    /// under test is held until the test lets it go, never slowed by a fixed delay, so it cannot finish inside the wait.
+    /// The class is already in "phlox-state", which the process-wide clock needs.
+    /// </summary>
     [Fact]
     public void ATimeoutAnswersTheRegionsTimeoutAndDoesNotBlockTheScheduler()
     {
-        using var h = new SchedulerHarness();
-        h.RezScript("default { state_entry() { llSetTimerEvent(0.1); } timer() { llSay(0, \"tick\"); } }");
-        var until = DateTime.UtcNow.AddSeconds(5);
-        while (DateTime.UtcNow < until && h.Said.Count(s => s == "tick") < 3) h.PumpOnce();
+        bool frozen = false;
+        ulong now = 0;
+        InWorldz.Phlox.Util.Clock.SetSourceForTesting(() => frozen ? now : (ulong)Environment.TickCount64);
+        using var held = new ManualResetEventSlim(false);
+        global::Phlox.ScriptEngine.PhloxScriptLoader.CompileDelayForTest = t => { if (t.Contains("HELD-C")) held.Wait(TimeSpan.FromSeconds(60)); return 0; };
+        try
+        {
+            // The chat pause (ChatThrottle) is a sleep on the same clock; off, so it cannot hold a tick back.
+            using var h = new SchedulerHarness(cfg => cfg.Configs["InWorldz.Phlox"].Set("ChatThrottle", "false"));
+            h.RezScript("default { state_entry() { llSetTimerEvent(0.1); } timer() { llSay(0, \"tick\"); } }");
+            int Ticks() => h.Said.Count(s => s == "tick");
+            Assert.True(h.PumpUntil(() => Ticks() >= 1, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
 
-        global::Phlox.ScriptEngine.PhloxScriptLoader.ErrorWaitTimeout = TimeSpan.FromSeconds(1);
-        global::Phlox.ScriptEngine.PhloxScriptLoader.CompileDelayForTest = t => t.Contains("SLOW-C") ? 3000 : 0;
-        var item = AddScriptItem(h, "// SLOW-C\ndefault { state_entry() { llSay(0, \"slow\"); } }");
-        int before = h.Said.Count(s => s == "tick");
-        var (errors, ms) = Save(h, item);
-        int during = h.Said.Count(s => s == "tick") - before;
-        _out.WriteLine($"{ms} ms: [{string.Join(" | ", errors.Cast<object>())}] ticks while waiting: {during}");
-        Assert.Equal(new[] { "timedout waiting for errors" }, errors.Cast<string>().ToArray());
-        Assert.InRange(ms, 900, 3000);
-        Assert.True(during >= 5, $"the timer fired {during} times during a 1 s wait: the wait blocked the scheduler");
+            // From here no tick falls due unless the test moves the clock.
+            now = (ulong)Environment.TickCount64;
+            frozen = true;
+            Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
+            int before = Ticks();
+
+            // 1. While a Save waits for its compile, the scheduler runs: each 100 ms of the clock brings exactly one tick,
+            //    and the Save is still waiting after all five (its compile is held). The wait then ends with the
+            //    compile's own answer, not the timeout.
+            var good = AddScriptItem(h, "// HELD-C\ndefault { state_entry() { llSay(0, \"held\"); } }");
+            var save = Task.Run(() => h.Prim.Inventory.CreateScriptInstanceEr(good, 0, false, h.Engine.Name, 1));
+            for (int i = 1; i <= 5; i++)
+            {
+                now += 100;
+                Assert.True(h.PumpUntil(() => Ticks() == before + i, TimeSpan.FromSeconds(10)),
+                    $"tick {i} did not come while the Save waited: the wait blocked the scheduler ({Ticks() - before} ticks)");
+            }
+            for (int i = 0; i < 20; i++) h.PumpOnce();
+            Assert.Equal(before + 5, Ticks());
+            Assert.False(save.IsCompleted, "the Save returned while its compile was still held");
+            held.Set();
+            Assert.True(h.PumpUntil(() => save.IsCompleted, TimeSpan.FromSeconds(30)), "the Save did not return");
+            _out.WriteLine($"while waiting: {Ticks() - before} ticks; answer [{string.Join(" | ", save.Result.Cast<object>())}]");
+            Assert.Empty(save.Result);
+
+            // 2. A compile that does not come in time: the wait ends at ErrorWaitTimeout with the region's timeout answer.
+            //    Real time only lengthens the wait, so 900 ms is a sound floor; far below the 15 s default is the ceiling.
+            held.Reset();
+            global::Phlox.ScriptEngine.PhloxScriptLoader.ErrorWaitTimeout = TimeSpan.FromSeconds(1);
+            var slow = AddScriptItem(h, "// HELD-C\ndefault { state_entry() { llSay(0, \"slow\"); } }");
+            var (errors, ms) = Save(h, slow);
+            held.Set();
+            _out.WriteLine($"{ms} ms: [{string.Join(" | ", errors.Cast<object>())}]");
+            Assert.Equal(new[] { "timedout waiting for errors" }, errors.Cast<string>().ToArray());
+            Assert.InRange(ms, 900, 10000);
+        }
+        finally
+        {
+            held.Set();
+            InWorldz.Phlox.Util.Clock.SetSourceForTesting(null);
+        }
     }
 }
