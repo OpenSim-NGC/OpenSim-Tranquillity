@@ -33,6 +33,13 @@ namespace OpenSim.Services.Interfaces;
 public interface  IMuteListService
 {
     Byte[] MuteListRequest(UUID agent, uint crc);
+
+    /// <summary>
+    /// As <see cref="MuteListRequest(UUID, uint)"/>, for a caller that must not wait long: a service on another
+    /// server is given timeoutSeconds to answer, and a request that fails or does not answer in time throws
+    /// instead of answering with no list. The default ignores the timeout.
+    /// </summary>
+    Byte[] MuteListRequest(UUID agent, uint crc, int timeoutSeconds) => MuteListRequest(agent, crc);
     bool UpdateMute(MuteData mute);
     bool RemoveMute(UUID agentID, UUID muteID, string muteName);
 }

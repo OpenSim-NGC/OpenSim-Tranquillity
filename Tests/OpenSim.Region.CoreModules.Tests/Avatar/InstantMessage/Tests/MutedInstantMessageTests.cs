@@ -26,8 +26,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Diagnostics;
+using System.Net;
+using System.Net.Http;
+using System.Net.Sockets;
 using System.Reflection;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Nini.Config;
 using OpenMetaverse;
 using Xunit;
@@ -36,6 +41,8 @@ using OpenSim.Framework;
 using OpenSim.Region.CoreModules.Avatar.InstantMessage;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Server.Base;
+using OpenSim.Services.Connectors;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 
@@ -68,6 +75,8 @@ public class MutedInstantMessageTests : OpenSimTestCase
             Reads++;
             if (Throws)
                 throw new InvalidOperationException("mute service down");
+            if (crc != 0)
+                return new byte[] { 1 };   // MuteListService's "your copy is current"
             return agent.Equals(RecipientId) ? Encoding.UTF8.GetBytes(Text) : Array.Empty<byte>();
         }
 
@@ -101,15 +110,45 @@ public class MutedInstantMessageTests : OpenSimTestCase
         protected override object Invoke(MethodInfo method, object[] args) => true;
     }
 
+    /// <summary>Records warnings, so a test can count the ones the mute check logs.</summary>
+    private sealed class RecordingLoggerFactory : ILoggerFactory, ILogger
+    {
+        public readonly List<string> Warnings = new();
+        public void AddProvider(ILoggerProvider provider) { }
+        public ILogger CreateLogger(string categoryName) => this;
+        public void Dispose() { }
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning)
+                lock (Warnings)
+                    Warnings.Add(formatter(state, exception));
+        }
+    }
+
+    private readonly ILoggerFactory m_savedLoggerFactory;
+    private readonly RecordingLoggerFactory m_log = new();
+
     public MutedInstantMessageTests()
     {
         InstantMessageMuteCheck.ForgetAll();
+        m_savedLoggerFactory = LoggerProvider.LoggerFactory;
+        LoggerProvider.LoggerFactory = m_log;
     }
 
     public override void Dispose()
     {
         InstantMessageMuteCheck.ForgetAll();
+        LoggerProvider.LoggerFactory = m_savedLoggerFactory;
+        m_slowServer?.Dispose();
         base.Dispose();
+    }
+
+    private int ReadWarnings()
+    {
+        lock (m_log.Warnings)
+            return m_log.Warnings.Count(w => w.Contains("could not be read"));
     }
 
     private TestScene m_scene;
@@ -393,6 +432,167 @@ public class MutedInstantMessageTests : OpenSimTestCase
         Send(FromAgent(SenderId));
 
         Assert.Single(m_received);
+        Assert.Equal(2, mutes.Reads);
+    }
+
+    // ---- the read's own timeout, failed reads, and the viewer's own request ------------------------------------
+
+    /// <summary>
+    /// A mute list service on another server that answers only after a delay, reached through the grid's mute
+    /// list connector. WebUtil's shared HTTP handlers are process-wide and are put back afterwards.
+    /// </summary>
+    private sealed class SlowMuteServer : IDisposable
+    {
+        private readonly HttpListener m_listener = new();
+        private readonly CancellationTokenSource m_stop = new();
+        private readonly SocketsHttpHandler m_savedRedir = WebUtil.SharedSocketsHttpHandler;
+        private readonly SocketsHttpHandler m_savedNoRedir = WebUtil.SharedSocketsHttpHandlerNoRedir;
+        public readonly string Url;
+        public int Requests;
+
+        public SlowMuteServer(TimeSpan delay)
+        {
+            WebUtil.SetupHTTPClients(false, false, null, 4);
+            int port;
+            using (TcpListener probe = new(IPAddress.Loopback, 0))
+            {
+                probe.Start();
+                port = ((IPEndPoint)probe.LocalEndpoint).Port;
+                probe.Stop();
+            }
+            Url = $"http://127.0.0.1:{port}/";
+            m_listener.Prefixes.Add(Url);
+            m_listener.Start();
+            _ = Task.Run(() => Serve(delay));
+        }
+
+        private async Task Serve(TimeSpan delay)
+        {
+            while (m_listener.IsListening)
+            {
+                HttpListenerContext ctx;
+                try { ctx = await m_listener.GetContextAsync(); }
+                catch { return; }
+                Interlocked.Increment(ref Requests);
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(delay, m_stop.Token);
+                        byte[] bytes = Encoding.UTF8.GetBytes(ServerUtils.BuildXmlResponse(
+                            new Dictionary<string, object> { ["result"] = string.Empty }));
+                        ctx.Response.ContentType = "text/xml";
+                        ctx.Response.ContentLength64 = bytes.Length;
+                        await ctx.Response.OutputStream.WriteAsync(bytes);
+                        ctx.Response.Close();
+                    }
+                    catch { try { ctx.Response.Abort(); } catch { } }
+                });
+            }
+        }
+
+        public void Dispose()
+        {
+            m_stop.Cancel();
+            m_listener.Close();
+            SocketsHttpHandler ours = WebUtil.SharedSocketsHttpHandler;
+            SocketsHttpHandler oursNoRedir = WebUtil.SharedSocketsHttpHandlerNoRedir;
+            WebUtil.SharedSocketsHttpHandler = m_savedRedir;
+            WebUtil.SharedSocketsHttpHandlerNoRedir = m_savedNoRedir;
+            ours?.Dispose();
+            oursNoRedir?.Dispose();
+        }
+    }
+
+    private SlowMuteServer m_slowServer;
+
+    [Fact]
+    public void ADeadMuteServiceHoldsAnImNoLongerThanTheReadTimeoutAndOnlyOncePerRecipient()
+    {
+        SetUpRegion("MessageTransferModule", null);
+        m_slowServer = new SlowMuteServer(TimeSpan.FromSeconds(12));
+        m_scene.RegisterModuleInterface<IMuteListService>(new MuteListServicesConnector(m_slowServer.Url));
+
+        Stopwatch first = Stopwatch.StartNew();
+        Send(FromAgent(SenderId));
+        first.Stop();
+        Stopwatch second = Stopwatch.StartNew();
+        Send(FromAgent(SenderId));
+        second.Stop();
+
+        Assert.Equal(2, m_received.Count);   // failed open
+        Assert.True(first.Elapsed < TimeSpan.FromSeconds(8), $"first IM took {first.Elapsed}");
+        Assert.True(second.Elapsed < TimeSpan.FromSeconds(1), $"second IM took {second.Elapsed}");
+        Assert.Equal(1, m_slowServer.Requests);
+        Assert.Equal(1, ReadWarnings());
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void AFailedReadIsKeptForTheLifetime(string module)
+    {
+        StandInMuteService mutes = new() { Text = Row(1, SenderId, 0), Throws = true };
+        SetUpRegion(module, mutes);
+
+        Send(FromAgent(SenderId));
+        Send(FromAgent(SenderId));
+
+        Assert.Equal(2, m_received.Count);
+        Assert.Equal(1, mutes.Reads);
+    }
+
+    [Fact]
+    public void TheReadWarningIsLoggedAtMostOncePerLifetime()
+    {
+        StandInMuteService mutes = new() { Throws = true };
+        SetUpRegion("MessageTransferModule", mutes);
+        UUID secondRecipient = new("9e3c5a71-2b84-4f06-a1d9-64c0e8b7f523");
+        ScenePresence second = SceneHelpers.AddScenePresence(m_scene, secondRecipient);
+        ((TestClient)second.ControllingClient).OnReceivedInstantMessage += im => m_received.Add(im);
+
+        Send(FromAgent(SenderId));
+        GridInstantMessage toSecond = FromAgent(SenderId);
+        toSecond.toAgentID = secondRecipient.Guid;
+        Send(toSecond);
+
+        Assert.Equal(2, mutes.Reads);
+        Assert.Equal(2, m_received.Count);
+        Assert.Equal(1, ReadWarnings());
+    }
+
+    /// <summary>The recipient's viewer asks this simulator for its mute list, as at login.</summary>
+    private void RecipientViewerAsksForItsList(uint crc)
+    {
+        MuteListRequest handler = (MuteListRequest)typeof(TestClient)
+            .GetField("OnMuteListRequest", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_recipientClient);
+        handler(m_recipientClient, crc);
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void AListTheRecipientsViewerAskedForIsUsedForTheNextMessage(string module)
+    {
+        StandInMuteService mutes = new() { Text = Row(1, SenderId, 0) };
+        SetUpRegion(module, mutes, withMuteListModule: true);
+
+        RecipientViewerAsksForItsList(0);
+        Send(FromAgent(SenderId));
+
+        Assert.Empty(m_received);
+        Assert.Equal(1, mutes.Reads);
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void AViewerWhoseCopyIsCurrentLeavesTheNextMessageToReadTheList(string module)
+    {
+        StandInMuteService mutes = new() { Text = Row(1, SenderId, 0) };
+        SetUpRegion(module, mutes, withMuteListModule: true);
+
+        RecipientViewerAsksForItsList(1234);
+        Send(FromAgent(SenderId));
+
+        Assert.Empty(m_received);
         Assert.Equal(2, mutes.Reads);
     }
 }

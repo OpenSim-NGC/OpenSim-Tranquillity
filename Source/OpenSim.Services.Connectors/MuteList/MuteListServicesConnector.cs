@@ -78,6 +78,30 @@ public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
     }
 
     #region IMuteListService
+    /// <summary>
+    /// The list with a timeout of its own for this one request. A failure or a timeout throws; a reply is read
+    /// as <see cref="MuteListRequest(UUID, uint)"/> reads it.
+    /// </summary>
+    public Byte[] MuteListRequest(UUID agentID, uint crc, int timeoutSeconds)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "get";
+        sendData["agentid"] = agentID.ToString();
+        sendData["mutecrc"] = crc.ToString();
+
+        string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI,
+                            ServerUtils.BuildQueryString(sendData), timeoutSeconds, m_Auth);
+        if (reply == string.Empty)
+            return null;
+        Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+        if (!replyData.ContainsKey("result"))
+            return null;
+        string datastr = replyData["result"].ToString();
+        if (String.IsNullOrWhiteSpace(datastr))
+            return null;
+        return Convert.FromBase64String(datastr);
+    }
+
     public Byte[] MuteListRequest(UUID agentID, uint crc)
     {
         Dictionary<string, object> sendData = new Dictionary<string, object>();

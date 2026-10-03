@@ -52,8 +52,13 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 /// On a grid the list is a request to the mute list service on another server, made on the thread that
 /// sends the message. Each recipient's list is kept for <see cref="CacheLifetimeMs"/>, so a run of messages to
 /// one person asks the service once; a change the recipient makes through this simulator's mute list module
-/// drops their entry at once (<see cref="Forget"/>). A change made through another simulator shows here when
-/// the entry expires.
+/// drops their entry at once (<see cref="Forget"/>), and a list the module reads to answer the recipient's
+/// own viewer fills it (<see cref="Remember"/>). A change made through another simulator shows here when the
+/// entry expires.
+///
+/// The read for a message is given <see cref="ReadTimeoutSeconds"/>. A read that fails or times out lets the
+/// message through, is kept for the cache lifetime like a "no list" answer, and logs one warning at most once
+/// per <see cref="CacheLifetimeMs"/>, so a dead service costs at most one short wait per recipient per minute.
 /// </remarks>
 public static class InstantMessageMuteCheck
 {
@@ -63,6 +68,11 @@ public static class InstantMessageMuteCheck
 
     /// <summary>How long a recipient's list is kept, in milliseconds.</summary>
     public const long CacheLifetimeMs = 60000;
+
+    /// <summary>How long the read for a message may take, in seconds.</summary>
+    public const int ReadTimeoutSeconds = 3;
+
+    private static long s_lastReadWarning = long.MinValue;
 
     private sealed record CachedList(byte[] Data, long ReadAt);
 
@@ -76,11 +86,27 @@ public static class InstantMessageMuteCheck
             m_cache.Remove(agentID);
     }
 
-    /// <summary>Drop every cached list.</summary>
+    /// <summary>Drop every cached list, and let the next failed read log its warning.</summary>
     public static void ForgetAll()
     {
         lock (m_cache)
+        {
             m_cache.Clear();
+            s_lastReadWarning = long.MinValue;
+        }
+    }
+
+    /// <summary>
+    /// Keep a list read for another reason (the recipient's viewer asking for it), so the next message to them
+    /// needs no read of its own. Only a whole list is kept: data with one byte is the service's "your copy is
+    /// current" answer, and null cannot be told apart from a failed read.
+    /// </summary>
+    public static void Remember(UUID agentID, byte[] data)
+    {
+        if (data is null || data.Length == 1)
+            return;
+        lock (m_cache)
+            m_cache[agentID] = new CachedList(data, Environment.TickCount64);
     }
 
     private static byte[] ReadList(IMuteListService mutes, UUID agentID)
@@ -92,9 +118,27 @@ public static class InstantMessageMuteCheck
                 return cached.Data;
         }
 
-        // A service that throws is not cached: the next message asks again. A null answer (no list, or a
-        // remote connector that could not reach the service) is kept like any other.
-        byte[] data = mutes.MuteListRequest(agentID, 0);
+        // A read that fails or times out counts as "no list" and is kept like any other answer, so a dead
+        // service is asked at most once per recipient per lifetime.
+        byte[] data;
+        try
+        {
+            data = mutes.MuteListRequest(agentID, 0, ReadTimeoutSeconds);
+        }
+        catch (Exception e)
+        {
+            data = null;
+            bool warn;
+            lock (m_cache)
+            {
+                warn = s_lastReadWarning == long.MinValue || now - s_lastReadWarning >= CacheLifetimeMs;
+                if (warn)
+                    s_lastReadWarning = now;
+            }
+            if (warn)
+                m_log.LogWarning("[INSTANT MESSAGE]: mute list of {0} could not be read, messages are delivered unchecked: {1}", agentID, e.Message);
+        }
+
         lock (m_cache)
             m_cache[agentID] = new CachedList(data, now);
         return data;
@@ -134,18 +178,7 @@ public static class InstantMessageMuteCheck
         if (mutes is null)
             return false;
 
-        byte[] data;
-        try
-        {
-            data = ReadList(mutes, to);
-        }
-        catch (Exception e)
-        {
-            m_log.LogWarning("[INSTANT MESSAGE]: mute list of {0} could not be read: {1}", to, e.Message);
-            return false;
-        }
-
-        return ListMutesText(data, from, objectID);
+        return ListMutesText(ReadList(mutes, to), from, objectID);
     }
 
     /// <summary>

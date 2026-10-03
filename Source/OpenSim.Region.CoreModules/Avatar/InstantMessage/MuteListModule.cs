@@ -165,6 +165,7 @@ public class MuteListModule : ISharedRegionModule
         }
 
         Byte[] data = m_service.MuteListRequest(client.AgentId, crc);
+        InstantMessageMuteCheck.Remember(client.AgentId, data);
         if (data == null)
         {
             if(crc == 0)
