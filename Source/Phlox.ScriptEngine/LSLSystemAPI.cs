@@ -760,6 +760,10 @@ namespace Phlox.ScriptEngine
         /// "Permissions persist across state changes".
         /// </para>
         /// <para>
+        /// A claim noted for carry (<see cref="NoteGrantForCarry"/>) is marked unverified; wherever it is restored from, a
+        /// row included, it is decided as carried state, never given back whole.
+        /// </para>
+        /// <para>
         /// A grant from an Experience (llRequestExperiencePermissions) is noted with that Experience. From a row it comes
         /// back whole, as any grant. From carried state it comes back only when llRequestExperiencePermissions would grant
         /// it now with no dialog, by the same decision (<see cref="DecideExperienceRequest"/>): the script is still in
@@ -777,10 +781,11 @@ namespace Phlox.ScriptEngine
                          && UUID.TryParse(st.PermsGranter, out granter) && UUID.TryParse(st.PermsOwner, out owner)
                          && (string.IsNullOrEmpty(st.PermsExperience) || UUID.TryParse(st.PermsExperience, out experience));
             int mask = st.GrantedPermsMask;
+            bool unverified = st.PermsUnverified;
             ClearSavedGrant(st);
             TaskInventoryItem item = GetInventorySelf();
             if (item == null || !noted || granter.IsZero() || mask == 0 || owner.IsZero() || owner != m_host.OwnerID) return;
-            if (!carried)
+            if (!carried && !unverified)
             {
                 SetRestoredGrant(item, granter, mask, experience);
                 return;
@@ -895,7 +900,7 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// The grant this script's state carries to its next region: the item's grant, else a claim still waiting for its
-        /// granter, as it was carried here. Scheduler thread, before the capture.
+        /// granter, as it was carried here and marked unverified. Scheduler thread, before the capture.
         /// </summary>
         internal void NoteGrantForCarry()
         {
@@ -905,7 +910,7 @@ namespace Phlox.ScriptEngine
             if (item.PermsGranter != UUID.Zero && item.PermsMask != 0)
                 NoteItemGrant(st, item, m_host.OwnerID);
             else if (m_grantClaim is GrantClaim claim)
-                NoteGrant(st, claim.Granter, claim.Mask, claim.Owner, claim.Experience);
+                NoteGrant(st, claim.Granter, claim.Mask, claim.Owner, claim.Experience, unverified: true);
             else
                 ClearSavedGrant(st);
         }
@@ -928,20 +933,22 @@ namespace Phlox.ScriptEngine
             NoteGrant(st, item.PermsGranter, item.PermsMask, objectOwner, experience);
         }
 
-        private static void NoteGrant(RuntimeState st, UUID granter, int mask, UUID owner, UUID experience)
+        private static void NoteGrant(RuntimeState st, UUID granter, int mask, UUID owner, UUID experience, bool unverified = false)
         {
             st.PermsGranter = granter.ToString();
             st.GrantedPermsMask = mask;
             st.PermsOwner = owner.ToString();
             st.PermsExperience = experience.IsZero() ? null : experience.ToString();
+            st.PermsUnverified = unverified;
         }
 
-        private static void ClearSavedGrant(RuntimeState st)
+        internal static void ClearSavedGrant(RuntimeState st)
         {
             st.PermsGranter = null;
             st.GrantedPermsMask = 0;
             st.PermsOwner = null;
             st.PermsExperience = null;
+            st.PermsUnverified = false;
         }
 
         /// <summary>

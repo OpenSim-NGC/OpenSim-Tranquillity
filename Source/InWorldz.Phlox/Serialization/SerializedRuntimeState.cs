@@ -127,6 +127,14 @@ namespace InWorldz.Phlox.Serialization
         [ProtoMember(29)]
         public string PermsExperience;
 
+        /// <summary>
+        /// Tag 30: the grant in tags 16 and 17 is a claim from carried state still waiting for its granter, which any
+        /// restore decides as carried state, never whole. Absent - false - in every row and carried state written before
+        /// it, which restore as before. An earlier build skips the tag.
+        /// </summary>
+        [ProtoMember(30)]
+        public bool PermsUnverified;
+
         public SerializedRuntimeState()
         {
         }
@@ -212,6 +220,7 @@ namespace InWorldz.Phlox.Serialization
             serState.GrantedPermsMask = state.GrantedPermsMask;
             serState.PermsOwner = state.PermsOwner;
             serState.PermsExperience = state.PermsExperience;
+            serState.PermsUnverified = state.PermsUnverified;
             serState.ActiveListens = listensSnapshot;
             serState.StartParameter = state.StartParameter;
 
@@ -326,6 +335,7 @@ namespace InWorldz.Phlox.Serialization
             state.GrantedPermsMask = this.GrantedPermsMask;
             state.PermsOwner = this.PermsOwner;
             state.PermsExperience = this.PermsExperience;
+            state.PermsUnverified = this.PermsUnverified;
 
             return state;
         }

@@ -1104,15 +1104,16 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// The grant a database row saves: the script item's grant now, with the object's owner. When the part has gone (a
-        /// derez) the grant noted last stays.
+        /// The grant a database row saves: the script item's grant now, with the object's owner. When the part or the
+        /// item has gone (a derez) nothing is saved: what the state noted last may be a claim noted for carry, which a row
+        /// must never hold as a grant.
         /// </summary>
         internal void NoteGrantForRow(InWorldz.Phlox.VM.Interpreter interp)
         {
             SceneObjectPart part = m_Scene?.GetSceneObjectPart(interp.HostLocalId);
             TaskInventoryItem item = part?.Inventory?.GetInventoryItem(interp.ItemId);
-            if (item == null) return;
-            LSLSystemAPI.NoteItemGrant(interp.ScriptState, item, part.OwnerID);
+            if (item == null) LSLSystemAPI.ClearSavedGrant(interp.ScriptState);
+            else LSLSystemAPI.NoteItemGrant(interp.ScriptState, item, part.OwnerID);
         }
 
         /// <summary>A script took or released controls.</summary>

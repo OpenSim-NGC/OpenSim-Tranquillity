@@ -524,6 +524,82 @@ public class GrantRestoreTests
         Assert.DoesNotContain(h.Said, s => s.StartsWith("rtp=", StringComparison.Ordinal));
     }
 
+    // ── a claim never reaches a row as a grant ───────────────────────────────
+
+    /// <summary>
+    /// A carried grant naming an avatar who is not here waits as a claim. A capture for the object to carry notes the
+    /// claim in the state; the object then goes, so the unload save finds no item. The row holds no grant, and a restart
+    /// from it gives none.
+    /// </summary>
+    [Fact]
+    public void AClaimNotedForCarryIsNotSavedAsAGrantWhenTheObjectGoesBeforeTheUnloadSave()
+    {
+        UUID owner, item, asset;
+        using (var h = new SchedulerHarness())
+        {
+            owner = h.Prim.OwnerID;
+            UUID absent = UUID.Random();
+            item = RezWithCarried(h, owner, st => Forge(st, absent, Debit | TakeControls, owner), false, out var copy);
+            Assert.True(Api(h, item).HasGrantClaim);
+            asset = copy.RootPart.Inventory.GetInventoryItem(item).AssetID;
+            Assert.NotEqual(string.Empty, h.Engine.GetXMLState(item));   // the capture for carry
+
+            h.Scene.DeleteSceneObject(copy, false);
+            Assert.True(h.PumpUntil(() => h.InterpreterFor(item) == null), "the script was not unloaded");
+            SavedStateRig.WaitForWrites(h);
+        }
+        SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
+        using (var h2 = Restart(owner, asset, item))
+        {
+            Assert.Equal(0, h2.Prim.Inventory.GetInventoryItem(item).PermsMask);
+            Assert.Equal("perms=0 key=" + UUID.Zero, Report(h2, item));
+        }
+        Assert.Equal(0, row.GrantedPermsMask);
+        Assert.True(string.IsNullOrEmpty(row.PermsGranter));
+    }
+
+    /// <summary>A row whose grant is marked as a claim noted for carry is decided as carried state: debit needs a dialog.</summary>
+    [Fact]
+    public void ARowHoldingAnUnverifiedClaimIsDecidedAsCarriedState()
+    {
+        UUID owner = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        SaveInFirstRegion(owner, asset, item, (h, inv) => { inv.PermsGranter = owner; inv.PermsMask = Debit; });
+        var saved = SavedStateRig.Row(item)!.Value;
+        SerializedRuntimeState st = StateManager.Decode(saved.Blob);
+        Assert.False(st.PermsUnverified);   // the item's own grant
+        st.PermsUnverified = true;
+        using (var ms = new MemoryStream())
+        {
+            Serializer.Serialize(ms, st);
+            SavedStateRig.PutRow(item, asset, ms.ToArray(), saved.SavedAt);
+        }
+
+        using var h2 = Restart(owner, asset, item, h => SceneHelpers.AddScenePresence(h.Scene, owner));
+        Assert.Equal(0, h2.Prim.Inventory.GetInventoryItem(item).PermsMask);
+        Assert.Equal("perms=0 key=" + UUID.Zero, Report(h2, item));
+    }
+
+    /// <summary>The claim's mark travels in the state (tag 30); a state written before it reads as unmarked.</summary>
+    [Fact]
+    public void TheUnverifiedMarkRoundTripsAndAnOlderStateReadsUnmarked()
+    {
+        var st = new SerializedRuntimeState { LSLState = 1, BytecodeIdentity = "b" };
+        Forge(st, UUID.Random(), TakeControls, UUID.Random());
+        st.PermsUnverified = true;
+        byte[] blob;
+        using (var ms = new MemoryStream()) { Serializer.Serialize(ms, st); blob = ms.ToArray(); }
+        Assert.True(StateManager.Decode(blob).PermsUnverified);
+        Assert.True(StateManager.Decode(blob).ToRuntimeState().PermsUnverified);
+        using (var read = new MemoryStream(blob))
+            Assert.Equal(TakeControls, Serializer.Deserialize<OlderState>(read).GrantedPermsMask);   // an older build skips it
+
+        var older = new OlderState { LSLState = 1, BytecodeIdentity = "b", PermsGranter = UUID.Random().ToString(), GrantedPermsMask = Debit };
+        using (var ms = new MemoryStream()) { Serializer.Serialize(ms, older); blob = ms.ToArray(); }
+        SerializedRuntimeState back = StateManager.Decode(blob);
+        Assert.False(back.PermsUnverified);
+        Assert.Equal(Debit, back.GrantedPermsMask);
+    }
+
     [Fact]
     public void AnOwnerChangeClearsAWaitingClaim()
     {

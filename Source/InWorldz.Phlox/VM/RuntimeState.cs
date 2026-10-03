@@ -226,6 +226,12 @@ namespace InWorldz.Phlox.VM
         public string PermsExperience;
 
         /// <summary>
+        /// The saved grant is a claim from carried state that was still waiting for its granter when it was noted, not a
+        /// grant the script item held. Every restore decides it as carried state is decided, never whole.
+        /// </summary>
+        public bool PermsUnverified;
+
+        /// <summary>
         /// The Experience whose grant the script item holds now, and that grant's granter; null when the item's grant did
         /// not come from an Experience. Not saved itself: a capture notes it as <see cref="PermsExperience"/> while the
         /// item's granter is still <see cref="ExperienceGranter"/>.
@@ -415,6 +421,7 @@ namespace InWorldz.Phlox.VM
             GrantedPermsMask = 0;
             PermsOwner = null;
             PermsExperience = null;
+            PermsUnverified = false;
             ExperienceGrant = null;
             ExperienceGranter = null;
             ActiveListens.Clear();
