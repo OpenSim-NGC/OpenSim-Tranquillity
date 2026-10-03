@@ -6,7 +6,7 @@
     <Copyright>Copyright (c) OpenSimulator.org Developers 2007-2009</Copyright>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="XMLRPC" HintPath="../../Library/XMLRPC.dll" />
+    <Reference Include="xmlrpc" HintPath="../../Library/xmlrpc.dll" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />

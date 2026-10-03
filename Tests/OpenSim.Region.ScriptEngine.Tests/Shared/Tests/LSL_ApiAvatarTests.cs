@@ -98,10 +98,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Vector3 newPos = new Vector3(1, 2, 3);
                 apiGrp1.llSetLinkPrimitiveParams(2, new LSL_Types.list(ScriptBaseClass.PRIM_POSITION, newPos));
 
-                Assert.Equal(,);
+                Assert.Equal(newPos, sp.OffsetPosition);
 
                 m_scene.Update(1);
-                Assert.Equal(,);
+                Assert.Equal(1, entityUpdates);
             }
 
             // Test small reposition
@@ -109,10 +109,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 Vector3 newPos = new Vector3(1.001f, 2, 3);
                 apiGrp1.llSetLinkPrimitiveParams(2, new LSL_Types.list(ScriptBaseClass.PRIM_POSITION, newPos));
 
-                Assert.Equal(,);
+                Assert.Equal(newPos, sp.OffsetPosition);
 
                 m_scene.Update(1);
-                Assert.Equal(,);
+                Assert.Equal(2, entityUpdates);
             }
 
             // Test world rotation
@@ -124,7 +124,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                     sp.Rotation, new QuaternionToleranceConstraint(part.GetWorldRotation() * newRot, 0.000001));
 
                 m_scene.Update(1);
-                Assert.Equal(,);
+                Assert.Equal(3, entityUpdates);
             }
 
             // Test local rotation
@@ -136,7 +136,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                     sp.Rotation, new QuaternionToleranceConstraint(newRot, 0.000001));
 
                 m_scene.Update(1);
-                Assert.Equal(,);
+                Assert.Equal(4, entityUpdates);
             }
 
         }
