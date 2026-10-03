@@ -323,6 +323,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptControlsReleased    += OnScriptControlsReleased;
             m_Scene.EventManager.OnRemovePresence            += OnRemovePresenceForControls;
             m_Scene.EventManager.OnMakeRootAgent             += OnMakeRootAgentForControls;
+            m_Scene.EventManager.OnAvatarEnteringNewParcel   += OnAvatarEnteringNewParcelForExperiences;
             if (PhysicsThrottle) m_Scene.EventManager.OnFrame += OnFrameForPhysicsTime;
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
@@ -588,6 +589,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptControlsReleased    -= OnScriptControlsReleased;
             m_Scene.EventManager.OnRemovePresence            -= OnRemovePresenceForControls;
             m_Scene.EventManager.OnMakeRootAgent             -= OnMakeRootAgentForControls;
+            m_Scene.EventManager.OnAvatarEnteringNewParcel   -= OnAvatarEnteringNewParcelForExperiences;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
             m_MasterScheduler?.Stop();
             AsyncCommands?.Shutdown();
@@ -1092,6 +1094,13 @@ namespace Phlox.ScriptEngine
         private void OnMakeRootAgentForControls(ScenePresence sp)
         {
             if (sp != null) m_ExeScheduler?.RequestAvatarArrived(sp.UUID);
+        }
+
+        // An avatar entered a parcel: a grant it gave from an Experience ends where the Experience cannot run (SL wiki
+        // experience_permissions_denied, "The agent has moved to a parcel where the experience cannot run").
+        private void OnAvatarEnteringNewParcelForExperiences(ScenePresence sp, int localLandID, UUID regionID)
+        {
+            if (sp != null && !sp.IsChildAgent) m_ExeScheduler?.RequestExperienceLandCheck(sp.UUID);
         }
 
         /// <summary>

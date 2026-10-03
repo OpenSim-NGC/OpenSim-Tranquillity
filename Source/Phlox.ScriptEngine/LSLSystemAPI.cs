@@ -834,6 +834,32 @@ namespace Phlox.ScriptEngine
             st.ExperienceGrant = experience.ToString();
         }
 
+        /// <summary>The script item's grant is one an Experience gave <paramref name="agentId"/>. Scheduler thread.</summary>
+        internal bool HoldsExperienceGrantFrom(UUID agentId)
+            => m_thisScript?.ScriptState is RuntimeState st && !string.IsNullOrEmpty(st.ExperienceGrant)
+               && UUID.TryParse(st.ExperienceGranter, out UUID granter) && granter == agentId;
+
+        /// <summary>
+        /// <paramref name="agentId"/>, who gave this script its grant from an Experience, entered a parcel. SL wiki
+        /// experience_permissions_denied, under "The experience can no longer run": "The agent has moved to a parcel where
+        /// the experience cannot run." When the land refuses the Experience by the decision llRequestExperiencePermissions
+        /// makes (XP_ERROR_NOT_PERMITTED_LAND: blocked here, or neither allowed nor trusted here), the grant ends with the
+        /// controls it took and experience_permissions_denied is posted with that code, as the core does for YEngine's
+        /// grants (ExperienceModule.UpdateScriptExperiencePerms). Scheduler thread.
+        /// </summary>
+        internal void ExperienceLandChanged(UUID agentId)
+        {
+            if (m_thisScript?.ScriptState is not RuntimeState st || !UUID.TryParse(st.ExperienceGrant, out UUID experience)) return;
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || item.PermsGranter != agentId || World == null) return;
+            if (GetExperienceAdapter() is not PhloxExperienceAdapter expService) return;
+            if (DecideExperienceRequest(expService, experience, agentId, out int denial) != ExperienceAnswer.Denied
+                || denial != XP_ERROR_NOT_PERMITTED_LAND) return;
+            EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
+            m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                "experience_permissions_denied", new object[] { agentId.ToString(), XP_ERROR_NOT_PERMITTED_LAND }, new DetectParams[0]));
+        }
+
         private void ForgetExperienceGrant()
         {
             if (m_thisScript?.ScriptState is not RuntimeState st) return;

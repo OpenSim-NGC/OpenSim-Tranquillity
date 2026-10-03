@@ -1167,6 +1167,7 @@ namespace Phlox.ScriptEngine
             }
             ProcessObjectStateRequests();
             ProcessArrivedAvatars();
+            ProcessExperienceLandChecks();
             ProcessHeldArrivals();   // After the arrivals, whose waiting grants it waits for
             CheckSleepingScripts();
             ProcessEventQueue();
@@ -1206,6 +1207,7 @@ namespace Phlox.ScriptEngine
             lock (m_PermsEnds) if (m_PermsEnds.Count > 0) return true;
             lock (m_ObjectStateRequests) if (m_ObjectStateRequests.Count > 0) return true;
             lock (m_ArrivedAvatars) if (m_ArrivedAvatars.Count > 0) return true;
+            lock (m_ExperienceLandChecks) if (m_ExperienceLandChecks.Count > 0) return true;
             lock (m_SuspendResumeQueue) if (m_SuspendResumeQueue.Count > 0) return true;
             lock (m_PendingResets) if (m_PendingResets.Count > 0) return true;
             lock (m_SyscallReturns) if (m_SyscallReturns.Count > 0) return true;
@@ -1806,6 +1808,7 @@ namespace Phlox.ScriptEngine
         }
         private readonly Queue<ObjectStateRequest> m_ObjectStateRequests = new();
         private readonly Queue<UUID> m_ArrivedAvatars = new();
+        private readonly Queue<UUID> m_ExperienceLandChecks = new();
 
         // Captures taken for an object's other scripts, by item id, until the core asks for them (it asks one script at a
         // time, SceneObjectPartInventory.GetScriptStates). A null blob: the script travels without state.
@@ -1963,6 +1966,34 @@ namespace Phlox.ScriptEngine
                 foreach (KeyValuePair<UUID, LSLSystemAPI> kv in m_Apis)
                     if (!visited.Contains(kv.Key) && kv.Value.HasExperienceClaimFor(agentId)) experienceClaims.Add(kv.Value);
                 foreach (LSLSystemAPI api in experienceClaims) api.OnGroupCrossedAvatarReady(agentId);
+            }
+        }
+
+        /// <summary>
+        /// An avatar entered a parcel here. Every script holding a grant this avatar gave from an Experience asks whether the
+        /// Experience can still run for it (<see cref="LSLSystemAPI.ExperienceLandChanged"/>).
+        /// </summary>
+        internal void RequestExperienceLandCheck(UUID agentId)
+        {
+            lock (m_ExperienceLandChecks) m_ExperienceLandChecks.Enqueue(agentId);
+            m_WorkArrived?.Invoke();
+        }
+
+        private void ProcessExperienceLandChecks()
+        {
+            List<UUID> batch;
+            lock (m_ExperienceLandChecks)
+            {
+                if (m_ExperienceLandChecks.Count == 0) return;
+                batch = new List<UUID>(m_ExperienceLandChecks);
+                m_ExperienceLandChecks.Clear();
+            }
+            foreach (UUID agentId in batch)
+            {
+                var holders = new List<LSLSystemAPI>();
+                foreach (KeyValuePair<UUID, LSLSystemAPI> kv in m_Apis)
+                    if (kv.Value.HoldsExperienceGrantFrom(agentId)) holders.Add(kv.Value);
+                foreach (LSLSystemAPI api in holders) api.ExperienceLandChanged(agentId);
             }
         }
 
