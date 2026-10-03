@@ -183,8 +183,14 @@ namespace InWorldz.Phlox.Serialization
         /// </summary>
         public static object ResolveValue(object value)
         {
+            return ResolveValue(value, 0);
+        }
+
+        /// <summary>As <see cref="ResolveValue(object)"/>, for a value held at table nesting <paramref name="depth"/>.</summary>
+        internal static object ResolveValue(object value, int depth)
+        {
             if (value is SerializedLSLList sl) return sl.ToList();
-            if (value is SerializedLSLTable st) return st.ToTable();
+            if (value is SerializedLSLTable st) return st.ToTable(depth + 1);
             return value;
         }
 
