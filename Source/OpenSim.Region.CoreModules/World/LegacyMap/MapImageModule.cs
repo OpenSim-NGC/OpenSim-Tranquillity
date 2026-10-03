@@ -105,59 +105,32 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
     {
         try
         {
-            // Size the tile to the region's terrain. A fixed 256x256 rendered only the
-            // first 65,536 of the 1,048,576 height samples a 1024x1024 varregion returns -
-            // 6.25% of the terrain - which is why this only ever showed on varregions.
             int mapWidth = m_scene.Heightmap.Width;
             int mapHeight = m_scene.Heightmap.Height;
 
             var mapbmp = new SKBitmap(mapWidth, mapHeight);
-            
-            // Create terrain renderer based on scene settings
-            terrainRenderer = new TexturedMapTileRenderer();
 
-            // Get terrain height data and render it directly
-            float[] heightData = m_scene.Heightmap.GetFloatsSerialised();
-            using (var surface = SKSurface.Create(new SKImageInfo(mapWidth, mapHeight)))
-            using (var canvas = surface.Canvas)
-            {
-                // Draw terrain heights
-                float maxHeight = float.MinValue;
-                float minHeight = float.MaxValue;
-                
-                // Find height range
-                foreach (var height in heightData)
-                {
-                    maxHeight = Math.Max(maxHeight, height);
-                    minHeight = Math.Min(minHeight, height);
-                }
+            // Render through IMapTileTerrainRenderer, as stock OpenSimulator does.
+            //
+            // This method previously assigned `terrainRenderer = new TexturedMapTileRenderer()`
+            // and then never used the field - written once, read nowhere - producing the tile
+            // from a hand-rolled greyscale loop over GetFloatsSerialised() instead.
+            // TextureOnMapTile was not read at all, so setting it had no effect and the world
+            // map was grey relief regardless of configuration.
+            //
+            // Both renderers are present and already ported to SKBitmap, with
+            // IMapTileTerrainRenderer intact. They were orphaned by the SkiaSharp rewrite,
+            // not removed.
+            string[] configSections = new string[] { "Map", "Startup" };
+            bool textureTerrain = Util.GetConfigVarFromSections<bool>(
+                    m_config, "TextureOnMapTile", configSections, false);
 
-                float heightRange = maxHeight - minHeight;
-                
-                // Render terrain
-                int index = 0;
-                // Traversal order (y outer, x inner, index++) is preserved exactly as
-                // found rather than "corrected" against GetFloatsSerialised's ordering.
-                // Every region on this grid is square, so the two are indistinguishable
-                // here; on a non-square varregion they would not be. That is a separate
-                // question from the size bug and is deliberately not answered by this patch.
-                for (int y = 0; y < mapHeight; y++)
-                {
-                    for (int x = 0; x < mapWidth; x++)
-                    {
-                        float height = heightData[index++];
-                        // Normalize height to 0-255 range
-                        byte gray = (byte)(((height - minHeight) / heightRange) * 255);
-                        
-                        // Apply some lighting to create terrain shading
-                        byte shaded = (byte)(gray * 0.8f); // Darken slightly
-                        var color = new SKColor(shaded, shaded, shaded);
-                        
-                        // Set pixel directly
-                        mapbmp.SetPixel(x, y, color);
-                    }
-                }
-            }
+            terrainRenderer = textureTerrain
+                    ? new TexturedMapTileRenderer()
+                    : (IMapTileTerrainRenderer)new ShadedMapTileRenderer();
+
+            terrainRenderer.Initialise(m_scene, m_config);
+            terrainRenderer.TerrainToBitmap(mapbmp);
 
             if (m_scene?.Entities != null && m_scene.Entities.Count > 0)
             {
