@@ -645,6 +645,8 @@ public class HGInventoryBroker : ISharedRegionModule, IInventoryService
                 // but good enough for now
                 RemoteXInventoryServicesConnector rxisc = new RemoteXInventoryServicesConnector(url);
                 rxisc.Scene = m_Scenes[0];
+                // Another grid's inventory: its items carry no Experience link into this grid's prims.
+                rxisc.AcceptsExperienceLinks = false;
                 connector = rxisc;
             }
             if (connector != null)

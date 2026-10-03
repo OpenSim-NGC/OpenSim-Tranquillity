@@ -43,6 +43,13 @@ public class XInventoryService : ServiceBase, IInventoryService
 
     protected IXInventoryData m_Database;
     protected bool m_AllowDelete = true;
+
+    /// <summary>
+    /// False for a service that regions of other grids write to (the Hypergrid inventory services). Such a
+    /// caller cannot vouch for a script's Experience link, so an item it adds has none and an item it updates
+    /// keeps the link this grid stored.
+    /// </summary>
+    protected bool m_AcceptsExperienceLinks = true;
     protected string m_ConfigName = "InventoryService";
 
     public XInventoryService(IConfigSource config)
@@ -636,6 +643,9 @@ public class XInventoryService : ServiceBase, IInventoryService
 //            m_log.LogDebug(
 //                "[XINVENTORY SERVICE]: Adding item {0} {1} to folder {2} for {3}", item.Name, item.ID, item.Folder, item.Owner);
 
+        if (!m_AcceptsExperienceLinks)
+            item.ExperienceID = UUID.Zero;
+
         return m_Database.StoreItem(ConvertFromOpenSim(item));
     }
 
@@ -687,6 +697,9 @@ public class XInventoryService : ServiceBase, IInventoryService
             item.CreatorIdentification = retrievedItem.CreatorIdentification;
             item.Owner = retrievedItem.Owner;
         }
+
+        if (!m_AcceptsExperienceLinks)
+            item.ExperienceID = retrievedItem.ExperienceID;
 
         return m_Database.StoreItem(ConvertFromOpenSim(item));
     }
