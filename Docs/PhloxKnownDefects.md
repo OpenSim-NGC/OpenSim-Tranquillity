@@ -321,8 +321,15 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - A script that arrives on a parcel where scripts may not run is paused, and the arrival's
     `changed` event is dropped with whatever else reaches a paused script. SL queues it and
     posts it once the object is somewhere scripts run.
-  - A seated avatar's crossing: the vehicle's script gets `CHANGED_REGION` when the vehicle
-    arrives, which can be before its riders do.
+  - A seated avatar's crossing: the simulator moves the vehicle before its riders. When a
+    script in the vehicle holds a grant from an avatar who has not arrived yet, the
+    vehicle's `changed(CHANGED_REGION)` waits until that avatar has arrived: seated on the
+    vehicle, with the grant given back, so the script reads it inside the event; or
+    anywhere else in the region, and then without it. The wait ends after 10 seconds
+    whatever has arrived, and the event comes once. The script runs its other events
+    meanwhile. Halcyon waits for every rider the same way, with no limit. A rider whose
+    grant no script in the vehicle holds is not waited for, as the simulator does not tell
+    the new region which riders are coming.
   - A script held stopped because its row could not be read carries no state.
   - Objects saved by an earlier Phlox build carry no Phlox state and start fresh as before.
 - **Carried state is checked as input from outside.** It can come from anywhere: inventory
@@ -390,6 +397,9 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     arrives anywhere in the region, as such a grant needs no seat or attachment. Neither
     `run_time_permissions` nor `experience_permissions` is posted by a restore.
   - States saved by an earlier Phlox build hold no grant and restore without one.
+  - When a region starts, once the scripts it starts have loaded, one line in the log says
+    how many came back with their saved state and how many of those got a grant back:
+    `[PhloxExe]: Region start: N scripts restored, M with a permission grant put back`.
   A seated driver's taken controls also travel with a crossing in the simulator's own agent
   data.
 - **The capture wait is per object.** The simulator asks for an object's script states on a
