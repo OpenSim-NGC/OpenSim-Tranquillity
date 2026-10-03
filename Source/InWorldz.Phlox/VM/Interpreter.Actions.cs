@@ -1981,6 +1981,25 @@ namespace InWorldz.Phlox.VM
         /// </summary>
         public object InvokeClosureSync(LuaClosure cl, object[] args)
         {
+            if (_syncCallDepth >= MaxSyncCallDepth) throw new CheckException("C stack overflow");
+            _syncCallDepth++;
+            try { return InvokeClosureSyncNested(cl, args); }
+            finally { _syncCallDepth--; }
+        }
+
+        /// <summary>
+        /// How deeply closures called from inside one instruction (pcall, metamethods, string.gsub and table.sort callbacks)
+        /// may nest. Each level runs the interpreter again on the simulator thread's own stack, so a script recursing
+        /// through pcall would otherwise overflow that stack, which ends the process. Past the limit the call raises the
+        /// script error "C stack overflow", which pcall catches like any other; Luau bounds nested C calls the same way
+        /// (LUAI_MAXCCALLS, 200, in luaconf.h).
+        /// </summary>
+        public const int MaxSyncCallDepth = 200;
+
+        private int _syncCallDepth;
+
+        private object InvokeClosureSyncNested(LuaClosure cl, object[] args)
+        {
             int baseDepth = _state.Calls.Count;
             int stackBefore = _state.Operands.Count;
             int savedIP = _state.IP;
