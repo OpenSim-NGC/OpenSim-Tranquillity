@@ -143,6 +143,13 @@ public class MessageTransferModule : ISharedRegionModule, IMessageTransferModule
         if (toAgentID.IsZero())
             return;
 
+        // The recipient has muted (blocked) the sender: drop the message, store no offline copy, tell no one.
+        if (InstantMessageMuteCheck.IsMutedByRecipient(m_Scenes, im))
+        {
+            result(true);
+            return;
+        }
+
         ScenePresence achildsp = null;
         // Try root avatar first
         foreach (Scene scene in m_Scenes)
