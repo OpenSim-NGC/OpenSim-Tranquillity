@@ -156,9 +156,18 @@ namespace InWorldz.Phlox.Serialization
                 catch (Exception) when (attempt < CopyAttempts) { }
                 catch (Exception e)
                 {
-                    throw new InvalidOperationException("the script's " + part + " could not be copied for its state: " + e.Message, e);
+                    throw new PartNotCopiedException("the script's " + part + " could not be copied for its state: " + e.Message, e);
                 }
             }
+        }
+
+        /// <summary>
+        /// A part of the state could not be copied, as when another thread kept changing it. Unlike a state that cannot be
+        /// captured at all (tables nested past the bound, a closure cycle), the next capture may well work.
+        /// </summary>
+        public sealed class PartNotCopiedException : InvalidOperationException
+        {
+            public PartNotCopiedException(string message, Exception inner) : base(message, inner) { }
         }
 
         public static SerializedRuntimeState FromRuntimeState(VM.RuntimeState state)

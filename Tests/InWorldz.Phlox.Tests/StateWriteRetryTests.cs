@@ -187,8 +187,8 @@ public class StateWriteRetryTests
     }
 
     /// <summary>
-    /// A script whose state cannot be captured fails at every flush while it runs: the warning is written once, the last
-    /// saved row stays, and the warning comes again only after a capture of it has succeeded.
+    /// A script whose state cannot be captured fails at every flush while it runs: the warning is written once, the older
+    /// row is moved aside once, and the warning comes again only after a capture of it has succeeded.
     /// </summary>
     [Fact]
     public void AScriptThatCannotBeCapturedIsWarnedOfOnceUntilACaptureSucceeds()
@@ -204,7 +204,7 @@ public class StateWriteRetryTests
         s.ScriptState.Globals[0] = TooDeep();
         for (int i = 0; i < 3; i++) m.SaveNow(new[] { s });
         Assert.Equal(1, m.CaptureFailureWarnings);
-        Assert.Equal(7, m.LoadState(s.ItemId, compiled.AssetId).ToRuntimeState().Globals[0]);   // the row is the old one
+        Assert.Null(m.LoadState(s.ItemId, compiled.AssetId));   // the older row was moved aside, once
 
         s.ScriptState.Globals[0] = 9;
         m.SaveNow(new[] { s });
@@ -212,6 +212,64 @@ public class StateWriteRetryTests
         s.ScriptState.Globals[0] = TooDeep();
         m.SaveNow(new[] { s });
         Assert.Equal(2, m.CaptureFailureWarnings);
+    }
+
+    private static long RejectedRows(string db, UUID item)
+    {
+        using var c = new SQLiteConnection($"Data Source={db}");
+        c.Open();
+        using var cmd = c.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM script_state_rejected WHERE item_id = @id";
+        cmd.Parameters.AddWithValue("@id", item.ToString());
+        return Convert.ToInt64(cmd.ExecuteScalar());
+    }
+
+    /// <summary>
+    /// A script whose state cannot be captured has its older row moved aside once, so a restart starts it fresh instead
+    /// of resuming an earlier state; a later capture that works writes a normal row again.
+    /// </summary>
+    [Fact]
+    public void AScriptWhoseStateCannotBeCapturedHasItsOlderRowMovedAsideUntilASaveWorks()
+    {
+        string db = NewDb();
+        var compiled = Compiled();
+        using var m = new StateManager(null, db, ShortBusyMs);
+        var s = Script(compiled);
+        s.ScriptState.Globals[0] = 7;
+        m.SaveNow(new[] { s });
+        Assert.True(HasRow(db, s.ItemId));
+
+        s.ScriptState.Globals[0] = TooDeep();
+        m.SaveNow(new[] { s });
+        m.SaveNow(new[] { s });
+        Assert.False(HasRow(db, s.ItemId), "the older row is still there to be restored");
+        Assert.Equal(1, RejectedRows(db, s.ItemId));
+        Assert.Equal(1, m.RowsMovedAside);
+        Assert.Null(m.LoadState(s.ItemId, compiled.AssetId));   // a restart starts the script fresh
+
+        s.ScriptState.Globals[0] = 9;
+        m.SaveNow(new[] { s });
+        Assert.Equal(9, m.LoadState(s.ItemId, compiled.AssetId).ToRuntimeState().Globals[0]);
+    }
+
+    /// <summary>A capture that fails because a part of the state could not be copied keeps the row: that failure passes.</summary>
+    [Fact]
+    public void ACaptureThatCouldNotCopyAPartKeepsTheRow()
+    {
+        string db = NewDb();
+        var compiled = Compiled();
+        using var m = new StateManager(null, db, ShortBusyMs);
+        var s = Script(compiled);
+        s.ScriptState.Globals[0] = 7;
+        m.SaveNow(new[] { s });
+
+        var listens = s.ScriptState.ActiveListens;
+        s.ScriptState.ActiveListens = null;   // a part that cannot be copied
+        m.SaveNow(new[] { s });
+        s.ScriptState.ActiveListens = listens;
+        Assert.True(HasRow(db, s.ItemId));
+        Assert.Equal(0, m.RowsMovedAside);
+        Assert.Equal(7, m.LoadState(s.ItemId, compiled.AssetId).ToRuntimeState().Globals[0]);
     }
 
     /// <summary>A load of an item whose save the database has not taken yet restores that save, not the older row.</summary>

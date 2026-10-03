@@ -271,10 +271,15 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   the script. At shutdown every queued write is tried to that bound, and the log names
   each write that was not saved. A script loaded while its last save is still queued is
   restored from that save, not from the older row.
-- **A state that cannot be saved.** A script whose tables nest more than 200 deep keeps
-  running, but its state cannot be saved while they are that deep: one warning in the log
-  names it (again only after a later capture of it has worked), and a restart restores the
-  last state that was saved.
+- **A state that cannot be saved.** A script whose tables nest more than 200 deep, or that
+  holds a closure referring back to itself, keeps running, but its state cannot be saved
+  while it is so. Its older saved state is not kept for a restart to resume from: the row
+  is moved to the `script_state_rejected` table, with one error in the log naming the
+  script ("cannot be captured ... cannot be restored in its place"), and a restart starts
+  the script fresh with `state_entry`. As soon as its state can be saved again, the next
+  save writes a normal row. The error is written once, and again only after a later save of
+  it has worked. A save that fails only because the state changed while it was copied
+  keeps the older row.
 - **Shutdown with a script stuck in a call.** The final save waits 5 seconds for the
   script scheduler to stop. If a script is still inside a call then, the scheduler runs
   nothing further, that script keeps its last saved state, and every other script is
