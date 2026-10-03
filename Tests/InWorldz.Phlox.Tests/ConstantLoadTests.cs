@@ -25,8 +25,8 @@ public class ConstantLoadTests
     /// A table integer value, decimal or hex, as the 32-bit integer LSL gives it. Hex is the bit
     /// pattern (0xFFFFFFFF is -1). A decimal value outside the 32-bit range is -1, as an
     /// oversized integer literal is in LSL (wiki.secondlife.com/wiki/Integer: "an undocumented
-    /// way to say -1") and in the assembler; the IW_POWER_* entries are 64-bit group powers and
-    /// all load as -1.
+    /// way to say -1") and in the assembler. (The IW_POWER_* entries above bit 30 used to be their
+    /// 64-bit values and loaded as -1; now they are minus their bit number.)
     /// </summary>
     public static int ParseTableInt(string text)
     {

@@ -20,6 +20,35 @@ namespace InWorldz.Phlox.Compiler
     /// </summary>
     public class TypesVisitor : LSLBaseVisitor<ISymbolType>
     {
+        // The recursive dispatch runs out of stack before a deeply nested tree does (DepthGuard).
+        // The counted limits (NestingLimits) are the rule, the same levels the parser counted;
+        // DepthGuard stays as the backstop. VisitChildren goes through Visit so every child is counted.
+        private readonly NestingCounter _nesting = new NestingCounter();
+
+        public override ISymbolType Visit(Antlr4.Runtime.Tree.IParseTree tree)
+        {
+            DepthGuard.Check(tree);
+            NestingKind? kind = NestingCounter.Classify(tree);
+            if (!kind.HasValue) return base.Visit(tree);
+            var start = (tree as Antlr4.Runtime.ParserRuleContext)?.Start;
+            _nesting.Enter(kind.Value, start?.Line ?? 0, start?.Column ?? 0);
+            try { return base.Visit(tree); }
+            finally { _nesting.Exit(kind.Value); }
+        }
+
+        public override ISymbolType VisitChildren(Antlr4.Runtime.Tree.IRuleNode node)
+        {
+            DepthGuard.Check(node);
+            ISymbolType result = DefaultResult;
+            int n = node.ChildCount;
+            for (int i = 0; i < n; i++)
+            {
+                if (!ShouldVisitNextChild(node, result)) break;
+                result = AggregateResult(result, Visit(node.GetChild(i)));
+            }
+            return result;
+        }
+
         private readonly SymbolTable _symtab;
         private readonly LSLNodeAnnotations _annotations;
 
@@ -61,7 +90,7 @@ namespace InWorldz.Phlox.Compiler
         /// </summary>
         private ISymbolType ResolveType(string typeName)
         {
-            Symbol s = _symtab.Globals.Resolve(typeName);
+            Symbol s = _symtab.Globals.Resolve(SymbolTable.CanonicalTypeName(typeName));
             if (s is ISymbolType t) return t;
             return SymbolTable.VOID;
         }
@@ -181,12 +210,16 @@ namespace InWorldz.Phlox.Compiler
                 scope = _annotations.GetScope(node);
                 node = node.Parent;
             }
-            Symbol sym = (scope ?? _symtab.Globals).Resolve(name);
+            Symbol sym = _symtab.ResolveVisible(scope ?? _symtab.Globals, name, nameToken.TokenIndex, out bool declaredLater);
             if (!(sym is VariableSymbol varSym) || sym is ConstantSymbol)
             {
-                Error(nameToken, sym == null ? $"Undefined symbol '{name}'" : $"'{name}' is not assignable");
+                Error(nameToken, sym != null ? $"'{name}' is not assignable"
+                    : declaredLater ? $"Symbol '{name}' can not be used before it is defined"
+                    : $"Undefined symbol '{name}'");
                 return null;
             }
+            if (context.subscript != null && !CheckSubscript(nameToken, varSym.Type, context.subscript.Text))
+                return null;
 
             ISymbolType lhsType = context.subscript != null ? SymbolTable.FLOAT : varSym.Type;
             string op = context.op?.Text ?? "=";
@@ -250,11 +283,20 @@ namespace InWorldz.Phlox.Compiler
         public override ISymbolType VisitStateChangeStmt([NotNull] LSLParser.StateChangeStmtContext context)
         {
             // Verify the target state exists.
-            string stateName = context.ID().GetText();
+            //
+            // `state default;` is valid LSL - the wiki's own example does it - and the
+            // grammar matches `default` as a KEYWORD, not an ID (LSL.g4:87,
+            // `stateNode='state' (ID | 'default') SEMI`). So ID() is null for exactly that case and
+            // this dereferenced it, throwing a NullReferenceException out of the whole compile.
+            // GenVisitor already had this right (`context.ID()?.GetText()`, GenVisitor.cs:237) and
+            // ByteCodeEmitter.StateChange reads a null id as the default state, so the back end was
+            // never wrong - only this check was.
+            var id = context.ID();
+            string stateName = id?.GetText() ?? "default";
             string key = stateName == "default" ? "default(*)" : stateName + "(*)";
             if (_symtab.Globals.Resolve(key) == null)
             {
-                Error(context.ID().Symbol, $"Unknown state '{stateName}'");
+                Error(id?.Symbol ?? context.stateNode, $"Unknown state '{stateName}'");
             }
             return null;
         }
@@ -362,7 +404,16 @@ namespace InWorldz.Phlox.Compiler
                 return t;
             }
             // &&  ||  — result is always integer (boolean)
-            foreach (var c in children) Visit(c);
+            // SL refuses a key operand at compile time (LL's operator table, as Tailslide's types.cc has it:
+            // OP_BOOLEAN_AND / OP_BOOLEAN_OR take LST_INTEGER, LST_INTEGER only); Phlox compiled it and the script
+            // stopped at run time. Only the key is refused here: the other non-integer operands keep compiling.
+            for (int i = 0; i < children.Length; i++)
+            {
+                ISymbolType t = Visit(children[i]);
+                if (t == SymbolTable.KEY)
+                    ErrorAtContext(children[i], $"Type mismatch: '{GetOpAt(context, i == 0 ? 1 : i)}' cannot be applied to a key");
+                else CheckHasValue(children[i], t);
+            }
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
         }
@@ -402,8 +453,18 @@ namespace InWorldz.Phlox.Compiler
                 SetType(context, t);
                 return t;
             }
-            // == !=  — result integer
-            foreach (var c in children) Visit(c);
+            // == !=  — result integer. The two sides must have the same type after integer-to-float and key/string
+            // conversion (Halcyon's SymbolTable.EqOp and HaveSameTypes; SL refuses the same pairs). A chain compares
+            // left to right, so every comparison after the first has an integer on its left.
+            ISymbolType lhs = Visit(children[0]);
+            for (int i = 1; i < children.Length; i++)
+            {
+                ISymbolType rhs = Visit(children[i]);
+                if (lhs != null && rhs != null && !HaveSameTypes(lhs, rhs))
+                    ErrorAtContext(children[i - 1],
+                        "Type mismatch, equality operators == and != require arguments of the same type");
+                lhs = SymbolTable.INT;
+            }
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
         }
@@ -418,8 +479,24 @@ namespace InWorldz.Phlox.Compiler
                 SetType(context, t);
                 return t;
             }
-            // < > <= >=  — result integer
-            foreach (var c in children) Visit(c);
+            // < > <= >=  — result integer. Halcyon's SymbolTable.RelOp: the same types as == (above), and no strings.
+            // Halcyon also accepted key, vector, rotation and list pairs, which SL refuses; content written for it may
+            // use them, so they keep compiling.
+            ISymbolType lhs = Visit(children[0]);
+            for (int i = 1; i < children.Length; i++)
+            {
+                ISymbolType rhs = Visit(children[i]);
+                if (lhs != null && rhs != null)
+                {
+                    if (!HaveSameTypes(lhs, rhs))
+                        ErrorAtContext(children[i - 1],
+                            "Type mismatch, relational operators require arguments of the same type");
+                    if (lhs == SymbolTable.STRING || rhs == SymbolTable.STRING)
+                        ErrorAtContext(children[i - 1],
+                            "Type mismatch, strings can not be compared with < or >");
+                }
+                lhs = SymbolTable.INT;
+            }
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
         }
@@ -524,7 +601,12 @@ namespace InWorldz.Phlox.Compiler
 
         public override ISymbolType VisitUnaryBoolNot([NotNull] LSLParser.UnaryBoolNotContext context)
         {
-            Visit(context.unaryExpression());
+            ISymbolType t = Visit(context.unaryExpression());
+            // SL refuses '!' on a key at compile time (Tailslide types.cc: {'!', LST_INTEGER, LST_NONE,
+            // LST_BOOLEAN}); Phlox compiled it and the script stopped at run time.
+            if (t == SymbolTable.KEY)
+                ErrorAtContext(context, "Type mismatch: '!' cannot be applied to a key");
+            else CheckHasValue(context.unaryExpression(), t);
             // ! always produces integer (boolean)
             SetType(context, SymbolTable.INT);
             return SymbolTable.INT;
@@ -639,11 +721,8 @@ namespace InWorldz.Phlox.Compiler
 
             // Resolve the function symbol.
             string funcName = GetCallName(context.postfixExpression());
-            MethodSymbol methSym = funcName != null
-                ? _symtab.Globals.Resolve(funcName + "()") as MethodSymbol
-                : null;
 
-            // Visit each argument expression.
+            // Visit each argument expression first: the arity chooses the overload.
             List<ISymbolType> argTypes = new List<ISymbolType>();
             if (context.callParamList() != null)
             {
@@ -651,9 +730,14 @@ namespace InWorldz.Phlox.Compiler
                     argTypes.Add(Visit(expr));
             }
 
+            MethodSymbol methSym = ResolveCall(context, funcName, argTypes);
+            if (methSym != null) _annotations.SetSymbol(context, methSym);   // The gen pass reads this choice
+
             if (methSym == null)
             {
-                // Already reported by DefVisitor if undefined; just return void.
+                // Halcyon's message (SymbolTable.MethodCall); the assembler used to be the first to notice, without a line.
+                if (funcName != null)
+                    ErrorAtContext(context, $"Call to undefined function {funcName}()");
                 SetType(context, SymbolTable.VOID);
                 return SymbolTable.VOID;
             }
@@ -662,8 +746,10 @@ namespace InWorldz.Phlox.Compiler
             var paramSymbols = new List<Symbol>(methSym.Members.Values);
             if (argTypes.Count != paramSymbols.Count)
             {
-                ErrorAtContext(context,
-                    $"Function '{funcName}' expects {paramSymbols.Count} arguments, got {argTypes.Count}");
+                string accepted = AcceptedSignatures(funcName);
+                ErrorAtContext(context, accepted == null
+                    ? $"Function '{funcName}' expects {paramSymbols.Count} arguments, got {argTypes.Count}"
+                    : $"Function '{funcName}' got {argTypes.Count} arguments; it accepts {accepted}");
             }
             else
             {
@@ -695,7 +781,11 @@ namespace InWorldz.Phlox.Compiler
             [NotNull] LSLParser.SubscriptPostfixContext context)
         {
             ISymbolType baseType = Visit(context.postfixExpression());
-            // Subscript (.x .y .z .s) always returns float.
+            // Subscript (.x .y .z .s) always returns float. Only a vector or rotation VARIABLE has members (Halcyon's
+            // SymbolTable.SubScript; SL refuses llGetPos().z, which compiled to no code at all).
+            bool isVariable = context.postfixExpression() is LSLParser.PrimaryExprContext pc
+                && pc.primary() is LSLParser.IdExprContext id && _annotations.GetSymbol(id) is VariableSymbol;
+            CheckSubscript(context.postfixExpression().Start, isVariable ? baseType : null, context.ID().GetText());
             SetType(context, SymbolTable.FLOAT);
             return SymbolTable.FLOAT;
         }
@@ -728,6 +818,7 @@ namespace InWorldz.Phlox.Compiler
         {
             // Visit the three component expressions inside vecLiteral.
             VisitChildren(context);
+            CheckComponents(context.vecLiteral().expr(), "Vector");
             SetType(context, SymbolTable.VECTOR);
             return SymbolTable.VECTOR;
         }
@@ -736,6 +827,7 @@ namespace InWorldz.Phlox.Compiler
             [NotNull] LSLParser.RotationLiteralExprContext context)
         {
             VisitChildren(context);
+            CheckComponents(context.rotLiteral().expr(), "Rotation");
             SetType(context, SymbolTable.ROTATION);
             return SymbolTable.ROTATION;
         }
@@ -743,8 +835,19 @@ namespace InWorldz.Phlox.Compiler
         public override ISymbolType VisitListLiteralExpr(
             [NotNull] LSLParser.ListLiteralExprContext context)
         {
-            // All element types are valid in LSL lists — just visit children.
+            // Any value but a list (Halcyon's SymbolTable.CheckListLiteral; SL refuses a nested list too).
             VisitChildren(context);
+            var elements = context.listLiteral().listContents()?.expr();
+            if (elements != null)
+            {
+                foreach (var e in elements)
+                {
+                    ISymbolType t = TypeOf(e);
+                    if (t == SymbolTable.LIST)
+                        ErrorAtContext(context, "A list can not contain another list");
+                    else CheckHasValue(e, t);
+                }
+            }
             SetType(context, SymbolTable.LIST);
             return SymbolTable.LIST;
         }
@@ -770,10 +873,15 @@ namespace InWorldz.Phlox.Compiler
 			}
 			if (scope == null) scope = _symtab.Globals;
 
-			Symbol sym = scope.Resolve(name) ?? scope.Resolve(name + "()");
+			Symbol sym = _symtab.ResolveVisible(scope, name, context.ID().Symbol.TokenIndex, out bool declaredLater)
+				?? scope.Resolve(name + "()");
 			if (sym == null)
 			{
-				Error(context.ID().Symbol, $"Undefined symbol '{name}'");
+				// A callee's name is reported by the call, as "Call to undefined function".
+				if (!IsCallee(context))
+					Error(context.ID().Symbol, declaredLater
+						? $"Symbol '{name}' can not be used before it is defined"
+						: $"Undefined symbol '{name}'");
 				SetType(context, SymbolTable.VOID);
 				return SymbolTable.VOID;
 			}
@@ -789,15 +897,21 @@ namespace InWorldz.Phlox.Compiler
         public override ISymbolType VisitFuncCall([NotNull] LSLParser.FuncCallContext context)
         {
             string funcName = context.ID().GetText();
-            MethodSymbol methSym = _symtab.Globals.Resolve(funcName + "()") as MethodSymbol;
 
+            // Arguments first, because the arity chooses the overload. A
+            // statement-level call reaches this visitor rather than VisitMethodCallPostfix, and
+            // missing that is why 2b resolved nothing - both paths must use the same rule.
             List<ISymbolType> argTypes = new List<ISymbolType>();
             if (context.callParamList() != null)
                 foreach (var expr in context.callParamList().expr())
                     argTypes.Add(Visit(expr));
 
+            MethodSymbol methSym = ResolveCall(context, funcName, argTypes);
+            if (methSym != null) _annotations.SetSymbol(context, methSym);   // The gen pass reads this choice
+
             if (methSym == null)
             {
+                ErrorAtContext(context, $"Call to undefined function {funcName}()");
                 SetType(context, SymbolTable.VOID);
                 return SymbolTable.VOID;
             }
@@ -805,8 +919,10 @@ namespace InWorldz.Phlox.Compiler
             var paramSymbols = new List<Symbol>(methSym.Members.Values);
             if (argTypes.Count != paramSymbols.Count)
             {
-                ErrorAtContext(context,
-                    $"Function '{funcName}' expects {paramSymbols.Count} arguments, got {argTypes.Count}");
+                string accepted = AcceptedSignatures(funcName);
+                ErrorAtContext(context, accepted == null
+                    ? $"Function '{funcName}' expects {paramSymbols.Count} arguments, got {argTypes.Count}"
+                    : $"Function '{funcName}' got {argTypes.Count} arguments; it accepts {accepted}");
             }
             else
             {
@@ -844,6 +960,143 @@ namespace InWorldz.Phlox.Compiler
 
         private void ErrorAtContext(ParserRuleContext ctx, string msg)
             => Error(ctx.Start.Line, ctx.Start.Column, msg);
+
+        /// <summary>
+        /// Halcyon's SymbolTable.HaveSameTypes: equal, or equal once one side takes LSL's implicit conversion
+        /// (integer to float, key to string, string to key).
+        /// </summary>
+        private static bool HaveSameTypes(ISymbolType a, ISymbolType b)
+            => a == b
+            || SymbolTable.promoteFromTo[a.TypeIndex, b.TypeIndex] == b
+            || SymbolTable.promoteFromTo[b.TypeIndex, a.TypeIndex] == a;
+
+        /// <summary>
+        /// A member (.x .y .z .s) of <paramref name="baseType"/>, null when the base is not a variable. Halcyon's
+        /// messages (SymbolTable.SubScript): a vector has x, y and z; a rotation x, y, z and s.
+        /// </summary>
+        private bool CheckSubscript(IToken at, ISymbolType baseType, string member)
+        {
+            if (baseType != SymbolTable.VECTOR && baseType != SymbolTable.ROTATION)
+            {
+                Error(at, $"Use of subscript .{member} requires a vector or rotation variable");
+                return false;
+            }
+            if (member != "x" && member != "y" && member != "z" && !(member == "s" && baseType == SymbolTable.ROTATION))
+            {
+                Error(at, $"Invalid subscript .{member}");
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>Vector and rotation components are floats or integers (Halcyon's CheckVectorLiteral / CheckRotationLiteral).</summary>
+        private void CheckComponents(LSLParser.ExprContext[] parts, string kind)
+        {
+            foreach (var e in parts)
+            {
+                ISymbolType t = TypeOf(e);
+                if (t != null && t != SymbolTable.FLOAT && t != SymbolTable.INT)
+                {
+                    ErrorAtContext(parts[0], $"{kind} components must be float or implicitly convertable to float ");
+                    return;
+                }
+            }
+        }
+
+        /// <summary>
+        /// A call to a function that returns nothing, used where a value is needed: the call pushes no value, so the
+        /// operator after it would take the wrong operand. SL refuses it at compile time.
+        /// </summary>
+        private void CheckHasValue(ParserRuleContext e, ISymbolType t)
+        {
+            if (e != null && t == SymbolTable.VOID)
+                ErrorAtContext(e, "A function that returns no value can not be used as a value");
+        }
+
+        /// <summary>The name of a call in an expression: f in f(...).</summary>
+        private static bool IsCallee(LSLParser.IdExprContext id)
+            => id.Parent is LSLParser.PrimaryExprContext pc
+            && pc.Parent is LSLParser.MethodCallPostfixContext call
+            && call.postfixExpression() == pc;
+
+        /// <summary>
+        /// The variable of a statement-level ++x; x++; --x; x--; (separate grammar rules from the expression forms):
+        /// it must be in scope at this point, and a member must be one the variable has.
+        /// </summary>
+        private void CheckStatementTarget(ParserRuleContext context, ITerminalNode id, IToken subscript)
+        {
+            IScope scope = null;
+            IParseTree node = context;
+            while (node != null && scope == null)
+            {
+                scope = _annotations.GetScope(node);
+                node = node.Parent;
+            }
+            string name = id.GetText();
+            Symbol sym = _symtab.ResolveVisible(scope ?? _symtab.Globals, name, id.Symbol.TokenIndex, out bool declaredLater);
+            if (!(sym is VariableSymbol varSym) || sym is ConstantSymbol)
+            {
+                Error(id.Symbol, sym != null ? $"'{name}' is not assignable"
+                    : declaredLater ? $"Symbol '{name}' can not be used before it is defined"
+                    : $"Undefined symbol '{name}'");
+                return;
+            }
+            if (subscript != null) CheckSubscript(id.Symbol, varSym.Type, subscript.Text);
+        }
+
+        public override ISymbolType VisitPreIncrementStmt([NotNull] LSLParser.PreIncrementStmtContext context)
+        {
+            CheckStatementTarget(context, context.ID(0), context.subscript);
+            return null;
+        }
+
+        public override ISymbolType VisitPreDecrementStmt([NotNull] LSLParser.PreDecrementStmtContext context)
+        {
+            CheckStatementTarget(context, context.ID(0), context.subscript);
+            return null;
+        }
+
+        public override ISymbolType VisitPostIncrementStmt([NotNull] LSLParser.PostIncrementStmtContext context)
+        {
+            CheckStatementTarget(context, context.ID(0), context.subscript);
+            return null;
+        }
+
+        public override ISymbolType VisitPostDecrementStmt([NotNull] LSLParser.PostDecrementStmtContext context)
+        {
+            CheckStatementTarget(context, context.ID(0), context.subscript);
+            return null;
+        }
+
+        // A condition must be a value: a function that returns nothing pushes none.
+        public override ISymbolType VisitIfStmt([NotNull] LSLParser.IfStmtContext context)
+        {
+            VisitChildren(context);
+            CheckHasValue(context.expression(), TypeOf(context.expression()));
+            return null;
+        }
+
+        public override ISymbolType VisitWhileStmt([NotNull] LSLParser.WhileStmtContext context)
+        {
+            VisitChildren(context);
+            CheckHasValue(context.expression(), TypeOf(context.expression()));
+            return null;
+        }
+
+        public override ISymbolType VisitDoWhileStmt([NotNull] LSLParser.DoWhileStmtContext context)
+        {
+            VisitChildren(context);
+            CheckHasValue(context.expression(), TypeOf(context.expression()));
+            return null;
+        }
+
+        public override ISymbolType VisitForStmt([NotNull] LSLParser.ForStmtContext context)
+        {
+            VisitChildren(context);
+            var cond = context.cond?.expression();
+            CheckHasValue(cond, cond == null ? null : TypeOf(cond));
+            return null;
+        }
 
         private static ParserRuleContext AssignmentTarget(LSLParser.BooleanExpressionContext target)
             => GenVisitor.AssignmentTarget(target);
@@ -912,5 +1165,69 @@ namespace InWorldz.Phlox.Compiler
             }
             return null;
         }
+
+        /// <summary>
+        /// Resolve a call to a method symbol, choosing among a built-in's overloads by
+        /// the number of arguments at the call site. The bare name is tried first, so a
+        /// single-signature built-in and every user function resolve exactly as they did; only a
+        /// name that has a <c>name$&lt;arity&gt;</c> sibling can pick anything else.
+        ///
+        /// <para>Argument TYPES are checked by the caller afterwards, through the tree's existing
+        /// implicit-conversion rule - <c>SymbolTable.promoteFromTo</c> plus <c>CanAssignTo</c>,
+        /// which is LSL's integer-to-float widening and its interchangeable key and string.</para>
+        /// </summary>
+        private MethodSymbol ResolveCall(ParserRuleContext context, string funcName, List<ISymbolType> argTypes)
+        {
+            if (funcName == null) return null;
+
+            MethodSymbol bare = _symtab.Globals.Resolve(funcName + "()") as MethodSymbol;
+            if (bare == null) return null;
+
+            int argCount = argTypes.Count;
+
+            // A user function or a built-in with one signature: exactly the old path, no selection.
+            if (!Defaults.SystemMethods.TryGetValue(funcName, out var sigs) || sigs.Count < 2)
+                return bare;
+
+            // Among the signatures of this arity, the argument TYPES choose.
+            var argVarTypes = new List<VarType?>(argCount);
+            foreach (ISymbolType t in argTypes)
+            {
+                int i = Idx(t);
+                argVarTypes.Add(i >= 0 && i < (int)VarType.Void ? (VarType?)i : null);
+            }
+
+            FunctionSig? chosen = Defaults.SelectOverload(funcName, argVarTypes, out FunctionSig? other);
+            if (!chosen.HasValue)
+            {
+                // No signature of this arity at all, or none whose types can be reached: fall back
+                // to the arity sibling so the argument-count / argument-type error below reads as it
+                // always did, against a signature of the right size where one exists.
+                if (bare.Members.Count == argCount) return bare;
+                if (_symtab.Globals.Resolve(funcName + Defaults.OverloadSeparator + argCount + "()") is MethodSymbol byArity)
+                    return byArity;
+                return bare;
+            }
+
+            if (other.HasValue)
+            {
+                ErrorAtContext(context,
+                    $"Call to '{funcName}' is ambiguous between {Defaults.DescribeSignature(chosen.Value)} and {Defaults.DescribeSignature(other.Value)}");
+            }
+
+            return _symtab.Globals.Resolve(Defaults.SymbolNameFor(chosen.Value) + "()") as MethodSymbol ?? bare;
+        }
+
+        /// <summary>Every arity a built-in accepts, for the error message when none of them match.</summary>
+        private string AcceptedSignatures(string funcName)
+        {
+            if (funcName == null || !Defaults.SystemMethods.TryGetValue(funcName, out var sigs))
+                return null;
+            var forms = new List<string>();
+            foreach (var sig in sigs)
+                forms.Add(funcName + "(" + string.Join(", ", Array.ConvertAll(sig.ParamTypes, t => t.ToString().ToLowerInvariant())) + ")");
+            return string.Join("; ", forms);
+        }
+
     }
 }

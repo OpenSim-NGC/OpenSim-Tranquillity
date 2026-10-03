@@ -25,10 +25,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-// Ported from Halcyon/InWorldz to Legion Grid (dotnet10-modernization)
+// Ported from Halcyon/InWorldz to this engine
 // Adaptations:
 //   - OpenSim.Framework.Communications.Cache removed (not present in modern OpenSim)
-//   - Bot/ScenePresence scanning paths removed (iw* bot functions not ported)
+//   - A bot's sweep (botSensor, botSensorRepeat) keeps Halcyon's bot branches: the bot is not in its own results,
+//     and every entry, no_sensor's too, carries the bot's key for iwDetectedBot
 //   - PostScriptEvent by itemID used for sensor/no_sensor events
 
 using System;
@@ -134,6 +135,21 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
             }
         }
 
+        /// <summary>
+        /// The script is gone or reset - its repeat ends whatever prim it was set from (Halcyon
+        /// RemoveAllAsyncHandlers / AsyncCommandManager.RemoveScript). Keyed on the item alone, so a repeat set before a
+        /// link change cannot outlive it.
+        /// </summary>
+        public void RemoveScript(UUID itemID)
+        {
+            lock (SenseRepeatListLock)
+                SenseRepeaters = SenseRepeaters.FindAll(ts => ts.itemID != itemID);
+        }
+
+        /// <summary>Repeats held, in all or for one item (tests and the leak check).</summary>
+        internal int RepeaterCount { get { lock (SenseRepeatListLock) return SenseRepeaters.Count; } }
+        internal int RepeatersFor(UUID itemID) { lock (SenseRepeatListLock) return SenseRepeaters.FindAll(ts => ts.itemID == itemID).Count; }
+
         public void CheckSenseRepeaterEvents()
         {
             if (SenseRepeaters.Count == 0)
@@ -182,13 +198,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
             if ((ts.type & SCRIPTED) != 0 || (ts.type & PASSIVE) != 0 || (ts.type & ACTIVE) != 0)
                 sensedEntities.AddRange(doObjectSensor(ts));
 
+            ScenePresence bot = ts.host as ScenePresence;
+
             lock (SenseLock)
             {
                 if (sensedEntities.Count == 0)
                 {
                     m_CmdManager.m_ScriptEngine.PostScriptEvent(ts.itemID,
-                        new EventParams("no_sensor", new object[0],
-                        Array.Empty<DetectParams>()));
+                        new EventParams("no_sensor", new object[0], NoSensorDetect(bot)));
                 }
                 else
                 {
@@ -197,9 +214,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                     List<DetectParams> detected = new List<DetectParams>();
                     foreach (SensedEntity se in sensedEntities)
                     {
+                        if (bot != null && se.itemID == bot.UUID) continue;   // a bot does not sense itself
                         try
                         {
-                            DetectParams detect = new DetectParams();
+                            DetectParams detect = bot != null
+                                ? new global::Phlox.ScriptEngine.PhloxEngine.BotDetectParams { BotID = bot.UUID }
+                                : new DetectParams();
                             detect.Key = se.itemID;
                             detect.Populate(m_CmdManager.m_ScriptEngine.World);
                             detected.Add(detect);
@@ -216,8 +236,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                     if (detected.Count == 0)
                     {
                         m_CmdManager.m_ScriptEngine.PostScriptEvent(ts.itemID,
-                            new EventParams("no_sensor", new object[0],
-                            Array.Empty<DetectParams>()));
+                            new EventParams("no_sensor", new object[0], NoSensorDetect(bot)));
                     }
                     else
                     {
@@ -229,6 +248,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                 }
             }
         }
+
+        /// <summary>no_sensor's detect data: none, or for a bot's sweep one entry naming the bot (Halcyon SensorSweep).</summary>
+        private static DetectParams[] NoSensorDetect(ScenePresence bot)
+            => bot == null
+                ? Array.Empty<DetectParams>()
+                : new DetectParams[] { new global::Phlox.ScriptEngine.PhloxEngine.BotDetectParams { BotID = bot.UUID } };
 
         private List<SensedEntity> doObjectSensor(SenseRepeatClass ts)
         {
@@ -280,7 +305,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
                 SceneObjectPart part = sog.RootPart;
                 if (sog.AttachmentPoint != 0) continue;
 
-                if (part.Inventory.ContainsScripts())
+                // SL SCRIPTED: "objects containing any active script"; Halcyon tested the whole linkset (IsScripted)
+                if (sog.ContainsScripts())
                     objtype |= ACTIVE | SCRIPTED;
                 else if (part.Velocity.Equals(ZeroVector))
                     objtype |= PASSIVE;

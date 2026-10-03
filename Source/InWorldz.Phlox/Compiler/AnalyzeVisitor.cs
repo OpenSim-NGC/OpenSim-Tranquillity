@@ -18,6 +18,35 @@ namespace InWorldz.Phlox.Compiler
     /// </summary>
     public class AnalyzeVisitor : LSLBaseVisitor<object>
     {
+        // The recursive dispatch runs out of stack before a deeply nested tree does (DepthGuard).
+        // The counted limits (NestingLimits) are the rule, the same levels the parser counted;
+        // DepthGuard stays as the backstop. VisitChildren goes through Visit so every child is counted.
+        private readonly NestingCounter _nesting = new NestingCounter();
+
+        public override object Visit(Antlr4.Runtime.Tree.IParseTree tree)
+        {
+            DepthGuard.Check(tree);
+            NestingKind? kind = NestingCounter.Classify(tree);
+            if (!kind.HasValue) return base.Visit(tree);
+            var start = (tree as Antlr4.Runtime.ParserRuleContext)?.Start;
+            _nesting.Enter(kind.Value, start?.Line ?? 0, start?.Column ?? 0);
+            try { return base.Visit(tree); }
+            finally { _nesting.Exit(kind.Value); }
+        }
+
+        public override object VisitChildren(Antlr4.Runtime.Tree.IRuleNode node)
+        {
+            DepthGuard.Check(node);
+            object result = DefaultResult;
+            int n = node.ChildCount;
+            for (int i = 0; i < n; i++)
+            {
+                if (!ShouldVisitNextChild(node, result)) break;
+                result = AggregateResult(result, Visit(node.GetChild(i)));
+            }
+            return result;
+        }
+
         private readonly SymbolTable _symtab;
         private readonly LSLNodeAnnotations _annotations;
 
@@ -46,7 +75,7 @@ namespace InWorldz.Phlox.Compiler
         public override object VisitFuncDef([NotNull] LSLParser.FuncDefContext context)
         {
             // Mirrors Analyze.g methodDef / methodOut
-            string typeName = context.TYPE() != null ? context.TYPE().GetText() : null;
+            string typeName = context.TYPE() != null ? SymbolTable.CanonicalTypeName(context.TYPE().GetText()) : null;
 
             // Build a synthetic LSLAst for the FunctionBranch node (used for line info only).
             LSLAst defNode = new LSLAst(context.ID().Symbol) { Text = context.ID().GetText() };

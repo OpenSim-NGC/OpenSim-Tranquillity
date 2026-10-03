@@ -1,11 +1,11 @@
 /*
- * Legion Grid — Phlox Script Engine Integration
+ * Phlox Script Engine Integration
  *
  * LSLSystemAPI — implementation of ISystemAPI.
  *
  * Core functions (llSay, math, basic queries) are implemented.
  * Everything else stubs with a log warning and safe default.
- * Port methods from /d/halcyon-reference/InWorldz/InWorldz.Phlox.Engine/LSLSystemAPI.cs
+ * Port methods from Halcyon's InWorldz/InWorldz.Phlox.Engine/LSLSystemAPI.cs
  * as needed, adapting Halcyon-specific APIs to standard OpenSim equivalents.
  */
 
@@ -32,11 +32,122 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.OptionalModules.World.NPC;
 
 using Microsoft.Extensions.Logging;
+using static Phlox.ScriptEngine.SlConst;
+using ScenePrimType = OpenSim.Region.Framework.Scenes.PrimType;
 
 namespace Phlox.ScriptEngine
 {
-    public class LSLSystemAPI : ISystemAPI
+    public class LSLSystemAPI : ISystemAPI, InWorldz.Phlox.Glue.ISyscallDeferralAdvisor
     {
+        // ── Inline or deferred ──────────────────────────────────────────────
+        //
+        // Answer inline (exactly as without deferral) when the call cannot leave the process: the subject
+        // is in this region, or the answer is already in the local cache the service call consults
+        // FIRST (RemoteUserAccountServicesConnector.GetUserAccount -> UserAccountCache;
+        // RegionAssetConnector.Get -> the asset cache). A cache hit therefore returns exactly what the
+        // blocking call returned, with the same staleness. Everything else in the deferred set runs
+        // on the region's service lane. Any doubt means defer: deferral changes only WHEN the script
+        // gets its answer, never WHAT it gets.
+        public bool NeedsService(string fn, object[] a)
+        {
+            if (m_ScriptEngine?.ServiceCallDeferral == ServiceCallDeferralMode.Always) return true;
+            try
+            {
+                switch (fn)
+                {
+                    case "llGetUsername":
+                        return false;                                          // the region's own presences only
+                    case "llGetDisplayName":
+                    {
+                        // An avatar the region does not know answers "" with no lookup; one it knows asks the
+                        // display-name module, which may call out.
+                        if (!UUID.TryParse(a[0] as string, out UUID id)) return false;
+                        if (World?.GetScenePresence(id) == null) return false;
+                        return World.RequestModuleInterface<IDisplayNameModule>() != null;
+                    }
+                    case "iwGetAgentData":
+                    {
+                        if (!UUID.TryParse(a[0] as string, out UUID id)) return false;
+                        int data = Convert.ToInt32(a[1]);
+                        if (data == DATA_ONLINE)                               // presence, friends and preferences services
+                        {
+                            ScenePresence sp = World?.GetScenePresence(id);
+                            return sp == null || sp.IsChildAgent;
+                        }
+                        if (data != DATA_NAME && data != DATA_BORN && data != DATA_ACCOUNT_TYPE) return false;   // no account lookup
+                        if (data == DATA_NAME && World?.GetScenePresence(id) != null) return false;
+                        return !AccountCached(id, requireAccount: false);
+                    }
+                    case "llName2Key":
+                    {
+                        string name = a[0] as string;
+                        if (string.IsNullOrWhiteSpace(name)) return false;
+                        string[] parts = name.Trim().Split(new[] { ' ', '.' }, 2, StringSplitOptions.RemoveEmptyEntries);
+                        string first = parts[0], last = parts.Length > 1 ? parts[1] : "Resident";
+                        bool here = false;
+                        World?.ForEachScenePresence(sp =>
+                        {
+                            if (!here && !sp.IsChildAgent &&
+                                sp.Firstname.Equals(first, StringComparison.InvariantCultureIgnoreCase) &&
+                                sp.Lastname.Equals(last, StringComparison.InvariantCultureIgnoreCase)) here = true;
+                        });
+                        if (here) return false;
+                        var cache = World?.RequestModuleInterface<IUserAccountCacheModule>();
+                        if (cache == null) return true;
+                        cache.Get(first + " " + last, out bool inCache);
+                        return !inCache;
+                    }
+                    case "osKey2Name":
+                    {
+                        if (!UUID.TryParse(a[0] as string, out UUID id)) return false;
+                        if (World?.GetScenePresence(id) != null) return false;
+                        // A cached null falls through to the user-management module, which may call out.
+                        return !AccountCached(id, requireAccount: true);
+                    }
+                    case "llDialog":
+                    {
+                        if (!UUID.TryParse(a[0] as string, out UUID av)) return false;
+                        ScenePresence sp = World?.GetScenePresence(av);
+                        if (sp == null || sp.IsChildAgent) return false;     // returns before any lookup
+                        if (World?.GetScenePresence(m_host.OwnerID) != null) return false;
+                        return !AccountCached(m_host.OwnerID, requireAccount: false);
+                    }
+                    case "llRequestPermissions":
+                        return !AccountCached(m_host.ParentGroup.RootPart.OwnerID, requireAccount: false);
+                    case "llGetNotecardLineSync":
+                    case "llFindNotecardTextSync":
+                    {
+                        TaskInventoryItem item = FindInventoryItem(a[0] as string, (int)AssetType.Notecard);
+                        return item != null && World?.AssetService?.GetCached(item.AssetID.ToString()) == null;
+                    }
+                    case "osGetNotecard":
+                    case "osGetNotecardLine":
+                    case "osGetNumberOfNotecardLines":
+                    {
+                        string name = a[0] as string;
+                        if (m_host == null || string.IsNullOrEmpty(name)) return false;
+                        TaskInventoryItem item = UUID.TryParse(name, out UUID nid) ? m_host.Inventory.GetInventoryItem(nid) : FindInventoryItem(name, (int)AssetType.Notecard);
+                        return item != null && World?.AssetService?.GetCached(item.AssetID.ToString()) == null;
+                    }
+                    default:
+                        return true;
+                }
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        /// <summary>Is an answer for this account already in the local user-account cache?</summary>
+        private bool AccountCached(UUID id, bool requireAccount)
+        {
+            var cache = World?.RequestModuleInterface<IUserAccountCacheModule>();
+            if (cache == null) return false;
+            UserAccount acct = cache.Get(id, out bool inCache);
+            return inCache && (!requireAccount || acct != null);
+        }
+
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         protected PhloxEngine m_ScriptEngine;
@@ -47,7 +158,6 @@ namespace Phlox.ScriptEngine
         private Interpreter m_thisScript;
         public Interpreter Script { get => m_thisScript; set => m_thisScript = value; }
         public Scene World => m_ScriptEngine.World;
-        private DateTime m_scriptTimer = DateTime.UtcNow;  // for llResetTime/llGetAndResetTime
 
         // Thread-local Random so each scheduler thread gets its own seeded instance;
         // avoids both per-call seed collisions (new Random()) and lock contention.
@@ -71,16 +181,246 @@ namespace Phlox.ScriptEngine
         protected void ScriptSleep(int ms)
         {
             if (m_thisScript == null || ms <= 0) return;
-            m_thisScript.ScriptState.NextWakeup = (ulong)OpenSim.Framework.Util.EnvironmentTickCount() + (ulong)ms;
+            // On an off-thread call for this script the delay travels with the call's
+            // return. Writing RunState from this thread stranded the script (SyscallSleepRaceTests).
+            var ctx = InWorldz.Phlox.Glue.SyscallContext.Current;
+            if (ctx != null && ctx.ItemId == m_itemID) { ctx.AddDelay(ms); return; }
+            m_thisScript.ScriptState.NextWakeup = InWorldz.Phlox.Util.Clock.Now + (ulong)ms;
             m_thisScript.ScriptState.RunState = RuntimeState.Status.Sleeping;
+        }
+
+        // ── Halcyon's anti-abuse slowdowns ─────────────────────────────────────────────────────────
+        // Each is Halcyon's ScriptSleep at Halcyon's call point, under its own [InWorldz.Phlox] setting (on by default;
+        // off is exactly the behaviour without them). The script sees its call work as before and runs on after the
+        // sleep. None logs, as none did in Halcyon.
+
+        /// <summary>Halcyon SimChat / llRegionSay / llOwnerSay (LSLSystemAPI.cs:1042-1085, 12727-12732): ScriptSleep(15).</summary>
+        private void ChatSleep()
+        {
+            if (m_ScriptEngine != null && m_ScriptEngine.ChatThrottle) ScriptSleep(15);
+        }
+
+        /// <summary>
+        /// Halcyon's ScriptShoutError (LSLSystemAPI.cs:14483-14486) - the error on DEBUG_CHANNEL, then SimChat's
+        /// 15 ms (:1042-1046); LSLError, NotImplemented and Deprecated go through it. Used exactly where Halcyon used it in a
+        /// call that is not long-running (its ScriptSleep does nothing in one, :145-156). Its plain ShoutError, which does
+        /// not pause, stays ShoutError here.
+        /// </summary>
+        private void ScriptShoutError(string errorText)
+        {
+            ShoutError(errorText);
+            ChatSleep();
+        }
+
+        // Halcyon's three wrappers of ScriptShoutError, with their texts (LSLSystemAPI.cs:14497-14513).
+        // Used where Halcyon raised them and Phlox was silent.
+        private void LSLError(string msg) => ScriptShoutError("LSL Runtime Error: " + msg);
+        private void NotImplemented(string command) => ScriptShoutError("Command not implemented: " + command);
+        private void Deprecated(string command) => ScriptShoutError("Command deprecated: " + command);
+
+        /// <summary>Halcyon llHTTPRequest's ERROR_DELAY after a refused request (LSLSystemAPI.cs:13762).</summary>
+        internal const int HTTP_CAPPED_DELAY = 80;
+
+        /// <summary>Halcyon botWhisper ... botTouchObject (LSLSystemAPI.cs:17867-17996): ScriptSleep(15) after the call.</summary>
+        private void BotSleep()
+        {
+            if (m_ScriptEngine != null && m_ScriptEngine.BotThrottle) ScriptSleep(15);
+        }
+
+        // Halcyon LSLSystemAPI.cs:60
+        private const int MAX_PHYSICS_TIME_BEFORE_DILATION = 30;
+
+        /// <summary>
+        /// Halcyon PhySleep (LSLSystemAPI.cs:1592-1614): when the physics frame time, averaged over the last 10 frames,
+        /// is over 30 ms, the script sleeps that many ms.
+        /// </summary>
+        private void PhySleep()
+        {
+            if (m_ScriptEngine == null || !m_ScriptEngine.PhysicsThrottle) return;
+            int cmdTime = m_ScriptEngine.PhysicsFrameTimeAvg;
+            if (cmdTime > MAX_PHYSICS_TIME_BEFORE_DILATION)
+                ScriptSleep(cmdTime);
+        }
+
+        /// <summary>
+        /// Halcyon llMessageLinked / botMessageLinked (LSLSystemAPI.cs:5886-5899, 18169-18185): after posting, a 50 ms sleep
+        /// when any receiving script's event queue has 20% or less free (52 or more of 64 queued). A script this engine does
+        /// not run (YEngine's) counts as free, as Halcyon's GetEventQueueFreeSpacePercentage does for an unknown item.
+        /// </summary>
+        private void LinkMessageBackPressure(IEnumerable<UUID> receivers)
+        {
+            if (m_ScriptEngine == null || !m_ScriptEngine.LinkMessageThrottle) return;
+            const float LOW_SPACE_THRESHOLD = 0.2f;
+            const int LOW_SPACE_DELAY = 50;
+            foreach (UUID item in receivers)
+            {
+                if (m_ScriptEngine.GetEventQueueFreeSpacePercentage(item) <= LOW_SPACE_THRESHOLD)
+                {
+                    ScriptSleep(LOW_SPACE_DELAY);
+                    return;
+                }
+            }
+        }
+
+        private static IEnumerable<UUID> ScriptItemsIn(IEnumerable<SceneObjectPart> parts)
+        {
+            var items = new List<UUID>();
+            foreach (SceneObjectPart part in parts)
+            {
+                if (part?.TaskInventory == null) continue;
+                lock (part.TaskInventory)
+                {
+                    foreach (var kvp in part.TaskInventory)
+                        if (kvp.Value.Type == (int)AssetType.LSLText || kvp.Value.Type == INVENTORY_SCRIPT)
+                            items.Add(kvp.Value.ItemID);
+                }
+            }
+            return items;
+        }
+
+        private void NotecardSleep(int ms)
+        {
+            if (m_ScriptEngine != null && m_ScriptEngine.NotecardThrottle) ScriptSleep(ms);
+        }
+
+        // Halcyon GetNumberOfNotecardLines (LSLSystemAPI.cs:14523-14525)
+        private const int NOTECARD_COUNT_ERROR_DELAY = 100;
+        private const int NOTECARD_COUNT_LONG_DELAY = 50;
+        private const int NOTECARD_COUNT_FAST_DELAY = 25;
+        // Halcyon GetNotecardSegment (LSLSystemAPI.cs:14604-14606)
+        private const int NOTECARD_LINE_LONG_DELAY = 25;
+        private const int NOTECARD_LINE_FAST_DELAY = 1;
+        private const int NOTECARD_LINES_PER_DELAY = 16;
+
+        /// <summary>Halcyon GetNotecardSegment's cached-read delay: 1 ms on every 16th line read from offset 0.</summary>
+        private void NotecardLineCachedSleep(int line, int startOffset)
+        {
+            if (((line % NOTECARD_LINES_PER_DELAY) == 0) && (startOffset == 0))
+                NotecardSleep(NOTECARD_LINE_FAST_DELAY);
+        }
+
+        /// <summary>
+        /// Answer a notecard read with <paramref name="answer"/> of the notecard's text. From the region's notecard cache
+        /// when it is on and holds the asset (true: a cached read); otherwise fetched on the thread pool,
+        /// cached when the cache is on, and the cache swept as Halcyon's CacheCheck does after a miss (false).
+        /// <paramref name="logAs"/> names the call in the error log (null: not logged, as the link variants never logged).
+        /// A fetch that finds no notecard asset is Halcyon's (LSLSystemAPI.cs:14563-14569, 14646-14652): the error
+        /// "Notecard '<paramref name="cardName"/>' could not be found." shouted and no dataserver answer (Phlox answered
+        /// "0" or EOF). Halcyon also paused the script (ScriptSleep(ERROR_DELAY), its ScriptShoutError's 15 ms); here the
+        /// fetch runs on the thread pool, where a ScriptSleep would set the run state off the script's own thread (the
+        /// strand, SyscallSleepRaceTests), so the error is shouted without a pause.
+        /// </summary>
+        private bool AnswerNotecardRead(UUID assetId, UUID queryID, Func<PhloxNotecardCache.Card, string> answer,
+            string cardName, string logAs)
+        {
+            PhloxNotecardCache cache = m_ScriptEngine != null && m_ScriptEngine.NotecardCacheEnabled ? m_ScriptEngine.NotecardCache : null;
+            if (cache != null && cache.TryGet(assetId, out PhloxNotecardCache.Card cached))
+            {
+                PostDataserverEvent(queryID, answer(cached));
+                return true;
+            }
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                try
+                {
+                    AssetBase asset = World.AssetService.Get(assetId.ToString());
+                    if (asset == null || asset.Data == null || asset.Type != (sbyte)AssetType.Notecard)
+                    {
+                        ShoutError("Notecard '" + cardName + "' could not be found.");
+                        return;
+                    }
+                    var card = new PhloxNotecardCache.Card(StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data)));
+                    cache?.Cache(assetId, card);
+                    PostDataserverEvent(queryID, answer(card));
+                }
+                catch (Exception ex)
+                {
+                    if (logAs != null) m_log.LogError("[PhloxAPI]: {0} ex: {1}", logAs, ex.Message);
+                    ShoutError("Notecard '" + cardName + "' could not be found.");
+                }
+            });
+            cache?.CacheCheck();
+            return false;
+        }
+
+        /// <summary>SL's notecard line limit: "If the requested line is longer than 1024 bytes (not characters), dataserver will only return the first 1024 bytes".</summary>
+        private const int NOTECARD_LINE_BYTES_DEFAULT = 1024;
+
+        /// <summary>YEngine's ceiling for NotecardLineReadCharsMax (LSL_Api.cs LoadConfig).</summary>
+        private const int NOTECARD_LINE_BYTES_MAX = 65535;
+
+        private int m_notecardLineCap;
+
+        /// <summary>
+        /// The most bytes a line read returns: NotecardLineReadCharsMax from [InWorldz.Phlox], else the same key from
+        /// [YEngine] (so one setting can govern both engines), else SL's 1024. YEngine's own default is 255 characters.
+        /// </summary>
+        private int NotecardLineCap
+        {
+            get
+            {
+                if (m_notecardLineCap > 0) return m_notecardLineCap;
+                const string key = "NotecardLineReadCharsMax";
+                var configs = m_ScriptEngine?.ConfigSource?.Configs;
+                Nini.Config.IConfig own = configs?["InWorldz.Phlox"], yengine = configs?["YEngine"];
+                int cap = own != null && own.Contains(key) ? own.GetInt(key, NOTECARD_LINE_BYTES_DEFAULT)
+                    : yengine != null && yengine.Contains(key) ? yengine.GetInt(key, NOTECARD_LINE_BYTES_DEFAULT)
+                    : NOTECARD_LINE_BYTES_DEFAULT;
+                if (cap <= 0) cap = NOTECARD_LINE_BYTES_DEFAULT;
+                m_notecardLineCap = Math.Min(cap, NOTECARD_LINE_BYTES_MAX);
+                return m_notecardLineCap;
+            }
+        }
+
+        /// <summary>The first <paramref name="maxBytes"/> bytes of <paramref name="text"/> in UTF-8, without splitting a character.</summary>
+        private static string CutToUtf8Bytes(string text, int maxBytes)
+        {
+            if (text.Length * 3 <= maxBytes) return text;   // no character takes more than three bytes per UTF-16 unit
+            byte[] utf8 = Encoding.UTF8.GetBytes(text);
+            if (utf8.Length <= maxBytes) return text;
+            int cut = maxBytes;
+            while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--;   // back to the start of the split character
+            return Encoding.UTF8.GetString(utf8, 0, cut);
+        }
+
+        /// <summary>
+        /// What a line read answers: the line, cut to <see cref="NotecardLineCap"/> bytes; EOF ("\n\n\n") past the end;
+        /// "" for a negative line (SL: negative indexes are not supported; Halcyon and YEngine answer "").
+        /// </summary>
+        private string NotecardLineAnswer(PhloxNotecardCache.Card card, int line)
+        {
+            if (line < 0) return string.Empty;
+            string text = card.Line(line);
+            return text == null ? "\n\n\n" : CutToUtf8Bytes(text, NotecardLineCap);
+        }
+
+        /// <summary>
+        /// What iwGetNotecardSegment answers: part of the line from startOffset, at most maxLength chars. As Halcyon's
+        /// NotecardCache.GetLine (LSLSystemAPI.cs:18685-18709): "" for a negative line or a maxLength of zero or less.
+        /// </summary>
+        private static string NotecardSegmentAnswer(PhloxNotecardCache.Card card, int line, int startOffset, int maxLength)
+        {
+            if (line < 0 || maxLength <= 0) return string.Empty;
+            string result = card.Line(line);
+            if (result == null) return "\n\n\n";
+            if (startOffset > 0 && startOffset < result.Length)
+                result = result.Substring(startOffset);
+            else if (startOffset >= result.Length)
+                result = string.Empty;
+            if (maxLength > 0 && result.Length > maxLength)
+                result = result.Substring(0, maxLength);
+            return result;
         }
 
         protected TaskInventoryItem GetInventorySelf()
         {
-            if (m_host == null) return null;
-            lock (m_host.TaskInventory)
+            // A derezzed part has no inventory left by the time its scripts unload; the NRE here stopped DoUnload
+            // half way and left every derezzed script loaded.
+            var inventory = m_host?.TaskInventory;
+            if (inventory == null) return null;
+            lock (inventory)
             {
-                foreach (var kvp in m_host.TaskInventory)
+                foreach (var kvp in inventory)
                     if (kvp.Value.Type == 10 && kvp.Value.ItemID == m_itemID)
                         return kvp.Value;
             }
@@ -102,22 +442,236 @@ namespace Phlox.ScriptEngine
             m_host.SetScriptEvents(m_itemID, flags);
         }
 
-        public void ShoutError(string errorText)
+        /// <summary>
+        /// The backstop completion for a long-running syscall. Twenty-four async shims set
+        /// RunState=Syscall and called an implementation that never signalled a return, so the script
+        /// stayed in Syscall for ever - no error, no timeout, every later event piling up in its
+        /// queue. That is what the manhole was doing at 19:21 with four queued events.
+        /// </summary>
+        public void CompleteSyscall()
         {
-            m_host?.ParentGroup?.Scene?.SimChat(
-                "Script error: " + errorText,
-                ChatTypeEnum.Shout, 0,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            // Post the call's one return - the body's own SysReturn result if it gave one,
+            // else nothing - with every ScriptSleep of the body as its delay and the call's sequence
+            // number, so a late or repeated completion cannot land in a later syscall.
+            var ctx = InWorldz.Phlox.Glue.SyscallContext.Current;
+            if (ctx != null && ctx.ItemId == m_itemID)
+            {
+                m_ScriptEngine?.SysReturnSequenced(m_itemID, ctx.HasResult ? ctx.Result : null, ctx.DelayMs, ctx.Seq);
+                return;
+            }
+            m_ScriptEngine?.SysReturn(m_itemID, null, 0);
         }
 
-        public void OnScriptReset() { }
-        public void OnStateChange() { }
+        /// <summary>
+        /// Run-time errors go out on DEBUG_CHANNEL, as SL does (wiki: "chat channel reserved for
+        /// script debugging and error messages"; viewers route it to the script-error window and filter
+        /// out other owners' objects) - not shouted on channel 0, where every avatar in range read them
+        /// in local chat. The text is unchanged. ChatModule turns the channel into ChatTypeEnum.DebugChannel.
+        /// They reach scripts listening on DEBUG_CHANNEL as far as llSay reaches (SL wiki, DEBUG_CHANNEL: "Server-generated
+        /// errors are broadcast the same distance as llSay"), and are cut as llSay's text is.
+        /// </summary>
+        public void ShoutError(string errorText)
+        {
+            HostSimChat(CapChatBytes("Script error: " + errorText), ChatTypeEnum.Say, DEBUG_CHANNEL);
+        }
+
+        /// <summary>
+        /// The host prim's chat through Scene.SimChat. Phlox's listens hear it through OnChatFromWorld, after the chat
+        /// module has rewritten chat on DEBUG_CHANNEL to ChatTypeEnum.DebugChannel; the type spoken is recorded for that
+        /// delivery (<see cref="PhloxListenManager.SpokenType"/>), so the listens still get the spoken distance.
+        /// </summary>
+        private void HostSimChat(string msg, ChatTypeEnum type, int channel)
+        {
+            Scene scene = m_host?.ParentGroup?.Scene;
+            if (scene == null) return;
+            PhloxListenManager.SpokenType = type;
+            try
+            {
+                scene.SimChat(msg, type, channel, m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            }
+            finally
+            {
+                PhloxListenManager.SpokenType = null;
+            }
+        }
+
+
+        // A reset and a state change drop every listen, as Halcyon's UnregisterScriptFromNotifications does.
+        // A reset also ends every permission and the controls taken under them (Halcyon OnScriptReset:
+        // ReleaseControlsInternal, then PermsChange(item, UUID.Zero, 0); SL llTakeControls: "The script will also lose
+        // this permission on reset"). Animations already playing and camera parameters stay, as in both.
+        public void OnScriptReset()
+        {
+            ReleaseScriptResources(ScriptEnd.Reset);
+            ClearGrantClaim();
+            EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
+            ThrottleScriptResets();
+        }
+        /// <summary>
+        /// A script loaded with no saved state. Only the listens go, as before: the permissions are the item's,
+        /// which the core sets when it starts the script (SceneObjectPartInventory.CreateScriptInstance), and a fresh start
+        /// is not the owner's or the script's reset.
+        /// </summary>
+        internal void OnFreshStart() => m_ScriptEngine?.ListenManager?.Remove(m_itemID);
+        public void OnStateChange() => ReleaseScriptResources(ScriptEnd.StateChange);
         public void OnScriptUnloaded(ScriptUnloadReason reason, RuntimeState.LocalDisableFlag localFlag)
         {
             m_host?.RemoveScriptEvents(m_itemID);
-            m_ScriptEngine.ListenManager?.Remove(m_itemID);
+            ReleaseScriptResources(ScriptEnd.Unload);
+            // Halcyon OnScriptUnloaded "silently release controls". The permissions and the Control record stay
+            // with the item and its saved state (a crossing object takes them with it); only an avatar still here is let go.
+            ReleaseControlsOnUnload();
         }
-        public void AddExecutionTime(double ms) => m_host?.ParentGroup?.AddScriptLPS((int)ms);
+
+        /// <summary>
+        /// The script was stopped (the Running checkbox, llSetScriptState FALSE). As Halcyon's OnScriptUnloaded with
+        /// GloballyDisabled: the sensor repeat stops, owed dataserver replies are dropped and taken controls are let go.
+        /// The SensorRepeat and Control records stay, and listens stay registered (a stopped script's chat is dropped by
+        /// the scheduler), so a start carries on with them through OnScriptInjected.
+        /// </summary>
+        internal void OnScriptStopped()
+        {
+            PauseSensorForParcel();
+            m_PendingDataserver.Clear();
+            ReleaseControlsOnUnload();
+        }
+
+        /// <summary>
+        /// The unload's release of taken controls, from what the script and the region hold, never from the part's
+        /// inventory: a derez queues the unload (Scene.DeleteSceneObject -> RemoveScriptInstances) and then disposes the
+        /// object, which takes the part's inventory away (SceneObjectPart.Dispose), so the unload can run after the item
+        /// is gone. Controls are registered under this script's item id only by llTakeControls, which also writes the
+        /// Control record, so the record says whether there is anything to release and the avatar holding them is found
+        /// by that id. No record, or no avatar still here holding them: nothing to do.
+        /// </summary>
+        private void ReleaseControlsOnUnload()
+        {
+            var misc = m_thisScript?.ScriptState?.MiscAttributes;
+            if (misc == null || !misc.ContainsKey((int)RuntimeState.MiscAttr.Control)) return;
+            ScenePresence holder = ControlsHolder(UUID.Zero, hadRecord: true);
+            if (holder != null)
+                using (PhloxEngine.OwnControlChange())
+                    holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+            m_ScriptEngine?.RequestParcelCheck(m_itemID);
+        }
+        // ── What ends with the script ──────────────────────────────────────────
+
+        internal enum ScriptEnd { Reset, StateChange, Unload }
+
+        /// <summary>
+        /// The one place a script's resources end: OnScriptReset, OnStateChange and OnScriptUnloaded call it, and
+        /// every reset (llResetScript, llResetOtherScript, the viewer's Reset, osResetAllScripts, a crashed script's
+        /// reset), state change and unload (delete, derez, recompile, region shutdown) reaches one of those three. Timers,
+        /// sleeps and touch waits belong to the scheduler, which ends them one step earlier on the same three paths
+        /// (PhloxExecutionScheduler.UnregisterFromNotifications).
+        /// <list type="bullet">
+        /// <item>listens: every end (SL: "Listeners are removed"; state: "All listens are released"). Unload also forgets the listen-rate record.</item>
+        /// <item>llSensorRepeat: every end (SL reset: "Timers (including repeating sensors) are cleared"; state: "Repeating sensors are released";
+        /// Halcyon RemoveAllAsyncHandlers). Reset and state change also drop the MiscAttr record, so a later restore or parcel resume cannot
+        /// bring the old sensor back; unload keeps it in the state that is saved for the object's return (Halcyon GetSerializationData).</item>
+        /// <item>pending dataserver replies: every end (Halcyon Dataserver.RemoveEvents from RemoveAllAsyncHandlers).</item>
+        /// <item>llHTTPRequest: reset and unload (Halcyon RemoveScript -> StopHttpRequest; a reset clears the event queue). Kept across a state
+        /// change, as Halcyon (its HttpRequestPlugin.RemoveEvents did nothing).</item>
+        /// <item>URLs: reset and unload (SL: "Any granted URLs are released"; "deleting the prim ... release URLs"). Kept across a state
+        /// change (SL: "Unlike listeners, URLs persist across state changes").</item>
+        /// <item>XML-RPC channels and llSendRemoteData: unload only (Halcyon RemoveScript; its reset did nothing and SL says nothing).</item>
+        /// </list>
+        /// </summary>
+        internal void ReleaseScriptResources(ScriptEnd end)
+        {
+            var listens = m_ScriptEngine?.ListenManager;
+            if (end == ScriptEnd.Unload) listens?.Forget(m_itemID);
+            else listens?.Remove(m_itemID);
+
+            m_PendingDataserver.Clear();
+
+            var async = m_ScriptEngine?.AsyncCommands;
+            if (end == ScriptEnd.Unload)
+            {
+                // Halcyon ScriptLoader: AsyncCommandManager.RemoveScript(engine, localId, itemId) - sensor, HTTP, XML-RPC
+                if (m_ScriptEngine != null && async != null)
+                    OpenSim.Region.ScriptEngine.Shared.Api.AsyncCommandManager.RemoveScript(m_ScriptEngine, m_localID, m_itemID);
+            }
+            else
+            {
+                async?.SensorRepeatPlugin.RemoveScript(m_itemID);
+                m_thisScript?.ScriptState?.MiscAttributes?.Remove((int)RuntimeState.MiscAttr.SensorRepeat);
+                if (end == ScriptEnd.Reset) async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID);
+            }
+
+            if (end != ScriptEnd.StateChange)
+                m_ScriptEngine?.World?.RequestModuleInterface<IUrlModule>()?.ScriptRemoved(m_itemID);
+        }
+
+        // Dataserver query ids this script is still owed a reply for. A reply whose id is not here was asked for before a
+        // reset, state change or unload, and is dropped (PostDataserverEvent). Written from pool threads.
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<UUID, byte> m_PendingDataserver = new();
+
+        /// <summary>A new dataserver query id, recorded as owed a reply.</summary>
+        private UUID NewDataserverQuery()
+        {
+            UUID id = UUID.Random();
+            m_PendingDataserver[id] = 0;
+            return id;
+        }
+
+        internal int PendingDataserverCount => m_PendingDataserver.Count;
+
+        // Halcyon LSLSystemAPI.ThrottleScriptResets, from its OnScriptReset.
+        private const int MAX_RESETS_PER_SECOND = 5;
+        private long m_resetSecond;
+        private int m_resetCount;
+        private DateTime m_resetWarned = DateTime.MinValue;
+
+        /// <summary>
+        /// Halcyon's reset throttle - more than 5 resets of this script in one second and it sleeps 5 s before
+        /// its state_entry, with a warning in the log and on DEBUG_CHANNEL once an hour. [InWorldz.Phlox] ResetThrottle.
+        /// The second is counted on the engine's clock (Clock), the clock the 5 s sleep runs on, where Halcyon took the
+        /// Unix second: the same one-second periods, so a test can move both.
+        /// </summary>
+        private void ThrottleScriptResets()
+        {
+            if (m_ScriptEngine == null || !m_ScriptEngine.ResetThrottle) return;
+            long now = (long)(InWorldz.Phlox.Util.Clock.Now / 1000);
+            if (m_resetSecond == now)
+            {
+                if (++m_resetCount > MAX_RESETS_PER_SECOND)
+                {
+                    if (DateTime.UtcNow > m_resetWarned.AddMinutes(60))   // warn once per hour
+                    {
+                        string context = m_host == null ? string.Empty : string.Format("in '{0}'{1} at {2}/{3}/{4}",
+                            m_host.ParentGroup?.Name, m_host.LinkNum < 2 ? string.Empty : " link #" + m_host.LinkNum,
+                            (int)m_host.AbsolutePosition.X, (int)m_host.AbsolutePosition.Y, (int)m_host.AbsolutePosition.Z);
+                        m_log.LogWarning("[Phlox]: Script '{0}' calling llResetScript too frequently: {1}", llGetScriptName(), context);
+                        ScriptShoutError("Script '" + llGetScriptName() + "' calling llResetScript too frequently: " + context);
+                        m_resetWarned = DateTime.UtcNow;
+                    }
+                    ResetSleepCount++;
+                    ScriptSleep(5000);   // punish the script for 5 seconds after too many resets in the same period
+                }
+            }
+            else
+                m_resetCount = 1;
+            m_resetSecond = now;
+        }
+
+        /// <summary>Times this script has been put to sleep by the reset throttle (tests).</summary>
+        internal int ResetSleepCount { get; private set; }
+
+        // The last NUM_RUN_SAMPLES timeslice times, for GetAverageScriptTime (Halcyon LSLSystemAPI: the mean of the
+        // last 16 samples, recorded by the run loop after every slice). Scheduler thread only.
+        private const int NUM_RUN_SAMPLES = 16;
+        private readonly double[] m_runSamples = new double[NUM_RUN_SAMPLES];
+        private int m_numRunSamples;
+        private int m_currRunSample;
+
+        public void AddExecutionTime(double ms)
+        {
+            m_host?.ParentGroup?.AddScriptLPS((int)ms);
+            m_runSamples[m_currRunSample++] = ms;
+            if (m_currRunSample > m_numRunSamples) m_numRunSamples = m_currRunSample;
+            if (m_currRunSample >= NUM_RUN_SAMPLES) m_currRunSample = 0;
+        }
         public void OnScriptInjected(bool fromCrossing)
         {
             if (m_thisScript?.ScriptState?.MiscAttributes == null) return;
@@ -136,20 +690,276 @@ namespace Phlox.ScriptEngine
                         llVolumeDetect((int)kvp.Value[0]);
                         break;
                     case RuntimeState.MiscAttr.Control:
-                        // Halcyon calls a 7-arg TakeControlsInternal helper that bypasses the
-                        // permission check by re-using the existing grant on the TaskInventoryItem.
-                        // We call llTakeControls() directly which re-validates PERMISSION_TAKE_CONTROLS.
-                        // If permission state didn't persist alongside the Control entry, restore
-                        // will silently fail. Acceptable for now; revisit if reports of lost
-                        // controls on restart surface.
+                        // A vehicle's script arriving by a crossing leaves its controls to the core, which carries the
+                        // seated avatar's registrations in the agent's data, and to OnGroupCrossedAvatarReady when the
+                        // avatar arrives without them (Halcyon OnScriptInjected: "m_host.IsAttachment || !fromCrossing").
                         if (m_host.ParentGroup.IsAttachment || !fromCrossing)
-                            llTakeControls((int)kvp.Value[0], (int)kvp.Value[1], (int)kvp.Value[2]);
+                            TakeControlsInternal((int)kvp.Value[0], (int)kvp.Value[1], (int)kvp.Value[2], UUID.Zero);
                         break;
                 }
             }
         }
-        public void OnGroupCrossedAvatarReady(UUID avatarId) { }
-        public float GetAverageScriptTime() => 0f;
+
+        /// <summary>
+        /// A restored script's records of grants it used, the taken controls and PERMISSION_SILENT_ESTATE_MANAGEMENT, are
+        /// kept only while the item holds the grant they rest on, from a granter, or while that grant waits for its granter
+        /// as a claim (<see cref="RestoreSavedGrant"/>); they go when the claim goes. A record never gives a grant itself.
+        /// SL: the script loses PERMISSION_TAKE_CONTROLS "on reset, or if the object is deleted, detached, or dropped"
+        /// (llTakeControls). Every restore calls this after the saved grant is decided, before anything runs.
+        /// </summary>
+        internal void DropGrantRecordsWithoutGrant()
+        {
+            var misc = m_thisScript?.ScriptState?.MiscAttributes;
+            if (misc == null) return;
+            TaskInventoryItem item = GetInventorySelf();
+            int mask = item == null || item.PermsGranter == UUID.Zero ? 0 : item.PermsMask;
+            if (mask == 0 && m_grantClaim is GrantClaim claim) mask = claim.Mask;
+            if ((mask & PERMISSION_TAKE_CONTROLS) == 0) misc.Remove((int)RuntimeState.MiscAttr.Control);
+            if ((mask & PERMISSION_SILENT_ESTATE_MANAGEMENT) == 0) misc.Remove((int)RuntimeState.MiscAttr.SilentEstateManagement);
+        }
+
+        /// <summary>
+        /// A grant from carried state whose granter is not here yet: who gave it, what it held, the owner then, and the
+        /// Experience it came from (zero for any other grant).
+        /// </summary>
+        private sealed record GrantClaim(UUID Granter, int Mask, UUID Owner, UUID Experience);
+
+        /// <summary>Scheduler thread only, as every caller is.</summary>
+        private GrantClaim m_grantClaim;
+
+        /// <summary>A grant from carried state is waiting for its granter to arrive (tests and `phlox status`).</summary>
+        internal bool HasGrantClaim => m_grantClaim != null;
+
+        /// <summary>
+        /// The avatar a waiting grant needs on or wearing the object (any claim not from an Experience), or zero. Such a
+        /// granter of an unworn object that just crossed is a rider still to come. Scheduler thread.
+        /// </summary>
+        internal UUID WaitingSeatGranter
+            => m_grantClaim is GrantClaim claim && claim.Experience.IsZero() ? claim.Granter : UUID.Zero;
+
+        /// <summary>
+        /// A grant from an Experience waits for <paramref name="agentId"/>. Such a grant needs no seat or attachment, so the
+        /// avatar's arrival anywhere in the region decides it. Scheduler thread.
+        /// </summary>
+        internal bool HasExperienceClaimFor(UUID agentId)
+            => m_grantClaim is GrantClaim claim && claim.Granter == agentId && !claim.Experience.IsZero();
+
+        /// <summary>
+        /// The grant saved with the state, given back to the script item when the object's owner is still the owner noted
+        /// with it; otherwise nothing. No run_time_permissions is posted, and llGetPermissionsKey answers the granter.
+        /// <para>
+        /// From this simulator's own state database (a restart, or an object back in the simulator that saved it with no
+        /// carried state) the grant comes back whole, as YEngine restores its saved grant (XMRInstCtor, the
+        /// &lt;Permissions&gt; node). State carried inside an object is input from outside the simulator: only the bits a
+        /// silent llRequestPermissions would give the granter at that moment come back, by the same decision
+        /// (<see cref="GetImplicitPermissions"/>: the granter wears the object, or sits on it). Every bit that needs a
+        /// dialog, debit among them, is asked for again. A granter who has not arrived yet (a vehicle crossing before its
+        /// rider, attachments rezzing as their wearer arrives) leaves the grant waiting as a claim, decided the same way
+        /// when that avatar arrives on the object or wearing it (<see cref="OnGroupCrossedAvatarReady"/>); a claim never met
+        /// never acts. The SL wiki says nothing on a grant across a restart, rez or crossing; llRequestPermissions says
+        /// "Permissions persist across state changes".
+        /// </para>
+        /// <para>
+        /// A grant from an Experience (llRequestExperiencePermissions) is noted with that Experience. From a row it comes
+        /// back whole, as any grant. From carried state it comes back only when llRequestExperiencePermissions would grant
+        /// it now with no dialog, by the same decision (<see cref="DecideExperienceRequest"/>): the script is still in
+        /// that Experience, the Experience is allowed here, and the granter, here, still allows it. Its granter need not
+        /// wear or sit on the object, so a claim for it is decided when that avatar arrives anywhere in the region.
+        /// </para>
+        /// </summary>
+        internal void RestoreSavedGrant(bool carried)
+        {
+            m_grantClaim = null;
+            RuntimeState st = m_thisScript?.ScriptState;
+            if (st == null) return;
+            UUID granter = UUID.Zero, owner = UUID.Zero, experience = UUID.Zero;
+            bool noted = !string.IsNullOrEmpty(st.PermsGranter) && !string.IsNullOrEmpty(st.PermsOwner)
+                         && UUID.TryParse(st.PermsGranter, out granter) && UUID.TryParse(st.PermsOwner, out owner)
+                         && (string.IsNullOrEmpty(st.PermsExperience) || UUID.TryParse(st.PermsExperience, out experience));
+            int mask = st.GrantedPermsMask;
+            ClearSavedGrant(st);
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || !noted || granter.IsZero() || mask == 0 || owner.IsZero() || owner != m_host.OwnerID) return;
+            if (!carried)
+            {
+                SetRestoredGrant(item, granter, mask, experience);
+                return;
+            }
+            ScenePresence sp = World?.GetScenePresence(granter);
+            if (sp == null || sp.IsChildAgent)
+            {
+                m_grantClaim = new GrantClaim(granter, mask, owner, experience);
+                return;
+            }
+            GrantSilently(item, granter, mask, experience);
+        }
+
+        /// <summary>
+        /// The bits of <paramref name="mask"/> a silent re-request would give <paramref name="granter"/> now: from an
+        /// Experience, what llRequestExperiencePermissions would grant with no dialog; otherwise what llRequestPermissions
+        /// would.
+        /// </summary>
+        private void GrantSilently(TaskInventoryItem item, UUID granter, int mask, UUID experience)
+        {
+            if (!experience.IsZero())
+            {
+                int bits = mask & EXPERIENCE_PERMISSIONS;
+                if (bits != 0 && GetScriptExperienceId() == experience && GetExperienceAdapter() is PhloxExperienceAdapter expService
+                    && DecideExperienceRequest(expService, experience, granter, out _) is ExperienceAnswer.Granted or ExperienceAnswer.Trusted)
+                    SetRestoredGrant(item, granter, bits, experience);
+                return;
+            }
+            int silent = mask & GetImplicitPermissions(item, granter);
+            if (silent != 0) SetRestoredGrant(item, granter, silent, UUID.Zero);
+        }
+
+        private void SetRestoredGrant(TaskInventoryItem item, UUID granter, int mask, UUID experience)
+        {
+            lock (m_host.TaskInventory)
+            {
+                item.PermsGranter = granter;
+                item.PermsMask = mask;
+            }
+            if (experience.IsZero()) ForgetExperienceGrant();
+            else NoteExperienceGrant(experience, granter);
+            NoteGrant(m_thisScript.ScriptState, granter, mask, m_host.OwnerID, experience);
+            GrantChanged();
+        }
+
+        /// <summary>The script item's grant now is the one <paramref name="experience"/> gave <paramref name="granter"/>.</summary>
+        private void NoteExperienceGrant(UUID experience, UUID granter)
+        {
+            if (m_thisScript?.ScriptState is not RuntimeState st) return;
+            st.ExperienceGranter = granter.ToString();
+            st.ExperienceGrant = experience.ToString();
+        }
+
+        private void ForgetExperienceGrant()
+        {
+            if (m_thisScript?.ScriptState is not RuntimeState st) return;
+            st.ExperienceGrant = null;
+            st.ExperienceGranter = null;
+        }
+
+        /// <summary>
+        /// The claimed granter arrived on this script's object or wearing it: the claim is decided as a silent re-request
+        /// would be, and goes either way. Its records stay only if what came back holds their grant.
+        /// </summary>
+        private void DecideGrantClaim()
+        {
+            GrantClaim claim = m_grantClaim;
+            m_grantClaim = null;
+            TaskInventoryItem item = GetInventorySelf();
+            if (item != null && claim.Owner == m_host.OwnerID && item.PermsGranter == UUID.Zero)
+                GrantSilently(item, claim.Granter, claim.Mask, claim.Experience);
+            DropGrantRecordsWithoutGrant();
+        }
+
+        /// <summary>
+        /// The saved grant and any waiting claim go, with the records that rested on the claim: a reset, an owner change,
+        /// and a new llRequestPermissions (whose answer replaces the grant).
+        /// </summary>
+        internal void ClearGrantClaim()
+        {
+            if (m_thisScript?.ScriptState is RuntimeState st) ClearSavedGrant(st);
+            if (m_grantClaim == null) return;
+            m_grantClaim = null;
+            DropGrantRecordsWithoutGrant();
+        }
+
+        /// <summary>
+        /// The grant this script's state carries to its next region: the item's grant, else a claim still waiting for its
+        /// granter, as it was carried here. Scheduler thread, before the capture.
+        /// </summary>
+        internal void NoteGrantForCarry()
+        {
+            RuntimeState st = m_thisScript?.ScriptState;
+            TaskInventoryItem item = GetInventorySelf();
+            if (st == null || item == null) return;
+            if (item.PermsGranter != UUID.Zero && item.PermsMask != 0)
+                NoteItemGrant(st, item, m_host.OwnerID);
+            else if (m_grantClaim is GrantClaim claim)
+                NoteGrant(st, claim.Granter, claim.Mask, claim.Owner, claim.Experience);
+            else
+                ClearSavedGrant(st);
+        }
+
+        /// <summary>
+        /// The grant a row saves: the item's grant now, with the object's owner, and the Experience it came from while the
+        /// item's granter is still the one that Experience's grant noted; none held, none saved.
+        /// </summary>
+        internal static void NoteItemGrant(RuntimeState st, TaskInventoryItem item, UUID objectOwner)
+        {
+            if (item.PermsGranter == UUID.Zero || item.PermsMask == 0)
+            {
+                ClearSavedGrant(st);
+                return;
+            }
+            UUID experience = UUID.Zero;
+            if (st.ExperienceGranter is string g && st.ExperienceGrant is string e
+                && UUID.TryParse(g, out UUID expGranter) && expGranter == item.PermsGranter)
+                UUID.TryParse(e, out experience);
+            NoteGrant(st, item.PermsGranter, item.PermsMask, objectOwner, experience);
+        }
+
+        private static void NoteGrant(RuntimeState st, UUID granter, int mask, UUID owner, UUID experience)
+        {
+            st.PermsGranter = granter.ToString();
+            st.GrantedPermsMask = mask;
+            st.PermsOwner = owner.ToString();
+            st.PermsExperience = experience.IsZero() ? null : experience.ToString();
+        }
+
+        private static void ClearSavedGrant(RuntimeState st)
+        {
+            st.PermsGranter = null;
+            st.GrantedPermsMask = 0;
+            st.PermsOwner = null;
+            st.PermsExperience = null;
+        }
+
+        /// <summary>
+        /// The script's saved controls taken again without llTakeControls (Halcyon TakeControlsInternal): no error on
+        /// DEBUG_CHANNEL, nothing when the grant no longer holds PERMISSION_TAKE_CONTROLS, when the granter is not a root
+        /// avatar here, or when <paramref name="requiredAvatar"/> is given and is not the granter. The Control record is
+        /// kept either way, so the avatar's later arrival can still take them.
+        /// </summary>
+        internal void TakeControlsInternal(int controls, int accept, int pass_on, UUID requiredAvatar)
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || item.PermsGranter == UUID.Zero) return;
+            if (requiredAvatar != UUID.Zero && item.PermsGranter != requiredAvatar) return;
+            if ((item.PermsMask & PERMISSION_TAKE_CONTROLS) == 0) return;
+            ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
+            if (sp == null || sp.IsChildAgent) return;
+            using (PhloxEngine.OwnControlChange())
+                sp.RegisterControlEventsToScript(controls, accept, pass_on, m_host.LocalId, m_itemID);
+            m_ScriptEngine?.RequestParcelCheck(m_itemID);   // Holding controls exempts it from a No Scripts parcel
+        }
+
+        /// <summary>
+        /// The avatar arrived here (a crossing, a teleport, a login) on this script's object or wearing it: the controls it
+        /// granted are taken again if this script holds a record of them and the avatar came without them (Halcyon
+        /// LSLSystemAPI.OnGroupCrossedAvatarReady). Scheduler thread.
+        /// </summary>
+        public void OnGroupCrossedAvatarReady(UUID avatarId)
+        {
+            if (m_grantClaim is GrantClaim claim && claim.Granter == avatarId) DecideGrantClaim();
+            var misc = m_thisScript?.ScriptState?.MiscAttributes;
+            if (misc == null || !misc.TryGetValue((int)RuntimeState.MiscAttr.Control, out object[] c)) return;
+            if (!m_thisScript.ScriptState.Enabled) return;
+            ScenePresence sp = World?.GetScenePresence(avatarId);
+            if (sp != null && sp.HasScriptControls(m_itemID)) return;
+            TakeControlsInternal((int)c[0], (int)c[1], (int)c[2], avatarId);
+        }
+        /// <summary>The mean of the last timeslice times in milliseconds, 0 before the first.</summary>
+        public float GetAverageScriptTime()
+        {
+            if (m_numRunSamples < 1) return 0f;
+            double total = 0;
+            for (int i = 0; i < m_numRunSamples; i++) total += m_runSamples[i];
+            return (float)(total / m_numRunSamples);
+        }
 
         // ── Math ───────────────────────────────────────────────────────────────
 
@@ -162,9 +972,11 @@ namespace Phlox.ScriptEngine
         public int llAbs(int i) => i == int.MinValue ? i : Math.Abs(i);
         public float llFabs(float f) => Math.Abs(f);
         public float llFrand(float mag) => (float)(ThreadRandom.NextDouble() * mag);
-        public int llFloor(float f) => (int)Math.Floor(f);
-        public int llCeil(float f) => (int)Math.Ceiling(f);
-        public int llRound(float f) => (int)Math.Round(f, MidpointRounding.AwayFromZero);
+        // SL wiki llFloor, "The returned value is -2147483648 (0x80000000) if the arithmetic result is outside
+        // of the range of valid integers"; NaN too. A plain (int) saturates on .NET 9+ x64.
+        public int llFloor(float f) => InWorldz.Phlox.Util.LslConvert.FloatToInteger(Math.Floor(f));
+        public int llCeil(float f) => InWorldz.Phlox.Util.LslConvert.FloatToInteger(Math.Ceiling(f));
+        public int llRound(float f) => InWorldz.Phlox.Util.LslConvert.FloatToInteger(Math.Round(f, MidpointRounding.AwayFromZero));
         public float llAcos(float f) => (float)Math.Acos(f);
         public float llAsin(float f) => (float)Math.Asin(f);
         public float llLog10(float f) => (float)Math.Log10(f);
@@ -247,22 +1059,42 @@ namespace Phlox.ScriptEngine
         public Quaternion llAxisAngle2Rot(Vector3 axis, float angle)
             => Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), angle);
 
+        // llRot2Axis, llRot2Angle and llAngleBetween are YEngine's (LSL_Api.cs llRot2Axis / llRot2Angle /
+        // llAngleBetween): the input's scale does not matter and there is no small-angle cut-off. OpenMetaverse's GetAxisAngle,
+        // used before, answered angle 0 and axis <1,0,0> below about 0.02 rad and did not normalise.
+
+        /// <summary>The axis that goes with llRot2Angle's angle; ZERO_VECTOR for no rotation.</summary>
+        // sin(angle/2) is taken from x, y and z rather than as sqrt(1 - w^2), which loses most of its digits for a
+        // small angle when w is a float (0.01 rad read its axis 0.07% short).
+
+        /// <summary>The axis that goes with llRot2Angle's angle; ZERO_VECTOR for no rotation.</summary>
         public Vector3 llRot2Axis(Quaternion rot)
         {
-            rot.GetAxisAngle(out Vector3 axis, out float angle);
-            return axis;
+            double s = Math.Sqrt((double)rot.X * rot.X + (double)rot.Y * rot.Y + (double)rot.Z * rot.Z);
+            if (s < 1e-12) return Vector3.Zero;
+            double invS = rot.W < 0 ? -1.0 / s : 1.0 / s;   // the axis of the turn of PI or less
+            return new Vector3((float)(rot.X * invS), (float)(rot.Y * invS), (float)(rot.Z * invS));
         }
 
+        /// <summary>SL: "a positive angle &lt;= PI radians, that is, it is the unsigned minimum angle".</summary>
         public float llRot2Angle(Quaternion rot)
         {
-            rot.GetAxisAngle(out Vector3 axis, out float angle);
-            return angle;
+            // 2 atan2(|xyz|, |w|) is 2 acos(w) of the normalised rotation, folded into [0, PI], at any scale.
+            double s = Math.Sqrt((double)rot.X * rot.X + (double)rot.Y * rot.Y + (double)rot.Z * rot.Z);
+            return (float)(2 * Math.Atan2(s, Math.Abs((double)rot.W)));
         }
 
+        /// <summary>Halcyon's and YEngine's formula: acos(2 (a.b)^2 / (|a|^2 |b|^2) - 1), 0 for a zero quaternion.</summary>
         public float llAngleBetween(Quaternion a, Quaternion b)
         {
-            float dotProduct = Quaternion.Dot(a, b);
-            return (float)(2.0 * Math.Acos(Math.Abs(Math.Max(-1.0, Math.Min(1.0, dotProduct)))));
+            double aa = (double)a.X * a.X + (double)a.Y * a.Y + (double)a.Z * a.Z + (double)a.W * a.W;
+            double bb = (double)b.X * b.X + (double)b.Y * b.Y + (double)b.Z * b.Z + (double)b.W * b.W;
+            double aa_bb = aa * bb;
+            if (aa_bb == 0) return 0f;
+            double ab = (double)a.X * b.X + (double)a.Y * b.Y + (double)a.Z * b.Z + (double)a.W * b.W;
+            double quotient = (ab * ab) / aa_bb;
+            if (quotient >= 1.0) return 0f;
+            return (float)Math.Acos(2 * quotient - 1);
         }
 
         public int llModPow(int a, int b, int c)
@@ -279,64 +1111,148 @@ namespace Phlox.ScriptEngine
 
         // ── Chat ───────────────────────────────────────────────────────────────
 
+        // llSay, llShout, llWhisper and llRegionSayTo send at most 1024 bytes (SL wiki, llSay: "msg can be a maximum of
+        // 1024 bytes"; llShout and llWhisper: "Text can be a maximum of 1024 bytes"); llRegionSay at most 1024 characters
+        // (llRegionSay: "If msg is longer than 1024 characters it is truncated to 1024 characters"). Avatars and every
+        // engine's listens hear the same cut text.
+
         public void llSay(int channel, string msg)
         {
-            m_host?.ParentGroup?.Scene?.SimChat(msg, ChatTypeEnum.Say, channel,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            msg = CapChatBytes(msg);
+            HostSimChat(msg, ChatTypeEnum.Say, channel);
+            ChatToWorldComm(ChatTypeEnum.Say, channel, msg);
+            ChatSleep();
         }
 
         public void llShout(int channel, string msg)
         {
-            m_host?.ParentGroup?.Scene?.SimChat(msg, ChatTypeEnum.Shout, channel,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            msg = CapChatBytes(msg);
+            HostSimChat(msg, ChatTypeEnum.Shout, channel);
+            ChatToWorldComm(ChatTypeEnum.Shout, channel, msg);
+            ChatSleep();
         }
 
         public void llWhisper(int channel, string msg)
         {
-            m_host?.ParentGroup?.Scene?.SimChat(msg, ChatTypeEnum.Whisper, channel,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            msg = CapChatBytes(msg);
+            HostSimChat(msg, ChatTypeEnum.Whisper, channel);
+            ChatToWorldComm(ChatTypeEnum.Whisper, channel, msg);
+            ChatSleep();
+        }
+
+        private const int MaxChatBytes = 1024;
+        private const int MaxRegionSayCharacters = 1024;
+
+        /// <summary>
+        /// Chat cut to SL's 1024 bytes of UTF-8. SL (llSay): "If a multibyte character ends up on the 1024 byte boundary,
+        /// it is discarded and not split into invalid bytes."
+        /// </summary>
+        private static string CapChatBytes(string msg) => CapUtf8Bytes(msg, MaxChatBytes);
+
+        /// <summary>Text cut to <paramref name="max"/> bytes of UTF-8; a multibyte character the cut would split is dropped whole.</summary>
+        private static string CapUtf8Bytes(string text, int max)
+        {
+            text ??= string.Empty;
+            if (text.Length <= max / 4) return text;   // can't exceed the cap even at four bytes a character
+            byte[] utf8 = Encoding.UTF8.GetBytes(text);
+            if (utf8.Length <= max) return text;
+            int cut = max;
+            while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--; // back to the start of the split character
+            return Encoding.UTF8.GetString(utf8, 0, cut);
+        }
+
+        /// <summary>Text cut to <paramref name="max"/> characters; a surrogate pair the cut would split is dropped whole.</summary>
+        private static string CapCharacters(string text, int max)
+        {
+            text ??= string.Empty;
+            if (text.Length <= max) return text;
+            int cut = max;
+            if (char.IsHighSurrogate(text[cut - 1])) cut--;
+            return text.Substring(0, cut);
         }
 
         public void llOwnerSay(string msg)
         {
             UUID ownerID = m_host?.OwnerID ?? UUID.Zero;
-            if (ownerID == UUID.Zero) return;
-            ScenePresence sp = World?.GetScenePresence(ownerID);
-            sp?.ControllingClient?.SendChatMessage(msg, (byte)ChatTypeEnum.Owner,
-                m_host.AbsolutePosition, m_host.Name, m_host.UUID, m_host.UUID,
-                (byte)ChatSourceType.Object, (byte)ChatAudibleLevel.Fully);
+            if (ownerID != UUID.Zero)
+            {
+                ScenePresence sp = World?.GetScenePresence(ownerID);
+                sp?.ControllingClient?.SendChatMessage(msg, (byte)ChatTypeEnum.Owner,
+                    m_host.AbsolutePosition, m_host.Name, m_host.UUID, m_host.UUID,
+                    (byte)ChatSourceType.Object, (byte)ChatAudibleLevel.Fully);
+            }
+            ChatSleep();   // Halcyon's llOwnerSay sleeps whether or not the owner hears it
         }
 
 		public void llRegionSay(int channel, string msg)
 		{
 			if (channel == 0)
 			{
-				ShoutError("llRegionSay: cannot use channel 0");
+				ScriptShoutError("llRegionSay: cannot use channel 0");
 				return;
 			}
-			m_host?.ParentGroup?.Scene?.SimChat(msg, ChatTypeEnum.Region, channel,
-				m_host.AbsolutePosition, m_host.Name, m_host.UUID, false);
+			msg = CapCharacters(msg, MaxRegionSayCharacters);
+			HostSimChat(msg, ChatTypeEnum.Region, channel);
+			ChatToWorldComm(ChatTypeEnum.Region, channel, msg);
+			ChatSleep();
 		}
 
+		/// <summary>
+		/// Scene.SimChat brings a Phlox script's chat to Phlox's listens (OnChatFromWorld) and to avatars; the
+		/// listens the core WorldComm holds - YEngine's, on a region running both engines - hear it only through
+		/// IWorldComm.DeliverMessage, which is how YEngine's own llSay/llShout/llWhisper/llRegionSay reach them.
+		/// </summary>
+		private void ChatToWorldComm(ChatTypeEnum type, int channel, string msg)
+		{
+			if (m_host == null) return;
+			string name = m_host.Name;
+			UUID id = m_host.UUID;
+			Vector3 pos = m_host.AbsolutePosition;
+			m_ScriptEngine?.SendToWorldComm(w => w.DeliverMessage(type, channel, name, id, msg, pos));
+		}
+
+		/// <summary>
+		/// Halcyon's llRegionSayTo (LSLSystemAPI.cs:1087-1100): NULL_KEY reaches no one. The listens that hear
+		/// it are chosen by WorldCommModule.DestIdMatches - the target prim's, or, for an avatar, its
+		/// attachments' - on the channel it was sent on, anywhere in the region, and never the sender's.
+		/// An avatar itself only sees it on channel 0.
+		/// </summary>
 		public void llRegionSayTo(string destId, int channel, string msg)
 		{
 			if (m_host == null) return;
-			if (!UUID.TryParse(destId, out UUID targetId)) return;
+			// Halcyon (LSLSystemAPI.cs:1089-1093) refuses DEBUG_CHANNEL with this error, and nothing is sent.
+			if (channel == DEBUG_CHANNEL)
+			{
+				ScriptShoutError("Cannot use llRegionSayTo() on DEBUG_CHANNEL.");
+				return;
+			}
+			if (!UUID.TryParse(destId, out UUID targetId) || targetId == UUID.Zero) return;
+			msg = CapChatBytes(msg);
 
 			ScenePresence sp = World?.GetScenePresence(targetId);
-			if (sp != null && !sp.IsChildAgent)
+			if (channel == 0 && sp != null && !sp.IsChildAgent)
 			{
-				// Target is an avatar — use Direct chat type which delivers only to them
 				sp.ControllingClient?.SendChatMessage(
 					msg, (byte)ChatTypeEnum.Direct,
 					m_host.AbsolutePosition, m_host.Name,
 					m_host.UUID, m_host.UUID,
 					(byte)ChatSourceType.Object, (byte)ChatAudibleLevel.Fully);
-				return;
 			}
 
-			// Target is an object — deliver via listen pipeline
-			m_ScriptEngine.ListenManager?.DeliverChat(channel, m_host.Name, m_host.UUID, msg);
+			m_ScriptEngine.ListenManager?.DeliverChat(ChatTypeEnum.Direct, channel, m_host.Name, m_host.UUID, msg,
+				m_host.AbsolutePosition, targetId);
+
+			// The listens the core WorldComm holds (YEngine's) hear it through DeliverMessageTo, as YEngine's own
+			// llRegionSayTo reaches them. On channel 0 to an avatar DeliverMessageTo only sends it to the viewer,
+			// which has had it above, so it is not called.
+			if (!(channel == 0 && sp != null))
+			{
+				string name = m_host.Name;
+				UUID id = m_host.UUID;
+				Vector3 pos = m_host.AbsolutePosition;
+				m_ScriptEngine.SendToWorldComm(w => w.DeliverMessageTo(targetId, channel, pos, name, id, msg));
+			}
+			ChatSleep();   // After a send; the refusals above return without it, as Halcyon's
 		}
 
 		public void llInstantMessage(string user, string message)
@@ -356,25 +1272,41 @@ namespace Phlox.ScriptEngine
                 imSessionID    = m_host.UUID.Guid,
                 timestamp      = (uint)Util.UnixTimeSinceEpoch(),
                 fromAgentName  = m_host.Name,
-                message        = message ?? string.Empty,
+                message        = CapInstantMessage(message),
                 dialog         = (byte)InstantMessageDialog.MessageFromObject,
                 fromGroup      = false,
-                offline        = 0,
+                // Kept for a recipient who is offline, and carrying the object's location ("Region/x/y/z", which
+                // viewers show as a link), as Halcyon (LSLSystemAPI.cs:3910-3916) and YEngine (LSL_Api.cs llInstantMessage)
+                // send it. SL: "If the specified user is not signed in, the messages will be delivered to their email
+                // just like a regular instant message".
+                offline        = 1,
                 ParentEstateID = World.RegionInfo.EstateSettings.ParentEstateID,
                 Position       = m_host.AbsolutePosition,
                 RegionID       = World.RegionInfo.RegionID.Guid,
-                binaryBucket   = new byte[0]
+                binaryBucket   = Util.StringToBytes256(
+                    $"{World.RegionInfo.RegionName}/{(int)m_host.AbsolutePosition.X}/{(int)m_host.AbsolutePosition.Y}/{(int)m_host.AbsolutePosition.Z}")
             };
 
             tr.SendInstantMessage(msg, success => {});
-        } 
+        }
+
+        private const int MaxInstantMessageBytes = 1023;
+
+        /// <summary>
+        /// llInstantMessage's message cut to SL's limit: "Messages longer than 1023 bytes will be truncated to 1023
+        /// bytes. This can convey 1023 ASCII characters, or fewer if non-ASCII characters are present."
+        /// (https://wiki.secondlife.com/wiki/LlInstantMessage). Bytes of UTF-8 are counted, and a multibyte character
+        /// the cut would split is dropped whole, as PrimSetText cuts floating text.
+        /// </summary>
+        private static string CapInstantMessage(string message) => CapUtf8Bytes(message, MaxInstantMessageBytes);
 		public void llDialog(string avatar, string message, LSLList buttons, int chat_channel)
 		{
 			if (m_host == null) return;
-			if (!UUID.TryParse(avatar, out UUID avatarId)) return;
-
-			ScenePresence sp = World?.GetScenePresence(avatarId);
-			if (sp == null || sp.IsChildAgent) return;
+			// Halcyon's checks and errors, in its order (LSLSystemAPI.cs:8816-8846); each refuses the
+			// dialog (no 1 s sleep). SL: "An error will be shouted on DEBUG_CHANNEL, if there are more than 12 buttons"; a label
+			// of length zero or over 24 fails too. Halcyon counts characters, as here.
+			if (!UUID.TryParse(avatar, out UUID avatarId)) { LSLError("First parameter to llDialog needs to be a key"); return; }
+			if (buttons != null && buttons.Length > 12) { LSLError("No more than 12 buttons can be shown"); return; }
 
 			var buttonList = new List<string>();
 			if (buttons != null)
@@ -382,12 +1314,15 @@ namespace Phlox.ScriptEngine
 				foreach (var o in buttons.Data)
 				{
 					string label = o?.ToString() ?? string.Empty;
-					if (label.Length > 24) label = label.Substring(0, 24);
+					if (string.IsNullOrEmpty(label)) { LSLError("button label cannot be blank"); return; }
+					if (label.Length > 24) { LSLError("button label cannot be longer than 24 characters"); return; }
 					buttonList.Add(label);
-					if (buttonList.Count >= 12) break;
 				}
 			}
 			if (buttonList.Count == 0) buttonList.Add("OK");
+
+			ScenePresence sp = World?.GetScenePresence(avatarId);
+			if (sp == null || sp.IsChildAgent) return;
 
 			string ownerFirst = string.Empty, ownerLast = string.Empty;
 			ScenePresence ownerSp = World?.GetScenePresence(m_host.OwnerID);
@@ -419,9 +1354,12 @@ namespace Phlox.ScriptEngine
 		}
         public void llTextBox(string avatar, string message, int chat_channel)
         {
-            if (!UUID.TryParse(avatar, out UUID av) || av == UUID.Zero) return;
             IDialogModule dm = World?.RequestModuleInterface<IDialogModule>();
             if (dm == null) return;
+            // Halcyon LSLSystemAPI.cs:5779-5783, its text naming llDialog.
+            if (!UUID.TryParse(avatar, out UUID av)) { LSLError("First parameter to llDialog needs to be a key"); return; }
+            // Halcyon sends NULL_KEY's text box to no one and still takes the 1 s (LSLSystemAPI.cs:5780-5791).
+            if (av == UUID.Zero) { ScriptSleep(1000); return; }
             if (message != null && message.Length > 1024) message = message.Substring(0, 1024);
             dm.SendTextBoxToUser(av, message, chat_channel, m_host.Name, m_host.UUID, m_host.OwnerID);
             ScriptSleep(1000);
@@ -433,11 +1371,57 @@ namespace Phlox.ScriptEngine
         public string llGetOwner() => m_host?.OwnerID.ToString() ?? UUID.Zero.ToString();
         public string llGetCreator() => m_host?.CreatorID.ToString() ?? UUID.Zero.ToString();
         public string llGetObjectName() => m_host?.Name ?? string.Empty;
-        public void llSetObjectName(string name) { if (m_host != null) m_host.Name = name; }
+        /// <summary>The name is in the full ObjectProperties reply (LLClientView.cs:6381),
+        /// so a change has to be pushed or the viewer keeps what it had at the last select.</summary>
+        public void llSetObjectName(string name)
+        {
+            if (m_host == null) return;
+            m_host.Name = CapPrimName(name);
+            if (m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
+            m_host.SendPropertiesToAllClients();
+        }
         public string llGetObjectDesc() => m_host?.Description ?? string.Empty;
-        public void llSetObjectDesc(string name) { if (m_host != null) m_host.Description = name; }
-        public int llGetNumberOfPrims() => m_host?.ParentGroup?.PrimCount ?? 1;
-        public int llGetLinkNumber() => m_host?.LinkNum ?? 0;
+        /// <summary>Same for the description (LLClientView.cs:6384).</summary>
+        public void llSetObjectDesc(string name)
+        {
+            if (m_host == null) return;
+            m_host.Description = CapPrimDesc(name);
+            if (m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
+            m_host.SendPropertiesToAllClients();
+        }
+
+        /// <summary>
+        /// A prim name as llSetObjectName and PRIM_NAME store it. SL wiki llSetObjectName: "The name is limited to 63
+        /// characters. Longer prim names are cut short." Halcyon cut it the same way (LimitLength(name, MAX_OBJ_NAME)).
+        /// </summary>
+        private static string CapPrimName(string name)
+        {
+            name ??= string.Empty;
+            return name.Length <= 63 ? name : name.Substring(0, 63);
+        }
+
+        /// <summary>
+        /// A prim description as llSetObjectDesc and PRIM_DESC store it. SL wiki llSetObjectDesc: "The prim
+        /// description is limited to 127 bytes; any string longer then that will be truncated." Bytes of UTF-8 are
+        /// counted, and a character the cut would split is dropped whole.
+        /// </summary>
+        private static string CapPrimDesc(string desc)
+        {
+            desc ??= string.Empty;
+            byte[] utf8 = Encoding.UTF8.GetBytes(desc);
+            if (utf8.Length <= 127) return desc;
+            int cut = 127;
+            while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--; // back to the start of the split character
+            return Encoding.UTF8.GetString(utf8, 0, cut);
+        }
+        /// <summary>Halcyon llGetNumberOfPrims: LinkCount, the prims plus the avatars seated on them.</summary>
+        public int llGetNumberOfPrims()
+        {
+            SceneObjectGroup group = m_host?.ParentGroup;
+            return group == null ? 1 : group.PrimCount + group.GetSittingAvatarsCount();
+        }
+        // SL: 0 in an unlinked prim. Halcyon checks PartCount, so a root left alone by a break reads 0 whatever LinkNum it kept.
+        public int llGetLinkNumber() => m_host?.ParentGroup != null && m_host.ParentGroup.PrimCount > 1 ? m_host.LinkNum : 0;
         public int llGetNumberOfSides() => m_host?.GetNumberOfSides() ?? 0;
         public string llGetScriptName() => GetInventorySelf()?.Name ?? string.Empty;
         public string llGetRegionName() => World?.RegionInfo?.RegionName ?? string.Empty;
@@ -452,21 +1436,26 @@ namespace Phlox.ScriptEngine
                 0f);
         }
         public int llGetRegionAgentCount() => World?.GetRootAgentCount() ?? 0;
+        /// <summary>
+        /// The estate module's full RegionFlags, as Halcyon (LSLSystemAPI.cs:13722-13725) and YEngine return them: fixed
+        /// sun, block terraform, block land resell and the rest. Without an estate module, the flags RegionSettings holds.
+        /// </summary>
         public int llGetRegionFlags()
         {
+            IEstateModule estate = World?.RequestModuleInterface<IEstateModule>();
+            if (estate != null) return (int)estate.GetRegionFlags();
             if (World?.RegionInfo?.RegionSettings == null) return 0;
             var s = World.RegionInfo.RegionSettings;
             int flags = 0;
-            if (s.AllowDamage)      flags |= 0x1;      // REGION_FLAG_ALLOW_DAMAGE
-            if (s.BlockFly)         flags |= 0x80000;  // REGION_FLAG_BLOCK_FLY
-            if (s.RestrictPushing)  flags |= 0x400000; // REGION_FLAG_RESTRICT_PUSHOBJECT
-            if (s.AllowLandResell)  flags |= 0x4;      // REGION_FLAG_ALLOW_LAND_RESELL
-            if (s.DisableCollisions)flags |= 0x1000;   // REGION_FLAG_DISABLE_COLLISIONS
-            if (s.DisablePhysics)   flags |= 0x4000;   // REGION_FLAG_DISABLE_PHYSICS
-            if (s.Sandbox)          flags |= 0x20;     // REGION_FLAG_SANDBOX
+            if (s.AllowDamage)      flags |= REGION_FLAG_ALLOW_DAMAGE;
+            if (s.BlockFly)         flags |= REGION_FLAG_BLOCK_FLY;
+            if (s.RestrictPushing)  flags |= REGION_FLAG_RESTRICT_PUSHOBJECT;
+            if (s.DisableCollisions)flags |= REGION_FLAG_DISABLE_COLLISIONS;
+            if (s.DisablePhysics)   flags |= REGION_FLAG_DISABLE_PHYSICS;
+            if (s.Sandbox)          flags |= REGION_FLAG_SANDBOX;
             return flags;
         }
-        public string llGetSimulatorHostname() => System.Net.Dns.GetHostName();
+        public string llGetSimulatorHostname() => World?.RegionInfo?.ExternalHostName ?? string.Empty;   // as Halcyon (Scene.GetEnv "simulator_hostname")
         public string llGetDate() => DateTime.UtcNow.ToString("yyyy-MM-dd");
         public string llGetTimestamp() => DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ss.ffffffZ");
         public float llGetWallclock() => (float)DateTime.UtcNow.TimeOfDay.TotalSeconds;
@@ -485,22 +1474,28 @@ namespace Phlox.ScriptEngine
             return llGetTimeOfDay();
         }
 
-        public float llGetTime() => (float)(DateTime.UtcNow - m_scriptTimer).TotalSeconds;
+        // The script's run time lives in its RuntimeState, as Halcyon's llGetTime (ScriptState.TotalRuntime): Reset()
+        // starts it again (SL llGetTime: the time "is reset when the script is reset") and it is saved with the state, so
+        // it carries across a region restart or a crossing.
+        public float llGetTime() => m_thisScript?.ScriptState?.TotalRuntime ?? 0f;
 
         public void llResetTime()
         {
-            m_scriptTimer = DateTime.UtcNow;
+            m_thisScript?.ScriptState?.ResetRuntime();
         }
 
         public float llGetAndResetTime()
         {
-            float elapsed = (float)(DateTime.UtcNow - m_scriptTimer).TotalSeconds;
-            m_scriptTimer = DateTime.UtcNow;
+            float elapsed = llGetTime();
+            llResetTime();
             return elapsed;
         }
-        public int llGetLocalTime() => 0;
-        public int iwGetLocalTime() => 0;
-        public int iwGetLocalTimeOffset() => 0;
+        // The server's local wall clock, as Halcyon's iwGetLocalTime and iwGetLocalTimeOffset return it
+        // (LSLSystemAPI.cs:2666-2674; Util.LocalUnixTimeSinceEpoch, Util.LocalTimeOffset): Unix seconds of the local
+        // clock reading, and its offset from UTC in seconds. iwFormatTime's local branch prints the same clock.
+        public int llGetLocalTime() => iwGetLocalTime();
+        public int iwGetLocalTime() => (int)DateTimeOffset.UtcNow.ToUnixTimeSeconds() + iwGetLocalTimeOffset();
+        public int iwGetLocalTimeOffset() => (int)TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow).TotalSeconds;
         public string iwFormatTime(int unixtime, int isUTC, string format)
         {
             DateTime date = OpenSim.Framework.Util.UnixEpoch.AddSeconds(unixtime);
@@ -513,46 +1508,90 @@ namespace Phlox.ScriptEngine
 
         // ── Position / rotation ────────────────────────────────────────────────
 
-        public Vector3 llGetPos() => m_host?.AbsolutePosition ?? Vector3.Zero;
-        public Vector3 llGetLocalPos() => m_host?.OffsetPosition ?? Vector3.Zero;
+        public Vector3 llGetPos() => m_host == null ? Vector3.Zero : SlCompatiblePosition(m_host);
+
+        /// <summary>
+        /// llGetPos and PRIM_POSITION: the prim's region position, except for a child prim of an attachment, which
+        /// gives its offset from the root turned by the wearer's rotation plus the wearer's position (Halcyon
+        /// SceneObjectPart.GetSLCompatiblePosition: "return the child prim offset applied to the avatar pos + rot";
+        /// SL: "position is always in region coordinates, even if the prim is a child or the root prim of an
+        /// attachment"). The plain AbsolutePosition turns the offset by the attachment root's rotation instead, so it
+        /// did not follow the wearer turning.
+        /// </summary>
+        private Vector3 SlCompatiblePosition(SceneObjectPart part)
+        {
+            SceneObjectGroup group = part.ParentGroup;
+            if (group == null || part == group.RootPart || !group.IsAttachment) return part.AbsolutePosition;
+            ScenePresence wearer = World?.GetScenePresence(group.AttachedAvatar);
+            if (wearer == null) return part.AbsolutePosition;
+            return part.OffsetPosition * wearer.Rotation + wearer.AbsolutePosition;
+        }
+        // Halcyon GetPartLocalPos and SL: a root's region position (an attachment's, its offset from the attach
+        // point), a child's offset from the root. The same read as PRIM_POS_LOCAL.
+        public Vector3 llGetLocalPos() => m_host == null ? Vector3.Zero : PartLocalPos(m_host);
         public Vector3 llGetRootPosition() => m_host?.ParentGroup?.AbsolutePosition ?? Vector3.Zero;
+        // Halcyon llSetPos: SetPos(m_host, pos, true), the helper PRIM_POSITION uses, so the two cannot disagree. SL: an
+        // unattached root takes a region position ("Movement is capped to 10m per call for unattached root prims"), an
+        // attached root its offset from the attach point, a child its offset from the root.
         public void llSetPos(Vector3 pos)
         {
             if (m_host == null) return;
-            SceneObjectGroup group = m_host.ParentGroup;
-            if (group == null || group.IsDeleted) return;
-            pos.X = Math.Max(0f, Math.Min(255.9f, pos.X));
-            pos.Y = Math.Max(0f, Math.Min(255.9f, pos.Y));
-            pos.Z = Math.Max(0f, Math.Min(4096f, pos.Z));
-            if (m_host.LinkNum < 2) group.UpdateGroupPosition(pos);
-            else m_host.UpdateOffSet(pos - group.AbsolutePosition);
+            SetPrimLocalPos(m_host, pos);
             ScriptSleep(200);
         }
-        public Quaternion llGetRot() => m_host?.GetWorldRotation() ?? Quaternion.Identity;
+        // Halcyon llGetRot and SL: on an attachment's root, the wearer's rotation. The same read as PRIM_ROTATION.
+        public Quaternion llGetRot() => m_host == null ? Quaternion.Identity : PartRegionRot(m_host);
         public Quaternion llGetLocalRot() => m_host?.RotationOffset ?? Quaternion.Identity;
-        public Quaternion llGetRootRotation() => m_host?.ParentGroup?.GroupRotation ?? Quaternion.Identity;
+        // Halcyon llGetRootRotation and SL: "In an attached object, returns region rotation of avatar NOT of the object's
+        // root prim". The root's PRIM_ROTATION read, so it matches llGetRot on the root.
+        public Quaternion llGetRootRotation()
+            => m_host?.ParentGroup?.RootPart is SceneObjectPart root ? PartRegionRot(root) : Quaternion.Identity;
+        /// <summary>
+        /// SL: "If the prim is not the root prim it is offset by the root's rotation." A child's rotation is the
+        /// root's times the one given (Halcyon :2452-2459, YEngine LSL_Api.llSetRot); the rotation is normalised first
+        /// (Halcyon Rot2Quaternion), and an object in transit is left alone (Halcyon).
+        /// </summary>
         public void llSetRot(Quaternion rot)
         {
             if (m_host == null) return;
             SceneObjectGroup group = m_host.ParentGroup;
             if (group == null || group.IsDeleted) return;
-            if (m_host.LinkNum < 2) group.UpdateGroupRotationR(rot);
-            else m_host.UpdateRotation(rot);
+            if (!group.inTransit)
+            {
+                rot = NormalizedRot(rot);
+                if (m_host == group.RootPart) group.UpdateGroupRotationR(rot);
+                else m_host.UpdateRotation(group.RootPart.RotationOffset * rot);
+            }
             ScriptSleep(200);
         }
+        /// <summary>Halcyon llSetLocalRot: the normalised rotation, then SL's 0.2 s delay.</summary>
         public void llSetLocalRot(Quaternion rot)
         {
             if (m_host == null) return;
-            m_host.UpdateRotation(rot);
+            m_host.UpdateRotation(NormalizedRot(rot));
+            ScriptSleep(200);
+        }
+
+        /// <summary>Halcyon Rot2Quaternion: the rotation as a unit quaternion (a zero one reads as no rotation).</summary>
+        private static Quaternion NormalizedRot(Quaternion rot)
+        {
+            float len = rot.Length();
+            return len < 1e-6f || float.IsNaN(len) ? Quaternion.Identity : new Quaternion(rot.X / len, rot.Y / len, rot.Z / len, rot.W / len);
         }
         public Vector3 llGetScale() => m_host?.Scale ?? Vector3.One;
+        /// <summary>
+        /// SL wiki llSetScale: "Does not work on physical prims." Otherwise each component is rounded into
+        /// [0.01, 64.0] ("rounded to the nearest endpoint").
+        /// </summary>
         public void llSetScale(Vector3 scale)
         {
             if (m_host == null) return;
+            if (m_host.ParentGroup != null && m_host.ParentGroup.UsesPhysics) { PhySleep(); return; }
             scale.X = Math.Max(0.01f, Math.Min(64f, scale.X));
             scale.Y = Math.Max(0.01f, Math.Min(64f, scale.Y));
             scale.Z = Math.Max(0.01f, Math.Min(64f, scale.Z));
             m_host.Resize(scale);
+            PhySleep();
         }
         public int llScaleByFactor(float factor)
         {
@@ -637,9 +1676,9 @@ namespace Phlox.ScriptEngine
             if (item == null) return Vector3.Zero;
             if (item.PermsGranter == UUID.Zero) return Vector3.Zero;
             // PERMISSION_TRACK_CAMERA = 0x400
-            if ((item.PermsMask & 0x400) == 0)
+            if ((item.PermsMask & PERMISSION_TRACK_CAMERA) == 0)
             {
-                ShoutError("No permissions to track the camera");
+                ScriptShoutError("No permissions to track the camera");
                 return Vector3.Zero;
             }
             ScenePresence presence = World?.GetScenePresence(item.PermsGranter);
@@ -653,9 +1692,9 @@ namespace Phlox.ScriptEngine
             if (item == null) return Quaternion.Identity;
             if (item.PermsGranter == UUID.Zero) return Quaternion.Identity;
             // PERMISSION_TRACK_CAMERA = 0x400
-            if ((item.PermsMask & 0x400) == 0)
+            if ((item.PermsMask & PERMISSION_TRACK_CAMERA) == 0)
             {
-                ShoutError("No permissions to track the camera");
+                ScriptShoutError("No permissions to track the camera");
                 return Quaternion.Identity;
             }
             ScenePresence presence = World?.GetScenePresence(item.PermsGranter);
@@ -675,43 +1714,76 @@ namespace Phlox.ScriptEngine
             // Return Firestorm default (roughly 60 degrees).
             return 1.0472f;
         }
+        /// <summary>
+        /// llSetRegionPos as the SL wiki documents it (https://wiki.secondlife.com/wiki/LlSetRegionPos):
+        /// - "Returns FALSE and does not move the object if position is more than 10m off region or above 4096m";
+        /// - FALSE for a dynamic (physical) object, for an avatar attachment, and for parcel or region refusals;
+        /// - below ground the object goes to ground level, and the call is FALSE if that is more than 0.1 m up.
+        /// A position up to 10 m past the edge moves the object into the region there: core crosses an object whose
+        /// position leaves the region (SceneObjectGroup.AbsolutePosition). With no region there it is FALSE and the
+        /// object stays. Inside the region the object takes core's object-entry check, and the rez check when it
+        /// changes parcel (YEngine LSL_Api.llSetRegionPos); the region it crosses into applies its own.
+        /// Halcyon kept the object in the region and teleported the wearer from an attachment.
+        /// </summary>
         public int llSetRegionPos(Vector3 position)
         {
-            // Halcyon used ValidLocation() + SetPos() helpers; Legion uses direct group position update.
-            // Clamp to region bounds (allow up to 10m outside for cross-region placement per SL spec)
-            float regionSize = World?.RegionInfo?.RegionSizeX ?? 256f;
-            position.X = Math.Max(-10f, Math.Min(regionSize + 10f, position.X));
-            position.Y = Math.Max(-10f, Math.Min(regionSize + 10f, position.Y));
-            position.Z = Math.Max(0f, Math.Min(4096f, position.Z));
+            SceneObjectGroup group = m_host?.ParentGroup;
+            if (group == null || group.IsDeleted || group.inTransit) return 0;
+            if (group.IsAttachment || group.UsesPhysics) return 0;
 
-            if (m_host.ParentGroup.IsAttachment)
+            float sizeX = World.RegionInfo.RegionSizeX, sizeY = World.RegionInfo.RegionSizeY;
+            if (position.X < -10f || position.X > sizeX + 10f || position.Y < -10f || position.Y > sizeY + 10f
+                || position.Z > 4096f || float.IsNaN(position.X) || float.IsNaN(position.Y) || float.IsNaN(position.Z))
+                return 0;
+
+            bool inRegion = position.X >= 0f && position.X < sizeX && position.Y >= 0f && position.Y < sizeY;
+            float ground = World.GetGroundHeight(Math.Clamp(position.X, 0f, sizeX - 0.01f), Math.Clamp(position.Y, 0f, sizeY - 0.01f));
+            bool deepBelowGround = position.Z < ground - 0.1f;
+            if (position.Z < ground) position.Z = ground;
+
+            if (inRegion)
             {
-                ScenePresence avatar = World?.GetScenePresence(m_host.ParentGroup.AttachedAvatar);
-                if (avatar == null)
+                if (!World.Permissions.CanObjectEntry(group, false, position)) return 0;
+                LandData here = World.GetLandData(group.AbsolutePosition);
+                LandData there = World.GetLandData(position);
+                if (here != null && there != null && here.GlobalID != there.GlobalID
+                    && !World.Permissions.CanRezObject(group.PrimCount, group.OwnerID, position))
                     return 0;
-                avatar.StandUp();
-                avatar.Teleport(position);
             }
-            else
+            else if (!RegionExistsAt(position))
             {
-                // Move the root prim (entire linkset)
-                SceneObjectGroup group = m_host.ParentGroup;
-                if (group == null || group.IsDeleted) return 0;
-                group.UpdateGroupPosition(position);
+                return 0;
             }
-            return 1;
+
+            group.UpdateGroupPosition(position);
+            if (deepBelowGround) return 0;
+            if (!inRegion) return group.inTransit || group.IsDeleted ? 1 : 0;
+            return Vector3.DistanceSquared(group.AbsolutePosition, position) <= 0.01f ? 1 : 0;
+        }
+
+        /// <summary>Whether the grid has a region at this position, given in this region's coordinates.</summary>
+        private bool RegionExistsAt(Vector3 pos)
+        {
+            double x = World.RegionInfo.WorldLocX + (double)pos.X;
+            double y = World.RegionInfo.WorldLocY + (double)pos.Y;
+            if (x < 0 || y < 0) return false;
+            return World.GridService?.GetRegionByPosition(World.RegionInfo.ScopeID, (int)x, (int)y) != null;
         }
 
         // ── Physics ────────────────────────────────────────────────────────────
 
         public void llSetForce(Vector3 force, int local)
         {
-            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return;
-            if (local != 0) force *= m_host.GetWorldRotation();
-            pa.Force = force;
+            try
+            {
+                if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
+                if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
+                PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
+                if (pa == null) return;
+                if (local != 0) force *= m_host.GetWorldRotation();
+                pa.Force = force;
+            }
+            finally { PhySleep(); }   // Halcyon sleeps on every path
         }
 
         public Vector3 llGetForce()
@@ -723,12 +1795,16 @@ namespace Phlox.ScriptEngine
 
         public void llSetTorque(Vector3 torque, int local)
         {
-            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return;
-            if (local != 0) torque *= m_host.GetWorldRotation();
-            pa.Torque = torque;
+            try
+            {
+                if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
+                if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
+                PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
+                if (pa == null) return;
+                if (local != 0) torque *= m_host.GetWorldRotation();
+                pa.Torque = torque;
+            }
+            finally { PhySleep(); }   // Halcyon sleeps on every path
         }
 
         public void llSetForceAndTorque(Vector3 force, Vector3 torque, int local)
@@ -737,24 +1813,48 @@ namespace Phlox.ScriptEngine
             llSetTorque(torque, local);
         }
 
+        /// <summary>
+        /// A physical object takes the impulse; from an attachment it pushes the wearer (Halcyon
+        /// SceneObjectGroup.ApplyImpulse, and core's SceneObjectGroup.applyImpulse, which YEngine reaches). The SL wiki
+        /// says nothing about attachments here.
+        /// </summary>
         public void llApplyImpulse(Vector3 force, int local)
         {
-            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
-            if (force.LengthSquared() > 20000f * 20000f)
-                force = Vector3.Normalize(force) * 20000f;
-            m_host.ApplyImpulse(force, local != 0);
+            try
+            {
+                if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
+                if (!m_host.ParentGroup.IsAttachment && (m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
+                if (force.LengthSquared() > 20000f * 20000f)
+                    force = Vector3.Normalize(force) * 20000f;
+                m_host.ApplyImpulse(force, local != 0);
+            }
+            finally { PhySleep(); }   // Halcyon sleeps on every path
         }
 
         public void llApplyRotationalImpulse(Vector3 force, int local)
         {
-            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
-            m_host.ApplyAngularImpulse(force, local != 0);
+            try
+            {
+                if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
+                if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
+                m_host.ApplyAngularImpulse(force, local != 0);
+            }
+            finally { PhySleep(); }   // Halcyon sleeps on every path
         }
+        /// <summary>
+        /// Halcyon :2580-2585: a target outside the region with no region there is brought back inside it, so a
+        /// physical object is not driven off the edge into the void. A target in a neighbouring region is kept.
+        /// </summary>
         public void llMoveToTarget(Vector3 target, float tau)
         {
             if (m_host?.ParentGroup == null) return;
+            float sizeX = World.RegionInfo.RegionSizeX, sizeY = World.RegionInfo.RegionSizeY;
+            bool inRegion = target.X >= 0f && target.X < sizeX && target.Y >= 0f && target.Y < sizeY;
+            if (!inRegion && !RegionExistsAt(target))
+            {
+                target.X = Math.Clamp(target.X, 0f, sizeX - 0.01f);
+                target.Y = Math.Clamp(target.Y, 0f, sizeY - 0.01f);
+            }
             m_host.ParentGroup.MoveToTarget(target, tau);
         }
 
@@ -763,29 +1863,37 @@ namespace Phlox.ScriptEngine
             if (m_host?.ParentGroup == null) return;
             m_host.ParentGroup.StopMoveToTarget();
         }
-        public float llGetMass() => m_host?.GetMass() ?? 0f;
-        public float llGetMassMKS()
+        /// <summary>
+        /// YEngine's scope (LSL_Api.llGetMass) - the whole object from any prim of it, and
+        /// the wearer's mass from an attachment. This used to be the script's own prim only.
+        /// </summary>
+        public float llGetMass()
         {
-            if (m_host?.ParentGroup == null) return 0f;
-            return m_host.ParentGroup.GetMass();
+            SceneObjectGroup group = m_host?.ParentGroup;
+            if (group == null) return 0f;
+            if (group.IsAttachment)
+                return World?.GetScenePresence(group.AttachedAvatar)?.GetMass() ?? 0f;
+            return group.GetMass();
         }
-        public float iwGetObjectMassMKS(string id)
-        {
-            if (!UUID.TryParse(id, out UUID key)) return 0f;
-            SceneObjectPart part = World?.GetSceneObjectPart(key);
-            if (part != null) return part.ParentGroup.GetMass();
-            ScenePresence sp = World?.GetScenePresence(key);
-            if (sp?.PhysicsActor != null) return sp.PhysicsActor.Mass;
-            return 0f;
-        }
+        /// <summary>Kilograms - 100 x llGetMass, as YEngine (LSL_Api.llGetMassMKS).</summary>
+        public float llGetMassMKS() => 100f * llGetMass();
+        /// <summary>
+        /// Kilograms - 100 x llGetObjectMass for the same object, as llGetMassMKS is 100 x llGetMass
+        /// (YEngine, LSL_Api.llGetMassMKS). It returned the same number as llGetObjectMass. Halcyon's body does too:
+        /// its Kilograms2Lindograms is the identity ("returning kg/100.0 would break existing content"); Phlox follows
+        /// its own llGetMass/llGetMassMKS pair instead.
+        /// </summary>
+        public float iwGetObjectMassMKS(string id) => 100f * llGetObjectMass(id);
         public float llGetObjectMass(string id)
         {
             if (!UUID.TryParse(id, out UUID key)) return 0f;
             SceneObjectPart part = World?.GetSceneObjectPart(key);
             if (part != null) return part.ParentGroup.GetMass();
             ScenePresence sp = World?.GetScenePresence(key);
-            if (sp?.PhysicsActor != null) return sp.PhysicsActor.Mass;
-            return 0f;
+            if (sp == null) return 0f;
+            // SL: "This function returns a mass of 0.01 for child agents." (Halcyon too.)
+            if (sp.IsChildAgent) return 0.01f;
+            return sp.GetMass();
         }
         public void llSetBuoyancy(float buoyancy)
         {
@@ -807,7 +1915,7 @@ namespace Phlox.ScriptEngine
         }
         public void llGroundRepel(float height, int water, float tau)
         {
-            // Halcyon used PIDHoverFlag.Ground|Repel; Legion uses PIDHoverType which
+            // Halcyon used PIDHoverFlag.Ground|Repel; this port uses PIDHoverType which
             // may not have a separate Repel flag. Use Ground (or Water) — SetHoverHeight
             // with a positive height inherently repels from the ground.
             if (m_host?.PhysActor == null) return;
@@ -836,18 +1944,6 @@ namespace Phlox.ScriptEngine
             42,43,44,45,46,47,48,49,50,51,52,-1,-1,-1,-1,-1   // 112-127
         };
 
-        // STATUS constants (LSL standard values)
-        private const int STATUS_PHYSICS          = 1;
-        private const int STATUS_ROTATE_X         = 2;
-        private const int STATUS_ROTATE_Y         = 4;
-        private const int STATUS_ROTATE_Z         = 8;
-        private const int STATUS_PHANTOM          = 16;
-        private const int STATUS_CAST_SHADOWS     = 32;
-        private const int STATUS_BLOCK_GRAB       = 64;
-        private const int STATUS_DIE_AT_EDGE      = 128;
-        private const int STATUS_RETURN_AT_EDGE   = 256;
-        private const int STATUS_SANDBOX          = 4096;
-        private const int STATUS_BLOCK_GRAB_OBJECT= 8192;
 
         public void llSetStatus(int status, int value)
         {
@@ -856,24 +1952,17 @@ namespace Phlox.ScriptEngine
             if (group == null) return;
             bool on = value != 0;
 
+            // Halcyon's PhySleep after each (LSLSystemAPI.cs:1506, 1516); none when physics is refused for size
             if ((status & STATUS_PHYSICS) != 0)
             {
-                if (on)
-                {
-                    bool allow = true;
-                    foreach (SceneObjectPart p in group.Parts)
-                    {
-                        if (p.Scale.X > World.m_maxPhys || p.Scale.Y > World.m_maxPhys || p.Scale.Z > World.m_maxPhys)
-                        { allow = false; break; }
-                    }
-                    if (allow) m_host.ScriptSetPhysicsStatus(true);
-                }
-                else
-                    m_host.ScriptSetPhysicsStatus(false);
+                if (SetObjectPhysics(group, on)) PhySleep();
             }
 
             if ((status & STATUS_PHANTOM) != 0)
+            {
                 group.ScriptSetPhantomStatus(on);
+                PhySleep();
+            }
 
             if ((status & STATUS_CAST_SHADOWS) != 0)
             {
@@ -887,8 +1976,13 @@ namespace Phlox.ScriptEngine
             if ((status & STATUS_DIE_AT_EDGE) != 0)
                 m_host.SetDieAtEdge(on);
 
+            // As YEngine (LSL_Api.cs:1577-1578); the core returns the object at a region edge (Scene.cs:2977,
+            // SceneObjectGroup.cs:874), where Halcyon answered "Command not implemented" (:1557-1560).
+            if ((status & STATUS_RETURN_AT_EDGE) != 0)
+                m_host.SetReturnAtEdge(on);
+
             if ((status & STATUS_SANDBOX) != 0)
-                Stub("llSetStatus(STATUS_SANDBOX)");
+                m_host.SetStatusSandbox(on);   // As YEngine
 
             // Rotation axis locks — byte bitmask: bit0=X, bit1=Y, bit2=Z
             if ((status & (STATUS_ROTATE_X | STATUS_ROTATE_Y | STATUS_ROTATE_Z)) != 0)
@@ -903,6 +1997,25 @@ namespace Phlox.ScriptEngine
                 m_host.RotationAxisLocks = locks;
                 m_host.PhysActor?.LockAngularMotion(locks);
             }
+        }
+
+        /// <summary>
+        /// STATUS_PHYSICS and PRIM_PHYSICS on the whole object (Halcyon llSetStatus): turning physics on is refused
+        /// when any prim is larger than the region's physical-prim size.
+        /// </summary>
+        /// <returns>false when turning physics on was refused (Halcyon does not PhySleep then)</returns>
+        private bool SetObjectPhysics(SceneObjectGroup group, bool on)
+        {
+            if (on)
+            {
+                foreach (SceneObjectPart p in group.Parts)
+                {
+                    if (p.Scale.X > World.m_maxPhys || p.Scale.Y > World.m_maxPhys || p.Scale.Z > World.m_maxPhys)
+                        return false;
+                }
+            }
+            group.ScriptSetPhysicsStatus(on);
+            return true;
         }
 
         public int llGetStatus(int status)
@@ -922,6 +2035,10 @@ namespace Phlox.ScriptEngine
                     return m_host.BlockGrab ? 1 : 0;
                 case STATUS_DIE_AT_EDGE:
                     return m_host.GetDieAtEdge() ? 1 : 0;
+                case STATUS_SANDBOX:
+                    return m_host.GetStatusSandbox() ? 1 : 0;
+                case STATUS_RETURN_AT_EDGE:
+                    return m_host.GetReturnAtEdge() ? 1 : 0;   // YEngine LSL_Api.cs:1649
                 case STATUS_ROTATE_X:
                     return (m_host.RotationAxisLocks & 0x01) == 0 ? 1 : 0;
                 case STATUS_ROTATE_Y:
@@ -932,52 +2049,86 @@ namespace Phlox.ScriptEngine
                     return 0;
             }
         }
+        // Halcyon's vehicle validators (OpenSim/Region/Physics/Manager/Vehicle/*.cs) - the ids
+        // Phlox's constants define (DefaultConstants VEHICLE_*) - and its LSLError on anything else or a NaN
+        // (LSLSystemAPI.cs:8541-8621). An invalid call is not applied and returns before Halcyon's PhySleep.
+        private static bool VehicleTypeValid(int t) => (t >= 0 && t <= 5) || t == 10001 || t == 10002;
+        private static bool VehicleFloatParamValid(int p) =>
+            ((p >= 24 && p <= 40) && p != 30 && p != 31 && p != 34 && p != 35) || (p >= 11001 && p <= 11006);
+        private static bool VehicleVectorParamValid(int p) =>
+            (p >= 16 && p <= 20) || p == 30 || p == 31 || p == 34 || p == 35 || p == 12001 || p == 12002;
+        private static bool VehicleRotationParamValid(int p) => p == 44;
+
         public void llSetVehicleType(int type)
         {
-            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return;
-            pa.VehicleType = type;
+            if (m_host?.ParentGroup != null && !m_host.ParentGroup.IsDeleted && !VehicleTypeValid(type))
+            {
+                LSLError("llSetVehicleType(" + type.ToString() + ") is not valid.");
+                return;
+            }
+            try
+            {
+                if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
+                m_host.ParentGroup.RootPart.SetVehicleType(type);
+            }
+            finally { PhySleep(); }   // Halcyon sleeps on every path it applies
         }
 
         public void llSetVehicleFloatParam(int param, float value)
         {
-            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return;
-            pa.VehicleFloatParam(param, value);
+            // A vector parameter takes <value, value, value> (Halcyon :8577; SOPVehicle.ProcessFloatVehicleParam).
+            if (m_host?.ParentGroup != null && !m_host.ParentGroup.IsDeleted
+                && (float.IsNaN(value) || !(VehicleFloatParamValid(param) || VehicleVectorParamValid(param))))
+            {
+                LSLError("llSetVehicleFloatParam(" + param.ToString() + ", " + value.ToString() + ") is not valid.");
+                return;
+            }
+            try
+            {
+                if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
+                m_host.ParentGroup.RootPart.SetVehicleFloatParam(param, value);
+            }
+            finally { PhySleep(); }   // Halcyon sleeps on every path it applies
         }
 
         public void llSetVehicleVectorParam(int param, Vector3 vec)
         {
-            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return;
-            pa.VehicleVectorParam(param, vec);
+            if (m_host?.ParentGroup != null && !m_host.ParentGroup.IsDeleted
+                && (float.IsNaN(vec.X) || float.IsNaN(vec.Y) || float.IsNaN(vec.Z) || !VehicleVectorParamValid(param)))
+            {
+                LSLError("llSetVehicleVectorParam(" + param.ToString() + ", " + vec.ToString() + ") is not valid.");
+                return;
+            }
+            try
+            {
+                if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
+                m_host.ParentGroup.RootPart.SetVehicleVectorParam(param, vec);
+            }
+            finally { PhySleep(); }   // Halcyon sleeps on every path it applies
         }
 
         public void llSetVehicleRotationParam(int param, Quaternion rot)
         {
             if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return;
-            pa.VehicleRotationParam(param, rot);
+            if (float.IsNaN(rot.X) || float.IsNaN(rot.Y) || float.IsNaN(rot.Z) || float.IsNaN(rot.W) || !VehicleRotationParamValid(param))
+            {
+                LSLError("llSetVehicleRotationParam(" + param.ToString() + ", " + rot.ToString() + ") is not valid.");
+                return;
+            }
+            m_host.ParentGroup.RootPart.SetVehicleRotationParam(param, NormalizedRot(rot));   // Halcyon Rot2Quaternion
         }
 
+        // VEHICLE_FLAG_CAMERA_DECOUPLED is kept by SOPVehicle, so Halcyon's "is not implemented" error is not needed.
         public void llSetVehicleFlags(int flags)
         {
             if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return;
-            pa.VehicleFlags(flags, false);
+            m_host.ParentGroup.RootPart.SetVehicleFlags(flags, false);
         }
 
         public void llRemoveVehicleFlags(int flags)
         {
             if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return;
-            pa.VehicleFlags(flags, true);
+            m_host.ParentGroup.RootPart.SetVehicleFlags(flags, true);
         }
         public LSLList llGetPhysicsMaterial()
         {
@@ -995,12 +2146,30 @@ namespace Phlox.ScriptEngine
         public void llSetPhysicsMaterial(int mask, float gravityMultiplier, float restitution, float friction, float density)
         {
             if (m_host == null) return;
-            // mask bits: 1=gravity, 2=restitution, 4=friction, 8=density
-            // SOP property setters handle bounds-clamping, HasGroupChanged, and PhysicsActor update.
-            if ((mask & 1) != 0) m_host.GravityModifier = gravityMultiplier;
-            if ((mask & 2) != 0) m_host.Restitution     = restitution;
-            if ((mask & 4) != 0) m_host.Friction         = friction;
-            if ((mask & 8) != 0) m_host.Density          = density;
+            // SL: "llSetPhysicsMaterial silently fails if called from an attachment."
+            if (m_host.ParentGroup?.IsAttachment == true) return;
+            PrimSetPhysicsMaterial(m_host, mask, density, friction, restitution, gravityMultiplier);
+            if (m_host.PhysActor != null) PhySleep();   // Halcyon's, for a prim with a physics actor
+        }
+
+        /// <summary>
+        /// llSetPhysicsMaterial and OpenSim's PRIM_PHYSICS_MATERIAL on one prim (OpenSim LSL_Api.SetPhysicsMaterial): the
+        /// mask's DENSITY, FRICTION, RESTITUTION and GRAVITY_MULTIPLIER bits (SL's values) pick the values that change.
+        /// The scene's UpdateExtraPhysics writes them through the part's setters, which ignore a value outside SL's
+        /// range, save it, and pass it to the prim's physics actor.
+        /// </summary>
+        private static void PrimSetPhysicsMaterial(SceneObjectPart part, int mask, float density, float friction,
+            float restitution, float gravityMultiplier)
+        {
+            var physdata = new ExtraPhysicsData
+            {
+                PhysShapeType = (PhysShapeType)part.PhysicsShapeType,
+                Density = (mask & DENSITY) != 0 ? density : part.Density,
+                Friction = (mask & FRICTION) != 0 ? friction : part.Friction,
+                Bounce = (mask & RESTITUTION) != 0 ? restitution : part.Restitution,
+                GravitationModifier = (mask & GRAVITY_MULTIPLIER) != 0 ? gravityMultiplier : part.GravityModifier,
+            };
+            part.UpdateExtraPhysics(physdata);
         }
         public void llSetAngularVelocity(Vector3 force, int local)
         {
@@ -1027,24 +2196,13 @@ namespace Phlox.ScriptEngine
             {
                 if (keyframes.Length == 0 && options.Length == 0)
                 {
-                    // Stop and clear
+                    // Stop and clear. The motion runs on the scene's keyframe timer, so dropping the reference
+                    // alone left it moving the object with nothing able to stop it (Halcyon stops it here).
+                    m_host.ParentGroup.RootPart.KeyframeMotion?.Stop();
                     m_host.ParentGroup.RootPart.KeyframeMotion = null;
                     return;
                 }
 
-                // KFM constants (raw values since ScriptBaseClass is not accessible)
-                const int KFM_COMMAND = 0;
-                const int KFM_MODE = 1;
-                const int KFM_DATA = 2;
-                const int KFM_CMD_PLAY = 0;
-                const int KFM_CMD_STOP = 1;
-                const int KFM_CMD_PAUSE = 2;
-                const int KFM_FORWARD = 0;
-                const int KFM_LOOP = 1;
-                const int KFM_PING_PONG = 2;
-                const int KFM_REVERSE = 3;
-                const int KFM_ROTATION = 1;
-                const int KFM_TRANSLATION = 2;
 
                 int dataType = KFM_ROTATION | KFM_TRANSLATION; // Both = default
                 int mode = KFM_FORWARD;
@@ -1118,6 +2276,7 @@ namespace Phlox.ScriptEngine
 
                 KeyframeMotion motion = new KeyframeMotion(m_host.ParentGroup, playMode, dFlags);
                 motion.SetKeyframes(kfArray);
+                m_host.ParentGroup.RootPart.KeyframeMotion?.Stop();   // a new motion replaces the running one
                 m_host.ParentGroup.RootPart.KeyframeMotion = motion;
                 motion.Start();
             }
@@ -1129,14 +2288,51 @@ namespace Phlox.ScriptEngine
 
         // ── Timer / sleep ──────────────────────────────────────────────────────
 
-        public void llSetTimerEvent(float sec) => m_ScriptEngine.SetTimerEvent(m_localID, m_itemID, sec);
-        public void llSleep(float sec) => ScriptSleep((int)(sec * 1000));
-        public void llMinEventDelay(float delay)
+        /// <summary>
+        /// A positive request below the region's floor is raised to it.
+        ///
+        /// <para>
+        /// Zero and negative are left exactly as they were: the SL wiki says "Passing in 0.0 stops
+        /// further timer events", and a negative value lands &lt;= 0 where the scheduler only arms a
+        /// timer for an interval &gt; 0. The floor must never resurrect a stopped timer.
+        /// </para>
+        ///
+        /// <para>
+        /// The clamp is here, at the API entry, and not in the scheduler, so that what
+        /// <c>phlox status</c> reads back is the value that was actually applied - one place to look
+        /// when a script and the log disagree about how fast a timer is.
+        /// </para>
+        /// </summary>
+        public void llSetTimerEvent(float sec)
         {
-            // No-op in Phlox — the scheduler handles event timing internally.
-            // LSL spec says this sets a minimum gap between event handler invocations,
-            // but Phlox's single-threaded scheduler already serializes events.
+            float applied = sec;
+            float floor = m_ScriptEngine?.MinTimerInterval ?? 0f;
+            if (sec > 0f && floor > 0f && sec < floor)
+            {
+                applied = floor;
+                if (!m_timerFloorLogged)
+                {
+                    // Once per script, not once per tick: the point is to name the script that asked,
+                    // and a 10 ms timer would otherwise write a hundred lines a second.
+                    m_timerFloorLogged = true;
+                    m_log.LogDebug("[PhloxAPI]: llSetTimerEvent floor applied for {Item}: requested {Requested}s, applied {Applied}s",
+                        m_itemID, sec, applied);
+                }
+            }
+
+            m_ScriptEngine.SetTimerEvent(m_localID, m_itemID, applied);
         }
+
+        /// <summary>One clamp message per script instance, however often it re-arms.</summary>
+        private bool m_timerFloorLogged;
+        public void llSleep(float sec) => ScriptSleep((int)(sec * 1000));
+        /// <summary>
+        /// Wiki: "Set the minimum time between events being handled" - a floor between
+        /// handler starts for THIS script, events inside the window queued, not dropped. The old
+        /// comment said the scheduler made this unnecessary; serialising events is not the same as
+        /// spacing them. Upstream forwards to the engine too (LSL_Api.cs:4433-4444).
+        /// </summary>
+        public void llMinEventDelay(float delay) => m_ScriptEngine?.SetMinEventDelay(m_itemID, delay);
 
         // ── Script state ───────────────────────────────────────────────────────
 
@@ -1147,7 +2343,7 @@ namespace Phlox.ScriptEngine
             TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.LSLText);
             if (item == null)
             {
-                ShoutError("llResetOtherScript: script '" + name + "' not found");
+                ScriptShoutError("llResetOtherScript: script '" + name + "' not found");
                 return;
             }
             m_ScriptEngine.ApiResetScript(item.ItemID);
@@ -1159,9 +2355,13 @@ namespace Phlox.ScriptEngine
             TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.LSLText);
             if (item == null)
             {
-                ShoutError("llGetScriptState: script '" + name + "' not found");
+                ScriptShoutError("llGetScriptState: script '" + name + "' not found");
                 return 0;
             }
+            // Halcyon asks the engine (EngineInterface.GetScriptState). A script this engine does not run, or one still
+            // compiling, answers from the item's Running flag, which llSetScriptState keeps.
+            if (m_ScriptEngine != null && m_ScriptEngine.HasScript(item.ItemID, out bool running))
+                return running ? 1 : 0;
             return item.ScriptRunning ? 1 : 0;
         }
 
@@ -1171,7 +2371,7 @@ namespace Phlox.ScriptEngine
             TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.LSLText);
             if (item == null)
             {
-                ShoutError("llSetScriptState: script '" + name + "' not found");
+                ScriptShoutError("llSetScriptState: script '" + name + "' not found");
                 return;
             }
             // Use EventManager directly — SetScriptRunning requires IClientAPI
@@ -1179,6 +2379,8 @@ namespace Phlox.ScriptEngine
                 World.EventManager.TriggerStartScript(m_host.LocalId, item.ItemID);
             else
                 World.EventManager.TriggerStopScript(m_host.LocalId, item.ItemID);
+            // The Running flag the viewer's checkbox shows and the region saves.
+            m_ScriptEngine?.SetItemRunningFlag(m_host.LocalId, item.ItemID, run != 0);
         }
         public void llSetRemoteScriptAccessPin(int pin)
         {
@@ -1202,7 +2404,7 @@ namespace Phlox.ScriptEngine
         {
             if (pin == 0)
             {
-                ShoutError("llRemoteLoadScriptPin: PIN cannot be zero.");
+                ScriptShoutError("llRemoteLoadScriptPin: PIN cannot be zero.");
                 ScriptSleep(3000);
                 return 0;
             }
@@ -1218,19 +2420,19 @@ namespace Phlox.ScriptEngine
             SceneObjectPart part = World?.GetSceneObjectPart(destId);
             if (part == null)
             {
-                ShoutError("llRemoteLoadScriptPin: Target prim [" + destId.ToString() + "] not found.");
+                ScriptShoutError("llRemoteLoadScriptPin: Target prim [" + destId.ToString() + "] not found.");
                 ScriptSleep(3000);
                 return 0;
             }
             if (m_host.OwnerID != part.OwnerID)
             {
-                ShoutError("llRemoteLoadScriptPin: Target prim ownership does not match.");
+                ScriptShoutError("llRemoteLoadScriptPin: Target prim ownership does not match.");
                 ScriptSleep(3000);
                 return 0;
             }
             if (m_host.UUID == destId)
             {
-                ShoutError("llRemoteLoadScriptPin: Target prim cannot be the source prim.");
+                ScriptShoutError("llRemoteLoadScriptPin: Target prim cannot be the source prim.");
                 ScriptSleep(3000);
                 return 0;
             }
@@ -1258,28 +2460,40 @@ namespace Phlox.ScriptEngine
                 return 0;
             }
 
-            // The rest of the permission checks are done in RezScript, so check the pin there as well.
+            // Halcyon's Scene.RezScript returned why it refused, and RemoteLoadScriptPin reported it (LSLSystemAPI.cs:8977-8993):
+            // "PIN" is -1, "NO PIN" -2, anything else 0 with the reason. Core's RezScriptFromPrim (Scene.Inventory.cs) makes
+            // the same checks but returns nothing, so they are made here first. The owners already match (above), so the
+            // destination needs Modify for its owner.
             int ret = 1;
-            try
+            if ((part.OwnerMask & (uint)OpenSim.Framework.PermissionMask.Modify) == 0)
             {
-                // Legion signature: RezScriptFromPrim(UUID srcId, SceneObjectPart srcPart, UUID destId, int pin, int running, int start_param)
-                World.RezScriptFromPrim(srcId, m_host, destId, pin, running, start_param);
+                ScriptShoutError("llRemoteLoadScriptPin: Destination lacks Modify permission.");
+                ret = 0;
             }
-            catch (Exception e)
+            else if (part.ScriptAccessPin == 0)
             {
-                string msg = e.Message;
-                if (msg.Contains("PIN"))
+                if (doShout) ShoutError("llRemoteLoadScriptPin: Script update denied - PIN not set.");
+                ret = -2;
+            }
+            else if (part.ScriptAccessPin != pin)
+            {
+                if (doShout) ShoutError("llRemoteLoadScriptPin: Script update denied - PIN mismatch.");
+                ret = -1;
+            }
+            else
+            {
+                try
                 {
-                    if (doShout) ShoutError("llRemoteLoadScriptPin: Script update denied - PIN mismatch.");
-                    ret = -1;
+                    World.RezScriptFromPrim(srcId, m_host, destId, pin, running, start_param);
                 }
-                else
+                catch (Exception e)
                 {
-                    m_log.LogWarning("[PhloxAPI]: RemoteLoadScriptPin failed: {0}", msg);
-                    if (doShout) ShoutError("llRemoteLoadScriptPin: " + msg);
+                    m_log.LogWarning("[PhloxAPI]: RemoteLoadScriptPin failed: {0}", e.Message);
+                    ScriptShoutError("llRemoteLoadScriptPin: " + e.Message);
                     ret = 0;
                 }
             }
+            // Halcyon: "this will cause the delay even if the script pin or permissions were wrong".
             ScriptSleep(3000);
             return ret;
         }
@@ -1291,30 +2505,58 @@ namespace Phlox.ScriptEngine
             var parms = new EventParams("link_message",
                 new object[] { m_host.LinkNum, num, str ?? string.Empty, id ?? UUID.Zero.ToString() },
                 new DetectParams[0]);
-            SceneObjectPart[] parts = group.Parts;
-            if (linknum == -4) m_ScriptEngine.PostObjectEvent(m_host.LocalId, parms);
-            else if (linknum == -3) foreach (var p in parts) m_ScriptEngine.PostObjectEvent(p.LocalId, parms);
-            else if (linknum == -1) foreach (var p in parts) { if (p.LocalId != m_host.LocalId) m_ScriptEngine.PostObjectEvent(p.LocalId, parms); }
-            else if (linknum == -2) foreach (var p in parts) { if (p.LinkNum > 1) m_ScriptEngine.PostObjectEvent(p.LocalId, parms); }
-            else if (linknum == 1) m_ScriptEngine.PostObjectEvent(group.RootPart.LocalId, parms);
-            else if (linknum > 1) { var t = group.GetLinkNumPart(linknum); if (t != null) m_ScriptEngine.PostObjectEvent(t.LocalId, parms); }
+            var targets = GetLinkParts(linknum).ToList();
+            foreach (var p in targets)
+                m_ScriptEngine.PostObjectEvent(p.LocalId, parms);
+            var receivers = ScriptItemsIn(targets);
+            OfferToOtherEngines("llMessageLinked", () => receivers, "link_message", () => (object[])parms.Params.Clone());
+            LinkMessageBackPressure(receivers);
+        }
+
+        /// <summary>
+        /// An event SL raises in every script of some prims, whatever engine runs them (llMessageLinked: "in all scripts in
+        /// the prim(s) described by link"; object_rez, email, linkset_data and dataserver likewise, see their callers).
+        /// Phlox's own posts reach only its own scripts, so each other script engine of the region is offered every script
+        /// item <paramref name="items"/> lists once, with plain values (int, string), as core modules post events; YEngine
+        /// unwraps those. An engine queues only for the scripts it runs, so no script gets it twice. An exception from
+        /// another engine is logged once for that engine and call and goes no further. With no other engine (a Phlox-only
+        /// region) nothing is listed or posted.
+        /// </summary>
+        private void OfferToOtherEngines(string caller, Func<IEnumerable<UUID>> items, string eventName, Func<object[]> args)
+        {
+            var others = new List<OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine>();
+            foreach (IScriptModule m in World?.RequestModuleInterfaces<IScriptModule>() ?? Array.Empty<IScriptModule>())
+                if (!ReferenceEquals(m, m_ScriptEngine) && m is OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine e && !others.Contains(e))
+                    others.Add(e);
+            if (others.Count == 0) return;
+
+            var list = items().ToList();
+            foreach (var e in others)
+            {
+                bool logged = false;
+                foreach (UUID item in list)
+                {
+                    try
+                    {
+                        e.PostScriptEvent(item, new EventParams(eventName, args(), new DetectParams[0]));
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!logged)
+                            m_log.LogWarning("[PhloxAPI]: {0}: another script engine failed to take a {1} event: {2}", caller, eventName, ex.Message);
+                        logged = true;
+                    }
+                }
+            }
         }
         public int llGetStartParameter()
         {
             return m_thisScript?.ScriptState?.StartParameter ?? 0;
         }
-        public int llGetFreeMemory() => 65536;
-        public int llGetUsedMemory()
-        {
-            // Phlox VM doesn't track per-script memory the way Mono does.
-            // Return a reasonable estimate: 16KB base + script state size.
-            if (m_thisScript?.ScriptState != null)
-            {
-                int stackSize = m_thisScript.ScriptState.Operands?.Count ?? 0;
-                return 16384 + (stackSize * 64);
-            }
-            return 16384;
-        }
+        // The VM's own accounting of the script's memory, as Halcyon reads it (EngineInterface.GetFreeMemory and
+        // GetUsedMemory: MemInfo.MemoryFree, MemInfo.MemoryUsed); the limit is MemoryInfo.MAX_MEMORY, llGetMemoryLimit's 128 KiB.
+        public int llGetFreeMemory() => m_thisScript?.ScriptState?.MemInfo?.MemoryFree ?? 0;
+        public int llGetUsedMemory() => m_thisScript?.ScriptState?.MemInfo?.MemoryUsed ?? 0;
         public int llSetMemoryLimit(int limit)
         {
             // Halcyon only accepts 128K (131072)
@@ -1322,11 +2564,30 @@ namespace Phlox.ScriptEngine
             return 0;
         }
         public int llGetMemoryLimit() { return 131072; /* 128 * 1024 */ }
-        public void llScriptProfiler(int flags) { }
+        /// <summary>
+        /// Wiki: "Enables or disables the scripts profiling state" - PROFILE_SCRIPT_MEMORY (1)
+        /// starts recording, PROFILE_NONE (0) stops it, and llGetSPMaxMemory then returns "the most
+        /// memory used at any one time". Upstream is a no-op (LSL_Api.cs:17570); Phlox has MemInfo, so
+        /// this is a peak field and two reads. Starting resets the peak to the current usage.
+        /// </summary>
+        public void llScriptProfiler(int flags)
+        {
+            var st = m_thisScript?.ScriptState;
+            if (st == null) return;
+            bool on = (flags & PROFILE_SCRIPT_MEMORY) != 0;
+            // Fold the usage at the moment of the call in FIRST: a PROFILE_NONE that cleared the flag
+            // before sampling would lose everything allocated since the last event boundary.
+            st.SampleMemoryPeak();
+            if (on && !st.ProfilingMemory) st.PeakMemoryUsed = st.MemInfo?.MemoryUsed ?? 0;
+            st.ProfilingMemory = on;
+            st.SampleMemoryPeak();
+        }
 
         // ── Permissions ────────────────────────────────────────────────────────
 
         private IClientAPI m_waitingForScriptAnswer = null;
+        /// <summary>The mask the pending question asked for; an answer is stored ANDed with it.</summary>
+        private int m_requestedPerms;
 
         private UUID InventorySelf()
         {
@@ -1335,33 +2596,59 @@ namespace Phlox.ScriptEngine
 
         private void PermsChange(TaskInventoryItem item, UUID granter, int mask)
         {
-            int silentEstateManagement = (mask & 0x40) != 0 ? 1 : 0; // PERMISSION_SILENT_ESTATE_MANAGEMENT
+            int silentEstateManagement = (mask & PERMISSION_SILENT_ESTATE_MANAGEMENT) != 0 ? 1 : 0;
             if (m_thisScript?.ScriptState?.MiscAttributes != null)
                 m_thisScript.ScriptState.MiscAttributes[(int)InWorldz.Phlox.VM.RuntimeState.MiscAttr.SilentEstateManagement]
                     = new object[] { silentEstateManagement };
             if (item != null)
             {
+                // A grant that came from an Experience stays one while bits of it end (a reset of the controls, a stand);
+                // any other grant, from another granter or with a bit it did not hold, is not that Experience's.
+                if (mask == 0 || granter != item.PermsGranter || (mask & ~item.PermsMask) != 0)
+                    ForgetExperienceGrant();
                 item.PermsGranter = granter;
                 item.PermsMask = mask;
                 m_host.Inventory.ForceInventoryPersistence();
                 m_host.ParentGroup.HasGroupChanged = true;
+                GrantChanged();
             }
+        }
+
+        /// <summary>
+        /// The grant changed, perhaps with no event run (a stand-up, Release Keys, an owner change): the script is saved
+        /// again, so its row never keeps a grant the item no longer holds, which a restart would give back whole.
+        /// </summary>
+        private void GrantChanged()
+        {
+            if (m_thisScript != null) m_ScriptEngine?.StateManager?.ScriptChanged(m_thisScript);
         }
 
         private int GetImplicitPermissions(TaskInventoryItem item, UUID agentID)
         {
-            int implicitPerms = 0;
+            // SL's implicit grants (wiki llRequestPermissions), as YEngine gives them
+            // (LSL_Api.llRequestPermissions). A sitter anywhere on the linkset counts, not only the
+            // root's sit-target avatar.
+            if (agentID == UUID.Zero) return 0;
             if (m_host.ParentGroup.IsAttachment && agentID == m_host.ParentGroup.AttachedAvatar)
+                return SlConst.PERMISSION_TAKE_CONTROLS | SlConst.PERMISSION_TRIGGER_ANIMATION |
+                       SlConst.PERMISSION_ATTACH | SlConst.PERMISSION_TRACK_CAMERA |
+                       SlConst.PERMISSION_CONTROL_CAMERA | SlConst.PERMISSION_OVERRIDE_ANIMATIONS;
+            if (m_host.ParentGroup.HasSittingAvatar(agentID))
+                return SlConst.PERMISSION_TAKE_CONTROLS | SlConst.PERMISSION_TRIGGER_ANIMATION |
+                       SlConst.PERMISSION_TRACK_CAMERA | SlConst.PERMISSION_CONTROL_CAMERA;
+            // Halcyon LSLSystemAPI.cs:4446-4460: a bot cannot answer a permission dialog, so one the object's owner
+            // owns, or one sitting on an object the owner owns, grants PERMISSION_TRIGGER_ANIMATION.
+            ScenePresence bot = World.GetScenePresence(agentID);
+            if (bot != null && bot.IsNPC && !bot.IsChildAgent)
             {
-                implicitPerms = 4 | 8 | 32 | 64 | 16;
-                // PERMISSION_TAKE_CONTROLS | PERMISSION_TRIGGER_ANIMATION |
-                // PERMISSION_CONTROL_CAMERA | PERMISSION_TRACK_CAMERA | PERMISSION_ATTACH
+                UUID botOwner = World.RequestModuleInterface<INPCModule>()?.GetOwner(agentID) ?? UUID.Zero;
+                if (botOwner != UUID.Zero && botOwner == m_host.OwnerID)
+                    return SlConst.PERMISSION_TRIGGER_ANIMATION;
+                SceneObjectPart seat = bot.ParentPart;
+                if (seat != null && seat.OwnerID == m_host.OwnerID)
+                    return SlConst.PERMISSION_TRIGGER_ANIMATION;
             }
-            else if (m_host.ParentGroup.RootPart.SitTargetAvatar == agentID && agentID != UUID.Zero)
-            {
-                implicitPerms = 4 | 8 | 32 | 64; // sitting avatar
-            }
-            return implicitPerms;
+            return 0;
         }
 
         private bool RequestImplicitPermissions(int perm, TaskInventoryItem item, UUID agentID)
@@ -1396,16 +2683,20 @@ namespace Phlox.ScriptEngine
         private void handleScriptAnswer(IClientAPI client, UUID taskID, UUID itemID, int answer)
         {
             if (taskID != m_host.UUID) return;
+            // Every script in the prim listens on the same client; an answer is for one item.
+            if (itemID != m_itemID) return;
             if (m_waitingForScriptAnswer == null || client != m_waitingForScriptAnswer) return;
             ClearWaitingForScriptAnswer(client);
             UUID invItemID = InventorySelf();
             if (invItemID == UUID.Zero) return;
-            if ((answer & 4) == 0) // PERMISSION_TAKE_CONTROLS
-                ; // ReleaseControlsInternal not yet implemented
+            // A viewer can only grant what was asked; extra bits in the answer are not a grant.
+            int granted = answer & m_requestedPerms;
+            if ((granted & SlConst.PERMISSION_TAKE_CONTROLS) == 0)
+                EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
             TaskInventoryItem item;
             lock (m_host.TaskInventory)
                 item = m_host.TaskInventory[invItemID];
-            PermsChange(item, client.AgentId, answer);
+            PermsChange(item, client.AgentId, granted);
             m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                 "run_time_permissions", new object[] { (int)item.PermsMask },
                 new DetectParams[0]));
@@ -1419,15 +2710,30 @@ namespace Phlox.ScriptEngine
             TaskInventoryItem item;
             lock (m_host.TaskInventory)
                 item = m_host.TaskInventory[invItemID];
+            ClearGrantClaim();   // The answer to this request replaces any grant a restore saved or left waiting
+            ForgetExperienceGrant();   // and whatever it grants is not an Experience's grant
+
+            // Halcyon :4518-4527; SL llRequestPermissions "PERMISSION_TELEPORT cannot be held by temporary
+            // attachments". The rest of the request goes on (TELEPORT alone becomes a release).
+            if ((perm & PERMISSION_TELEPORT) != 0 && IsTempAttachment(m_host.ParentGroup))
+            {
+                ScriptShoutError("Temporary attachments cannot request runtime permissions to teleport.");
+                perm &= ~PERMISSION_TELEPORT;
+            }
 
             if (agentID == UUID.Zero || perm == 0)
             {
-                PermsChange(item, UUID.Zero, 0);
+                EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "run_time_permissions", new object[] { 0 },
                     new DetectParams[0]));
                 return;
             }
+
+            // Halcyon :4544-4545; SL llTakeControls, the permission is revoked by "a new llRequestPermissions
+            // call". Another avatar, or a request without TAKE_CONTROLS: the controls and the permission go now.
+            if (item.PermsGranter != agentID || (perm & SlConst.PERMISSION_TAKE_CONTROLS) == 0)
+                EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
 
             if (RequestImplicitPermissions(perm, item, agentID))
                 return;
@@ -1435,11 +2741,19 @@ namespace Phlox.ScriptEngine
             ScenePresence presence = World.GetScenePresence(agentID);
             if (presence == null)
             {
-                PermsChange(item, UUID.Zero, 0);
+                EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
                 ScriptSleep(200);
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "run_time_permissions", new object[] { 0 },
                     new DetectParams[0]));
+                return;
+            }
+
+            // Halcyon :4565-4571, only when a dialog would be sent: someone who muted the owner or the object
+            // gets none, and the request ends unanswered (no run_time_permissions).
+            if (IsScriptMuted(agentID))
+            {
+                EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
                 return;
             }
 
@@ -1460,6 +2774,7 @@ namespace Phlox.ScriptEngine
                 m_waitingForScriptAnswer = presence.ControllingClient;
             }
 
+            m_requestedPerms = perm;
             presence.ControllingClient.SendScriptQuestion(
                 m_host.UUID, m_host.ParentGroup.RootPart.Name, ownerName, invItemID, perm,
                 GetScriptExperienceId());
@@ -1476,47 +2791,190 @@ namespace Phlox.ScriptEngine
         {
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return 0;
-            return item.PermsMask;
+            // AutomaticLinkPermission reports PERMISSION_CHANGE_LINKS (YEngine LSL_Api.cs:4755, Halcyon :4702).
+            return AutomaticLinkPermission ? item.PermsMask | PERMISSION_CHANGE_LINKS : item.PermsMask;
         }
         public void llTakeControls(int controls, int accept, int pass_on)
         {
             // Requires PERMISSION_TAKE_CONTROLS (0x04)
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
-            if ((item.PermsMask & 4) == 0)
+            if ((item.PermsMask & PERMISSION_TAKE_CONTROLS) == 0)
             {
                 ShoutError("llTakeControls: PERMISSION_TAKE_CONTROLS not granted.");
                 return;
             }
             ScenePresence sp = World.GetScenePresence(item.PermsGranter);
             if (sp == null || sp.IsChildAgent) return;
-            sp.RegisterControlEventsToScript(controls, accept, pass_on, m_host.LocalId, m_itemID);
+            // The script's own call; a release the core raises for it (a re-take, or pass_on without accept) is
+            // not a stand-up (PhloxEngine.OnScriptControlsReleased)
+            using (PhloxEngine.OwnControlChange())
+                sp.RegisterControlEventsToScript(controls, accept, pass_on, m_host.LocalId, m_itemID);
             m_thisScript.ScriptState.MiscAttributes[(int)RuntimeState.MiscAttr.Control] =
                 new object[] { controls, accept, pass_on };
+            m_ScriptEngine?.RequestParcelCheck(m_itemID);   // Holding controls exempts it from a No Scripts parcel
         }
 
-        public void llReleaseControls()
+        /// <summary>
+        /// SL llReleaseControls "If PERMISSION_TAKE_CONTROLS was previously granted, it will be revoked." (Halcyon
+        /// :3756-3759, ReleaseControlsInternal with releasePerms).
+        /// </summary>
+        public void llReleaseControls() => EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
+
+        // ── The permission lifecycle ────────────────────────────────────────────
+
+        /// <summary>Every permission bit: the granter goes too.</summary>
+        internal const int ALL_PERMISSIONS = -1;
+
+        /// <summary>
+        /// The one place a script's permissions end, with what they started. Every lifecycle path comes here: reset,
+        /// llRequestPermissions (release, another avatar, no TAKE_CONTROLS, absent, muted), a dialog answer without
+        /// TAKE_CONTROLS, llReleaseControls, the core's release of controls on a stand, Release Keys, detach or drop, an
+        /// owner change, and an animation call for a granter who is not here. Unload ends no permission and releases
+        /// controls without the item (<see cref="ReleaseControlsOnUnload"/>).
+        /// </summary>
+        /// <param name="revoke">The bits that end; <see cref="ALL_PERMISSIONS"/> clears the grant. The granter is cleared
+        /// when nothing is left (Halcyon: "if (item.PermsMask == 0) item.PermsGranter = UUID.Zero").</param>
+        /// <param name="releaseControls">Let go of the controls this script took, on whichever avatar here holds them.</param>
+        /// <param name="forgetControls">Drop the Control record too, so a restart or a restore does not take them again.</param>
+        /// <remarks>
+        /// Animations already playing and camera parameters are left alone: SL clears the camera on a stand or detach,
+        /// which the core does (ScenePresence.StandUp), and neither SL nor Halcyon stops an animation when a grant ends.
+        /// The item is persisted only when it changed, so resetting a script with no grant does not mark its object changed.
+        /// </remarks>
+        internal void EndPermissions(int revoke, bool releaseControls, bool forgetControls)
         {
             TaskInventoryItem item = GetInventorySelf();
-            if (item == null) return;
-            ScenePresence sp = World.GetScenePresence(item.PermsGranter);
-            // Null-conditional (not early-return): we need to reach the MiscAttributes
-            // Remove below even when the avatar has left the region, so a stale
-            // Control entry isn't restored after the next restart. If you add code
-            // after this point, handle the null-sp case explicitly.
-            sp?.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
-            m_thisScript.ScriptState.MiscAttributes.Remove((int)RuntimeState.MiscAttr.Control);
+            if (releaseControls)
+            {
+                var misc = m_thisScript?.ScriptState?.MiscAttributes;
+                bool hadRecord = misc != null && misc.ContainsKey((int)RuntimeState.MiscAttr.Control);
+                if (forgetControls && hadRecord) misc.Remove((int)RuntimeState.MiscAttr.Control);
+                ScenePresence holder = ControlsHolder(item?.PermsGranter ?? UUID.Zero, hadRecord);
+                if (holder != null)
+                    using (PhloxEngine.OwnControlChange())
+                        holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                if (hadRecord || holder != null)
+                    m_ScriptEngine?.RequestParcelCheck(m_itemID);   // Without controls a No Scripts parcel pauses it
+            }
+
+            if (item == null || revoke == 0) return;
+            int mask = revoke == ALL_PERMISSIONS ? 0 : item.PermsMask & ~revoke;
+            UUID granter = mask == 0 ? UUID.Zero : item.PermsGranter;
+            bool changed = mask != item.PermsMask || granter != item.PermsGranter;
+            PermsChange(changed ? item : null, granter, mask);
         }
 
-        public void llTakeCamera(string avatar)
+        /// <summary>
+        /// The avatar holding this script's taken controls: the granter when it holds them, else - when the script has a
+        /// Control record and the core already cleared or changed the granter (an owner change) - any root avatar that
+        /// does. A child agent is never asked: its controls went with the crossing.
+        /// </summary>
+        private ScenePresence ControlsHolder(UUID granter, bool hadRecord)
         {
-            // Deprecated — no-op in modern viewers
+            Scene world = World;
+            if (world == null) return null;
+            if (granter != UUID.Zero)
+            {
+                ScenePresence sp = world.GetScenePresence(granter);
+                if (sp != null && !sp.IsChildAgent && sp.HasScriptControls(m_itemID)) return sp;
+            }
+            if (!hadRecord) return null;
+            ScenePresence found = null;
+            world.ForEachRootScenePresence(p => { if (found == null && p.HasScriptControls(m_itemID)) found = p; });
+            return found;
         }
 
-        public void llReleaseCamera(string avatar)
+        /// <summary>
+        /// The core let go of this script's controls on an avatar still in the region: a stand-up, Release Keys, a detach
+        /// or a drop (PhloxEngine.OnScriptControlsReleased; crossings and departures never come here). Halcyon's
+        /// handleMustReleaseControls: only for the permission holder, "On stand, lose both PERMISSION_CONTROL_CAMERA and
+        /// PERMISSION_TAKE_CONTROLS". Scheduler thread.
+        /// </summary>
+        internal void ControlsReleasedByCore(UUID agentId)
         {
-            // Deprecated — no-op in modern viewers
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || item.PermsGranter != agentId) return;
+            var misc = m_thisScript?.ScriptState?.MiscAttributes;
+            if (misc == null || !misc.ContainsKey((int)RuntimeState.MiscAttr.Control)) return;   // already ended here
+            ScenePresence sp = World?.GetScenePresence(agentId);
+            if (sp != null && sp.HasScriptControls(m_itemID)) return;                            // taken again since
+            EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS | SlConst.PERMISSION_CONTROL_CAMERA,
+                           releaseControls: true, forgetControls: true);
         }
+
+        /// <summary>
+        /// The object has a new owner. Halcyon clears every item's grant (ApplyNextOwnerPermissions, Rationalize) and so
+        /// does the core (ChangeInventoryOwner), but neither lets go of controls the old grant took. Scheduler thread.
+        /// </summary>
+        internal void OwnerChanged()
+        {
+            ClearGrantClaim();
+            EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
+        }
+
+        /// <summary>
+        /// Halcyon :4117-4126 (and llStopAnimation, iwStart/StopLinkAnimation): "Emulate SL's behavior of clearing this
+        /// permission when this is called for an agent outside this region" - TRIGGER_ANIMATION ends and
+        /// run_time_permissions says what is left.
+        /// </summary>
+        private void AnimationGranterAbsent()
+        {
+            EndPermissions(SlConst.PERMISSION_TRIGGER_ANIMATION, releaseControls: false, forgetControls: false);
+            TaskInventoryItem item = GetInventorySelf();
+            m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                "run_time_permissions", new object[] { item?.PermsMask ?? 0 },
+                new DetectParams[0]));
+        }
+
+        /// <summary>A temporary attachment: worn, and not from inventory (the core's own test, AttachmentsModule).</summary>
+        private static bool IsTempAttachment(SceneObjectGroup group)
+            => group != null && group.IsAttachment && group.FromItemID.IsZero();
+
+        /// <summary>
+        /// Halcyon IsScriptMuted: never for the owner; muted when the target has muted the object's owner or the object.
+        /// NGC has no mute query, so the target's list is read from IMuteListService (lines "type id name|flags", as
+        /// MuteListService writes them); like Halcyon's IsMuted, any row counts, whatever its flags.
+        /// </summary>
+        private bool IsScriptMuted(UUID target)
+        {
+            if (target == m_host.OwnerID) return false;
+            IMuteListService mutes = World?.RequestModuleInterface<IMuteListService>();
+            if (mutes == null) return false;
+            byte[] data;
+            try { data = mutes.MuteListRequest(target, 0); }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxAPI]: mute list of {0} could not be read: {1}", target, e.Message);
+                return false;
+            }
+            if (data == null || data.Length <= 1) return false;
+            UUID owner = m_host.OwnerID, obj = m_host.ParentGroup.UUID;
+            foreach (string line in Encoding.UTF8.GetString(data).Split('\n'))
+            {
+                string[] f = line.Split(' ', 3);
+                if (f.Length >= 2 && UUID.TryParse(f[1], out UUID id) && (id == owner || id == obj)) return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Every give asks this first. Halcyon _GiveInventory / _GiveLinkInventoryList: a
+        /// recipient who muted the object or its owner is not offered anything - IW_DELIVER_MUTED, the normal delay, a
+        /// server-log line and nothing said to the script. A prim has no mute list, so it is not looked up.
+        /// </summary>
+        private bool GiveRefusedByMute(UUID destId, string what)
+        {
+            if (World.GetSceneObjectPart(destId) != null) return false;
+            if (!IsScriptMuted(destId)) return false;
+            m_log.LogInformation("[PhloxAPI]: Not offering {0} from muted {1} to {2}", what, m_host.ParentGroup.UUID, destId);
+            return true;
+        }
+
+        // Deprecated - no-op in modern viewers. Halcyon's Deprecated, LSLSystemAPI.cs:3867, 3873.
+        public void llTakeCamera(string avatar) => Deprecated("llTakeCamera");
+
+        public void llReleaseCamera(string avatar) => Deprecated("llReleaseCamera");
 
         public void llSetCameraEyeOffset(Vector3 offset)
         {
@@ -1533,7 +2991,7 @@ namespace Phlox.ScriptEngine
             // Requires PERMISSION_CONTROL_CAMERA (0x800 = 2048)
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
-            if ((item.PermsMask & 2048) == 0) return;
+            if ((item.PermsMask & PERMISSION_CONTROL_CAMERA) == 0) return;
             ScenePresence sp = World.GetScenePresence(item.PermsGranter);
             if (sp == null || sp.IsChildAgent) return;
 
@@ -1543,6 +3001,16 @@ namespace Phlox.ScriptEngine
             for (int i = 0; i + 1 < data.Length; i += 2)
             {
                 if (!int.TryParse(data[i].ToString(), out int camType)) continue;
+                // The vector rules CAMERA_FOCUS_OFFSET (9), CAMERA_POSITION (13) and CAMERA_FOCUS (17) go to the viewer
+                // as three floats, type + 1 .. type + 3 (Halcyon LSLSystemAPI.cs:13617-13626).
+                if (camType == 9 || camType == 13 || camType == 17)
+                {
+                    if (data[i + 1] is not Vector3 v) continue;
+                    parameters[camType + 1] = v.X;
+                    parameters[camType + 2] = v.Y;
+                    parameters[camType + 3] = v.Z;
+                    continue;
+                }
                 if (!float.TryParse(data[i + 1].ToString(), System.Globalization.NumberStyles.Float,
                     System.Globalization.CultureInfo.InvariantCulture, out float camVal)) continue;
                 parameters[camType] = camVal;
@@ -1554,6 +3022,9 @@ namespace Phlox.ScriptEngine
         {
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
+            // Halcyon needs PERMISSION_CONTROL_CAMERA from a granter and returns silently without it
+            // (LSLSystemAPI.cs:13650-13659). (SL shouts an error there; Halcyon does not.)
+            if (item.PermsGranter == UUID.Zero || (item.PermsMask & PERMISSION_CONTROL_CAMERA) == 0) return;
             ScenePresence sp = World.GetScenePresence(item.PermsGranter);
             if (sp == null || sp.IsChildAgent) return;
             sp.ControllingClient.SendClearFollowCamProperties(m_host.ParentUUID);
@@ -1573,28 +3044,191 @@ namespace Phlox.ScriptEngine
         {
             m_host.SetForceMouselook(mouselook != 0);
         }
+        /// <summary>
+        /// The table returns integer and the async shim returns only what the body hands to
+        /// SysReturn, so TRUE/FALSE goes back through the deferred call's sequenced return on every path.
+        /// InWorldz llManageEstateAccess. After a change the object's owner gets an IM
+        /// ("... has been banned from REGION" and so on) and the call takes 200 ms, unless the script holds
+        /// PERMISSION_SILENT_ESTATE_MANAGEMENT (SL: "the object owner receives notifications by default").
+        /// </summary>
         public void llManageEstateAccess(int action, string avatar)
         {
-            if (!World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID))
+            int result = 0, delay = 0;
+            try
+            {
+                if (UUID.TryParse(avatar, out UUID key) && ManageEstateAccess(action, key))
+                {
+                    result = 1;
+                    if (ReportEstateChange(action, key)) delay = 200;
+                }
+            }
+            finally { m_ScriptEngine.SysReturn(m_itemID, result, delay); }
+        }
+
+        // Phlox's action numbers (DefaultConstants.cs), not SL's 0x4..0x80: renumbering them is an open decision.
+        private const int EstateAllowedAgentAdd = 0, EstateAllowedAgentRemove = 1, EstateAllowedGroupAdd = 2,
+            EstateAllowedGroupRemove = 3, EstateBannedAgentAdd = 4, EstateBannedAgentRemove = 5,
+            EstateQueryCanManage = 11000, EstateQueryAllowedAgent = 11001, EstateQueryAllowedGroup = 11002,
+            EstateQueryBannedAgent = 11003;
+
+        /// <summary>
+        /// Halcyon ManageEstateAccess over EstateManagementModule's EstateAllowUser / EstateAllowGroup /
+        /// EstateBanUser / Estate*Query (EstateManagementModule.cs:258-460). Who may call: CanIssueEstateCommand, i.e. a
+        /// god, the estate owner or an estate manager (SL: "the object owner is the Estate Owner or an Estate Manager"),
+        /// through the same EstateSettings and IsGod helpers HasParcelPowers uses. QUERY_CAN_MANAGE answers anyone,
+        /// silently. A change that is already so (AlreadySet), a NULL_KEY and an unknown action are FALSE. A ban never
+        /// touches the estate owner or a manager ("never process EO"), the object's owner, or a god (YEngine, and NGC's
+        /// estate tools: "Cannot ban a Administrator"); it takes the avatar off the allowed list and sends them away.
+        /// Halcyon's estate-owner's-partner rule is not ported: NGC has no partner lookup in the region.
+        /// </summary>
+        private bool ManageEstateAccess(int action, UUID key)
+        {
+            EstateSettings es = World.RegionInfo.EstateSettings;
+            bool canManage = es.IsEstateManagerOrOwner(m_host.OwnerID) || World.Permissions.IsGod(m_host.OwnerID);
+            if (action == EstateQueryCanManage) return canManage;
+            if (!canManage)
             {
                 ShoutError("llManageEstateAccess: object owner must manage estate.");
-                return;
+                return false;
             }
-            if (!UUID.TryParse(avatar, out UUID key)) return;
-            // action constants: ESTATE_ACCESS_ALLOWED_AGENT_ADD=0, REMOVE=1,
-            //   ALLOWED_GROUP_ADD=2, REMOVE=3, BANNED_AGENT_ADD=4, REMOVE=5
-            var es = World.RegionInfo.EstateSettings;
+            if (key.IsZero()) return false;
+
+            bool allowed = es.EstateAccess.Contains(key), banned = es.EstateBans.Any(b => b.BannedUserID == key);
+            bool groupAllowed = es.GroupAccess(key);
             switch (action)
             {
-                case 0: es.AddEstateUser(key); break;
-                case 1: es.RemoveEstateUser(key); break;
-                case 2: es.AddEstateGroup(key); break;
-                case 3: es.RemoveEstateGroup(key); break;
-                case 4: es.AddBan(new EstateBan { BannedUserID = key, EstateID = es.EstateID }); break;
-                case 5: es.RemoveBan(key); break;
+                case EstateQueryAllowedAgent: return allowed;
+                case EstateQueryAllowedGroup: return groupAllowed;
+                case EstateQueryBannedAgent: return banned;
+
+                case EstateAllowedAgentAdd:
+                    // "A user cannot be in both the banned and access lists": allowing lifts the ban.
+                    if (banned) es.RemoveBan(key);
+                    if (!allowed) es.AddEstateUser(key);
+                    if (banned || !allowed) StoreEstate(es);
+                    return !allowed && es.EstateAccess.Contains(key);
+                case EstateAllowedAgentRemove:
+                    if (!allowed) return false;
+                    es.RemoveEstateUser(key);
+                    StoreEstate(es);
+                    return true;
+                case EstateAllowedGroupAdd:
+                    if (groupAllowed) return false;
+                    es.AddEstateGroup(key);
+                    StoreEstate(es);
+                    return es.GroupAccess(key);
+                case EstateAllowedGroupRemove:
+                    if (!groupAllowed) return false;
+                    es.RemoveEstateGroup(key);
+                    StoreEstate(es);
+                    return true;
+                case EstateBannedAgentAdd:
+                    if (es.IsEstateManagerOrOwner(key) || key == m_host.OwnerID || World.Permissions.IsGod(key))
+                        return false;
+                    // Halcyon clears the allowed entry even when the avatar is already banned.
+                    if (allowed) es.RemoveEstateUser(key);
+                    if (!banned)
+                        es.AddBan(new EstateBan
+                        {
+                            BannedUserID = key,
+                            EstateID = es.EstateID,
+                            BannedHostAddress = "0.0.0.0",
+                            BannedHostIPMask = "0.0.0.0",
+                            BanningUserID = m_host.OwnerID,
+                            BanTime = Util.UnixTimeSinceEpoch()
+                        });
+                    if (allowed || !banned) StoreEstate(es);
+                    if (banned || !es.EstateBans.Any(b => b.BannedUserID == key)) return false;
+                    EjectBannedAvatar(key);
+                    return true;
+                case EstateBannedAgentRemove:
+                    if (!banned) return false;
+                    es.RemoveBan(key);
+                    StoreEstate(es);
+                    return true;
+                default:
+                    return false;
             }
-            World.EstateDataService?.StoreEstateSettings(es);
         }
+
+        private void StoreEstate(EstateSettings es) => World.EstateDataServiceSafe?.StoreEstateSettings(es);
+
+        /// <summary>
+        /// Halcyon EstateBanUser "Banned, now shoo them away" (EstateManagementModule.cs:311-328): an avatar here whose
+        /// home is this region is logged out ("You have been banned from your Home location. You must login directly to
+        /// a different region."); anyone else is sent home. A home teleport that cannot start logs them out, as NGC's
+        /// own estate ban does (EstateManagementModule.cs:1126-1131).
+        /// </summary>
+        private void EjectBannedAvatar(UUID id)
+        {
+            ScenePresence sp = World.GetScenePresence(id);
+            if (sp == null || sp.IsChildAgent) return;
+            GridUserInfo home = World.GridUserService?.GetGridUserInfo(id.ToString());
+            if (home != null && home.HomeRegionID == World.RegionInfo.RegionID)
+            {
+                sp.ControllingClient.Kick("You have been banned from your Home location. You must login directly to a different region.");
+                World.CloseAgent(id, false);
+                return;
+            }
+            sp.ControllingClient.SendTeleportStart((uint)OpenMetaverse.TeleportFlags.DisableCancel);
+            if (!World.TeleportClientHome(id, sp.ControllingClient))
+            {
+                sp.ControllingClient.Kick("Your access to the region was revoked and TP home failed - you have been logged out.");
+                World.CloseAgent(id, false);
+            }
+        }
+
+        /// <summary>
+        /// Halcyon llManageEstateAccess's report (InWorldz LSLSystemAPI.cs:15181-15225) and SendIM (:3883-3915): an IM
+        /// from the object to its owner, stored for an offline owner. True when one was sent.
+        /// </summary>
+        private bool ReportEstateChange(int action, UUID key)
+        {
+            string region = World.RegionInfo.RegionName;
+            string msg = action switch
+            {
+                EstateAllowedAgentAdd => EstateUserName(key) + " has been added to the allowed user list for " + region,
+                EstateAllowedAgentRemove => EstateUserName(key) + " has been removed from the allowed user list for " + region,
+                EstateAllowedGroupAdd => EstateGroupName(key) + " has been added to the allowed group list for " + region,
+                EstateAllowedGroupRemove => EstateGroupName(key) + " has been removed from the allowed group list for " + region,
+                EstateBannedAgentAdd => EstateUserName(key) + " has been banned from " + region,
+                EstateBannedAgentRemove => EstateUserName(key) + " has been removed from the banned list for " + region,
+                _ => null
+            };
+            if (msg == null) return false;
+            TaskInventoryItem item = GetInventorySelf();
+            if (item != null && (item.PermsMask & PERMISSION_SILENT_ESTATE_MANAGEMENT) != 0) return false;
+            IMessageTransferModule tr = World.RequestModuleInterface<IMessageTransferModule>();
+            if (tr == null) return false;
+            tr.SendInstantMessage(new GridInstantMessage()
+            {
+                fromAgentID    = m_host.OwnerID.Guid,
+                toAgentID      = m_host.OwnerID.Guid,
+                imSessionID    = m_host.UUID.Guid,
+                timestamp      = (uint)Util.UnixTimeSinceEpoch(),
+                fromAgentName  = m_host.Name,
+                message        = msg.Length > 1024 ? msg.Substring(0, 1024) : msg,
+                dialog         = (byte)InstantMessageDialog.MessageFromObject,
+                fromGroup      = false,
+                offline        = 1,
+                ParentEstateID = 0,
+                Position       = m_host.AbsolutePosition,
+                RegionID       = World.RegionInfo.RegionID.Guid,
+                binaryBucket   = new byte[0]
+            }, success => { });
+            return true;
+        }
+
+        /// <summary>Halcyon UserNameToReport: the name when known, else the key.</summary>
+        private string EstateUserName(UUID id)
+        {
+            string name = World.RequestModuleInterface<IUserManagement>()?.GetUserName(id);
+            return string.IsNullOrEmpty(name) ? id.ToString() : name;
+        }
+
+        /// <summary>Halcyon GroupNameToReport: the group's name when known, else the key.</summary>
+        private string EstateGroupName(UUID id)
+            => World.RequestModuleInterface<IGroupsModule>()?.GetGroupRecord(id)?.GroupName ?? id.ToString();
 
         // ── Avatar ─────────────────────────────────────────────────────────────
 
@@ -1603,34 +3237,96 @@ namespace Phlox.ScriptEngine
             if (m_host == null) return;
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
-            if ((item.PermsMask & 0x10) == 0)
+            if ((item.PermsMask & SlConst.PERMISSION_ATTACH) == 0)
             {
                 ShoutError("llAttachToAvatar: PERMISSION_ATTACH not granted.");
                 return;
             }
+            // YEngine (LSL_Api.llAttachToAvatar): only the object's owner can be attached to.
+            if (item.PermsGranter != m_host.OwnerID) return;
+            // SL: "If the object is already attached the function fails silently" (Halcyon :3780-3781, YEngine :4148-4150).
+            if (m_host.ParentGroup.IsAttachment) return;
             IAttachmentsModule attachMod = World.RequestModuleInterface<IAttachmentsModule>();
             if (attachMod == null) return;
             ScenePresence sp = World.GetScenePresence(item.PermsGranter);
             if (sp == null || sp.IsChildAgent) return;
-            attachMod.AttachObject(sp, m_host.ParentGroup, (uint)attach_point, false, true, false, GetScriptExperienceId());
+            // SL: "Attach points can be occupied by multiple attachments": append, never knock off what is already worn
+            // there (Halcyon :3819-3823, YEngine :4115).
+            attachMod.AttachObject(sp, m_host.ParentGroup, (uint)attach_point, false, true, true, GetScriptExperienceId());
         }
 
+        /// <summary>
+        /// SL (wiki llAttachToAvatarTemp) and Halcyon (AttachInternal): any avatar who granted
+        /// PERMISSION_ATTACH can wear it; a non-owner becomes the owner ("Can be used on non-owners (changing ownership
+        /// to the wearer)"), which needs the transfer right or fails with "No permission to transfer"; an object
+        /// already attached fails silently; no inventory is created. After the change of owner the permissions are
+        /// reset (SL: "When object ownership changes, any granted permissions are reset").
+        /// </summary>
         public void llAttachToAvatarTemp(int attachPoint)
         {
-            // Temp attachments don't persist to inventory — attach without addToInventory
-            if (m_host == null) return;
+            if (m_host?.ParentGroup == null) return;
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
-            if ((item.PermsMask & 0x10) == 0)
+            if ((item.PermsMask & SlConst.PERMISSION_ATTACH) == 0)
             {
                 ShoutError("llAttachToAvatarTemp: PERMISSION_ATTACH not granted.");
                 return;
             }
+            SceneObjectGroup grp = m_host.ParentGroup;
+            if (grp.IsDeleted || grp.IsAttachment) return;
             IAttachmentsModule attachMod = World.RequestModuleInterface<IAttachmentsModule>();
             if (attachMod == null) return;
             ScenePresence sp = World.GetScenePresence(item.PermsGranter);
             if (sp == null || sp.IsChildAgent) return;
-            attachMod.AttachObject(sp, m_host.ParentGroup, (uint)attachPoint, false, false, false, GetScriptExperienceId());
+
+            if (sp.UUID != grp.OwnerID && !GiveToTempWearer(grp, sp, item))
+            {
+                ScriptShoutError("llAttachToAvatarTemp: No permission to transfer");
+                return;
+            }
+            // Not added to inventory: AttachmentsModule deletes an attachment with no FromItemID on detach.
+            attachMod.AttachObject(sp, grp, (uint)attachPoint, false, false, true, GetScriptExperienceId());
+        }
+
+        /// <summary>
+        /// Hand a live object to its temp wearer the way the scene sells an object "Original"
+        /// (BuySellModule, SaleType.Original) and YEngine's llAttachToAvatarTemp do it: transfer right on the
+        /// effective owner perms, SetOwner, then the contents follow with next-owner perms and CHANGED_OWNER.
+        /// False, and nothing changed, without the transfer right.
+        /// </summary>
+        private bool GiveToTempWearer(SceneObjectGroup grp, ScenePresence wearer, TaskInventoryItem item)
+        {
+            if ((grp.EffectiveOwnerPerms & (uint)OpenSim.Framework.PermissionMask.Transfer) == 0) return false;
+
+            grp.SetOwner(wearer.UUID, wearer.ControllingClient.ActiveGroupId);
+            bool propagate = World.Permissions.PropagatePermissions();
+            foreach (SceneObjectPart part in grp.Parts)
+            {
+                if (propagate)
+                {
+                    part.Inventory.ChangeInventoryOwner(wearer.UUID);
+                    part.ApplyNextOwnerPermissions();
+                }
+                else
+                {
+                    // SL resets every grant on a change of owner; ChangeInventoryOwner does it when propagating.
+                    foreach (TaskInventoryItem inv in part.Inventory.GetInventoryItems())
+                    {
+                        inv.PermsGranter = UUID.Zero;
+                        inv.PermsMask = 0;
+                    }
+                }
+                part.TriggerScriptChangedEvent(Changed.OWNER);
+            }
+            if (propagate) grp.InvalidateDeepEffectivePerms();
+            PermsChange(item, UUID.Zero, 0);
+
+            grp.RootPart.ObjectSaleType = 0;
+            grp.RootPart.SalePrice = 10;
+            grp.HasGroupChanged = true;
+            grp.RootPart.SendPropertiesToClient(wearer.ControllingClient);
+            grp.RootPart.ScheduleFullUpdate();
+            return true;
         }
 
         public void llDetachFromAvatar()
@@ -1639,11 +3335,13 @@ namespace Phlox.ScriptEngine
             if (!m_host.ParentGroup.IsAttachment) return;
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
-            if ((item.PermsMask & 0x10) == 0)
+            if ((item.PermsMask & SlConst.PERMISSION_ATTACH) == 0)
             {
                 ShoutError("llDetachFromAvatar: PERMISSION_ATTACH not granted.");
                 return;
             }
+            // The permission must be the owner's (SL; Halcyon LSLSystemAPI.cs:3847-3848, silently otherwise).
+            if (item.PermsGranter != m_host.OwnerID) return;
             IAttachmentsModule attachMod = World.RequestModuleInterface<IAttachmentsModule>();
             if (attachMod == null) return;
             ScenePresence sp = World.GetScenePresence(m_host.ParentGroup.AttachedAvatar);
@@ -1660,20 +3358,34 @@ namespace Phlox.ScriptEngine
 		public void llSitTarget(Vector3 offset, Quaternion rot)
 		{
 			if (m_host == null) return;
-			if (offset == Vector3.Zero && rot == Quaternion.Identity)
-			{
-				m_host.SitTargetPosition = Vector3.Zero;
-				m_host.SitTargetOrientation = Quaternion.Identity;
-			}
-			else
-			{
-				m_host.SitTargetPosition = offset;
-				m_host.SitTargetOrientation = rot;
-			}
-			if (m_host.ParentGroup != null)
-				m_host.ParentGroup.HasGroupChanged = true;
-			m_host.ScheduleFullUpdate();
+			PrimSetSitTarget(m_host, offset != Vector3.Zero, offset, rot);
 		}
+
+        /// <summary>
+        /// PRIM_SIT_TARGET, llSitTarget and llLinkSitTarget on one prim (Halcyon SetSitTarget / RemoveSitTarget). An
+        /// active target takes the offset and rotation, the offset held to SL's [-300, 300] m on each axis ("Values
+        /// outside this range are automatically rounded to the nearest limit"; Halcyon does not cap). An inactive one
+        /// is removed: zero offset, identity rotation. The ll functions pass active only for a non-zero offset, as SL
+        /// ("If offset == &lt;0.0, 0.0, 0.0&gt; then the sit target is removed"); Halcyon also keeps a zero offset with a
+        /// turned rotation. The scene holds no active flag apart from the offset and rotation (IsSitTargetSet), so an
+        /// active target at ZERO_VECTOR and ZERO_ROTATION reads back, and sits, as none (Docs/PhloxKnownDefects.md).
+        /// </summary>
+        private static void PrimSetSitTarget(SceneObjectPart part, bool active, Vector3 offset, Quaternion rot)
+        {
+            if (active)
+            {
+                part.SitTargetPosition = new Vector3(Math.Clamp(offset.X, -300f, 300f),
+                    Math.Clamp(offset.Y, -300f, 300f), Math.Clamp(offset.Z, -300f, 300f));
+                part.SitTargetOrientation = NormalizedRot(rot);   // Halcyon Rot2Quaternion; core assumes a unit rotation
+            }
+            else
+            {
+                part.SitTargetPosition = Vector3.Zero;
+                part.SitTargetOrientation = Quaternion.Identity;
+            }
+            if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
+            part.ScheduleFullUpdate();
+        }
 		public string llAvatarOnSitTarget()
 		{
 			if (m_host == null) return UUID.Zero.ToString();
@@ -1687,23 +3399,25 @@ namespace Phlox.ScriptEngine
 			ScenePresence sp = World?.GetScenePresence(targetId);
 			if (sp == null || sp.ParentID == 0) return;
 
-			// Only unsit if they're sitting on this object, or script owner is unsitting them
+			// Only unsit if they're sitting on this object, or by the land rules below. The owner is no exception
+			// (SL; Halcyon :7957-7990 and YEngine :7506-7539 have no owner case).
 			SceneObjectPart seatPart = World.GetSceneObjectPart(sp.ParentID);
 			if (seatPart != null && seatPart.ParentGroup?.UUID == m_host.ParentGroup?.UUID)
 				sp.StandUp();
-			else if (m_host.OwnerID == sp.UUID)
-				sp.StandUp(); // owner can always stand themselves up
+			else
+			{
+				// Halcyon LSLSystemAPI.cs:7981-7990: the object's owner owns the avatar's parcel, the object is deeded
+				// to the group that owns it, or the owner is an estate manager or a god. No group role qualifies.
+				Vector3 pos = sp.AbsolutePosition;
+				if (HasParcelPowers(m_host.OwnerID, World.LandChannel?.GetLandObject(pos.X, pos.Y), null))
+					sp.StandUp();
+			}
 		} 
         public void llLinkSitTarget(int link, Vector3 offset, Quaternion rot)
         {
             if (m_host == null) return;
             foreach (SceneObjectPart part in GetLinkParts(link))
-            {
-                part.SitTargetPosition    = offset;
-                part.SitTargetOrientation = rot;
-                if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
-                part.ScheduleFullUpdate();
-            }
+                PrimSetSitTarget(part, offset != Vector3.Zero, offset, rot);
         }
 
         public string llAvatarOnLinkSitTarget(int linknumber)
@@ -1722,52 +3436,80 @@ namespace Phlox.ScriptEngine
         }
         public void iwLinkStandTarget(int link, Vector3 offset, Quaternion rot)
         {
-            // Faithful port from Halcyon, adapted for Legion.
-            // Legion SOP only has StandOffset (Vector3), no StandTargetRot.
+            // Faithful port from Halcyon, adapted for this tree.
+            // This tree's SOP only has StandOffset (Vector3), no StandTargetRot: the rotation is not used.
             foreach (SceneObjectPart part in GetLinkParts(link))
             {
                 part.StandOffset = offset;
+                // Saved with the object, as OSSL's osSetStandTarget marks it (OSSL_Api.cs:6051-6082).
+                if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
             }
         }
         public void llSetSitText(string text)
         {
             if (m_host == null) return;
             m_host.SitName = text;
+
+            // The sit label rides the same wire as the touch label - the full
+            // ObjectProperties reply (LLClientView.cs:6390), which the region otherwise sends only
+            // on select. Right-click asks for ObjectPropertiesFamily, which carries neither.
+            if (m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
+            m_host.SendPropertiesToAllClients();
         }
 
         public void llSetTouchText(string text)
         {
             if (m_host == null) return;
             m_host.TouchName = text;
+
+            // Setting the field is not enough - the viewer's context menu comes from the
+            // object update, so without scheduling one the menu keeps whatever it last received.
+            // That is why the manhole's menu still read "Touch" after its state_entry had run
+            // llSetTouchText("Enter") successfully. llSetClickAction next door already marks the
+            // group changed for the same reason.
+            if (m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
+            m_host.ScheduleFullUpdate();
+
+            // The ObjectUpdate above does NOT carry the touch label. The viewer takes it
+            // from the full ObjectProperties reply, which the region otherwise sends only on
+            // select - a right-click asks for ObjectPropertiesFamily, which has no touch name.
+            // Without this push the menu keeps whatever it was told when the object was last
+            // selected, which is why it still read "Touch" after state_entry had set "Enter".
+            m_host.SendPropertiesToAllClients();
         }
 
         public void llSetClickAction(int action)
         {
             if (m_host == null) return;
-            m_host.ClickAction = (byte)action;
-            if (m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
-            m_host.ScheduleFullUpdate();
+            PrimSetClickAction(m_host, action);
         }
+
+        /// <summary>
+        /// PRIM_CLICK_ACTION and llSetClickAction on one prim (Halcyon llSetClickAction; Halcyon has no rule, SL's
+        /// PRIM_CLICK_ACTION is "as llSetClickAction"). The click action rides the object update. SL (llSetClickAction):
+        /// "If llSetClickAction is CLICK_ACTION_PAY then you must have a money event, or it will revert to
+        /// CLICK_ACTION_NONE"; Halcyon keeps PAY regardless. A child with no money event of its own counts the root's,
+        /// since a payment on such a child reaches the root's money event (PhloxEngine.HandleObjectPaid).
+        /// </summary>
+        private static void PrimSetClickAction(SceneObjectPart part, int action)
+        {
+            if (action == CLICK_ACTION_PAY && !HasMoneyEvent(part) && !HasMoneyEvent(part.ParentGroup?.RootPart))
+                action = CLICK_ACTION_NONE;
+            part.ClickAction = (byte)action;
+            if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
+            part.ScheduleFullUpdate();
+        }
+
+        /// <summary>Whether a script in the prim, in its current state, has a money event.</summary>
+        private static bool HasMoneyEvent(SceneObjectPart part)
+            => part != null && (part.ScriptEvents & scriptEvents.money) != 0;
+
         public int llGetAgentInfo(string id)
         {
             if (!UUID.TryParse(id, out UUID key)) return 0;
             ScenePresence sp = World?.GetScenePresence(key);
             if (sp == null || sp.IsChildAgent) return 0;
 
-            // AGENT_* bit values (standard LSL constants)
-            const int AGENT_FLYING        = 0x0001;
-            const int AGENT_ATTACHMENTS   = 0x0002;
-            const int AGENT_SCRIPTED      = 0x0004;
-            const int AGENT_MOUSELOOK     = 0x0008;
-            const int AGENT_SITTING       = 0x0010;
-            const int AGENT_ON_OBJECT     = 0x0020;
-            const int AGENT_AWAY          = 0x0040;
-            const int AGENT_WALKING       = 0x0100;
-            const int AGENT_IN_AIR        = 0x0200;
-            const int AGENT_TYPING        = 0x0400;
-            const int AGENT_CROUCHING     = 0x0800;
-            const int AGENT_BUSY          = 0x1000;
-            const int AGENT_ALWAYS_RUN    = 0x2000;
 
             int flags = 0;
             uint ctrlFlags = sp.AgentControlFlags;
@@ -1786,6 +3528,23 @@ namespace Phlox.ScriptEngine
             if ((ctrlFlags & 0x00400000u) != 0) flags |= AGENT_AWAY;
             if ((ctrlFlags & 0x00020000u) != 0) flags |= AGENT_MOUSELOOK;
 
+            // Halcyon LSLSystemAPI.cs:7173-7212 (and YEngine llGetAgentInfo): typing from the agent state; busy from
+            // the BUSY animation (there is no server-side busy mode); crouching and walking from the movement
+            // animation (SL: AGENT_WALKING is "walking, running or crouch walking"); a ground sit is sitting.
+            const int AGENT_TYPING = 0x0200, AGENT_CROUCHING = 0x0400, AGENT_BUSY = 0x0800;
+            if ((sp.State & (byte)AgentState.Typing) != 0) flags |= AGENT_TYPING;
+            if (sp.Animator != null)
+            {
+                if (sp.Animator.HasAnimation(OpenSim.Region.Framework.Scenes.Animation.DefaultAvatarAnimations.GetDefaultAnimation("BUSY")))
+                    flags |= AGENT_BUSY;
+                string movement = sp.Animator.CurrentMovementAnimation;
+                if (movement == "CROUCH") flags |= AGENT_CROUCHING;
+                if (movement == "WALK" || movement == "CROUCHWALK" || movement == "RUN") flags |= AGENT_WALKING;
+                UUID groundSit = OpenSim.Region.Framework.Scenes.Animation.DefaultAvatarAnimations.GetDefaultAnimation("SIT_GROUND_CONSTRAINED");
+                if (groundSit != UUID.Zero && sp.Animator.Animations.ImplicitDefaultAnimation.AnimID == groundSit)
+                    flags |= AGENT_SITTING;
+            }
+
             // Sitting detection
             if (sp.ParentPart != null)
             {
@@ -1793,7 +3552,7 @@ namespace Phlox.ScriptEngine
                 flags |= AGENT_SITTING;
             }
 
-            // Flying / in-air (only if not sitting)
+            // Flying / in-air (only if not sitting); not in the air while walking or crouching (Halcyon :7233-7238)
             if ((flags & AGENT_SITTING) == 0)
             {
                 if (sp.Flying)
@@ -1801,25 +3560,17 @@ namespace Phlox.ScriptEngine
                     flags |= AGENT_FLYING;
                     flags |= AGENT_IN_AIR;
                 }
-                else if (sp.PhysicsActor != null && !sp.PhysicsActor.IsColliding)
+                else if ((flags & (AGENT_WALKING | AGENT_CROUCHING)) == 0 && sp.PhysicsActor != null && !sp.PhysicsActor.IsColliding)
                 {
                     flags |= AGENT_IN_AIR;
                 }
-            }
-
-            // Walking/crouching — use control flags
-            // AGENT_CONTROL_AT_POS=0x01, AGENT_CONTROL_AT_NEG=0x02
-            if (!sp.Flying && (flags & AGENT_SITTING) == 0)
-            {
-                if ((ctrlFlags & 0x03u) != 0)
-                    flags |= AGENT_WALKING;
             }
 
             return flags;
         }
         public string llGetAgentLanguage(string avatar)
         {
-            // Legion doesn't expose AgentPreferences — return empty (caller must handle)
+            // This tree doesn't expose AgentPreferences — return empty (caller must handle)
             if (!UUID.TryParse(avatar, out UUID key)) return string.Empty;
             ScenePresence sp = World?.GetScenePresence(key);
             if (sp == null || sp.IsChildAgent) return string.Empty;
@@ -1836,16 +3587,20 @@ namespace Phlox.ScriptEngine
         }
         public int llSameGroup(string id)
         {
+            // Halcyon llSameGroup and HasMatchingGroup (LSLSystemAPI.cs:7919-7954): NULL_KEY matches a prim with no
+            // group; an object or avatar matches when its group (an avatar's active group) is the prim's, no group
+            // matching no group; a child agent never matches.
             if (!UUID.TryParse(id, out UUID key)) return 0;
             UUID hostGroup = m_host.GroupID;
+            if (key == UUID.Zero) return hostGroup == UUID.Zero ? 1 : 0;
             // Check objects
             SceneObjectPart part = World?.GetSceneObjectPart(key);
             if (part != null)
-                return (part.GroupID == hostGroup && hostGroup != UUID.Zero) ? 1 : 0;
+                return part.GroupID == hostGroup ? 1 : 0;
             // Check avatars
             ScenePresence sp = World?.GetScenePresence(key);
             if (sp != null)
-                return (sp.ControllingClient.ActiveGroupId == hostGroup && hostGroup != UUID.Zero) ? 1 : 0;
+                return !sp.IsChildAgent && sp.ControllingClient.ActiveGroupId == hostGroup ? 1 : 0;
             return 0;
         }
         public int llIsFriend(string agent)
@@ -1882,23 +3637,22 @@ namespace Phlox.ScriptEngine
         }
         // ── Teleport helpers (ported from Halcyon) ────────────────────────────
 
-        private bool HasLandPrivileges(ILandObject parcel)
-        {
-            if (parcel == null) return false;
-            // Script owner owns this parcel (includes estate owner)
-            if (parcel.LandData.OwnerID == m_host.OwnerID)
-                return true;
-            // Estate manager
-            if (World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID))
-                return true;
-            // Group-deeded land: Legion doesn't have CanEditParcel with GroupPowers,
-            // so check if script owner's group matches the parcel group
-            if (parcel.LandData.IsGroupOwned && parcel.LandData.GroupID == m_host.GroupID
-                && m_host.GroupID != UUID.Zero)
-                return true;
-            return false;
-        }
+        /// <summary>
+        /// An avatar with god powers: Halcyon's "targetSP.GodLevel > 0" is the level
+        /// granted when god mode is switched on (ScenePresence.GrantGodlikePowers); NGC keeps that as IsViewerUIGod /
+        /// IsGod (GodController.cs:129-130).
+        /// </summary>
+        private static bool IsGodTarget(ScenePresence sp) => sp.IsViewerUIGod || sp.IsGod;
 
+        /// <summary>
+        /// Halcyon IsTeleportAuthorized (LSLSystemAPI.cs:14923-14961), the rule of iwTeleportAgent, llTeleportAgentHome
+        /// and llEjectFromLand. Halcyon's "scripts cannot force-TP gods, unless the god is the owner of the script" is
+        /// applies. The land test is Halcyon's too: its HasLandPrivileges is
+        /// CanEditParcel(owner, parcel, GroupPowers.LandEjectAndFreeze), and SL (wiki llTeleportAgentHome, llEjectFromLand)
+        /// admits on group land "The object is deeded to the same group" or "The object owner must have 'Eject and freeze
+        /// Residents on parcels' ability in the group". So on group land: an object deeded to that group, or an owner who
+        /// holds Eject and Freeze in it; an object merely set to the group whose owner lacks the power is refused.
+        /// </summary>
         private bool IsTeleportAuthorized(ScenePresence targetSP)
         {
             // Agent must be in this region
@@ -1908,6 +3662,10 @@ namespace Phlox.ScriptEngine
             // Always allow HUDs, attachments and objects owned by the same user
             if (targetSP.UUID == m_host.OwnerID)
                 return true;
+
+            // Scripts cannot force-teleport gods, unless the god is the owner of the script (above)
+            if (IsGodTarget(targetSP))
+                return false;
 
             // Estate manager can always teleport
             if (World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID))
@@ -1923,33 +3681,111 @@ namespace Phlox.ScriptEngine
             Vector3 agentPos = targetSP.AbsolutePosition;
             ILandObject agentLand = World.LandChannel.GetLandObject(agentPos.X, agentPos.Y);
 
-            if (HasLandPrivileges(objectLand))
+            if (HasParcelPowers(m_host.OwnerID, objectLand, (ulong)GroupPowers.LandEjectAndFreeze))
             {
                 // If avatar parcel can't be determined but script has land privs, allow it
                 if (agentLand == null)
                     return true;
-                if (HasLandPrivileges(agentLand))
+                if (HasParcelPowers(m_host.OwnerID, agentLand, (ulong)GroupPowers.LandEjectAndFreeze))
                     return true;
             }
 
             return false;
         }
 
+        // SL llTeleportAgent: "Only 4 initial teleports can be done immediately, or You can keep teleporting every 1.4
+        // seconds"; throttled, "No further teleports will succeed until 10 seconds have passed". The wiki names no scope;
+        // this is per script (LSLSystemAPI is per script).
+        private const int SlTeleportBurst = 4, SlTeleportRefillMs = 1400, SlTeleportLockoutMs = 10000;
+        private readonly object m_slTeleportLock = new object();
+        private double m_slTeleportTokens = SlTeleportBurst;
+        private long m_slTeleportLastMs = Environment.TickCount64, m_slTeleportLockedUntilMs;
+
+        private bool SlTeleportThrottleAllows()
+        {
+            lock (m_slTeleportLock)
+            {
+                long now = Environment.TickCount64;
+                if (now < m_slTeleportLockedUntilMs) return false;
+                m_slTeleportTokens = Math.Min(SlTeleportBurst, m_slTeleportTokens + (now - m_slTeleportLastMs) / (double)SlTeleportRefillMs);
+                m_slTeleportLastMs = now;
+                if (m_slTeleportTokens >= 1) { m_slTeleportTokens -= 1; return true; }
+                m_slTeleportLockedUntilMs = now + SlTeleportLockoutMs;
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// SL's gate for llTeleportAgent and llTeleportAgentGlobalCoords. "This function can only teleport the
+        /// owner of the object (unless part of an Experience)"; "If the script lacks the permission PERMISSION_TELEPORT,
+        /// the script will shout an error on DEBUG_CHANNEL and the operation fails"; "If PERMISSION_TELEPORT is granted by
+        /// anyone other than agent, then when the function is called an error will be shouted"; "Does not work in scripts
+        /// within attached temp objects"; "Sitting avatars cannot be teleported using this function". The experience case
+        /// is the one already in Phlox (HasExperiencePermission: the script's experience is allowed here and the agent
+        /// granted it). Returns the avatar to move, or null.
+        /// </summary>
+        private ScenePresence SlTeleportTarget(string fn, string agent)
+        {
+            if (m_host?.ParentGroup == null || World == null) return null;
+            if (IsTempAttachment(m_host.ParentGroup))
+            {
+                ShoutError(fn + ": Temporary attachments cannot request runtime permissions to teleport.");
+                return null;
+            }
+            if (!UUID.TryParse(agent, out UUID agentId) || agentId.IsZero()) return null;
+            ScenePresence sp = World.GetScenePresence(agentId);
+            if (sp == null || sp.IsChildAgent || sp.IsDeleted || sp.IsInTransit) return null;
+
+            if (!HasExperiencePermission(agentId))
+            {
+                TaskInventoryItem item = GetInventorySelf();
+                if (item == null || (item.PermsMask & PERMISSION_TELEPORT) == 0)
+                {
+                    ShoutError(fn + ": Script trying to teleport an agent but PERMISSION_TELEPORT permission not set!");
+                    return null;
+                }
+                if (item.PermsGranter != agentId)
+                {
+                    ShoutError(fn + ": PERMISSION_TELEPORT was granted by someone other than the agent to teleport.");
+                    return null;
+                }
+                if (agentId != m_host.OwnerID)
+                {
+                    ShoutError(fn + ": can only teleport the owner of the object.");
+                    return null;
+                }
+            }
+            if (sp.IsSatOnObject || sp.ParentID != 0)
+            {
+                ShoutError(fn + ": Sitting avatars cannot be teleported; use llUnSit first.");
+                return null;
+            }
+            return sp;
+        }
+
         // ── Teleport functions ───────────────────────────────────────────────
 
         public void llTeleportAgentHome(string agent)
         {
-            if (!UUID.TryParse(agent, out UUID agentId)) return;
+            // SL: "This function causes the script to sleep for 5.0 seconds" - on every path, as Halcyon's finally
+            // (LSLSystemAPI.cs:5749-5770), so a refused call cannot be retried in a tight loop.
+            try
+            {
+                if (!UUID.TryParse(agent, out UUID agentId)) return;
 
-            ScenePresence presence = World?.GetScenePresence(agentId);
-            if (presence == null) return;
+                ScenePresence presence = World?.GetScenePresence(agentId);
+                if (presence == null) return;
 
-            if (!IsTeleportAuthorized(presence))
-                return;
+                if (!IsTeleportAuthorized(presence))
+                    return;
 
-            presence.ControllingClient.SendTeleportStart((uint)OpenMetaverse.TeleportFlags.DisableCancel);
-            World.TeleportClientHome(agentId, presence.ControllingClient);
-            ScriptSleep(5000);
+                presence.ControllingClient.SendTeleportStart((uint)OpenMetaverse.TeleportFlags.DisableCancel);
+                World.TeleportClientHome(agentId, presence.ControllingClient);
+            }
+            finally
+            {
+                ScriptSleep(5000);
+            }
         }
 
         public void iwTeleportAgent(string agent, string region, Vector3 pos, Vector3 lookAt)
@@ -1970,28 +3806,155 @@ namespace Phlox.ScriptEngine
             World.RequestTeleportLocation(targetSP.ControllingClient,
                 region, pos, lookAt, (uint)OpenMetaverse.TeleportFlags.ViaLocation);
         }
-        public void osTeleportAgent(string agent, string region, Vector3 pos, Vector3 lookAt)
+
+        // ── osTeleportAgent / osTeleportOwner: YEngine's OSSL (OSSL_Api.cs:895-1096) ─────────────────────────
+        // Not the iw rule: the Severe threat level on the region-name and grid forms, checkAllowAgentTPbyLandOwner, the
+        // 500 ms refusal and 500 / 5000 ms teleport sleeps. YEngine has no god check here and admits the object's group
+        // tag on group land; both are kept for parity (noted for the core list).
+
+        /// <summary>OSSL_Api.cs:895-933 checkAllowAgentTPbyLandOwner: the owner, the PERMISSION_TELEPORT granter, or the land rule.</summary>
+        private bool OsslAgentTeleportAllowed(UUID agentId, Vector3 pos)
+            => m_host.OwnerID == agentId
+                || (OsslItem?.PermsGranter == agentId && (OsslItem.PermsMask & PERMISSION_TELEPORT) != 0)
+                || OsslLandOwnerAllows(pos);
+
+        /// <summary>The root presence an OSSL teleport may act on (OSSL_Api.cs:966-967), or null.</summary>
+        private ScenePresence OsslTeleportTarget(string agent, out UUID agentId)
         {
-            // OSSL alias for iwTeleportAgent.
-            // OSSL semantics: region "" means same region.
-            // Auth check (owner / estate manager) is already enforced inside iwTeleportAgent
-            // via IsTeleportAuthorized().
-            iwTeleportAgent(agent, region, pos, lookAt);
+            agentId = UUID.Zero;
+            if (m_host == null || World == null || !UUID.TryParse(agent, out agentId)) return null;
+            ScenePresence sp = World.GetScenePresence(agentId);
+            return sp == null || sp.IsDeleted || sp.IsChildAgent || sp.IsInTransit ? null : sp;
         }
 
+        /// <summary>OSSL_Api.cs:952-959 - Severe ("High because there is no security check. High griefer potential").</summary>
+        public void osTeleportAgent(string agent, string region, Vector3 pos, Vector3 lookAt)
+        {
+            OsslCheck(TlSevere, "osTeleportAgent");
+            OsslTeleportAgent(agent, region, pos, lookAt);
+        }
+
+        /// <summary>OSSL_Api.cs:961-994 TeleportAgent(region name). "" or this region's name (any case) is here.</summary>
+        private void OsslTeleportAgent(string agent, string regionName, Vector3 pos, Vector3 lookAt)
+        {
+            ScenePresence sp = OsslTeleportTarget(agent, out UUID agentId);
+            if (sp == null) return;
+            if (!OsslAgentTeleportAllowed(agentId, sp.AbsolutePosition)) { ScriptSleep(500); return; }
+
+            if (string.IsNullOrEmpty(regionName) || regionName.Equals(World.RegionInfo.RegionName, StringComparison.InvariantCultureIgnoreCase))
+            {
+                World.RequestTeleportLocation(sp.ControllingClient, World.RegionInfo.RegionName, pos, lookAt,
+                    (uint)OpenMetaverse.TeleportFlags.ViaLocation);
+                ScriptSleep(500);
+            }
+            else
+            {
+                Util.FireAndForget(o => World.RequestTeleportLocation(sp.ControllingClient, regionName, pos, lookAt,
+                    (uint)OpenMetaverse.TeleportFlags.ViaLocation), null, "PhloxOSSL.TeleportAgentByRegionName");
+                ScriptSleep(5000);
+            }
+        }
+
+        /// <summary>OSSL_Api.cs:1032-1074 - ungated upstream. A position inside this region teleports here; outside it
+        /// is read as an offset from this region's corner and sent to the region there.</summary>
+        public void osTeleportAgent(string agent, Vector3 pos, Vector3 lookAt)
+        {
+            ScenePresence sp = OsslTeleportTarget(agent, out UUID agentId);
+            if (sp == null) return;
+            if (!OsslAgentTeleportAllowed(agentId, sp.AbsolutePosition)) { ScriptSleep(500); return; }
+
+            RegionInfo ri = World.RegionInfo;
+            double px = pos.X, py = pos.Y;
+            if (px >= 0 && px < ri.RegionSizeX && py >= 0 && py < ri.RegionSizeY)
+            {
+                World.RequestTeleportLocation(sp.ControllingClient, ri.RegionName, pos, lookAt,
+                    (uint)OpenMetaverse.TeleportFlags.ViaLocation);
+                ScriptSleep(500);
+                return;
+            }
+
+            px += ri.WorldLocX;
+            py += ri.WorldLocY;
+            int gx = (int)px / 256, gy = (int)py / 256;
+            px -= 256 * gx;
+            py -= 256 * gy;
+            ulong regionHandle = Util.RegionGridLocToHandle((uint)gx, (uint)gy);
+            var local = new Vector3((float)px, (float)py, pos.Z);
+            Util.FireAndForget(o => World.RequestTeleportLocation(sp.ControllingClient, regionHandle, local, lookAt,
+                (uint)OpenMetaverse.TeleportFlags.ViaLocation), null, "PhloxOSSL.TeleportAgentByFarPos");
+            ScriptSleep(5000);
+        }
+
+        /// <summary>OSSL_Api.cs:996-1003 - Severe. Grid coordinates (region units, not metres).</summary>
+        public void osTeleportAgent(string agent, int regionGridX, int regionGridY, Vector3 pos, Vector3 lookAt)
+        {
+            OsslCheck(TlSevere, "osTeleportAgent");
+            OsslTeleportAgent(agent, regionGridX, regionGridY, pos, lookAt);
+        }
+
+        /// <summary>OSSL_Api.cs:1005-1030 TeleportAgent(grid coordinates).</summary>
+        private void OsslTeleportAgent(string agent, int regionGridX, int regionGridY, Vector3 pos, Vector3 lookAt)
+        {
+            ScenePresence sp = OsslTeleportTarget(agent, out UUID agentId);
+            if (sp == null) return;
+            if (!OsslAgentTeleportAllowed(agentId, sp.AbsolutePosition)) { ScriptSleep(500); return; }
+
+            ulong regionHandle = Util.RegionGridLocToHandle((uint)regionGridX, (uint)regionGridY);
+            Util.FireAndForget(o => World.RequestTeleportLocation(sp.ControllingClient, regionHandle, pos, lookAt,
+                (uint)OpenMetaverse.TeleportFlags.ViaLocation), null, "PhloxOSSL.TeleportAgentByRegionCoords");
+            ScriptSleep(5000);
+        }
+
+        /// <summary>
+        /// SL llTeleportAgent. "Teleports an agent to a landmark stored in the object's inventory. If landmark is
+        /// an empty string, the avatar is teleported to the location position in the current region." "If landmark is not
+        /// an empty string and landmark is missing from the prim's inventory or it is not a landmark then an error is
+        /// shouted on DEBUG_CHANNEL." The landmark is an inventory NAME only (YEngine also takes a key or a region name).
+        /// </summary>
         public void llTeleportAgent(string agent, string landmark, Vector3 pos, Vector3 lookAt)
         {
-            // SL: teleport to landmark name or "" for same region
-            // In OpenSim, we treat the landmark parameter as a region name (same as iwTeleportAgent)
-            iwTeleportAgent(agent, landmark, pos, lookAt);
+            ScenePresence sp = SlTeleportTarget("llTeleportAgent", agent);
+            if (sp == null) return;
+
+            if (string.IsNullOrEmpty(landmark))
+            {
+                if (!SlTeleportThrottleAllows()) { ShoutError("llTeleportAgent: Too many teleports; throttled for 10 seconds."); return; }
+                World.RequestTeleportLocation(sp.ControllingClient, World.RegionInfo.RegionHandle,
+                    pos, lookAt, (uint)OpenMetaverse.TeleportFlags.ViaLocation);
+                return;
+            }
+
+            TaskInventoryItem lmItem = null;
+            lock (m_host.TaskInventory)
+            {
+                foreach (var kvp in m_host.TaskInventory)
+                    if (kvp.Value.Name == landmark) { lmItem = kvp.Value; break; }
+            }
+            AssetLandmark lm = null;
+            if (lmItem != null && lmItem.Type == (int)AssetType.Landmark)
+            {
+                AssetBase asset = World.AssetService?.Get(lmItem.AssetID.ToString());
+                if (asset?.Data != null && asset.Data.Length > 0 && asset.Type == (sbyte)AssetType.Landmark)
+                {
+                    try { lm = new AssetLandmark(asset); }
+                    catch (Exception) { lm = null; }
+                }
+            }
+            if (lm == null)
+            {
+                ShoutError("llTeleportAgent: Could not find landmark '" + landmark + "' in the object's inventory.");
+                return;
+            }
+            if (!SlTeleportThrottleAllows()) { ShoutError("llTeleportAgent: Too many teleports; throttled for 10 seconds."); return; }
+            World.RequestTeleportLandmark(sp.ControllingClient, lm, lookAt);
         }
+
+        /// <summary>SL llTeleportAgentGlobalCoords - the llTeleportAgent gate and throttle, to global coordinates.</summary>
         public void llTeleportAgentGlobalCoords(string agent, Vector3 globalCoords, Vector3 regionPos, Vector3 lookAt)
         {
-            // SL: teleport to global coordinates. globalCoords.X/Y are in global meters (region_x * 256 + local)
-            if (!UUID.TryParse(agent, out UUID agentId)) return;
-            ScenePresence sp = World?.GetScenePresence(agentId);
+            ScenePresence sp = SlTeleportTarget("llTeleportAgentGlobalCoords", agent);
             if (sp == null) return;
-            if (!IsTeleportAuthorized(sp)) return;
+            if (!SlTeleportThrottleAllows()) { ShoutError("llTeleportAgentGlobalCoords: Too many teleports; throttled for 10 seconds."); return; }
 
             // Convert global coords to region handle
             uint regionX = (uint)((int)globalCoords.X / 256);
@@ -2037,91 +4000,95 @@ namespace Phlox.ScriptEngine
             return new LSLList(l);
         }
 
-        public void llStartAnimation(string anim)
+        /// <summary>
+        /// The animation a start form plays: one in <paramref name="part"/>'s inventory by name, else a built-in animation
+        /// by name (SL wiki llStartAnimation: "an item in the inventory of the prim this script is in or built-in
+        /// animation"). Never a key: Halcyon and YEngine both say "Do NOT try to parse UUID, animations cannot be
+        /// triggered by ID" (YEngine LSL_Api.llStartAnimation), so a script cannot play animations it does not hold.
+        /// Nothing found shouts Halcyon's text on DEBUG_CHANNEL (SL: "an error is shouted on DEBUG_CHANNEL") and gives
+        /// UUID.Zero.
+        /// </summary>
+        private UUID AnimationToStart(SceneObjectPart part, string anim)
         {
-            const int PERMISSION_TRIGGER_ANIMATION = 0x10;
-            TaskInventoryItem item = GetInventorySelf();
-            if (item == null || item.PermsGranter == UUID.Zero) return;
-            if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0) return;
-
-            ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
-            if (sp == null || sp.IsChildAgent) return;
-
-            // Resolve to UUID: try inventory first, then direct parse
-            UUID animID = FindInventoryItem(anim, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
-            if (animID == UUID.Zero) UUID.TryParse(anim, out animID);
-            if (animID == UUID.Zero) return;
-
-            sp.Animator.AddAnimation(animID, m_host.UUID);
-            sp.TriggerScenePresenceUpdated();
+            UUID animID = InventoryAnimation(part, anim);
+            if (animID == UUID.Zero && !string.IsNullOrEmpty(anim))
+                animID = OpenSim.Region.Framework.Scenes.Animation.DefaultAvatarAnimations.GetDefaultAnimation(anim);
+            if (animID == UUID.Zero) ScriptShoutError("Could not find animation '" + anim + "'");
+            return animID;
         }
 
-        public void llStopAnimation(string anim)
+        /// <summary>
+        /// The animation a stop form stops: a key as given, else one in <paramref name="part"/>'s inventory by name,
+        /// else a built-in animation by name (Halcyon StopAnimation; YEngine llStopAnimation). UUID.Zero if none.
+        /// </summary>
+        private UUID AnimationToStop(SceneObjectPart part, string anim)
         {
-            const int PERMISSION_TRIGGER_ANIMATION = 0x10;
-            TaskInventoryItem item = GetInventorySelf();
-            if (item == null || item.PermsGranter == UUID.Zero) return;
-            if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0) return;
-
-            ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
-            if (sp == null || sp.IsChildAgent) return;
-
-            UUID animID;
-            if (!UUID.TryParse(anim, out animID))
-                animID = FindInventoryItem(anim, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
-            if (animID == UUID.Zero) return;
-
-            sp.Animator.RemoveAnimation(animID, false);
-            sp.TriggerScenePresenceUpdated();
+            if (UUID.TryParse(anim, out UUID animID)) return animID;
+            animID = InventoryAnimation(part, anim);
+            if (animID == UUID.Zero && !string.IsNullOrEmpty(anim))
+                animID = OpenSim.Region.Framework.Scenes.Animation.DefaultAvatarAnimations.GetDefaultAnimation(anim);
+            return animID;
         }
+
+        private static UUID InventoryAnimation(SceneObjectPart part, string name)
+        {
+            if (part == null) return UUID.Zero;
+            lock (part.TaskInventory)
+                foreach (var kvp in part.TaskInventory)
+                    if (kvp.Value.Name == name && kvp.Value.Type == (int)AssetType.Animation)
+                        return kvp.Value.AssetID;
+            return UUID.Zero;
+        }
+
+        /// <summary>
+        /// The one prim an iw*LinkAnimation reads: Halcyon's iwStartLinkAnimation and iwStopLinkAnimation ignore a
+        /// negative link number and use one prim (GetLinkOnePrimOnly, LSLSystemAPI.cs:4140-4146, :4263-4270).
+        /// </summary>
+        private SceneObjectPart LinkAnimationPart(int link)
+            => link < 0 ? null : GetLinkParts(link).FirstOrDefault();
+
+        public void llStartAnimation(string anim) => StartAnimation(m_host, anim);
+
+        public void llStopAnimation(string anim) => StopAnimation(m_host, anim);
+
         public void iwStartLinkAnimation(int link, string anim)
         {
-            const int PERMISSION_TRIGGER_ANIMATION = 0x10;
+            SceneObjectPart part = LinkAnimationPart(link);
+            if (part != null) StartAnimation(part, anim);
+        }
+
+        public void iwStopLinkAnimation(int link, string anim)
+        {
+            SceneObjectPart part = LinkAnimationPart(link);
+            if (part != null) StopAnimation(part, anim);
+        }
+
+        private void StartAnimation(SceneObjectPart part, string anim)
+        {
             TaskInventoryItem item = GetInventorySelf();
             if (item == null || item.PermsGranter == UUID.Zero) return;
             if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0) return;
 
             ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
-            if (sp == null || sp.IsChildAgent) return;
+            if (sp == null || sp.IsChildAgent) { AnimationGranterAbsent(); return; }
 
-            // Find animation in the specified link's inventory
-            UUID animID = UUID.Zero;
-            foreach (SceneObjectPart part in GetLinkParts(link))
-            {
-                lock (part.TaskInventory)
-                    foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Name == anim && kvp.Value.Type == (int)AssetType.Animation)
-                        { animID = kvp.Value.AssetID; break; }
-                if (animID != UUID.Zero) break;
-            }
-            if (animID == UUID.Zero) UUID.TryParse(anim, out animID);
+            UUID animID = AnimationToStart(part, anim);
             if (animID == UUID.Zero) return;
 
             sp.Animator.AddAnimation(animID, m_host.UUID);
             sp.TriggerScenePresenceUpdated();
         }
-        public void iwStopLinkAnimation(int link, string anim)
+
+        private void StopAnimation(SceneObjectPart part, string anim)
         {
-            const int PERMISSION_TRIGGER_ANIMATION = 0x10;
             TaskInventoryItem item = GetInventorySelf();
             if (item == null || item.PermsGranter == UUID.Zero) return;
             if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0) return;
 
             ScenePresence sp = World?.GetScenePresence(item.PermsGranter);
-            if (sp == null || sp.IsChildAgent) return;
+            if (sp == null || sp.IsChildAgent) { AnimationGranterAbsent(); return; }
 
-            UUID animID = UUID.Zero;
-            if (!UUID.TryParse(anim, out animID))
-            {
-                foreach (SceneObjectPart part in GetLinkParts(link))
-                {
-                    lock (part.TaskInventory)
-                        foreach (var kvp in part.TaskInventory)
-                            if (kvp.Value.Name == anim && kvp.Value.Type == (int)AssetType.Animation)
-                            { animID = kvp.Value.AssetID; break; }
-                    if (animID != UUID.Zero) break;
-                }
-            }
+            UUID animID = AnimationToStop(part, anim);
             if (animID == UUID.Zero) return;
 
             sp.Animator.RemoveAnimation(animID, false);
@@ -2134,7 +4101,7 @@ namespace Phlox.ScriptEngine
             UUID agentId = item.PermsGranter;
             if (agentId == UUID.Zero) return string.Empty;
 
-            bool hasAnimPerm = (item.PermsMask & 0x8000) != 0;
+            bool hasAnimPerm = (item.PermsMask & PERMISSION_OVERRIDE_ANIMATIONS) != 0;
             if (!hasAnimPerm && !HasExperiencePermission(agentId))
             {
                 ShoutError("llGetAnimationOverride: requires PERMISSION_OVERRIDE_ANIMATIONS or experience permission");
@@ -2160,7 +4127,7 @@ namespace Phlox.ScriptEngine
             UUID agentId = item.PermsGranter;
             if (agentId == UUID.Zero) return;
 
-            bool hasAnimPerm = (item.PermsMask & 0x8000) != 0;
+            bool hasAnimPerm = (item.PermsMask & PERMISSION_OVERRIDE_ANIMATIONS) != 0;
             if (!hasAnimPerm && !HasExperiencePermission(agentId))
             {
                 ShoutError("llSetAnimationOverride: requires PERMISSION_OVERRIDE_ANIMATIONS or experience permission");
@@ -2201,7 +4168,7 @@ namespace Phlox.ScriptEngine
             UUID agentId = item.PermsGranter;
             if (agentId == UUID.Zero) return;
 
-            bool hasAnimPerm = (item.PermsMask & 0x8000) != 0;
+            bool hasAnimPerm = (item.PermsMask & PERMISSION_OVERRIDE_ANIMATIONS) != 0;
             if (!hasAnimPerm && !HasExperiencePermission(agentId))
             {
                 ShoutError("llResetAnimationOverride: requires PERMISSION_OVERRIDE_ANIMATIONS or experience permission");
@@ -2216,15 +4183,21 @@ namespace Phlox.ScriptEngine
             m_log.LogDebug("[PhloxAPI]: llResetAnimationOverride: cleared {0} for {1}",
                 anim_state, sp.Name);
         }
+        /// <summary>
+        /// SL wiki llGetUsername: "id must specify a valid avatar key, present in or otherwise known to the sim ...,
+        /// otherwise an empty string is returned"; llGetDisplayName answers for child agents too. As Halcyon
+        /// (ReturnUserFirstLastIfOnSim, LSLSystemAPI.cs:14821-14843) and YEngine (LSL_Api.cs:16024-16027, 16071-16089):
+        /// an avatar the region holds, root or child, else "", with no grid lookup. The display name comes from the
+        /// grid's display-name module where it has one, as YEngine reads it. llRequestUsername and llRequestDisplayName
+        /// answer for absent avatars.
+        /// </summary>
         public string llGetDisplayName(string id)
         {
-            // In OpenSim display names aren't separate from usernames — return avatar name if in region
-            if (!UUID.TryParse(id, out UUID key)) return string.Empty;
+            if (!UUID.TryParse(id, out UUID key) || key == UUID.Zero) return string.Empty;
             ScenePresence sp = World?.GetScenePresence(key);
-            if (sp != null && !sp.IsChildAgent) return sp.Name;
-            // Try user account service for offline users
-            UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
-            return acct != null ? acct.FirstName + " " + acct.LastName : string.Empty;
+            if (sp == null) return string.Empty;
+            IDisplayNameModule names = World.RequestModuleInterface<IDisplayNameModule>();
+            return names != null ? names.GetDisplayName(key) ?? string.Empty : sp.Name;
         }
 
         public void llRequestDisplayName(string id)
@@ -2234,17 +4207,16 @@ namespace Phlox.ScriptEngine
 
         public string llGetUsername(string id)
         {
-            if (!UUID.TryParse(id, out UUID key)) return string.Empty;
-            ScenePresence sp = World?.GetScenePresence(key);
-            if (sp != null && !sp.IsChildAgent) return sp.Name;
-            UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
-            return acct != null ? acct.FirstName + " " + acct.LastName : string.Empty;
+            if (!UUID.TryParse(id, out UUID key) || key == UUID.Zero) return string.Empty;
+            return World?.GetScenePresence(key)?.Name ?? string.Empty;
         }
 
         public void llRequestUsername(string id)
         {
-            if (!UUID.TryParse(id, out UUID key)) return;
-            UUID requestID = UUID.Random();
+            if (!UUID.TryParse(id, out UUID key)) { ReturnQueryKey(UUID.Zero); return; }
+            UUID requestID = NewDataserverQuery();   // On the one dataserver path
+            // Halcyon's 100 ms (LSLSystemAPI.cs:14852-14857).
+            m_ScriptEngine.SysReturn(m_itemID, requestID.ToString(), 100);
 
             // Fire the dataserver event with the name (synchronous in Phlox)
             string name = string.Empty;
@@ -2259,11 +4231,24 @@ namespace Phlox.ScriptEngine
                 if (acct != null) name = acct.FirstName + " " + acct.LastName;
             }
 
-            m_ScriptEngine.PostObjectEvent(m_host.LocalId,
-                new EventParams("dataserver",
-                    new object[] { requestID.ToString(), name },
-                    new DetectParams[0]));
+            PostDataserverEvent(requestID, name);
         }
+
+        /// <summary>InWorldz's DATA_ACCOUNT_TYPE (11001): Halcyon's profile CustomType; here the account's UserTitle.</summary>
+        private const int DATA_ACCOUNT_TYPE = 11001;
+
+        /// <summary>DATA_BORN for an agent with no account: Halcyon's epoch date (LSLSystemAPI.cs:5591-5595).</summary>
+        private string BornOf(UUID agent)
+        {
+            UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, agent);
+            long created = acct?.Created ?? 0;
+            return DateTimeOffset.FromUnixTimeSeconds(created).UtcDateTime.ToString("yyyy-MM-dd");
+        }
+
+        /// <summary>DATA_ACCOUNT_TYPE: the account's UserTitle, the label the viewer's profile shows; "" with no account.</summary>
+        private string AccountTypeOf(UUID agent)
+            => World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, agent)?.UserTitle ?? string.Empty;
+
         public string iwGetAgentData(string id, int data)
         {
             // Synchronous version of llRequestAgentData — faithful port from Halcyon
@@ -2272,10 +4257,11 @@ namespace Phlox.ScriptEngine
             {
                 switch (data)
                 {
-                    case 1: // DATA_ONLINE
-                        ScenePresence sp = World?.GetScenePresence(agentId);
-                        return (sp != null && !sp.IsChildAgent) ? "1" : "0";
-                    case 2: // DATA_NAME
+                    case DATA_ONLINE:
+                        // llRequestAgentData's rule (Halcyon GetAgentData): online elsewhere counts, subject to
+                        // the owner, friend or "only friends know I'm online" test. NeedsService defers it.
+                        return IsOnlineToThisScript(agentId) ? "1" : "0";
+                    case DATA_NAME:
                     {
                         ScenePresence sp2 = World?.GetScenePresence(agentId);
                         if (sp2 != null) return sp2.Name;
@@ -2283,27 +4269,75 @@ namespace Phlox.ScriptEngine
                             World.RegionInfo.ScopeID, agentId);
                         return acct != null ? acct.FirstName + " " + acct.LastName : string.Empty;
                     }
-                    case 3: // DATA_BORN
-                    {
-                        UserAccount acct = World?.UserAccountService?.GetUserAccount(
-                            World.RegionInfo.ScopeID, agentId);
-                        if (acct != null)
-                        {
-                            var born = DateTimeOffset.FromUnixTimeSeconds(acct.Created).UtcDateTime;
-                            return born.ToString("yyyy-MM-dd");
-                        }
-                        return string.Empty;
-                    }
-                    case 4: // DATA_RATING — deprecated
+                    case DATA_BORN:
+                        return BornOf(agentId);
+                    case DATA_RATING: // DATA_RATING — deprecated
                         return "0,0,0,0,0,0";
-                    case 7: // DATA_PAYINFO
-                        return "0";
+                    case DATA_PAYINFO:
+                        return PayInfo(agentId);
+                    case DATA_ACCOUNT_TYPE:
+                        return AccountTypeOf(agentId);
                     default:
                         return string.Empty;
                 }
             }
             catch { return string.Empty; }
         }
+        /// <summary>
+        /// DATA_PAYINFO - PAYMENT_INFO_ON_FILE | PAYMENT_INFO_USED, from the account's flags
+        /// as YEngine reads them ((UserFlags &gt;&gt; 2) &amp; 3); "0" for an agent with no account here.
+        /// </summary>
+        private bool IsOnline(UUID agent)
+        {
+            // As YEngine (LSL_Api.llRequestAgentData): an avatar in this region is online;
+            // otherwise the presence service is asked for a root agent in any region.
+            ScenePresence sp = World?.GetScenePresence(agent);
+            if (sp != null && !sp.IsChildAgent) return true;
+            OpenSim.Services.Interfaces.PresenceInfo[] infos = World?.PresenceService?.GetAgents(new[] { agent.ToString() });
+            return infos != null && infos.Any(p => p != null && p.RegionID != UUID.Zero);
+        }
+
+        /// <summary>
+        /// DATA_ONLINE, as Halcyon (LSLSystemAPI.GetAgentData): an avatar in this region is online. One
+        /// elsewhere is online to its owner's scripts, to its friends' scripts, and to everyone's unless
+        /// it has ticked "Only friends and groups know I'm online"; if that setting cannot be read, it is
+        /// not. Groups are not consulted. Makes service calls: run it off the scheduler thread.
+        /// </summary>
+        private bool IsOnlineToThisScript(UUID agent)
+        {
+            ScenePresence sp = World?.GetScenePresence(agent);
+            if (sp != null && !sp.IsChildAgent) return true;
+            if (!IsOnline(agent)) return false;
+            if (agent == m_host.OwnerID) return true;
+
+            try
+            {
+                if (World?.RequestModuleInterface<IFriendsModule>()?.IsFriendInService(agent, m_host.OwnerID) == true)
+                    return true;
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxAPI]: DATA_ONLINE friends lookup for {0} failed: {1}", agent, e.Message);
+            }
+
+            try
+            {
+                UserPreferences prefs = World?.RequestModuleInterface<IProfileModule>()?.GetUserPreferences(agent);
+                return prefs != null && prefs.Visible;
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxAPI]: DATA_ONLINE preferences lookup for {0} failed: {1}", agent, e.Message);
+                return false;
+            }
+        }
+
+        private string PayInfo(UUID agent)
+        {
+            UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, agent);
+            return acct == null ? "0" : ((acct.UserFlags >> 2) & (PAYMENT_INFO_ON_FILE | PAYMENT_INFO_USED)).ToString();
+        }
+
         public int iwGetAppearanceParam(string who, int which)
         {
             // Faithful port from Halcyon
@@ -2359,7 +4393,7 @@ namespace Phlox.ScriptEngine
         }
         public LSLList llGetAttachedList(string avatar)
         {
-            // Halcyon used sp.CollectVisibleAttachmentIds(); Legion uses sp.GetAttachments()
+            // As Halcyon (ScenePresence.CollectVisibleAttachmentIds) and the SL wiki: HUDs are left out.
             if (!UUID.TryParse(avatar, out UUID agentID)) return new LSLList(new object[] { "NOT FOUND" });
             ScenePresence sp = World?.GetScenePresence(agentID);
             if (sp == null || sp.IsChildAgent) return new LSLList(new object[] { "NOT FOUND" });
@@ -2369,7 +4403,8 @@ namespace Phlox.ScriptEngine
             if (attachments != null)
             {
                 foreach (var grp in attachments)
-                    ret = ret.Append(grp.UUID.ToString());
+                    if (!grp.HasPrivateAttachmentPoint)
+                        ret = ret.Append(grp.UUID.ToString());
             }
             return ret;
         }
@@ -2392,43 +4427,47 @@ namespace Phlox.ScriptEngine
             return ret;
         }
         public string iwGetLastOwner() { return m_host.LastOwnerID.ToString(); }
+        /// <summary>
+        /// Halcyon (InWorldz.Phlox.Engine/LSLSystemAPI.cs iwAvatarName2Key) returns the avatar's key as
+        /// the call's value through SysReturn; this used to return a query key and answer with a
+        /// dataserver event instead, which no InWorldz script expects. The async shim runs this off the
+        /// scheduler thread, so the account lookup never holds the region's other scripts up. A blank
+        /// last name is "Resident"; the region's root agents are matched first without regard to case
+        /// (100 ms), then the account service (1 s); an unknown or blank name is NULL_KEY.
+        /// </summary>
         public void iwAvatarName2Key(string firstName, string lastName)
         {
-            // Faithful port from Halcyon — fires dataserver event with agent UUID
-            if (m_host == null) return;
-            if (string.IsNullOrWhiteSpace(firstName)) return;
-            if (string.IsNullOrWhiteSpace(lastName)) lastName = "Resident";
-            firstName = firstName.Trim();
-            lastName = lastName.Trim();
+            const int LONG_DELAY = 1000;
+            const int SHORT_DELAY = 100;
+            int delay = LONG_DELAY;
+            UUID agentID = UUID.Zero;
 
-            UUID queryID = UUID.Random();
-            string fn = firstName, ln = lastName;
-
-            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            try
             {
-                try
+                if (!string.IsNullOrWhiteSpace(firstName))
                 {
-                    UUID agentID = UUID.Zero;
-                    // Check if avatar is in region first (fast path)
+                    lastName = string.IsNullOrWhiteSpace(lastName) ? "Resident" : lastName.Trim();
+                    firstName = firstName.Trim();
+
                     World?.ForEachScenePresence(sp =>
                     {
                         if (agentID == UUID.Zero && !sp.IsChildAgent &&
-                            sp.Firstname.Equals(fn, StringComparison.InvariantCultureIgnoreCase) &&
-                            sp.Lastname.Equals(ln, StringComparison.InvariantCultureIgnoreCase))
+                            sp.Firstname.Equals(firstName, StringComparison.InvariantCultureIgnoreCase) &&
+                            sp.Lastname.Equals(lastName, StringComparison.InvariantCultureIgnoreCase))
                             agentID = sp.UUID;
                     });
 
-                    if (agentID == UUID.Zero)
+                    if (agentID != UUID.Zero)
+                        delay = SHORT_DELAY;
+                    else
                     {
                         UserAccount acct = World?.UserAccountService?.GetUserAccount(
-                            World.RegionInfo.ScopeID, fn, ln);
+                            World.RegionInfo.ScopeID, firstName, lastName);
                         if (acct != null) agentID = acct.PrincipalID;
                     }
-                    PostDataserverEvent(queryID, agentID.ToString());
                 }
-                catch { PostDataserverEvent(queryID, UUID.Zero.ToString()); }
-            });
-            ScriptSleep(100);
+            }
+            finally { m_ScriptEngine.SysReturn(m_itemID, agentID.ToString(), delay); }
         }
 
         public string llName2Key(string name)
@@ -2460,12 +4499,21 @@ namespace Phlox.ScriptEngine
 
 		private DetectVariables GetDetect(int n)
 		{
-			var state = m_thisScript?.ScriptState;
-			if (state == null) return new DetectVariables();
-			var vars = state.RunningEvent.DetectVars;
-			if (vars == null) return new DetectVariables();
-			return n >= 0 && n < vars.Length ? vars[n] : new DetectVariables();
+			var vars = m_thisScript?.ScriptState?.RunningEvent?.DetectVars;
+			return vars != null && n >= 0 && n < vars.Length ? vars[n] : InvalidDetect();
 		}
+
+		/// <summary>
+		/// What an index outside the detected set reads: TOUCH_INVALID_FACE and TOUCH_INVALID_TEXCOORD for the touch
+		/// surface (SL llDetectedTouchFace, llDetectedTouchST, llDetectedTouchUV; Halcyon and YEngine alike), NULL_KEY
+		/// for keys, zero and "" for the rest.
+		/// </summary>
+		private static DetectVariables InvalidDetect() => new DetectVariables
+		{
+			TouchFace = -1,
+			TouchST = new Vector3(-1f, -1f, 0f),
+			TouchUV = new Vector3(-1f, -1f, 0f),
+		};
 
         public string llDetectedName(int n) => GetDetect(n).Name ?? string.Empty;
         public string llDetectedKey(int n) => GetDetect(n).Key ?? UUID.Zero.ToString();
@@ -2482,6 +4530,12 @@ namespace Phlox.ScriptEngine
             if (string.IsNullOrEmpty(keyStr)) return 0;
             if (!UUID.TryParse(keyStr, out UUID detectedId)) return 0;
             UUID hostGroup = m_host.GroupID;
+
+            // The group captured with the event, as Halcyon and YEngine compare it: it still answers after the toucher
+            // or collider has left. No group on either side counts as the same group, as SL's llSameGroup counts it.
+            if (!string.IsNullOrEmpty(detect.Group) && UUID.TryParse(detect.Group, out UUID captured))
+                return captured == hostGroup ? 1 : 0;
+
             if (hostGroup == UUID.Zero) return 0;
 
             SceneObjectPart part = World?.GetSceneObjectPart(detectedId);
@@ -2501,7 +4555,16 @@ namespace Phlox.ScriptEngine
         public Vector3 llDetectedTouchPos(int n) => GetDetect(n).TouchPos;
         public Vector3 llDetectedTouchST(int n) => GetDetect(n).TouchST;
         public Vector3 llDetectedTouchUV(int n) => GetDetect(n).TouchUV;
-        public string iwDetectedBot() { return "0"; }
+        /// <summary>
+        /// The bot a botSensor scanned for or a botListen heard with; NULL_KEY in other detect events; "" in an event with
+        /// no detect data (Halcyon iwDetectedBot reads DetectVariables.BotID of entry 0).
+        /// </summary>
+        public string iwDetectedBot()
+        {
+            var vars = m_thisScript?.ScriptState?.RunningEvent?.DetectVars;
+            if (vars == null || vars.Length == 0) return string.Empty;
+            return vars[0].BotID ?? UUID.Zero.ToString();
+        }
 
         public string llDetectedRezzer(int n)
         {
@@ -2533,6 +4596,24 @@ namespace Phlox.ScriptEngine
                 new object[] { name, id, type, range, arc, rate };
         }
 
+        /// <summary>The prim this script lives in.</summary>
+        internal SceneObjectPart HostPart => m_host;
+
+        /// <summary>A parcel pause stops the sensor repeat; the record in MiscAttributes stays for the resume.</summary>
+        internal void PauseSensorForParcel()
+        {
+            if (m_thisScript?.ScriptState?.MiscAttributes?.ContainsKey((int)RuntimeState.MiscAttr.SensorRepeat) == true)
+                m_ScriptEngine.AsyncCommands?.SensorRepeatPlugin.UnSetSenseRepeaterEvents(m_localID, m_itemID);
+        }
+
+        /// <summary>The resume starts the sensor repeat again from its record, as a state restore does.</summary>
+        internal void RestoreSensorAfterParcel()
+        {
+            if (m_thisScript?.ScriptState?.MiscAttributes != null
+                && m_thisScript.ScriptState.MiscAttributes.TryGetValue((int)RuntimeState.MiscAttr.SensorRepeat, out object[] s))
+                llSensorRepeat((string)s[0], (string)s[1], (int)s[2], (float)s[3], (float)s[4], (float)s[5]);
+        }
+
         public void llSensorRemove()
         {
             m_ScriptEngine.AsyncCommands?.SensorRepeatPlugin.UnSetSenseRepeaterEvents(
@@ -2547,10 +4628,19 @@ namespace Phlox.ScriptEngine
             if (m_ScriptEngine.ListenManager == null) { Stub("llListen (no ListenManager)"); return -1; }
             UUID filterKey = UUID.Zero;
             UUID.TryParse(id, out filterKey);
-            return m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channel, name, filterKey, msg);
+            int handle = m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channel, name, filterKey, msg);
+            // Kept in the script's state, so a restore registers the listen again with this handle (Halcyon llListen:
+            // ScriptState.AddActiveListen).
+            if (handle > 0)
+                m_thisScript?.ScriptState?.AddActiveListen(new ActiveListen { Handle = handle, Channel = channel, Name = name, Key = id, Message = msg });
+            return handle;
         }
         public void llListenControl(int number, int active) { m_ScriptEngine.ListenManager?.SetActive(m_itemID, number, active != 0); }
-        public void llListenRemove(int number) { m_ScriptEngine.ListenManager?.Remove(m_itemID, number); }
+        public void llListenRemove(int number)
+        {
+            m_ScriptEngine.ListenManager?.Remove(m_itemID, number);
+            m_thisScript?.ScriptState?.RemoveListen(number);
+        }
 
         // ── Inventory ──────────────────────────────────────────────────────────
 
@@ -2566,12 +4656,58 @@ namespace Phlox.ScriptEngine
         public string llGetInventoryName(int type, int number)
         {
             if (m_host == null) return string.Empty;
-            int idx = 0;
-            lock (m_host.TaskInventory)
-                foreach (var kvp in m_host.TaskInventory)
-                    if (type == -1 || kvp.Value.Type == type)
-                        if (idx++ == number) return kvp.Value.Name;
-            return string.Empty;
+            return InventoryNameAt(new[] { m_host }, type, number);
+        }
+
+        /// <summary>
+        /// Halcyon's InvNameComparer (LSLSystemAPI.cs:5057-5096), the order SL lists inventory in: letters compared without
+        /// case, and space, punctuation and digits ordered by their place in OrderLSL, before the letters; characters not in
+        /// it sort after those that are. A name sorts before a longer one it begins. Equal names compare equal (Halcyon's
+        /// answered 1, which a sort may not be given).
+        /// </summary>
+        private sealed class InvNameComparer : IComparer<string>
+        {
+            public static readonly InvNameComparer Instance = new InvNameComparer();
+            private const string OrderLSL = " !\"#$%&'()*+,-./0123456789:;<=>?@[\\]^_`ABCDEFGHIJKLMNOPQRSTUVWXYZ{|}~";
+
+            private static int CompareChars(char c1, char c2)
+            {
+                int val1 = OrderLSL.IndexOf(char.ToUpperInvariant(c1));
+                int val2 = OrderLSL.IndexOf(char.ToUpperInvariant(c2));
+                if (val1 != -1 && val2 != -1) return val1 - val2;
+                if (val1 == -1 && val2 == -1) return c1 - c2;
+                return val1 == -1 ? 1 : -1;
+            }
+
+            public int Compare(string name1, string name2)
+            {
+                int max = Math.Min(name1.Length, name2.Length);
+                for (int x = 0; x < max; x++)
+                {
+                    int cmp = CompareChars(name1[x], name2[x]);
+                    if (cmp != 0) return cmp;
+                }
+                return name1.Length.CompareTo(name2.Length);
+            }
+        }
+
+        /// <summary>The inventory names of <paramref name="type"/> (-1 any) in <paramref name="parts"/>, in LSL order.</summary>
+        private static List<string> SortedInventoryNames(IEnumerable<SceneObjectPart> parts, int type, Func<string, bool> match = null)
+        {
+            var names = new List<string>();
+            foreach (SceneObjectPart part in parts)
+                lock (part.TaskInventory)
+                    foreach (var kvp in part.TaskInventory)
+                        if ((type == -1 || kvp.Value.Type == type) && (match == null || match(kvp.Value.Name)))
+                            names.Add(kvp.Value.Name);
+            names.Sort(InvNameComparer.Instance);
+            return names;
+        }
+
+        private static string InventoryNameAt(IEnumerable<SceneObjectPart> parts, int type, int number)
+        {
+            List<string> names = SortedInventoryNames(parts, type);
+            return number >= 0 && number < names.Count ? names[number] : string.Empty;
         }
         public int llGetInventoryType(string name)
         {
@@ -2581,12 +4717,26 @@ namespace Phlox.ScriptEngine
                     if (kvp.Value.Name == name) return kvp.Value.Type;
             return -1;
         }
+        /// <summary>
+        /// Halcyon's IsMyScript (LSLSystemAPI.cs:6293-6296) - the item is this script itself, in
+        /// this prim. Halcyon's GetInventoryKey (:6309-6310) gives it its own asset key whatever its permissions.
+        /// </summary>
+        private bool IsMyScript(SceneObjectPart part, TaskInventoryItem item)
+            => part == m_host && item.Type == (int)AssetType.LSLText && item.ItemID == m_itemID;
+
         public string llGetInventoryKey(string name)
         {
             if (m_host == null) return UUID.Zero.ToString();
             lock (m_host.TaskInventory)
                 foreach (var kvp in m_host.TaskInventory)
-                    if (kvp.Value.Name == name) return kvp.Value.AssetID.ToString();
+                    if (kvp.Value.Name == name)
+                    {
+                        // As YEngine's llGetInventoryKey: the asset key only for an item that is
+                        // copy, modify and transfer for its owner; anything less reads NULL_KEY.
+                        // And the calling script's own key (Halcyon IsMyScript).
+                        return IsMyScript(m_host, kvp.Value) ? kvp.Value.AssetID.ToString()
+                            : AssetKeyIfFullPerm(kvp.Value.AssetID, kvp.Value.CurrentPermissions);
+                    }
             return UUID.Zero.ToString();
         }
         public string llGetInventoryCreator(string item)
@@ -2595,7 +4745,10 @@ namespace Phlox.ScriptEngine
             lock (m_host.TaskInventory)
                 foreach (var kvp in m_host.TaskInventory)
                     if (kvp.Value.Name == item) return kvp.Value.CreatorID.ToString();
-            return UUID.Zero.ToString();
+            // SL: "If item is missing from the prim's inventory then an error is shouted on DEBUG_CHANNEL"; "" as YEngine
+            // and Halcyon (LSLSystemAPI.cs:12707-12712, which said it on channel 0 with its chat pause).
+            ScriptShoutError("No item named '" + item + "'");
+            return string.Empty;
         }
         public string llGetInventoryDesc(string item)
         {
@@ -2643,14 +4796,68 @@ namespace Phlox.ScriptEngine
             return -1;
         }
 
-        public void llSetInventoryPermMask(string item, int mask, int value)
+        /// <summary>
+        /// A god function, as YEngine (LSL_Api.llSetInventoryPermMask) - only with AllowGodFunctions and
+        /// an administrator owner; copy/transfer is kept. The MASK_* number alone picks the category, as
+        /// llSetObjectPermMask does (SL: "Sets the given permission category to the new value on the inventory item";
+        /// Halcyon does not implement it). YEngine's limit ANDed the MASK_* number with the item's PERM_* bits, which
+        /// sent every category but MASK_BASE to the base mask once the base was not full; it is not carried.
+        /// </summary>
+        public void llSetInventoryPermMask(string itemName, int mask, int value)
         {
-            // Not implemented — permission changes on task inventory items
-            // require owner-level validation that isn't exposed via LSL in OpenSim.
+            if (m_ScriptEngine == null || !m_ScriptEngine.AllowGodFunctions) return;
+            if (World?.Permissions == null || !World.Permissions.IsAdministrator(m_host.OwnerID)) return;
+
+            TaskInventoryItem item = m_host.Inventory.GetInventoryItem(itemName);
+            if (item == null) return;
+
+            switch (mask)
+            {
+                case MASK_BASE:
+                    item.BasePermissions = LSLPermToPermissionMask(FixedCopyTransfer(value), item.BasePermissions);
+                    break;
+                case MASK_OWNER:
+                    item.CurrentPermissions = LSLPermToPermissionMask(FixedCopyTransfer(value), item.CurrentPermissions);
+                    break;
+                case MASK_GROUP:
+                    item.GroupPermissions = LSLPermToPermissionMask(value, item.GroupPermissions);
+                    break;
+                case MASK_EVERYONE:
+                    item.EveryonePermissions = LSLPermToPermissionMask(value, item.EveryonePermissions);
+                    break;
+                case MASK_NEXT:
+                    item.NextPermissions = LSLPermToPermissionMask(FixedCopyTransfer(value), item.NextPermissions);
+                    break;
+                default:
+                    return;
+            }
+
+            m_host.ParentGroup.InvalidateDeepEffectivePerms();
+            m_host.ParentGroup.AggregatePerms();
         }
+
+        private const uint FullPerms = (uint)OpenSim.Framework.PermissionMask.All;
+
+        private static uint LSLPermToPermissionMask(int lslperm, uint oldvalue)
+        {
+            lslperm &= PERM_ALL;
+            if (lslperm == PERM_ALL) return oldvalue | FullPerms;
+            oldvalue &= ~FullPerms;
+            if ((lslperm & PERM_COPY) != 0) oldvalue |= (uint)OpenSim.Framework.PermissionMask.Copy;
+            if ((lslperm & PERM_MODIFY) != 0) oldvalue |= (uint)OpenSim.Framework.PermissionMask.Modify;
+            if ((lslperm & PERM_MOVE) != 0) oldvalue |= (uint)OpenSim.Framework.PermissionMask.Move;
+            if ((lslperm & PERM_TRANSFER) != 0) oldvalue |= (uint)OpenSim.Framework.PermissionMask.Transfer;
+            return oldvalue;
+        }
+
+        /// <summary>An item must stay copyable or transferable.</summary>
+        private static int FixedCopyTransfer(int value)
+            => (value & (PERM_COPY | PERM_TRANSFER)) == 0 ? value | PERM_TRANSFER : value;
         public void llGiveInventory(string destination, string inventory)
         {
-            ScriptSleep(2000);
+            // SL: "If destination is an avatar the script sleeps for 2.0 seconds. (Giving to objects or attachments has
+            // no delay)"; Halcyon's _GiveInventory waits for an avatar and for errors (LSLSystemAPI.cs:5351).
+            if (!GivesToPrim(destination)) ScriptSleep(2000);
             if (m_host == null || World == null) return;
 
             if (!UUID.TryParse(destination, out UUID destId) || destId == UUID.Zero)
@@ -2658,6 +4865,7 @@ namespace Phlox.ScriptEngine
                 llSay(0, "Could not parse destination key: " + destination);
                 return;
             }
+            if (GiveRefusedByMute(destId, "inventory")) return;
 
             // Find the item in task inventory
             TaskInventoryItem item = null;
@@ -2678,57 +4886,70 @@ namespace Phlox.ScriptEngine
                 return;
             }
 
-            // Try to get the avatar's client — null is OK for offline delivery
-            IClientAPI remoteClient = null;
-            if (World.TryGetScenePresence(destId, out ScenePresence sp))
-                remoteClient = sp.ControllingClient;
-
-            InventoryItemBase agentItem = World.MoveTaskInventoryItem(
-                remoteClient, UUID.Zero, m_host, item.ItemID, out string reason);
-
-            if (agentItem == null)
-            {
-                ShoutError($"Failed to give '{inventory}': {reason}");
-                return;
-            }
-
-            // Send IM notification to recipient
-            byte[] bucket = new byte[] { (byte)item.Type };
-            GridInstantMessage msg = new GridInstantMessage(World,
-                m_host.OwnerID, m_host.Name, destId,
-                (byte)InstantMessageDialog.TaskInventoryOffered,
-                false, $"'{item.Name}'",
-                agentItem.ID, true, m_host.AbsolutePosition, bucket, true);
-
-            IMessageTransferModule tr = World.RequestModuleInterface<IMessageTransferModule>();
-            tr?.SendInstantMessage(msg, success => {});
+            // YEngine's delivery (a prim, or an avatar here, elsewhere or offline); no null client.
+            if (GiveTaskItem(m_host, item, destId, out string failure) != IW_DELIVER_OK)
+                ShoutError($"Failed to give '{inventory}': {failure}");
         }
         public void llGiveInventoryList(string target, string folder, LSLList inventory)
         {
-            if (m_host == null || World == null) return;
-            if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return;
-
-            // Collect UUIDs of the named items from task inventory
-            var itemIDs = new List<UUID>();
-            lock (m_host.TaskInventory)
+            // SL: "This function causes the script to sleep for 3.0 seconds", with no exception for a prim destination
+            // (Halcyon's 0 s for one is not carried) - on every path, including a list that names nothing here.
+            try
             {
-                foreach (var kvp in m_host.TaskInventory)
-                {
-                    for (int i = 0; i < inventory.Length; i++)
-                    {
-                        if (kvp.Value.Name == inventory.Data[i]?.ToString())
-                        {
-                            itemIDs.Add(kvp.Value.ItemID);
-                            break;
-                        }
-                    }
-                }
-            }
-            if (itemIDs.Count == 0) return;
+                if (m_host == null || World == null) return;
+                if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return;
+                if (GiveRefusedByMute(destId, "inventory list")) return;
 
-            World.MoveTaskInventoryItems(destId, folder, m_host, itemIDs);
-            ScriptSleep(3000);
+                // SL: the avatar must be in, or able to see into, the region (SVC-868). YEngine gives nothing to one
+                // with no presence here - "we could check if it is a grid user ... but that increases security risk" -
+                // and says so on DEBUG_CHANNEL. llGiveInventory and iwDeliverInventory[List] still deliver anywhere.
+                if (World.GetSceneObjectPart(destId) == null && World.GetScenePresence(destId) == null)
+                {
+                    ShoutError("llGiveInventoryList: Unable to give list, destination not found");
+                    return;
+                }
+
+                List<UUID> itemIDs = ListedItems(m_host, inventory, shoutMissing: true);
+                if (itemIDs.Count == 0) return;
+
+                if (GiveTaskItems(m_host, destId, folder, itemIDs, out string failure) != IW_DELIVER_OK)
+                    ShoutError($"Failed to give inventory list: {failure}");
+            }
+            finally
+            {
+                ScriptSleep(3000);
+            }
         }
+
+        /// <summary>
+        /// The task items a give list names, in list order: an entry is an item's name or its task item key (Halcyon,
+        /// LSLSystemAPI.cs:8453-8458). With <paramref name="shoutMissing"/>, an entry that names nothing here is said on
+        /// DEBUG_CHANNEL (SL llGiveInventoryList: "If inventory is missing from the prim's inventory then an error is
+        /// shouted on DEBUG_CHANNEL") and the rest are still given.
+        /// </summary>
+        private List<UUID> ListedItems(SceneObjectPart part, LSLList inventory, bool shoutMissing)
+        {
+            var itemIDs = new List<UUID>();
+            for (int i = 0; i < inventory.Length; i++)
+            {
+                string entry = inventory.Data[i]?.ToString();
+                UUID found = UUID.Zero;
+                lock (part.TaskInventory)
+                    foreach (var kvp in part.TaskInventory)
+                        if (kvp.Value.Name == entry || kvp.Value.ItemID.ToString() == entry) { found = kvp.Value.ItemID; break; }
+                if (found == UUID.Zero)
+                {
+                    if (shoutMissing) ShoutError($"Could not find item '{entry}'");
+                    continue;
+                }
+                if (!itemIDs.Contains(found)) itemIDs.Add(found);
+            }
+            return itemIDs;
+        }
+
+        /// <summary>Is the give's destination a prim in this region (a give that has no delay)?</summary>
+        private bool GivesToPrim(string destination)
+            => UUID.TryParse(destination, out UUID destId) && destId != UUID.Zero && World?.GetSceneObjectPart(destId) != null;
 
         public void llRemoveInventory(string item)
         {
@@ -2750,18 +4971,21 @@ namespace Phlox.ScriptEngine
         {
             if (m_host?.ParentGroup == null) return;
             m_host.ParentGroup.RootPart.AllowedDrop = (add != 0);
-            // Trigger a flag update so the viewer knows drop is allowed
-            m_host.ParentGroup.RootPart.ScheduleFullUpdate();
+            // The flag enters the object's flags only when its script events are aggregated (SceneObjectPart
+            // aggregateScriptEvents), which also sends the update; Halcyon re-aggregated here (LSLSystemAPI.cs:6382-6388).
+            m_host.ParentGroup.RootPart.aggregateScriptEvents();
         }
         public void iwMakeNotecard(string name, LSLList data)
         {
-            // Faithful port from Halcyon: create a notecard in this prim's inventory
-            if (m_host == null || World == null || string.IsNullOrEmpty(name)) return;
+            // Faithful port from Halcyon: create a notecard in this prim's inventory. Its 5 s is in a finally
+            // (LSLSystemAPI.cs:14740-14790), so the refusals (no name, more than 64K) wait too.
+            if (m_host == null || World == null) return;
 
             const int MAX_LENGTH = 65536;
 
             try
             {
+                if (string.IsNullOrEmpty(name)) return;
                 StringBuilder notecardData = new StringBuilder();
                 for (int i = 0; i < data.Length; i++)
                 {
@@ -2777,7 +5001,16 @@ namespace Phlox.ScriptEngine
                 AssetBase asset = new AssetBase(UUID.Random(), name, (sbyte)AssetType.Notecard, m_host.OwnerID.ToString());
                 asset.Description = "Script Generated Notecard";
                 asset.Data = Encoding.UTF8.GetBytes(sNotecardData);
-                World.AssetService.Store(asset);
+                // Halcyon iwMakeNotecard shouts when storing the asset fails and makes no item. Its call
+                // was long-running (its ScriptSleep did nothing), so ShoutError: no pause.
+                string stored;
+                try { stored = World.AssetService.Store(asset); }
+                catch (Exception se) { m_log.LogWarning("[PhloxAPI]: iwMakeNotecard store: {0}", se.Message); stored = null; }
+                if (string.IsNullOrEmpty(stored))
+                {
+                    ShoutError("Notecard asset storage failed!");
+                    return;
+                }
 
                 // Create task inventory item
                 TaskInventoryItem taskItem = new TaskInventoryItem();
@@ -2806,82 +5039,82 @@ namespace Phlox.ScriptEngine
             {
                 m_log.LogWarning("[PhloxAPI]: iwMakeNotecard exception: {0}", e.Message);
             }
-            ScriptSleep(5000);
+            finally
+            {
+                ScriptSleep(5000);
+            }
         }
+        /// <summary>
+        /// The notecard a reader names in <paramref name="part"/>: a notecard item of that name, else the name read as a
+        /// notecard asset key (SL llGetNotecardLine: "a notecard in the inventory of the prim this script is in or a UUID
+        /// of a notecard"; "If name is a UUID then there are no new asset permissions consequences for the object").
+        /// Halcyon (LSLSystemAPI.cs:14530-14540) and YEngine read a key the same way. The fetch refuses an asset that is not
+        /// a notecard ("could not be found", AnswerNotecardRead). UUID.Zero when it names neither.
+        /// </summary>
+        private static UUID NotecardAssetIn(SceneObjectPart part, string name)
+        {
+            if (string.IsNullOrEmpty(name)) return UUID.Zero;
+            lock (part.TaskInventory)
+                foreach (var kvp in part.TaskInventory)
+                    if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
+                        return kvp.Value.AssetID;
+            return UUID.TryParse(name, out UUID asset) ? asset : UUID.Zero;
+        }
+
+        /// <summary>
+        /// Halcyon's GetNumberOfNotecardLines delays (LSLSystemAPI.cs:14521-14580) - 25 ms answered from the
+        /// notecard cache, 50 ms fetched, 100 ms when there is no such notecard - and its cache. The answer is unchanged.
+        /// </summary>
         public string llGetNumberOfNotecardLines(string name)
         {
-            if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.Notecard);
-            if (item == null) return UUID.Zero.ToString();
-            UUID queryID = UUID.Random();
-            UUID assetId = item.AssetID;
-            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            if (m_host == null) return UUID.Zero.ToString();
+            UUID notecard = NotecardAssetIn(m_host, name);
+            if (notecard == UUID.Zero)
             {
-                try
-                {
-                    AssetBase asset = World.AssetService.Get(assetId.ToString());
-                    if (asset == null || asset.Data == null) { PostDataserverEvent(queryID, "0"); return; }
-                    string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                    int count = body.Length == 0 ? 0 : body.Split('\n').Length;
-                    PostDataserverEvent(queryID, count.ToString());
-                }
-                catch (Exception ex) { m_log.LogError("[PhloxAPI]: llGetNumberOfNotecardLines ex: {0}", ex.Message); PostDataserverEvent(queryID, "0"); }
-            });
+                // Halcyon LSLSystemAPI.cs:14543-14547, the error, then its 100 ms (which replaces the 15).
+                ScriptShoutError("Notecard '" + name + "' could not be found.");
+                NotecardSleep(NOTECARD_COUNT_ERROR_DELAY);
+                return UUID.Zero.ToString();
+            }
+            UUID queryID = NewDataserverQuery();
+            bool cached = AnswerNotecardRead(notecard, queryID, c => c.LineCount.ToString(), name, "llGetNumberOfNotecardLines");
+            NotecardSleep(cached ? NOTECARD_COUNT_FAST_DELAY : NOTECARD_COUNT_LONG_DELAY);
             return queryID.ToString();
         }
 
+        /// <summary>
+        /// Halcyon's GetNotecardSegment delays (LSLSystemAPI.cs:14602-14661) - 25 ms fetched; from the cache,
+        /// 1 ms on lines 0, 16, 32 ... read from offset 0 and none otherwise; none for a missing notecard - and its cache.
+        /// </summary>
         public string llGetNotecardLine(string name, int line)
         {
-            if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.Notecard);
-            if (item == null) return UUID.Zero.ToString();
-            UUID queryID = UUID.Random();
-            UUID assetId = item.AssetID;
-            int lineNum = line;
-            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            if (m_host == null) return UUID.Zero.ToString();
+            UUID notecard = NotecardAssetIn(m_host, name);
+            if (notecard == UUID.Zero)
             {
-                try
-                {
-                    AssetBase asset = World.AssetService.Get(assetId.ToString());
-                    if (asset == null || asset.Data == null) { PostDataserverEvent(queryID, "\n\n\n"); return; }
-                    string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                    string[] lines = body.Split('\n');
-                    if (lineNum < 0 || lineNum >= lines.Length) PostDataserverEvent(queryID, "\n\n\n");
-                    else PostDataserverEvent(queryID, lines[lineNum].TrimEnd('\r'));
-                }
-                catch (Exception ex) { m_log.LogError("[PhloxAPI]: llGetNotecardLine ex: {0}", ex.Message); PostDataserverEvent(queryID, "\n\n\n"); }
-            });
+                // Halcyon GetNotecardSegment, LSLSystemAPI.cs:14624-14628 (no delay after it).
+                ScriptShoutError("Notecard '" + name + "' could not be found.");
+                return UUID.Zero.ToString();
+            }
+            UUID queryID = NewDataserverQuery();
+            int lineNum = line;
+            bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardLineAnswer(c, lineNum), name, "llGetNotecardLine");
+            if (cached) NotecardLineCachedSleep(line, 0);
+            else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
             return queryID.ToString();
         }
         public string iwGetNotecardSegment(string name, int line, int startOffset, int maxLength)
         {
             // Faithful port: read a segment of a notecard line (offset + length)
             if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.Notecard);
-            if (item == null) { ShoutError("Notecard '" + name + "' could not be found."); return UUID.Zero.ToString(); }
-            UUID queryID = UUID.Random();
-            UUID assetId = item.AssetID;
+            UUID notecard = NotecardAssetIn(m_host, name);
+            if (notecard == UUID.Zero) { ScriptShoutError("Notecard '" + name + "' could not be found."); return UUID.Zero.ToString(); }
+            UUID queryID = NewDataserverQuery();
             int lineNum = line;
-            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-            {
-                try
-                {
-                    AssetBase asset = World.AssetService.Get(assetId.ToString());
-                    if (asset == null || asset.Data == null) { PostDataserverEvent(queryID, "\n\n\n"); return; }
-                    string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                    string[] lines = body.Split('\n');
-                    if (lineNum < 0 || lineNum >= lines.Length) { PostDataserverEvent(queryID, "\n\n\n"); return; }
-                    string result = lines[lineNum].TrimEnd('\r');
-                    if (startOffset > 0 && startOffset < result.Length)
-                        result = result.Substring(startOffset);
-                    else if (startOffset >= result.Length)
-                        result = string.Empty;
-                    if (maxLength > 0 && result.Length > maxLength)
-                        result = result.Substring(0, maxLength);
-                    PostDataserverEvent(queryID, result);
-                }
-                catch (Exception ex) { m_log.LogError("[PhloxAPI]: iwGetNotecardSegment ex: {0}", ex.Message); PostDataserverEvent(queryID, "\n\n\n"); }
-            });
+            bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardSegmentAnswer(c, lineNum, startOffset, maxLength),
+                name, "iwGetNotecardSegment");
+            if (cached) NotecardLineCachedSleep(line, startOffset);   // As llGetNotecardLine
+            else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
             return queryID.ToString();
         }
         public string llGetNotecardLineSync(string name, int line)
@@ -2924,9 +5157,10 @@ namespace Phlox.ScriptEngine
         }
         public string llRequestInventoryData(string name)
         {
-            // Looks up a landmark by name and fires dataserver with its position
+            // Looks up a landmark by name and fires dataserver with its position. SL: "This function causes the script
+            // to sleep for 1.0 seconds", on every call; a missing landmark: "an error is shouted on DEBUG_CHANNEL".
+            // Halcyon returned "" with no event for one (LSLSystemAPI.cs:5686-5692).
             if (m_host == null) return UUID.Zero.ToString();
-            UUID queryID = UUID.Random();
 
             TaskInventoryItem landmark = null;
             lock (m_host.TaskInventory)
@@ -2943,11 +5177,16 @@ namespace Phlox.ScriptEngine
 
             if (landmark == null)
             {
-                PostDataserverEvent(queryID, string.Empty);
-                return queryID.ToString();
+                ShoutError("No landmark named '" + name + "'");
+                ScriptSleep(1000);
+                return string.Empty;
             }
 
+            UUID queryID = NewDataserverQuery();
             UUID assetId = landmark.AssetID;
+            // SL: "a global position as an offset from the current region's origin"; Halcyon added the landmark region's
+            // corner, from its region_handle, less this region's (LSLSystemAPI.cs:5666-5680).
+            Vector3 here = new Vector3(World.RegionInfo.WorldLocX, World.RegionInfo.WorldLocY, 0);
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
                 try
@@ -2955,9 +5194,10 @@ namespace Phlox.ScriptEngine
                     AssetBase asset = World.AssetService.Get(assetId.ToString());
                     if (asset == null) { PostDataserverEvent(queryID, string.Empty); return; }
 
-                    // Landmark format: first line is "Landmark version N", then "region_id UUID", then "local_pos x y z"
+                    // Landmark format: "Landmark version N", "region_id UUID", "local_pos x y z", "region_handle N"
                     string data = System.Text.Encoding.UTF8.GetString(asset.Data);
                     Vector3 pos = Vector3.Zero;
+                    ulong handle = 0;
                     foreach (string line in data.Split('\n'))
                     {
                         string trimmed = line.Trim();
@@ -2969,8 +5209,17 @@ namespace Phlox.ScriptEngine
                                     float.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture),
                                     float.Parse(parts[2], System.Globalization.CultureInfo.InvariantCulture),
                                     float.Parse(parts[3], System.Globalization.CultureInfo.InvariantCulture));
-                            break;
                         }
+                        else if (trimmed.StartsWith("region_handle"))
+                        {
+                            string[] parts = trimmed.Split(' ');
+                            if (parts.Length == 2) ulong.TryParse(parts[1], out handle);
+                        }
+                    }
+                    if (handle != 0)
+                    {
+                        Utils.LongToUInts(handle, out uint x, out uint y);
+                        pos += new Vector3(x, y, 0) - here;
                     }
                     PostDataserverEvent(queryID, pos.ToString());
                 }
@@ -2986,25 +5235,17 @@ namespace Phlox.ScriptEngine
         }
         public LSLList iwSearchLinkInventory(int link, int type, string pattern, int matchtype)
         {
+            // Halcyon's SearchInventory (LSLSystemAPI.cs:5140-5164): its texts for the two counting match types, nothing
+            // for a higher one, and the names in LSL order. Every prim of a multi-prim link is searched (an extension).
             if (matchtype > 2)
             {
-                ShoutError("IW_MATCH_COUNT/REGEX not valid for iwSearchLinkInventory");
+                if (matchtype == 3) LSLError("IW_MATCH_COUNT is not a valid matching type for iwSearchInventory or iwSearchLinkInventory.");
+                else if (matchtype == 4) LSLError("IW_MATCH_COUNT_REGEX is not a valid matching type for iwSearchInventory or iwSearchLinkInventory.");
                 return new LSLList();
             }
-            List<object> ret = new List<object>();
-            foreach (SceneObjectPart part in GetLinkParts(link))
-            {
-                lock (part.TaskInventory)
-                {
-                    foreach (var kvp in part.TaskInventory)
-                    {
-                        if (type != -1 && kvp.Value.Type != type) continue;
-                        if (String.IsNullOrEmpty(pattern) || iwMatchString(kvp.Value.Name, pattern, matchtype) == 1)
-                            ret.Add(kvp.Value.Name);
-                    }
-                }
-            }
-            return new LSLList(ret);
+            List<string> names = SortedInventoryNames(GetLinkParts(link), type,
+                n => String.IsNullOrEmpty(pattern) || iwMatchString(n, pattern, matchtype) == 1);
+            return new LSLList(names.Cast<object>().ToList());
         }
         public int iwGetLinkInventoryNumber(int linknumber, int type)
         {
@@ -3023,8 +5264,13 @@ namespace Phlox.ScriptEngine
                         if (kvp.Value.Name == name) return kvp.Value.Type;
             return -1;
         }
+        /// <summary>
+        /// Halcyon (LSLSystemAPI.cs:12680-12686): -1 ANDed with each selected prim's mask for the item, a prim without it
+        /// counting as -1, so the answer is -1 when no prim holds it and the common bits when several do.
+        /// </summary>
         public int iwGetLinkInventoryPermMask(int linknumber, string item, int mask)
         {
+            int rc = -1;
             foreach (SceneObjectPart part in GetLinkParts(linknumber))
                 lock (part.TaskInventory)
                     foreach (var kvp in part.TaskInventory)
@@ -3032,40 +5278,45 @@ namespace Phlox.ScriptEngine
                         {
                             switch (mask)
                             {
-                                case 0: return (int)kvp.Value.BasePermissions;
-                                case 1: return (int)kvp.Value.CurrentPermissions;
-                                case 2: return (int)kvp.Value.GroupPermissions;
-                                case 3: return (int)kvp.Value.EveryonePermissions;
-                                case 4: return (int)kvp.Value.NextPermissions;
+                                case 0: rc &= (int)kvp.Value.BasePermissions; break;
+                                case 1: rc &= (int)kvp.Value.CurrentPermissions; break;
+                                case 2: rc &= (int)kvp.Value.GroupPermissions; break;
+                                case 3: rc &= (int)kvp.Value.EveryonePermissions; break;
+                                case 4: rc &= (int)kvp.Value.NextPermissions; break;
                             }
+                            break;
                         }
-            return 0;
+            return rc;
         }
+        /// <summary>The names of every selected prim, in LSL order (Halcyon sorted one prim's, LSLSystemAPI.cs:5130-5137).</summary>
         public string iwGetLinkInventoryName(int linknumber, int type, int number)
-        {
-            int idx = 0;
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
-                lock (part.TaskInventory)
-                    foreach (var kvp in part.TaskInventory)
-                        if (type == -1 || kvp.Value.Type == type)
-                            if (idx++ == number) return kvp.Value.Name;
-            return string.Empty;
-        }
+            => InventoryNameAt(GetLinkParts(linknumber), type, number);
         public string iwGetLinkInventoryKey(int linknumber, string name)
         {
             foreach (SceneObjectPart part in GetLinkParts(linknumber))
                 lock (part.TaskInventory)
                     foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Name == name) return kvp.Value.AssetID.ToString();
+                        // llGetInventoryKey's rule, as Halcyon's shared GetInventoryKey.
+                        if (kvp.Value.Name == name)
+                            return IsMyScript(part, kvp.Value) ? kvp.Value.AssetID.ToString()
+                                : AssetKeyIfFullPerm(kvp.Value.AssetID, kvp.Value.CurrentPermissions);
             return UUID.Zero.ToString();
         }
+        /// <summary>
+        /// As llGetInventoryCreator over every selected prim: a missing item is "" with Halcyon's "No item named '...' in
+        /// link N" on DEBUG_CHANNEL (LSLSystemAPI.cs:12695-12724); a link with no prim is NULL_KEY, silently.
+        /// </summary>
         public string iwGetLinkInventoryCreator(int linknumber, string item)
         {
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            var parts = GetLinkParts(linknumber).ToList();
+            if (parts.Count == 0) return UUID.Zero.ToString();
+            foreach (SceneObjectPart part in parts)
                 lock (part.TaskInventory)
                     foreach (var kvp in part.TaskInventory)
                         if (kvp.Value.Name == item) return kvp.Value.CreatorID.ToString();
-            return UUID.Zero.ToString();
+            if (parts.Count == 1 && parts[0].LinkNum == 0) ScriptShoutError("No item named '" + item + "'");
+            else ScriptShoutError("No item named '" + item + "' in link " + linknumber);
+            return string.Empty;
         }
         public void iwRemoveLinkInventory(int linknumber, string item)
         {
@@ -3077,8 +5328,9 @@ namespace Phlox.ScriptEngine
                     {
                         if (kvp.Value.Name == item)
                         {
+                            // One per selected prim, as Halcyon (LSLSystemAPI.cs:5498-5503).
                             part.Inventory.RemoveInventoryItem(kvp.Key);
-                            return;
+                            break;
                         }
                     }
                 }
@@ -3086,82 +5338,218 @@ namespace Phlox.ScriptEngine
         }
         public void iwGiveLinkInventory(int linknumber, string destination, string inventory)
         {
-            ScriptSleep(2000);
-            if (World == null) return;
-            if (!UUID.TryParse(destination, out UUID destId) || destId == UUID.Zero)
-            {
-                llSay(0, "Could not parse destination key: " + destination);
-                return;
-            }
+            // Halcyon: 2 s for an avatar destination and for errors, none for a prim (LSLSystemAPI.cs:5351).
+            if (!GivesToPrim(destination)) ScriptSleep(2000);
+            GiveLinkInventory(linknumber, destination, inventory);
+        }
+
+        /// <summary>
+        /// iwGiveLinkInventory's body, now returning Halcyon's IW_DELIVER_* code
+        /// (InWorldz.Phlox.Engine/LSLSystemAPI.cs GiveLinkInventory/_GiveInventory) so
+        /// iwDeliverInventory can hand it back.
+        /// </summary>
+        private int GiveLinkInventory(int linknumber, string destination, string inventory)
+        {
+            if (World == null) return IW_DELIVER_PRIM;
 
             // Find the item in the specified link's inventory
             TaskInventoryItem item = null;
             SceneObjectPart sourcePart = null;
+            bool anyPart = false;
             foreach (SceneObjectPart part in GetLinkParts(linknumber))
             {
+                anyPart = true;
                 lock (part.TaskInventory)
                     foreach (var kvp in part.TaskInventory)
                         if (kvp.Value.Name == inventory)
                         { item = kvp.Value; sourcePart = part; break; }
                 if (item != null) break;
             }
+            // Halcyon looks for the prim before the key (LSLSystemAPI.cs GiveLinkInventory -> _GiveInventory).
+            if (!anyPart) return IW_DELIVER_PRIM;
+            if (!UUID.TryParse(destination, out UUID destId) || destId == UUID.Zero)
+            {
+                llSay(0, "Could not parse destination key: " + destination);
+                return IW_DELIVER_BADKEY;
+            }
+            if (GiveRefusedByMute(destId, "inventory")) return IW_DELIVER_MUTED;   // Before the item, as Halcyon
             if (item == null || sourcePart == null)
             {
                 ShoutError($"Could not find item '{inventory}'");
-                return;
+                return IW_DELIVER_NONE;
             }
 
-            IClientAPI remoteClient = null;
-            if (World.TryGetScenePresence(destId, out ScenePresence sp))
-                remoteClient = sp.ControllingClient;
+            // YEngine's delivery - no null client into Scene.MoveTaskInventoryItem (Scene.Inventory.cs:1479).
+            int rc = GiveTaskItem(sourcePart, item, destId, out string failure);
+            if (rc != IW_DELIVER_OK) ShoutError($"Failed to give '{inventory}': {failure}");
+            return rc;
+        }
 
-            InventoryItemBase agentItem = World.MoveTaskInventoryItem(
-                remoteClient, UUID.Zero, sourcePart, item.ItemID, out string reason);
+        // ── Giving task inventory to an avatar who may not be in this region ────────────────────────
+        //
+        // YEngine (LSL_Api.llGiveInventory): a prim destination is a task-to-task move; an avatar is accepted when
+        // present here, or known to the grid - a user account, or an online grid user - and is given the item with
+        // Scene.MoveTaskInventoryItem(avatarId, folderId, part, itemId), the overload that needs no client; the
+        // TaskInventoryOffered notice goes to the client when present, else through the IM transfer module, which
+        // stores it for an offline avatar. The codes are Halcyon's (InWorldz.Phlox.Engine/LSLSystemAPI.cs
+        // _GiveInventory / _GiveLinkInventoryList / DeliverReasonToResult): IW_DELIVER_OK delivered,
+        // IW_DELIVER_USER no such avatar ("user"), IW_DELIVER_PERM a transfer refusal ("perm"), IW_DELIVER_ITEM
+        // the item vanished ("item").
 
+        /// <summary>Is this an avatar we can give to: here, with an account, or online on the grid (YEngine's test)?</summary>
+        private bool AvatarKnown(UUID id)
+        {
+            if (World.GetScenePresence(id) != null) return true;
+            if (World.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, id) != null) return true;
+            var info = World.GridUserService?.GetGridUserInfo(id.ToString());
+            return info != null && info.Online;
+        }
+
+        /// <summary>Give one task item to a prim or an avatar. Returns an IW_DELIVER_* code; <paramref name="failure"/> says why not.</summary>
+        private int GiveTaskItem(SceneObjectPart source, TaskInventoryItem item, UUID destId, out string failure)
+        {
+            failure = null;
+            if (World.GetSceneObjectPart(destId) != null)
+            {
+                World.MoveTaskInventoryItem(destId, source, item.ItemID);   // YEngine: destination is an object
+                return IW_DELIVER_OK;
+            }
+            if (!AvatarKnown(destId))
+            {
+                failure = "Can't find destination '" + destId + "'";
+                return IW_DELIVER_USER;
+            }
+            InventoryItemBase agentItem = World.MoveTaskInventoryItem(destId, UUID.Zero, source, item.ItemID, out string reason);
             if (agentItem == null)
             {
-                ShoutError($"Failed to give '{inventory}': {reason}");
-                return;
+                failure = reason;
+                return DeliverReasonToResult(reason);
             }
+            SendGiveNotice(source, destId, "'" + item.Name + "'", agentItem.ID, (byte)item.Type);
+            return IW_DELIVER_OK;
+        }
 
-            byte[] bucket = new byte[] { (byte)item.Type };
+        /// <summary>
+        /// Give task items to a prim, or into a new folder named <paramref name="category"/> in an avatar's inventory.
+        /// Scene.MoveTaskInventoryItems gives up (UUID.Zero) for an avatar who is not in this region, so for one who is
+        /// elsewhere or offline the folder is made here and each item goes in by the no-client overload.
+        /// </summary>
+        private int GiveTaskItems(SceneObjectPart source, UUID destId, string category, List<UUID> itemIDs, out string failure)
+        {
+            failure = null;
+            if (World.GetSceneObjectPart(destId) != null)
+            {
+                World.MoveTaskInventoryItems(destId, category, source, itemIDs);
+                return IW_DELIVER_OK;
+            }
+            // Halcyon gives an avatar all of the list or none of it: an item that cannot be moved aborts the give with
+            // its reason (LSLSystemAPI.cs:8478-8501). Core's MoveTaskInventoryItems alerts per item and gives the rest, so
+            // the items are checked first, by its own rules (CreateAgentInventoryItemFromTask).
+            foreach (UUID itemId in itemIDs)
+            {
+                TaskInventoryItem item = source.Inventory.GetInventoryItem(itemId);
+                if (item == null)
+                {
+                    failure = "Item not found: " + itemId;
+                    return IW_DELIVER_ITEM;
+                }
+                if (destId != item.OwnerID && (item.CurrentPermissions & (uint)OpenSim.Framework.PermissionMask.Transfer) == 0)
+                {
+                    failure = "Item doesn't have the Transfer permission.";
+                    return IW_DELIVER_PERM;
+                }
+            }
+            if (World.GetScenePresence(destId) != null)
+            {
+                UUID given = World.MoveTaskInventoryItems(destId, category, source, itemIDs);
+                if (given == UUID.Zero)
+                {
+                    failure = "the recipient's inventory could not be reached";
+                    return IW_DELIVER_USER;
+                }
+                // Halcyon offers the folder to a present avatar too, so the viewer shows the offer.
+                SendGiveNotice(source, destId, "'" + category + "'", given, (byte)AssetType.Folder);
+                return IW_DELIVER_OK;
+            }
+            if (!AvatarKnown(destId))
+            {
+                failure = "Can't find destination '" + destId + "'";
+                return IW_DELIVER_USER;
+            }
+            InventoryFolderBase root = World.InventoryService.GetRootFolder(destId);
+            if (root == null)
+            {
+                failure = "the recipient's inventory could not be reached";
+                return IW_DELIVER_USER;
+            }
+            var folder = new InventoryFolderBase(UUID.Random(), category, destId, -1, root.ID, root.Version);
+            World.InventoryService.AddFolder(folder);
+            foreach (UUID itemId in itemIDs)
+            {
+                if (World.MoveTaskInventoryItem(destId, folder.ID, source, itemId, out string reason) == null)
+                {
+                    failure = reason;
+                    return DeliverReasonToResult(failure);
+                }
+            }
+            SendGiveNotice(source, destId, "'" + category + "'", folder.ID, (byte)AssetType.Folder);
+            return IW_DELIVER_OK;
+        }
+
+        /// <summary>The TaskInventoryOffered notice: to the client when present, else through the IM transfer module (offline IM).</summary>
+        private void SendGiveNotice(SceneObjectPart source, UUID destId, string text, UUID givenId, byte assetType)
+        {
+            // From the object: its root prim's name, owner and position (Halcyon _GiveInventory, LSLSystemAPI.cs:5419-5427).
+            SceneObjectPart root = source.ParentGroup?.RootPart ?? source;
             GridInstantMessage msg = new GridInstantMessage(World,
-                m_host.OwnerID, m_host.Name, destId,
+                root.OwnerID, root.Name, destId,
                 (byte)InstantMessageDialog.TaskInventoryOffered,
-                false, item.Name + "\n" + m_host.Name + " (owned by " +
-                    World.GetScenePresence(m_host.OwnerID)?.Name + ")",
-                agentItem.ID, true, m_host.AbsolutePosition,
-                bucket, true);
-            if (World.TryGetScenePresence(destId, out ScenePresence recipient))
-                recipient.ControllingClient.SendInstantMessage(msg);
+                false, text + ". (" + root.Name + " is located at " + World.RegionInfo.RegionName + " " + root.AbsolutePosition + ")",
+                givenId, true, root.AbsolutePosition,
+                new byte[] { assetType }, true);
+            if (World.TryGetScenePresence(destId, out ScenePresence sp) && !sp.IsChildAgent)
+                sp.ControllingClient.SendInstantMessage(msg);
+            else
+                World.RequestModuleInterface<IMessageTransferModule>()?.SendInstantMessage(msg, success => { });
+        }
+
+        /// <summary>
+        /// Halcyon's DeliverReasonToResult, over OpenSim's MoveTaskInventoryItem messages
+        /// (Scene.Inventory.cs): a transfer refusal is PERM, a missing item is ITEM, anything else USER.
+        /// </summary>
+        private static int DeliverReasonToResult(string reason)
+        {
+            if (string.IsNullOrEmpty(reason)) return IW_DELIVER_USER;
+            if (reason.StartsWith("Item not found")) return IW_DELIVER_ITEM;
+            if (reason.Contains("Transfer permission") || reason.StartsWith("Not allowed") || reason.StartsWith("Sender did not match"))
+                return IW_DELIVER_PERM;
+            return IW_DELIVER_USER;
         }
         public void iwGiveLinkInventoryList(int linknumber, string target, string folder, LSLList inventory)
         {
             // Faithful port: give inventory items from a specific link prim
             if (m_host == null || World == null) return;
-            if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return;
-
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            // Halcyon: 3 s for an avatar, none for a prim (LSLSystemAPI.cs:8469-8473).
+            try
             {
-                var itemIDs = new List<UUID>();
-                lock (part.TaskInventory)
+                if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return;
+                if (GiveRefusedByMute(destId, "inventory list")) return;   // otherwise unchanged
+
+                // One folder, from the first prim of the link that holds a listed item (Halcyon :8511-8518).
+                foreach (SceneObjectPart part in GetLinkParts(linknumber))
                 {
-                    foreach (var kvp in part.TaskInventory)
-                    {
-                        for (int i = 0; i < inventory.Length; i++)
-                        {
-                            if (kvp.Value.Name == inventory.Data[i]?.ToString())
-                            {
-                                itemIDs.Add(kvp.Value.ItemID);
-                                break;
-                            }
-                        }
-                    }
+                    List<UUID> itemIDs = ListedItems(part, inventory, shoutMissing: false);
+                    if (itemIDs.Count == 0) continue;
+                    ListedItems(part, inventory, shoutMissing: true);   // say the entries this prim does not hold
+                    if (GiveTaskItems(part, destId, folder, itemIDs, out string failure) != IW_DELIVER_OK)
+                        ShoutError($"Failed to give inventory list: {failure}");
+                    break;
                 }
-                if (itemIDs.Count > 0)
-                    World.MoveTaskInventoryItems(destId, folder, part, itemIDs);
             }
-            ScriptSleep(3000);
+            finally
+            {
+                if (!GivesToPrim(target)) ScriptSleep(3000);
+            }
         }
         public string iwGetLinkInventoryDesc(int linknumber, string name)
         {
@@ -3179,123 +5567,132 @@ namespace Phlox.ScriptEngine
                         if (kvp.Value.Name == name) return kvp.Value.LastOwnerID.ToString();
             return UUID.Zero.ToString();
         }
+        /// <summary>
+        /// The table returns integer and the async shim returns only what the body hands to
+        /// SysReturn. Halcyon (InWorldz.Phlox.Engine/LSLSystemAPI.cs iwDeliverInventory ->
+        /// GiveLinkInventory(.., 100, includeRC: true)) returns an IW_DELIVER_* code from a finally,
+        /// IW_DELIVER_PRIM if the body never got as far as a prim, and sleeps 100 ms, not 2 s.
+        /// </summary>
         public void iwDeliverInventory(int linknumber, string destination, string inventory)
         {
-            // Faithful port: same as iwGiveLinkInventory but from a specific link
-            iwGiveLinkInventory(linknumber, destination, inventory);
+            int rc = IW_DELIVER_PRIM;
+            try { rc = GiveLinkInventory(linknumber, destination, inventory); }
+            finally { m_ScriptEngine.SysReturn(m_itemID, rc, GivesToPrim(destination) ? 0 : 100); }   // none for a prim, as Halcyon
         }
+
+        /// <summary>
+        /// Halcyon's iwDeliverInventoryList (GiveInventoryList(.., 100, includeRC: true) ->
+        /// _GiveLinkInventoryList): the first prim of the link set gives, a named item missing from it
+        /// aborts with IW_DELIVER_ITEM, an empty list is IW_DELIVER_NONE, no prim is IW_DELIVER_PRIM.
+        /// The code goes back from a finally, so every path returns one.
+        /// </summary>
         public void iwDeliverInventoryList(int linknumber, string target, string folder, LSLList inventory)
         {
-            iwGiveLinkInventoryList(linknumber, target, folder, inventory);
+            int rc = IW_DELIVER_PRIM;
+            try { rc = DeliverInventoryList(linknumber, target, folder, inventory); }
+            finally { m_ScriptEngine.SysReturn(m_itemID, rc, GivesToPrim(target) ? 0 : 100); }   // none for a prim, as Halcyon
+        }
+
+        private int DeliverInventoryList(int linknumber, string target, string folder, LSLList inventory)
+        {
+            if (m_host == null || World == null) return IW_DELIVER_PRIM;
+            if (!UUID.TryParse(target, out UUID destId) || destId == UUID.Zero) return IW_DELIVER_BADKEY;
+
+            SceneObjectPart part = GetLinkParts(linknumber).FirstOrDefault();
+            if (part == null) return IW_DELIVER_PRIM;
+            if (GiveRefusedByMute(destId, "inventory list")) return IW_DELIVER_MUTED;
+
+            var itemIDs = new List<UUID>();
+            for (int i = 0; i < inventory.Length; i++)
+            {
+                string name = inventory.Data[i]?.ToString();
+                UUID found = UUID.Zero;
+                lock (part.TaskInventory)
+                    foreach (var kvp in part.TaskInventory)
+                        if (kvp.Value.Name == name || kvp.Value.ItemID.ToString() == name) { found = kvp.Value.ItemID; break; }
+                if (found == UUID.Zero) return IW_DELIVER_ITEM;
+                itemIDs.Add(found);
+            }
+            if (itemIDs.Count == 0) return IW_DELIVER_NONE;
+
+            return GiveTaskItems(part, destId, folder, itemIDs, out _);
         }
         public string iwGetLinkNumberOfNotecardLines(int linknumber, string name)
         {
             // Faithful port: get notecard line count from a specific link's inventory
             if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            foreach (UUID notecard in LinkNotecardAssets(linknumber, name))
             {
-                TaskInventoryItem item = null;
-                lock (part.TaskInventory)
-                {
-                    foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
-                        { item = kvp.Value; break; }
-                }
-                if (item == null) continue;
-                UUID queryID = UUID.Random();
-                UUID assetId = item.AssetID;
-                System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    try
-                    {
-                        AssetBase asset = World.AssetService.Get(assetId.ToString());
-                        if (asset == null || asset.Data == null) { PostDataserverEvent(queryID, "0"); return; }
-                        string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                        int count = body.Length == 0 ? 0 : body.Split('\n').Length;
-                        PostDataserverEvent(queryID, count.ToString());
-                    }
-                    catch { PostDataserverEvent(queryID, "0"); }
-                });
+                UUID queryID = NewDataserverQuery();
+                // Halcyon's GetNumberOfNotecardLines delays and cache, as llGetNumberOfNotecardLines
+                bool cached = AnswerNotecardRead(notecard, queryID, c => c.LineCount.ToString(), name, null);
+                NotecardSleep(cached ? NOTECARD_COUNT_FAST_DELAY : NOTECARD_COUNT_LONG_DELAY);
                 return queryID.ToString();
             }
-            ShoutError("iwGetLinkNumberOfNotecardLines: Link number " + linknumber + " does not contain notecard '" + name + "'.");
+            ScriptShoutError("iwGetLinkNumberOfNotecardLines: Link number " + linknumber + " does not contain notecard '" + name + "'.");
+            // Halcyon sleeps 100 ms when the link is one prim without the notecard; a link of several prims
+            // was refused before any read (LSLSystemAPI.cs:14585-14599), without a sleep.
+            if (GetLinkParts(linknumber).Take(2).Count() == 1) NotecardSleep(NOTECARD_COUNT_ERROR_DELAY);
             return UUID.Zero.ToString();
         }
         public string iwGetLinkNotecardLine(int linknumber, string name, int line)
         {
             // Faithful port: read a notecard line from a specific link's inventory
             if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            foreach (UUID notecard in LinkNotecardAssets(linknumber, name))
             {
-                TaskInventoryItem item = null;
-                lock (part.TaskInventory)
-                {
-                    foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
-                        { item = kvp.Value; break; }
-                }
-                if (item == null) continue;
-                UUID queryID = UUID.Random();
-                UUID assetId = item.AssetID;
+                UUID queryID = NewDataserverQuery();
                 int lineNum = line;
-                System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    try
-                    {
-                        AssetBase asset = World.AssetService.Get(assetId.ToString());
-                        if (asset == null || asset.Data == null) { PostDataserverEvent(queryID, "\n\n\n"); return; }
-                        string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                        string[] lines = body.Split('\n');
-                        if (lineNum < 0 || lineNum >= lines.Length) PostDataserverEvent(queryID, "\n\n\n");
-                        else PostDataserverEvent(queryID, lines[lineNum].TrimEnd('\r'));
-                    }
-                    catch { PostDataserverEvent(queryID, "\n\n\n"); }
-                });
+                // Halcyon's GetNotecardSegment delays and cache, as llGetNotecardLine
+                bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardLineAnswer(c, lineNum), name, null);
+                if (cached) NotecardLineCachedSleep(line, 0);
+                else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
                 return queryID.ToString();
             }
             ShoutError("iwGetLinkNotecardLine: Notecard '" + name + "' not found in link " + linknumber + ".");
+            // Halcyon (LSLSystemAPI.cs:14674-14684) reads the link's first prim, whose GetNotecardSegment pauses
+            // on a missing notecard (:14627); a link number with no prim returns without an error or a pause.
+            if (GetLinkParts(linknumber).Any()) ChatSleep();
             return UUID.Zero.ToString();
         }
         public string iwGetLinkNotecardSegment(int linknumber, string name, int line, int startOffset, int maxLength)
         {
             // Faithful port: read a notecard segment from a specific link's inventory
             if (m_host == null || string.IsNullOrEmpty(name)) return UUID.Zero.ToString();
-            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            foreach (UUID notecard in LinkNotecardAssets(linknumber, name))
             {
-                TaskInventoryItem item = null;
-                lock (part.TaskInventory)
-                {
-                    foreach (var kvp in part.TaskInventory)
-                        if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
-                        { item = kvp.Value; break; }
-                }
-                if (item == null) continue;
-                UUID queryID = UUID.Random();
-                UUID assetId = item.AssetID;
+                UUID queryID = NewDataserverQuery();
                 int lineNum = line;
-                System.Threading.ThreadPool.QueueUserWorkItem(_ =>
-                {
-                    try
-                    {
-                        AssetBase asset = World.AssetService.Get(assetId.ToString());
-                        if (asset == null || asset.Data == null) { PostDataserverEvent(queryID, "\n\n\n"); return; }
-                        string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                        string[] lines = body.Split('\n');
-                        if (lineNum < 0 || lineNum >= lines.Length) { PostDataserverEvent(queryID, "\n\n\n"); return; }
-                        string result = lines[lineNum].TrimEnd('\r');
-                        if (startOffset > 0 && startOffset < result.Length)
-                            result = result.Substring(startOffset);
-                        else if (startOffset >= result.Length)
-                            result = string.Empty;
-                        if (maxLength > 0 && result.Length > maxLength)
-                            result = result.Substring(0, maxLength);
-                        PostDataserverEvent(queryID, result);
-                    }
-                    catch { PostDataserverEvent(queryID, "\n\n\n"); }
-                });
+                // Halcyon's GetNotecardSegment delays and cache, as iwGetNotecardSegment
+                bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardSegmentAnswer(c, lineNum, startOffset, maxLength),
+                    name, null);
+                if (cached) NotecardLineCachedSleep(line, startOffset);
+                else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
                 return queryID.ToString();
             }
+            // As iwGetLinkNotecardLine: Halcyon said 'could not be found' for a link prim without it (LSLSystemAPI.cs:14624-14628).
+            ShoutError("iwGetLinkNotecardSegment: Notecard '" + name + "' not found in link " + linknumber + ".");
+            if (GetLinkParts(linknumber).Any()) ChatSleep();
             return UUID.Zero.ToString();
+        }
+
+        /// <summary>
+        /// The notecard an iwGetLink* reader reads: a notecard of that name in the first prim of the link that holds one
+        /// (every prim of a multi-prim link is searched, an extension), else the name read as a notecard asset key (as
+        /// NotecardAssetIn). Empty when it names neither.
+        /// </summary>
+        private List<UUID> LinkNotecardAssets(int linknumber, string name)
+        {
+            foreach (SceneObjectPart part in GetLinkParts(linknumber))
+            {
+                lock (part.TaskInventory)
+                    foreach (var kvp in part.TaskInventory)
+                        if (kvp.Value.Type == (int)AssetType.Notecard && kvp.Value.Name == name)
+                            return new List<UUID> { kvp.Value.AssetID };
+            }
+            var byKey = new List<UUID>();
+            if (UUID.TryParse(name, out UUID asset) && asset != UUID.Zero) byKey.Add(asset);
+            return byKey;
         }
 
         // ── Object manipulation ────────────────────────────────────────────────
@@ -3306,67 +5703,75 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llRezAtRoot(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param)
             => RezObjectInternal(inventory, pos, vel, rot, param, true);
 
-        private void RezObjectInternal(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot)
+        private string RezObjectInternal(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot)
+            => RezObjectInternal(inventory, pos, vel, rot, param, atRoot, null);
+
+        /// <summary>
+        /// SL wiki object_rez: "Triggers in all running scripts with an object_rez event, AND in the same prim as the
+        /// script calling llRezObject or llRezAtRoot. Does NOT trigger in linked prims." Phlox's scripts in this prim, then
+        /// every other engine's, with the rezzed root's key.
+        /// </summary>
+        private void PostObjectRez(string rootKey)
         {
-            ScriptSleep(100);
-            if (m_host == null || World == null) return;
+            m_ScriptEngine.PostObjectEvent(m_host.LocalId, new EventParams("object_rez", new object[] { rootKey }, new DetectParams[0]));
+            SceneObjectPart host = m_host;
+            OfferToOtherEngines("object_rez", () => ScriptItemsIn(new[] { host }), "object_rez", () => new object[] { rootKey });
+        }
 
-            if (Util.GetDistanceTo(pos, m_host.AbsolutePosition) > 10f)
-            {
-                ShoutError("Unable to create requested object. Position exceeds 10m distance limit.");
-                return;
-            }
-
-            TaskInventoryItem item = FindInventoryItem(inventory, (int)InventoryType.Object);
-            if (item == null)
-            {
-                ShoutError("Unable to create requested object. Inventory item '" + inventory + "' not found or is not an object.");
-                return;
-            }
-
-            List<SceneObjectGroup> rezzed = World.RezObject(
-                m_host, item,
-                m_host.OwnerID, m_host.GroupID,
-                pos, rot, vel, param, atRoot, false, false);
-
-            if (rezzed == null || rezzed.Count == 0)
-            {
-                ShoutError("Unable to create requested object '" + inventory + "'.");
-                return;
-            }
+        /// <summary>
+        /// The one rez path, now carrying REZ_PARAM_STRING. Upstream stores it on the rezzed
+        /// group (LSL_Api.cs:3894, sog.RezStringParameter) and llGetStartString reads it back
+        /// (LSL_Api.cs:4589-4593); until now Phlox parsed REZ_PARAM only and the string went nowhere.
+        /// </summary>
+        private string RezObjectInternal(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot, string startString)
+        {
+            List<SceneObjectGroup> rezzed = RezChecked(inventory, pos, vel, rot, param, atRoot);
+            if (rezzed == null) return UUID.Zero.ToString();
 
             foreach (SceneObjectGroup grp in rezzed)
             {
-                m_ScriptEngine.PostObjectEvent(m_host.LocalId,
-                    new EventParams("object_rez",
-                        new object[] { grp.RootPart.UUID.ToString() },
-                        new DetectParams[0]));
+                if (startString != null) grp.RezStringParameter = startString;
             }
+            string result = UUID.Zero.ToString();
+            foreach (SceneObjectGroup grp in rezzed)
+            {
+                result = grp.RootPart.UUID.ToString();
+                PostObjectRez(result);
+            }
+            return result;
         }
-        public void iwRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param)
-            => RezObjectInternal(inventory, pos, vel, rot, param, false);
-        public void iwRezAtRoot(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param)
-            => RezObjectInternal(inventory, pos, vel, rot, param, true);
 
-        public string iwRezAt(string inventory, int rezAtRoot, Vector3 pos, Vector3 vel, Quaternion rot, int param)
+        /// <summary>
+        /// The checks and errors of Halcyon's iwRezAt (LSLSystemAPI.cs:3155-3245), which every rez function shares. A NaN
+        /// rotation, a position over 10 m away, an item that is not an object and a refused rez each shout their own
+        /// text and cost no delay; a missing item and a rez cost 100 ms (Halcyon's sleepTime). Halcyon was silent for a
+        /// missing item; Phlox keeps its error for it (SL: an error is shouted). The scene does not say why a rez was
+        /// refused, so the refusal names no reason. Null when nothing was rezzed.
+        /// </summary>
+        private List<SceneObjectGroup> RezChecked(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot)
         {
-            ScriptSleep(100);
-            if (m_host == null || World == null) return UUID.Zero.ToString();
+            if (RezRotationIsNaN(rot)) return null;
+            if (m_host == null || World == null) return null;
 
             if (Util.GetDistanceTo(pos, m_host.AbsolutePosition) > 10f)
             {
                 ShoutError("Unable to create requested object. Position exceeds 10m distance limit.");
-                return UUID.Zero.ToString();
+                return null;
             }
 
-            TaskInventoryItem item = FindInventoryItem(inventory, (int)InventoryType.Object);
+            TaskInventoryItem item = FindInventoryItem(inventory, -1);
             if (item == null)
             {
-                ShoutError("Unable to create requested object. Inventory item '" + inventory + "' not found or is not an object.");
-                return UUID.Zero.ToString();
+                ShoutError("Unable to create requested object. Inventory item '" + inventory + "' not found.");
+                ScriptSleep(100);
+                return null;
+            }
+            if (item.Type != (int)AssetType.Object)
+            {
+                ShoutError("Unable to create requested object. Inventory item '" + inventory + "' is something other than an object.");
+                return null;
             }
 
-            bool atRoot = (rezAtRoot != 0);
             List<SceneObjectGroup> rezzed = World.RezObject(
                 m_host, item,
                 m_host.OwnerID, m_host.GroupID,
@@ -3374,30 +5779,81 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
             if (rezzed == null || rezzed.Count == 0)
             {
-                ShoutError("Unable to create requested object '" + inventory + "'.");
-                return UUID.Zero.ToString();
+                string spos = (int)Math.Round(pos.X) + "," + (int)Math.Round(pos.Y) + "," + (int)Math.Round(pos.Z);
+                ShoutError("Object '" + m_host.ParentGroup.Name + "' is unable to create object '" + inventory + "' at <" + spos + ">. The object failed to rez");
+                return null;
             }
+            ScriptSleep(100);
+            return rezzed;
+        }
+        /// <summary>
+        /// The table returns key and the async shim returns only what the body hands to
+        /// SysReturn. Halcyon (InWorldz.Phlox.Engine/LSLSystemAPI.cs iwRezObject/iwRezAtRoot) returns
+        /// iwRezAt's result - the last rezzed group's root key, NULL_KEY on every failure - from a
+        /// finally; so does this, with NULL_KEY (not Halcyon's "") if the rez throws.
+        /// </summary>
+        public void iwRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param)
+            => RezReturningKey(inventory, pos, vel, rot, param, false);
+        public void iwRezAtRoot(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param)
+            => RezReturningKey(inventory, pos, vel, rot, param, true);
+
+        private void RezReturningKey(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot)
+        {
+            string result = UUID.Zero.ToString();
+            try { result = RezObjectInternal(inventory, pos, vel, rot, param, atRoot); }
+            finally { m_ScriptEngine.SysReturn(m_itemID, result, 0); }
+        }
+
+        /// <summary>
+        /// Halcyon iwRezAt (LSLSystemAPI.cs:3168-3173) refuses a NaN rotation with this error and no delay
+        /// (sleepTime = 0), before its 10 m check. Its rez calls were long-running, so ShoutError: no pause.
+        /// Halcyon's other guard there, IsBadUser (:3160-3166), reads a nuke/blacklist-owner list NGC core does not have.
+        /// </summary>
+        private bool RezRotationIsNaN(Quaternion rot)
+        {
+            if (!(float.IsNaN(rot.X) || float.IsNaN(rot.Y) || float.IsNaN(rot.Z) || float.IsNaN(rot.W))) return false;
+            ShoutError("Unable to create requested object. Position is invalid.");
+            return true;
+        }
+
+        public string iwRezAt(string inventory, int rezAtRoot, Vector3 pos, Vector3 vel, Quaternion rot, int param)
+        {
+            List<SceneObjectGroup> rezzed = RezChecked(inventory, pos, vel, rot, param, rezAtRoot != 0);
+            if (rezzed == null) return UUID.Zero.ToString();
 
             string result = UUID.Zero.ToString();
             foreach (SceneObjectGroup grp in rezzed)
             {
                 result = grp.RootPart.UUID.ToString();
-                m_ScriptEngine.PostObjectEvent(m_host.LocalId,
-                    new EventParams("object_rez",
-                        new object[] { result },
-                        new DetectParams[0]));
+                PostObjectRez(result);
             }
             return result;
         }
 
-        public string iwRezPrim(LSLList primParams, LSLList particleSystem, LSLList inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param) { /* InWorldz-specific — no OpenSim equivalent */ return UUID.Zero.ToString(); }
-        public void llGodLikeRezObject(string inventory, Vector3 pos) { /* No god mode */ }
+        /// <summary>Not implemented: says so, as llGodLikeRezObject does, instead of a silent NULL_KEY (Halcyon has a full iwRezPrim).</summary>
+        public string iwRezPrim(LSLList primParams, LSLList particleSystem, LSLList inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param)
+        {
+            NotImplemented("iwRezPrim");
+            return UUID.Zero.ToString();
+        }
+        public void llGodLikeRezObject(string inventory, Vector3 pos) => NotImplemented("llGodLikeRezObject");   // Halcyon LSLSystemAPI.cs:4384
+        /// <summary>
+        /// SL wiki llDie: no effect in an attachment (Halcyon LSLSystemAPI.cs:1363-1367). Otherwise the object goes and the
+        /// script stops at once: Halcyon marks it Killed (:1368), so nothing after llDie in the same event runs on the
+        /// deleted object while the unload is still queued.
+        /// </summary>
         public void llDie()
         {
             if (m_host == null) return;
             SceneObjectGroup group = m_host.ParentGroup;
-            if (group == null || group.IsDeleted) return;
+            if (group == null || group.IsDeleted || group.IsAttachment) return;
             World?.DeleteSceneObject(group, false);
+            RuntimeState state = m_thisScript?.ScriptState;
+            if (state != null)
+            {
+                state.RunningEvent?.SignalCompleted();
+                state.RunState = RuntimeState.Status.Killed;
+            }
         }
         public void llDerezObject(string id)
         {
@@ -3494,23 +5950,40 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (pusheeIsAvatar && pusheeAv != null)
             {
                 PhysicsActor pa = pusheeAv.PhysicsActor;
-                if (pa == null) return;
-                if (local != 0)
-                    appliedImpulse *= m_host.GetWorldRotation();
-                pa.AddForce(appliedImpulse, true);
+                if (pa != null)
+                {
+                    if (local != 0)
+                        appliedImpulse *= m_host.GetWorldRotation();
+                    pa.AddForce(appliedImpulse, true);
+                }
             }
             else if (pusheeOb != null)
             {
                 pusheeOb.ApplyImpulse(appliedImpulse, local != 0);
             }
+            PhySleep();   // Halcyon's, once a push is allowed (LSLSystemAPI.cs:6055)
         }
         public void llSetDamage(float damage)
         {
             if (m_host == null) return;
-            SceneObjectGroup group = m_host.ParentGroup;
-            if (group == null) return;
-            group.Damage = Math.Max(damage, 0f);
+            PrimSetDamage(m_host, damage);
         }
+
+        /// <summary>
+        /// llSetDamage and PRIM_DAMAGE's amount: the object's damage (SceneObjectGroup.Damage, the root part's, which
+        /// the scene's collision damage reads), whichever prim names it. SL: "Collideable damage as set via
+        /// llSetDamage, PRIM_DAMAGE, and REZ_DAMAGE is limited to 100 maximum". Held at 0 below: the scene keeps -1
+        /// for "none" and deals only damage above 0, so it cannot heal. Not saved, as the scene keeps it.
+        /// </summary>
+        private static void PrimSetDamage(SceneObjectPart part, float damage)
+        {
+            SceneObjectGroup group = part.ParentGroup;
+            if (group == null) return;
+            group.Damage = Math.Clamp(damage, 0f, 100f);
+        }
+
+        /// <summary>PRIM_DAMAGE's amount: the object's damage, SL's 0.0 while none is set (the scene's -1).</summary>
+        private static float PrimDamage(SceneObjectPart part) => Math.Max(0f, part.ParentGroup?.Damage ?? 0f);
         public void llModifyLand(int action, int brush)
         {
             // Faithful port from Halcyon.
@@ -3528,9 +6001,67 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
             }
         }
-        public void iwSetGround(int x1, int y1, int x2, int y2, float height) { /* ITerrainModule.SetTerrain not available in Legion */ }
-        public int llCheckRezError(Vector3 pos, int isTemp, int landImpact) { /* InWorldz Scene.CheckRezError not in OpenSim */ return 0; }
-        public int iwCheckRezError(Vector3 pos, int isTemp, int landImpact) { /* InWorldz Scene.CheckRezError not in OpenSim */ return 0; }
+        /// <summary>Real now - the heightmap over the rectangle, where the owner may terraform, then a taint (the door osSetTerrainHeight/osTerrainFlush share).</summary>
+        /// <summary>
+        /// Halcyon's TerrainModule.SetTerrain rule (TerrainModule.cs:655-688, :610-641), silent to the script
+        /// as there: a height outside 0..1024 or a corner outside the region changes nothing; a god sets any cell; anyone else
+        /// the cells they may terraform, each held within the estate's raise/lower limits of the baked terrain, as NGC core
+        /// holds the viewer's brush (TerrainModule.LimitChannelChanges against Scene.Bakedmap).
+        /// </summary>
+        public void iwSetGround(int x1, int y1, int x2, int y2, float height)
+        {
+            if (World?.Heightmap == null || m_host == null) return;
+            if (!(height >= 0.0f && height <= 1024.0f)) return;
+            int sx = Math.Min(x1, x2), ex = Math.Max(x1, x2), sy = Math.Min(y1, y2), ey = Math.Max(y1, y2);
+            if (sx < 0 || sy < 0 || ex >= (int)World.RegionInfo.RegionSizeX || ey >= (int)World.RegionInfo.RegionSizeY) return;
+
+            UUID owner = m_host.OwnerID;
+            bool god = World.Permissions.IsGod(owner);
+            ITerrainChannel baked = god ? null : World.Bakedmap;
+            RegionSettings rs = World.RegionInfo.RegionSettings;
+            float lower = (float)rs.TerrainLowerLimit, raise = (float)rs.TerrainRaiseLimit;
+            bool any = false;
+            for (int x = sx; x <= ex; x++) for (int y = sy; y <= ey; y++)
+            {
+                if (!god && !World.Permissions.CanTerraformLand(owner, new Vector3(x, y, 0))) continue;
+                float h = height;
+                if (baked != null)
+                {
+                    float b = baked[x, y];
+                    if (h - b > raise) h = b + raise;
+                    else if (h - b < lower) h = b + lower;
+                }
+                World.Heightmap[x, y] = h;
+                any = true;
+            }
+            if (any) World.RequestModuleInterface<ITerrainModule>()?.TaintTerrain();
+        }
+        public int llCheckRezError(Vector3 pos, int isTemp, int landImpact) => iwCheckRezError(pos, isTemp, landImpact);
+
+        // The IW_REZ_* values of Halcyon's compiler, which scripts compare against (DefaultConstants.cs). Halcyon's
+        // Scene.CheckRezError returned its own REZ_* codes, numbered differently, so there only IW_REZ_OK and
+        // IW_REZ_NOT_PERMITTED ever matched by name; Phlox answers in the scripts' numbering.
+        private const int IW_REZ_OK = 0, IW_REZ_NOT_PERMITTED = 1, IW_REZ_NO_LAND_PARCEL = 3, IW_REZ_PARCEL_LAND_IMPACT = 4;
+
+        /// <summary>
+        /// Could the owner rez <paramref name="landImpact"/> prims at <paramref name="pos"/>? Halcyon's Scene.CheckRezError
+        /// (Scene.cs:2341-2367), answered by the checks a rez itself goes through: no parcel there; the region's rez
+        /// permission (CanRezObject, asked with no prims as Halcyon asked it); the same permission asked with the prims the
+        /// rez would add (the prim-limit checks hang off it). IW_REZ_REGION_SCENIC and IW_REZ_REGION_LAND_IMPACT are never
+        /// returned: there are no scenic regions, and no region-wide total is checked apart from the parcels'. isTemp is
+        /// not used, as in Halcyon.
+        /// </summary>
+        public int iwCheckRezError(Vector3 pos, int isTemp, int landImpact)
+        {
+            if (World?.LandChannel?.GetLandObject(pos.X, pos.Y) == null) return IW_REZ_NO_LAND_PARCEL;
+            UUID owner = m_host.OwnerID;
+            if (!World.Permissions.CanRezObject(0, owner, pos)) return IW_REZ_NOT_PERMITTED;
+            if (landImpact > 0 && !World.Permissions.CanRezObject(landImpact, owner, pos)) return IW_REZ_PARCEL_LAND_IMPACT;
+            return IW_REZ_OK;
+        }
+        /// <summary>[YEngine] AutomaticLinkPermission, as YEngine reads it (PhloxEngine.AutomaticLinkPermission).</summary>
+        private bool AutomaticLinkPermission => m_ScriptEngine != null && m_ScriptEngine.AutomaticLinkPermission;
+
         public void llCreateLink(string target, int parent)
         {
             if (m_host?.ParentGroup == null) return;
@@ -3539,26 +6070,66 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             // Requires PERMISSION_CHANGE_LINKS
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
-            const int PERMISSION_CHANGE_LINKS = 0x80;
-            if ((item.PermsMask & PERMISSION_CHANGE_LINKS) == 0)
+            // With AutomaticLinkPermission neither check applies (YEngine LSL_Api.cs:4790).
+            if (!AutomaticLinkPermission && (item.PermsMask & PERMISSION_CHANGE_LINKS) == 0)
             {
-                ShoutError("llCreateLink: PERMISSION_CHANGE_LINKS not set");
+                // Halcyon's text (the SL wiki says only that an error is shouted).
+                ScriptShoutError("Script trying to link but PERMISSION_CHANGE_LINKS permission not set!");
                 ScriptSleep(1000);
                 return;
             }
+            // SL (wiki llCreateLink): "If the permission PERMISSION_CHANGE_LINKS is granted by anyone other
+            // than the owner, then when the function is called an error will be shouted". YEngine's text.
+            if (!AutomaticLinkPermission && item.PermsGranter != m_host.ParentGroup.OwnerID)
+            {
+                ShoutError("llCreateLink: PERMISSION_CHANGE_LINKS not set by script owner");
+                return;
+            }
 
-            if (!UUID.TryParse(target, out UUID targetUUID) || targetUUID == UUID.Zero) return;
+            // The region's edit permission on both objects, for the script's owner (who granted the permission above):
+            // linking edits both, so a link the region would not let the owner make by hand fails. Halcyon checks it
+            // (CanEditObject on the script's object and on the target) and fails silently - no error, no sleep; YEngine
+            // does not check it. A target that is not here or is attached is left to CreateLinkCore's error.
+            UUID editor = m_host.ParentGroup.OwnerID;
+            if (!World.Permissions.CanEditObject(m_host.ParentGroup.UUID, editor)) return;
+            if (UUID.TryParse(target, out UUID targetId) && targetId != UUID.Zero)
+            {
+                SceneObjectGroup targetGroup = World.GetSceneObjectPart(targetId)?.ParentGroup;
+                if (targetGroup != null && !targetGroup.IsAttachment
+                    && !World.Permissions.CanEditObject(targetGroup.UUID, editor))
+                    return;
+            }
+
+            string failure = CreateLinkCore(target, parent);
+            if (failure != null) ShoutError("llCreateLink: " + failure);
+        }
+
+        /// <summary>
+        /// llCreateLink after its PERMISSION_CHANGE_LINKS check - the door osForceCreateLink takes (OSSL_Api.cs:2784-2789 calls the same split, m_LSL_Api.CreateLink).
+        /// SL's conditions - "target must be modifiable and have the same owner. This object must also be
+        /// modifiable." - with modify read from each root's OwnerMask as Halcyon and YEngine read it. Returns why it
+        /// did not link (llCreateLink shouts it, as SL does; osForceCreateLink stays silent, as YEngine's CreateLink),
+        /// or null.
+        /// </summary>
+        private string CreateLinkCore(string target, int parent)
+        {
+            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsAttachment) return null;
+            const string noTarget = "the target is not a prim in this region, or is attached to an avatar";
+            if (!UUID.TryParse(target, out UUID targetUUID) || targetUUID == UUID.Zero) return noTarget;
             SceneObjectPart targetPart = World?.GetSceneObjectPart(targetUUID);
-            if (targetPart?.ParentGroup == null) return;
-            if (targetPart.ParentGroup.IsAttachment) return;
+            if (targetPart?.ParentGroup == null) return noTarget;
+            if (targetPart.ParentGroup.IsAttachment) return noTarget;
 
-            // Both objects must have the same owner
-            if (m_host.OwnerID != targetPart.OwnerID) return;
+            const uint modify = (uint)OpenSim.Framework.PermissionMask.Modify;
+            if (m_host.ParentGroup.OwnerID != targetPart.ParentGroup.OwnerID
+                || (m_host.ParentGroup.RootPart.OwnerMask & modify) == 0
+                || (targetPart.ParentGroup.RootPart.OwnerMask & modify) == 0)
+                return "this object and the target must both be modifiable and have the same owner";
 
             SceneObjectGroup group1 = (parent != 0) ? m_host.ParentGroup : targetPart.ParentGroup;
             SceneObjectGroup group2 = (parent != 0) ? targetPart.ParentGroup : m_host.ParentGroup;
 
-            if (group1 == group2) return; // already in same linkset
+            if (group1 == group2) return null; // already in same linkset
 
             // Link group2 into group1 — group2 ceases to exist as a separate object
             group1.LinkToGroup(group2);
@@ -3568,6 +6139,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             group1.ScheduleGroupForFullUpdate();
 
             ScriptSleep(1000);
+            return null;
         }
 
         public void llBreakLink(int linknum)
@@ -3578,34 +6150,67 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             // Requires PERMISSION_CHANGE_LINKS
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
-            const int PERMISSION_CHANGE_LINKS = 0x80;
-            if ((item.PermsMask & PERMISSION_CHANGE_LINKS) == 0)
+            if (!AutomaticLinkPermission && (item.PermsMask & PERMISSION_CHANGE_LINKS) == 0)   // as YEngine, LSL_Api.cs:4868
             {
-                ShoutError("llBreakLink: PERMISSION_CHANGE_LINKS not set");
+                ScriptShoutError("llBreakLink: PERMISSION_CHANGE_LINKS not set");
                 ScriptSleep(1000);
                 return;
             }
 
+            BreakLinkCore(linknum);
+        }
+
+        /// <summary>llBreakLink after its PERMISSION_CHANGE_LINKS check - the door osForceBreakLink takes (OSSL_Api.cs:2792-2797).</summary>
+        private void BreakLinkCore(int linknum)
+        {
+            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsAttachment) return;
             SceneObjectGroup parentGroup = m_host.ParentGroup;
 
-            if (linknum == 1) // LINK_ROOT — break all children off, leave root alone
+            if (linknum == LINK_ROOT)
             {
+                // Take the root out and keep the rest linked (Halcyon :4858-4877; SL: the other prims stay linked).
+                // Every child is delinked, then the others are linked again to the first of them, its new root.
                 var parts = new List<SceneObjectPart>(parentGroup.Parts);
                 parts.RemoveAll(p => p.LocalId == parentGroup.RootPart.LocalId);
                 if (parts.Count == 0) return;
+                parts.Sort((a, b) => a.LinkNum.CompareTo(b.LinkNum));
+                var groups = new List<SceneObjectGroup>();
                 foreach (SceneObjectPart p in parts)
-                    parentGroup.DelinkFromGroup(p, true);
+                {
+                    SceneObjectGroup g = parentGroup.DelinkFromGroup(p, true);
+                    if (g != null) groups.Add(g);
+                }
                 parentGroup.TriggerScriptChangedEvent(Changed.LINK);
+                if (groups.Count > 1)
+                {
+                    SceneObjectGroup newRoot = groups[0];
+                    for (int i = 1; i < groups.Count; i++)
+                        newRoot.LinkToGroup(groups[i]);
+                    newRoot.TriggerScriptChangedEvent(Changed.LINK);
+                    newRoot.HasGroupChanged = true;
+                    newRoot.ScheduleGroupForFullUpdate();
+                }
                 return;
             }
 
-            SceneObjectPart childPrim = null;
-            if (linknum == -1) // LINK_THIS
-                childPrim = m_host;
-            else if (linknum > 1)
-                childPrim = parentGroup.GetLinkNumPart(linknum);
-            else
-                return; // invalid
+            // SL's link constants, handled as YEngine does (LSL_Api.BreakLink): LINK_THIS is
+            // the script's own prim; LINK_SET, LINK_ALL_OTHERS and LINK_ALL_CHILDREN name no single
+            // prim; anything below LINK_THIS is invalid. (-1 is LINK_SET, not LINK_THIS.)
+            if (linknum < LINK_THIS) return;
+            SceneObjectPart childPrim;
+            switch (linknum)
+            {
+                case LINK_SET:
+                case LINK_ALL_OTHERS:
+                case LINK_ALL_CHILDREN:
+                    return;
+                case LINK_THIS:
+                    childPrim = m_host;
+                    break;
+                default:
+                    childPrim = parentGroup.GetLinkNumPart(linknum);
+                    break;
+            }
 
             if (childPrim == null) return;
             if (childPrim.LocalId == parentGroup.RootPart.LocalId) return; // can't break root this way
@@ -3618,6 +6223,33 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             if (m_host?.ParentGroup == null) return;
             if (m_host.ParentGroup.IsAttachment) return;
+
+            // SL wiki llBreakAllLinks: "the script must request the PERMISSION_CHANGE_LINKS permission with
+            // llRequestPermissions and it must be granted by the owner"; without it "the script will shout an error on
+            // DEBUG_CHANNEL and the operation fails (but the script continues to run)"; "If PERMISSION_CHANGE_LINKS is
+            // granted by anyone other than the owner, then when the function is called an error will be shouted".
+            // YEngine LSL_Api.cs:4963-4975 checks it unless AutomaticLinkPermission, as Phlox's llBreakLink
+            // and llCreateLink do; their texts and forms. Halcyon had no check.
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null) return;
+            if (!AutomaticLinkPermission && (item.PermsMask & PERMISSION_CHANGE_LINKS) == 0)
+            {
+                ScriptShoutError("llBreakAllLinks: PERMISSION_CHANGE_LINKS not set");
+                return;
+            }
+            if (!AutomaticLinkPermission && item.PermsGranter != m_host.ParentGroup.OwnerID)
+            {
+                ShoutError("llBreakAllLinks: PERMISSION_CHANGE_LINKS not set by script owner");
+                return;
+            }
+
+            BreakAllLinksCore();
+        }
+
+        /// <summary>llBreakAllLinks after its permission checks - the door osForceBreakAllLinks takes (OSSL_Api.cs:2800-2805 calls BreakAllLinks).</summary>
+        private void BreakAllLinksCore()
+        {
+            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsAttachment) return;
 
             SceneObjectGroup parentGroup = m_host.ParentGroup;
             if (parentGroup.PrimCount < 2) return;
@@ -3637,34 +6269,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         // ── Primitive params implementation ────────────────────────────────────────
 
-        // PRIM_* constants (match LSL_Constants.cs)
-        private const int PRIM_MATERIAL     = 2;
-        private const int PRIM_POSITION     = 6;
-        private const int PRIM_SIZE         = 7;
-        private const int PRIM_TYPE         = 9;
-        private const int PRIM_TEXTURE      = 17;
-        private const int PRIM_COLOR        = 18;
-        private const int PRIM_BUMP_SHINY   = 19;
-        private const int PRIM_FULLBRIGHT   = 20;
-        private const int PRIM_FLEXIBLE     = 21;
-        private const int PRIM_POINT_LIGHT  = 23;
-        private const int PRIM_NAME         = 27;
-        private const int PRIM_DESC         = 28;
-        private const int PRIM_GLOW         = 25;
-        private const int PRIM_ROT_LOCAL    = 29;
-        private const int PRIM_LINK_TARGET  = 34;
-        private const int PRIM_ALPHA_MODE   = 38;
-        private const int PRIM_RENDER_MATERIAL = 42;
-        private const int PRIM_GLTF_BASE_COLOR = 48;
-        private const int PRIM_GLTF_NORMAL     = 49;
-        private const int PRIM_GLTF_METALLIC_ROUGHNESS = 50;
-        private const int PRIM_GLTF_EMISSIVE   = 51;
 
-        // PRIM_GLTF alpha mode sub-constants
-        private const int PRIM_GLTF_ALPHA_MODE_OPAQUE = 0;
-        private const int PRIM_GLTF_ALPHA_MODE_BLEND  = 1;
-        private const int PRIM_GLTF_ALPHA_MODE_MASK   = 2;
-        private const int ALL_SIDES         = -1;
 
         public void llSetPrimitiveParams(LSLList rules)
         {
@@ -3676,45 +6281,111 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public LSLList llGetPrimitiveParams(LSLList parms)
         {
             if (m_host == null) return new LSLList();
-            return GetPrimParams(m_host, parms);
+            return GetPrimParams(new[] { m_host }, new List<ScenePresence>(), parms);
         }
 
         public void llSetLinkPrimitiveParams(int linknumber, LSLList rules)
         {
             if (m_host == null) return;
-            foreach (var part in GetLinkParts(linknumber))
-                SetPrimParams(part, rules);
+            SetPrimParams(GetLinkParts(linknumber), GetLinkSitters(linknumber), rules);
             ScriptSleep(200);
         }
 
         public void llSetLinkPrimitiveParamsFast(int linknumber, LSLList rules)
         {
             if (m_host == null) return;
-            foreach (var part in GetLinkParts(linknumber))
-                SetPrimParams(part, rules);
+            SetPrimParams(GetLinkParts(linknumber), GetLinkSitters(linknumber), rules);
             // no sleep for Fast variant
         }
 
         public LSLList llGetLinkPrimitiveParams(int linknumber, LSLList rules)
         {
             if (m_host == null) return new LSLList();
-            var result = new LSLList();
-            foreach (var part in GetLinkParts(linknumber))
-                result += GetPrimParams(part, rules);
+            return GetPrimParams(GetLinkParts(linknumber), GetLinkSitters(linknumber), rules);
+        }
+
+        /// <summary>
+        /// The one link-number resolver, used by llMessageLinked and every function that takes a link number
+        /// (Halcyon LSLSystemAPI.GetLinkParts). LINK_SET: every prim, the script's own included. LINK_ALL_OTHERS:
+        /// every prim but the script's own. LINK_ALL_CHILDREN: every prim but the root. LINK_THIS: the script's
+        /// prim. LINK_ROOT and 0: the root (0 is Halcyon's "other LINK_ROOT linknum", and an unlinked prim's own
+        /// number). A positive number: that link. An unknown negative number or one past the last prim selects
+        /// nothing (SL: an invalid link number does nothing).
+        /// </summary>
+        private IEnumerable<SceneObjectPart> GetLinkParts(int linknumber)
+        {
+            SceneObjectGroup group = m_host?.ParentGroup;
+            if (group == null) yield break;
+            switch (linknumber)
+            {
+                case LINK_SET:
+                    foreach (var p in group.Parts.OrderBy(p => p.LinkNum)) yield return p;
+                    break;
+                case LINK_ALL_OTHERS:
+                    foreach (var p in group.Parts.OrderBy(p => p.LinkNum)) if (p != m_host) yield return p;
+                    break;
+                case LINK_ALL_CHILDREN:
+                    foreach (var p in group.Parts.OrderBy(p => p.LinkNum)) if (p != group.RootPart) yield return p;
+                    break;
+                case LINK_THIS:
+                    yield return m_host;
+                    break;
+                case 0:
+                case LINK_ROOT:
+                    yield return group.RootPart;
+                    break;
+                default:
+                    if (linknumber > 1 && linknumber <= group.PrimCount)
+                    {
+                        var t = group.GetLinkNumPart(linknumber);
+                        if (t != null) yield return t;
+                    }
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// The avatars a link number selects (Halcyon GetLinkParts with includeAvatars). Seated avatars take the
+        /// link numbers after the last prim in the order they sat, and close up when one stands
+        /// (Halcyon SceneObjectGroup.AddSeatedAvatar, RecalcSeatedAvatarLinks); the group's sitting list keeps
+        /// that order. LINK_SET, LINK_ALL_OTHERS and LINK_ALL_CHILDREN take in every sitter; a number past the
+        /// last prim is that sitter; every other selector is prims only. Only the prim-params functions and
+        /// llGetLinkKey/llGetLinkName reach avatars; llMessageLinked and the rest stay on GetLinkParts.
+        /// </summary>
+        private List<ScenePresence> GetLinkSitters(int linknumber)
+        {
+            var result = new List<ScenePresence>();
+            SceneObjectGroup group = m_host?.ParentGroup;
+            if (group == null) return result;
+            switch (linknumber)
+            {
+                case LINK_SET:
+                case LINK_ALL_OTHERS:
+                case LINK_ALL_CHILDREN:
+                    result.AddRange(group.GetSittingAvatars());
+                    break;
+                default:
+                    if (linknumber > group.PrimCount)
+                    {
+                        var sitters = group.GetSittingAvatars();
+                        int i = linknumber - group.PrimCount - 1;
+                        if (i < sitters.Count) result.Add(sitters[i]);
+                    }
+                    break;
+            }
             return result;
         }
 
-        private IEnumerable<SceneObjectPart> GetLinkParts(int linknumber)
+        /// <summary>The resolver's prim when it selects exactly one, else null (Halcyon llGetLinkKey's rule).</summary>
+        private SceneObjectPart GetSingleLinkPart(int linknumber)
         {
-            SceneObjectGroup group = m_host.ParentGroup;
-            if (group == null) yield break;
-            if (linknumber == -4) { yield return m_host; yield break; }
-            if (linknumber == -3) { foreach (var p in group.Parts) yield return p; yield break; }
-            if (linknumber == -1) { foreach (var p in group.Parts) if (p.LocalId != m_host.LocalId) yield return p; yield break; }
-            if (linknumber == -2) { foreach (var p in group.Parts) if (p.LinkNum > 1) yield return p; yield break; }
-            if (linknumber == 1) { yield return group.RootPart; yield break; }
-            if (linknumber > 1) { var t = group.GetLinkNumPart(linknumber); if (t != null) yield return t; yield break; }
-            yield return m_host;
+            SceneObjectPart found = null;
+            foreach (var p in GetLinkParts(linknumber))
+            {
+                if (found != null) return null;
+                found = p;
+            }
+            return found;
         }
 
         // ── Helpers: texture/inventory lookup (ported from Halcyon) ───────────
@@ -3726,8 +6397,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         private UUID KeyOrName(string k)
         {
             if (string.IsNullOrEmpty(k)) return UUID.Zero;
-            if (UUID.TryParse(k, out UUID id)) return id;
-            // Not a UUID — search the host prim's inventory for a matching item name.
+            // The prim's inventory first, then a key (Halcyon :692-717): "no-one can name an inventory item with a
+            // UUID string and have this code return the UUID in the name instead of the inventory item's UUID".
             lock (m_host.TaskInventory)
             {
                 foreach (var kvp in m_host.TaskInventory)
@@ -3736,19 +6407,43 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         return kvp.Value.AssetID;
                 }
             }
-            return UUID.Zero;
+            return UUID.TryParse(k, out UUID id) ? id : UUID.Zero;
+        }
+
+        /// <summary>
+        /// A texture as PRIM_TEXTURE names it. SL wiki: "a texture in the inventory of the prim this
+        /// script is in or a UUID of a texture". The script's prim's texture item of that name first (Halcyon's
+        /// KeyOrName order: "no-one can name an inventory item with a UUID string" and get the named key), then a UUID.
+        /// Only a texture item matches, as SL's "it is not a texture" rule and YEngine's
+        /// GetAssetIdFromItemName(m_host, texture, AssetType.Texture). UUID.Zero when neither.
+        /// </summary>
+        private UUID TextureKeyOrName(string k)
+        {
+            if (string.IsNullOrEmpty(k)) return UUID.Zero;
+            lock (m_host.TaskInventory)
+            {
+                foreach (var kvp in m_host.TaskInventory)
+                {
+                    if (kvp.Value.Name == k && kvp.Value.Type == (int)AssetType.Texture)
+                        return kvp.Value.AssetID;
+                }
+            }
+            return UUID.TryParse(k, out UUID id) ? id : UUID.Zero;
         }
 
         /// <summary>
         /// Reverse lookup: given an asset UUID, return the inventory item name if it
         /// exists in the host prim's task inventory; otherwise string.Empty.
         /// </summary>
-        private string InventoryName(UUID assetID)
+        private string InventoryName(UUID assetID) => InventoryName(m_host, assetID);
+
+        /// <summary>The same reverse lookup in the given prim's task inventory.</summary>
+        private static string InventoryName(SceneObjectPart part, UUID assetID)
         {
             if (assetID == UUID.Zero) return string.Empty;
-            lock (m_host.TaskInventory)
+            lock (part.TaskInventory)
             {
-                foreach (var kvp in m_host.TaskInventory)
+                foreach (var kvp in part.TaskInventory)
                 {
                     if (kvp.Value.AssetID == assetID)
                         return kvp.Value.Name;
@@ -3760,7 +6455,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// <summary>
         /// True if the permission mask includes full modify/copy/transfer.
         /// </summary>
-        private bool IsFullPerm(uint permsMask)
+        private static bool IsFullPerm(uint permsMask)
         {
             const uint full = (uint)(OpenSim.Framework.PermissionMask.Modify
                                    | OpenSim.Framework.PermissionMask.Copy
@@ -3768,7 +6463,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return (permsMask & full) == full;
         }
 
-        // ── Texture workhorses (ported from Halcyon, adapted to Legion SOP API) ──
+        /// <summary>
+        /// The one rule for whether a script may see an asset key. The key shows only when
+        /// the owner's permissions on it are copy, modify and transfer; otherwise NULL_KEY. Inventory keys
+        /// (llGetInventoryKey, iwGetLinkInventoryKey) pass the item's CurrentPermissions; texture and material keys
+        /// (ConditionalTextureNameOrUUID) pass the prim's OwnerMask, as Halcyon's IsFullPerm(part.OwnerMask).
+        /// </summary>
+        private static string AssetKeyIfFullPerm(UUID assetID, uint ownerPerms)
+            => assetID != UUID.Zero && IsFullPerm(ownerPerms) ? assetID.ToString() : UUID.Zero.ToString();
+
+        // ── Texture workhorses (ported from Halcyon, adapted to this tree's SOP API) ──
 
         /// <summary>Apply a texture UUID to a face or all faces of a part.</summary>
         private void SetTexture(SceneObjectPart part, string texture, int face)
@@ -3818,7 +6522,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             float r = Math.Max(0f, Math.Min(1f, color.X));
             float g = Math.Max(0f, Math.Min(1f, color.Y));
             float b = Math.Max(0f, Math.Min(1f, color.Z));
-            // Legion's SOP already has SetFaceColorAlpha. Passing null alpha preserves per-face alpha.
+            // This tree's SOP already has SetFaceColorAlpha. Passing null alpha preserves per-face alpha.
             part.SetFaceColorAlpha(face, new Vector3(r, g, b), null);
             part.SendFullUpdateToAllClients();
         }
@@ -3856,6 +6560,146 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     tex.DefaultTexture.RGBA = c;
                 }
                 part.UpdateTextureEntry(tex);
+            }
+        }
+
+        /// <summary>
+        /// llGetAlpha and IW_PRIM_ALPHA's read (Halcyon GetAlpha): a face's alpha; for ALL_SIDES the sum over the
+        /// faces (SL: llGetAlpha(ALL_SIDES) is the sum, so scripts compare it with llGetNumberOfSides()); 0 for a
+        /// face that does not exist.
+        /// </summary>
+        private static float GetAlpha(SceneObjectPart part, int face)
+        {
+            Primitive.TextureEntry tex = part?.Shape.Textures;
+            if (tex == null) return 0f;
+            int sides = part.GetNumberOfSides();
+            if (face == ALL_SIDES)
+            {
+                double sum = 0;
+                for (int i = 0; i < sides; i++)
+                    sum += tex.GetFace((uint)i).RGBA.A;
+                return (float)sum;
+            }
+            if (face >= 0 && face < sides)
+                return tex.GetFace((uint)face).RGBA.A;
+            return 0f;
+        }
+
+        /// <summary>A float list value: a float, or an integer taken as one (SL converts it).</summary>
+        private static bool PrimFloat(object value, out float f)
+        {
+            switch (value)
+            {
+                case float v: f = v; return true;
+                case double d: f = (float)d; return true;
+                case int i: f = i; return true;
+                default: f = 0f; return false;
+            }
+        }
+
+        /// <summary>A 0..1 colour component as the material's byte, rounded as OpenSim's LSL_Api does.</summary>
+        private static byte ColorByte(float c) => (byte)(255f * Math.Clamp(c, 0f, 1f) + 0.5f);
+
+        /// <summary>
+        /// A PRIM_NORMAL / PRIM_SPECULAR map: the texture of that name in this prim's inventory, else a key; an empty
+        /// string or NULL_KEY is no map. False for anything else (Halcyon InventoryKey then UUID.TryParse; OpenSim's
+        /// LSL_Api the same), and the rule then changes nothing.
+        /// </summary>
+        private bool PrimMaterialMap(object value, out UUID map)
+        {
+            map = UUID.Zero;
+            string name = value?.ToString();
+            if (value is Vector3 || value is Quaternion || value is int || value is float) return false;
+            if (string.IsNullOrEmpty(name)) return true;
+            map = OpenSim.Region.Framework.Scenes.Scripting.ScriptUtils.GetAssetIdFromItemName(m_host, name, (int)AssetType.Texture);
+            return map != UUID.Zero || UUID.TryParse(name, out map);
+        }
+
+        /// <summary>
+        /// PRIM_NORMAL, PRIM_SPECULAR and PRIM_ALPHA_MODE storage, the scene's own: each face's MaterialID names a
+        /// FaceMaterial kept by the region's IMaterialsModule, exactly as OpenSim's LSL_Api keeps them
+        /// (SetFaceMaterialNormalMap / SetFaceMaterialSpecMap / SetFaceMaterialAlphaMode), so a YEngine script and a
+        /// Phlox script see the same material. <paramref name="edit"/> changes a copy of the face's material, or a
+        /// new one when the face has none unless <paramref name="noneStaysNone"/> (a cleared map, or the default
+        /// blend mode, on a face with no material). The module gives an edited material its id by content, and none
+        /// for one that is all defaults. A face that does not exist changes nothing. With no materials module in the
+        /// region nothing changes, as in OpenSim.
+        /// </summary>
+        private void PrimEditFaceMaterials(SceneObjectPart part, int face, bool noneStaysNone, Action<FaceMaterial> edit)
+        {
+            IMaterialsModule materials = World?.RequestModuleInterface<IMaterialsModule>();
+            if (materials == null || part?.ParentGroup == null || part.ParentGroup.IsDeleted) return;
+
+            Primitive.TextureEntry tex = part.Shape.Textures;
+            int sides = part.GetNumberOfSides();
+            bool changed = false;
+
+            bool EditFace(int f)
+            {
+                Primitive.TextureEntryFace texface = tex.CreateFace((uint)f);
+                UUID oldID = texface.MaterialID;
+                if (oldID == UUID.Zero && noneStaysNone) return false;
+                FaceMaterial mat = (oldID == UUID.Zero ? null : materials.GetMaterialCopy(oldID)) ?? new FaceMaterial();
+                edit(mat);
+                UUID newID = materials.AddNewMaterial(mat);
+                if (newID == oldID)
+                {
+                    materials.RemoveMaterial(newID); // AddNewMaterial counted this face a second time
+                    return false;
+                }
+                texface.MaterialID = newID;
+                materials.RemoveMaterial(oldID);
+                return true;
+            }
+
+            if (face == ALL_SIDES)
+                for (int f = 0; f < sides; f++) changed |= EditFace(f);
+            else if (face >= 0 && face < sides)
+                changed = EditFace(face);
+            if (!changed) return;
+
+            part.Shape.TextureEntry = tex.GetBytes(9);
+            part.TriggerScriptChangedEvent(Changed.TEXTURE);
+            part.ScheduleFullUpdate();
+            part.ParentGroup.HasGroupChanged = true;
+        }
+
+        /// <summary>
+        /// One face's PRIM_NORMAL, PRIM_SPECULAR or PRIM_ALPHA_MODE read from the scene's material store, as OpenSim's
+        /// LSL_Api reads it (getLSLFaceMaterial). A face with no material reads SL's defaults: PRIM_NORMAL
+        /// [ NULL_KEY, &lt;1,1,0&gt;, ZERO_VECTOR, 0.0 ], PRIM_SPECULAR the same then &lt;1,1,1&gt;, 51, 0, and
+        /// PRIM_ALPHA_MODE [ PRIM_ALPHA_MODE_BLEND, 0 ].
+        /// </summary>
+        private void GetFaceMaterial(List<object> result, int code, SceneObjectPart part, Primitive.TextureEntryFace texface)
+        {
+            IMaterialsModule materials = World?.RequestModuleInterface<IMaterialsModule>();
+            UUID id = materials == null ? UUID.Zero : texface.MaterialID;
+            FaceMaterial mat = id == UUID.Zero ? null : materials.GetMaterial(id);
+            mat ??= new FaceMaterial();
+
+            switch (code)
+            {
+                case PRIM_NORMAL:
+                    result.Add(ConditionalTextureNameOrUUID(part, mat.NormalMapID));
+                    result.Add(new Vector3(mat.NormalRepeatX, mat.NormalRepeatY, 0f));
+                    result.Add(new Vector3(mat.NormalOffsetX, mat.NormalOffsetY, 0f));
+                    result.Add(mat.NormalRotation);
+                    break;
+                case PRIM_SPECULAR:
+                    const float scale = 1f / 255f;
+                    result.Add(ConditionalTextureNameOrUUID(part, mat.SpecularMapID));
+                    result.Add(new Vector3(mat.SpecularRepeatX, mat.SpecularRepeatY, 0f));
+                    result.Add(new Vector3(mat.SpecularOffsetX, mat.SpecularOffsetY, 0f));
+                    result.Add(mat.SpecularRotation);
+                    result.Add(new Vector3(mat.SpecularLightColorR * scale, mat.SpecularLightColorG * scale,
+                        mat.SpecularLightColorB * scale));
+                    result.Add((int)mat.SpecularLightExponent);
+                    result.Add((int)mat.EnvironmentIntensity);
+                    break;
+                case PRIM_ALPHA_MODE:
+                    result.Add((int)mat.DiffuseAlphaMode);
+                    result.Add((int)mat.AlphaMaskCutoff);
+                    break;
             }
         }
 
@@ -3968,10 +6812,1222 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
         }
 
+        /// <summary>SL's floating-text limit: 254 bytes of UTF-8 (wiki llSetText).</summary>
+        private const int MaxFloatingTextBytes = 254;
+
+        /// <summary>
+        /// Floating text on one prim, for llSetText and PRIM_TEXT (Halcyon PrimSetText): the color and alpha are
+        /// clamped to 0..1, and the text is cut to SL's 254 bytes of UTF-8, a multibyte character that would be
+        /// split dropped whole ("If the string is longer it will be truncated to 254 bytes, and any multibyte
+        /// characters getting split will be removed entirely.").
+        /// </summary>
+        private static void PrimSetText(SceneObjectPart part, string text, Vector3 color, float alpha)
+        {
+            if (part == null) return;
+            text ??= string.Empty;
+            byte[] utf8 = Encoding.UTF8.GetBytes(text);
+            if (utf8.Length > MaxFloatingTextBytes)
+            {
+                int cut = MaxFloatingTextBytes;
+                while (cut > 0 && (utf8[cut] & 0xC0) == 0x80) cut--; // back to the start of the split character
+                text = Encoding.UTF8.GetString(utf8, 0, cut);
+            }
+            color = new Vector3(Math.Clamp(color.X, 0f, 1f), Math.Clamp(color.Y, 0f, 1f), Math.Clamp(color.Z, 0f, 1f));
+            part.SetText(text, color, Math.Clamp(alpha, 0f, 1f));
+            if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
+        }
+
+        /// <summary>
+        /// PRIM_POSITION, PRIM_POS_LOCAL and llSetPos on one prim (Halcyon SetPos(part, v, true) and SetPosAdjust): a root moves
+        /// the object (an attachment's root, its offset from the attach point); a child takes the vector as its offset from
+        /// the root. Halcyon's caps: an unattached root moves at most 10 m from where it is (SL: "The distance is
+        /// capped to 10m per PRIM_POSITION call"), an attached root at most 3.5 m from the attach point, a child of
+        /// an attachment at most 54 m from the root and any other child at most 256 m; a longer move stops at the
+        /// cap along the same line.
+        /// </summary>
+        private static void SetPrimLocalPos(SceneObjectPart part, Vector3 target)
+        {
+            SceneObjectGroup group = part.ParentGroup;
+            if (group == null || group.IsDeleted || group.inTransit) return;
+
+            bool root = part == group.RootPart;
+            Vector3 anchor = root && !group.IsAttachment ? part.AbsolutePosition : Vector3.Zero;
+            float limit = root ? (group.IsAttachment ? 3.5f : 10f) : (group.IsAttachment ? 54f : 256f);
+            float dist = Vector3.Distance(target, anchor);
+            if (dist > limit) target = (target - anchor) * (limit / dist) + anchor;
+
+            if (root) group.UpdateGroupPosition(target);
+            else
+            {
+                part.UpdateOffSet(target);
+                group.HasGroupChanged = true;
+            }
+        }
+
+        /// <summary>
+        /// PRIM_POS_LOCAL read (Halcyon GetPartLocalPos; SL llGetLocalPos): an unattached root returns its region
+        /// position, an attachment's root its offset from the attach point, a child its offset from the root.
+        /// </summary>
+        private static Vector3 PartLocalPos(SceneObjectPart part)
+        {
+            SceneObjectGroup group = part.ParentGroup;
+            if (group == null || part != group.RootPart) return part.OffsetPosition;
+            return group.IsAttachment ? part.AttachedPos : part.AbsolutePosition;
+        }
+
+        /// <summary>
+        /// PRIM_ROTATION read (Halcyon GetPartRot): the prim's region rotation. On an attachment's root it is the
+        /// wearer's rotation, or the camera's in mouselook (SL: "PRIM_ROTATION incorrectly reports the avatars
+        /// rotation when called on the root of an attached object"). A seated wearer's is its region rotation, not
+        /// the one relative to its seat that the scene keeps (SL llGetRootRotation: "Returns an accurate facing for
+        /// Avatars seated"; OpenSim's LSL_Api llGetRootRotation reads GetWorldRotation too).
+        /// </summary>
+        private Quaternion PartRegionRot(SceneObjectPart part)
+        {
+            SceneObjectGroup group = part.ParentGroup;
+            if (group != null && part == group.RootPart && group.IsAttachment)
+            {
+                ScenePresence avatar = World?.GetScenePresence(group.AttachedAvatar);
+                if (avatar != null)
+                    return (avatar.AgentControlFlags & 0x00020000u) != 0  // AGENT_CONTROL_MOUSELOOK
+                        ? avatar.CameraRotation
+                        : avatar.GetWorldRotation();
+                return group.GroupRotation;
+            }
+            return part.GetWorldRotation();
+        }
+
+        /// <summary>
+        /// PRIM_PHYSICS_SHAPE_TYPE on one prim (Halcyon: PreferredPhysicsShape, only for a type it defines). A type
+        /// other than PRIM_PHYSICS_SHAPE_PRIM, _NONE or _CONVEX changes nothing. PRIM_PHYSICS_SHAPE_NONE is refused on
+        /// a root (SL: "This cannot be applied to the root prim or avatars") and the root keeps its type; the scene
+        /// would otherwise put its default in. The scene's setter rebuilds or drops the prim's physics actor, and
+        /// the properties reply carries the new type to viewers.
+        /// </summary>
+        private static void PrimSetPhysicsShapeType(SceneObjectPart part, int type)
+        {
+            if (type != PRIM_PHYSICS_SHAPE_PRIM && type != PRIM_PHYSICS_SHAPE_NONE && type != PRIM_PHYSICS_SHAPE_CONVEX)
+                return;
+            SceneObjectGroup group = part.ParentGroup;
+            if (group == null || group.IsDeleted) return;
+            if (type == PRIM_PHYSICS_SHAPE_NONE && part == group.RootPart) return;
+            if (part.PhysicsShapeType == (byte)type) return;
+            part.PhysicsShapeType = (byte)type;
+            group.HasGroupChanged = true;
+            part.SendPropertiesToAllClients();
+        }
+
+        /// <summary>
+        /// PRIM_SLICE on one prim: the shape's advanced cut (SL: "a shape attribute, equivalent to advanced_cut"), through
+        /// the scene's own UpdateSlice, which OpenSim's LSL_Api uses too. That is the slice PRIM_TYPE writes on a box,
+        /// cylinder or prism (PathBegin / PathEnd), and the dimple of a sphere or the profile cut of a torus, tube or
+        /// ring (ProfileBegin / ProfileEnd), so PRIM_TYPE reads those back. The scene keeps begin at least 0.02 below
+        /// end (SL: "x must be at least 0.05 smaller than y", with the wiki's note that "the difference can be as small
+        /// as 0.02"). A sculpt or mesh has no cut and is left alone, as Halcyon leaves every shape but box, cylinder and
+        /// prism.
+        /// </summary>
+        private void PrimSetSlice(SceneObjectPart part, Vector3 slice)
+        {
+            if (part.GetPrimType() == ScenePrimType.SCULPT) return;
+            part.UpdateSlice(slice.X, slice.Y);
+        }
+
+        /// <summary>
+        /// PRIM_SLICE read: where UpdateSlice writes for the prim's shape (the scene's own shape test); a sculpt or
+        /// mesh reads the full &lt;0, 1, 0&gt;.
+        /// </summary>
+        private static Vector3 PrimSlice(SceneObjectPart part)
+        {
+            PrimitiveBaseShape shape = part.Shape;
+            ScenePrimType type = part.GetPrimType();
+            if (type == ScenePrimType.SCULPT) return DEFAULT_SLICE_VEC;
+            bool profile = type == ScenePrimType.SPHERE || type == ScenePrimType.TORUS || type == ScenePrimType.TUBE
+                           || type == ScenePrimType.RING;
+            return profile
+                ? new Vector3(shape.ProfileBegin / 50000.0f, 1 - shape.ProfileEnd / 50000.0f, 0)
+                : new Vector3(shape.PathBegin / 50000.0f, 1 - shape.PathEnd / 50000.0f, 0);
+        }
+
+        /// <summary>
+        /// PRIM_PROJECTOR on one prim (SL's [texture, fov, focus, ambiance]; Halcyon has no rule), with OpenSim's
+        /// meaning for what SL leaves open (LSL_Api.SetPrimParams): the texture is a key or the name of a texture in
+        /// this prim; "" or NULL_KEY turns projection off; fov is held to 0..3, focus to -20..20 and ambiance to 0..1,
+        /// as osSetProjectionParams holds them. A name that is not a texture here is an error and changes nothing.
+        /// </summary>
+        private void PrimSetProjector(SceneObjectPart part, string texture, float fov, float focus, float ambiance)
+        {
+            UUID texID = UUID.Zero;
+            if (!string.IsNullOrEmpty(texture) && !UUID.TryParse(texture, out texID))
+            {
+                TaskInventoryItem item = FindInventoryItem(texture, (int)AssetType.Texture);
+                if (item == null)
+                {
+                    ShoutError($"Could not find texture '{texture}'");
+                    return;
+                }
+                texID = item.AssetID;
+            }
+
+            PrimitiveBaseShape shape = part.Shape;
+            if (texID != UUID.Zero)
+            {
+                shape.ProjectionEntry = true;
+                shape.ProjectionTextureUUID = texID;
+                shape.ProjectionFOV = Math.Clamp(fov, 0f, 3.0f);
+                shape.ProjectionFocus = Math.Clamp(focus, -20.0f, 20.0f);
+                shape.ProjectionAmbiance = Math.Clamp(ambiance, 0f, 1.0f);
+            }
+            else if (shape.ProjectionEntry)
+                shape.ProjectionEntry = false;
+            else
+                return;
+            ProjectionChanged(part);
+        }
+
+        /// <summary>
+        /// A prim's projection changed: saved with the object and sent to viewers in the shape's extra parameters (the
+        /// scene saves the projection fields only while projection is on).
+        /// </summary>
+        private static void ProjectionChanged(SceneObjectPart part)
+        {
+            if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
+            part.ScheduleFullUpdate();
+        }
+
+        /// <summary>
+        /// PRIM_PROJECTOR read (SL's [texture, fov, focus, ambiance]: "If the prim is not a projector the texture key
+        /// will be NULL_KEY"), with the texture as Phlox's other texture reads show it.
+        /// </summary>
+        private void PrimProjector(SceneObjectPart part, List<object> result)
+        {
+            PrimitiveBaseShape shape = part.Shape;
+            if (!shape.ProjectionEntry)
+            {
+                result.Add(UUID.Zero.ToString());
+                result.Add(0f);
+                result.Add(0f);
+                result.Add(0f);
+                return;
+            }
+            result.Add(ConditionalTextureNameOrUUID(part, shape.ProjectionTextureUUID));
+            result.Add(shape.ProjectionFOV);
+            result.Add(shape.ProjectionFocus);
+            result.Add(shape.ProjectionAmbiance);
+        }
+
+        /// <summary>
+        /// PRIM_REFLECTION_PROBE on one prim (SL): ambiance "Ranges from 0.0 to 100.0", clip_distance "Ranges from 0.0 to
+        /// 1024.0", and the PRIM_REFLECTION_PROBE_* flags, kept in the shape's ReflectionProbe as OpenSim's LSL_Api
+        /// keeps them (saved and sent in its extra parameters). FALSE removes the probe.
+        /// </summary>
+        private static void PrimSetReflectionProbe(SceneObjectPart part, bool active, float ambiance, float clip, int flags)
+        {
+            PrimitiveBaseShape shape = part.Shape;
+            bool changed;
+            if (active)
+            {
+                ambiance = Math.Clamp(ambiance, 0f, 100f);
+                clip = Math.Clamp(clip, 0f, 1024f);
+                changed = shape.ReflectionProbe is null;
+                shape.ReflectionProbe ??= new Primitive.ReflectionProbe();
+                changed |= shape.ReflectionProbe.Ambiance != ambiance || shape.ReflectionProbe.ClipDistance != clip
+                           || shape.ReflectionProbe.Flags != (byte)flags;
+                shape.ReflectionProbe.Ambiance = ambiance;
+                shape.ReflectionProbe.ClipDistance = clip;
+                shape.ReflectionProbe.Flags = (byte)flags;
+            }
+            else
+            {
+                changed = shape.ReflectionProbe is not null;
+                shape.ReflectionProbe = null;
+            }
+            if (!changed) return;
+            if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
+            part.ScheduleFullUpdate();
+        }
+
+        /// <summary>One prim's prim-params rules (llSetPrimitiveParams, osSetPrimitiveParams).</summary>
         private void SetPrimParams(SceneObjectPart part, LSLList rules)
         {
-            if (part == null || rules == null) return;
+            if (part == null) return;
+            SetPrimParams(new[] { part }, new List<ScenePresence>(), rules);
+        }
+
+        /// <summary>
+        /// The prim-params setter walk (Halcyon SetPrimParams): each rule in turn, on every prim and seated avatar it
+        /// targets. Every rule is read by SL's value count (PrimParamRules), so a rule Phlox does not act on yet is
+        /// skipped whole, logged once per script, and the rules after it still apply. PRIM_LINK_TARGET points the
+        /// rules after it at the prims and avatars its link selects. A rule that is not an integer, or a rule number
+        /// none of SL, Halcyon and OpenSim defines, ends the walk with SL's script error ("llSetPrimitiveParams
+        /// error running rule #2: unknown rule."); the rules before it have applied. A rule whose values run past
+        /// the end of the list ends the walk.
+        /// </summary>
+        private void SetPrimParams(IEnumerable<SceneObjectPart> parts, IEnumerable<ScenePresence> sitters, LSLList rules)
+        {
+            if (rules == null) return;
             var data = rules.Data;
+            var prims = parts.ToList();
+            var seated = sitters.ToList();
+            var moved = new List<ScenePresence>();
+            int idx = 0, rule = 0;
+
+            while (idx < data.Length)
+            {
+                rule++;
+                if (data[idx] is not int code)
+                {
+                    ShoutError($"llSetPrimitiveParams error running rule #{rule}: non-integer rule.");
+                    break;
+                }
+                int length = PrimParamRules.SetRuleLength(data, idx, code);
+                if (length < 0)
+                {
+                    ShoutError($"llSetPrimitiveParams error running rule #{rule}: unknown rule.");
+                    break;
+                }
+                if (idx + length > data.Length) break;
+                int values = idx + 1;
+                idx += length;
+
+                if (code == PRIM_LINK_TARGET)
+                {
+                    if (data[values] is not int link) break;
+                    prims = GetLinkParts(link).ToList();
+                    seated = GetLinkSitters(link);
+                    continue;
+                }
+
+                bool applied = false;
+                foreach (var part in prims)
+                    applied = SetPrimRule(part, code, data, values);
+                if (prims.Count > 0 && !applied)
+                    LogUnimplementedPrimRule(code, length - 1);
+                foreach (var sp in seated)
+                {
+                    // SL: "PRIM_OMEGA cannot be used on avatars sitting on the object. It will emit the error message
+                    // 'PRIM_OMEGA disallowed on agent'." The rules after it still apply. SL documents no other rule
+                    // as disallowed on an agent.
+                    if (code == PRIM_OMEGA && sp.ParentID != 0) { ShoutError("PRIM_OMEGA disallowed on agent"); continue; }
+                    if (SetSitterPrimRule(sp, code, data, values) && !moved.Contains(sp))
+                        moved.Add(sp);
+                }
+            }
+
+            foreach (var sp in moved)
+                sp.SendTerseUpdateToAllClients();
+        }
+
+        /// <summary>The prim-params rules Phlox reads but does not act on yet, each logged once per script.</summary>
+        private HashSet<int> m_unimplementedPrimRulesLogged;
+
+        private void LogUnimplementedPrimRule(int code, int values)
+        {
+            m_unimplementedPrimRulesLogged ??= new HashSet<int>();
+            if (!m_unimplementedPrimRulesLogged.Add(code)) return;
+            m_log.LogWarning("[PhloxAPI]: prim-params rule {Rule} is not implemented yet; skipped its {Values} values for {Item}",
+                code, values, m_itemID);
+        }
+
+        /// <summary>
+        /// One setter rule on one prim, its values starting at <paramref name="idx"/> (the walk has checked they are
+        /// all there). False for a rule Phlox does not implement yet.
+        /// </summary>
+        private bool SetPrimRule(SceneObjectPart part, int code, object[] data, int idx)
+        {
+            switch (code)
+            {
+                case PRIM_COLOR:
+                {
+                    if (idx + 2 >= data.Length) break;
+                    int face; Vector3 color; float alpha;
+                    try { face  = Convert.ToInt32(data[idx++]); } catch { idx += 2; break; }
+                    try { color = (Vector3)data[idx++]; } catch { idx++; break; }
+                    try { alpha = (float)Convert.ToDouble(data[idx++]); } catch { break; }
+                    alpha = Math.Max(0f, Math.Min(1f, alpha));
+                    part.SetFaceColorAlpha(face, color, alpha);
+                    part.SendFullUpdateToAllClients();
+                    break;
+                }
+
+                case PRIM_TEXTURE:
+                {
+                    if (idx + 4 >= data.Length) break;
+                    int face; string tex; Vector3 repeats, offsets; float rot;
+                    try { face    = Convert.ToInt32(data[idx++]); } catch { idx += 4; break; }
+                    try { tex     = data[idx++]?.ToString() ?? string.Empty; } catch { idx += 3; break; }
+                    try { repeats = (Vector3)data[idx++]; } catch { idx += 2; break; }
+                    try { offsets = (Vector3)data[idx++]; } catch { idx++; break; }
+                    try { rot     = (float)Convert.ToDouble(data[idx++]); } catch { break; }
+                    Primitive.TextureEntry texEntry = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
+                    // SL wiki PRIM_TEXTURE, "a texture in the inventory of the prim this script is in or a
+                    // UUID of a texture". A name no longer blanks the face. Neither found: the texture stays as it is and
+                    // the rest still applies (Halcyon SetTexture + ScaleTexture/OffsetTexture/RotateTexture).
+                    UUID texUUID = TextureKeyOrName(tex);
+                    void ApplyTex(Primitive.TextureEntryFace f) {
+                        if (texUUID != UUID.Zero) f.TextureID = texUUID;
+                        f.RepeatU = repeats.X; f.RepeatV = repeats.Y;
+                        f.OffsetU = offsets.X; f.OffsetV = offsets.Y;
+                        f.Rotation = rot;
+                    }
+                    if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) ApplyTex(texEntry.CreateFace((uint)i)); }
+                    else { try { ApplyTex(texEntry.CreateFace((uint)face)); } catch { } }
+                    part.UpdateTextureEntry(texEntry.GetBytes());
+                    break;
+                }
+
+                case PRIM_GLOW:
+                {
+                    if (idx + 1 >= data.Length) break;
+                    int face; float glow;
+                    try { face = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
+                    try { glow = (float)Convert.ToDouble(data[idx++]); } catch { break; }
+                    glow = Math.Max(0f, Math.Min(1f, glow));   // SL: glow is 0.0 to 1.0
+                    // Halcyon SetGlow (:1805-1826): the prim's own faces, and with ALL_SIDES the default face too; a
+                    // face the prim does not have is ignored.
+                    int sides = part.GetNumberOfSides();
+                    Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
+                    if (face == ALL_SIDES)
+                    {
+                        for (int i = 0; i < sides; i++) te.CreateFace((uint)i).Glow = glow;
+                        te.DefaultTexture.Glow = glow;
+                    }
+                    else if (face >= 0 && face < sides) te.CreateFace((uint)face).Glow = glow;
+                    else break;
+                    part.UpdateTextureEntry(te.GetBytes());
+                    break;
+                }
+
+                case PRIM_FULLBRIGHT:
+                {
+                    if (idx + 1 >= data.Length) break;
+                    int face; bool bright;
+                    try { face  = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
+                    try { bright = Convert.ToInt32(data[idx++]) != 0; } catch { break; }
+                    Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
+                    if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) te.CreateFace((uint)i).Fullbright = bright; }
+                    else { try { te.CreateFace((uint)face).Fullbright = bright; } catch { } }
+                    part.UpdateTextureEntry(te.GetBytes());
+                    break;
+                }
+
+                case PRIM_BUMP_SHINY:
+                {
+                    if (idx + 2 >= data.Length) break;
+                    int face, shiny, bump;
+                    try { face  = Convert.ToInt32(data[idx++]); } catch { idx += 2; break; }
+                    try { shiny = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
+                    try { bump  = Convert.ToInt32(data[idx++]); } catch { break; }
+                    Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
+                    // PRIM_SHINY_* 0..3 go in the top two bits of the material byte (OpenMetaverse
+                    // Shininess Low = 0x40 .. High = 0xC0); anything else is none (Halcyon and YEngine SetShiny). The bump
+                    // keeps to its five bits (BUMP_MASK 0x1F) so it cannot write the fullbright or shiny bits.
+                    Shininess shinyBits = shiny >= 0 && shiny <= 3 ? (Shininess)(shiny << 6) : Shininess.None;
+                    void ApplyBS(Primitive.TextureEntryFace f) {
+                        f.Shiny = shinyBits;
+                        f.Bump  = (Bumpiness)(bump & 0x1F);
+                    }
+                    if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) ApplyBS(te.CreateFace((uint)i)); }
+                    else { try { ApplyBS(te.CreateFace((uint)face)); } catch { } }
+                    part.UpdateTextureEntry(te.GetBytes());
+                    break;
+                }
+
+                case PRIM_MATERIAL:
+                {
+                    if (idx >= data.Length) break;
+                    int mat;
+                    try { mat = Convert.ToInt32(data[idx++]); } catch { break; }
+                    // PRIM_MATERIAL_STONE (0) to PRIM_MATERIAL_LIGHT (7); Halcyon refused anything else.
+                    if (mat < 0 || mat > 7) break;
+                    part.Material = (byte)mat;
+                    if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
+                    part.ScheduleFullUpdate();
+                    break;
+                }
+
+
+                case PRIM_SIZE:
+                {
+                    if (idx >= data.Length) break;
+                    Vector3 scale;
+                    try { scale = (Vector3)data[idx++]; } catch { break; }
+                    scale.X = Math.Max(0.01f, Math.Min(64f, scale.X));
+                    scale.Y = Math.Max(0.01f, Math.Min(64f, scale.Y));
+                    scale.Z = Math.Max(0.01f, Math.Min(64f, scale.Z));
+                    part.Resize(scale);
+                    PhySleep();   // Halcyon's SetPrimParams PRIM_SIZE goes through SetScale
+                    break;
+                }
+
+                case PRIM_ROT_LOCAL:
+                {
+                    if (idx >= data.Length) break;
+                    Quaternion rot;
+                    try { rot = (Quaternion)data[idx++]; } catch { break; }
+                    part.UpdateRotation(rot);
+                    break;
+                }
+
+                case PRIM_POSITION:
+                case PRIM_POS_LOCAL:
+                {
+                    // Halcyon: PRIM_POS_LOCAL is "same as PRIM_POSITION on a SET operation", both its
+                    // SetPos(part, v, true). A root takes the object's position (an attachment's: its offset from the
+                    // attach point); a child, its offset from the root (SL: child prims take local coordinates).
+                    // Halcyon's movement caps apply per rule, so a list that repeats the rule moves once per rule.
+                    if (data[idx] is not Vector3 pos) break;
+                    SetPrimLocalPos(part, pos);
+                    break;
+                }
+
+                case PRIM_PHYSICS:
+                case PRIM_PHANTOM:
+                case PRIM_TEMP_ON_REZ:
+                {
+                    // Object-wide in SL ("PRIM_PHANTOM, PRIM_PHYSICS and PRIM_TEMP_ON_REZ applies to the entire
+                    // object") and in Halcyon (part.ParentGroup), even through a child link. Any non-zero integer is
+                    // TRUE, as llSetStatus.
+                    if (data[idx] is not int flag) break;
+                    SceneObjectGroup group = part.ParentGroup;
+                    if (group == null || group.IsDeleted) break;
+                    bool on = flag != 0;
+                    if (code == PRIM_PHYSICS) SetObjectPhysics(group, on);
+                    else if (code == PRIM_PHANTOM) group.ScriptSetPhantomStatus(on);
+                    else group.ScriptSetTemporaryStatus(on);
+                    break;
+                }
+
+                case PRIM_ROTATION:
+                {
+                    // Halcyon and SL: a root turns the whole object to the rotation given. A child gets the root's
+                    // rotation times the one given, SL's child-prim quirk (SVC-93: "If the prim is not the root
+                    // prim it is offset by the root's rotation").
+                    if (data[idx] is not Quaternion rot) break;
+                    rot = NormalizedRot(rot);   // as llSetRot (Halcyon Rot2Quaternion)
+                    SceneObjectGroup group = part.ParentGroup;
+                    if (group == null || part == group.RootPart) part.UpdateRotation(rot);
+                    else part.UpdateRotation(group.RootPart.RotationOffset * rot);
+                    break;
+                }
+
+                case PRIM_TEXT:
+                {
+                    // [ PRIM_TEXT, string text, vector color, float alpha ], as llSetText on this prim.
+                    if (data[idx + 1] is not Vector3 color) break;
+                    float alpha;
+                    try { alpha = (float)Convert.ToDouble(data[idx + 2]); } catch { break; }
+                    PrimSetText(part, data[idx]?.ToString() ?? string.Empty, color, alpha);
+                    break;
+                }
+
+                case PRIM_OMEGA:
+                {
+                    // [ PRIM_OMEGA, vector axis, float spinrate, float gain ], as llTargetOmega on this prim.
+                    if (data[idx] is not Vector3 axis) break;
+                    float spinrate, gain;
+                    try
+                    {
+                        spinrate = (float)Convert.ToDouble(data[idx + 1]);
+                        gain = (float)Convert.ToDouble(data[idx + 2]);
+                    }
+                    catch { break; }
+                    PrimTargetOmega(part, axis, spinrate, gain);
+                    break;
+                }
+
+                case PRIM_CLICK_ACTION:
+                {
+                    // [ PRIM_CLICK_ACTION, integer action ], as llSetClickAction on this prim.
+                    if (data[idx] is not int action) break;
+                    PrimSetClickAction(part, action);
+                    break;
+                }
+
+                case PRIM_SIT_TARGET:
+                {
+                    // [ PRIM_SIT_TARGET, integer active, vector offset, rotation rot ] (Halcyon, SL): active 0
+                    // removes the target; otherwise it is set, a zero offset included.
+                    if (data[idx] is not int active || data[idx + 1] is not Vector3 offset
+                        || data[idx + 2] is not Quaternion rot) break;
+                    PrimSetSitTarget(part, active != 0, offset, rot);
+                    break;
+                }
+
+                case PRIM_PHYSICS_SHAPE_TYPE:
+                {
+                    // [ PRIM_PHYSICS_SHAPE_TYPE, integer type ]
+                    if (data[idx] is not int shapeType) break;
+                    PrimSetPhysicsShapeType(part, shapeType);
+                    break;
+                }
+
+                case PRIM_FLEXIBLE:
+                {
+                    if (idx + 6 >= data.Length) break;
+                    bool flex; int softness; float gravity, friction, wind, tension; Vector3 force;
+                    try { flex      = Convert.ToInt32(data[idx++]) != 0; } catch { idx += 6; break; }
+                    try { softness  = Convert.ToInt32(data[idx++]); } catch { idx += 5; break; }
+                    try { gravity   = (float)Convert.ToDouble(data[idx++]); } catch { idx += 4; break; }
+                    try { friction  = (float)Convert.ToDouble(data[idx++]); } catch { idx += 3; break; }
+                    try { wind      = (float)Convert.ToDouble(data[idx++]); } catch { idx += 2; break; }
+                    try { tension   = (float)Convert.ToDouble(data[idx++]); } catch { idx++; break; }
+                    try { force     = (Vector3)data[idx++]; } catch { break; }
+                    SceneObjectGroup sog = part.ParentGroup;
+                    if (sog != null && (sog.IsDeleted || sog.inTransit)) break;
+                    var shape = part.Shape;
+                    shape.FlexiEntry    = flex;
+                    shape.FlexiSoftness = softness;
+                    shape.FlexiGravity  = gravity;
+                    shape.FlexiDrag     = friction;
+                    shape.FlexiWind     = wind;
+                    shape.FlexiTension  = tension;
+                    shape.FlexiForceX   = force.X;
+                    shape.FlexiForceY   = force.Y;
+                    shape.FlexiForceZ   = force.Z;
+                    // The path curve is what makes a prim flexible (Halcyon :2027: the FlexiEntry setting alone "isn't
+                    // working"): Flexible on, Straight off, for a straight unsculpted prim (YEngine SetFlexi). Flexible
+                    // prims are phantom, so the object becomes phantom (YEngine; Halcyon for a root).
+                    bool phantom = false;
+                    if (!shape.SculptEntry && (shape.PathCurve == (byte)Extrusion.Straight || shape.PathCurve == (byte)Extrusion.Flexible))
+                    {
+                        shape.PathCurve = flex ? (byte)Extrusion.Flexible : (byte)Extrusion.Straight;
+                        phantom = flex && sog != null && !sog.IsPhantom;
+                    }
+                    part.Shape = shape;
+                    if (phantom) sog.ScriptSetPhantomStatus(true);
+                    if (sog != null) sog.HasGroupChanged = true;
+                    part.ScheduleFullUpdate();
+                    break;
+                }
+
+                case PRIM_POINT_LIGHT:
+                {
+                    if (idx + 4 >= data.Length) break;
+                    bool enabled; Vector3 color; float intensity, radius, falloff;
+                    try { enabled   = Convert.ToInt32(data[idx++]) != 0; } catch { idx += 4; break; }
+                    try { color     = (Vector3)data[idx++]; } catch { idx += 3; break; }
+                    try { intensity = (float)Convert.ToDouble(data[idx++]); } catch { idx += 2; break; }
+                    try { radius    = (float)Convert.ToDouble(data[idx++]); } catch { idx++; break; }
+                    try { falloff   = (float)Convert.ToDouble(data[idx++]); } catch { break; }
+                    // SL wiki PRIM_POINT_LIGHT ranges: colour 0..1, intensity 0..1, radius 0.1..20, falloff 0.01..2
+                    // (YEngine SetPointLight; Halcyon clipped the colour).
+                    var shape = part.Shape;
+                    shape.LightEntry     = enabled;
+                    shape.LightColorR    = Math.Clamp(color.X, 0f, 1f);
+                    shape.LightColorG    = Math.Clamp(color.Y, 0f, 1f);
+                    shape.LightColorB    = Math.Clamp(color.Z, 0f, 1f);
+                    shape.LightIntensity = Math.Clamp(intensity, 0f, 1f);
+                    shape.LightRadius    = Math.Clamp(radius, 0.1f, 20f);
+                    shape.LightFalloff   = Math.Clamp(falloff, 0.01f, 2f);
+                    part.Shape = shape;
+                    if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
+                    part.ScheduleFullUpdate();
+                    break;
+                }
+
+                case PRIM_ALPHA_MODE:
+                {
+                    // [ PRIM_ALPHA_MODE, integer face, integer alpha_mode, integer mask_cutoff ] (Halcyon
+                    // SetRenderMaterialAlphaModeData): the faces' material alpha mode and cutoff, both stored whatever
+                    // the mode. A mode outside PRIM_ALPHA_MODE_NONE..EMISSIVE or a cutoff outside 0-255 changes
+                    // nothing, as OpenSim's LSL_Api refuses them (neither Halcyon nor SL documents a range check).
+                    if (data[idx] is not int face || data[idx + 1] is not int mode || data[idx + 2] is not int cutoff) break;
+                    if (mode < PRIM_ALPHA_MODE_NONE || mode > PRIM_ALPHA_MODE_EMISSIVE || cutoff < 0 || cutoff > 255) break;
+                    PrimEditFaceMaterials(part, face, noneStaysNone: mode == PRIM_ALPHA_MODE_BLEND, mat =>
+                    {
+                        mat.DiffuseAlphaMode = (byte)mode;
+                        mat.AlphaMaskCutoff = (byte)cutoff;
+                    });
+                    break;
+                }
+
+                case PRIM_NORMAL:
+                {
+                    // [ PRIM_NORMAL, integer face, string texture, vector repeats, vector offsets, float rot ]
+                    // (Halcyon SetRenderMaterialNormalData; SL's ranges: repeats -100..100, offsets 0..1). NULL_KEY
+                    // clears the map; on a face with no material it changes nothing.
+                    if (data[idx] is not int face || !PrimMaterialMap(data[idx + 1], out UUID map)
+                        || data[idx + 2] is not Vector3 repeats || data[idx + 3] is not Vector3 offsets
+                        || !PrimFloat(data[idx + 4], out float rot)) break;
+                    PrimEditFaceMaterials(part, face, noneStaysNone: map == UUID.Zero, mat =>
+                    {
+                        mat.NormalMapID = map;
+                        mat.NormalRepeatX = Math.Clamp(repeats.X, -100f, 100f);
+                        mat.NormalRepeatY = Math.Clamp(repeats.Y, -100f, 100f);
+                        mat.NormalOffsetX = Math.Clamp(offsets.X, 0f, 1f);
+                        mat.NormalOffsetY = Math.Clamp(offsets.Y, 0f, 1f);
+                        mat.NormalRotation = rot;
+                    });
+                    break;
+                }
+
+                case PRIM_SPECULAR:
+                {
+                    // [ PRIM_SPECULAR, integer face, string texture, vector repeats, vector offsets, float rot,
+                    //   vector color, integer glossiness, integer environment ] (Halcyon
+                    // SetRenderMaterialSpecularData; SL's ranges: repeats -100..100, offsets 0..1, color 0..1,
+                    // glossiness and environment 0-255). NULL_KEY clears the map; on a face with no material it
+                    // changes nothing.
+                    if (data[idx] is not int face || !PrimMaterialMap(data[idx + 1], out UUID map)
+                        || data[idx + 2] is not Vector3 repeats || data[idx + 3] is not Vector3 offsets
+                        || !PrimFloat(data[idx + 4], out float rot) || data[idx + 5] is not Vector3 color
+                        || data[idx + 6] is not int gloss || data[idx + 7] is not int env) break;
+                    PrimEditFaceMaterials(part, face, noneStaysNone: map == UUID.Zero, mat =>
+                    {
+                        mat.SpecularMapID = map;
+                        mat.SpecularRepeatX = Math.Clamp(repeats.X, -100f, 100f);
+                        mat.SpecularRepeatY = Math.Clamp(repeats.Y, -100f, 100f);
+                        mat.SpecularOffsetX = Math.Clamp(offsets.X, 0f, 1f);
+                        mat.SpecularOffsetY = Math.Clamp(offsets.Y, 0f, 1f);
+                        mat.SpecularRotation = rot;
+                        mat.SpecularLightColorR = ColorByte(color.X);
+                        mat.SpecularLightColorG = ColorByte(color.Y);
+                        mat.SpecularLightColorB = ColorByte(color.Z);
+                        mat.SpecularLightExponent = (byte)Math.Clamp(gloss, 0, 255);
+                        mat.EnvironmentIntensity = (byte)Math.Clamp(env, 0, 255);
+                    });
+                    break;
+                }
+
+                case PRIM_TEXGEN:
+                {
+                    // [ PRIM_TEXGEN, integer face, integer mode ] (Halcyon SetTexGen): PRIM_TEXGEN_PLANAR maps the
+                    // faces planar, any other mode default. SL: it "silently fails if its face value indicates a
+                    // face that does not exist." The scene's own helper, which OpenSim's LSL_Api uses too.
+                    if (data[idx] is not int face || data[idx + 1] is not int mode) break;
+                    OpenSim.Region.ScriptEngine.Shared.Api.LSL_Api.SetTexGen(part, face, mode);
+                    break;
+                }
+
+                case IW_PRIM_ALPHA:
+                {
+                    // [ IW_PRIM_ALPHA, integer face, float alpha ] (Halcyon: SetAlpha, as llSetAlpha).
+                    if (data[idx] is not int face || !PrimFloat(data[idx + 1], out float alpha)) break;
+                    SetAlpha(part, alpha, face);
+                    break;
+                }
+
+                case PRIM_CAST_SHADOWS:
+                    // [ PRIM_CAST_SHADOWS, integer boolean ]: a no-op in SL ("setting it will have no effect");
+                    // Halcyon has no rule.
+                    break;
+
+                case PRIM_ALLOW_UNSIT:
+                case PRIM_SCRIPTED_SIT_ONLY:
+                {
+                    // [ PRIM_ALLOW_UNSIT, integer boolean ], [ PRIM_SCRIPTED_SIT_ONLY, integer boolean ] (SL; Halcyon has
+                    // neither): the part properties OpenSim's LSL_Api sets and the region's sit path checks. Any
+                    // non-zero integer is TRUE.
+                    if (data[idx] is not int flag) break;
+                    if (code == PRIM_ALLOW_UNSIT) part.AllowUnsit = flag != 0;
+                    else part.ScriptedSitOnly = flag != 0;
+                    break;
+                }
+
+                case PRIM_SIT_FLAGS:
+                    // [ PRIM_SIT_FLAGS, integer flags ] (SL; Halcyon has no rule), as llSetLinkSitFlags.
+                    if (data[idx] is not int sitFlags) break;
+                    PartSetSitFlags(part, sitFlags);
+                    break;
+
+                case PRIM_DAMAGE:
+                {
+                    // [ PRIM_DAMAGE, float damage, integer damage_type ] (SL; Halcyon has no rule). The amount is the
+                    // object's, as llSetDamage. The scene keeps no damage type, so the type is accepted and dropped.
+                    if (!PrimFloat(data[idx], out float damage) || data[idx + 1] is not int) break;
+                    PrimSetDamage(part, damage);
+                    break;
+                }
+
+                case PRIM_HEALTH:
+                    // [ PRIM_HEALTH, float health ] (SL; Halcyon has no rule). The scene keeps no health for a prim,
+                    // so the value is accepted and dropped; it reads SL's default.
+                    break;
+
+                case PRIM_COLLISION_SOUND:
+                {
+                    // [ PRIM_COLLISION_SOUND, string sound, float volume ] (SL; Halcyon has no rule), as
+                    // llCollisionSound on this prim.
+                    if (data[idx] is not string sound || !PrimFloat(data[idx + 1], out float volume)) break;
+                    PrimSetCollisionSound(part, sound, volume);
+                    break;
+                }
+
+                case PRIM_SLICE:
+                {
+                    // [ PRIM_SLICE, vector slice ] (SL: "a shape attribute, equivalent to advanced_cut"; Halcyon).
+                    if (data[idx] is not Vector3 slice) break;
+                    PrimSetSlice(part, slice);
+                    break;
+                }
+
+                case PRIM_PROJECTOR:
+                {
+                    // [ PRIM_PROJECTOR, string texture, float fov, float focus, float ambiance ] (SL; Halcyon has no
+                    // rule): OpenSim's meaning, on the projection fields the IW_PRIM_PROJECTOR rules share.
+                    if (data[idx] is not string texture || !PrimFloat(data[idx + 1], out float fov)
+                        || !PrimFloat(data[idx + 2], out float focus) || !PrimFloat(data[idx + 3], out float ambiance)) break;
+                    PrimSetProjector(part, texture, fov, focus, ambiance);
+                    break;
+                }
+
+                case IW_PRIM_PROJECTOR:
+                {
+                    // [ IW_PRIM_PROJECTOR, integer enabled, string texture, float fov, float focus, float ambience ]
+                    // (Halcyon SetPrimParams): only 1 enables; a texture that is NULL_KEY, or a name not in the prim,
+                    // is refused and nothing changes; the values are kept as given.
+                    if (data[idx] is not int enabled || !PrimFloat(data[idx + 2], out float fov)
+                        || !PrimFloat(data[idx + 3], out float focus) || !PrimFloat(data[idx + 4], out float ambience)) break;
+                    UUID texID = KeyOrName(data[idx + 1]?.ToString());
+                    if (texID == UUID.Zero)
+                    {
+                        ScriptShoutError("The second argument of IW_PRIM_PROJECTOR must not be NULL_KEY.");
+                        break;
+                    }
+                    PrimitiveBaseShape shape = part.Shape;
+                    shape.ProjectionEntry = enabled == 1;
+                    shape.ProjectionTextureUUID = texID;
+                    shape.ProjectionFOV = fov;
+                    shape.ProjectionFocus = focus;
+                    shape.ProjectionAmbiance = ambience;
+                    ProjectionChanged(part);
+                    break;
+                }
+
+                case IW_PRIM_PROJECTOR_ENABLED:
+                {
+                    // [ IW_PRIM_PROJECTOR_ENABLED, integer enabled ] (Halcyon): only 1 enables.
+                    if (data[idx] is not int on) break;
+                    part.Shape.ProjectionEntry = on == 1;
+                    ProjectionChanged(part);
+                    break;
+                }
+
+                case IW_PRIM_PROJECTOR_TEXTURE:
+                {
+                    // [ IW_PRIM_PROJECTOR_TEXTURE, string texture ] (Halcyon): NULL_KEY or a missing name is refused.
+                    UUID texID = KeyOrName(data[idx]?.ToString());
+                    if (texID == UUID.Zero)
+                    {
+                        ScriptShoutError("The argument of IW_PRIM_PROJECTOR_TEXTURE must not be NULL_KEY.");
+                        break;
+                    }
+                    part.Shape.ProjectionTextureUUID = texID;
+                    ProjectionChanged(part);
+                    break;
+                }
+
+                case IW_PRIM_PROJECTOR_FOV:
+                case IW_PRIM_PROJECTOR_FOCUS:
+                case IW_PRIM_PROJECTOR_AMBIENCE:
+                {
+                    // [ IW_PRIM_PROJECTOR_FOV | _FOCUS | _AMBIENCE, float value ] (Halcyon), kept as given.
+                    if (!PrimFloat(data[idx], out float value)) break;
+                    if (code == IW_PRIM_PROJECTOR_FOV) part.Shape.ProjectionFOV = value;
+                    else if (code == IW_PRIM_PROJECTOR_FOCUS) part.Shape.ProjectionFocus = value;
+                    else part.Shape.ProjectionAmbiance = value;
+                    ProjectionChanged(part);
+                    break;
+                }
+
+                case PRIM_REFLECTION_PROBE:
+                {
+                    // [ PRIM_REFLECTION_PROBE, integer boolean, float ambiance, float clip_distance, integer flags ] (SL;
+                    // Halcyon has no rule): "Ranges from 0.0 to 100.0", "Ranges from 0.0 to 1024.0". FALSE removes the
+                    // probe. The shape's ReflectionProbe, as OpenSim's LSL_Api keeps it.
+                    if (data[idx] is not int active || !PrimFloat(data[idx + 1], out float ambiance)
+                        || !PrimFloat(data[idx + 2], out float clip) || data[idx + 3] is not int flags) break;
+                    PrimSetReflectionProbe(part, active != 0, ambiance, clip, flags);
+                    break;
+                }
+
+                case PRIM_PHYSICS_MATERIAL:
+                {
+                    // [ PRIM_PHYSICS_MATERIAL, integer mask, float density, float friction, float restitution,
+                    //   float gravity_multiplier ]: OpenSim's own rule (LSL_Api.SetPrimParams), as llSetPhysicsMaterial.
+                    if (data[idx] is not int mask || !PrimFloat(data[idx + 1], out float density)
+                        || !PrimFloat(data[idx + 2], out float friction) || !PrimFloat(data[idx + 3], out float restitution)
+                        || !PrimFloat(data[idx + 4], out float gravity)) break;
+                    PrimSetPhysicsMaterial(part, mask, density, friction, restitution, gravity);
+                    break;
+                }
+
+                case PRIM_TYPE:
+                {
+                    if (idx >= data.Length) break;
+                    int primTypeCode = Convert.ToInt32(data[idx++]);
+                    int remain2 = data.Length - idx;
+                    int holeshape2;
+                    Vector3 cut2, twist2, taper_b2, topshear2, holesize2, profilecut2, taper_a2;
+                    float hollow2, revolutions2, radiusoffset2, skew2;
+
+                    switch (primTypeCode)
+                    {
+                        case 0:
+                            if (remain2 < 6) break;
+                            holeshape2 = Convert.ToInt32(data[idx++]);
+                            cut2       = (Vector3)data[idx++];
+                            hollow2    = (float)Convert.ToDouble(data[idx++]);
+                            twist2     = (Vector3)data[idx++];
+                            taper_b2   = (Vector3)data[idx++];
+                            topshear2  = (Vector3)data[idx++];
+                            part.Shape.PathCurve = (byte)Extrusion.Straight;
+                            SetPrimitiveShapeParamsCommon(part, holeshape2, cut2, hollow2, twist2, taper_b2, topshear2, DEFAULT_SLICE_VEC, 1);
+                            break;
+
+                        case 1:
+                            if (remain2 < 6) break;
+                            holeshape2 = Convert.ToInt32(data[idx++]);
+                            cut2       = (Vector3)data[idx++];
+                            hollow2    = (float)Convert.ToDouble(data[idx++]);
+                            twist2     = (Vector3)data[idx++];
+                            taper_b2   = (Vector3)data[idx++];
+                            topshear2  = (Vector3)data[idx++];
+                            part.Shape.ProfileShape = ProfileShape.Circle;
+                            part.Shape.PathCurve    = (byte)Extrusion.Straight;
+                            SetPrimitiveShapeParamsCommon(part, holeshape2, cut2, hollow2, twist2, taper_b2, topshear2, DEFAULT_SLICE_VEC, 0);
+                            break;
+
+                        case 2:
+                            if (remain2 < 6) break;
+                            holeshape2 = Convert.ToInt32(data[idx++]);
+                            cut2       = (Vector3)data[idx++];
+                            hollow2    = (float)Convert.ToDouble(data[idx++]);
+                            twist2     = (Vector3)data[idx++];
+                            taper_b2   = (Vector3)data[idx++];
+                            topshear2  = (Vector3)data[idx++];
+                            part.Shape.PathCurve = (byte)Extrusion.Straight;
+                            SetPrimitiveShapeParamsCommon(part, holeshape2, cut2, hollow2, twist2, taper_b2, topshear2, DEFAULT_SLICE_VEC, 3);
+                            break;
+
+                        case 3:
+                            if (remain2 < 5) break;
+                            holeshape2 = Convert.ToInt32(data[idx++]);
+                            cut2       = (Vector3)data[idx++];
+                            hollow2    = (float)Convert.ToDouble(data[idx++]);
+                            twist2     = (Vector3)data[idx++];
+                            taper_b2   = (Vector3)data[idx++];
+                            part.Shape.PathCurve = (byte)Extrusion.Curve1;
+                            SetPrimitiveShapeParamsSphere(part, holeshape2, cut2, hollow2, twist2, taper_b2, 5);
+                            break;
+
+                        case 4:
+                        case 5:
+                        case 6:
+                            if (remain2 < 11) break;
+                            holeshape2    = Convert.ToInt32(data[idx++]);
+                            cut2          = (Vector3)data[idx++];
+                            hollow2       = (float)Convert.ToDouble(data[idx++]);
+                            twist2        = (Vector3)data[idx++];
+                            holesize2     = (Vector3)data[idx++];
+                            topshear2     = (Vector3)data[idx++];
+                            profilecut2   = (Vector3)data[idx++];
+                            taper_a2      = (Vector3)data[idx++];
+                            revolutions2  = (float)Convert.ToDouble(data[idx++]);
+                            radiusoffset2 = (float)Convert.ToDouble(data[idx++]);
+                            skew2         = (float)Convert.ToDouble(data[idx++]);
+                            byte torusFudge = primTypeCode == 4 ? (byte)0
+                                            : primTypeCode == 5  ? (byte)1
+                                            : (byte)3;
+                            part.Shape.PathCurve = (byte)Extrusion.Curve1;
+                            SetPrimitiveShapeParamsTorus(part, holeshape2, cut2, hollow2, twist2, holesize2,
+                                topshear2, profilecut2, taper_a2, revolutions2, radiusoffset2, skew2, torusFudge);
+                            break;
+
+                        case 7:
+                            if (remain2 < 2) break;
+                            string sculptMap2  = data[idx++].ToString();
+                            int    sculptType2 = Convert.ToInt32(data[idx++]);
+                            part.Shape.PathCurve = (byte)Extrusion.Curve1;
+                            SetPrimitiveShapeParamsSculpt(part, sculptMap2, sculptType2);
+                            break;
+                    }
+                    break;
+                }
+
+                case PRIM_NAME:
+                {
+                    if (idx >= data.Length) break;
+                    string name = data[idx++].ToString();
+                    part.Name = CapPrimName(name);
+                    break;
+                }
+
+                case PRIM_DESC:
+                {
+                    if (idx >= data.Length) break;
+                    string desc = data[idx++].ToString();
+                    part.Description = CapPrimDesc(desc);
+                    break;
+                }
+
+                // ── PBR / glTF Material params ──────────────────────────────
+
+                case PRIM_RENDER_MATERIAL:
+                {
+                    // [ PRIM_RENDER_MATERIAL, integer face, string render_material ]
+                    if (idx + 1 >= data.Length) { idx = data.Length; break; }
+                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
+                    string matStr = data[idx++].ToString();
+                    UUID matUUID = UUID.Zero;
+                    UUID.TryParse(matStr, out matUUID);
+
+                    var shape_rm = part.Shape;
+                    shape_rm.RenderMaterials ??= new OpenMetaverse.Primitive.RenderMaterials();
+                    int numFaces_rm = part.GetNumberOfSides();
+
+                    if (face == ALL_SIDES)
+                    {
+                        var entries = new OpenMetaverse.Primitive.RenderMaterials.RenderMaterialEntry[numFaces_rm];
+                        for (int i = 0; i < numFaces_rm; i++)
+                        {
+                            entries[i].te_index = (byte)i;
+                            entries[i].id = matUUID;
+                        }
+                        shape_rm.RenderMaterials.entries = entries;
+                        // Clear non-transform overrides per SL spec
+                    }
+                    else if (face >= 0 && face < numFaces_rm)
+                    {
+                        SetRenderMaterialEntry(ref shape_rm.RenderMaterials.entries, matUUID, face);
+                    }
+
+                    if (part.ParentGroup != null)
+                        part.ParentGroup.HasGroupChanged = true;
+                    part.ScheduleFullUpdate();
+                    break;
+                }
+
+                case PRIM_GLTF_BASE_COLOR:
+                {
+                    // [ PRIM_GLTF_BASE_COLOR, face, texture, repeats, offsets, rotation,
+                    //   color, alpha, alpha_mode, alpha_cutoff, double_sided ]
+                    if (idx + 9 >= data.Length) { idx = data.Length; break; }
+                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 9; break; }
+                    string texture = data[idx++].ToString();
+                    Vector3 repeats = (Vector3)data[idx++];
+                    Vector3 offsets = (Vector3)data[idx++];
+                    float rotation = (float)Convert.ToDouble(data[idx++]);
+                    Vector3 color = (Vector3)data[idx++];
+                    float alpha = (float)Convert.ToDouble(data[idx++]);
+                    int alphaMode = Convert.ToInt32(data[idx++]);
+                    float alphaCutoff = (float)Convert.ToDouble(data[idx++]);
+                    int doubleSided = Convert.ToInt32(data[idx++]);
+
+                    var osd = new OpenMetaverse.StructuredData.OSDMap();
+                    if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
+                        osd["tex"] = texture;
+                    osd["rep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
+                    osd["off"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
+                    osd["rot"] = (double)rotation;
+                    osd["bc"] = new OpenMetaverse.StructuredData.OSDArray { (double)color.X, (double)color.Y, (double)color.Z, (double)alpha };
+                    osd["am"] = alphaMode;
+                    osd["ac"] = (double)alphaCutoff;
+                    osd["ds"] = (doubleSided != 0);
+
+                    ApplyGLTFOverrideToPart(part, face, osd);
+                    break;
+                }
+
+                case PRIM_GLTF_NORMAL:
+                {
+                    // [ PRIM_GLTF_NORMAL, face, texture, repeats, offsets, rotation ]
+                    if (idx + 4 >= data.Length) { idx = data.Length; break; }
+                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 4; break; }
+                    string texture = data[idx++].ToString();
+                    Vector3 repeats = (Vector3)data[idx++];
+                    Vector3 offsets = (Vector3)data[idx++];
+                    float rotation = (float)Convert.ToDouble(data[idx++]);
+
+                    var osd = new OpenMetaverse.StructuredData.OSDMap();
+                    if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
+                        osd["ntex"] = texture;
+                    osd["nrep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
+                    osd["noff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
+                    osd["nrot"] = (double)rotation;
+
+                    ApplyGLTFOverrideToPart(part, face, osd);
+                    break;
+                }
+
+                case PRIM_GLTF_METALLIC_ROUGHNESS:
+                {
+                    // [ PRIM_GLTF_METALLIC_ROUGHNESS, face, texture, repeats, offsets, rotation,
+                    //   metallic_factor, roughness_factor ]
+                    if (idx + 6 >= data.Length) { idx = data.Length; break; }
+                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 6; break; }
+                    string texture = data[idx++].ToString();
+                    Vector3 repeats = (Vector3)data[idx++];
+                    Vector3 offsets = (Vector3)data[idx++];
+                    float rotation = (float)Convert.ToDouble(data[idx++]);
+                    float metallic = (float)Convert.ToDouble(data[idx++]);
+                    float roughness = (float)Convert.ToDouble(data[idx++]);
+
+                    var osd = new OpenMetaverse.StructuredData.OSDMap();
+                    if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
+                        osd["mrtex"] = texture;
+                    osd["mrrep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
+                    osd["mroff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
+                    osd["mrrot"] = (double)rotation;
+                    osd["mf"] = (double)Math.Clamp(metallic, 0f, 1f);
+                    osd["rf"] = (double)Math.Clamp(roughness, 0f, 1f);
+
+                    ApplyGLTFOverrideToPart(part, face, osd);
+                    break;
+                }
+
+                case PRIM_GLTF_EMISSIVE:
+                {
+                    // [ PRIM_GLTF_EMISSIVE, face, texture, repeats, offsets, rotation, emissive_tint ]
+                    if (idx + 5 >= data.Length) { idx = data.Length; break; }
+                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 5; break; }
+                    string texture = data[idx++].ToString();
+                    Vector3 repeats = (Vector3)data[idx++];
+                    Vector3 offsets = (Vector3)data[idx++];
+                    float rotation = (float)Convert.ToDouble(data[idx++]);
+                    Vector3 emissive = (Vector3)data[idx++];
+
+                    var osd = new OpenMetaverse.StructuredData.OSDMap();
+                    if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
+                        osd["etex"] = texture;
+                    osd["erep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
+                    osd["eoff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
+                    osd["erot"] = (double)rotation;
+                    osd["ec"] = new OpenMetaverse.StructuredData.OSDArray { (double)emissive.X, (double)emissive.Y, (double)emissive.Z };
+
+                    ApplyGLTFOverrideToPart(part, face, osd);
+                    break;
+                }
+
+                default:
+                    return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// One setter rule on a seated avatar (Halcyon SetPrimParams' ScenePresence branches): PRIM_POSITION and
+        /// PRIM_POS_LOCAL set the sitter's offset from the root, PRIM_ROT_LOCAL its rotation, and PRIM_ROTATION the
+        /// root's rotation times the one given. Every other rule leaves an avatar alone. SL: an offset more than 54 m
+        /// away is silently ignored. True when the avatar moved; the walk then sends one terse update to every
+        /// viewer, the way the scene moves a sitter (ScenePresence.OffsetPosition / Rotation).
+        /// </summary>
+        private bool SetSitterPrimRule(ScenePresence sp, int code, object[] data, int idx)
+        {
+            if (sp == null || sp.ParentID == 0) return false;
+            switch (code)
+            {
+                case PRIM_POSITION:
+                case PRIM_POS_LOCAL:
+                {
+                    if (data[idx] is not Vector3 v || v.Length() > 54f) return false;
+                    if (!sp.LegacySitOffsets)
+                        v += (Vector3.UnitZ * sp.Rotation) * (2f * sp.Appearance.AvatarHeight * 0.02638f);
+                    sp.OffsetPosition = v;
+                    return true;
+                }
+
+                case PRIM_ROT_LOCAL:
+                {
+                    if (data[idx] is not Quaternion q) return false;
+                    sp.Rotation = q;
+                    return true;
+                }
+
+                case PRIM_ROTATION:
+                {
+                    if (data[idx] is not Quaternion q) return false;
+                    sp.Rotation = (m_host.ParentGroup?.RootPart?.RotationOffset ?? Quaternion.Identity) * q;
+                    return true;
+                }
+
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// The prim-params getter walk: the rules up to the first PRIM_LINK_TARGET read from the prims and seated
+        /// avatars given, prims first in link order and then the avatars; the rules after a PRIM_LINK_TARGET read
+        /// from the prims and avatars its link selects, as in SL and Halcyon GetPrimParams. The walk finds each
+        /// PRIM_LINK_TARGET by SL's getter value counts (PrimParamRules.GetValueCount), so a per-face rule's face is
+        /// never mistaken for a rule.
+        /// </summary>
+        private LSLList GetPrimParams(IEnumerable<SceneObjectPart> parts, IEnumerable<ScenePresence> sitters, LSLList rules)
+        {
+            var result = new LSLList();
+            if (rules == null) return result;
+            var data = rules.Data;
+            int start = 0;
+
+            while (true)
+            {
+                int idx = start, target = -1;
+                while (idx < data.Length && data[idx] is int code)
+                {
+                    if (code == PRIM_LINK_TARGET) { target = idx; break; }
+                    idx += 1 + PrimParamRules.GetValueCount(code);
+                }
+
+                int end = target < 0 ? data.Length : target;
+                // Each rule for every prim (and seated avatar) before the next rule, as Halcyon's GetPrimParams walks
+                // them: [r1(p1), r1(p2), r2(p1), r2(p2)].
+                var partList = parts as IList<SceneObjectPart> ?? parts.ToList();
+                var sitterList = sitters as IList<ScenePresence> ?? sitters.ToList();
+                int r = start;
+                while (r < end)
+                {
+                    int len = data[r] is int rc ? 1 + PrimParamRules.GetValueCount(rc) : end - r;
+                    if (r + len > end) len = end - r;
+                    var one = new object[len];
+                    Array.Copy(data, r, one, 0, len);
+                    var oneRule = new LSLList(one);
+                    foreach (var part in partList)
+                        result += GetPrimParams(part, oneRule);
+                    foreach (var sp in sitterList)
+                        result += GetSitterPrimParams(sp, oneRule);
+                    r += len;
+                }
+
+                if (target < 0 || target + 1 >= data.Length || data[target + 1] is not int link) break;
+                parts = GetLinkParts(link).ToList();
+                sitters = GetLinkSitters(link);
+                start = target + 2;
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// A seated avatar's PRIM_POS_LOCAL: its offset from the root in the root's frame, the region offset turned
+        /// by the inverse of the root's rotation (Halcyon returns the region offset unturned). Without legacy sit
+        /// offsets the setter adds the avatar's sit height (SetSitterPrimRule); it is taken off again here, so the
+        /// offset a script sets is the one it reads back.
+        /// </summary>
+        private Vector3 SitterLocalPos(ScenePresence sp)
+        {
+            SceneObjectPart root = m_host.ParentGroup?.RootPart;
+            if (root == null) return sp.OffsetPosition;
+            Vector3 local = (sp.AbsolutePosition - root.AbsolutePosition) * Quaternion.Inverse(root.GetWorldRotation());
+            if (!sp.LegacySitOffsets)
+                local -= (Vector3.UnitZ * sp.Rotation) * (2f * sp.Appearance.AvatarHeight * 0.02638f);
+            return local;
+        }
+
+        /// <summary>
+        /// llGetLinkPrimitiveParams on a seated avatar (Halcyon GetAvatarAsPrimParam): the avatar's name, an empty
+        /// description, flesh, not temporary or phantom, its agent size, its region position, a default box shape
+        /// and empty text, light and flexi. The texture rules consume their face, return nothing and tell the
+        /// owner "texture info cannot be accessed for avatars." PRIM_ROTATION returns the avatar's region rotation,
+        /// as SL documents; Halcyon returns nothing there. PRIM_POS_LOCAL and PRIM_ROT_LOCAL return the avatar's
+        /// offset and rotation relative to the root, in the root's frame (SitterLocalPos); Halcyon returns the
+        /// region offset and nothing. Rules Halcyon has no avatar value for (PRIM_PHYSICS and the rest) return
+        /// nothing.
+        /// </summary>
+        private LSLList GetSitterPrimParams(ScenePresence sp, LSLList parms)
+        {
+            if (sp == null || parms == null) return new LSLList();
+            var result = new List<object>();
+            var data = parms.Data;
             int idx = 0;
 
             while (idx < data.Length)
@@ -3982,459 +8038,100 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 switch (code)
                 {
                     case PRIM_LINK_TARGET:
-                        if (idx >= data.Length) break;
-                        int linkTarget;
-                        try { linkTarget = Convert.ToInt32(data[idx++]); } catch { break; }
-                        foreach (var p in GetLinkParts(linkTarget))
-                        {
-                            // Build remaining list and recurse
-                            var remaining = new object[data.Length - idx];
-                            Array.Copy(data, idx, remaining, 0, remaining.Length);
-                            SetPrimParams(p, new LSLList(remaining));
-                        }
-                        return;
-
-                    case PRIM_COLOR:
-                    {
-                        if (idx + 2 >= data.Length) break;
-                        int face; Vector3 color; float alpha;
-                        try { face  = Convert.ToInt32(data[idx++]); } catch { idx += 2; break; }
-                        try { color = (Vector3)data[idx++]; } catch { idx++; break; }
-                        try { alpha = (float)Convert.ToDouble(data[idx++]); } catch { break; }
-                        alpha = Math.Max(0f, Math.Min(1f, alpha));
-                        part.SetFaceColorAlpha(face, color, alpha);
-                        part.SendFullUpdateToAllClients();
+                        if (idx < data.Length) idx++; // as GetPrimParams: routing is the caller's
                         break;
-                    }
-
-                    case PRIM_TEXTURE:
-                    {
-                        if (idx + 4 >= data.Length) break;
-                        int face; string tex; Vector3 repeats, offsets; float rot;
-                        try { face    = Convert.ToInt32(data[idx++]); } catch { idx += 4; break; }
-                        try { tex     = data[idx++]?.ToString() ?? string.Empty; } catch { idx += 3; break; }
-                        try { repeats = (Vector3)data[idx++]; } catch { idx += 2; break; }
-                        try { offsets = (Vector3)data[idx++]; } catch { idx++; break; }
-                        try { rot     = (float)Convert.ToDouble(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry texEntry = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
-                        void ApplyTex(Primitive.TextureEntryFace f) {
-                            UUID texUUID;
-                            if (!UUID.TryParse(tex, out texUUID)) texUUID = UUID.Zero;
-                            f.TextureID = texUUID;
-                            f.RepeatU = repeats.X; f.RepeatV = repeats.Y;
-                            f.OffsetU = offsets.X; f.OffsetV = offsets.Y;
-                            f.Rotation = rot;
-                        }
-                        if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) ApplyTex(texEntry.CreateFace((uint)i)); }
-                        else { try { ApplyTex(texEntry.CreateFace((uint)face)); } catch { } }
-                        part.UpdateTextureEntry(texEntry.GetBytes());
-                        break;
-                    }
-
-                    case PRIM_GLOW:
-                    {
-                        if (idx + 1 >= data.Length) break;
-                        int face; float glow;
-                        try { face = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
-                        try { glow = (float)Convert.ToDouble(data[idx++]); } catch { break; }
-                        glow = Math.Max(0f, Math.Min(1f, glow));
-                        Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
-                        if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) te.CreateFace((uint)i).Glow = glow; }
-                        else { try { te.CreateFace((uint)face).Glow = glow; } catch { } }
-                        part.UpdateTextureEntry(te.GetBytes());
-                        break;
-                    }
-
-                    case PRIM_FULLBRIGHT:
-                    {
-                        if (idx + 1 >= data.Length) break;
-                        int face; bool bright;
-                        try { face  = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
-                        try { bright = Convert.ToInt32(data[idx++]) != 0; } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
-                        if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) te.CreateFace((uint)i).Fullbright = bright; }
-                        else { try { te.CreateFace((uint)face).Fullbright = bright; } catch { } }
-                        part.UpdateTextureEntry(te.GetBytes());
-                        break;
-                    }
-
-                    case PRIM_BUMP_SHINY:
-                    {
-                        if (idx + 2 >= data.Length) break;
-                        int face, shiny, bump;
-                        try { face  = Convert.ToInt32(data[idx++]); } catch { idx += 2; break; }
-                        try { shiny = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
-                        try { bump  = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
-                        void ApplyBS(Primitive.TextureEntryFace f) {
-                            f.Shiny = (Shininess)shiny;
-                            f.Bump  = (Bumpiness)bump;
-                        }
-                        if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) ApplyBS(te.CreateFace((uint)i)); }
-                        else { try { ApplyBS(te.CreateFace((uint)face)); } catch { } }
-                        part.UpdateTextureEntry(te.GetBytes());
-                        break;
-                    }
-
-                    case PRIM_MATERIAL:
-                    {
-                        if (idx >= data.Length) break;
-                        int mat;
-                        try { mat = Convert.ToInt32(data[idx++]); } catch { break; }
-                        part.Material = (byte)mat;
-                        if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
-                        part.ScheduleFullUpdate();
-                        break;
-                    }
-
                     case PRIM_POSITION:
-                    {
-                        if (idx >= data.Length) break;
-                        Vector3 pos;
-                        try { pos = (Vector3)data[idx++]; } catch { break; }
-                        if (part.LinkNum < 2) part.ParentGroup?.UpdateGroupPosition(pos);
-                        else part.UpdateOffSet(pos - (part.ParentGroup?.AbsolutePosition ?? Vector3.Zero));
+                        result.Add(sp.AbsolutePosition);
                         break;
-                    }
-
-                    case PRIM_SIZE:
-                    {
-                        if (idx >= data.Length) break;
-                        Vector3 scale;
-                        try { scale = (Vector3)data[idx++]; } catch { break; }
-                        scale.X = Math.Max(0.01f, Math.Min(64f, scale.X));
-                        scale.Y = Math.Max(0.01f, Math.Min(64f, scale.Y));
-                        scale.Z = Math.Max(0.01f, Math.Min(64f, scale.Z));
-                        part.Resize(scale);
+                    case PRIM_POS_LOCAL:
+                        result.Add(SitterLocalPos(sp));
                         break;
-                    }
-
                     case PRIM_ROT_LOCAL:
-                    {
-                        if (idx >= data.Length) break;
-                        Quaternion rot;
-                        try { rot = (Quaternion)data[idx++]; } catch { break; }
-                        part.UpdateRotation(rot);
+                        result.Add(sp.Rotation); // the scene keeps a sitter's rotation relative to the root
                         break;
-                    }
-
-                    case PRIM_FLEXIBLE:
-                    {
-                        if (idx + 6 >= data.Length) break;
-                        bool flex; int softness; float gravity, friction, wind, tension; Vector3 force;
-                        try { flex      = Convert.ToInt32(data[idx++]) != 0; } catch { idx += 6; break; }
-                        try { softness  = Convert.ToInt32(data[idx++]); } catch { idx += 5; break; }
-                        try { gravity   = (float)Convert.ToDouble(data[idx++]); } catch { idx += 4; break; }
-                        try { friction  = (float)Convert.ToDouble(data[idx++]); } catch { idx += 3; break; }
-                        try { wind      = (float)Convert.ToDouble(data[idx++]); } catch { idx += 2; break; }
-                        try { tension   = (float)Convert.ToDouble(data[idx++]); } catch { idx++; break; }
-                        try { force     = (Vector3)data[idx++]; } catch { break; }
-                        var shape = part.Shape;
-                        shape.FlexiEntry    = flex;
-                        shape.FlexiSoftness = softness;
-                        shape.FlexiGravity  = gravity;
-                        shape.FlexiDrag     = friction;
-                        shape.FlexiWind     = wind;
-                        shape.FlexiTension  = tension;
-                        shape.FlexiForceX   = force.X;
-                        shape.FlexiForceY   = force.Y;
-                        shape.FlexiForceZ   = force.Z;
-                        part.Shape = shape;
-                        if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
-                        part.ScheduleFullUpdate();
+                    case PRIM_ROTATION:
+                        result.Add(sp.GetWorldRotation());
                         break;
-                    }
-
-                    case PRIM_POINT_LIGHT:
-                    {
-                        if (idx + 4 >= data.Length) break;
-                        bool enabled; Vector3 color; float intensity, radius, falloff;
-                        try { enabled   = Convert.ToInt32(data[idx++]) != 0; } catch { idx += 4; break; }
-                        try { color     = (Vector3)data[idx++]; } catch { idx += 3; break; }
-                        try { intensity = (float)Convert.ToDouble(data[idx++]); } catch { idx += 2; break; }
-                        try { radius    = (float)Convert.ToDouble(data[idx++]); } catch { idx++; break; }
-                        try { falloff   = (float)Convert.ToDouble(data[idx++]); } catch { break; }
-                        var shape = part.Shape;
-                        shape.LightEntry     = enabled;
-                        shape.LightColorR    = color.X;
-                        shape.LightColorG    = color.Y;
-                        shape.LightColorB    = color.Z;
-                        shape.LightIntensity = intensity;
-                        shape.LightRadius    = radius;
-                        shape.LightFalloff   = falloff;
-                        part.Shape = shape;
-                        if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
-                        part.ScheduleFullUpdate();
-                        break;
-                    }
-
-                    case PRIM_ALPHA_MODE:
-                    {
-                        if (idx + 1 >= data.Length) break;
-                        int face, mode;
-                        try { face = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
-                        try { mode = Convert.ToInt32(data[idx++]); } catch { break; }
-                        // PRIM_ALPHA_MODE uses texture entry material alpha mode
-                        Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
-                        if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) te.CreateFace((uint)i).MediaFlags = (mode != 0); }
-                        else { try { te.CreateFace((uint)face).MediaFlags = (mode != 0); } catch { } }
-                        part.UpdateTextureEntry(te.GetBytes());
-                        break;
-                    }
-
-                    case PRIM_TYPE:
-                    {
-                        if (idx >= data.Length) break;
-                        int primTypeCode = Convert.ToInt32(data[idx++]);
-                        int remain2 = data.Length - idx;
-                        int holeshape2;
-                        Vector3 cut2, twist2, taper_b2, topshear2, holesize2, profilecut2, taper_a2;
-                        float hollow2, revolutions2, radiusoffset2, skew2;
-
-                        switch (primTypeCode)
-                        {
-                            case 0:
-                                if (remain2 < 6) break;
-                                holeshape2 = Convert.ToInt32(data[idx++]);
-                                cut2       = (Vector3)data[idx++];
-                                hollow2    = (float)Convert.ToDouble(data[idx++]);
-                                twist2     = (Vector3)data[idx++];
-                                taper_b2   = (Vector3)data[idx++];
-                                topshear2  = (Vector3)data[idx++];
-                                part.Shape.PathCurve = (byte)Extrusion.Straight;
-                                SetPrimitiveShapeParamsCommon(part, holeshape2, cut2, hollow2, twist2, taper_b2, topshear2, DEFAULT_SLICE_VEC, 1);
-                                break;
-
-                            case 1:
-                                if (remain2 < 6) break;
-                                holeshape2 = Convert.ToInt32(data[idx++]);
-                                cut2       = (Vector3)data[idx++];
-                                hollow2    = (float)Convert.ToDouble(data[idx++]);
-                                twist2     = (Vector3)data[idx++];
-                                taper_b2   = (Vector3)data[idx++];
-                                topshear2  = (Vector3)data[idx++];
-                                part.Shape.ProfileShape = ProfileShape.Circle;
-                                part.Shape.PathCurve    = (byte)Extrusion.Straight;
-                                SetPrimitiveShapeParamsCommon(part, holeshape2, cut2, hollow2, twist2, taper_b2, topshear2, DEFAULT_SLICE_VEC, 0);
-                                break;
-
-                            case 2:
-                                if (remain2 < 6) break;
-                                holeshape2 = Convert.ToInt32(data[idx++]);
-                                cut2       = (Vector3)data[idx++];
-                                hollow2    = (float)Convert.ToDouble(data[idx++]);
-                                twist2     = (Vector3)data[idx++];
-                                taper_b2   = (Vector3)data[idx++];
-                                topshear2  = (Vector3)data[idx++];
-                                part.Shape.PathCurve = (byte)Extrusion.Straight;
-                                SetPrimitiveShapeParamsCommon(part, holeshape2, cut2, hollow2, twist2, taper_b2, topshear2, DEFAULT_SLICE_VEC, 3);
-                                break;
-
-                            case 3:
-                                if (remain2 < 5) break;
-                                holeshape2 = Convert.ToInt32(data[idx++]);
-                                cut2       = (Vector3)data[idx++];
-                                hollow2    = (float)Convert.ToDouble(data[idx++]);
-                                twist2     = (Vector3)data[idx++];
-                                taper_b2   = (Vector3)data[idx++];
-                                part.Shape.PathCurve = (byte)Extrusion.Curve1;
-                                SetPrimitiveShapeParamsSphere(part, holeshape2, cut2, hollow2, twist2, taper_b2, 5);
-                                break;
-
-                            case 4:
-                            case 5:
-                            case 6:
-                                if (remain2 < 11) break;
-                                holeshape2    = Convert.ToInt32(data[idx++]);
-                                cut2          = (Vector3)data[idx++];
-                                hollow2       = (float)Convert.ToDouble(data[idx++]);
-                                twist2        = (Vector3)data[idx++];
-                                holesize2     = (Vector3)data[idx++];
-                                topshear2     = (Vector3)data[idx++];
-                                profilecut2   = (Vector3)data[idx++];
-                                taper_a2      = (Vector3)data[idx++];
-                                revolutions2  = (float)Convert.ToDouble(data[idx++]);
-                                radiusoffset2 = (float)Convert.ToDouble(data[idx++]);
-                                skew2         = (float)Convert.ToDouble(data[idx++]);
-                                byte torusFudge = primTypeCode == 4 ? (byte)0
-                                                : primTypeCode == 5  ? (byte)1
-                                                : (byte)3;
-                                part.Shape.PathCurve = (byte)Extrusion.Curve1;
-                                SetPrimitiveShapeParamsTorus(part, holeshape2, cut2, hollow2, twist2, holesize2,
-                                    topshear2, profilecut2, taper_a2, revolutions2, radiusoffset2, skew2, torusFudge);
-                                break;
-
-                            case 7:
-                                if (remain2 < 2) break;
-                                string sculptMap2  = data[idx++].ToString();
-                                int    sculptType2 = Convert.ToInt32(data[idx++]);
-                                part.Shape.PathCurve = (byte)Extrusion.Curve1;
-                                SetPrimitiveShapeParamsSculpt(part, sculptMap2, sculptType2);
-                                break;
-                        }
-                        break;
-                    }
-
                     case PRIM_NAME:
-                    {
-                        if (idx >= data.Length) break;
-                        string name = data[idx++].ToString();
-                        part.Name = name;
+                        result.Add(sp.Name);
                         break;
-                    }
-
                     case PRIM_DESC:
-                    {
-                        if (idx >= data.Length) break;
-                        string desc = data[idx++].ToString();
-                        part.Description = desc;
+                        result.Add(string.Empty);
                         break;
-                    }
-
-                    // ── PBR / glTF Material params ──────────────────────────────
-
+                    case PRIM_TYPE:
+                        result.Add(PRIM_TYPE_BOX);
+                        result.Add(PRIM_HOLE_DEFAULT);
+                        result.Add(new Vector3(0f, 1f, 0f));
+                        result.Add(0f);
+                        result.Add(Vector3.Zero);
+                        result.Add(new Vector3(1f, 1f, 0f));
+                        result.Add(Vector3.Zero);
+                        break;
+                    case PRIM_SLICE:
+                        result.Add(new Vector3(0f, 1f, 0f));
+                        break;
+                    case PRIM_MATERIAL:
+                        result.Add(PRIM_MATERIAL_FLESH);
+                        break;
+                    case PRIM_TEMP_ON_REZ:
+                    case PRIM_PHANTOM:
+                        result.Add(0);
+                        break;
+                    case PRIM_SIZE:
+                        result.Add(llGetAgentSize(sp.UUID.ToString()));
+                        break;
+                    case PRIM_TEXT:
+                        result.Add(string.Empty);
+                        result.Add(Vector3.Zero);
+                        result.Add(1f);
+                        break;
+                    case PRIM_POINT_LIGHT:
+                        result.Add(0);
+                        result.Add(Vector3.Zero);
+                        result.Add(0f);
+                        result.Add(0f);
+                        result.Add(0f);
+                        break;
+                    case PRIM_FLEXIBLE:
+                        result.Add(0);
+                        result.Add(0);
+                        result.Add(0f);
+                        result.Add(0f);
+                        result.Add(0f);
+                        result.Add(0f);
+                        result.Add(Vector3.Zero);
+                        break;
+                    case PRIM_SIT_TARGET:
+                        result.Add(0);
+                        result.Add(Vector3.Zero);
+                        result.Add(Quaternion.Identity);
+                        break;
+                    case PRIM_TEXTURE:
+                    case PRIM_COLOR:
+                    case PRIM_BUMP_SHINY:
+                    case PRIM_FULLBRIGHT:
+                    case PRIM_TEXGEN:
+                    case PRIM_GLOW:
+                    case PRIM_SPECULAR:
+                    case PRIM_NORMAL:
+                    case PRIM_ALPHA_MODE:
+                    case IW_PRIM_ALPHA:
+                        if (idx < data.Length) idx++;
+                        ScriptShoutError("texture info cannot be accessed for avatars.");
+                        break;
                     case PRIM_RENDER_MATERIAL:
-                    {
-                        // [ PRIM_RENDER_MATERIAL, integer face, string render_material ]
-                        if (idx + 1 >= data.Length) { idx = data.Length; break; }
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
-                        string matStr = data[idx++].ToString();
-                        UUID matUUID = UUID.Zero;
-                        UUID.TryParse(matStr, out matUUID);
-
-                        var shape_rm = part.Shape;
-                        shape_rm.RenderMaterials ??= new OpenMetaverse.Primitive.RenderMaterials();
-                        int numFaces_rm = part.GetNumberOfSides();
-
-                        if (face == ALL_SIDES)
-                        {
-                            var entries = new OpenMetaverse.Primitive.RenderMaterials.RenderMaterialEntry[numFaces_rm];
-                            for (int i = 0; i < numFaces_rm; i++)
-                            {
-                                entries[i].te_index = (byte)i;
-                                entries[i].id = matUUID;
-                            }
-                            shape_rm.RenderMaterials.entries = entries;
-                            // Clear non-transform overrides per SL spec
-                        }
-                        else if (face >= 0 && face < numFaces_rm)
-                        {
-                            SetRenderMaterialEntry(ref shape_rm.RenderMaterials.entries, matUUID, face);
-                        }
-
-                        if (part.ParentGroup != null)
-                            part.ParentGroup.HasGroupChanged = true;
-                        part.ScheduleFullUpdate();
-                        break;
-                    }
-
                     case PRIM_GLTF_BASE_COLOR:
-                    {
-                        // [ PRIM_GLTF_BASE_COLOR, face, texture, repeats, offsets, rotation,
-                        //   color, alpha, alpha_mode, alpha_cutoff, double_sided ]
-                        if (idx + 9 >= data.Length) { idx = data.Length; break; }
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 9; break; }
-                        string texture = data[idx++].ToString();
-                        Vector3 repeats = (Vector3)data[idx++];
-                        Vector3 offsets = (Vector3)data[idx++];
-                        float rotation = (float)Convert.ToDouble(data[idx++]);
-                        Vector3 color = (Vector3)data[idx++];
-                        float alpha = (float)Convert.ToDouble(data[idx++]);
-                        int alphaMode = Convert.ToInt32(data[idx++]);
-                        float alphaCutoff = (float)Convert.ToDouble(data[idx++]);
-                        int doubleSided = Convert.ToInt32(data[idx++]);
-
-                        var osd = new OpenMetaverse.StructuredData.OSDMap();
-                        if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
-                            osd["tex"] = texture;
-                        osd["rep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
-                        osd["off"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
-                        osd["rot"] = (double)rotation;
-                        osd["bc"] = new OpenMetaverse.StructuredData.OSDArray { (double)color.X, (double)color.Y, (double)color.Z, (double)alpha };
-                        osd["am"] = alphaMode;
-                        osd["ac"] = (double)alphaCutoff;
-                        osd["ds"] = (doubleSided != 0);
-
-                        ApplyGLTFOverrideToPart(part, face, osd);
-                        break;
-                    }
-
                     case PRIM_GLTF_NORMAL:
-                    {
-                        // [ PRIM_GLTF_NORMAL, face, texture, repeats, offsets, rotation ]
-                        if (idx + 4 >= data.Length) { idx = data.Length; break; }
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 4; break; }
-                        string texture = data[idx++].ToString();
-                        Vector3 repeats = (Vector3)data[idx++];
-                        Vector3 offsets = (Vector3)data[idx++];
-                        float rotation = (float)Convert.ToDouble(data[idx++]);
-
-                        var osd = new OpenMetaverse.StructuredData.OSDMap();
-                        if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
-                            osd["ntex"] = texture;
-                        osd["nrep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
-                        osd["noff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
-                        osd["nrot"] = (double)rotation;
-
-                        ApplyGLTFOverrideToPart(part, face, osd);
-                        break;
-                    }
-
                     case PRIM_GLTF_METALLIC_ROUGHNESS:
-                    {
-                        // [ PRIM_GLTF_METALLIC_ROUGHNESS, face, texture, repeats, offsets, rotation,
-                        //   metallic_factor, roughness_factor ]
-                        if (idx + 6 >= data.Length) { idx = data.Length; break; }
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 6; break; }
-                        string texture = data[idx++].ToString();
-                        Vector3 repeats = (Vector3)data[idx++];
-                        Vector3 offsets = (Vector3)data[idx++];
-                        float rotation = (float)Convert.ToDouble(data[idx++]);
-                        float metallic = (float)Convert.ToDouble(data[idx++]);
-                        float roughness = (float)Convert.ToDouble(data[idx++]);
-
-                        var osd = new OpenMetaverse.StructuredData.OSDMap();
-                        if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
-                            osd["mrtex"] = texture;
-                        osd["mrrep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
-                        osd["mroff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
-                        osd["mrrot"] = (double)rotation;
-                        osd["mf"] = (double)Math.Clamp(metallic, 0f, 1f);
-                        osd["rf"] = (double)Math.Clamp(roughness, 0f, 1f);
-
-                        ApplyGLTFOverrideToPart(part, face, osd);
-                        break;
-                    }
-
                     case PRIM_GLTF_EMISSIVE:
-                    {
-                        // [ PRIM_GLTF_EMISSIVE, face, texture, repeats, offsets, rotation, emissive_tint ]
-                        if (idx + 5 >= data.Length) { idx = data.Length; break; }
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 5; break; }
-                        string texture = data[idx++].ToString();
-                        Vector3 repeats = (Vector3)data[idx++];
-                        Vector3 offsets = (Vector3)data[idx++];
-                        float rotation = (float)Convert.ToDouble(data[idx++]);
-                        Vector3 emissive = (Vector3)data[idx++];
-
-                        var osd = new OpenMetaverse.StructuredData.OSDMap();
-                        if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
-                            osd["etex"] = texture;
-                        osd["erep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
-                        osd["eoff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
-                        osd["erot"] = (double)rotation;
-                        osd["ec"] = new OpenMetaverse.StructuredData.OSDArray { (double)emissive.X, (double)emissive.Y, (double)emissive.Z };
-
-                        ApplyGLTFOverrideToPart(part, face, osd);
+                        if (idx < data.Length) idx++; // the face, as GetPrimParams takes it
                         break;
-                    }
-
                     default:
-                        m_log.LogWarning("[PhloxAPI]: llSetPrimitiveParams unknown code {0}, stopping", code);
-                        idx = data.Length;
+                        idx += PrimParamRules.GetValueCount(code); // nothing for an avatar; its face is not a rule
                         break;
                 }
             }
+            return new LSLList(result.ToArray());
         }
 
         // ── PRIM_TYPE shape helpers ───────────────────────────────────────────────
@@ -4647,6 +8344,27 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             part.UpdateShape(shapeBlock);
         }
 
+        /// <summary>
+        /// One prim's getter rules. A rule Phlox does not implement yet returns nothing and takes its face, if it
+        /// has one, so the walk goes on with the next rule. PRIM_LINK_TARGET takes its link and changes nothing
+        /// here: the walk above (and osGetPrimitiveParams' one prim) decides which prims a rule reads.
+        /// </summary>
+        /// <summary>
+        /// The faces a per-face read reports: every face of the prim in turn for ALL_SIDES, the one face asked for, or
+        /// none for a face the prim does not have (Halcyon GetPrimParams; SL: ALL_SIDES gives one entry per face). An
+        /// entry is null when the prim has no texture entry at all.
+        /// </summary>
+        private static IEnumerable<Primitive.TextureEntryFace> FacesRead(SceneObjectPart part, int face)
+        {
+            int sides = part.GetNumberOfSides();
+            int first = face == ALL_SIDES ? 0 : face;
+            int last = face == ALL_SIDES ? sides - 1 : face;
+            if (first < 0 || last >= sides) yield break;
+            Primitive.TextureEntry te = part.Shape.Textures;
+            for (int f = first; f <= last; f++)
+                yield return te?.GetFace((uint)f);
+        }
+
         private LSLList GetPrimParams(SceneObjectPart part, LSLList parms)
         {
             if (part == null || parms == null) return new LSLList();
@@ -4663,19 +8381,19 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 {
                     case PRIM_LINK_TARGET:
                         if (idx >= data.Length) break;
-                        idx++; // consume link number — llGetLinkPrimitiveParams handles routing
+                        idx++; // the link: the caller's walk does the routing
                         break;
 
                     case PRIM_COLOR:
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        if (te == null) { result.Add(Vector3.One); result.Add(1f); break; }
-                        Primitive.TextureEntryFace f = face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face);
-                        if (f == null) f = te.DefaultTexture;
-                        result.Add(new Vector3(f.RGBA.R, f.RGBA.G, f.RGBA.B));
-                        result.Add(f.RGBA.A);
+                        foreach (var f in FacesRead(part, face))
+                        {
+                            if (f == null) { result.Add(Vector3.One); result.Add(1f); continue; }
+                            result.Add(new Vector3(f.RGBA.R, f.RGBA.G, f.RGBA.B));
+                            result.Add(f.RGBA.A);
+                        }
                         break;
                     }
 
@@ -4683,14 +8401,15 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        if (te == null) { result.Add(UUID.Zero.ToString()); result.Add(new Vector3(1,1,0)); result.Add(Vector3.Zero); result.Add(0f); break; }
-                        Primitive.TextureEntryFace f = face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face);
-                        if (f == null) f = te.DefaultTexture;
-                        result.Add(f.TextureID.ToString());
-                        result.Add(new Vector3(f.RepeatU, f.RepeatV, 0));
-                        result.Add(new Vector3(f.OffsetU, f.OffsetV, 0));
-                        result.Add(f.Rotation);
+                        foreach (var f in FacesRead(part, face))
+                        {
+                            if (f == null) { result.Add(UUID.Zero.ToString()); result.Add(new Vector3(1,1,0)); result.Add(Vector3.Zero); result.Add(0f); continue; }
+                            // Halcyon's name / full-perm key / NULL_KEY rule.
+                            result.Add(ConditionalTextureNameOrUUID(part, f.TextureID));
+                            result.Add(new Vector3(f.RepeatU, f.RepeatV, 0));
+                            result.Add(new Vector3(f.OffsetU, f.OffsetV, 0));
+                            result.Add(f.Rotation);
+                        }
                         break;
                     }
 
@@ -4698,9 +8417,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        Primitive.TextureEntryFace f = te == null ? null : (face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face));
-                        result.Add(f?.Glow ?? 0f);
+                        foreach (var f in FacesRead(part, face))
+                            result.Add(f?.Glow ?? 0f);
                         break;
                     }
 
@@ -4708,9 +8426,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        Primitive.TextureEntry te = part.Shape.Textures;
-                        Primitive.TextureEntryFace f = te == null ? null : (face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face));
-                        result.Add(f?.Fullbright == true ? 1 : 0);
+                        foreach (var f in FacesRead(part, face))
+                            result.Add(f?.Fullbright == true ? 1 : 0);
                         break;
                     }
 
@@ -4718,10 +8435,127 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     {
                         if (idx >= data.Length) break;
                         int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
+                        foreach (var f in FacesRead(part, face))
+                        {
+                            result.Add((int)(f?.Shiny ?? Shininess.None) >> 6);   // Back to PRIM_SHINY_* 0..3
+                            result.Add((int)(f?.Bump  ?? Bumpiness.None));
+                        }
+                        break;
+                    }
+
+                    case PRIM_TEXGEN:
+                    case PRIM_NORMAL:
+                    case PRIM_SPECULAR:
+                    case PRIM_ALPHA_MODE:
+                    {
+                        // Per face, ALL_SIDES giving each face in turn; a face that does not exist gives nothing
+                        // (Halcyon GetPrimParams).
+                        if (idx >= data.Length) break;
+                        if (data[idx++] is not int face) break;
+                        int sides = part.GetNumberOfSides();
                         Primitive.TextureEntry te = part.Shape.Textures;
-                        Primitive.TextureEntryFace f = te == null ? null : (face == ALL_SIDES ? te.DefaultTexture : te.GetFace((uint)face));
-                        result.Add((int)(f?.Shiny ?? Shininess.None));
-                        result.Add((int)(f?.Bump  ?? Bumpiness.None));
+                        int first = face == ALL_SIDES ? 0 : face;
+                        int last = face == ALL_SIDES ? sides - 1 : face;
+                        if (te == null || first < 0 || last >= sides) break;
+                        for (int f = first; f <= last; f++)
+                        {
+                            Primitive.TextureEntryFace texface = te.GetFace((uint)f);
+                            if (code == PRIM_TEXGEN)
+                                result.Add((int)texface.TexMapType >> 1); // Halcyon: MappingType Default 0, Planar 2
+                            else
+                                GetFaceMaterial(result, code, part, texface);
+                        }
+                        break;
+                    }
+
+                    case IW_PRIM_ALPHA:
+                    {
+                        // [ float alpha ] (Halcyon: GetAlpha, as llGetAlpha, so ALL_SIDES is the faces' sum).
+                        if (idx >= data.Length) break;
+                        if (data[idx++] is not int face) break;
+                        result.Add(GetAlpha(part, face));
+                        break;
+                    }
+
+                    case PRIM_CAST_SHADOWS:
+                        result.Add(0); // SL: it "will always return 0"; Halcyon has no rule
+                        break;
+
+                    case PRIM_ALLOW_UNSIT:
+                        result.Add(part.AllowUnsit ? 1 : 0);
+                        break;
+
+                    case PRIM_SCRIPTED_SIT_ONLY:
+                        result.Add(part.ScriptedSitOnly ? 1 : 0);
+                        break;
+
+                    case PRIM_SIT_FLAGS:
+                        result.Add(PartSitFlags(part));
+                        break;
+
+                    case PRIM_DAMAGE:
+                        // [ float damage, integer damage_type ]: the scene keeps no type, so DAMAGE_TYPE_GENERIC.
+                        result.Add(PrimDamage(part));
+                        result.Add(DAMAGE_TYPE_GENERIC);
+                        break;
+
+                    case PRIM_HEALTH:
+                        result.Add(0f); // SL: "Objects start with 0 health by default"; the scene keeps none
+                        break;
+
+                    case PRIM_COLLISION_SOUND:
+                        PrimCollisionSound(part, result);
+                        break;
+
+                    case PRIM_SLICE:
+                        result.Add(PrimSlice(part));
+                        break;
+
+                    case PRIM_PROJECTOR:
+                        PrimProjector(part, result);
+                        break;
+
+                    case IW_PRIM_PROJECTOR:
+                    {
+                        // [ integer enabled, string texture, float fov, float focus, float ambience ] (Halcyon)
+                        PrimitiveBaseShape shape = part.Shape;
+                        result.Add(shape.ProjectionEntry ? 1 : 0);
+                        result.Add(ConditionalTextureNameOrUUID(part, shape.ProjectionTextureUUID));
+                        result.Add(shape.ProjectionFOV);
+                        result.Add(shape.ProjectionFocus);
+                        result.Add(shape.ProjectionAmbiance);
+                        break;
+                    }
+
+                    case IW_PRIM_PROJECTOR_ENABLED:
+                        result.Add(part.Shape.ProjectionEntry ? 1 : 0);
+                        break;
+
+                    case IW_PRIM_PROJECTOR_TEXTURE:
+                        result.Add(ConditionalTextureNameOrUUID(part, part.Shape.ProjectionTextureUUID));
+                        break;
+
+                    case IW_PRIM_PROJECTOR_FOV:
+                        result.Add(part.Shape.ProjectionFOV);
+                        break;
+
+                    case IW_PRIM_PROJECTOR_FOCUS:
+                        result.Add(part.Shape.ProjectionFocus);
+                        break;
+
+                    case IW_PRIM_PROJECTOR_AMBIENCE:
+                        result.Add(part.Shape.ProjectionAmbiance);
+                        break;
+
+                    case PRIM_REFLECTION_PROBE:
+                    {
+                        // [ integer boolean, float ambiance, float clip_distance, integer flags ] (SL); none: 0, 0.0,
+                        // 0.0, 0.
+                        Primitive.ReflectionProbe probe = part.Shape.ReflectionProbe;
+                        result.Add(probe != null ? 1 : 0);
+                        result.Add(probe?.Ambiance ?? 0f);
+                        result.Add(probe?.ClipDistance ?? 0f);
+                        result.Add((int)(probe?.Flags ?? 0));
                         break;
                     }
 
@@ -4730,15 +8564,67 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         break;
 
                     case PRIM_POSITION:
-                        result.Add(part.AbsolutePosition);
+                        result.Add(SlCompatiblePosition(part));   // as llGetPos
+                        break;
+
+                    case PRIM_POS_LOCAL:
+                        result.Add(PartLocalPos(part));
                         break;
 
                     case PRIM_SIZE:
                         result.Add(part.Scale);
                         break;
 
+                    case PRIM_ROTATION:
+                        result.Add(PartRegionRot(part));
+                        break;
+
                     case PRIM_ROT_LOCAL:
+                        // Halcyon GetPartLocalRot: the root's is the object's rotation (an attachment's, relative
+                        // to the attach point); a child's is relative to the root.
                         result.Add(part.RotationOffset);
+                        break;
+
+                    case PRIM_PHYSICS:
+                        result.Add((part.GetEffectiveObjectFlags() & (uint)PrimFlags.Physics) != 0 ? 1 : 0);
+                        break;
+
+                    case PRIM_TEMP_ON_REZ:
+                        result.Add((part.GetEffectiveObjectFlags() & (uint)PrimFlags.TemporaryOnRez) != 0 ? 1 : 0);
+                        break;
+
+                    case PRIM_PHANTOM:
+                        result.Add((part.GetEffectiveObjectFlags() & (uint)PrimFlags.Phantom) != 0 ? 1 : 0);
+                        break;
+
+                    case PRIM_OMEGA:
+                    {
+                        // SL's form: "the vector is normalized, and the spinrate is
+                        // multiplied by the magnitude of the original vector", then the gain (PrimOmega).
+                        PrimOmega(part, out Vector3 axis, out float spinrate, out float gain);
+                        result.Add(axis);
+                        result.Add(spinrate);
+                        result.Add(gain);
+                        break;
+                    }
+
+                    case PRIM_CLICK_ACTION:
+                        result.Add((int)part.ClickAction);
+                        break;
+
+                    case PRIM_SIT_TARGET:
+                    {
+                        // [ integer active, vector offset, rotation rot ] (Halcyon); none set: 0, ZERO_VECTOR,
+                        // ZERO_ROTATION.
+                        bool active = part.IsSitTargetSet;
+                        result.Add(active ? 1 : 0);
+                        result.Add(active ? part.SitTargetPosition : Vector3.Zero);
+                        result.Add(active ? part.SitTargetOrientation : Quaternion.Identity);
+                        break;
+                    }
+
+                    case PRIM_PHYSICS_SHAPE_TYPE:
+                        result.Add((int)part.PhysicsShapeType);
                         break;
 
                     case PRIM_FLEXIBLE:
@@ -4790,7 +8676,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                                 result.Add(new Vector3(shape.ProfileBegin / 50000.0f, 1 - shape.ProfileEnd / 50000.0f, 0));
                                 break;
                             case 7:
-                                result.Add(shape.SculptTexture.ToString());
+                                // Halcyon's PRIM_TYPE_SCULPT read.
+                                result.Add(ConditionalTextureNameOrUUID(part, shape.SculptTexture));
                                 result.Add((int)shape.SculptType);
                                 break;
                             case 6:
@@ -4820,6 +8707,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         result.Add(part.Description);
                         break;
 
+                    case PRIM_TEXT:
+                    {
+                        // [ string text, vector color, float alpha ] (Halcyon GetPrimParams, SL PRIM_TEXT)
+                        Color4 c = part.GetTextColor();
+                        result.Add(part.Text);
+                        result.Add(new Vector3(c.R, c.G, c.B));
+                        result.Add(c.A);
+                        break;
+                    }
+
                     // ── PBR / glTF Material get params ──────────────────────────
 
                     case PRIM_RENDER_MATERIAL:
@@ -4834,7 +8731,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             foreach (var entry in shape_rm.RenderMaterials.entries)
                             {
                                 if (entry.te_index == (byte)face)
-                                { matId = entry.id.ToString(); break; }
+                                { matId = ConditionalMaterialNameOrUUID(part, entry.id.ToString()); break; }
                             }
                         }
                         result.Add(matId);
@@ -4879,6 +8776,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     }
 
                     default:
+                        idx += PrimParamRules.GetValueCount(code);
                         break;
                 }
             }
@@ -4889,16 +8787,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (m_host == null) return UUID.Zero.ToString();
             SceneObjectGroup group = m_host.ParentGroup;
             if (group == null) return UUID.Zero.ToString();
-            // Link 0 = root part
-            if (linknumber == 0) return group.RootPart.UUID.ToString();
-            SceneObjectPart part = group.GetLinkNumPart(linknumber);
-            if (part != null) return part.UUID.ToString();
-            // Beyond prim count — check sitting avatars (seated avatar link numbers)
-            int seatIndex = linknumber - group.PrimCount;
-            var sitters = GetSittingAvatarList(group);
-            if (seatIndex >= 1 && seatIndex <= sitters.Count)
-                return sitters[seatIndex - 1].ToString();
-            return UUID.Zero.ToString();
+            // Halcyon: the key when the link number selects exactly one prim or seated avatar.
+            var prims = GetLinkParts(linknumber).Take(2).ToList();
+            var sitters = GetLinkSitters(linknumber);
+            if (prims.Count + sitters.Count != 1) return UUID.Zero.ToString();
+            return prims.Count == 1 ? prims[0].UUID.ToString() : sitters[0].UUID.ToString();
         }
 
         public string llGetObjectLinkKey(string objectId, int linknumber)
@@ -4915,47 +8808,49 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return UUID.Zero.ToString();
         }
 
+        /// <summary>
+        /// SL: "If link is out of bounds, NULL_KEY is returned." The rest is Halcyon's table (:4924-5010):
+        /// - in an unlinked prim only 0 and LINK_THIS name it;
+        /// - from the root, LINK_THIS and LINK_ROOT name the root, 0 is NULL_KEY, and the other negative numbers name
+        ///   link 2;
+        /// - from a child, LINK_THIS names it, and 0, LINK_ROOT and the other negative numbers name the root;
+        /// - a number past the prims is a seated avatar, by its name.
+        /// </summary>
         public string llGetLinkName(int linknumber)
         {
-            if (m_host == null) return string.Empty;
+            string nullKey = UUID.Zero.ToString();
+            if (m_host == null) return nullKey;
             SceneObjectGroup group = m_host.ParentGroup;
-            if (group == null) return string.Empty;
-            if (linknumber == 0) return group.RootPart.Name;
-            SceneObjectPart part = group.GetLinkNumPart(linknumber);
-            if (part != null) return part.Name;
-            // Sitting avatar name
-            int seatIndex = linknumber - group.PrimCount;
-            var sitters = GetSittingAvatarList(group);
-            if (seatIndex >= 1 && seatIndex <= sitters.Count)
+            if (group == null) return nullKey;
+            if (linknumber > group.PrimCount)
             {
-                ScenePresence sp = World?.GetScenePresence(sitters[seatIndex - 1]);
-                return sp?.Name ?? string.Empty;
+                var sitters = GetLinkSitters(linknumber);
+                return sitters.Count == 1 ? sitters[0].Name : nullKey;
             }
-            return string.Empty;
-        }
 
-        private List<UUID> GetSittingAvatarList(SceneObjectGroup group)
-        {
-            var result = new List<UUID>();
-            if (World == null) return result;
-            World.ForEachScenePresence(sp =>
-            {
-                if (!sp.IsChildAgent && sp.ParentID != 0 &&
-                    group.ContainsPart(sp.ParentID))
-                    result.Add(sp.UUID);
-            });
-            return result;
+            SceneObjectPart part;
+            if (group.PrimCount == 1)
+                part = linknumber == 0 || linknumber == LINK_THIS ? m_host : null;
+            else if (m_host == group.RootPart)
+                part = linknumber == LINK_THIS || linknumber == LINK_ROOT ? m_host
+                     : linknumber < 0 ? group.GetLinkNumPart(2)
+                     : linknumber == 0 ? null
+                     : group.GetLinkNumPart(linknumber);
+            else
+                part = linknumber == LINK_THIS ? m_host
+                     : linknumber <= 1 ? group.RootPart
+                     : group.GetLinkNumPart(linknumber);
+            return part?.Name ?? nullKey;
         }
 
         public int llGetLinkNumberOfSides(int link)
         {
             if (m_host == null) return 0;
-            SceneObjectGroup group = m_host.ParentGroup;
-            if (group == null) return 0;
-            SceneObjectPart part = link == 0
-                ? group.RootPart
-                : group.GetLinkNumPart(link);
-            return part?.GetNumberOfSides() ?? 0;
+            // Halcyon: the sides of every prim the link number selects.
+            int sides = 0;
+            foreach (SceneObjectPart part in GetLinkParts(link))
+                sides += part.GetNumberOfSides();
+            return sides;
         }
 
         // ── Texture / color / alpha ────────────────────────────────────────────
@@ -4965,12 +8860,15 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             SetColor(m_host, color, face);
         }
 
-        public Vector3 llGetColor(int face)
+        public Vector3 llGetColor(int face) => ColorOf(m_host, face);
+
+        /// <summary>llGetColor over any part, shared with osGetLinkColor (upstream LSL_Api.GetColor).</summary>
+        private static Vector3 ColorOf(SceneObjectPart part, int face)
         {
-            if (m_host == null) return Vector3.Zero;
-            Primitive.TextureEntry tex = m_host.Shape.Textures;
+            if (part == null) return Vector3.Zero;
+            Primitive.TextureEntry tex = part.Shape.Textures;
             if (tex == null) return Vector3.Zero;
-            int sides = m_host.GetNumberOfSides();
+            int sides = part.GetNumberOfSides();
             Vector3 rgb = Vector3.Zero;
 
             if (face == ALL_SIDES)
@@ -4997,28 +8895,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             SetAlpha(m_host, alpha, face);
         }
 
-        public float llGetAlpha(int face)
-        {
-            if (m_host == null) return 0f;
-            Primitive.TextureEntry tex = m_host.Shape.Textures;
-            if (tex == null) return 0f;
-            int sides = m_host.GetNumberOfSides();
-
-            if (face == ALL_SIDES)
-            {
-                // LSL spec: llGetAlpha(ALL_SIDES) returns the SUM of per-face alphas
-                // (not the mean). Scripts rely on this to detect "all faces opaque"
-                // via  llGetAlpha(ALL_SIDES) == (float)llGetNumberOfSides().
-                if (sides <= 0) return 0f;
-                double sum = 0;
-                for (int i = 0; i < sides; i++)
-                    sum += tex.GetFace((uint)i).RGBA.A;
-                return (float)sum;
-            }
-            if (face >= 0 && face < sides)
-                return tex.GetFace((uint)face).RGBA.A;
-            return 0f;
-        }
+        public float llGetAlpha(int face) => GetAlpha(m_host, face);
 
         public void llSetTexture(string texture, int face)
         {
@@ -5038,18 +8915,39 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (effectiveFace >= 0 && effectiveFace < sides)
                 assetID = tex.GetFace((uint)effectiveFace).TextureID;
 
+            return ConditionalTextureNameOrUUID(m_host, assetID);
+        }
+
+        /// <summary>
+        /// A texture as a script may see it (Halcyon ConditionalTextureNameOrUUID, LSLSystemAPI.cs:2300-2316, used by
+        /// llGetTexture, PRIM_TEXTURE, the PRIM_TYPE sculpt map, PRIM_NORMAL / PRIM_SPECULAR and the projector reads):
+        /// its name when it is in the script's prim's inventory (Halcyon's InventoryName searches m_host even when
+        /// llGetLinkPrimitiveParams reads another prim); else its key when <paramref name="part"/> is full-perm for its
+        /// owner (<see cref="AssetKeyIfFullPerm"/>); otherwise NULL_KEY.
+        /// <paramref name="namesFrom"/>: the prim whose inventory names it, for the reads Halcyon has no rule for and
+        /// SL names "a material in the inventory of the target prim" (PRIM_RENDER_MATERIAL, and the GLTF reads with it).
+        /// </summary>
+        private string ConditionalTextureNameOrUUID(SceneObjectPart part, UUID assetID, SceneObjectPart namesFrom = null)
+        {
             if (assetID == UUID.Zero) return UUID.Zero.ToString();
 
             // If the texture is in the prim's inventory, return the inventory name.
-            string name = InventoryName(assetID);
+            string name = InventoryName(namesFrom ?? m_host, assetID);
             if (!string.IsNullOrEmpty(name)) return name;
 
             // Not in prim inventory — only reveal the UUID on full-perm objects.
-            if (IsFullPerm(m_host.OwnerMask))
-                return assetID.ToString();
-
-            return UUID.Zero.ToString();
+            return AssetKeyIfFullPerm(assetID, part.OwnerMask);
         }
+
+        /// <summary>
+        /// A render material or GLTF texture key as a script may see it. SL (llGetRenderMaterial): "If the
+        /// Material is in the prim's inventory, the return value is the inventory name ... NULL_KEY is returned when the
+        /// owner does not have full permissions to the object and the Material is not in the prim's inventory." A GLTF
+        /// override texture that is not a key (none set: empty) is returned as stored.
+        /// </summary>
+        private string ConditionalMaterialNameOrUUID(SceneObjectPart part, string stored)
+            => UUID.TryParse(stored, out UUID id) && id != UUID.Zero
+                ? ConditionalTextureNameOrUUID(part, id, namesFrom: part) : stored;
 
         public void llScaleTexture(float u, float v, int face)
         {
@@ -5136,34 +9034,43 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
 		public void llSetText(string text, Vector3 color, float alpha)
 		{
-			if (m_host == null) return;
-			alpha = Math.Max(0f, Math.Min(1f, alpha));
-			m_host.SetText(text, color, (double)alpha);
+			PrimSetText(m_host, text, color, alpha);
 		}
         // ── Sound ──────────────────────────────────────────────────────────────
 
-        public void llSound(string sound, float volume, int queue, int loop) { /* Deprecated */ }
+        public void llSound(string sound, float volume, int queue, int loop) => Deprecated("llSound");   // Halcyon LSLSystemAPI.cs:2752
         public void llPlaySound(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
             sm.SendSound(m_host, soundID, volume, false, 0, false, false);
         }
 
+        /// <summary>LSL_Api.cs:2939-2942 - the three-argument form is the four with flags 0.</summary>
+        public void llLinkPlaySound(int link, string sound, float volume)
+        {
+            llLinkPlaySound(link, sound, volume, 0);
+        }
+
         public void llLinkPlaySound(int link, string sound, float volume, int flags)
         {
             // SL: play a sound on a specific link. flags: SOUND_PLAY=0, SOUND_LOOP=1, SOUND_TRIGGER=2, SOUND_SYNC=4
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            if (m_host == null) return;
+            bool loop = (flags & 1) != 0;
+            bool trigger = (flags & 2) != 0;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero)
+            {
+                MissingSound(sound, trigger ? Array.Empty<SceneObjectPart>() : GetLinkParts(link).ToArray());
+                return;
+            }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
-            bool loop = (flags & 1) != 0;
-            bool trigger = (flags & 2) != 0;
             foreach (SceneObjectPart part in GetLinkParts(link))
             {
                 if (trigger)
@@ -5176,8 +9083,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llLoopSound(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -5187,8 +9094,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llLoopSoundMaster(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -5198,8 +9105,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llLoopSoundSlave(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -5209,8 +9116,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llPlaySoundSlave(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound, m_host); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -5220,8 +9127,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llTriggerSound(string sound, float volume)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -5231,8 +9138,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llTriggerSoundLimited(string sound, float volume, Vector3 top, Vector3 bottom)
         {
             if (m_host == null) return;
-            UUID soundID = KeyOrName(sound);
-            if (soundID == UUID.Zero) return;
+            UUID soundID = SoundKeyOrName(sound);
+            if (soundID == UUID.Zero) { MissingSound(sound); return; }
             volume = Math.Max(0f, Math.Min(1f, volume));
             ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
             if (sm == null) return;
@@ -5258,7 +9165,52 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             ScriptSleep(1000);
         }
 
-        public void llSoundPreload(string sound) { llPreloadSound(sound); }
+        /// <summary>
+        /// SL: "This function has been deprecated, please use llPreloadSound instead." It preloads as llPreloadSound
+        /// does, without llPreloadSound's 1 s delay: Halcyon's has none ("documented to have no delay",
+        /// LSLSystemAPI.cs:4050-4057).
+        /// </summary>
+        public void llSoundPreload(string sound)
+        {
+            if (m_host == null) return;
+            UUID soundID = KeyOrName(sound);
+            if (soundID == UUID.Zero) return;
+            World?.RequestModuleInterface<ISoundModule>()?.PreloadSound(m_host, soundID);
+        }
+
+        /// <summary>
+        /// A sound as the sound calls name it: the script's prim's sound item of that name, else a UUID; UUID.Zero when
+        /// neither. SL (llPlaySound, llLoopSound): "If sound is missing from the prim's inventory and it is not a UUID or
+        /// it is not a sound then an error is shouted on DEBUG_CHANNEL" - an item of another type does not count.
+        /// </summary>
+        private UUID SoundKeyOrName(string k)
+        {
+            if (string.IsNullOrEmpty(k)) return UUID.Zero;
+            lock (m_host.TaskInventory)
+            {
+                foreach (var kvp in m_host.TaskInventory)
+                {
+                    if (kvp.Value.Name == k && kvp.Value.Type == (int)AssetType.Sound)
+                        return kvp.Value.AssetID;
+                }
+            }
+            return UUID.TryParse(k, out UUID id) ? id : UUID.Zero;
+        }
+
+        /// <summary>
+        /// A sound the prim does not have: the sound playing on each of <paramref name="stop"/> stops, as Halcyon's
+        /// UpdateSound with a zero key stops it, and SL's error goes out on DEBUG_CHANNEL with the text Phlox gives for a
+        /// missing collision sound. The trigger calls pass no prims: they play no attached sound to stop.
+        /// </summary>
+        private void MissingSound(string sound, params SceneObjectPart[] stop)
+        {
+            if (stop.Length > 0)
+            {
+                ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
+                foreach (SceneObjectPart part in stop) sm?.StopSound(part);
+            }
+            ShoutError($"Could not find sound '{sound}'");
+        }
 
         public void llAdjustSoundVolume(float volume)
         {
@@ -5284,10 +9236,59 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llCollisionSound(string impact_sound, float impact_volume)
         {
             if (m_host == null) return;
-            m_host.CollisionSound = KeyOrName(impact_sound);
-            m_host.CollisionSoundVolume = Math.Max(0f, Math.Min(1f, impact_volume));
+            PrimSetCollisionSound(m_host, impact_sound, impact_volume);
         }
-        public void llCollisionSprite(string impact_sprite) { /* NotImplemented in Halcyon */ }
+
+        /// <summary>
+        /// llCollisionSound and PRIM_COLLISION_SOUND on one prim, stored in the scene's CollisionSound and
+        /// CollisionSoundVolume (the CollisionSound setter derives CollisionSoundType), as OpenSim's LSL_Api does.
+        /// SL: "If impact_sound is an empty string then the collision sound is suppressed" (the scene's
+        /// invalidCollisionSoundUUID); otherwise impact_sound is a sound's key or the name of a sound in the prim's
+        /// inventory (Halcyon and SL: a sound, not any item), and when it is neither "an error is shouted on
+        /// DEBUG_CHANNEL" and the prim keeps its sound. The volume is held to SL's 0.0-1.0. The part's collision
+        /// subscription is refreshed, since the scene listens for collisions only while a sound is not suppressed.
+        /// </summary>
+        private void PrimSetCollisionSound(SceneObjectPart part, string impact_sound, float impact_volume)
+        {
+            float volume = Math.Clamp(impact_volume, 0f, 1f);
+            UUID sound;
+            if (string.IsNullOrEmpty(impact_sound))
+                sound = part.invalidCollisionSoundUUID;
+            else if (!UUID.TryParse(impact_sound, out sound))
+            {
+                sound = UUID.Zero;
+                lock (part.TaskInventory)
+                {
+                    foreach (TaskInventoryItem item in part.TaskInventory.Values)
+                    {
+                        if (item.Type == (int)AssetType.Sound && item.Name == impact_sound)
+                        {
+                            sound = item.AssetID;
+                            break;
+                        }
+                    }
+                }
+                if (sound == UUID.Zero)
+                {
+                    ShoutError($"Could not find sound '{impact_sound}'");
+                    return;
+                }
+            }
+            part.CollisionSound = sound;
+            part.CollisionSoundVolume = volume;
+            part.aggregateScriptEvents();
+        }
+
+        /// <summary>
+        /// PRIM_COLLISION_SOUND's read: [ key sound, float volume ]. A suppressed or default sound reads NULL_KEY.
+        /// </summary>
+        private static void PrimCollisionSound(SceneObjectPart part, List<object> result)
+        {
+            UUID sound = part.CollisionSound;
+            result.Add(sound == part.invalidCollisionSoundUUID ? UUID.Zero.ToString() : sound.ToString());
+            result.Add(part.CollisionSoundVolume);
+        }
+        public void llCollisionSprite(string impact_sprite) => NotImplemented("llCollisionSprite");   // Halcyon LSLSystemAPI.cs:5835
 
         // ── Particles ──────────────────────────────────────────────────────────
 
@@ -5326,8 +9327,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             ps.BurstRate = 0.1f;
             ps.PartMaxAge = 10.0f;
             ps.BurstPartCount = 1;
-            ps.BlendFuncSource = (byte)0;  // PSYS_PART_BF_SOURCE_ALPHA
-            ps.BlendFuncDest = (byte)1;    // PSYS_PART_BF_ONE_MINUS_SOURCE_ALPHA
+            ps.BlendFuncSource = (byte)PSYS_PART_BF_SOURCE_ALPHA;
+            ps.BlendFuncDest = (byte)PSYS_PART_BF_ONE_MINUS_SOURCE_ALPHA;
             ps.PartStartGlow = 0.0f;
             ps.PartEndGlow = 0.0f;
             return ps;
@@ -5354,110 +9355,110 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
                     switch (rule)
                     {
-                        case 0: // PSYS_PART_FLAGS
+                        case PSYS_PART_FLAGS:
                             prules.PartDataFlags = (Primitive.ParticleSystem.ParticleDataFlags)(uint)rules.GetLSLIntegerItem(i + 1);
                             break;
-                        case 1: // PSYS_PART_START_COLOR
+                        case PSYS_PART_START_COLOR:
                             tempv = ParseVector(rules.Data[i + 1]);
                             prules.PartStartColor.R = tempv.X;
                             prules.PartStartColor.G = tempv.Y;
                             prules.PartStartColor.B = tempv.Z;
                             break;
-                        case 2: // PSYS_PART_START_ALPHA
+                        case PSYS_PART_START_ALPHA:
                             prules.PartStartColor.A = ParseFloat(rules.Data[i + 1]);
                             break;
-                        case 3: // PSYS_PART_END_COLOR
+                        case PSYS_PART_END_COLOR:
                             tempv = ParseVector(rules.Data[i + 1]);
                             prules.PartEndColor.R = tempv.X;
                             prules.PartEndColor.G = tempv.Y;
                             prules.PartEndColor.B = tempv.Z;
                             break;
-                        case 4: // PSYS_PART_END_ALPHA
+                        case PSYS_PART_END_ALPHA:
                             prules.PartEndColor.A = ParseFloat(rules.Data[i + 1]);
                             break;
-                        case 5: // PSYS_PART_START_SCALE
+                        case PSYS_PART_START_SCALE:
                             tempv = ParseVector(rules.Data[i + 1]);
                             prules.PartStartScaleX = LimitScaleForByteEncoding(tempv.X);
                             prules.PartStartScaleY = LimitScaleForByteEncoding(tempv.Y);
                             break;
-                        case 6: // PSYS_PART_END_SCALE
+                        case PSYS_PART_END_SCALE:
                             tempv = ParseVector(rules.Data[i + 1]);
                             prules.PartEndScaleX = LimitScaleForByteEncoding(tempv.X);
                             prules.PartEndScaleY = LimitScaleForByteEncoding(tempv.Y);
                             break;
-                        case 7: // PSYS_PART_MAX_AGE
+                        case PSYS_PART_MAX_AGE:
                             prules.PartMaxAge = LimitFloat(ParseFloat(rules.Data[i + 1]), 30.0f, false);
                             break;
-                        case 8: // PSYS_SRC_ACCEL
+                        case PSYS_SRC_ACCEL:
                             tempv = ParseVector(rules.Data[i + 1]);
                             prules.PartAcceleration.X = LimitFloat(tempv.X, 100.0f, true);
                             prules.PartAcceleration.Y = LimitFloat(tempv.Y, 100.0f, true);
                             prules.PartAcceleration.Z = LimitFloat(tempv.Z, 100.0f, true);
                             break;
-                        case 9: // PSYS_SRC_PATTERN
+                        case PSYS_SRC_PATTERN:
                             prules.Pattern = (Primitive.ParticleSystem.SourcePattern)rules.GetLSLIntegerItem(i + 1);
                             break;
-                        case 10: // PSYS_SRC_INNERANGLE
+                        case PSYS_SRC_INNERANGLE:
                             prules.InnerAngle = ParseFloat(rules.Data[i + 1]);
                             prules.PartFlags &= 0xFFFFFFFD;
                             break;
-                        case 11: // PSYS_SRC_OUTERANGLE
+                        case PSYS_SRC_OUTERANGLE:
                             prules.OuterAngle = ParseFloat(rules.Data[i + 1]);
                             prules.PartFlags &= 0xFFFFFFFD;
                             break;
-                        case 12: // PSYS_SRC_TEXTURE
+                        case PSYS_SRC_TEXTURE:
                             prules.Texture = KeyOrName(rules.Data[i + 1].ToString());
                             break;
-                        case 13: // PSYS_SRC_BURST_RATE
+                        case PSYS_SRC_BURST_RATE:
                             tempf = ParseFloat(rules.Data[i + 1]);
                             if (tempf < MIN_SRC_BURST_RATE) tempf = MIN_SRC_BURST_RATE;
                             prules.BurstRate = tempf;
                             break;
-                        case 15: // PSYS_SRC_BURST_PART_COUNT
+                        case PSYS_SRC_BURST_PART_COUNT:
                             prules.BurstPartCount = (byte)rules.GetLSLIntegerItem(i + 1);
                             break;
-                        case 16: // PSYS_SRC_BURST_RADIUS
+                        case PSYS_SRC_BURST_RADIUS:
                             prules.BurstRadius = LimitFloat(ParseFloat(rules.Data[i + 1]), 50.0f, false);
                             break;
-                        case 17: // PSYS_SRC_BURST_SPEED_MIN
+                        case PSYS_SRC_BURST_SPEED_MIN:
                             prules.BurstSpeedMin = ParseFloat(rules.Data[i + 1]);
                             break;
-                        case 18: // PSYS_SRC_BURST_SPEED_MAX
+                        case PSYS_SRC_BURST_SPEED_MAX:
                             prules.BurstSpeedMax = ParseFloat(rules.Data[i + 1]);
                             break;
-                        case 19: // PSYS_SRC_MAX_AGE
+                        case PSYS_SRC_MAX_AGE:
                             prules.MaxAge = ParseFloat(rules.Data[i + 1]);
                             break;
-                        case 20: // PSYS_SRC_TARGET_KEY
+                        case PSYS_SRC_TARGET_KEY:
                             if (UUID.TryParse(rules.Data[i + 1].ToString(), out UUID key))
                                 prules.Target = key;
                             else
                                 prules.Target = part.UUID;
                             break;
-                        case 21: // PSYS_SRC_OMEGA
+                        case PSYS_SRC_OMEGA:
                             tempv = ParseVector(rules.Data[i + 1]);
                             prules.AngularVelocity.X = tempv.X;
                             prules.AngularVelocity.Y = tempv.Y;
                             prules.AngularVelocity.Z = tempv.Z;
                             break;
-                        case 22: // PSYS_SRC_ANGLE_BEGIN
+                        case PSYS_SRC_ANGLE_BEGIN:
                             prules.InnerAngle = ParseFloat(rules.Data[i + 1]);
                             prules.PartFlags |= 0x02;
                             break;
-                        case 23: // PSYS_SRC_ANGLE_END
+                        case PSYS_SRC_ANGLE_END:
                             prules.OuterAngle = ParseFloat(rules.Data[i + 1]);
                             prules.PartFlags |= 0x02;
                             break;
-                        case 24: // PSYS_PART_START_GLOW
+                        case PSYS_PART_START_GLOW:
                             prules.PartStartGlow = ParseFloat(rules.Data[i + 1]);
                             break;
-                        case 25: // PSYS_PART_END_GLOW
+                        case PSYS_PART_END_GLOW:
                             prules.PartEndGlow = ParseFloat(rules.Data[i + 1]);
                             break;
-                        case 26: // PSYS_PART_BLEND_FUNC_SOURCE
+                        case PSYS_PART_BLEND_FUNC_SOURCE:
                             prules.BlendFuncSource = (byte)rules.GetLSLIntegerItem(i + 1);
                             break;
-                        case 27: // PSYS_PART_BLEND_FUNC_DEST
+                        case PSYS_PART_BLEND_FUNC_DEST:
                             prules.BlendFuncDest = (byte)rules.GetLSLIntegerItem(i + 1);
                             break;
                     }
@@ -5496,10 +9497,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 return new Vector3(x, y, z);
             return Vector3.Zero;
         }
-        public void llMakeExplosion(int particles, float scale, float vel, float lifetime, float arc, string texture, Vector3 offset) { /* Deprecated */ }
-        public void llMakeFountain(int particles, float scale, float vel, float lifetime, float arc, int bounce, string texture, Vector3 offset, float bounce_offset) { /* Deprecated */ }
-        public void llMakeSmoke(int particles, float scale, float vel, float lifetime, float arc, string texture, Vector3 offset) { /* Deprecated */ }
-        public void llMakeFire(int particles, float scale, float vel, float lifetime, float arc, string texture, Vector3 offset) { /* Deprecated */ }
+        public void llMakeExplosion(int particles, float scale, float vel, float lifetime, float arc, string texture, Vector3 offset) => Deprecated("llMakeExplosion");   // Halcyon LSLSystemAPI.cs:3104
+        public void llMakeFountain(int particles, float scale, float vel, float lifetime, float arc, int bounce, string texture, Vector3 offset, float bounce_offset) => Deprecated("llMakeFountain");   // Halcyon LSLSystemAPI.cs:3110
+        public void llMakeSmoke(int particles, float scale, float vel, float lifetime, float arc, string texture, Vector3 offset) => Deprecated("llMakeSmoke");   // Halcyon LSLSystemAPI.cs:3116
+        public void llMakeFire(int particles, float scale, float vel, float lifetime, float arc, string texture, Vector3 offset) => Deprecated("llMakeFire");   // Halcyon LSLSystemAPI.cs:3122
 
         // ── Terrain / environment ──────────────────────────────────────────────
 
@@ -5522,7 +9523,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             Vector3 pos = m_host.AbsolutePosition + offset;
             IWindModule windMod = World.RequestModuleInterface<IWindModule>();
             if (windMod == null) return Vector3.Zero;
-            return windMod.WindSpeed((int)pos.X, (int)pos.Y, (int)pos.Z);
+            // llWind has no vertical part (Halcyon :1426-1435 "llWind's legacy behavior is that is does not return
+            // any z-data"; YEngine LSL_Api.llWind); iwWind keeps it.
+            Vector3 wind = windMod.WindSpeed((int)pos.X, (int)pos.Y, (int)pos.Z);
+            wind.Z = 0f;
+            return wind;
         }
 
         public Vector3 llGetSunDirection()
@@ -5538,43 +9543,102 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return envModule.GetSunDir(m_host.GetWorldPosition());
         }
        
+        // The ground vectors are Halcyon's (LSLSystemAPI.cs:7998-8036, TerrainChannel.cs:416-531). The SL wiki says of
+        // llGroundNormal "This function does not return a unit vector"; the slope's length gives the steepness.
+
+        /// <summary>Halcyon llGroundNormal: &lt;slope.x, slope.y, 1.0&gt;, not normalised.</summary>
         public Vector3 llGroundNormal(Vector3 offset)
         {
-            if (World == null || m_host == null) return Vector3.UnitZ;
-            Vector3 pos = m_host.AbsolutePosition + offset;
-            float hC = World.GetGroundHeight(pos.X,       pos.Y);
-            float hX = World.GetGroundHeight(pos.X + 1f,  pos.Y);
-            float hY = World.GetGroundHeight(pos.X,       pos.Y + 1f);
-            Vector3 normal = new Vector3(hC - hX, hC - hY, 1f);
-            normal.Normalize();
-            return normal;
+            Vector3 slope = llGroundSlope(offset);
+            return new Vector3(slope.X, slope.Y, 1f);
         }
 
+        /// <summary>
+        /// Halcyon llGroundSlope: the downhill vector of the heightmap triangle under the point, not normalised, with
+        /// a negative z on sloped ground (NormalToSlope(CalculateNormalAt)); zero on flat ground.
+        /// </summary>
         public Vector3 llGroundSlope(Vector3 offset)
         {
-            // Slope is the horizontal component of the ground normal
-            Vector3 n = llGroundNormal(offset);
-            Vector3 slope = new Vector3(n.X, n.Y, 0f);
-            slope.Normalize();
+            if (World == null || m_host == null) return Vector3.Zero;
+            Vector3 pos = GroundPoint(offset);
+            return NormalToSlope(TriangleNormalAt(World.Heightmap, pos.X, pos.Y));
+        }
+
+        /// <summary>Halcyon llGroundContour: &lt;-slope.y, slope.x, 0&gt; over the unnormalised slope.</summary>
+        public Vector3 llGroundContour(Vector3 offset)
+        {
+            Vector3 slope = llGroundSlope(offset);
+            return new Vector3(-slope.Y, slope.X, 0f);
+        }
+
+        /// <summary>The prim's position plus the offset, held on the heightmap (Halcyon ValidLocation).</summary>
+        private Vector3 GroundPoint(Vector3 offset)
+        {
+            Vector3 pos = m_host.GetWorldPosition() + offset;
+            ITerrainChannel map = World.Heightmap;
+            pos.X = Math.Clamp(pos.X, 0f, map.Width - 0.01f);
+            pos.Y = Math.Clamp(pos.Y, 0f, map.Height - 0.01f);
+            return pos;
+        }
+
+        /// <summary>Halcyon TerrainChannel.TriangleNormal: the cross product of two edge deltas.</summary>
+        private static Vector3 TriangleNormal(Vector3 delta1, Vector3 delta2)
+        {
+            if (delta1 == Vector3.Zero) return new Vector3(0f, delta2.Y * -delta1.Z, 1f);
+            if (delta2 == Vector3.Zero) return new Vector3(delta1.X * -delta1.Z, 0f, 1f);
+            return new Vector3(
+                delta1.Y * delta2.Z - delta1.Z * delta2.Y,
+                delta1.Z * delta2.X - delta1.X * delta2.Z,
+                delta1.X * delta2.Y - delta1.Y * delta2.X);
+        }
+
+        /// <summary>Halcyon TerrainChannel.NormalToSlope.</summary>
+        private static Vector3 NormalToSlope(Vector3 normal)
+        {
+            Vector3 slope = normal;
+            slope.Z = normal.Z == 0f ? 1f : (normal.X * normal.X + normal.Y * normal.Y) / (-1f * normal.Z);
             return slope;
         }
 
-        public Vector3 llGroundContour(Vector3 offset)
+        /// <summary>The four heightmap points of the cell under (x, y): P0 (x, y), P1 (x+1, y), P2 (x, y+1), P3 (x+1, y+1).</summary>
+        private static void CellCorners(ITerrainChannel map, float xPos, float yPos,
+            out Vector3 p0, out Vector3 p1, out Vector3 p2, out Vector3 p3)
         {
-            // Contour is perpendicular to slope in the XY plane
-            Vector3 slope = llGroundSlope(offset);
-            return new Vector3(-slope.Y, slope.X, 0f);
+            int x = (int)xPos, y = (int)yPos;
+            int x1 = Math.Min(x + 1, map.Width - 1), y1 = Math.Min(y + 1, map.Height - 1);
+            p0 = new Vector3(x, y, map[x, y]);
+            p1 = new Vector3(x1, y, map[x1, y]);
+            p2 = new Vector3(x, y1, map[x, y1]);
+            p3 = new Vector3(x1, y1, map[x1, y1]);
+        }
+
+        /// <summary>
+        /// Halcyon TerrainChannel.CalculateNormalAt: the normal of the triangle the point is in. Cells are split like
+        /// [/] (P2 - P3 over P0 - P1), as LL's terrain is.
+        /// </summary>
+        private static Vector3 TriangleNormalAt(ITerrainChannel map, float xPos, float yPos)
+        {
+            CellCorners(map, xPos, yPos, out Vector3 p0, out Vector3 p1, out Vector3 p2, out Vector3 p3);
+            float xOffset = xPos - (int)xPos, yOffset = yPos - (int)yPos;
+            return xOffset + (1f - yOffset) < 1f
+                ? TriangleNormal(p2 - p3, p0 - p2)    // upper left (NW) triangle
+                : TriangleNormal(p0 - p1, p1 - p3);   // lower right (SE) triangle
         }
 
         public float llWater(Vector3 offset)
         {
             return (float)(World?.RegionInfo?.RegionSettings?.WaterHeight ?? 20.0);
         }
+        /// <summary>
+        /// Not implemented: core's IWindModule has no way to set the wind at a point (Halcyon's WindSet). Halcyon let
+        /// estate managers and gods call it (:1459-1472) and ignored everyone else, so those callers are told on
+        /// DEBUG_CHANNEL; anyone else still gets nothing.
+        /// </summary>
         public void iwSetWind(int type, Vector3 offset, Vector3 speed)
         {
-            // Halcyon's IWindModule.WindSet(type, pos, speed) does not exist in Legion.
-            // Legion only has WindParamSet(plugin, param, value) which is a different API.
-            // Keeping as no-op.
+            if (m_host == null || World == null) return;
+            if (World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false) || World.Permissions.IsGod(m_host.OwnerID))
+                NotImplemented("iwSetWind");
         }
         public Vector3 iwWind(Vector3 offset)
         {
@@ -5588,13 +9652,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public Vector3 iwGroundSurfaceNormal(Vector3 offset)
         {
-            // Faithful port: returns the terrain surface normal at the given offset
+            // Halcyon TerrainChannel.Calculate4PointNormalAt (:487-531): the unit normal averaged over the cell's two
+            // triangles; on a perfectly balanced ridge or valley, the triangle the point is in.
             if (World == null || m_host == null) return Vector3.UnitZ;
-            Vector3 pos = m_host.AbsolutePosition + offset;
-            float hC = World.GetGroundHeight(pos.X,       pos.Y);
-            float hX = World.GetGroundHeight(pos.X + 1f,  pos.Y);
-            float hY = World.GetGroundHeight(pos.X,       pos.Y + 1f);
-            Vector3 normal = new Vector3(hC - hX, hC - hY, 1f);
+            Vector3 pos = GroundPoint(offset);
+            CellCorners(World.Heightmap, pos.X, pos.Y, out Vector3 p0, out Vector3 p1, out Vector3 p2, out Vector3 p3);
+            Vector3 normal0 = TriangleNormal(p2 - p3, p0 - p2);
+            Vector3 normal1 = TriangleNormal(p1 - p0, p3 - p1);
+            Vector3 normal = (normal0 + normal1) / 2f;
+            if (normal.X == 0f && normal.Y == 0f)
+                normal = pos.X - (int)pos.X + (1f - (pos.Y - (int)pos.Y)) <= 1f ? normal0 : normal1;
             normal.Normalize();
             return normal;
         }
@@ -5673,9 +9740,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return parcel.GetSimulatorMaxPrimCount();
         }
 
-        public LSLList llGetParcelDetails(Vector3 pos, LSLList parms)
+        public LSLList llGetParcelDetails(Vector3 pos, LSLList parms) => ParcelDetailsOf(World?.GetLandData(pos.X, pos.Y), parms);
+
+        /// <summary>llGetParcelDetails over a LandData, shared with osGetParcelDetails (by parcel id).</summary>
+        private LSLList ParcelDetailsOf(LandData land, LSLList parms)
         {
-            LandData land = World.GetLandData(pos.X, pos.Y);
             if (land == null) return new LSLList(0);
             var ret = new LSLList();
             for (int idx = 0; idx < parms.Length; idx++)
@@ -5723,9 +9792,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             Vector3 landpos = m_host.AbsolutePosition;
             ILandObject landObject = World.LandChannel.GetLandObject(landpos.X, landpos.Y);
-            if (landObject == null) return;
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return;
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.LandManageAllowed)) { ScriptSleep(100); return; }
             if (UUID.TryParse(avatar, out UUID key))
             {
                 LandAccessEntry entry = new LandAccessEntry();
@@ -5741,9 +9808,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             Vector3 landpos = m_host.AbsolutePosition;
             ILandObject landObject = World.LandChannel.GetLandObject(landpos.X, landpos.Y);
-            if (landObject == null) return;
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return;
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.LandManageAllowed)) { ScriptSleep(100); return; }
             if (UUID.TryParse(avatar, out UUID key))
             {
                 LandAccessEntry entry = new LandAccessEntry();
@@ -5759,9 +9824,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             Vector3 landpos = m_host.AbsolutePosition;
             ILandObject landObject = World.LandChannel.GetLandObject(landpos.X, landpos.Y);
-            if (landObject == null) return;
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return;
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.LandManageAllowed)) { ScriptSleep(100); return; }
             if (UUID.TryParse(avatar, out UUID key))
             {
                 landObject.LandData.ParcelAccessList.RemoveAll(
@@ -5774,9 +9837,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             Vector3 landpos = m_host.AbsolutePosition;
             ILandObject landObject = World.LandChannel.GetLandObject(landpos.X, landpos.Y);
-            if (landObject == null) return;
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return;
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.LandManageAllowed)) { ScriptSleep(100); return; }
             if (UUID.TryParse(avatar, out UUID key))
             {
                 landObject.LandData.ParcelAccessList.RemoveAll(
@@ -5789,9 +9850,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             Vector3 landpos = m_host.AbsolutePosition;
             ILandObject landObject = World.LandChannel.GetLandObject(landpos.X, landpos.Y);
-            if (landObject == null) return;
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return;
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.LandManageAllowed)) { ScriptSleep(100); return; }
             landObject.LandData.ParcelAccessList.RemoveAll(e => e.Flags == AccessList.Ban);
             ScriptSleep(100);
         }
@@ -5800,13 +9859,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             Vector3 landpos = m_host.AbsolutePosition;
             ILandObject landObject = World.LandChannel.GetLandObject(landpos.X, landpos.Y);
-            if (landObject == null) return;
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return;
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.LandManageAllowed)) { ScriptSleep(100); return; }
             landObject.LandData.ParcelAccessList.RemoveAll(e => e.Flags == AccessList.Access);
             ScriptSleep(100);
         }
 
+        /// <summary>
+        /// Halcyon LSLSystemAPI.cs:7348-7351: the avatar is sent home through llTeleportAgentHome, so the same
+        /// authorization (no god; group land for deeded objects or an owner with Eject and Freeze) and
+        /// the same 5 s sleep.
+        /// </summary>
         public void llEjectFromLand(string pest)
         {
             llTeleportAgentHome(pest);
@@ -5816,9 +9878,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             ILandObject landObject = World.LandChannel.GetLandObject(
                 m_host.AbsolutePosition.X, m_host.AbsolutePosition.Y);
-            if (landObject == null) return;
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return;
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.ChangeMedia)) return;
             landObject.LandData.MusicURL = url ?? string.Empty;
             World.EventManager.TriggerLandObjectUpdated((uint)landObject.LandData.LocalID, landObject);
             ScriptSleep(2000);
@@ -5836,9 +9896,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             ILandObject landObject = World.LandChannel.GetLandObject(
                 m_host.AbsolutePosition.X, m_host.AbsolutePosition.Y);
-            if (landObject == null) return;
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return;
+            // Halcyon asks for m_host.ObjectOwner here, which is the owner.
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.ChangeMedia)) return;
 
             bool update = false;
             byte loop = 0;
@@ -5867,7 +9926,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                                 if (UUID.TryParse((string)commandList.Data[i + 1], out UUID agentID))
                                     presence = World.GetScenePresence(agentID);
                             }
-                            else ShoutError("The argument of PARCEL_MEDIA_COMMAND_AGENT must be a key");
+                            else ScriptShoutError("The argument of PARCEL_MEDIA_COMMAND_AGENT must be a key");
                             ++i;
                         }
                         break;
@@ -5883,7 +9942,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         if ((i + 1) < commandList.Length)
                         {
                             if (commandList.Data[i + 1] is string) { url = (string)commandList.Data[i + 1]; update = true; }
-                            else ShoutError("The argument of PARCEL_MEDIA_COMMAND_URL must be a string.");
+                            else ScriptShoutError("The argument of PARCEL_MEDIA_COMMAND_URL must be a string.");
                             ++i;
                         }
                         break;
@@ -5896,7 +9955,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                                     textureID = UUID.Zero;
                                 update = true;
                             }
-                            else ShoutError("The argument of PARCEL_MEDIA_COMMAND_TEXTURE must be a string or key.");
+                            else ScriptShoutError("The argument of PARCEL_MEDIA_COMMAND_TEXTURE must be a string or key.");
                             ++i;
                         }
                         break;
@@ -5904,7 +9963,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         if ((i + 1) < commandList.Length)
                         {
                             if (commandList.Data[i + 1] is float) time = (float)commandList.Data[i + 1];
-                            else ShoutError("The argument of PARCEL_MEDIA_COMMAND_TIME must be a float.");
+                            else ScriptShoutError("The argument of PARCEL_MEDIA_COMMAND_TIME must be a float.");
                             ++i;
                         }
                         break;
@@ -5912,7 +9971,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         if ((i + 1) < commandList.Length)
                         {
                             if (commandList.Data[i + 1] is int) { autoAlign = (int)commandList.Data[i + 1] == 1; update = true; }
-                            else ShoutError("The argument of PARCEL_MEDIA_COMMAND_AUTO_ALIGN must be an integer.");
+                            else ScriptShoutError("The argument of PARCEL_MEDIA_COMMAND_AUTO_ALIGN must be an integer.");
                             ++i;
                         }
                         break;
@@ -5920,7 +9979,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         if ((i + 1) < commandList.Length)
                         {
                             if (commandList.Data[i + 1] is string) { mediaType = (string)commandList.Data[i + 1]; update = true; }
-                            else ShoutError("The argument of PARCEL_MEDIA_COMMAND_TYPE must be a string.");
+                            else ScriptShoutError("The argument of PARCEL_MEDIA_COMMAND_TYPE must be a string.");
                             ++i;
                         }
                         break;
@@ -5928,7 +9987,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         if ((i + 1) < commandList.Length)
                         {
                             if (commandList.Data[i + 1] is string) { description = (string)commandList.Data[i + 1]; update = true; }
-                            else ShoutError("The argument of PARCEL_MEDIA_COMMAND_DESC must be a string.");
+                            else ScriptShoutError("The argument of PARCEL_MEDIA_COMMAND_DESC must be a string.");
                             ++i;
                         }
                         break;
@@ -5937,50 +9996,56 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         {
                             if (commandList.Data[i + 1] is int && commandList.Data[i + 2] is int)
                             { width = (int)commandList.Data[i + 1]; height = (int)commandList.Data[i + 2]; update = true; }
+                            // Halcyon LSLSystemAPI.cs:13148, 13150.
+                            else if (commandList.Data[i + 1] is int)
+                                ScriptShoutError("The second argument of PARCEL_MEDIA_COMMAND_SIZE must be an integer.");
+                            else
+                                ScriptShoutError("The first argument of PARCEL_MEDIA_COMMAND_SIZE must be an integer.");
                             ++i; ++i;
                         }
                         break;
                     default:
+                        // Halcyon :13155-13157, naming the command as its Enum.Parse did.
+                        NotImplemented("llParcelMediaCommandList parameter not supported yet: " + command.ToString());
                         break;
                 }
             }
 
+            // With PARCEL_MEDIA_COMMAND_AGENT the command goes to that agent only and the parcel's media settings
+            // stay as they are (SL wiki llParcelMediaCommandList; Halcyon :13161-13201: "if we did get a presence, we
+            // only send to the agent specified, and *don't change the land settings*!"). Without it the parcel is
+            // updated and every agent on it told.
+            List<ScenePresence> receivers;
+            if (presence != null)
+                receivers = presence.IsChildAgent || presence.IsDeleted || presence.IsInTransit
+                    || presence.currentParcelUUID != landData.GlobalID
+                    ? new List<ScenePresence>() : new List<ScenePresence> { presence };
+            else
+                receivers = World.GetScenePresences().FindAll(
+                    a => !a.IsChildAgent && !a.IsDeleted && a.currentParcelUUID == landData.GlobalID);
+
             if (update)
             {
-                landData.MediaID = textureID;
-                landData.MediaAutoScale = autoAlign ? (byte)1 : (byte)0;
-                landData.MediaDescription = description;
-                landData.MediaWidth = width;
-                landData.MediaHeight = height;
-                landData.MediaType = mediaType;
-                landData.MediaURL = url;
-                World.EventManager.TriggerLandObjectUpdated((uint)landData.LocalID, landObject);
-
-                List<ScenePresence> agents = World.GetScenePresences();
-                foreach (ScenePresence agent in agents)
+                if (presence == null)
                 {
-                    if (agent.IsChildAgent || agent.IsDeleted) continue;
-                    ScenePresence target = presence ?? agent;
-                    if (target == agent && agent.currentParcelUUID == landData.GlobalID)
-                        agent.ControllingClient.SendParcelMediaUpdate(landData.MediaURL,
-                            landData.MediaID, landData.MediaAutoScale,
-                            mediaType, description, width, height, loop);
-                    if (presence != null) break;
+                    landData.MediaID = textureID;
+                    landData.MediaAutoScale = autoAlign ? (byte)1 : (byte)0;
+                    landData.MediaDescription = description;
+                    landData.MediaWidth = width;
+                    landData.MediaHeight = height;
+                    landData.MediaType = mediaType;
+                    landData.MediaURL = url;
+                    World.EventManager.TriggerLandObjectUpdated((uint)landData.LocalID, landObject);
                 }
+                foreach (ScenePresence agent in receivers)
+                    agent.ControllingClient.SendParcelMediaUpdate(url, textureID, autoAlign ? (byte)1 : (byte)0,
+                        mediaType, description, width, height, loop);
             }
 
             if (commandToSend != null)
             {
-                List<ScenePresence> agents = World.GetScenePresences();
-                foreach (ScenePresence agent in agents)
-                {
-                    if (agent.IsChildAgent || agent.IsDeleted) continue;
-                    ScenePresence target = presence ?? agent;
-                    if (target == agent && agent.currentParcelUUID == landData.GlobalID)
-                        agent.ControllingClient.SendParcelMediaCommand(0x4,
-                            (ParcelMediaCommandEnum)commandToSend, time);
-                    if (presence != null) break;
-                }
+                foreach (ScenePresence agent in receivers)
+                    agent.ControllingClient.SendParcelMediaCommand(0x4, (ParcelMediaCommandEnum)commandToSend, time);
             }
             ScriptSleep(2000);
         }
@@ -5990,9 +10055,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             var list = new System.Collections.Generic.List<object>();
             Vector3 pos = m_host.AbsolutePosition;
             ILandObject landObject = World.LandChannel.GetLandObject(pos.X, pos.Y);
-            if (landObject == null) return new LSLList(list.ToArray());
-            if (landObject.LandData.OwnerID != m_host.OwnerID &&
-                !World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID))
+            if (!HasParcelPowers(m_host.OwnerID, landObject, (ulong)GroupPowers.ChangeMedia))
                 return new LSLList(list.ToArray());
             for (int i = 0; i < aList.Data.Length; i++)
             {
@@ -6014,6 +10077,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             list.Add(ld?.MediaHeight ?? 0);
                             break;
                         default:
+                            // Halcyon LSLSystemAPI.cs:13281-13285, its text.
+                            NotImplemented("llParcelMediaQuery parameter do not supported yet: "
+                                + ((ParcelMediaCommandEnum)aList.GetLSLIntegerItem(i)).ToString());
                             break;
                     }
                 }
@@ -6038,22 +10104,62 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (parcel.LandData.OwnerID == m_host.OwnerID) return 0;
             return 1;
         }
+        /// <summary>
+        /// Halcyon LSLSystemAPI.cs:10633-10638: the script owner's rights, with the power asked about, on the parcel
+        /// under the object: `CanEditParcel(m_host.OwnerID, landObject, (GroupPowers)operation) ? 1 : 0`.
+        /// </summary>
         public int iwHasParcelPowers(int groupPower)
         {
-            // Faithful port: check if script owner has parcel editing powers
-            try
+            ILandObject landObject = World?.LandChannel?.GetLandObject(m_host.AbsolutePosition.X, m_host.AbsolutePosition.Y);
+            return HasParcelPowers(m_host.OwnerID, landObject, IwGroupPowers(groupPower)) ? 1 : 0;
+        }
+
+        /// <summary>
+        /// The group powers an iwHasParcelPowers argument asks for. An LSL integer is 32 bits and group powers are 64,
+        /// so the IW_POWER_* constants for bits 31-48 load as minus their bit number (IW_POWER_FREEZE_EJECT is -32);
+        /// Halcyon's assembler loaded them all as -1 (Int32 overflow). Any other value is Halcyon's cast
+        /// `(GroupPowers)operation`, which sign-extends: -1, what scripts compiled before carry, is every power.
+        /// </summary>
+        internal static ulong IwGroupPowers(int value)
+            => value >= -IW_POWER_HIGHEST_BIT && value <= -IW_POWER_FIRST_HIGH_BIT
+                ? 1UL << -value
+                : unchecked((ulong)(long)value);
+
+        private const int IW_POWER_FIRST_HIGH_BIT = 31, IW_POWER_HIGHEST_BIT = 48;
+
+        /// <summary>
+        /// The land-rights rule every land function asks, Halcyon's CanEditParcel ->
+        /// GenericParcelOwnerPermission (PermissionsModule.cs:1002-1042). <paramref name="user"/> may act on
+        /// <paramref name="parcel"/> when it owns the parcel ("This also includes group-deeded objects on group-deeded
+        /// land"); on group-owned land when it is the group, or a member holding ANY of <paramref name="powers"/> (0 =
+        /// membership, Halcyon HasGroupPower); on land only tagged to a group when AllowSetHome is asked and held; when
+        /// it is the estate owner or an estate manager; or when it is a god. <paramref name="powers"/> null: no group
+        /// role qualifies (llUnSit, Halcyon LSLSystemAPI.cs:7986-7988).
+        /// NGC's CanEditParcelProperties is not used: it needs every requested bit and never admits estate managers.
+        /// </summary>
+        private bool HasParcelPowers(UUID user, ILandObject parcel, ulong? powers)
+        {
+            LandData land = parcel?.LandData;
+            if (land == null || user.IsZero()) return false;
+            if (land.OwnerID == user) return true;
+            if (land.IsGroupOwned)
             {
-                ILandObject landObject = World?.LandChannel?.GetLandObject(m_host.AbsolutePosition.X, m_host.AbsolutePosition.Y);
-                if (landObject == null) return 0;
-                // Check if owner owns the parcel or is estate manager
-                if (landObject.LandData.OwnerID == m_host.OwnerID) return 1;
-                if (World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(m_host.OwnerID)) return 1;
-                // Check group ownership
-                if (landObject.LandData.GroupID != UUID.Zero && landObject.LandData.GroupID == m_host.GroupID)
-                    return 1;
-                return 0;
+                if (land.GroupID == user) return true;
+                if (powers.HasValue && !land.GroupID.IsZero() && HasGroupPower(land.GroupID, user, powers.Value)) return true;
             }
-            catch { return 0; }
+            else if (!land.GroupID.IsZero() && powers == (ulong)GroupPowers.AllowSetHome
+                && HasGroupPower(land.GroupID, user, (ulong)GroupPowers.AllowSetHome))
+                return true;
+            if (World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(user)) return true;
+            return World.Permissions.IsGod(user);
+        }
+
+        /// <summary>Halcyon HasGroupPower: a member, and (power 0) that is enough, else any requested bit held.</summary>
+        private bool HasGroupPower(UUID group, UUID user, ulong powers)
+        {
+            GroupMembershipData m = World.RequestModuleInterface<IGroupsModule>()?.GetMembershipData(group, user);
+            if (m == null) return false;
+            return powers == 0 || (m.GroupPowers & powers) != 0;
         }
 
         // ── Targeting ──────────────────────────────────────────────────────────
@@ -6084,67 +10190,98 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public void llTargetOmega(Vector3 axis, float spinrate, float gain)
         {
-            // TargetOmega is a client-side visual spin effect delivered via angular velocity
-            // in the terse object update packet. We set the angular velocity on the root part
-            // which causes viewers to render the continuous rotation.
             if (m_host?.ParentGroup == null) return;
-            SceneObjectPart root = m_host.ParentGroup.RootPart;
-            if (root == null) return;
-
-            if (Math.Abs(spinrate) < 0.0001f)
-            {
-                // Stop the spin
-                root.UpdateAngularVelocity(Vector3.Zero);
-            }
-            else
-            {
-                Vector3 normalized = axis;
-                float len = normalized.Length();
-                if (len > 0.0001f) normalized /= len;
-                root.UpdateAngularVelocity(normalized * spinrate);
-            }
+            PrimTargetOmega(m_host, axis, spinrate, gain);
         }
+
+        /// <summary>
+        /// PRIM_OMEGA, llTargetOmega and iwLinkTargetOmega on one prim (Halcyon PrimTargetOmega): the prim's angular
+        /// velocity, which viewers render as a spin from the terse update. The prim the script names spins, so a
+        /// child spins about its own centre (SL: "the prim rotates around the local axis"). Physical: axis *
+        /// spinrate * gain. Otherwise axis * spinrate, and a gain of 0 stops it (SL: gain 0 "disables and removes
+        /// the rotation behavior"). The axis is not normalised (SL: "Use llVecNorm on axis so that spinrate
+        /// actually represents the rate of rotation").
+        /// </summary>
+        private static void PrimTargetOmega(SceneObjectPart part, Vector3 axis, float spinrate, float gain)
+        {
+            PhysicsActor actor = part.PhysActor;
+            Vector3 omega;
+            if (actor != null && actor.IsPhysical) omega = axis * (spinrate * gain);
+            else omega = gain == 0f ? Vector3.Zero : axis * spinrate;
+            part.UpdateAngularVelocity(omega);
+            s_primOmegas.AddOrUpdate(part, new PrimOmegaSet(axis, spinrate, gain, part.AngularVelocity));
+        }
+
+        /// <summary>The axis, spinrate and gain PrimTargetOmega last set on a prim, and the spin that gave it.</summary>
+        private sealed record PrimOmegaSet(Vector3 Axis, float Spinrate, float Gain, Vector3 Omega);
+
+        /// <summary>
+        /// What PrimTargetOmega last set on each prim, for PRIM_OMEGA's read. Not saved: the scene keeps only the
+        /// angular velocity. Held weakly, so a deleted prim's entry goes with it.
+        /// </summary>
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<SceneObjectPart, PrimOmegaSet> s_primOmegas = new();
+
+        /// <summary>
+        /// PRIM_OMEGA's read in SL's form: "the vector is normalized, and the spinrate is multiplied by the magnitude
+        /// of the original vector", then the gain. While the prim still spins as a PRIM_OMEGA, llTargetOmega or
+        /// iwLinkTargetOmega in Phlox left it, that is what was set. Otherwise (a YEngine script or the physics
+        /// engine changed the spin since, phantom stopped it, or the region restarted) the scene has only the angular
+        /// velocity: its direction, its rate, and a gain of 1.0, or ZERO_VECTOR, 0.0, 0.0 for no spin.
+        /// </summary>
+        private static void PrimOmega(SceneObjectPart part, out Vector3 axis, out float spinrate, out float gain)
+        {
+            Vector3 omega = part.AngularVelocity;
+            if (s_primOmegas.TryGetValue(part, out PrimOmegaSet set) && set.Omega == omega)
+            {
+                float length = set.Axis.Length();
+                axis = length > 0f ? set.Axis / length : Vector3.Zero;
+                spinrate = set.Spinrate * length;
+                gain = set.Gain;
+                return;
+            }
+            float rate = omega.Length();
+            axis = rate > 0f ? omega / rate : Vector3.Zero;
+            spinrate = rate;
+            gain = rate > 0f ? 1f : 0f;
+        }
+
         public void iwLinkTargetOmega(int linknumber, Vector3 axis, float spinrate, float gain)
         {
             foreach (SceneObjectPart part in GetLinkParts(linknumber))
-            {
-                part.AngularVelocity = axis * spinrate;
-                part.ScheduleFullUpdate();
-            }
+                PrimTargetOmega(part, axis, spinrate, gain);
         }
         public void llLookAt(Vector3 target, float strength, float damping)
         {
             if (m_host?.ParentGroup == null) return;
 
-            // Compute the rotation needed to face the target, then delegate to llRotLookAt.
-            // This mirrors Halcyon's approach: calculate the target quaternion and hand off.
+            // SL: "Cause object to point its up axis (positive z) towards target, while keeping its forward axis
+            // (positive x) below the horizon." The left axis (+y) is kept level, as Halcyon's levelling rotation does
+            // (:3524-3545). Straight above or below, the current turn about z is kept (Halcyon's rotstart cases).
             Vector3 from = m_host.ParentGroup.AbsolutePosition;
             Vector3 toTarget = target - from;
 
             if (toTarget.LengthSquared() < 0.0001f)
                 return; // target is at same position, nothing to do
 
-            // Build a rotation that points our +Z axis toward the target (LSL convention)
-            toTarget = Vector3.Normalize(toTarget);
-            Vector3 forward = Vector3.UnitZ;
-
-            float dot = Vector3.Dot(forward, toTarget);
-            Quaternion newRot;
-
-            if (dot > 0.9999f)
+            Vector3 up = Vector3.Normalize(toTarget);
+            Quaternion current = m_host.ParentGroup.GroupRotation;
+            Vector3 left = Vector3.Cross(Vector3.UnitZ, up);
+            if (left.LengthSquared() < 1e-8f)
             {
-                newRot = Quaternion.Identity;
+                // Straight above or below: keep the current left axis, made horizontal.
+                left = Vector3.UnitY * current;
+                left.Z = 0f;
+                if (left.LengthSquared() < 1e-8f) left = Vector3.UnitY;
+                if (up.Z < 0f) left = -left;
             }
-            else if (dot < -0.9999f)
-            {
-                newRot = new Quaternion(Vector3.UnitY, (float)Math.PI);
-            }
-            else
-            {
-                Vector3 axis = Vector3.Normalize(Vector3.Cross(forward, toTarget));
-                float angle = (float)Math.Acos(Math.Max(-1f, Math.Min(1f, dot)));
-                newRot = Quaternion.CreateFromAxisAngle(axis, angle);
-            }
+            left = Vector3.Normalize(left);
+            Vector3 fwd = Vector3.Cross(left, up);
+            Quaternion newRot = Quaternion.CreateFromRotationMatrix(new Matrix4(
+                fwd.X, fwd.Y, fwd.Z, 0f,
+                left.X, left.Y, left.Z, 0f,
+                up.X, up.Y, up.Z, 0f,
+                0f, 0f, 0f, 1f));
+            newRot.Normalize();
 
             llRotLookAt(newRot, strength, damping);
         }
@@ -6175,9 +10312,26 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     m_host.UpdateRotation(target);
             }
         }
-        public void llPointAt(Vector3 pos) { /* Deprecated */ }
-        public void llStopPointAt() { /* Deprecated */ }
-        public void llCollisionFilter(string name, string id, int accept) { /* NotImplemented in Halcyon */ }
+        public void llPointAt(Vector3 pos) => NotImplemented("llPointAt");   // Halcyon LSLSystemAPI.cs:4332
+        public void llStopPointAt() => NotImplemented("llStopPointAt");   // Halcyon LSLSystemAPI.cs:4338
+        /// <summary>
+        /// Ported from upstream LSL_Api.cs:4036-4043. wiki: "Sets the collision filter,
+        /// exclusively or inclusively" - accept TRUE keeps only matches, FALSE excludes them; a blank
+        /// name or a null/invalid id matches everything. The part stores it
+        /// (SceneObjectPart.SetCollisionFilter) and the region's own collision path consults
+        /// CollisionFilteredOut before raising the event; PhloxEngine's handlers consult it too, so
+        /// the filter holds whichever door a collision arrives by.
+        /// </summary>
+        public void llCollisionFilter(string name, string id, int accept)
+        {
+            if (m_host == null) return;
+            _ = UUID.TryParse(id, out UUID objectID);
+            string lname = (name ?? string.Empty).ToLower(System.Globalization.CultureInfo.InvariantCulture);
+            if (objectID == UUID.Zero)
+                m_host.SetCollisionFilter(accept != 0, lname, string.Empty);
+            else
+                m_host.SetCollisionFilter(accept != 0, lname, objectID.ToString());
+        }
         public void llPassTouches(int pass)
         {
             if (m_host == null) return;
@@ -6206,30 +10360,50 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return part?.ParentGroup.PrimCount ?? 0;
         }
 
+        // llGetObjectDetails flags past OBJECT_TEMP_ON_REZ (SL wiki; compiler DefaultConstants) and InWorldz's memory total.
+        private const int OBJECT_CHARACTER_TIME = 17, OBJECT_PATHFINDING_TYPE = 20, OBJECT_RENDER_WEIGHT = 24,
+            OBJECT_HOVER_HEIGHT = 25, OBJECT_BODY_SHAPE_TYPE = 26, OBJECT_LAST_OWNER_ID = 27, OBJECT_CLICK_ACTION = 28,
+            IW_OBJECT_SCRIPT_MEMORY_USED = 10001, OBJECT_UNKNOWN_DETAIL = -1, OPT_OTHER = -1, OPT_LEGACY_LINKSET = 0,
+            OPT_AVATAR = 1;
+
+        /// <summary>
+        /// The script totals Halcyon adds up over an object's prims, or an avatar's attachments (GetPartScriptTotal,
+        /// GetAgentTotals, LSLSystemAPI.cs:5186-5300), for scripts of either engine: running and total counts as the
+        /// scene counts them; OBJECT_SCRIPT_MEMORY the memory each script may use (a Phlox script's 128 KiB, Halcyon's
+        /// GetMaxMemory; another engine's running script the 16 KiB YEngine reports); IW_OBJECT_SCRIPT_MEMORY_USED the
+        /// memory in use; OBJECT_SCRIPT_TIME the engines' average time per frame in seconds, as YEngine reads it.
+        /// </summary>
+        private object ScriptTotal(IEnumerable<SceneObjectGroup> groups, int which)
+        {
+            int total = 0;
+            float time = 0f;
+            IScriptModule[] engines = World.RequestModuleInterfaces<IScriptModule>();
+            foreach (SceneObjectGroup grp in groups)
+            {
+                if (grp == null || grp.IsDeleted) continue;
+                switch (which)
+                {
+                    case OBJECT_RUNNING_SCRIPT_COUNT: total += grp.RunningScriptCount(); break;
+                    case OBJECT_TOTAL_SCRIPT_COUNT: total += grp.ScriptCount(); break;
+                    case IW_OBJECT_SCRIPT_MEMORY_USED: if (grp.ScriptsMemory(out int used)) total += used; break;
+                    case OBJECT_SCRIPT_TIME: time += grp.ScriptExecutionTime() / 1000.0f; break;
+                    case OBJECT_SCRIPT_MEMORY:
+                        foreach (SceneObjectPart part in grp.Parts)
+                            foreach (TaskInventoryItem script in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                            {
+                                if (m_ScriptEngine != null && m_ScriptEngine.HasScript(script.ItemID, out _))
+                                    total += InWorldz.Phlox.VM.MemoryInfo.MAX_MEMORY;
+                                else if (engines.Any(e => e != null && e.HasScript(script.ItemID, out bool running) && running))
+                                    total += 16384;
+                            }
+                        break;
+                }
+            }
+            return which == OBJECT_SCRIPT_TIME ? (object)time : total;
+        }
+
         public LSLList llGetObjectDetails(string id, LSLList parms)
         {
-            // OBJECT_* constant values (standard LSL)
-            const int OBJECT_NAME                = 1;
-            const int OBJECT_DESC                = 2;
-            const int OBJECT_POS                 = 3;
-            const int OBJECT_ROT                 = 4;
-            const int OBJECT_VELOCITY            = 5;
-            const int OBJECT_OWNER               = 6;
-            const int OBJECT_GROUP               = 7;
-            const int OBJECT_CREATOR             = 8;
-            const int OBJECT_RUNNING_SCRIPT_COUNT = 9;
-            const int OBJECT_TOTAL_SCRIPT_COUNT  = 10;
-            const int OBJECT_SCRIPT_MEMORY       = 11;
-            const int OBJECT_SCRIPT_TIME         = 12;
-            const int OBJECT_PRIM_EQUIVALENCE    = 13;
-            const int OBJECT_SERVER_COST         = 14;
-            const int OBJECT_STREAMING_COST      = 15;
-            const int OBJECT_PHYSICS_COST        = 16;
-            const int OBJECT_ROOT                = 18;
-            const int OBJECT_ATTACHED_POINT      = 19;
-            const int OBJECT_PHYSICS             = 21;
-            const int OBJECT_PHANTOM             = 22;
-            const int OBJECT_TEMP_ON_REZ         = 23;
 
             var ret = new List<object>();
             if (!UUID.TryParse(id, out UUID key) || key == UUID.Zero || parms == null)
@@ -6239,35 +10413,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             ScenePresence sp = World?.GetScenePresence(key);
             if (sp != null)
             {
-                foreach (object param in parms.Data)
-                {
-                    int p; try { p = Convert.ToInt32(param); } catch { continue; }
-                    switch (p)
-                    {
-                        case OBJECT_NAME:     ret.Add(sp.Name); break;
-                        case OBJECT_DESC:     ret.Add(string.Empty); break;
-                        case OBJECT_POS:      ret.Add(sp.AbsolutePosition); break;
-                        case OBJECT_ROT:      ret.Add(sp.Rotation); break;
-                        case OBJECT_VELOCITY: ret.Add(sp.Velocity); break;
-                        case OBJECT_OWNER:    ret.Add(sp.UUID.ToString()); break;
-                        case OBJECT_GROUP:    ret.Add(UUID.Zero.ToString()); break;
-                        case OBJECT_CREATOR:  ret.Add(UUID.Zero.ToString()); break;
-                        case OBJECT_RUNNING_SCRIPT_COUNT: ret.Add(0); break;
-                        case OBJECT_TOTAL_SCRIPT_COUNT:   ret.Add(0); break;
-                        case OBJECT_SCRIPT_MEMORY:        ret.Add(0); break;
-                        case OBJECT_SCRIPT_TIME:          ret.Add(0f); break;
-                        case OBJECT_PRIM_EQUIVALENCE:     ret.Add(1); break;
-                        case OBJECT_SERVER_COST:          ret.Add(0f); break;
-                        case OBJECT_STREAMING_COST:       ret.Add(0f); break;
-                        case OBJECT_PHYSICS_COST:         ret.Add(0f); break;
-                        case OBJECT_ROOT:                 ret.Add(sp.UUID.ToString()); break;
-                        case OBJECT_ATTACHED_POINT:       ret.Add(0); break;
-                        case OBJECT_PHYSICS:              ret.Add(0); break;
-                        case OBJECT_PHANTOM:              ret.Add(0); break;
-                        case OBJECT_TEMP_ON_REZ:          ret.Add(0); break;
-                        default:                          ret.Add(string.Empty); break;
-                    }
-                }
+                AvatarDetails(ret, sp, parms);
                 return new LSLList(ret);
             }
 
@@ -6291,28 +10437,100 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             ? UUID.Zero.ToString() : grp.OwnerID.ToString()); break;
                     case OBJECT_GROUP:    ret.Add(grp.GroupID.ToString()); break;
                     case OBJECT_CREATOR:  ret.Add(part.CreatorID.ToString()); break;
-                    case OBJECT_RUNNING_SCRIPT_COUNT: ret.Add(0); break;
-                    case OBJECT_TOTAL_SCRIPT_COUNT:   ret.Add(grp.ScriptCount()); break;
-                    case OBJECT_SCRIPT_MEMORY:        ret.Add(0); break;
-                    case OBJECT_SCRIPT_TIME:          ret.Add(0f); break;
+                    case OBJECT_RUNNING_SCRIPT_COUNT:
+                    case OBJECT_TOTAL_SCRIPT_COUNT:
+                    case OBJECT_SCRIPT_MEMORY:
+                    case OBJECT_SCRIPT_TIME:
+                    case IW_OBJECT_SCRIPT_MEMORY_USED:
+                        ret.Add(ScriptTotal(new[] { grp }, p)); break;
+                    // The prim count is what NGC's parcels count (PrimCountModule), so it is this core's land impact.
                     case OBJECT_PRIM_EQUIVALENCE:     ret.Add(grp.PrimCount); break;
                     case OBJECT_SERVER_COST:          ret.Add(0f); break;
-                    case OBJECT_STREAMING_COST:       ret.Add(0f); break;
-                    case OBJECT_PHYSICS_COST:         ret.Add(0f); break;
+                    // The part's costs, as YEngine reports them (LSL_Api.llGetObjectDetails).
+                    case OBJECT_STREAMING_COST:       ret.Add(part.StreamingCost); break;
+                    case OBJECT_PHYSICS_COST:         ret.Add(part.PhysicsCost); break;
                     case OBJECT_ROOT:                 ret.Add(grp.RootPart.UUID.ToString()); break;
                     case OBJECT_ATTACHED_POINT:       ret.Add((int)grp.AttachmentPoint); break;
                     case OBJECT_PHYSICS:              ret.Add(grp.UsesPhysics ? 1 : 0); break;
                     case OBJECT_PHANTOM:              ret.Add(grp.IsPhantom ? 1 : 0); break;
                     case OBJECT_TEMP_ON_REZ:          ret.Add(grp.IsTemporary ? 1 : 0); break;
-                    default:                          ret.Add(string.Empty); break;
+                    // The seven later flags with the values Halcyon (:14314-14358) and YEngine give an object.
+                    case OBJECT_CHARACTER_TIME:       ret.Add(0f); break;
+                    case OBJECT_PATHFINDING_TYPE:
+                    {
+                        byte pcode = part.Shape.PCode;
+                        bool other = grp.IsAttachment || pcode == (byte)PCode.Grass || pcode == (byte)PCode.Tree || pcode == (byte)PCode.NewTree;
+                        ret.Add(other ? OPT_OTHER : OPT_LEGACY_LINKSET);
+                        break;
+                    }
+                    case OBJECT_RENDER_WEIGHT:        ret.Add(0); break;
+                    case OBJECT_HOVER_HEIGHT:         ret.Add(0f); break;
+                    case OBJECT_BODY_SHAPE_TYPE:      ret.Add(-1f); break;
+                    case OBJECT_LAST_OWNER_ID:        ret.Add(grp.LastOwnerID.ToString()); break;
+                    case OBJECT_CLICK_ACTION:         ret.Add((int)part.ClickAction); break;
+                    // SL: "OBJECT_UNKNOWN_DETAIL is returned when passed an invalid integer parameter."
+                    default:                          ret.Add(OBJECT_UNKNOWN_DETAIL); break;
                 }
             }
             return new LSLList(ret);
         }
+
+        /// <summary>llGetObjectDetails for an avatar; iwGetAgentList's details are the same values.</summary>
+        private void AvatarDetails(List<object> ret, ScenePresence sp, LSLList parms)
+        {
+            foreach (object param in parms.Data)
+            {
+                int p; try { p = Convert.ToInt32(param); } catch { continue; }
+                switch (p)
+                {
+                    case OBJECT_NAME:     ret.Add(sp.Name); break;
+                    case OBJECT_DESC:     ret.Add(string.Empty); break;
+                    case OBJECT_POS:      ret.Add(sp.AbsolutePosition); break;
+                    case OBJECT_ROT:      ret.Add(sp.Rotation); break;
+                    case OBJECT_VELOCITY: ret.Add(sp.Velocity); break;
+                    case OBJECT_OWNER:    ret.Add(sp.UUID.ToString()); break;
+                    case OBJECT_GROUP:    ret.Add(UUID.Zero.ToString()); break;
+                    case OBJECT_CREATOR:  ret.Add(UUID.Zero.ToString()); break;
+                    // An avatar's totals are its attachments' (Halcyon GetAgentTotals).
+                    case OBJECT_RUNNING_SCRIPT_COUNT:
+                    case OBJECT_TOTAL_SCRIPT_COUNT:
+                    case OBJECT_SCRIPT_MEMORY:
+                    case OBJECT_SCRIPT_TIME:
+                    case IW_OBJECT_SCRIPT_MEMORY_USED:
+                        ret.Add(ScriptTotal(sp.GetAttachments(), p)); break;
+                    case OBJECT_PRIM_EQUIVALENCE:     ret.Add(1); break;
+                    case OBJECT_SERVER_COST:          ret.Add(0f); break;
+                    case OBJECT_STREAMING_COST:       ret.Add(0f); break;
+                    case OBJECT_PHYSICS_COST:         ret.Add(0f); break;
+                    // A seated avatar's root is the root of what it sits on (SL, Halcyon :14184-14190, YEngine).
+                    case OBJECT_ROOT:
+                        ret.Add((sp.ParentPart?.ParentGroup?.RootPart?.UUID ?? sp.UUID).ToString()); break;
+                    case OBJECT_ATTACHED_POINT:       ret.Add(0); break;
+                    case OBJECT_PHYSICS:              ret.Add(0); break;
+                    case OBJECT_PHANTOM:              ret.Add(0); break;
+                    case OBJECT_TEMP_ON_REZ:          ret.Add(0); break;
+                    // The seven later flags with the values Halcyon (:14181-14229) and YEngine give an avatar.
+                    case OBJECT_CHARACTER_TIME:       ret.Add(0f); break;
+                    case OBJECT_PATHFINDING_TYPE:     ret.Add(OPT_AVATAR); break;
+                    case OBJECT_RENDER_WEIGHT:        ret.Add(-1); break;
+                    case OBJECT_HOVER_HEIGHT:         ret.Add(0f); break;
+                    case OBJECT_BODY_SHAPE_TYPE:
+                    {
+                        byte[] vp = sp.Appearance?.VisualParams;
+                        int male = (int)AvatarAppearance.VPElement.SHAPE_MALE;
+                        ret.Add(vp != null && male < vp.Length && vp[male] != 0 ? 1f : 0f);
+                        break;
+                    }
+                    case OBJECT_LAST_OWNER_ID:        ret.Add(UUID.Zero.ToString()); break;
+                    case OBJECT_CLICK_ACTION:         ret.Add(0); break;
+                    default:                          ret.Add(OBJECT_UNKNOWN_DETAIL); break;
+                }
+            }
+        }
         public LSLList llGetBoundingBox(string obj)
         {
             // Return [min_corner, max_corner] relative to the root prim.
-            // Legion's GetBoundingBox already returns root-relative coords — no position subtraction needed.
+            // This tree's GetBoundingBox already returns root-relative coords — no position subtraction needed.
             var empty = new LSLList(new object[] { Vector3.Zero, Vector3.Zero });
 
             if (!UUID.TryParse(obj, out UUID objID) || objID == UUID.Zero)
@@ -6353,10 +10571,36 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 new Vector3(maxX, maxY, maxZ)
             });
         }
+        /// <summary>
+        /// Halcyon iwGetWorldBoundingBox (:10757-10790): the box in region coordinates. llGetBoundingBox's corners are
+        /// relative to the root in the root's frame, so the eight corners are turned by the root's rotation and moved
+        /// to its position, and the box around them returned. An avatar's box is moved to the avatar's position.
+        /// </summary>
         public LSLList iwGetWorldBoundingBox(string obj)
         {
-            // Faithful port: same as llGetBoundingBox but returns world coordinates
-            return llGetBoundingBox(obj);
+            LSLList rel = llGetBoundingBox(obj);
+            if (!UUID.TryParse(obj, out UUID id) || rel.Length < 2) return rel;
+            Vector3 lo = (Vector3)rel.Data[0], hi = (Vector3)rel.Data[1];
+            Vector3 pos;
+            Quaternion rot = Quaternion.Identity;
+            ScenePresence sp = World?.GetScenePresence(id);
+            if (sp != null && sp.ParentPart == null) pos = sp.AbsolutePosition;
+            else
+            {
+                SceneObjectGroup group = sp?.ParentPart?.ParentGroup ?? World?.GetSceneObjectPart(id)?.ParentGroup;
+                if (group == null) return rel;
+                pos = group.AbsolutePosition;
+                rot = group.GroupRotation;
+            }
+            Vector3 min = new Vector3(float.MaxValue), max = new Vector3(float.MinValue);
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 c = new Vector3((i & 1) == 0 ? lo.X : hi.X, (i & 2) == 0 ? lo.Y : hi.Y, (i & 4) == 0 ? lo.Z : hi.Z);
+                c = c * rot + pos;
+                min = Vector3.Min(min, c);
+                max = Vector3.Max(max, c);
+            }
+            return new LSLList(new object[] { min, max });
         }
         public int llGetObjectPermMask(int mask)
         {
@@ -6375,9 +10619,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public void llSetObjectPermMask(int mask, int value)
         {
-            // Only available to god-level scripts per LSL spec.
+            // A god function (SL: "This function can only be executed in God Mode"), gated as YEngine gates it
+            // (LSL_Api.llSetObjectPermMask): AllowGodFunctions and an administrator owner.
             if (m_host == null) return;
-            if (!World.Permissions.CanRunConsoleCommand(m_host.OwnerID)) return;
+            if (m_ScriptEngine == null || !m_ScriptEngine.AllowGodFunctions) return;
+            if (World?.Permissions == null || !World.Permissions.IsAdministrator(m_host.OwnerID)) return;
 
             switch (mask)
             {
@@ -6386,79 +10632,2837 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 case 2: m_host.GroupMask     = (uint)value; break;
                 case 3: m_host.EveryoneMask  = (uint)value; break;
                 case 4: m_host.NextOwnerMask = (uint)value; break;
+                default: return;
             }
+            m_host.ParentGroup?.InvalidateDeepEffectivePerms();
         }
+        /// <summary>
+        /// SL wiki llGetAgentList: "agents in God Mode depending on the level will have NULL_KEY returned instead of their
+        /// real key". A god keeps its place in the list, so counts stay true, and its key is not given.
+        /// </summary>
         public LSLList llGetAgentList(int scope, LSLList options)
         {
-            // scope: 1=region, 16=parcel, 4=parcel-owner-same
-            // Returns list of avatar UUIDs in the specified scope
+            Func<ScenePresence, bool> inScope = AgentListScope(scope);
+            if (inScope == null) return new LSLList(new List<object> { "INVALID_SCOPE" });
             List<object> result = new List<object>();
             List<ScenePresence> presences = World?.GetScenePresences();
             if (presences == null) return new LSLList();
 
             foreach (ScenePresence sp in presences)
             {
-                if (sp.IsChildAgent) continue;
-                if (scope == 1) // AGENT_LIST_REGION
-                {
-                    result.Add(sp.UUID.ToString());
-                }
-                else if (scope == 16 || scope == 4) // AGENT_LIST_PARCEL / AGENT_LIST_PARCEL_OWNER
-                {
-                    ILandObject hostParcel = World.LandChannel?.GetLandObject(
-                        m_host.AbsolutePosition.X, m_host.AbsolutePosition.Y);
-                    ILandObject avParcel = World.LandChannel?.GetLandObject(
-                        sp.AbsolutePosition.X, sp.AbsolutePosition.Y);
-                    if (hostParcel != null && avParcel != null &&
-                        hostParcel.LandData.GlobalID == avParcel.LandData.GlobalID)
-                    {
-                        if (scope == 4 && sp.UUID != hostParcel.LandData.OwnerID) continue;
-                        result.Add(sp.UUID.ToString());
-                    }
-                }
+                if (!inScope(sp)) continue;
+                result.Add(sp.IsViewerUIGod ? UUID.Zero.ToString() : sp.UUID.ToString());
+                if (result.Count >= 100) break;   // SL's maximum
             }
             return new LSLList(result);
         }
+
+        /// <summary>
+        /// llGetAgentList's scope as YEngine reads it (LSL_Api.llGetAgentList) - SL's
+        /// AGENT_LIST_PARCEL (1), AGENT_LIST_PARCEL_OWNER (2) or AGENT_LIST_REGION (4), with the
+        /// AGENT_LIST_EXCLUDENPC flag; PARCEL_OWNER is every parcel with the same owner as the one the
+        /// object is on. Null for any other scope (INVALID_SCOPE). Child agents are not listed.
+        /// </summary>
+        private Func<ScenePresence, bool> AgentListScope(int scope)
+        {
+            const int AGENT_LIST_EXCLUDENPC = 0x4000000;   // OpenSim's flag, not an SL constant
+            bool noNpc = (scope & AGENT_LIST_EXCLUDENPC) != 0;
+            scope &= ~AGENT_LIST_EXCLUDENPC;
+            if (scope != AGENT_LIST_REGION && scope != AGENT_LIST_PARCEL && scope != AGENT_LIST_PARCEL_OWNER)
+                return null;
+
+            UUID id = UUID.Zero;
+            if (scope != AGENT_LIST_REGION)
+            {
+                ILandObject here = World.LandChannel?.GetLandObject(m_host.ParentGroup.RootPart.GetWorldPosition());
+                if (here != null)
+                    id = scope == AGENT_LIST_PARCEL_OWNER ? here.LandData.OwnerID : here.LandData.GlobalID;
+            }
+            return sp =>
+            {
+                if (sp.IsChildAgent || sp.IsDeleted) return false;
+                if (noNpc && sp.IsNPC) return false;
+                if (scope == AGENT_LIST_REGION) return true;
+                ILandObject land = World.LandChannel?.GetLandObject(sp.AbsolutePosition);
+                if (land == null) return false;
+                return scope == AGENT_LIST_PARCEL_OWNER ? land.LandData.OwnerID == id : land.LandData.GlobalID == id;
+            };
+        }
+
+        /// <summary>
+        /// Halcyon iwGetAgentList (LSLSystemAPI.cs:14360-14454). For each agent in scope and in the box, the
+        /// llGetObjectDetails values <paramref name="paramList"/> asks for (Halcyon GetAgentDetails), so
+        /// [OBJECT_NAME, OBJECT_POS] gives name, pos, name, pos ...; an empty list gives the agents' keys (Halcyon gave
+        /// nothing). The box applies only when both corners are non-zero; on each axis 0 and 0 accept any value, and
+        /// the corners may come in either order (Halcyon IsInRange). Gods stay hidden, as in the sensors.
+        /// </summary>
         public LSLList iwGetAgentList(int scope, Vector3 minPos, Vector3 maxPos, LSLList paramList)
         {
-            // Like llGetAgentList but with optional bounding box filter
+            Func<ScenePresence, bool> inScope = AgentListScope(scope);
+            if (inScope == null) return new LSLList(new List<object> { "INVALID_SCOPE" });
             List<object> result = new List<object>();
             List<ScenePresence> presences = World?.GetScenePresences();
             if (presences == null) return new LSLList();
 
-            bool useBBox = (minPos != Vector3.Zero || maxPos != Vector3.Zero);
+            static bool InRange(float value, float a, float b)
+                => (a == 0f && b == 0f) || (value >= Math.Min(a, b) && value <= Math.Max(a, b));
+            bool useBBox = minPos != Vector3.Zero && maxPos != Vector3.Zero;
 
             foreach (ScenePresence sp in presences)
             {
-                if (sp.IsChildAgent) continue;
+                if (sp.IsViewerUIGod || sp.IsInTransit || !inScope(sp)) continue;
 
-                // Bounding box filter
                 if (useBBox)
                 {
                     Vector3 pos = sp.AbsolutePosition;
-                    if (pos.X < minPos.X || pos.Y < minPos.Y || pos.Z < minPos.Z) continue;
-                    if (pos.X > maxPos.X || pos.Y > maxPos.Y || pos.Z > maxPos.Z) continue;
+                    if (!InRange(pos.X, minPos.X, maxPos.X) || !InRange(pos.Y, minPos.Y, maxPos.Y) || !InRange(pos.Z, minPos.Z, maxPos.Z))
+                        continue;
                 }
 
-                if (scope == 1) // AGENT_LIST_REGION
-                {
-                    result.Add(sp.UUID.ToString());
-                }
-                else if (scope == 16 || scope == 4) // AGENT_LIST_PARCEL / AGENT_LIST_PARCEL_OWNER
-                {
-                    ILandObject hostParcel = World.LandChannel?.GetLandObject(
-                        m_host.AbsolutePosition.X, m_host.AbsolutePosition.Y);
-                    ILandObject avParcel = World.LandChannel?.GetLandObject(
-                        sp.AbsolutePosition.X, sp.AbsolutePosition.Y);
-                    if (hostParcel != null && avParcel != null &&
-                        hostParcel.LandData.GlobalID == avParcel.LandData.GlobalID)
-                    {
-                        if (scope == 4 && sp.UUID != hostParcel.LandData.OwnerID) continue;
-                        result.Add(sp.UUID.ToString());
-                    }
-                }
+                if (paramList == null || paramList.Length == 0) result.Add(sp.UUID.ToString());
+                else AvatarDetails(result, sp, paramList);
             }
             return new LSLList(result);
+        }
+
+        // ── OSSL read-only information functions ───────────────────────────────────────────────
+        // Each ported from Source/OpenSim.Region.ScriptEngine.Shared/Api/OSSL_Api.cs (line cited) with
+        // the SAME threat level and the same [OSSL] keys, through OsslGate. A denied call throws, and
+        // the script stops with YEngine's message on DEBUG_CHANNEL.
+        private TaskInventoryItem OsslItem => m_host?.Inventory?.GetInventoryItem(m_itemID);
+        private void OsslCheck() => m_ScriptEngine.Ossl.Check();
+        private void OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel level, string function)
+            => m_ScriptEngine.Ossl.Check(level, function, World, m_host, OsslItem);
+        private const string GridInfoSection = "GridInfoService";
+
+        /// <summary>OSSL_Api.cs:2580 - ungated upstream.</summary>
+        public string osGetGridName() => World?.SceneGridInfo?.GridName ?? string.Empty;
+
+        /// <summary>OSSL_Api.cs:2575 - ungated upstream.</summary>
+        public string osGetGridNick() => World?.SceneGridInfo?.GridNick ?? string.Empty;
+
+        /// <summary>OSSL_Api.cs:2601 - Moderate.</summary>
+        public string osGetGridHomeURI()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Moderate, "osGetGridHomeURI");
+            return World?.SceneGridInfo?.HomeURLNoEndSlash ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:2585 - Moderate. [GridInfoService] login; the upstream fallback to the login server's info page is not made.</summary>
+        public string osGetGridLoginURI()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Moderate, "osGetGridLoginURI");
+            return m_ScriptEngine.ConfigSource?.Configs[GridInfoSection]?.GetString("login", string.Empty) ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:2608 - Moderate.</summary>
+        public string osGetGridGatekeeperURI()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Moderate, "osGetGridGatekeeperURI");
+            return World?.SceneGridInfo?.GateKeeperURLNoEndSlash ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:2615 - Moderate. [GridInfoService] &lt;key&gt;; no remote fallback.</summary>
+        public string osGetGridCustom(string key)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Moderate, "osGetGridCustom");
+            if (string.IsNullOrEmpty(key)) return string.Empty;
+            return m_ScriptEngine.ConfigSource?.Configs[GridInfoSection]?.GetString(key, string.Empty) ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:3640 - bare CheckThreatLevel (the master switch only).</summary>
+        public Vector3 osGetRegionSize()
+        {
+            OsslCheck();
+            var reg = World.RegionInfo;
+            return new Vector3(reg.RegionSizeX, reg.RegionSizeY, 0f);
+        }
+
+        /// <summary>OSSL_Api.cs:3626 - Moderate.</summary>
+        public LSLList osGetRegionStats()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Moderate, "osGetRegionStats");
+            var ret = new List<object>();
+            float[] stats = World.StatsReporter?.LastReportedSimStats;
+            if (stats != null) foreach (float f in stats) ret.Add(f);
+            return new LSLList(ret);
+        }
+
+        /// <summary>OSSL_Api.cs:2078 - High.</summary>
+        public string osGetSimulatorVersion()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osGetSimulatorVersion");
+            return World.GetSimulatorVersion();
+        }
+
+        /// <summary>OSSL_Api.cs:1145 - None.</summary>
+        public LSLList osGetAgents()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.None, "osGetAgents");
+            var ret = new List<object>();
+            World.ForEachRootScenePresence(sp => ret.Add(sp.Name));
+            return new LSLList(ret);
+        }
+
+        /// <summary>OSSL_Api.cs:3582 - bare CheckThreatLevel.</summary>
+        public string osGetMapTexture()
+        {
+            OsslCheck();
+            return World.RegionInfo.RegionSettings.TerrainImageID.ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:2040 - High, but NON-throwing: an empty string when not permitted, as upstream.</summary>
+        public string osGetPhysicsEngineType()
+        {
+            if (!m_ScriptEngine.Ossl.Enabled) return string.Empty;
+            if (!string.IsNullOrEmpty(m_ScriptEngine.Ossl.Test(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osGetPhysicsEngineType", World, m_host, OsslItem)))
+                return string.Empty;
+            return World.PhysicsScene?.EngineType ?? "unknown";
+        }
+
+        /// <summary>OSSL_Api.cs:2064 - bare CheckThreatLevel.</summary>
+        public string osGetPhysicsEngineName()
+        {
+            OsslCheck();
+            if (World.PhysicsScene == null) return "NoEngine";
+            return World.PhysicsScene.EngineName ?? "UnknownEngine";
+        }
+
+        /// <summary>OSSL_Api.cs:3651 - Moderate.</summary>
+        public int osGetSimulatorMemory()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Moderate, "osGetSimulatorMemory");
+            long pws = Util.GetPhysicalMemUse();
+            if (pws > int.MaxValue) return int.MaxValue;
+            return pws < 0 ? 0 : (int)pws;
+        }
+
+        /// <summary>OSSL_Api.cs:3665 - Moderate.</summary>
+        public int osGetSimulatorMemoryKB()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Moderate, "osGetSimulatorMemoryKB");
+            long pws = Util.GetPhysicalMemUse();
+            if ((pws & 0x3FFL) != 0) pws += 0x400L;
+            pws >>= 10;
+            return pws > int.MaxValue ? int.MaxValue : (int)pws;
+        }
+
+        /// <summary>OSSL_Api.cs:3749 - None.</summary>
+        public float osGetHealth(string agent)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.None, "osGetHealth");
+            if (!UUID.TryParse(agent, out UUID id) || id.IsZero()) return -1f;
+            ScenePresence presence = World.GetScenePresence(id);
+            return presence == null ? -1f : presence.Health;
+        }
+
+        /// <summary>OSSL_Api.cs:1997 - High. Upstream strips through the first '.' of the engine name: "InWorldz.Phlox" -> "Phlox".</summary>
+        public string osGetScriptEngineName()
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osGetScriptEngineName");
+            string n = m_ScriptEngine.Name ?? string.Empty;
+            int dot = n.IndexOf('.');
+            return dot >= 0 ? n.Substring(dot + 1) : n;
+        }
+
+        // ── OSSL pure helpers, ported from OSSL_Api.cs (line cited), same threat level via OsslGate ──
+        /// <summary>OSSL_Api.cs:6586 - ungated upstream.</summary>
+        public string osAESEncrypt(string secret, string plainText)
+        {
+            if (string.IsNullOrEmpty(secret) || string.IsNullOrEmpty(plainText)) return string.Empty;
+            string r = Util.AESEncrypt(secret.AsSpan(), plainText.AsSpan());
+            if (string.IsNullOrEmpty(r)) { ShoutError("osAESEncrypt: Failed to encrypt!"); return string.Empty; }
+            return r;
+        }
+
+        /// <summary>OSSL_Api.cs:6600 - ungated upstream.</summary>
+        public string osAESDecrypt(string secret, string encryptedText)
+        {
+            if (string.IsNullOrEmpty(secret) || string.IsNullOrEmpty(encryptedText)) return string.Empty;
+            var r = Util.AESDecrypt(secret.AsSpan(), encryptedText.AsSpan());
+            if (r.Length == 0) { ShoutError("osAESDecrypt: Failed to Decrypt!"); return string.Empty; }
+            return r.ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:6614 - ungated upstream.</summary>
+        public string osAESEncryptTo(string secret, string plainText, string ivString)
+        {
+            if (string.IsNullOrEmpty(secret) || string.IsNullOrEmpty(plainText) || string.IsNullOrEmpty(ivString)) return string.Empty;
+            string r = Util.AESEncryptTo(secret.AsSpan(), plainText.AsSpan(), ivString.AsSpan());
+            if (string.IsNullOrEmpty(r)) { ShoutError("osAESEncryptTo: Failed to encrypt!"); return string.Empty; }
+            return r;
+        }
+
+        /// <summary>OSSL_Api.cs:6628 - ungated upstream.</summary>
+        public string osAESDecryptFrom(string secret, string encryptedText, string ivString)
+        {
+            if (string.IsNullOrEmpty(secret) || string.IsNullOrEmpty(encryptedText) || string.IsNullOrEmpty(ivString)) return string.Empty;
+            var r = Util.AESDecryptFrom(secret.AsSpan(), encryptedText.AsSpan(), ivString.AsSpan());
+            if (r.Length == 0) { ShoutError("osAESDecryptFrom: Failed to decrypt!"); return string.Empty; }
+            return r.ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:5010 - ungated upstream.</summary>
+        public float osAngleBetween(Vector3 a, Vector3 b)
+        {
+            double dot = Vector3.Dot(a, b);
+            double mcross = Vector3.Cross(a, b).Length();
+            return (float)Math.Atan2(mcross, dot);
+        }
+
+        // ── OSSL sit target, misc and list functions ───────────────────────────────
+
+        /// <summary>OSSL_Api.cs:5985-5988 - ungated upstream: this prim's sit target offset.</summary>
+        public Vector3 osGetSitTargetPos() => m_host?.SitTargetPosition ?? Vector3.Zero;
+
+        /// <summary>OSSL_Api.cs:5990-5993 - ungated upstream.</summary>
+        public Quaternion osGetSitTargetRot() => m_host?.SitTargetOrientation ?? Quaternion.Identity;
+
+        /// <summary>OSSL_Api.cs:2721-2726 - Low.</summary>
+        public string osLoadedCreationDate()
+        {
+            OsslCheck(TlLow, "osLoadedCreationDate");
+            return World?.RegionInfo?.RegionSettings?.LoadedCreationDate ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:2728-2733 - Low.</summary>
+        public string osLoadedCreationTime()
+        {
+            OsslCheck(TlLow, "osLoadedCreationTime");
+            return World?.RegionInfo?.RegionSettings?.LoadedCreationTime ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:2735-2740 - Low.</summary>
+        public string osLoadedCreationID()
+        {
+            OsslCheck(TlLow, "osLoadedCreationID");
+            return World?.RegionInfo?.RegionSettings?.LoadedCreationID ?? string.Empty;
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:6660-6692 - ungated upstream. The blackbody fit to the vendian.org 10-degree D65
+        /// tables, component for component as upstream writes it.
+        /// </summary>
+        public Vector3 osTemperature2sRGB(float dtemp)
+        {
+            float temp = dtemp;
+            if (temp <= 1000f) return new Vector3(1.0f, 0.0401f, 0f);
+            if (temp >= 40000f) return new Vector3(0.3277f, 0.5022f, 1.0f);
+
+            float green;
+            if (temp < 6600f)
+            {
+                green = temp - 1000f;
+                green = ((((-7.87308e-13f * green) - 7.10085e-9f) * green) + 0.00022693f) * green + 0.0374249f;
+                green = Math.Clamp(green, 0f, 1.0f);
+                if (temp <= 19.0f) return new Vector3(1.0f, green, 0f);
+
+                float blue = temp - 1900f;
+                blue = ((((-5.97E-12f * blue) + 5.49E-08f) * blue) + 8.85465E-05f) * blue - 0.0058959f;
+                blue = Math.Clamp(blue, 0f, 1.0f);
+                return new Vector3(1.0f, green, blue);
+            }
+
+            temp = 0.01f * (temp - 6000f);
+            float red = 1.897315f * MathF.Pow(temp, -0.346837f) + 0.0622044f;
+            red = Math.Clamp(red, 0f, 1.0f);
+            green = 1.261989f * MathF.Pow(temp, -0.251708f) + 0.200836f;
+            green = Math.Clamp(green, 0f, 1.0f);
+            return new Vector3(red, green, 1.0f);
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:6477-6540 - ungated upstream. The pre-2010 llList2ListStrided: a start past end
+        /// wraps into two passes, and the stride is counted from index 0 of the whole list, not from start.
+        /// </summary>
+        public LSLList osOldList2ListStrided(LSLList src, int start, int end, int stride)
+        {
+            var data = src?.Data ?? Array.Empty<object>();
+            var result = new List<object>();
+            int len = data.Length;
+
+            if (start < 0) start += len;
+            if (end < 0) end += len;
+            if (start > len) start = len;
+            if (end > len) end = len;
+            if (stride == 0) stride = 1;
+            if (stride < 0) stride = -stride;
+
+            var si = new int[2];
+            var ei = new int[2];
+            bool twopass = false;
+            if (start != end)
+            {
+                if (start <= end) { si[0] = start; ei[0] = end; }
+                else { si[1] = start; ei[1] = len; si[0] = 0; ei[0] = end; twopass = true; }
+            }
+            else
+            {
+                si[0] = 0; ei[0] = len;
+            }
+
+            for (int i = si[0]; i < ei[0]; i++)
+                if (i % stride == 0) result.Add(data[i]);
+
+            if (twopass)
+                for (int i = si[1]; i < ei[1]; i++)
+                    if (i % stride == 0) result.Add(data[i]);
+
+            return new LSLList(result);
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:6695-6780 - ungated upstream. The instance-th occurrence of ltest inside lsrc between
+        /// lstart and lend; a negative instance counts back from the last occurrence, a negative index from the
+        /// end of the list, an empty test list answers with the index itself. -1 when there is no such match.
+        /// </summary>
+        public int osListFindListNext(LSLList lsrc, LSLList ltest, int lstart, int lend, int linstance)
+        {
+            var src = lsrc?.Data ?? Array.Empty<object>();
+            var test = ltest?.Data ?? Array.Empty<object>();
+            int srclen = src.Length, testlen = test.Length;
+            if (srclen == 0) return testlen == 0 ? 0 : -1;
+
+            if (testlen == 0)
+            {
+                if (linstance >= 0) return linstance < srclen ? linstance : -1;
+                int back = linstance + srclen;
+                return back >= 0 ? back : -1;
+            }
+            if (testlen > srclen) return -1;
+
+            int start = lstart;
+            if (start < 0) { start += srclen; if (start < 0) return -1; }
+            else if (start >= srclen) return -1;
+
+            int end = lend;
+            if (end < 0) { end += srclen; if (end < 0) return -1; }
+            else if (end >= srclen) end = srclen - 1;
+            if (end < start) return -1;
+
+            var hits = new List<int>();
+            for (int i = start; i <= end - testlen + 1; i++)
+            {
+                bool all = true;
+                for (int j = 0; j < testlen; j++)
+                {
+                    // the same comparison llListFindList makes: the string form of each item
+                    string a = src[i + j]?.ToString() ?? string.Empty;
+                    string b = test[j]?.ToString() ?? string.Empty;
+                    if (a != b) { all = false; break; }
+                }
+                if (all) hits.Add(i);
+            }
+            if (hits.Count == 0) return -1;
+            if (linstance >= 0) return linstance < hits.Count ? hits[linstance] : -1;
+            int fromEnd = hits.Count + linstance;
+            return fromEnd >= 0 ? hits[fromEnd] : -1;
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:6417-6420 - ungated upstream, and the one OSSL function with VALUE semantics: it sorts
+        /// the caller's own list rather than returning a new one. It can do that here because a list argument
+        /// reaches a syscall as the same <see cref="LSLList"/> the variable slot holds - the shim casts, it does
+        /// not copy - so writing back into that instance's Data array is what the script sees in its variable.
+        /// The sort itself is llListSort's, so the ordering cannot drift from LSL's.
+        /// </summary>
+        public void osListSortInPlace(LSLList src, int stride, int ascending)
+        {
+            OsslCheck();
+            if (src?.Data == null || src.Data.Length == 0) return;
+            var sorted = llListSort(src, stride, ascending);
+            SortInPlace(src, sorted);
+        }
+
+        /// <summary>
+        /// The caller's list takes the sorted order in both of LSLList's stores - the Data array the VM's
+        /// list operations read and the member list that GetLSLStringItem, (string)list and now llDumpList2String /
+        /// llList2CSV / llList2String read. Only Data was written, so those saw the unsorted list.
+        /// </summary>
+        private static void SortInPlace(LSLList src, LSLList sorted)
+        {
+            Array.Copy(sorted.Data, src.Data, src.Data.Length);
+            for (int i = 0; i < src.Members.Count; i++) src.Members[i] = sorted.Data[i];
+        }
+
+        /// <summary>OSSL_Api.cs:6422-6425 - the same, keyed on one element of each stride (llListSortStrided's order).</summary>
+        public void osListSortInPlaceStrided(LSLList src, int stride, int strideIndex, int ascending)
+        {
+            OsslCheck();
+            if (src?.Data == null || src.Data.Length == 0) return;
+            var sorted = llListSortStrided(src, stride, strideIndex, ascending);
+            SortInPlace(src, sorted);
+        }
+
+        /// <summary>OSSL_Api.cs:6318-6322 - ungated upstream: llParticleSystem without its sleep.</summary>
+        public void osParticleSystem(LSLList rules)
+        {
+            OsslCheck();
+            if (m_host == null) return;
+            PrimParticleSystem(m_host, rules);
+        }
+
+        /// <summary>OSSL_Api.cs:6324-6333 - ungated upstream: every part the link number names.</summary>
+        public void osLinkParticleSystem(int linknumber, LSLList rules)
+        {
+            OsslCheck();
+            foreach (var part in GetLinkParts(linknumber))
+                PrimParticleSystem(part, rules);
+        }
+
+        /// <summary>OSSL_Api.cs:5150-5165 - ungated upstream: llPreloadSound for a link, and without its 1 s sleep.</summary>
+        public void osPreloadSound(int linknum, string sound)
+        {
+            OsslCheck();
+            UUID soundID = KeyOrName(sound);
+            if (soundID == UUID.Zero) return;
+            var sm = World?.RequestModuleInterface<ISoundModule>();
+            if (sm == null) return;
+            foreach (var part in GetLinkParts(linknum))
+                sm.PreloadSound(part, soundID);
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:4704-4740 - bare CheckThreatLevel (master switch). Mass, centre of mass, the inertia
+        /// tensor divided by the mass, and the off-diagonal terms as a rotation - empty for a deleted group.
+        /// </summary>
+        public LSLList osGetInertiaData()
+        {
+            OsslCheck();
+            var result = new List<object>();
+            var sog = m_host?.ParentGroup;
+            if (sog == null || sog.IsDeleted) return new LSLList(result);
+
+            sog.GetInertiaData(out float totalMass, out Vector3 centerOfMass, out Vector3 inertia, out Vector4 aux);
+            if (totalMass > 0)
+            {
+                float t = 1.0f / totalMass;
+                inertia.X *= t; inertia.Y *= t; inertia.Z *= t;
+                aux.X *= t; aux.Y *= t; aux.Z *= t;
+            }
+            result.Add(totalMass);
+            result.Add(centerOfMass);
+            result.Add(inertia);
+            result.Add(new Quaternion(aux.X, aux.Y, aux.Z, aux.W));
+            return new LSLList(result);
+        }
+
+        /// <summary>OSSL_Api.cs:3988-3998 - None. Every NPC the region's bot manager knows.</summary>
+        public LSLList osGetNPCList()
+        {
+            OsslCheck(TlNone, "osGetNPCList");
+            var result = new List<object>();
+            var mgr = NpcMgr();
+            if (mgr == null) return new LSLList(result);
+            foreach (var id in mgr.GetAllBots())
+                result.Add(id.ToString());
+            return new LSLList(result);
+        }
+
+        /// <summary>OSSL_Api.cs:5724-5745 - ungated upstream: llRemoveInventory on a linked prim.</summary>
+        public void osRemoveLinkInventory(int linkNumber, string name)
+        {
+            OsslCheck();
+            var part = OsslSingleLinkPart(linkNumber);
+            if (part == null) return;
+            var item = part.Inventory?.GetInventoryItem(name);
+            if (item == null) return;
+            part.Inventory.RemoveInventoryItem(item.ItemID);
+        }
+
+        /// <summary>OSSL_Api.cs:6313-6316 - ungated upstream, the sim's own terrain noise.</summary>
+        public float osPerlinNoise2D(float x, float y, int octaves, float persistence)
+        {
+            OsslCheck();
+            return (float)OpenSim.Region.Framework.Scenes.TerrainUtil.PerlinNoise2D(x, y, octaves, persistence);
+        }
+
+        /// <summary>OSSL_Api.cs:3489-3497 - VeryHigh. The agent must be in this region; the outfit goes to the store osOwnerSaveAppearance uses.</summary>
+        public string osAgentSaveAppearance(string avatarKey, string notecard) => osAgentSaveAppearance(avatarKey, notecard, 1);
+
+        /// <summary>OSSL_Api.cs:3499-3507 - VeryHigh. includeHuds is accepted, not applied: the store keeps the whole appearance.</summary>
+        public string osAgentSaveAppearance(string avatarKey, string notecard, int includeHuds)
+        {
+            OsslCheck(TlVeryHigh, "osAgentSaveAppearance");
+            if (World == null || !UUID.TryParse(avatarKey, out UUID agentId) || agentId == UUID.Zero)
+                return UUID.Zero.ToString();
+            var sp = World.GetScenePresence(agentId);
+            if (sp == null || sp.IsChildAgent) { ShoutError("osAgentSaveAppearance: no such agent in this region"); return UUID.Zero.ToString(); }
+            var mgr = NpcMgr();
+            if (mgr == null) return UUID.Zero.ToString();
+            mgr.SaveOutfitToDatabase(agentId, notecard, out string reason);
+            if (reason != null) { ShoutError("osAgentSaveAppearance: " + reason); return UUID.Zero.ToString(); }
+            return OpenSim.Region.OptionalModules.World.NPC.BotManager.OutfitKey(agentId, notecard).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:5417 - ungated upstream.</summary>
+        public int osApproxEquals(float a, float b)
+        {
+            return (a > b + 1.0e-6 || a < b - 1.0e-6) ? 0 : 1;
+        }
+
+        /// <summary>OSSL_Api.cs:5424 - ungated upstream.</summary>
+        public int osApproxEquals(float a, float b, float margin)
+        {
+            double e = Math.Abs(margin);
+            return (a > b + e || a < b - e) ? 0 : 1;
+        }
+
+        /// <summary>OSSL_Api.cs:5432-5447 - ungated upstream, the fixed 1.0e-6 of the float form on each component.</summary>
+        public int osApproxEquals(Vector3 va, Vector3 vb) => OsslApproxEquals(va, vb, 1.0e-6f);
+
+        /// <summary>OSSL_Api.cs:5450-5466 - the same with the caller's margin.</summary>
+        public int osApproxEquals(Vector3 va, Vector3 vb, float margin) => OsslApproxEquals(va, vb, Math.Abs(margin));
+
+        /// <summary>OSSL_Api.cs:5469-5488 - all four components of the rotation.</summary>
+        public int osApproxEquals(Quaternion ra, Quaternion rb) => OsslApproxEquals(ra, rb, 1.0e-6f);
+
+        /// <summary>OSSL_Api.cs:5491-5510 - the same with the caller's margin.</summary>
+        public int osApproxEquals(Quaternion ra, Quaternion rb, float margin) => OsslApproxEquals(ra, rb, Math.Abs(margin));
+
+        private static int OsslApproxEquals(Vector3 a, Vector3 b, float e)
+            => (Off(a.X, b.X, e) || Off(a.Y, b.Y, e) || Off(a.Z, b.Z, e)) ? 0 : 1;
+
+        private static int OsslApproxEquals(Quaternion a, Quaternion b, float e)
+            => (Off(a.X, b.X, e) || Off(a.Y, b.Y, e) || Off(a.Z, b.Z, e) || Off(a.W, b.W, e)) ? 0 : 1;
+
+        private static bool Off(float a, float b, float e) => a > b + e || a < b - e;
+
+        /// <summary>OSSL_Api.cs:2026 - bare CheckThreatLevel (master switch).</summary>
+        public int osCheckODE()
+        {
+            OsslCheck();
+            return World?.PhysicsScene?.EngineType == "OpenDynamicsEngine" ? 1 : 0;
+        }
+
+        /// <summary>OSSL_Api.cs:2649 - VeryLow (key osFormatString).</summary>
+        public string osFormatString(string str, LSLList strings)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.VeryLow, "osFormatString");
+            return string.Format(str, strings.Members.ToArray());
+        }
+
+        /// <summary>OSSL_Api.cs:5973 - ungated upstream.</summary>
+        public int osIsNotValidNumber(float v)
+        {
+            if (float.IsNaN(v)) return 1;
+            if (float.IsNegativeInfinity(v)) return 2;
+            if (float.IsPositiveInfinity(v)) return 3;
+            return 0;
+        }
+
+        /// <summary>OSSL_Api.cs:4434 - ungated upstream.</summary>
+        public int osIsUUID(string thing)
+        {
+            return UUID.TryParse(thing, out _) ? 1 : 0;
+        }
+
+        /// <summary>OSSL_Api.cs:6799 - ungated upstream.</summary>
+        public float osListAsFloat(LSLList src, int index)
+        {
+            var m = src?.Members; if (m == null || index < 0 || index >= m.Count) return 0f;
+            return m[index] switch { float f => f, double d => (float)d, _ => 0f };
+        }
+
+        /// <summary>OSSL_Api.cs:6815 - ungated upstream.</summary>
+        public int osListAsInteger(LSLList src, int index)
+        {
+            var m = src?.Members; if (m == null || index < 0 || index >= m.Count) return 0;
+            return m[index] is int i ? i : 0;
+        }
+
+        /// <summary>OSSL_Api.cs:6831 - ungated upstream.</summary>
+        public string osListAsString(LSLList src, int index)
+        {
+            var m = src?.Members; if (m == null || index < 0 || index >= m.Count) return string.Empty;
+            return m[index] is string s ? s : string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:6847 - ungated upstream.</summary>
+        public Vector3 osListAsVector(LSLList src, int index)
+        {
+            var m = src?.Members; if (m == null || index < 0 || index >= m.Count) return Vector3.Zero;
+            return m[index] is Vector3 v ? v : Vector3.Zero;
+        }
+
+        /// <summary>OSSL_Api.cs:6863 - ungated upstream.</summary>
+        public Quaternion osListAsRotation(LSLList src, int index)
+        {
+            var m = src?.Members; if (m == null || index < 0 || index >= m.Count) return Quaternion.Identity;
+            return m[index] is Quaternion q ? q : Quaternion.Identity;
+        }
+
+        /// <summary>OSSL_Api.cs:2656 - VeryLow (key osMatchString).</summary>
+        public LSLList osMatchString(string src, string pattern, int start)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.VeryLow, "osMatchString");
+            var result = new List<object>();
+            if (start < 0) start = src.Length + start;
+            if (start < 0 || start >= src.Length) return new LSLList(result);
+            try
+            {
+                var match = ScriptRegex.Create(pattern).Match(src, start);
+                while (match.Success)
+                {
+                    foreach (System.Text.RegularExpressions.Group g in match.Groups)
+                        if (g.Success) { result.Add(g.Value); result.Add(g.Index); }
+                    match = match.NextMatch();
+                }
+            }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+            {
+                ShoutError(ScriptRegex.TimedOutMessage);
+                return new LSLList(new List<object>());
+            }
+            return new LSLList(result);
+        }
+
+        /// <summary>OSSL_Api.cs:4456 - None (key osGetRezzingObject).</summary>
+        public float osMax(float a, float b)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.None, "osGetRezzingObject");
+            return Math.Max(a, b);   // upstream gates osMax under the key "osGetRezzingObject" (a copy-paste there); honoured as is
+        }
+
+        /// <summary>OSSL_Api.cs:4445 - ungated upstream.</summary>
+        public float osMin(float a, float b)
+        {
+            return Math.Min(a, b);
+        }
+
+        /// <summary>OSSL_Api.cs:4600 - Low (key osRegexIsMatch).</summary>
+        public int osRegexIsMatch(string input, string pattern)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Low, "osRegexIsMatch");
+            try { return ScriptRegex.Create(pattern).IsMatch(input ?? string.Empty) ? 1 : 0; }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException) { ShoutError(ScriptRegex.TimedOutMessage); return 0; }
+            catch (Exception) { ShoutError("Possible invalid regular expression detected."); return 0; }
+        }
+
+        /// <summary>OSSL_Api.cs:4990 - ungated upstream.</summary>
+        public float osRound(float value, int ndigits)
+        {
+            if (ndigits <= 0) return (float)Math.Round((double)value, MidpointRounding.AwayFromZero);
+            if (ndigits > 15) ndigits = 15;
+            return (float)Math.Round((double)value, ndigits, MidpointRounding.AwayFromZero);
+        }
+
+        /// <summary>OSSL_Api.cs:2557 - ungated upstream.</summary>
+        public string osSHA256(string input)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            return Convert.ToHexString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(input ?? string.Empty))).ToLowerInvariant();
+        }
+
+        /// <summary>OSSL_Api.cs:5919 - ungated upstream.</summary>
+        public Quaternion osSlerp(Quaternion a, Quaternion b, float amount)
+        {
+            if (amount < 0) amount = 0; else if (amount > 1f) amount = 1f;
+            a.Normalize(); b.Normalize();
+            return Quaternion.Slerp(a, b, amount);
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:5931-5940 - the vector form, ungated upstream. Upstream's
+        /// LSL_Types.Vector3.Slerp (LSL_Types.cs:417-438) does NOT normalise its inputs and falls back
+        /// to a straight lerp when the vectors are nearly parallel; mirrored exactly.
+        /// </summary>
+        public Vector3 osSlerp(Vector3 a, Vector3 b, float amount)
+        {
+            if (amount < 0) amount = 0; else if (amount > 1f) amount = 1f;
+            double angle = (a.X * b.X) + (a.Y * b.Y) + (a.Z * b.Z);
+            double scale, invscale;
+            if (angle < 0.999f)
+            {
+                angle = Math.Acos(angle);
+                invscale = 1.0 / Math.Sin(angle);
+                scale = Math.Sin((1.0 - amount) * angle) * invscale;
+                invscale *= Math.Sin(amount * angle);
+            }
+            else
+            {
+                scale = 1.0 - amount;
+                invscale = amount;
+            }
+            return new Vector3(
+                (float)(a.X * scale + b.X * invscale),
+                (float)(a.Y * scale + b.Y * invscale),
+                (float)(a.Z * scale + b.Z * invscale));
+        }
+
+        /// <summary>OSSL_Api.cs:5284 - bare CheckThreatLevel (master switch).</summary>
+        public int osStringStartsWith(string src, string value, int ignorecase)
+        {
+            OsslCheck();
+            if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(value)) return 0;
+            return src.StartsWith(value, ignorecase != 0, System.Globalization.CultureInfo.CurrentCulture) ? 1 : 0;
+        }
+
+        /// <summary>OSSL_Api.cs:5296 - bare CheckThreatLevel (master switch).</summary>
+        public int osStringEndsWith(string src, string value, int ignorecase)
+        {
+            OsslCheck();
+            if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(value)) return 0;
+            return src.EndsWith(value, ignorecase != 0, System.Globalization.CultureInfo.CurrentCulture) ? 1 : 0;
+        }
+
+        /// <summary>OSSL_Api.cs:5308 - bare CheckThreatLevel (master switch).</summary>
+        public int osStringIndexOf(string src, string value, int ignorecase)
+        {
+            OsslCheck();
+            if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(value)) return -1;
+            return src.IndexOf(value, ignorecase == 0 ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>OSSL_Api.cs:5322 - bare CheckThreatLevel (master switch).</summary>
+        public int osStringIndexOf(string src, string value, int offset, int count, int ignorecase)
+        {
+            OsslCheck();
+            if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(value)) return -1;
+            if (offset >= src.Length) return -1; else if (offset < 0) offset = 0;
+            if (count <= 0) count = src.Length - offset; else if (count > src.Length - offset) count = src.Length - offset;
+            return src.IndexOf(value, offset, count, ignorecase == 0 ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>OSSL_Api.cs:5346 - bare CheckThreatLevel (master switch).</summary>
+        public int osStringLastIndexOf(string src, string value, int ignorecase)
+        {
+            OsslCheck();
+            if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(value)) return -1;
+            return src.LastIndexOf(value, ignorecase == 0 ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>OSSL_Api.cs:5360 - bare CheckThreatLevel (master switch).</summary>
+        public int osStringLastIndexOf(string src, string value, int offset, int count, int ignorecase)
+        {
+            OsslCheck();
+            if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(value)) return -1;
+            if (offset >= src.Length) return -1; if (offset < 0) offset = 0;
+            if (count <= 0) count = src.Length - offset; else if (count > src.Length - offset) count = src.Length - offset;
+            return src.LastIndexOf(value, offset, count, ignorecase == 0 ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase);
+        }
+
+        /// <summary>OSSL_Api.cs:5384 - ungated upstream.</summary>
+        public string osStringRemove(string src, int offset, int count)
+        {
+            if (string.IsNullOrEmpty(src) || offset >= src.Length) return string.Empty;
+            if (offset < 0) offset = 0;
+            if (count <= 0) count = src.Length - offset; else if (count > src.Length - offset) count = src.Length - offset;
+            if (count >= src.Length) return string.Empty;
+            return src.Remove(offset, count);
+        }
+
+        /// <summary>OSSL_Api.cs:5405 - ungated upstream.</summary>
+        public string osStringReplace(string src, string oldvalue, string newvalue)
+        {
+            if (string.IsNullOrEmpty(src) || string.IsNullOrEmpty(oldvalue)) return string.Empty;
+            if (string.IsNullOrEmpty(newvalue)) newvalue = null;
+            return src.Replace(oldvalue, newvalue);
+        }
+
+        /// <summary>OSSL_Api.cs:5252 - bare CheckThreatLevel (master switch).</summary>
+        public string osStringSubString(string src, int offset)
+        {
+            OsslCheck();
+            if (string.IsNullOrEmpty(src) || offset >= src.Length) return string.Empty;
+            if (offset <= 0) return src;
+            return src.Substring(offset);
+        }
+
+        /// <summary>OSSL_Api.cs:5265 - bare CheckThreatLevel (master switch).</summary>
+        public string osStringSubString(string src, int offset, int length)
+        {
+            OsslCheck();
+            if (string.IsNullOrEmpty(src) || length <= 0 || offset >= src.Length) return string.Empty;
+            if (offset <= 0) { if (length == src.Length) return src; offset = 0; }
+            if (length > src.Length - offset) length = src.Length - offset;
+            return src.Substring(offset, length);
+        }
+
+        /// <summary>OSSL_Api.cs:4012 - ungated upstream.</summary>
+        public string osUnixTimeToTimestamp(int time)
+        {
+            return Util.ToDateTime(time).ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ");
+        }
+
+        /// <summary>OSSL_Api.cs:5004 - ungated upstream.</summary>
+        public float osVecDistSquare(Vector3 a, Vector3 b)
+        {
+            return (a - b).LengthSquared();
+        }
+
+        /// <summary>OSSL_Api.cs:4999 - ungated upstream.</summary>
+        public float osVecMagSquare(Vector3 a)
+        {
+            return a.LengthSquared();
+        }
+
+        // ── OSSL side-effect functions, ported from OSSL_Api.cs (line cited per function), each under its
+        //    upstream key and threat level through OsslGate; "master" = upstream's bare CheckThreatLevel() ──
+        private static readonly OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel
+            TlVeryLow  = OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.VeryLow,
+            TlLow      = OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Low,
+            TlModerate = OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Moderate,
+            TlHigh     = OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High,
+            TlVeryHigh = OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.VeryHigh,
+            TlSevere   = OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Severe;
+
+        /// <summary>
+        /// OSSL_Api.cs:5180-5199 GetSingleLinkPart: LINK_SET/ALL_OTHERS/ALL_CHILDREN -> none; 0/LINK_ROOT -> root;
+        /// LINK_THIS -> host; n -> link n. The link resolver's prim, with the multi-prim selectors refused.
+        /// </summary>
+        private SceneObjectPart OsslSingleLinkPart(int linkType)
+        {
+            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return null;
+            if (linkType == LINK_SET || linkType == LINK_ALL_OTHERS || linkType == LINK_ALL_CHILDREN) return null;
+            return GetLinkParts(linkType).FirstOrDefault();
+        }
+
+        /// <summary>OSSL_Api.cs:895-933 checkAllowAgentTPbyLandOwner minus the agent branches: land owner, estate manager/owner, or the land's group.</summary>
+        private bool OsslLandOwnerAllows(Vector3 pos)
+        {
+            ILandObject land = World?.LandChannel?.GetLandObject(pos);
+            LandData landdata = land?.LandData;
+            if (landdata == null) return true;
+            if (landdata.OwnerID == m_host.OwnerID) return true;
+            EstateSettings es = World.RegionInfo?.EstateSettings;
+            if (es != null && es.IsEstateManagerOrOwner(m_host.OwnerID)) return true;
+            if (!landdata.IsGroupOwned || landdata.GroupID == UUID.Zero) return false;
+            return landdata.GroupID == m_host.GroupID;
+        }
+
+        /// <summary>OSSL_Api.cs:701-720 - VeryHigh. A linkset by its key rotates as a group; a presence gets its Rotation set.</summary>
+        public void osSetRot(string target, Quaternion rotation)
+        {
+            OsslCheck(TlVeryHigh, "osSetRot");
+            if (!UUID.TryParse(target, out UUID id)) return;
+            SceneObjectGroup sog = World?.GetSceneObjectGroup(id);
+            if (sog != null && !sog.IsDeleted) { sog.UpdateGroupRotationR(rotation); return; }
+            ScenePresence sp = World?.GetScenePresence(id);
+            if (sp != null) sp.Rotation = rotation;
+        }
+
+        /// <summary>OSSL_Api.cs:2784-2789 - VeryLow. llCreateLink without PERMISSION_CHANGE_LINKS.</summary>
+        public void osForceCreateLink(string target, int parent)
+        {
+            OsslCheck(TlVeryLow, "osForceCreateLink");
+            CreateLinkCore(target, parent);
+        }
+
+        /// <summary>OSSL_Api.cs:2792-2797 - VeryLow.</summary>
+        public void osForceBreakLink(int linknum)
+        {
+            OsslCheck(TlVeryLow, "osForceBreakLink");
+            BreakLinkCore(linknum);
+        }
+
+        /// <summary>OSSL_Api.cs:2800-2805 - VeryLow. llBreakAllLinks without its permission checks (BreakAllLinksCore).</summary>
+        public void osForceBreakAllLinks()
+        {
+            OsslCheck(TlVeryLow, "osForceBreakAllLinks");
+            BreakAllLinksCore();
+        }
+
+        /// <summary>OSSL_Api.cs:4954-4975 - Severe. Another owner's object only where the land owner rule allows; SceneObjectGroup.TeleportObject does the move (OSTPOBJ_* flags).</summary>
+        public int osTeleportObject(string objectUUID, Vector3 targetPos, Quaternion rotation, int flags)
+        {
+            OsslCheck(TlSevere, "osTeleportObject");
+            if (!UUID.TryParse(objectUUID, out UUID id)) { ShoutError("osTeleportObject() invalid object Key"); return -1; }
+            SceneObjectGroup sog = World?.GetSceneObjectGroup(id);
+            if (sog == null || sog.IsDeleted || sog.inTransit) return -1;
+            if (sog.OwnerID != m_host.OwnerID && !OsslLandOwnerAllows(sog.AbsolutePosition)) return -1;
+            return sog.TeleportObject(m_host.ParentGroup.UUID, targetPos, rotation, flags);
+        }
+
+        /// <summary>OSSL_Api.cs:3681-3689 - Moderate.</summary>
+        public void osSetSpeed(string ID, float SpeedModifier)
+        {
+            OsslCheck(TlModerate, "osSetSpeed");
+            if (!UUID.TryParse(ID, out UUID avid)) return;
+            ScenePresence avatar = World?.GetScenePresence(avid);
+            if (avatar != null) avatar.SpeedModifier = SpeedModifier;
+        }
+
+        /// <summary>OSSL_Api.cs:3693-3701 - Moderate; capped at 4.</summary>
+        public void osSetOwnerSpeed(float SpeedModifier)
+        {
+            OsslCheck(TlModerate, "osSetOwnerSpeed");
+            if (SpeedModifier > 4) SpeedModifier = 4;
+            ScenePresence avatar = World?.GetScenePresence(m_host.OwnerID);
+            if (avatar != null) avatar.SpeedModifier = SpeedModifier;
+        }
+
+        /// <summary>OSSL_Api.cs:4475-4479 - Severe. The MIME type verbatim, unlike llSetContentType's enum.</summary>
+        public void osSetContentType(string id, string type)
+        {
+            OsslCheck(TlSevere, "osSetContentType");
+            if (!UUID.TryParse(id, out UUID reqID)) return;
+            World?.RequestModuleInterface<IUrlModule>()?.HttpContentType(reqID, type);
+        }
+
+        /// <summary>OSSL_Api.cs:889-893 - VeryLow.</summary>
+        public void osSetPrimFloatOnWater(int floatYN)
+        {
+            OsslCheck(TlVeryLow, "osSetPrimFloatOnWater");
+            m_host?.ParentGroup?.RootPart?.SetFloatOnWater(floatYN);
+        }
+
+        /// <summary>OSSL_Api.cs:4682-4688 - master switch. Unlike llVolumeDetect this does not record the flag in the script's state.</summary>
+        public void osVolumeDetect(int detect)
+        {
+            OsslCheck();
+            if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted || m_host.ParentGroup.IsAttachment) return;
+            m_host.ScriptSetVolumeDetect(detect != 0);
+        }
+
+        /// <summary>OSSL_Api.cs:3877-3882 - master switch; LSL_Api.SetPrimitiveParamsEx refuses another owner's prim.</summary>
+        public void osSetPrimitiveParams(string prim, LSLList rules)
+        {
+            OsslCheck();
+            if (!UUID.TryParse(prim, out UUID id)) return;
+            SceneObjectPart part = World?.GetSceneObjectPart(id);
+            if (part == null || part.OwnerID != m_host.OwnerID) return;
+            SetPrimParams(part, rules);
+        }
+
+        /// <summary>OSSL_Api.cs:3869-3874 - master switch; LSL_Api.GetPrimitiveParamsEx answers only for the same owner.</summary>
+        public LSLList osGetPrimitiveParams(string prim, LSLList rules)
+        {
+            OsslCheck();
+            if (!UUID.TryParse(prim, out UUID id)) return new LSLList();
+            SceneObjectPart part = World?.GetSceneObjectPart(id);
+            if (part == null || part.OwnerID != m_host.OwnerID) return new LSLList();
+            return GetPrimParams(part, rules);
+        }
+
+        /// <summary>OSSL_Api.cs:2755-2781 - High. llGetLinkPrimitiveParams behind the OSSL gate (the PRIM_LINK_TARGET re-walk is Phlox's GetPrimParams' business).</summary>
+        public LSLList osGetLinkPrimitiveParams(int linknumber, LSLList rules)
+        {
+            OsslCheck(TlHigh, "osGetLinkPrimitiveParams");
+            return llGetLinkPrimitiveParams(linknumber, rules);
+        }
+
+        /// <summary>OSSL_Api.cs:3936-3962 SetProjectionParams - ungated upstream.</summary>
+        private static void OsslSetProjectionParams(SceneObjectPart obj, int projection, string texture, float fov, float focus, float amb)
+        {
+            if (obj == null || obj.IsDeleted || obj.Shape == null) return;
+            if (projection != 0)
+            {
+                if (!UUID.TryParse(texture, out UUID texID)) return;
+                obj.Shape.ProjectionEntry = true;
+                obj.Shape.ProjectionTextureUUID = texID;
+                obj.Shape.ProjectionFOV = Math.Clamp(fov, 0f, 3.0f);
+                obj.Shape.ProjectionFocus = Math.Clamp(focus, -20.0f, 20.0f);
+                obj.Shape.ProjectionAmbiance = Math.Clamp(amb, 0f, 1.0f);
+                obj.ParentGroup.HasGroupChanged = true;
+                obj.ScheduleFullUpdate();
+                return;
+            }
+            if (obj.Shape.ProjectionEntry)
+            {
+                obj.Shape.ProjectionEntry = false;
+                obj.ParentGroup.HasGroupChanged = true;
+                obj.ScheduleFullUpdate();
+            }
+        }
+
+        /// <summary>OSSL_Api.cs:3888-3891 - ungated upstream.</summary>
+        public void osSetProjectionParams(int projection, string texture, float fov, float focus, float amb)
+            => OsslSetProjectionParams(m_host, projection, texture, fov, focus, amb);
+
+        /// <summary>OSSL_Api.cs:3896-3914 - ungated upstream.</summary>
+        public void osSetProjectionParams(int linknum, int projection, string texture, float fov, float focus, float amb)
+        {
+            if (m_host?.ParentGroup == null) return;
+            SceneObjectPart part = OsslSingleLinkPart(linknum);
+            if (part != null) OsslSetProjectionParams(part, projection, texture, fov, focus, amb);
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:3921-3935 - ungated upstream. The prim is addressed by key and must be
+        /// owned by this prim's owner; a key that is not a UUID, or zero, means this prim. Arity 6 like
+        /// the link form above, told apart by the first argument's type.
+        /// </summary>
+        public void osSetProjectionParams(string prim, int projection, string texture, float fov, float focus, float amb)
+        {
+            if (UUID.TryParse(prim, out UUID pID) && pID != UUID.Zero)
+            {
+                SceneObjectPart obj = World?.GetSceneObjectPart(pID);
+                if (obj != null && m_host != null && obj.OwnerID == m_host.OwnerID)
+                    OsslSetProjectionParams(obj, projection, texture, fov, focus, amb);
+                return;
+            }
+            OsslSetProjectionParams(m_host, projection, texture, fov, focus, amb);
+        }
+
+        private static Vector4 OsslNormalisedRot(Quaternion q)
+        {
+            var v = new Vector4(q.X, q.Y, q.Z, q.W);
+            v.Normalize();
+            return v;
+        }
+
+        /// <summary>OSSL_Api.cs:4747-4770 - master switch. Note upstream's rot.y typo for z (:4767); the port uses z.</summary>
+        public void osSetInertia(float mass, Vector3 centerOfMass, Vector3 principalInertiaScaled, Quaternion lslrot)
+        {
+            OsslCheck();
+            SceneObjectGroup sog = m_host?.ParentGroup;
+            if (sog == null || sog.IsDeleted) return;
+            if (mass < 0 || principalInertiaScaled.X < 0 || principalInertiaScaled.Y < 0 || principalInertiaScaled.Z < 0) return;
+            sog.SetInertiaData(mass, centerOfMass, principalInertiaScaled * mass, OsslNormalisedRot(lslrot));
+        }
+
+        /// <summary>OSSL_Api.cs:4785-4811 - master switch.</summary>
+        public void osSetInertiaAsBox(float mass, Vector3 boxSize, Vector3 centerOfMass, Quaternion lslrot)
+        {
+            OsslCheck();
+            SceneObjectGroup sog = m_host?.ParentGroup;
+            if (sog == null || sog.IsDeleted || mass < 0) return;
+            float lx = boxSize.X, ly = boxSize.Y, lz = boxSize.Z, t = mass / 12.0f;
+            sog.SetInertiaData(mass, centerOfMass, new Vector3(t * (ly * ly + lz * lz), t * (lx * lx + lz * lz), t * (lx * lx + ly * ly)), OsslNormalisedRot(lslrot));
+        }
+
+        /// <summary>OSSL_Api.cs:4825-4841 - master switch.</summary>
+        public void osSetInertiaAsSphere(float mass, float radius, Vector3 centerOfMass)
+        {
+            OsslCheck();
+            SceneObjectGroup sog = m_host?.ParentGroup;
+            if (sog == null || sog.IsDeleted || mass < 0) return;
+            float t = 0.4f * mass * radius * radius;
+            sog.SetInertiaData(mass, centerOfMass, new Vector3(t, t, t), new Vector4(0f, 0f, 0f, 1.0f));
+        }
+
+        /// <summary>OSSL_Api.cs:4860-4883 - master switch.</summary>
+        public void osSetInertiaAsCylinder(float mass, float radius, float length, Vector3 centerOfMass, Quaternion lslrot)
+        {
+            OsslCheck();
+            SceneObjectGroup sog = m_host?.ParentGroup;
+            if (sog == null || sog.IsDeleted || mass < 0) return;
+            float r = radius * radius;
+            float t = length * length;
+            t += 3.0f * r;
+            t *= 8.333333e-2f * mass;
+            sog.SetInertiaData(mass, centerOfMass, new Vector3(t, t, 0.5f * mass * r), OsslNormalisedRot(lslrot));
+        }
+
+        /// <summary>OSSL_Api.cs:4896-4903 - master switch.</summary>
+        public void osClearInertia()
+        {
+            OsslCheck();
+            SceneObjectGroup sog = m_host?.ParentGroup;
+            if (sog == null || sog.IsDeleted) return;
+            sog.SetInertiaData(-1, Vector3.Zero, Vector3.Zero, Vector4.Zero);
+        }
+
+        /// <summary>OSSL_Api.cs:5995-6005 - ungated upstream; capped at 128.</summary>
+        public void osSetSitActiveRange(float v)
+        {
+            if (m_host == null) return;
+            if (v > 128f) v = 128f;
+            if (m_host.SitActiveRange != v) { m_host.SitActiveRange = v; if (m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true; }
+        }
+
+        /// <summary>OSSL_Api.cs:6008-6025 - ungated upstream.</summary>
+        public void osSetLinkSitActiveRange(int linkNumber, float v)
+        {
+            if (m_host == null) return;
+            if (v > 128f) v = 128f;
+            bool changed = false;
+            foreach (SceneObjectPart sop in GetLinkParts(linkNumber))
+                if (sop.SitActiveRange != v) { sop.SitActiveRange = v; changed = true; }
+            if (changed && m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
+        }
+
+        /// <summary>OSSL_Api.cs:6051-6058 - ungated upstream.</summary>
+        public void osSetStandTarget(Vector3 v)
+        {
+            if (m_host == null) return;
+            Vector3 old = m_host.StandOffset;
+            m_host.StandOffset = v;
+            if (!old.ApproxEquals(v) && m_host.ParentGroup != null) m_host.ParentGroup.HasGroupChanged = true;
+        }
+
+        /// <summary>OSSL_Api.cs:6060-6080 - ungated upstream: LINK_THIS -> host, negative -> nothing, 0/1 -> root, n -> link n.</summary>
+        public void osSetLinkStandTarget(int linkNumber, Vector3 v)
+        {
+            if (m_host?.ParentGroup == null) return;
+            SceneObjectPart target = OsslSingleLinkPart(linkNumber);
+            if (target == null) return;
+            Vector3 old = target.StandOffset;
+            target.StandOffset = v;
+            if (!old.ApproxEquals(v)) m_host.ParentGroup.HasGroupChanged = true;
+        }
+
+        // sound family, OSSL_Api.cs:5017-5178 - every one ungated upstream; the link-addressed forms of the ll* calls
+        /// <summary>OSSL_Api.cs:5017-5021.</summary>
+        public void osAdjustSoundVolume(int linknum, float volume) => OsslSingleLinkPart(linknum)?.AdjustSoundGain(volume);
+        /// <summary>OSSL_Api.cs:5023-5028.</summary>
+        public void osSetSoundRadius(int linknum, float radius) { var sop = OsslSingleLinkPart(linknum); if (sop != null) sop.SoundRadius = radius; }
+        private void OsslSound(int linknum, string sound, float volume, bool trigger, bool loop, bool master, bool slave)
+        {
+            ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
+            SceneObjectPart sop = OsslSingleLinkPart(linknum);
+            if (sm == null || sop == null) return;
+            UUID soundID = KeyOrName(sound);
+            if (soundID == UUID.Zero) return;
+            if (loop) sm.LoopSound(sop, soundID, volume, master, slave);
+            else sm.SendSound(sop, soundID, volume, trigger, 0, slave, false);
+        }
+        /// <summary>OSSL_Api.cs:5030-5044.</summary>
+        public void osPlaySound(int linknum, string sound, float volume) => OsslSound(linknum, sound, volume, false, false, false, false);
+        /// <summary>OSSL_Api.cs:5047-5060.</summary>
+        public void osLoopSound(int linknum, string sound, float volume) => OsslSound(linknum, sound, volume, false, true, false, false);
+        /// <summary>OSSL_Api.cs:5063-5076.</summary>
+        public void osLoopSoundMaster(int linknum, string sound, float volume) => OsslSound(linknum, sound, volume, false, true, true, false);
+        /// <summary>OSSL_Api.cs:5079-5090.</summary>
+        public void osLoopSoundSlave(int linknum, string sound, float volume) => OsslSound(linknum, sound, volume, false, true, false, true);
+        /// <summary>OSSL_Api.cs:5093-5104.</summary>
+        public void osPlaySoundSlave(int linknum, string sound, float volume) => OsslSound(linknum, sound, volume, false, false, false, true);
+        /// <summary>OSSL_Api.cs:5107-5118.</summary>
+        public void osTriggerSound(int linknum, string sound, float volume) => OsslSound(linknum, sound, volume, true, false, false, false);
+        /// <summary>OSSL_Api.cs:5121-5134.</summary>
+        public void osTriggerSoundLimited(int linknum, string sound, float volume, Vector3 top_north_east, Vector3 bottom_south_west)
+        {
+            ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
+            SceneObjectPart sop = OsslSingleLinkPart(linknum);
+            if (sm == null || sop == null) return;
+            UUID soundID = KeyOrName(sound);
+            if (soundID != UUID.Zero) sm.TriggerSoundLimited(sop.UUID, soundID, volume, bottom_south_west, top_north_east);
+        }
+        /// <summary>OSSL_Api.cs:5137-5148 - every part the link number names.</summary>
+        public void osStopSound(int linknum)
+        {
+            ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
+            if (sm == null || m_host == null) return;
+            foreach (SceneObjectPart sop in GetLinkParts(linknum)) sm.StopSound(sop);
+        }
+        /// <summary>OSSL_Api.cs:5167-5177.</summary>
+        public void osTriggerSoundAtPos(string sound, Vector3 position, float gain)
+        {
+            ISoundModule sm = World?.RequestModuleInterface<ISoundModule>();
+            if (sm == null || m_host == null) return;
+            UUID soundID = KeyOrName(sound);
+            if (soundID == UUID.Zero) return;
+            sm.TriggerSound(soundID, m_host.OwnerID, m_host.UUID, UUID.Zero, gain, position, m_host.RegionHandle);
+        }
+        /// <summary>OSSL_Api.cs:4650-4677 - master switch. "" with volume 0 disables collision sounds, 1 restores the defaults, otherwise defaults at that volume.</summary>
+        public void osCollisionSound(string impact_sound, float impact_volume)
+        {
+            OsslCheck();
+            if (m_host == null) return;
+            if (string.IsNullOrEmpty(impact_sound))
+            {
+                m_host.CollisionSoundVolume = impact_volume;
+                m_host.CollisionSound = m_host.invalidCollisionSoundUUID;
+                m_host.CollisionSoundType = impact_volume == 0.0f ? (sbyte)-1 : impact_volume == 1.0f ? (sbyte)0 : (sbyte)2;
+                m_host.aggregateScriptEvents();
+                return;
+            }
+            UUID soundId = KeyOrName(impact_sound);
+            if (soundId == UUID.Zero) m_host.CollisionSoundType = -1;
+            else { m_host.CollisionSound = soundId; m_host.CollisionSoundVolume = impact_volume; m_host.CollisionSoundType = 1; }
+            m_host.aggregateScriptEvents();
+        }
+
+        // attachments, OSSL_Api.cs:4193-4265 and :4537-4555
+        /// <summary>OSSL_Api.cs:4193-4198 - High. llAttachToAvatar without PERMISSION_ATTACH, onto the owner.</summary>
+        public void osForceAttachToAvatar(int attachmentPoint)
+        {
+            OsslCheck(TlHigh, "osForceAttachToAvatar");
+            if (m_host?.ParentGroup == null) return;
+            IAttachmentsModule attachMod = World?.RequestModuleInterface<IAttachmentsModule>();
+            ScenePresence sp = World?.GetScenePresence(m_host.OwnerID);
+            if (attachMod == null || sp == null || sp.IsChildAgent) return;
+            if (m_host.ParentGroup.IsAttachment) return;   // as llAttachToAvatar: already attached fails silently
+            attachMod.AttachObject(sp, m_host.ParentGroup, (uint)attachmentPoint, false, true, true, GetScriptExperienceId());   // appends
+        }
+
+        /// <summary>OSSL_Api.cs:4213-4252 ForceAttachToAvatarFromInventory: the object moves from the prim's inventory to the avatar's and is rezzed as an attachment.</summary>
+        private void OsslForceAttachFromInventory(UUID avatarId, string itemName, int attachmentPoint)
+        {
+            IAttachmentsModule attachMod = World?.RequestModuleInterface<IAttachmentsModule>();
+            if (attachMod == null || m_host == null) return;
+            TaskInventoryItem item = m_host.Inventory.GetInventoryItem(itemName);
+            if (item == null) { ShoutError($"Could not find object '{itemName}'"); return; }
+            if (item.InvType != (int)InventoryType.Object) { ShoutError($"Unable to attach, item '{itemName}' is not an object."); return; }
+            if ((item.Flags & (uint)InventoryItemFlags.ObjectHasMultipleItems) != 0) { ShoutError($"Unable to attach coalesced object, item '{itemName}'"); return; }
+            ScenePresence sp = World.GetScenePresence(avatarId);
+            if (sp == null) return;
+            InventoryItemBase newItem = World.MoveTaskInventoryItem(sp.UUID, UUID.Zero, m_host, item.ItemID, out string message);
+            if (newItem == null) { ShoutError(message); return; }
+            attachMod.RezSingleAttachmentFromInventory(sp, newItem.ID, (uint)attachmentPoint);
+        }
+
+        /// <summary>OSSL_Api.cs:4201-4205 - High.</summary>
+        public void osForceAttachToAvatarFromInventory(string itemName, int attachmentPoint)
+        {
+            OsslCheck(TlHigh, "osForceAttachToAvatarFromInventory");
+            OsslForceAttachFromInventory(m_host.OwnerID, itemName, attachmentPoint);
+        }
+
+        /// <summary>OSSL_Api.cs:4208-4214 - VeryHigh.</summary>
+        public void osForceAttachToOtherAvatarFromInventory(string rawAvatarId, string itemName, int attachmentPoint)
+        {
+            OsslCheck(TlVeryHigh, "osForceAttachToOtherAvatarFromInventory");
+            if (!UUID.TryParse(rawAvatarId, out UUID avatarId)) return;
+            OsslForceAttachFromInventory(avatarId, itemName, attachmentPoint);
+        }
+
+        /// <summary>OSSL_Api.cs:4263-4268 - High. llDetachFromAvatar without PERMISSION_ATTACH.</summary>
+        public void osForceDetachFromAvatar()
+        {
+            OsslCheck(TlHigh, "osForceDetachFromAvatar");
+            if (m_host?.ParentGroup == null || !m_host.ParentGroup.IsAttachment) return;
+            IAttachmentsModule attachMod = World?.RequestModuleInterface<IAttachmentsModule>();
+            ScenePresence sp = World?.GetScenePresence(m_host.ParentGroup.AttachedAvatar);
+            if (attachMod == null || sp == null) return;
+            attachMod.DetachSingleAttachmentToInv(sp, m_host.ParentGroup);
+        }
+
+        /// <summary>OSSL_Api.cs:4537-4541 (DropAttachment :4500-4509) - High.</summary>
+        public void osForceDropAttachment()
+        {
+            OsslCheck(TlHigh, "osForceDropAttachment");
+            if (m_host?.ParentGroup == null || !m_host.ParentGroup.IsAttachment) return;
+            IAttachmentsModule attachMod = World?.RequestModuleInterface<IAttachmentsModule>();
+            ScenePresence sp = World?.GetScenePresence(m_host.ParentGroup.OwnerID);
+            if (attachMod != null && sp != null) attachMod.DetachSingleAttachmentToGround(sp, m_host.ParentGroup.LocalId);
+        }
+
+        /// <summary>OSSL_Api.cs:4551-4555 (DropAttachmentAt :4511-4520) - High.</summary>
+        public void osForceDropAttachmentAt(Vector3 pos, Quaternion rot)
+        {
+            OsslCheck(TlHigh, "osForceDropAttachmentAt");
+            if (m_host?.ParentGroup == null || !m_host.ParentGroup.IsAttachment) return;
+            IAttachmentsModule attachMod = World?.RequestModuleInterface<IAttachmentsModule>();
+            ScenePresence sp = World?.GetScenePresence(m_host.ParentGroup.OwnerID);
+            if (attachMod != null && sp != null) attachMod.DetachSingleAttachmentToGround(sp, m_host.ParentGroup.LocalId, pos, rot);
+        }
+
+        /// <summary>OSSL_Api.cs:2099-2124 - Low. A dataserver event (sender key, message) on every script in the target prim.</summary>
+        public void osMessageObject(string objectUUID, string message)
+        {
+            OsslCheck(TlLow, "osMessageObject");
+            if (!UUID.TryParse(objectUUID, out UUID objUUID)) { ShoutError("osMessageObject() cannot send messages to objects with invalid UUIDs"); return; }
+            SceneObjectPart sceneOP = World?.GetSceneObjectPart(objUUID);
+            if (sceneOP == null) { ShoutError("osMessageObject() cannot send message to " + objUUID + ", object was not found in scene."); return; }
+            m_ScriptEngine.PostObjectEvent(sceneOP.LocalId, new EventParams("dataserver",
+                new object[] { m_host.UUID.ToString(), message ?? string.Empty }, new DetectParams[0]));
+            // Every script in the target prim, whatever engine runs it.
+            string sender = m_host.UUID.ToString(), text = message ?? string.Empty;
+            OfferToOtherEngines("osMessageObject", () => ScriptItemsIn(new[] { sceneOP }), "dataserver", () => new object[] { sender, text });
+        }
+
+        /// <summary>OSSL_Api.cs:5941-5966 - ungated upstream. Every other script in the prim (or the linkset) is reset, then this one.</summary>
+        public void osResetAllScripts(int linkset)
+        {
+            if (m_host?.ParentGroup == null) return;
+            var scripts = new List<TaskInventoryItem>();
+            if (linkset != 0)
+            {
+                SceneObjectGroup sog = m_host.ParentGroup;
+                if (sog.inTransit || sog.IsDeleted) return;
+                foreach (SceneObjectPart part in sog.Parts) scripts.AddRange(part.Inventory.GetInventoryItems(InventoryType.LSL));
+            }
+            else scripts.AddRange(m_host.Inventory.GetInventoryItems(InventoryType.LSL));
+            foreach (TaskInventoryItem script in scripts)
+                if (script.ItemID != m_itemID) m_ScriptEngine.ResetScript(script.ItemID);
+            World?.RequestModuleInterface<IUrlModule>()?.ScriptRemoved(m_itemID);
+            m_ScriptEngine.ApiResetScript(m_itemID);
+        }
+
+        private static System.Collections.Hashtable OsslUrlOptions(LSLList options)
+        {
+            var opts = new System.Collections.Hashtable();
+            for (int i = 0; i < options.Length; i++)
+                if (options.Data[i]?.ToString() == "allowXss") opts["allowXss"] = true;
+            return opts;
+        }
+
+        /// <summary>OSSL_Api.cs:4615-4629 - Moderate. llRequestURL with options ("allowXss").</summary>
+        public string osRequestURL(LSLList options)
+        {
+            OsslCheck(TlModerate, "osRequestURL");
+            IUrlModule urlMod = World?.RequestModuleInterface<IUrlModule>();
+            if (urlMod == null) return UUID.Zero.ToString();
+            return urlMod.RequestURL(m_ScriptEngine, m_host, m_itemID, OsslUrlOptions(options)).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:4633-4647 - Moderate.</summary>
+        public string osRequestSecureURL(LSLList options)
+        {
+            OsslCheck(TlModerate, "osRequestSecureURL");
+            IUrlModule urlMod = World?.RequestModuleInterface<IUrlModule>();
+            if (urlMod == null) return UUID.Zero.ToString();
+            return urlMod.RequestSecureURL(m_ScriptEngine, m_host, m_itemID, OsslUrlOptions(options)).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:2697-2710 - VeryLow. Regex replace of at most count matches from start (negative start counts from the end).</summary>
+        public string osReplaceString(string src, string pattern, string replace, int count, int start)
+        {
+            OsslCheck(TlVeryLow, "osReplaceString");
+            src ??= string.Empty;
+            if (start < 0) start = src.Length + start;
+            if (start < 0 || start >= src.Length) return src;
+            try { return ScriptRegex.Create(pattern).Replace(src, replace ?? string.Empty, count, start); }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException) { ShoutError(ScriptRegex.TimedOutMessage); return src; }
+        }
+
+        /// <summary>OSSL_Api.cs:6103-6106 - ungated upstream.</summary>
+        public int osClearObjectAnimations() => m_host?.ClearObjectAnimations() ?? 0;
+
+        /// <summary>OSSL_Api.cs:936-949 - ungated upstream, but only the owner, a PERMISSION_TELEPORT granter, or an agent standing on land the owner rule allows.</summary>
+        public void osLocalTeleportAgent(string agent, Vector3 position, Vector3 velocity, Vector3 lookat, int flags)
+        {
+            if (!UUID.TryParse(agent, out UUID agentId)) return;
+            ScenePresence presence = World?.GetScenePresence(agentId);
+            if (presence == null || presence.IsDeleted || presence.IsInTransit) return;
+            if (!OsslAgentTeleportAllowed(agentId, presence.AbsolutePosition)) return;
+            World.RequestLocalTeleport(presence, position, velocity, lookat, flags);
+        }
+
+        /// <summary>OSSL_Api.cs:875-886 - Severe, and a second check: the owner must be allowed console commands by the permissions module.</summary>
+        public int osConsoleCommand(string command)
+        {
+            OsslCheck(TlSevere, "osConsoleCommand");
+            if (World?.Permissions == null || !World.Permissions.CanRunConsoleCommand(m_host.OwnerID)) return 0;
+            OpenSim.Framework.MainConsole.Instance?.RunCommand(command);
+            return 1;
+        }
+
+        // ── OSSL agent, teleport, kick, animation and group functions, ported from OSSL_Api.cs (line cited per
+        //    function), each under its upstream key and threat level through OsslGate ──
+        private static readonly OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel
+            TlNone = OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.None;
+
+        /// <summary>OSSL_Api.cs:1076-1082 - None. The owner through YEngine's region-name TeleportAgent (not the Severe door).</summary>
+        public void osTeleportOwner(string regionName, Vector3 position, Vector3 lookat)
+        {
+            OsslCheck(TlNone, "osTeleportOwner");
+            if (m_host == null) return;
+            OsslTeleportAgent(m_host.OwnerID.ToString(), regionName, position, lookat);
+        }
+
+        /// <summary>OSSL_Api.cs:1084-1089 - None. Grid coordinates, through YEngine's grid TeleportAgent.</summary>
+        public void osTeleportOwner(int regionGridX, int regionGridY, Vector3 position, Vector3 lookat)
+        {
+            OsslCheck(TlNone, "osTeleportOwner");
+            if (m_host == null) return;
+            OsslTeleportAgent(m_host.OwnerID.ToString(), regionGridX, regionGridY, position, lookat);
+        }
+
+        /// <summary>OSSL_Api.cs:1091-1096 - None. The three-argument osTeleportAgent, ungated upstream.</summary>
+        public void osTeleportOwner(Vector3 position, Vector3 lookat)
+        {
+            OsslCheck(TlNone, "osTeleportOwner");
+            if (m_host == null) return;
+            osTeleportAgent(m_host.OwnerID.ToString(), position, lookat);
+        }
+
+        /// <summary>OSSL_Api.cs:3705-3727 - Severe. Every root presence with that name: Kick with the alert when there is one, then CloseAgent.</summary>
+        public void osKickAvatar(string FirstName, string SurName, string alert)
+        {
+            OsslCheck(TlSevere, "osKickAvatar");
+            var victims = new List<ScenePresence>();
+            World?.ForEachRootScenePresence(sp => { if (sp.Firstname == FirstName && sp.Lastname == SurName) victims.Add(sp); });
+            foreach (ScenePresence sp in victims)
+            {
+                if (!string.IsNullOrEmpty(alert)) sp.ControllingClient.Kick(alert);
+                sp.Scene.CloseAgent(sp.UUID, false);
+            }
+        }
+
+        /// <summary>OSSL_Api.cs:3730-3741 - Severe.</summary>
+        public void osKickAvatar(string agentKey, string alert)
+        {
+            OsslCheck(TlSevere, "osKickAvatar");
+            if (!UUID.TryParse(agentKey, out UUID id) || id == UUID.Zero) return;
+            ScenePresence sp = World?.GetScenePresence(id);
+            if (sp == null) return;
+            if (!string.IsNullOrEmpty(alert)) sp.ControllingClient.Kick(alert);
+            sp.Scene.CloseAgent(id, false);
+        }
+
+        /// <summary>OSSL_Api.cs:1178-1206 - VeryHigh. An animation from the prim's inventory by name, else a default animation by name, on any presence; never a key, as in OSSL and llStartAnimation.</summary>
+        public void osAvatarPlayAnimation(string avatar, string animation)
+        {
+            OsslCheck(TlVeryHigh, "osAvatarPlayAnimation");
+            if (!UUID.TryParse(avatar, out UUID avatarID)) return;
+            ScenePresence target = World?.GetScenePresence(avatarID);
+            if (target?.Animator == null) return;
+            UUID animID = AnimationToStart(m_host, animation);
+            if (animID == UUID.Zero) return;
+            target.Animator.AddAnimation(animID, m_host.UUID);
+            target.TriggerScenePresenceUpdated();
+        }
+
+        /// <summary>OSSL_Api.cs:1210-1232 - VeryHigh.</summary>
+        public void osAvatarStopAnimation(string avatar, string animation)
+        {
+            OsslCheck(TlVeryHigh, "osAvatarStopAnimation");
+            if (!UUID.TryParse(avatar, out UUID avatarID)) return;
+            ScenePresence target = World?.GetScenePresence(avatarID);
+            if (target?.Animator == null) return;
+            if (!UUID.TryParse(animation, out UUID animID))
+                animID = FindInventoryItem(animation, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
+            if (animID == UUID.Zero) target.Animator.RemoveAnimation(animation);
+            else target.Animator.RemoveAnimation(animID, true);
+            target.TriggerScenePresenceUpdated();
+        }
+
+        /// <summary>OSSL_Api.cs:2432-2450 - Low. A presence here first, then the user-management lookup.</summary>
+        public string osAvatarName2Key(string firstname, string lastname)
+        {
+            OsslCheck(TlLow, "osAvatarName2Key");
+            ScenePresence sp = World?.GetScenePresence(firstname, lastname);
+            if (sp != null) return sp.UUID.ToString();
+            IUserManagement um = World?.RequestModuleInterface<IUserManagement>();
+            if (um == null) { ShoutError("osAvatarName2Key: UserManagement module not available"); return string.Empty; }
+            UUID userID = um.GetUserIdByName(firstname, lastname);
+            return userID == UUID.Zero ? string.Empty : userID.ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:2478-2508 - Low. A presence here, then the account service, then the user-management name (which knows HG visitors).</summary>
+        public string osKey2Name(string id)
+        {
+            OsslCheck(TlLow, "osKey2Name");
+            if (!UUID.TryParse(id, out UUID key)) return string.Empty;
+            ScenePresence sp = World?.GetScenePresence(key);
+            if (sp != null) return sp.Name;
+            UserAccount account = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
+            if (account != null) return account.Name;
+            return World?.RequestModuleInterface<IUserManagement>()?.GetUserName(key) ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:1159-1173 - Severe, and the owner must be a god as well.</summary>
+        public string osGetAgentIP(string agent)
+        {
+            OsslCheck(TlSevere, "osGetAgentIP");
+            if (World?.Permissions == null || !World.Permissions.IsGod(m_host.OwnerID)) return string.Empty;
+            if (!UUID.TryParse(agent, out UUID avatarID)) return string.Empty;
+            ScenePresence target = World.GetScenePresence(avatarID);
+            return target?.ControllingClient?.RemoteEndPoint?.Address?.ToString() ?? string.Empty;
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:3475-3479 - High. Upstream writes the appearance into a notecard; here, as for osNpcSaveAppearance,
+        /// the "notecard" is an outfit name in BotManager's store, scoped to the owner - which is exactly
+        /// what SaveOutfitToDatabase captures. The key returned is the outfit's key in that store.
+        /// </summary>
+        public string osOwnerSaveAppearance(string notecard) => osOwnerSaveAppearance(notecard, 1);
+
+        /// <summary>OSSL_Api.cs:3482-3486 - High. includeHuds is accepted, not applied: the store keeps the whole appearance.</summary>
+        public string osOwnerSaveAppearance(string notecard, int includeHuds)
+        {
+            OsslCheck(TlHigh, "osOwnerSaveAppearance");
+            var mgr = NpcMgr(); if (mgr == null || m_host == null) return UUID.Zero.ToString();
+            mgr.SaveOutfitToDatabase(m_host.OwnerID, notecard, out string reason);
+            if (reason != null) { ShoutError("osOwnerSaveAppearance: " + reason); return UUID.Zero.ToString(); }
+            return OpenSim.Region.OptionalModules.World.NPC.BotManager.OutfitKey(m_host.OwnerID, notecard).ToString();
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:3764-3792 - High. Through llDamage's one door with this prim as the source, so the target's
+        /// attachments get on_damage with this prim as the detected key; the parcel (upstream) or the region must allow damage.
+        /// Death (health at or below 0) is the door's business, not repeated here.
+        /// </summary>
+        public void osCauseDamage(string avatar, float damage)
+        {
+            OsslCheck(TlHigh, "osCauseDamage");
+            if (World == null || m_host == null || !UUID.TryParse(avatar, out UUID avatarId)) return;
+            ScenePresence presence = World.GetScenePresence(avatarId);
+            if (presence == null || presence.IsChildAgent) return;
+            // upstream admits the call on the parcel flag alone; here the region's AllowDamage (the rule
+            // llDamage applies in this tree) admits it as well, so a damage-enabled region needs no per-parcel flag
+            LandData land = World.GetLandData(m_host.GetWorldPosition());
+            bool parcelAllows = land != null && (land.Flags & (uint)ParcelFlags.AllowDamage) != 0;
+            if (!parcelAllows && !World.RegionInfo.RegionSettings.AllowDamage) return;
+            try { presence.ApplyDamage(m_host.UUID, m_host.OwnerID, m_host.LocalId, damage, DamageEntry.TYPE_GENERIC, true); }
+            catch (Exception e) { m_log.LogWarning(e, "[Phlox] osCauseDamage from {Prim} to {Avatar} threw", m_host.UUID, avatarId); }
+        }
+
+        /// <summary>OSSL_Api.cs:3800-3813 - High. Health up by the amount, capped at 100.</summary>
+        public void osCauseHealing(string avatar, float healing)
+        {
+            OsslCheck(TlHigh, "osCauseHealing");
+            if (!UUID.TryParse(avatar, out UUID avatarId)) return;
+            ScenePresence presence = World?.GetScenePresence(avatarId);
+            if (presence == null) return;
+            presence.setHealthWithUpdate(Math.Min(100f, presence.Health + healing));
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:3820-3835 - High. Clamped to 1..100; a decrease goes through llDamage's door as damage from
+        /// this prim (the llSetHealth rule), an increase is set directly.
+        /// </summary>
+        public void osSetHealth(string avatar, float health)
+        {
+            OsslCheck(TlHigh, "osSetHealth");
+            if (World == null || m_host == null || !UUID.TryParse(avatar, out UUID avatarId)) return;
+            ScenePresence presence = World.GetScenePresence(avatarId);
+            if (presence == null || presence.IsChildAgent) return;
+            health = Math.Clamp(health, 1f, 100f);
+            if (health < presence.Health)
+            {
+                try { presence.ApplyDamage(m_host.UUID, m_host.OwnerID, m_host.LocalId, presence.Health - health, DamageEntry.TYPE_GENERIC, true); }
+                catch (Exception e) { m_log.LogWarning(e, "[Phlox] osSetHealth from {Prim} to {Avatar} threw", m_host.UUID, avatarId); }
+            }
+            else presence.setHealthWithUpdate(health);
+        }
+
+        /// <summary>OSSL_Api.cs:3840-3849 - High.</summary>
+        public void osSetHealRate(string avatar, float healrate)
+        {
+            OsslCheck(TlHigh, "osSetHealRate");
+            if (!UUID.TryParse(avatar, out UUID avatarId)) return;
+            ScenePresence presence = World?.GetScenePresence(avatarId);
+            if (presence != null) presence.HealRate = healrate;
+        }
+
+        /// <summary>OSSL_Api.cs:1125-1139 ForceSit: the presence requests a sit on the target as if it had clicked it, if nobody sits there.</summary>
+        private void OsslForceSit(string avatar, UUID targetID)
+        {
+            if (!UUID.TryParse(avatar, out UUID agentID)) return;
+            ScenePresence presence = World?.GetScenePresence(agentID);
+            if (presence == null) return;
+            SceneObjectPart part = World.GetSceneObjectPart(targetID);
+            if (part != null && part.SitTargetAvatar == UUID.Zero)
+                presence.HandleAgentRequestSit(presence.ControllingClient, agentID, targetID, part.SitTargetPosition);
+        }
+
+        /// <summary>OSSL_Api.cs:1106-1110 - VeryHigh. Onto this prim.</summary>
+        public void osForceOtherSit(string avatar)
+        {
+            OsslCheck(TlVeryHigh, "osForceOtherSit");
+            if (m_host != null) OsslForceSit(avatar, m_host.UUID);
+        }
+
+        /// <summary>OSSL_Api.cs:1119-1123 - VeryHigh. Onto the prim named.</summary>
+        public void osForceOtherSit(string avatar, string target)
+        {
+            OsslCheck(TlVeryHigh, "osForceOtherSit");
+            if (UUID.TryParse(target, out UUID targetID)) OsslForceSit(avatar, targetID);
+        }
+
+        /// <summary>OSSL_Api.cs:2136-2160 - Low. Deletes an object this prim's linkset rezzed, same owner, not an attachment, never itself.</summary>
+        public void osDie(string objectUUID)
+        {
+            OsslCheck(TlLow, "osDie");
+            if (!UUID.TryParse(objectUUID, out UUID objUUID)) { ShoutError("osDie() cannot delete objects with invalid UUIDs"); return; }
+            if (objUUID == UUID.Zero || m_host?.ParentGroup == null) return;
+            SceneObjectGroup sog = World?.GetSceneObjectGroup(objUUID);
+            if (sog == null || sog.IsDeleted || sog.IsAttachment) return;
+            if (sog.OwnerID != m_host.OwnerID) return;
+            if (sog.RezzerID == m_host.ParentGroup.UUID && sog.UUID != m_host.ParentGroup.UUID)
+                World.DeleteSceneObject(sog, false);
+        }
+
+        /// <summary>OSSL_Api.cs:4530-4534 (DropAttachment :4500-4509 with the check) - Moderate: PERMISSION_ATTACH or a shout.</summary>
+        public void osDropAttachment()
+        {
+            OsslCheck(TlModerate, "osDropAttachment");
+            if (((OsslItem?.PermsMask ?? 0) & PERMISSION_ATTACH) == 0) { ShoutError("Cannot drop attachment. Permissions not granted."); return; }
+            if (m_host?.ParentGroup == null || !m_host.ParentGroup.IsAttachment) return;
+            IAttachmentsModule attachMod = World?.RequestModuleInterface<IAttachmentsModule>();
+            ScenePresence sp = World?.GetScenePresence(m_host.ParentGroup.OwnerID);
+            if (attachMod != null && sp != null) attachMod.DetachSingleAttachmentToGround(sp, m_host.ParentGroup.LocalId);
+        }
+
+        /// <summary>OSSL_Api.cs:4544-4548 (DropAttachmentAt :4511-4520 with the check) - Moderate.</summary>
+        public void osDropAttachmentAt(Vector3 pos, Quaternion rot)
+        {
+            OsslCheck(TlModerate, "osDropAttachmentAt");
+            if (((OsslItem?.PermsMask ?? 0) & PERMISSION_ATTACH) == 0) { ShoutError("Cannot drop attachment. Permissions not granted."); return; }
+            if (m_host?.ParentGroup == null || !m_host.ParentGroup.IsAttachment) return;
+            IAttachmentsModule attachMod = World?.RequestModuleInterface<IAttachmentsModule>();
+            ScenePresence sp = World?.GetScenePresence(m_host.ParentGroup.OwnerID);
+            if (attachMod != null && sp != null) attachMod.DetachSingleAttachmentToGround(sp, m_host.ParentGroup.LocalId, pos, rot);
+        }
+
+        /// <summary>OSSL_Api.cs:4022-4046 - VeryLow. 0 = no groups module / no group / not present / owner lacks Invite; 2 = already a member; 1 = invited.</summary>
+        public int osInviteToGroup(string agentId)
+        {
+            OsslCheck(TlVeryLow, "osInviteToGroup");
+            IGroupsModule groups = World?.RequestModuleInterface<IGroupsModule>();
+            if (groups == null || m_host == null || !UUID.TryParse(agentId, out UUID agent)) return 0;
+            if (m_host.GroupID == UUID.Zero || m_host.GroupID == m_host.OwnerID) return 0;
+            ScenePresence sp = World.GetScenePresence(agent);
+            if (sp == null || sp.IsNPC || sp.IsChildAgent || !sp.ControllingClient.IsActive) return 0;
+            if (sp.ControllingClient.IsGroupMember(m_host.GroupID)) return 2;
+            if ((groups.GetFullGroupPowers(m_host.OwnerID, m_host.GroupID) & (ulong)GroupPowers.Invite) == 0) return 0;
+            groups.InviteGroup(null, m_host.OwnerID, m_host.GroupID, agent, UUID.Zero);
+            return 1;
+        }
+
+        /// <summary>OSSL_Api.cs:4060-4078 - VeryLow.</summary>
+        public int osEjectFromGroup(string agentId)
+        {
+            OsslCheck(TlVeryLow, "osEjectFromGroup");
+            IGroupsModule groups = World?.RequestModuleInterface<IGroupsModule>();
+            if (groups == null || m_host == null || !UUID.TryParse(agentId, out UUID agent)) return 0;
+            if (m_host.GroupID == UUID.Zero || m_host.GroupID == m_host.OwnerID) return 0;
+            if ((groups.GetFullGroupPowers(m_host.OwnerID, m_host.GroupID) & (ulong)GroupPowers.Eject) == 0) return 0;
+            groups.EjectGroupMember(null, m_host.OwnerID, m_host.GroupID, agent);
+            return 1;
+        }
+
+        /// <summary>OSSL_Api.cs:6396-6404 - ungated upstream. -1 not a key, 0 not here (or a child), 1 an avatar, 2 an NPC.</summary>
+        public int osAvatarType(string avkey)
+        {
+            if (!UUID.TryParse(avkey, out UUID avId)) return -1;
+            ScenePresence av = World?.GetScenePresence(avId);
+            if (av == null || av.IsDeleted || av.IsChildAgent) return 0;
+            return av.IsNPC ? 2 : 1;
+        }
+
+        /// <summary>OSSL_Api.cs:6408-6414 - ungated upstream.</summary>
+        public int osAvatarType(string sFirstName, string sLastName)
+        {
+            ScenePresence av = World?.GetScenePresence(sFirstName, sLastName);
+            if (av == null || av.IsDeleted || av.IsChildAgent) return 0;
+            return av.IsNPC ? 2 : 1;
+        }
+
+        // ── OSSL parcel, estate, terrain, wind and sun functions, ported from OSSL_Api.cs (line cited per
+        //    function), each under its upstream key and threat level through OsslGate ──
+
+        private bool TerrainInBounds(int x, int y, string fn)
+        {
+            if (World == null) return false;
+            if (x < 0 || y < 0 || x > World.RegionInfo.RegionSizeX - 1 || y > World.RegionInfo.RegionSizeY - 1)
+            {
+                ShoutError(fn + ": Coordinate out of bounds");
+                return false;
+            }
+            return true;
+        }
+
+        /// <summary>OSSL_Api.cs:548-552 (SetTerrainHeight :562-572) - High. 1 when the owner may terraform there and the height is written, else 0.</summary>
+        public int osSetTerrainHeight(int x, int y, float val)
+        {
+            OsslCheck(TlHigh, "osSetTerrainHeight");
+            if (!TerrainInBounds(x, y, "osSetTerrainHeight") || World.Heightmap == null) return 0;
+            if (!World.Permissions.CanTerraformLand(m_host.OwnerID, new Vector3(x, y, 0))) return 0;
+            World.Heightmap[x, y] = val;
+            return 1;
+        }
+
+        /// <summary>OSSL_Api.cs:555-560 - High; the deprecated name for osSetTerrainHeight, same key upstream.</summary>
+        public int osTerrainSetHeight(int x, int y, float val)
+        {
+            OsslCheck(TlHigh, "osTerrainSetHeight");
+            if (!TerrainInBounds(x, y, "osTerrainSetHeight") || World.Heightmap == null) return 0;
+            if (!World.Permissions.CanTerraformLand(m_host.OwnerID, new Vector3(x, y, 0))) return 0;
+            World.Heightmap[x, y] = val;
+            return 1;
+        }
+
+        /// <summary>OSSL_Api.cs:577-581 (GetTerrainHeight :590-596) - master switch.</summary>
+        public float osGetTerrainHeight(int x, int y)
+        {
+            OsslCheck();
+            if (!TerrainInBounds(x, y, "osGetTerrainHeight") || World.Heightmap == null) return 0f;
+            return World.Heightmap[x, y];
+        }
+
+        /// <summary>OSSL_Api.cs:583-588 - master switch; the deprecated name.</summary>
+        public float osTerrainGetHeight(int x, int y)
+        {
+            OsslCheck();
+            if (!TerrainInBounds(x, y, "osTerrainGetHeight") || World.Heightmap == null) return 0f;
+            return World.Heightmap[x, y];
+        }
+
+        private double m_lastOsTerrainFlush;
+
+        /// <summary>OSSL_Api.cs:599-609 - VeryLow, at most once a minute per script: the terrain module's taint, which sends the changed patches.</summary>
+        public void osTerrainFlush()
+        {
+            double now = Util.GetTimeStamp();
+            if (now - m_lastOsTerrainFlush < 60) return;
+            m_lastOsTerrainFlush = now;
+            OsslCheck(TlVeryLow, "osTerrainFlush");
+            World?.RequestModuleInterface<ITerrainModule>()?.TaintTerrain();
+        }
+
+        /// <summary>OSSL_Api.cs:612-626 - High, and CanIssueEstateCommand. Under 15 s aborts a pending restart; otherwise the restart module schedules it.</summary>
+        public int osRegionRestart(float seconds) => osRegionRestart(seconds, string.Empty);
+
+        /// <summary>OSSL_Api.cs:638-652 - High. The message is accepted; the restart module here takes no custom text (RegionRestart :654-658 drops it upstream too).</summary>
+        public int osRegionRestart(float seconds, string msg)
+        {
+            OsslCheck(TlHigh, "osRegionRestart");
+            IRestartModule restart = World?.RequestModuleInterface<IRestartModule>();
+            if (restart == null || m_host == null || !World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false)) return 0;
+            if (seconds < 15) { restart.AbortRestart("Region restart has been aborted\n"); return 1; }
+            restart.ScheduleRestart(UUID.Zero, (int)seconds);
+            return 1;
+        }
+
+        /// <summary>OSSL_Api.cs:664-675 - High, and CanIssueEstateCommand.</summary>
+        public void osRegionNotice(string msg)
+        {
+            OsslCheck(TlHigh, "osRegionNotice");
+            IDialogModule dm = World?.RequestModuleInterface<IDialogModule>();
+            if (dm == null || m_host == null || !World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false)) return;
+            dm.SendGeneralAlert(msg + "\n");
+        }
+
+        /// <summary>OSSL_Api.cs:678-697 - High. To one root, non-NPC presence.</summary>
+        public void osRegionNotice(string agentID, string msg)
+        {
+            OsslCheck(TlHigh, "osRegionNotice");
+            if (m_host == null || World == null || !World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false)) return;
+            IDialogModule dm = World.RequestModuleInterface<IDialogModule>();
+            if (dm == null || !UUID.TryParse(agentID, out UUID avatarID)) return;
+            ScenePresence sp = World.GetScenePresence(avatarID);
+            if (sp == null || sp.IsChildAgent || sp.IsDeleted || sp.IsInTransit || sp.IsNPC) return;
+            dm.SendAlertToUser(sp.ControllingClient, msg + "\n", false);
+        }
+
+        /// <summary>OSSL_Api.cs:1488-1492 - High.</summary>
+        public void osSetRegionWaterHeight(float height)
+        {
+            OsslCheck(TlHigh, "osSetRegionWaterHeight");
+            World?.EventManager.TriggerRequestChangeWaterHeight(height);
+        }
+
+        /// <summary>OSSL_Api.cs:1501-1516 - High. The legacy region sun settings (hour 0-24, stored +6), saved, then the estate-tools sun update.</summary>
+        public void osSetRegionSunSettings(int useEstateSun, int sunFixed, float sunHour)
+        {
+            OsslCheck(TlHigh, "osSetRegionSunSettings");
+            if (World == null) return;
+            while (sunHour > 24.0f) sunHour -= 24.0f;
+            while (sunHour < 0) sunHour += 24.0f;
+            var rs = World.RegionInfo.RegionSettings;
+            rs.UseEstateSun = useEstateSun != 0;
+            rs.SunPosition = sunHour + 6;   // LL region sun hour is 6 to 30
+            rs.FixedSun = sunFixed != 0;
+            rs.Save();
+            World.EventManager.TriggerEstateToolsSunUpdate(World.RegionInfo.RegionHandle);
+        }
+
+        /// <summary>OSSL_Api.cs:1524-1538 - High upstream, and its whole body is commented out since EEP: a gated no-op, kept so the call compiles.</summary>
+        public void osSetEstateSunSettings(int sunFixed, float sunHour)
+        {
+            OsslCheck(TlHigh, "osSetEstateSunSettings");
+        }
+
+        /// <summary>OSSL_Api.cs:1548-1555 - master switch. 24 x the environment module's day fraction.</summary>
+        public float osGetCurrentSunHour()
+        {
+            OsslCheck();
+            IEnvironmentModule env = World?.RequestModuleInterface<IEnvironmentModule>();
+            return env == null ? 0f : 24f * env.GetRegionDayFractionTime();
+        }
+
+        /// <summary>OSSL_Api.cs:1638-1657 GetSunParam: day_length from the environment module (14400 without one), year_length 365, the rest EEP-fixed.</summary>
+        private float OsslSunParam(string param)
+        {
+            switch ((param ?? string.Empty).ToLowerInvariant())
+            {
+                case "day_length":
+                    IEnvironmentModule env = World?.RequestModuleInterface<IEnvironmentModule>();
+                    return env == null || m_host == null ? 14400f : env.GetDayLength(m_host.AbsolutePosition);
+                case "year_length": return 365f;
+                case "day_night_offset": return 0f;
+                case "update_interval": return 0.1f;
+                case "day_time_sun_hour_scale": return 1f;
+                default: return 0f;
+            }
+        }
+
+        /// <summary>OSSL_Api.cs:1633-1637 - master switch.</summary>
+        public float osGetSunParam(string param) { OsslCheck(); return OsslSunParam(param); }
+
+        /// <summary>OSSL_Api.cs:1626-1631 - None; the deprecated name.</summary>
+        public float osSunGetParam(string param) { OsslCheck(TlNone, "osSunGetParam"); return OsslSunParam(param); }
+
+        /// <summary>OSSL_Api.cs:1667-1671 (SetSunParam :1673-1677) - None. Goes to ISunModule, which no EEP region carries: a no-op there, as upstream (the wiki says so too).</summary>
+        public void osSetSunParam(string param, float value)
+        {
+            OsslCheck(TlNone, "osSetSunParam");
+            World?.RequestModuleInterface<ISunModule>()?.SetSunParameter(param, value);
+        }
+
+        /// <summary>OSSL_Api.cs:1660-1665 - None; the deprecated name.</summary>
+        public void osSunSetParam(string param, float value)
+        {
+            OsslCheck(TlNone, "osSunSetParam");
+            World?.RequestModuleInterface<ISunModule>()?.SetSunParameter(param, value);
+        }
+
+        /// <summary>OSSL_Api.cs:1679-1688 - None.</summary>
+        public string osWindActiveModelPluginName()
+        {
+            OsslCheck(TlNone, "osWindActiveModelPluginName");
+            return World?.RequestModuleInterface<IWindModule>()?.WindActiveModelPluginName ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:1692-1705 - VeryLow. The wind module's own parameter door (iwSetWind's Halcyon shape has no counterpart here).</summary>
+        public void osSetWindParam(string plugin, string param, float value)
+        {
+            OsslCheck(TlVeryLow, "osSetWindParam");
+            IWindModule wind = World?.RequestModuleInterface<IWindModule>();
+            if (wind == null) return;
+            try { wind.WindParamSet(plugin, param, value); } catch (Exception) { }
+        }
+
+        /// <summary>OSSL_Api.cs:1707-1716 - VeryLow.</summary>
+        public float osGetWindParam(string plugin, string param)
+        {
+            OsslCheck(TlVeryLow, "osGetWindParam");
+            IWindModule wind = World?.RequestModuleInterface<IWindModule>();
+            if (wind == null) return 0f;
+            try { return wind.WindParamGet(plugin, param); } catch (Exception) { return 0f; }
+        }
+
+        /// <summary>OSSL_Api.cs:1731-1740 - High. The land channel's join over the rectangle, as the owner.</summary>
+        public void osParcelJoin(Vector3 pos1, Vector3 pos2)
+        {
+            OsslCheck(TlHigh, "osParcelJoin");
+            if (World?.LandChannel == null || m_host == null) return;
+            World.LandChannel.Join((int)Math.Min(pos1.X, pos2.X), (int)Math.Min(pos1.Y, pos2.Y), (int)Math.Max(pos1.X, pos2.X), (int)Math.Max(pos1.Y, pos2.Y), m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:1743-1752 - High.</summary>
+        public void osParcelSubdivide(Vector3 pos1, Vector3 pos2)
+        {
+            OsslCheck(TlHigh, "osParcelSubdivide");
+            if (World?.LandChannel == null || m_host == null) return;
+            World.LandChannel.Subdivide((int)Math.Min(pos1.X, pos2.X), (int)Math.Min(pos1.Y, pos2.Y), (int)Math.Max(pos1.X, pos2.X), (int)Math.Max(pos1.Y, pos2.Y), m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:1762-1766 - High.</summary>
+        public void osSetParcelDetails(Vector3 pos, LSLList rules)
+        {
+            OsslCheck(TlHigh, "osSetParcelDetails");
+            OsslSetParcelDetails(pos, rules);
+        }
+
+        /// <summary>OSSL_Api.cs:1755-1760 - High; the deprecated name.</summary>
+        public void osParcelSetDetails(Vector3 pos, LSLList rules)
+        {
+            OsslCheck(TlHigh, "osParcelSetDetails");
+            OsslSetParcelDetails(pos, rules);
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:1768-1957 SetParcelDetails: NAME, DESC (LandOptions on the parcel), OWNER and CLAIMDATE (estate
+        /// manager or owner), GROUP (the land's owner or an estate manager; upstream's group-membership check through
+        /// the groups module is not repeated), SEE_AVATARS, ANY_AVATAR_SOUNDS, GROUP_SOUNDS; committed through
+        /// UpdateLandObject, and the parcel overlay resent when SEE_AVATARS moved.
+        /// </summary>
+        private void OsslSetParcelDetails(Vector3 pos, LSLList rules)
+        {
+            if (World?.LandChannel == null || m_host == null) return;
+            ILandObject start = World.LandChannel.GetLandObject((int)pos.X, (int)pos.Y);
+            if (start?.LandData == null) { ShoutError("There is no land at that location"); return; }
+            if (!World.Permissions.CanEditParcelProperties(m_host.OwnerID, start, GroupPowers.LandOptions, false))
+            { ShoutError("script owner does not have permission to modify the parcel"); return; }
+            LandData newLand = start.LandData.Copy();
+            EstateSettings es = World.RegionInfo.EstateSettings;
+            bool manager = es == null || es.IsEstateManagerOrOwner(m_host.OwnerID);
+            bool changed = false, changedSeeAvs = false;
+            for (int idx = 0; idx < rules.Length;)
+            {
+                int code = rules.GetLSLIntegerItem(idx++);
+                if (idx >= rules.Length) break;
+                switch (code)
+                {
+                    case PARCEL_DETAILS_NAME:
+                    { string arg = rules.GetLSLStringItem(idx++); if (newLand.Name != arg) { newLand.Name = arg; changed = true; } break; }
+                    case PARCEL_DETAILS_DESC:
+                    { string arg = rules.GetLSLStringItem(idx++); if (newLand.Description != arg) { newLand.Description = arg; changed = true; } break; }
+                    case PARCEL_DETAILS_OWNER:
+                    {
+                        string arg = rules.GetLSLStringItem(idx++);
+                        if (!manager) { ShoutError("script owner does not have permission to modify the parcel owner"); break; }
+                        if (UUID.TryParse(arg, out UUID uuid) && newLand.OwnerID != uuid) { newLand.OwnerID = uuid; newLand.GroupID = UUID.Zero; changed = true; }
+                        break;
+                    }
+                    case PARCEL_DETAILS_GROUP:
+                    {
+                        string arg = rules.GetLSLStringItem(idx++);
+                        if ((m_host.OwnerID == newLand.OwnerID || manager) && UUID.TryParse(arg, out UUID uuid) && newLand.GroupID != uuid)
+                        { newLand.GroupID = uuid; changed = true; }
+                        break;
+                    }
+                    case 10:  // PARCEL_DETAILS_CLAIMDATE
+                    {
+                        int date = rules.GetLSLIntegerItem(idx++);
+                        if (!manager) { ShoutError("script owner does not have permission to modify the parcel CLAIM DATE"); break; }
+                        if (date == 0) date = Util.UnixTimeSinceEpoch();
+                        if (newLand.ClaimDate != date) { newLand.ClaimDate = date; changed = true; }
+                        break;
+                    }
+                    case PARCEL_DETAILS_SEE_AVATARS:
+                    { bool v = rules.GetLSLIntegerItem(idx++) != 0; if (newLand.SeeAVs != v) { newLand.SeeAVs = v; changed = true; changedSeeAvs = true; } break; }
+                    case 7:   // PARCEL_DETAILS_ANY_AVATAR_SOUNDS
+                    { bool v = rules.GetLSLIntegerItem(idx++) != 0; if (newLand.AnyAVSounds != v) { newLand.AnyAVSounds = v; changed = true; } break; }
+                    case 8:   // PARCEL_DETAILS_GROUP_SOUNDS
+                    { bool v = rules.GetLSLIntegerItem(idx++) != 0; if (newLand.GroupAVSounds != v) { newLand.GroupAVSounds = v; changed = true; } break; }
+                    default:
+                        idx++;   // an unknown code and its value
+                        break;
+                }
+            }
+            if (!changed) return;
+            World.LandChannel.UpdateLandObject(newLand.LocalID, newLand);
+            if (changedSeeAvs)
+                World.ForEachRootScenePresence(avatar => { if (!avatar.IsNPC) World.LandChannel.SendParcelsOverlay(avatar.ControllingClient); });
+        }
+
+        /// <summary>OSSL_Api.cs:1958-1963 - VeryLow. The parcel under the prim.</summary>
+        public void osSetParcelMusicURL(string url)
+        {
+            OsslCheck(TlVeryLow, "osSetParcelMusicURL");
+            if (m_host == null) return;
+            World?.LandChannel?.GetLandObject(m_host.AbsolutePosition)?.SetMusicUrl(url ?? string.Empty);
+        }
+
+        /// <summary>OSSL_Api.cs:1966-1971 - VeryLow.</summary>
+        public void osSetParcelMediaURL(string url)
+        {
+            OsslCheck(TlVeryLow, "osSetParcelMediaURL");
+            if (m_host == null) return;
+            World?.LandChannel?.GetLandObject(m_host.AbsolutePosition)?.SetMediaUrl(url ?? string.Empty);
+        }
+
+        /// <summary>OSSL_Api.cs:1974-1990 - VeryLow. The land under the prim must be the owner's; the voice module takes the address.</summary>
+        public void osSetParcelSIPAddress(string SIPAddress)
+        {
+            OsslCheck(TlVeryLow, "osSetParcelSIPAddress");
+            if (m_host == null) return;
+            ILandObject land = World?.LandChannel?.GetLandObject(m_host.AbsolutePosition);
+            if (land?.LandData == null) return;
+            if (land.LandData.OwnerID != m_host.OwnerID) { ShoutError("osSetParcelSIPAddress: Sorry, you need to own the land to use this function"); return; }
+            IVoiceModule voice = World.RequestModuleInterface<IVoiceModule>();
+            if (voice == null) { ShoutError("osSetParcelSIPAddress: No voice module enabled for this land"); return; }
+            voice.setLandSIPAddress(SIPAddress, land.LandData.GlobalID);
+        }
+
+        /// <summary>OSSL_Api.cs:4091-4103 - High unless the owner is a god. Level 0-3 through the estate module (legacy viewers and the map; osSetTerrainTextures is the PBR-aware form).</summary>
+        public void osSetTerrainTexture(int level, string texture)
+        {
+            if (level < 0 || level > 3 || m_host == null) return;
+            IEstateModule estate = World?.RequestModuleInterface<IEstateModule>();
+            if (estate == null || !UUID.TryParse(texture, out UUID textureID)) return;
+            if (!World.Permissions.IsGod(m_host.OwnerID)) OsslCheck(TlHigh, "osSetTerrainTexture");
+            estate.setEstateTerrainBaseTexture(level, textureID);
+        }
+
+        /// <summary>OSSL_Api.cs:4117-4160 - High (key osSetTerrainTexture) unless the owner is a god. Four keys or inventory names; types 0 texture, 1 PBR material, 2 both.</summary>
+        public void osSetTerrainTextures(LSLList textures, int ltypes)
+        {
+            IEstateModule estate = World?.RequestModuleInterface<IEstateModule>();
+            if (estate == null || m_host == null) return;
+            if (!World.Permissions.IsGod(m_host.OwnerID)) OsslCheck(TlHigh, "osSetTerrainTexture");
+            if (textures.Length != 4) { ShoutError("osSetTerrainTextures first argument is a list of keys or names that must have 4 elements"); return; }
+            if (ltypes < 0 || ltypes > 2) { ShoutError("osSetTerrainTextures second argument must be >=0 and <= 2"); return; }
+            var ids = new List<UUID>(4);
+            bool hasChanges = false;
+            for (int i = 0; i < 4; i++)
+            {
+                string u = textures.GetLSLStringItem(i);
+                if (string.IsNullOrEmpty(u)) { ids.Add(UUID.Zero); continue; }
+                if (!UUID.TryParse(u, out UUID id))
+                {
+                    TaskInventoryItem item = FindInventoryItem(u, (int)AssetType.Texture) ?? (ltypes == 1 ? FindInventoryItem(u, (int)AssetType.Material) : null);
+                    if (item == null) { ShoutError($"Invalid key or asset type in osSetTerrainTextures texture {i}"); return; }
+                    id = item.AssetID;
+                }
+                ids.Add(id);
+                if (id != UUID.Zero) hasChanges = true;
+            }
+            if (hasChanges) estate.SetEstateTerrainTextures(ids, ltypes);
+        }
+
+        /// <summary>OSSL_Api.cs:4177-4187 - High, and only a god owner reaches the estate module (as upstream).</summary>
+        public void osSetTerrainTextureHeight(int corner, float low, float high)
+        {
+            if (corner < 0 || corner > 3 || m_host == null) return;
+            OsslCheck(TlHigh, "osSetTerrainTextureHeight");
+            if (World?.Permissions == null || !World.Permissions.IsGod(m_host.OwnerID)) return;
+            World.RequestModuleInterface<IEstateModule>()?.setEstateTerrainTextureHeights(corner, low, high);
+        }
+
+        /// <summary>OSSL_Api.cs:6427-6438 - ungated upstream. llGetParcelDetails for the parcel with that id.</summary>
+        public LSLList osGetParcelDetails(string id, LSLList param)
+        {
+            if (!UUID.TryParse(id, out UUID parcelID)) return new LSLList(0);
+            ILandObject parcel = World?.LandChannel?.GetLandObject(parcelID);
+            return ParcelDetailsOf(parcel?.LandData, param);
+        }
+
+        // ── OSSL draw and dynamic-texture functions, ported from OSSL_Api.cs (line cited per function).
+        //    The draw helpers append to a command string the VectorRender module parses; the texture calls hand it to
+        //    the DynamicTexture module (IDynamicTextureManager), which renders synchronously and puts the asset on the face. ──
+
+        private IDynamicTextureManager DynTex() => World?.RequestModuleInterface<IDynamicTextureManager>();
+
+        /// <summary>OSSL_Api.cs:721-737 - VeryHigh. dynamicID and timer are unused upstream too; the updater's id comes back.</summary>
+        public string osSetDynamicTextureURL(string dynamicID, string contentType, string url, string extraParams, int timer)
+        {
+            OsslCheck(TlVeryHigh, "osSetDynamicTextureURL");
+            var tm = DynTex();
+            if (tm == null || m_host == null || !string.IsNullOrEmpty(dynamicID)) return UUID.Zero.ToString();
+            return tm.AddDynamicTextureURL(World.RegionInfo.RegionID, m_host.UUID, contentType, url, extraParams ?? string.Empty).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:742-758 - VeryHigh.</summary>
+        public string osSetDynamicTextureURLBlend(string dynamicID, string contentType, string url, string extraParams, int timer, int alpha)
+        {
+            OsslCheck(TlVeryHigh, "osSetDynamicTextureURLBlend");
+            var tm = DynTex();
+            if (tm == null || m_host == null || !string.IsNullOrEmpty(dynamicID)) return UUID.Zero.ToString();
+            return tm.AddDynamicTextureURL(World.RegionInfo.RegionID, m_host.UUID, contentType, url, extraParams ?? string.Empty, true, (byte)alpha).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:763-779 - VeryHigh.</summary>
+        public string osSetDynamicTextureURLBlendFace(string dynamicID, string contentType, string url, string extraParams, int blend, int disp, int timer, int alpha, int face)
+        {
+            OsslCheck(TlVeryHigh, "osSetDynamicTextureURLBlendFace");
+            var tm = DynTex();
+            if (tm == null || m_host == null || !string.IsNullOrEmpty(dynamicID)) return UUID.Zero.ToString();
+            return tm.AddDynamicTextureURL(World.RegionInfo.RegionID, m_host.UUID, contentType, url, extraParams ?? string.Empty, blend != 0, disp, (byte)alpha, face).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:784-788 - the five-argument form is DataFace with face -1 (all faces).</summary>
+        public string osSetDynamicTextureData(string dynamicID, string contentType, string data, string extraParams, int timer)
+            => OsslDynamicTextureData("osSetDynamicTextureData", dynamicID, contentType, data, extraParams, false, 3, 255, -1);
+
+        /// <summary>OSSL_Api.cs:790-813 DataFace body - VeryLow (key osSetDynamicTextureData). "" extraParams means 256.</summary>
+        private string OsslDynamicTextureData(string key, string dynamicID, string contentType, string data, string extraParams, bool blend, int disp, byte alpha, int face)
+        {
+            OsslCheck(TlVeryLow, key);
+            var tm = DynTex();
+            if (tm == null || m_host == null || !string.IsNullOrEmpty(dynamicID)) return UUID.Zero.ToString();
+            if (string.IsNullOrEmpty(extraParams)) extraParams = "256";
+            return tm.AddDynamicTextureData(World.RegionInfo.RegionID, m_host.UUID, contentType, data ?? string.Empty, extraParams, blend, disp, alpha, face).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:790-813 - VeryLow, the data form with a face; the five-argument form is this with face -1.</summary>
+        public string osSetDynamicTextureDataFace(string dynamicID, string contentType, string data, string extraParams, int timer, int face)
+            => OsslDynamicTextureData("osSetDynamicTextureData", dynamicID, contentType, data, extraParams, false, 3, 255, face);
+
+        /// <summary>OSSL_Api.cs:819-841 - VeryLow.</summary>
+        public string osSetDynamicTextureDataBlend(string dynamicID, string contentType, string data, string extraParams, int timer, int alpha)
+        {
+            OsslCheck(TlVeryLow, "osSetDynamicTextureDataBlend");
+            var tm = DynTex();
+            if (tm == null || m_host == null || !string.IsNullOrEmpty(dynamicID)) return UUID.Zero.ToString();
+            if (string.IsNullOrEmpty(extraParams)) extraParams = "256";
+            return tm.AddDynamicTextureData(World.RegionInfo.RegionID, m_host.UUID, contentType, data ?? string.Empty, extraParams, true, (byte)alpha).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:847-869 - VeryLow.</summary>
+        public string osSetDynamicTextureDataBlendFace(string dynamicID, string contentType, string data, string extraParams, int blend, int disp, int timer, int alpha, int face)
+            => OsslDynamicTextureData("osSetDynamicTextureDataBlendFace", dynamicID, contentType, data, extraParams, blend != 0, disp, (byte)alpha, face);
+
+        // the draw-list helpers, OSSL_Api.cs:1238-1470 - every one is upstream's bare CheckThreatLevel(), the master switch
+        /// <summary>OSSL_Api.cs:1238-1243.</summary>
+        public string osDrawResetTransform(string drawList) { OsslCheck(); return drawList + "ResetTransf;"; }
+        /// <summary>OSSL_Api.cs:1246-1251.</summary>
+        public string osDrawRotationTransform(string drawList, float x) { OsslCheck(); return drawList + "RotTransf " + x + ";"; }
+        /// <summary>OSSL_Api.cs:1254-1259.</summary>
+        public string osDrawScaleTransform(string drawList, float x, float y) { OsslCheck(); return drawList + "ScaleTransf " + x + "," + y + ";"; }
+        /// <summary>OSSL_Api.cs:1262-1267.</summary>
+        public string osDrawTranslationTransform(string drawList, float x, float y) { OsslCheck(); return drawList + "TransTransf " + x + "," + y + ";"; }
+        /// <summary>OSSL_Api.cs:1270-1275.</summary>
+        public string osMovePen(string drawList, int x, int y) { OsslCheck(); return drawList + "MoveTo " + x + "," + y + ";"; }
+        /// <summary>OSSL_Api.cs:1278-1283.</summary>
+        public string osDrawLine(string drawList, int startX, int startY, int endX, int endY) { OsslCheck(); return drawList + "MoveTo " + startX + "," + startY + "; LineTo " + endX + "," + endY + "; "; }
+        /// <summary>OSSL_Api.cs:1286-1291.</summary>
+        public string osDrawLine(string drawList, int endX, int endY) { OsslCheck(); return drawList + "LineTo " + endX + "," + endY + "; "; }
+        /// <summary>OSSL_Api.cs:1294-1299.</summary>
+        public string osDrawText(string drawList, string text) { OsslCheck(); return drawList + "Text " + text + "; "; }
+        /// <summary>OSSL_Api.cs:1302-1307.</summary>
+        public string osDrawEllipse(string drawList, int width, int height) { OsslCheck(); return drawList + "Ellipse " + width + "," + height + "; "; }
+        /// <summary>OSSL_Api.cs:1310-1315.</summary>
+        public string osDrawFilledEllipse(string drawList, int width, int height) { OsslCheck(); return drawList + "FillEllipse " + width + "," + height + "; "; }
+        /// <summary>OSSL_Api.cs:1318-1323.</summary>
+        public string osDrawRectangle(string drawList, int width, int height) { OsslCheck(); return drawList + "Rectangle " + width + "," + height + "; "; }
+        /// <summary>OSSL_Api.cs:1326-1331.</summary>
+        public string osDrawFilledRectangle(string drawList, int width, int height) { OsslCheck(); return drawList + "FillRectangle " + width + "," + height + "; "; }
+
+        private string OsslPolygon(string keyword, string drawList, LSLList x, LSLList y)
+        {
+            if (x.Length != y.Length || x.Length < 3) return string.Empty;
+            var sb = new StringBuilder(drawList).Append(keyword).Append(' ').Append(x.GetLSLStringItem(0)).Append(',').Append(y.GetLSLStringItem(0));
+            for (int i = 1; i < x.Length; i++) sb.Append(',').Append(x.GetLSLStringItem(i)).Append(',').Append(y.GetLSLStringItem(i));
+            return sb.Append("; ").ToString();
+        }
+        /// <summary>OSSL_Api.cs:1334-1348 - an empty string for mismatched or fewer than three points, as upstream.</summary>
+        public string osDrawFilledPolygon(string drawList, LSLList x, LSLList y) { OsslCheck(); return OsslPolygon("FillPolygon", drawList, x, y); }
+        /// <summary>OSSL_Api.cs:1351-1365.</summary>
+        public string osDrawPolygon(string drawList, LSLList x, LSLList y) { OsslCheck(); return OsslPolygon("Polygon", drawList, x, y); }
+        /// <summary>OSSL_Api.cs:1368-1373.</summary>
+        public string osSetFontSize(string drawList, int fontSize) { OsslCheck(); return drawList + "FontSize " + fontSize + "; "; }
+        /// <summary>OSSL_Api.cs:1376-1381.</summary>
+        public string osSetFontName(string drawList, string fontName) { OsslCheck(); return drawList + "FontName " + fontName + "; "; }
+        /// <summary>OSSL_Api.cs:1384-1389.</summary>
+        public string osSetPenSize(string drawList, int penSize) { OsslCheck(); return drawList + "PenSize " + penSize + "; "; }
+        /// <summary>OSSL_Api.cs:1392-1397 - a colour name or hex.</summary>
+        public string osSetPenColor(string drawList, string color) { OsslCheck(); return drawList + "PenColor " + color + "; "; }
+        /// <summary>OSSL_Api.cs:1400-1419 - the vector form, opaque; arity 2 like the colour-name form and told apart by type.</summary>
+        public string osSetPenColor(string drawList, Vector3 color) => osSetPenColor(drawList, color, 1.0f);
+
+        /// <summary>OSSL_Api.cs:1422-1446 - vector and alpha as AARRGGBB.</summary>
+        public string osSetPenColor(string drawList, Vector3 color, float alpha)
+        {
+            OsslCheck();
+            byte a = Utils.FloatZeroOneToByte(alpha), r = Utils.FloatZeroOneToByte(color.X), g = Utils.FloatZeroOneToByte(color.Y), b = Utils.FloatZeroOneToByte(color.Z);
+            return drawList + "PenColor " + a.ToString("X2") + r.ToString("X2") + g.ToString("X2") + b.ToString("X2") + "; ";
+        }
+        /// <summary>OSSL_Api.cs:1449-1455 - the deprecated spelling; the renderer accepts PenColour.</summary>
+        public string osSetPenColour(string drawList, string colour) { OsslCheck(); return drawList + "PenColour " + colour + "; "; }
+        /// <summary>OSSL_Api.cs:1458-1463.</summary>
+        public string osSetPenCap(string drawList, string direction, string type) { OsslCheck(); return drawList + "PenCap " + direction + "," + type + "; "; }
+        /// <summary>OSSL_Api.cs:1466-1471.</summary>
+        public string osDrawImage(string drawList, int width, int height, string imageUrl) { OsslCheck(); return drawList + "Image " + width + "," + height + "," + imageUrl + "; "; }
+
+        /// <summary>OSSL_Api.cs:1474-1485 - master switch. The renderer measures the text; zero without a texture manager.</summary>
+        public Vector3 osGetDrawStringSize(string contentType, string text, string fontName, int fontSize)
+        {
+            OsslCheck();
+            var tm = DynTex();
+            if (tm == null) return Vector3.Zero;
+            tm.GetDrawStringSize(contentType, text ?? string.Empty, fontName, fontSize, out double xSize, out double ySize);
+            return new Vector3((float)xSize, (float)ySize, 0f);
+        }
+
+        // ── OSSL read-only remainder, ported from OSSL_Api.cs (line cited per function), each gated function
+        //    under its upstream key and threat level through OsslGate; "master" = upstream's bare CheckThreatLevel() ──
+
+        private const uint OsslFullPerms = (uint)(OpenSim.Framework.PermissionMask.Copy | OpenSim.Framework.PermissionMask.Transfer | OpenSim.Framework.PermissionMask.Modify);
+        private static bool OsslFullPerm(TaskInventoryItem item) => (item.CurrentPermissions & OsslFullPerms) == OsslFullPerms;
+        private TaskInventoryItem OsslItemByNameOrId(SceneObjectPart part, string nameOrId)
+        {
+            if (part == null || string.IsNullOrEmpty(nameOrId)) return null;
+            return UUID.TryParse(nameOrId, out UUID id) ? part.Inventory.GetInventoryItem(id) : part.Inventory.GetInventoryItem(nameOrId);
+        }
+
+        /// <summary>The notecard's body lines, read synchronously through the asset service the async llGetNotecardLine uses (LSL_Api's NotecardCache is a cache over the same read); null when there is no such notecard.</summary>
+        private string[] OsslNotecardLines(string name)
+        {
+            if (m_host == null || string.IsNullOrEmpty(name)) return null;
+            TaskInventoryItem item = UUID.TryParse(name, out UUID id) ? m_host.Inventory.GetInventoryItem(id) : FindInventoryItem(name, (int)AssetType.Notecard);
+            if (item == null) return null;
+            AssetBase asset = World?.AssetService?.Get(item.AssetID.ToString());
+            if (asset?.Data == null) return null;
+            string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
+            if (body.Length == 0) return Array.Empty<string>();
+            string[] lines = body.Split('\n');
+            for (int i = 0; i < lines.Length; i++) lines[i] = lines[i].TrimEnd('\r');
+            return lines;
+        }
+
+        /// <summary>OSSL_Api.cs:2361-2371 - VeryHigh. The line, or "ERROR!" with a shout when the notecard is missing; an out-of-range line is EOF as the cache answers.</summary>
+        public string osGetNotecardLine(string name, int line)
+        {
+            OsslCheck(TlVeryHigh, "osGetNotecardLine");
+            string[] lines = OsslNotecardLines(name);
+            if (lines == null) { ShoutError("Notecard '" + name + "' could not be found."); return "ERROR!"; }
+            return line >= 0 && line < lines.Length ? lines[line] : "\n\n\n";
+        }
+
+        /// <summary>OSSL_Api.cs:2388-2402 (LoadNotecard :2264-2290) - VeryHigh. Every line joined with newlines.</summary>
+        public string osGetNotecard(string name)
+        {
+            OsslCheck(TlVeryHigh, "osGetNotecard");
+            string[] lines = OsslNotecardLines(name);
+            if (lines == null) { ShoutError("Notecard '" + name + "' could not be found."); return "ERROR!"; }
+            var sb = new StringBuilder();
+            foreach (string l in lines) sb.Append(l).Append('\n');
+            return sb.ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:2417-2428 - VeryHigh. -1 with a shout when the notecard is missing.</summary>
+        public int osGetNumberOfNotecardLines(string name)
+        {
+            OsslCheck(TlVeryHigh, "osGetNumberOfNotecardLines");
+            string[] lines = OsslNotecardLines(name);
+            if (lines == null) { ShoutError("Notecard '" + name + "' could not be found."); return -1; }
+            return lines.Length;
+        }
+
+        /// <summary>OSSL_Api.cs:2631-2645 - Low. The user's HomeURI from user management, else this grid's home URL.</summary>
+        public string osGetAvatarHomeURI(string uuid)
+        {
+            OsslCheck(TlLow, "osGetAvatarHomeURI");
+            string v = string.Empty;
+            if (UUID.TryParse(uuid, out UUID id)) v = World?.RequestModuleInterface<IUserManagement>()?.GetUserServerURL(id, "HomeURI") ?? string.Empty;
+            return v.Length == 0 ? (World?.SceneGridInfo?.HomeURLNoEndSlash ?? string.Empty) : v;
+        }
+
+        /// <summary>OSSL_Api.cs:4299-4322 - Moderate. A strided list [point, count] for each point asked for; nothing for a point at or below 0 but 0.</summary>
+        public LSLList osGetNumberOfAttachments(string avatar, LSLList attachmentPoints)
+        {
+            OsslCheck(TlModerate, "osGetNumberOfAttachments");
+            var resp = new LSLList();
+            if (attachmentPoints.Length < 1 || !UUID.TryParse(avatar, out UUID id)) return resp;
+            ScenePresence target = World?.GetScenePresence(id);
+            if (target == null) return resp;
+            for (int i = 0; i < attachmentPoints.Length; i++)
+            {
+                int point = attachmentPoints.GetLSLIntegerItem(i);
+                resp = resp.Append(point);
+                resp = resp.Append(point <= 0 ? 0 : target.GetAttachments((uint)point).Count);
+            }
+            return resp;
+        }
+
+        /// <summary>OSSL_Api.cs:3594-3617 - High. "" = this region's map texture; a name or id is looked up in the grid service (1 s sleep upstream, not applied).</summary>
+        public string osGetRegionMapTexture(string regionNameOrID)
+        {
+            OsslCheck(TlHigh, "osGetRegionMapTexture");
+            if (World == null) return UUID.Zero.ToString();
+            if (string.IsNullOrWhiteSpace(regionNameOrID)) return World.RegionInfo.RegionSettings.TerrainImageID.ToString();
+            OpenSim.Services.Interfaces.GridRegion region = UUID.TryParse(regionNameOrID, out UUID key)
+                ? World.GridService?.GetRegionByUUID(UUID.Zero, key)
+                : World.GridService?.GetRegionByName(UUID.Zero, regionNameOrID);
+            return (region?.TerrainImage ?? UUID.Zero).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:4979-4986 - master switch. The link number of the first prim with that name, -1 for none.</summary>
+        public int osGetLinkNumber(string name)
+        {
+            OsslCheck();
+            SceneObjectGroup sog = m_host?.ParentGroup;
+            if (sog == null || sog.IsDeleted) return -1;
+            return sog.GetLinkNumber(name);
+        }
+
+        /// <summary>OSSL_Api.cs:4461-4468 - None. NULL_KEY when nothing rezzed this object or the rezzer is an avatar.</summary>
+        public string osGetRezzingObject()
+        {
+            OsslCheck(TlNone, "osGetRezzingObject");
+            UUID rez = m_host?.ParentGroup?.RezzerID ?? UUID.Zero;
+            if (rez == UUID.Zero || World?.GetScenePresence(rez) != null) return UUID.Zero.ToString();
+            return rez.ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:4558-4592 - Low. The regexes are validated as upstream (a shout and -1 when invalid); the listen goes to Phlox's listen manager with the bitfield.</summary>
+        public int osListenRegex(int channelID, string name, string ID, string msg, int regexBitfield)
+        {
+            OsslCheck(TlLow, "osListenRegex");
+            if (m_ScriptEngine.ListenManager == null || m_host == null) return -1;
+            if (!UUID.TryParse(ID, out UUID keyID)) return -1;
+            if ((regexBitfield & 1) != 0) { try { ScriptRegex.Create(name).IsMatch(""); } catch { ShoutError("Name regex is invalid."); return -1; } }
+            if ((regexBitfield & 2) != 0) { try { ScriptRegex.Create(msg).IsMatch(""); } catch { ShoutError("Message regex is invalid."); return -1; } }
+            return m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channelID, name, keyID, msg, regexBitfield);
+        }
+
+        private string OsslCountryOf(UUID key)
+        {
+            if (key == UUID.Zero) return string.Empty;
+            UserAccount account = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
+            return account?.UserCountry ?? string.Empty;
+        }
+
+        /// <summary>OSSL_Api.cs:5212-5225 - Moderate. The detected agent's account country.</summary>
+        public string osDetectedCountry(int number)
+        {
+            OsslCheck(TlModerate, "osDetectedCountry");
+            if (!UUID.TryParse(GetDetect(number).Key ?? string.Empty, out UUID key)) return string.Empty;
+            return OsslCountryOf(key);
+        }
+
+        /// <summary>OSSL_Api.cs:5228-5249 - Moderate. A non-god owner may only ask about an agent present in the region.</summary>
+        public string osGetAgentCountry(string id)
+        {
+            OsslCheck(TlModerate, "osGetAgentCountry");
+            if (!UUID.TryParse(id, out UUID key) || key == UUID.Zero || World == null) return string.Empty;
+            if (!World.Permissions.IsGod(m_host.OwnerID) && World.GetScenePresence(key) == null) return string.Empty;
+            return OsslCountryOf(key);
+        }
+
+        /// <summary>OSSL_Api.cs:3540-3575 - None. The shape's "male" visual param, read by its index among the group-0 params; "unknown" off-region.</summary>
+        public string osGetGender(string rawAvatarId)
+        {
+            OsslCheck(TlNone, "osGetGender");
+            if (!UUID.TryParse(rawAvatarId, out UUID id)) return "unknown";
+            ScenePresence sp = World?.GetScenePresence(id);
+            if (sp == null || sp.IsChildAgent || sp.Appearance?.VisualParams == null) return "unknown";
+            int index = 0; bool found = false; VisualParam male = default;
+            foreach (var vp in VisualParams.Params)
+            {
+                if (vp.Value.Name == "male" && vp.Value.Wearable == "shape") { male = vp.Value; found = true; break; }
+                if (vp.Value.Group == 0) index++;
+            }
+            if (!found || index >= sp.Appearance.VisualParams.Length) return "unknown";
+            float weight = Utils.ByteToFloat(sp.Appearance.VisualParams[index], male.MinValue, male.MaxValue);
+            return weight > 0.5f ? "male" : "female";
+        }
+
+        /// <summary>OSSL_Api.cs:3854-3865 - None.</summary>
+        public float osGetHealRate(string avatar)
+        {
+            OsslCheck(TlNone, "osGetHealRate");
+            if (!UUID.TryParse(avatar, out UUID id)) return 0f;
+            return World?.GetScenePresence(id)?.HealRate ?? 0f;
+        }
+
+        private float OsslDayFraction() => World?.RequestModuleInterface<IEnvironmentModule>()?.GetRegionDayFractionTime() ?? -1f;
+        private static string OsslTimeToString(float hours, bool format24)
+        {
+            int h = (int)hours; hours -= h; hours *= 60; int m = (int)hours; hours -= m; hours *= 60; int s = (int)hours;
+            if (format24) return string.Format("{0:00}:{1:00}:{2:00}", h, m, s);
+            if (h > 12) return string.Format("{0}:{1:00}:{2:00} PM", h - 12, m, s);
+            if (h == 12) return string.Format("{0}:{1:00}:{2:00} PM", h, m, s);
+            return string.Format("{0}:{1:00}:{2:00} AM", h, m, s);
+        }
+
+        /// <summary>OSSL_Api.cs:1559-1566 - master switch. Seconds into the region's day; 0 without an environment module.</summary>
+        public float osGetApparentTime() { OsslCheck(); float f = OsslDayFraction(); return f < 0 ? 0f : 86400f * f; }
+        /// <summary>OSSL_Api.cs:1588-1596 - master switch.</summary>
+        public string osGetApparentTimeString(int format24) { OsslCheck(); float f = OsslDayFraction(); return f < 0 ? (format24 != 0 ? "00:00:00" : "0:00:00 AM") : OsslTimeToString(24f * f, format24 != 0); }
+        /// <summary>OSSL_Api.cs:1602-1609 - master switch. The same value as osGetApparentTime under EEP (one region day).</summary>
+        public float osGetApparentRegionTime() { OsslCheck(); float f = OsslDayFraction(); return f < 0 ? 0f : 86400f * f; }
+        /// <summary>OSSL_Api.cs:1613-1621 - master switch.</summary>
+        public string osGetApparentRegionTimeString(int format24) { OsslCheck(); float f = OsslDayFraction(); return f < 0 ? (format24 != 0 ? "00:00:00" : "0:00:00 AM") : OsslTimeToString(24f * f, format24 != 0); }
+
+        private static readonly TimeZoneInfo OsslPstZone = FindPst();
+        private static TimeZoneInfo FindPst()
+        {
+            foreach (string id in new[] { "Pacific Standard Time", "America/Los_Angeles" })
+                try { return TimeZoneInfo.FindSystemTimeZoneById(id); } catch (Exception) { }
+            return null;
+        }
+
+        /// <summary>OSSL_Api.cs:5910-5916 - ungated upstream. Seconds since midnight, Pacific time; the local clock when the zone is unknown to this host.</summary>
+        public float osGetPSTWallclock()
+        {
+            if (OsslPstZone == null) return (float)DateTime.Now.TimeOfDay.TotalSeconds;
+            return (float)TimeZoneInfo.ConvertTime(DateTime.UtcNow, OsslPstZone).TimeOfDay.TotalSeconds;
+        }
+
+        /// <summary>OSSL_Api.cs:5901-5907 - ungated upstream. The key of the first detected entry of the current event.</summary>
+        public string osGetLastChangedEventKey() => GetDetect(0).Key ?? string.Empty;
+
+        /// <summary>OSSL_Api.cs:6642-6656 - ungated upstream. LINK_ROOT, LINK_THIS or a link number; llGetColor's reading over that part.</summary>
+        public Vector3 osGetLinkColor(int link, int face)
+        {
+            if (m_host?.ParentGroup == null) return Vector3.Zero;
+            SceneObjectPart part = OsslSingleLinkPart(link);
+            return part == null ? Vector3.Zero : ColorOf(part, face);
+        }
+
+        /// <summary>OSSL_Api.cs:6032-6035 - ungated upstream.</summary>
+        public float osGetSitActiveRange() => m_host?.SitActiveRange ?? 0f;
+
+        /// <summary>OSSL_Api.cs:6037-6049 - ungated upstream. int.MinValue for a negative link or an unknown one, as upstream.</summary>
+        public float osGetLinkSitActiveRange(int linkNumber)
+        {
+            if (m_host?.ParentGroup == null) return 0f;
+            SceneObjectPart t = OsslSingleLinkPart(linkNumber);
+            return t == null ? int.MinValue : t.SitActiveRange;
+        }
+
+        /// <summary>OSSL_Api.cs:6084-6087 - ungated upstream.</summary>
+        public Vector3 osGetStandTarget() => m_host?.StandOffset ?? Vector3.Zero;
+
+        /// <summary>OSSL_Api.cs:6089-6101 - ungated upstream.</summary>
+        public Vector3 osGetLinkStandTarget(int linkNumber)
+        {
+            if (m_host?.ParentGroup == null) return Vector3.Zero;
+            return OsslSingleLinkPart(linkNumber)?.StandOffset ?? Vector3.Zero;
+        }
+
+        /// <summary>OSSL_Api.cs:6560-6563 - ungated upstream.</summary>
+        public int osGetPrimCount() => m_host?.ParentGroup?.PrimCount ?? 0;
+
+        /// <summary>OSSL_Api.cs:6565-6570 - ungated upstream. 0 for a key that is not a prim here.</summary>
+        public int osGetPrimCount(string object_id)
+        {
+            if (!UUID.TryParse(object_id, out UUID id) || id == UUID.Zero || World == null) return 0;
+            return World.TryGetSceneObjectPart(id, out SceneObjectPart part) ? part.ParentGroup.PrimCount : 0;
+        }
+
+        /// <summary>OSSL_Api.cs:6573-6576 - ungated upstream.</summary>
+        public int osGetSittingAvatarsCount() => m_host?.ParentGroup?.GetSittingAvatarsCount() ?? 0;
+
+        /// <summary>OSSL_Api.cs:6578-6583 - ungated upstream.</summary>
+        public int osGetSittingAvatarsCount(string object_id)
+        {
+            if (!UUID.TryParse(object_id, out UUID id) || id == UUID.Zero || World == null) return 0;
+            return World.TryGetSceneObjectPart(id, out SceneObjectPart part) ? part.ParentGroup.GetSittingAvatarsCount() : 0;
+        }
+
+        /// <summary>OSSL_Api.cs:1720-1728 - ungated upstream.</summary>
+        public int osGetParcelDwell(Vector3 pos) => (int)(World?.GetLandData(pos)?.Dwell ?? 0f);
+
+        /// <summary>OSSL_Api.cs:6463-6467 - ungated upstream. The parcel under the prim.</summary>
+        public string osGetParcelID()
+        {
+            if (m_host == null) return UUID.Zero.ToString();
+            ILandObject parcel = World?.LandChannel?.GetLandObject(m_host.AbsolutePosition);
+            return (parcel?.GlobalID ?? UUID.Zero).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:6443-6458 - ungated upstream. Every parcel with a global id and a non-zero area.</summary>
+        public LSLList osGetParcelIDs()
+        {
+            var ret = new LSLList();
+            var parcels = World?.LandChannel?.AllParcels();
+            if (parcels == null) return ret;
+            foreach (ILandObject p in parcels)
+            {
+                if (p.GlobalID == UUID.Zero || p.LandData == null || p.LandData.Area == 0) continue;
+                ret = ret.Append(p.GlobalID.ToString());
+            }
+            return ret;
+        }
+
+        // inventory family, OSSL_Api.cs:5514-5720 - every one ungated upstream; the *ItemKey / *Keys forms answer only for full-permission items
+        /// <summary>OSSL_Api.cs:5514-5523.</summary>
+        public string osGetInventoryLastOwner(string itemNameorid)
+        {
+            TaskInventoryItem item = OsslItemByNameOrId(m_host, itemNameorid);
+            if (item == null) return UUID.Zero.ToString();
+            return (item.LastOwnerID != UUID.Zero ? item.LastOwnerID : item.OwnerID).ToString();
+        }
+        /// <summary>OSSL_Api.cs:5528-5541.</summary>
+        public string osGetInventoryItemKey(string name)
+        {
+            TaskInventoryItem item = m_host?.Inventory.GetInventoryItem(name);
+            return item != null && OsslFullPerm(item) ? item.ItemID.ToString() : UUID.Zero.ToString();
+        }
+        /// <summary>OSSL_Api.cs:5544-5550.</summary>
+        public string osGetInventoryName(string itemId)
+        {
+            TaskInventoryItem item = UUID.TryParse(itemId, out UUID id) ? m_host?.Inventory.GetInventoryItem(id) : null;
+            return item?.Name ?? string.Empty;
+        }
+        /// <summary>OSSL_Api.cs:5567-5573.</summary>
+        public string osGetInventoryDesc(string itemNameorid) => OsslItemByNameOrId(m_host, itemNameorid)?.Description ?? string.Empty;
+        /// <summary>OSSL_Api.cs:5651-5664.</summary>
+        public LSLList osGetInventoryItemKeys(int type)
+        {
+            var ret = new LSLList();
+            if (m_host == null) return ret;
+            foreach (TaskInventoryItem item in m_host.Inventory.GetInventoryItems())
+                if ((item.Type == type || type == -1) && OsslFullPerm(item)) ret = ret.Append(item.ItemID.ToString());
+            return ret;
+        }
+        /// <summary>OSSL_Api.cs:5690-5701.</summary>
+        public LSLList osGetInventoryNames(int type)
+        {
+            var ret = new LSLList();
+            if (m_host == null) return ret;
+            foreach (TaskInventoryItem item in m_host.Inventory.GetInventoryItems())
+                if (item.Type == type || type == -1) ret = ret.Append(item.Name);
+            return ret;
+        }
+        /// <summary>OSSL_Api.cs:5553-5564 - the link-addressed forms use upstream's GetSingleLinkPart rule.</summary>
+        public string osGetLinkInventoryName(int linkNumber, string itemId)
+        {
+            SceneObjectPart part = OsslSingleLinkPart(linkNumber);
+            TaskInventoryItem item = part != null && UUID.TryParse(itemId, out UUID id) ? part.Inventory.GetInventoryItem(id) : null;
+            return item?.Name ?? string.Empty;
+        }
+        /// <summary>OSSL_Api.cs:5576-5586.</summary>
+        public string osGetLinkInventoryDesc(int linkNumber, string itemNameorid) => OsslItemByNameOrId(OsslSingleLinkPart(linkNumber), itemNameorid)?.Description ?? string.Empty;
+        /// <summary>OSSL_Api.cs:5589-5606 - the ASSET key of a full-permission item of that name and type.</summary>
+        public string osGetLinkInventoryKey(int linkNumber, string name, int type)
+        {
+            SceneObjectPart part = OsslSingleLinkPart(linkNumber);
+            TaskInventoryItem item = part?.Inventory.GetInventoryItem(name);
+            if (item == null || (type != -1 && item.Type != type) || !OsslFullPerm(item)) return UUID.Zero.ToString();
+            return item.AssetID.ToString();
+        }
+        /// <summary>OSSL_Api.cs:5609-5628 - asset keys of full-permission items of that type (-1 = any).</summary>
+        public LSLList osGetLinkInventoryKeys(int linkNumber, int type)
+        {
+            var ret = new LSLList();
+            SceneObjectPart part = OsslSingleLinkPart(linkNumber);
+            if (part == null) return ret;
+            foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
+                if ((item.Type == type || type == -1) && OsslFullPerm(item)) ret = ret.Append(item.AssetID.ToString());
+            return ret;
+        }
+        /// <summary>OSSL_Api.cs:5631-5648.</summary>
+        public string osGetLinkInventoryItemKey(int linkNumber, string name)
+        {
+            TaskInventoryItem item = OsslSingleLinkPart(linkNumber)?.Inventory.GetInventoryItem(name);
+            return item != null && OsslFullPerm(item) ? item.ItemID.ToString() : UUID.Zero.ToString();
+        }
+        /// <summary>OSSL_Api.cs:5668-5687.</summary>
+        public LSLList osGetLinkInventoryItemKeys(int linkNumber, int type)
+        {
+            var ret = new LSLList();
+            SceneObjectPart part = OsslSingleLinkPart(linkNumber);
+            if (part == null) return ret;
+            foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
+                if ((item.Type == type || type == -1) && OsslFullPerm(item)) ret = ret.Append(item.ItemID.ToString());
+            return ret;
+        }
+        /// <summary>OSSL_Api.cs:5705-5718.</summary>
+        public LSLList osGetLinkInventoryNames(int linkNumber, int type)
+        {
+            var ret = new LSLList();
+            SceneObjectPart part = OsslSingleLinkPart(linkNumber);
+            if (part == null) return ret;
+            foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
+                if (item.Type == type || type == -1) ret = ret.Append(item.Name);
+            return ret;
+        }
+
+        // ── osNpc* - a second door onto BotManager's bots (one BotData per NPC), ported from OSSL_Api.cs ──
+        private const int OS_NPC_NOT_OWNED = 0x2, OS_NPC_SENSE_AS_AGENT = 0x4, OS_NPC_OBJECT_GROUP = 0x8, OS_NPC_NO_FLY = 1, OS_NPC_RUNNING = 4;
+        private IBotManager NpcMgr() => World?.RequestModuleInterface<IBotManager>();
+        private static bool NpcKey(string npc, out UUID id) => UUID.TryParse(npc, out id) && id.IsNotZero();
+
+        /// <summary>OSSL_Api.cs:2848-2975 NpcCreate. The notecard argument is the bot outfit store's outfit name ("" = the owner's current appearance).</summary>
+        private string NpcCreate(string firstname, string lastname, Vector3 position, string notecard, bool owned, bool senseAsAgent, bool hostGroup)
+        {
+            if (World == null || m_host == null) return UUID.Zero.ToString();
+            if (!World.Permissions.CanRezObject(1, m_host.OwnerID, position))
+            {
+                ShoutError("no permission to rez NPC at requested location");
+                return UUID.Zero.ToString();
+            }
+            var mgr = NpcMgr();
+            if (mgr == null)
+            {
+                ShoutError("NPC module not enabled");
+                return UUID.Zero.ToString();
+            }
+            // OS_NPC_OBJECT_GROUP: BotManager's CreateNPC call carries no group - accepted, not applied.
+            UUID id = mgr.CreateBot(firstname, lastname, position, notecard ?? string.Empty, m_itemID, m_host.OwnerID, owned, senseAsAgent, out string reason);
+            if (reason != null) ShoutError("osNpcCreate: " + reason);
+            return id.ToString();
+        }
+
+        private string NpcSaveOutfit(string npc, string notecard)
+        {
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return UUID.Zero.ToString();
+            UUID key = mgr.SaveBotOutfit(id, notecard, m_host.OwnerID, out string reason);
+            if (reason != null) ShoutError("osNpcSaveAppearance: " + reason);
+            return key.ToString();
+        }
+
+        private void NpcMove(string npc, Vector3 target, TravelMode mode)
+        {
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            mgr.SetBotNavigationPoints(id, new List<Vector3> { target }, new List<TravelMode> { mode }, new Dictionary<int, object>(), m_host.OwnerID);
+        }
+
+        private void NpcChat(string npc, int channel, string message, ChatTypeEnum type)
+        {
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            mgr.BotChat(id, channel, message ?? string.Empty, type, m_host.OwnerID);   // upstream's 2 s say-throttle is not applied
+        }
+
+
+        /// <summary>OSSL_Api.cs:2808 - bare CheckThreatLevel (master switch).</summary>
+        public int osIsNpc(string npc)
+        {
+            OsslCheck();
+            return UUID.TryParse(npc, out UUID id) && World?.GetScenePresence(id)?.IsNPC == true ? 1 : 0;
+        }
+
+        /// <summary>OSSL_Api.cs:2823 - High (key osNpcCreate).</summary>
+        public string osNpcCreate(string firstname, string lastname, Vector3 position, string notecard)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcCreate");
+            return NpcCreate(firstname, lastname, position, notecard, true, false, false);
+        }
+
+        /// <summary>OSSL_Api.cs:2837 - High (key osNpcCreate).</summary>
+        public string osNpcCreate(string firstname, string lastname, Vector3 position, string notecard, int options)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcCreate");
+            return NpcCreate(firstname, lastname, position, notecard,
+                (options & OS_NPC_NOT_OWNED) == 0, (options & OS_NPC_SENSE_AS_AGENT) != 0, (options & OS_NPC_OBJECT_GROUP) != 0);
+        }
+
+        /// <summary>OSSL_Api.cs:2975 - High (key osNpcSaveAppearance).</summary>
+        public string osNpcSaveAppearance(string npc, string notecard)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcSaveAppearance");
+            return NpcSaveOutfit(npc, notecard);
+        }
+
+        /// <summary>OSSL_Api.cs:2980 - High (key osNpcSaveAppearance).</summary>
+        public string osNpcSaveAppearance(string npc, string notecard, int includeHuds)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcSaveAppearance");
+            return NpcSaveOutfit(npc, notecard);   // includeHuds: the outfit store keeps the whole appearance
+        }
+
+        /// <summary>OSSL_Api.cs:3005 - High (key osNpcLoadAppearance).</summary>
+        public void osNpcLoadAppearance(string npc, string notecard)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcLoadAppearance");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            mgr.ChangeBotOutfit(id, notecard, m_host.OwnerID, out string reason);
+            if (reason != null) ShoutError("osNpcLoadAppearance: " + reason);
+        }
+
+        /// <summary>OSSL_Api.cs:3035 - None (key osNpcGetOwner).</summary>
+        public string osNpcGetOwner(string npc)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.None, "osNpcGetOwner");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return UUID.Zero.ToString();
+            UUID owner = mgr.GetBotOwner(id);
+            return owner.IsZero() ? npc : owner.ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:3055 - High (key osNpcGetPos).</summary>
+        public Vector3 osNpcGetPos(string npc)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcGetPos");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id) || !mgr.CheckPermission(id, m_host.OwnerID)) return Vector3.Zero;
+            return World.GetScenePresence(id)?.AbsolutePosition ?? Vector3.Zero;
+        }
+
+        /// <summary>OSSL_Api.cs:3077 - High (key osNpcMoveTo).</summary>
+        public void osNpcMoveTo(string npc, Vector3 pos)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcMoveTo");
+            NpcMove(npc, pos, TravelMode.Fly);   // upstream: noFly false, land at target
+        }
+
+        /// <summary>OSSL_Api.cs:3094 - High (key osNpcMoveToTarget).</summary>
+        public void osNpcMoveToTarget(string npc, Vector3 target, int options)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcMoveToTarget");
+            NpcMove(npc, target, (options & OS_NPC_RUNNING) != 0 ? TravelMode.Run : (options & OS_NPC_NO_FLY) != 0 ? TravelMode.Walk : TravelMode.Fly);
+        }
+
+        /// <summary>OSSL_Api.cs:3117 - High (key osNpcGetRot).</summary>
+        public Quaternion osNpcGetRot(string npc)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcGetRot");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id) || !mgr.CheckPermission(id, m_host.OwnerID)) return Quaternion.Identity;
+            return World.GetScenePresence(id)?.GetWorldRotation() ?? Quaternion.Identity;
+        }
+
+        /// <summary>OSSL_Api.cs:3139 - High (key osNpcSetRot).</summary>
+        public void osNpcSetRot(string npc, Quaternion rotation)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcSetRot");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            mgr.SetBotRotation(id, rotation, m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:3158 - High (key osNpcStopMoveToTarget).</summary>
+        public void osNpcStopMoveToTarget(string npc)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcStopMoveToTarget");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            mgr.StopMovement(id, m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:3174 - Low (key osNpcSetProfileAbout).</summary>
+        public void osNpcSetProfileAbout(string npc, string about)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Low, "osNpcSetProfileAbout");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            mgr.SetBotProfile(id, about ?? string.Empty, null, null, null, m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:3192 - Low (key osNpcSetProfileImage).</summary>
+        public void osNpcSetProfileImage(string npc, string image)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.Low, "osNpcSetProfileImage");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            UUID imageId = UUID.Zero;
+            if (!UUID.TryParse(image, out imageId)) imageId = FindInventoryItem(image, (int)AssetType.Texture)?.AssetID ?? UUID.Zero;
+            mgr.SetBotProfile(id, null, null, imageId, null, m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:3217 - ungated upstream.</summary>
+        public void osNpcSay(string npc, string message)
+        {
+            osNpcSay(npc, 0, message);
+        }
+
+        /// <summary>OSSL_Api.cs:3222 - High (key osNpcSay).</summary>
+        public void osNpcSay(string npc, int channel, string message)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcSay");
+            NpcChat(npc, channel, message, ChatTypeEnum.Say);
+        }
+
+        /// <summary>OSSL_Api.cs:3272 - High (key osNpcShout).</summary>
+        public void osNpcShout(string npc, int channel, string message)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcShout");
+            NpcChat(npc, channel, message, ChatTypeEnum.Shout);
+        }
+
+        /// <summary>OSSL_Api.cs:3417 - High (key osNpcWhisper).</summary>
+        public void osNpcWhisper(string npc, int channel, string message)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcWhisper");
+            NpcChat(npc, channel, message, ChatTypeEnum.Whisper);
+        }
+
+        /// <summary>OSSL_Api.cs:3290 - High (key osNpcSit).</summary>
+        public void osNpcSit(string npc, string target, int options)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcSit");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id) || !UUID.TryParse(target, out UUID targetId)) return;
+            mgr.SitBotOnObject(id, targetId, m_host.OwnerID);   // OS_NPC_SIT_NOW is the only option and the only behaviour
+        }
+
+        /// <summary>OSSL_Api.cs:3306 - High (key osNpcStand).</summary>
+        public void osNpcStand(string npc)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcStand");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            mgr.StandBotUp(id, m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:3322 - High (key osNpcRemove).</summary>
+        public void osNpcRemove(string npc)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcRemove");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            mgr.RemoveBot(id, m_host.OwnerID);   // permission inside: unowned, or owner == caller (NPCModule.CheckPermissions)
+        }
+
+        /// <summary>OSSL_Api.cs:3342 - High (key osNpcPlayAnimation).</summary>
+        public void osNpcPlayAnimation(string npc, string animation)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcPlayAnimation");
+            if (string.IsNullOrEmpty(animation)) return;
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            UUID animID = FindInventoryItem(animation, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
+            if (animID.IsZero()) UUID.TryParse(animation, out animID);
+            if (animID.IsZero()) return;
+            mgr.StartBotAnimation(id, animID, animation, m_host.UUID, m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:3381 - High (key osNpcStopAnimation).</summary>
+        public void osNpcStopAnimation(string npc, string animation)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcStopAnimation");
+            if (string.IsNullOrEmpty(animation)) return;
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id)) return;
+            UUID animID = FindInventoryItem(animation, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
+            if (animID.IsZero()) UUID.TryParse(animation, out animID);
+            if (animID.IsZero()) return;
+            mgr.StopBotAnimation(id, animID, animation, m_host.OwnerID);
+        }
+
+        /// <summary>OSSL_Api.cs:3433 - High (key osNpcTouch).</summary>
+        public void osNpcTouch(string npc, string object_key, int link_num)
+        {
+            OsslCheck(OpenSim.Region.ScriptEngine.Shared.Api.Interfaces.ThreatLevel.High, "osNpcTouch");
+            var mgr = NpcMgr(); if (mgr == null || !NpcKey(npc, out UUID id) || !UUID.TryParse(object_key, out UUID objectId)) return;
+            SceneObjectPart part = World.GetSceneObjectPart(objectId);
+            if (part == null) return;
+            if (link_num != -4 /* LINK_THIS */)
+            {
+                if (link_num == 0 || link_num == 1 /* LINK_ROOT */) part = part.ParentGroup.RootPart;
+                else part = part.ParentGroup.GetLinkNumPart(link_num);
+                if (part == null) return;
+            }
+            mgr.BotTouchObject(id, part.UUID, m_host.OwnerID);
         }
 
         public LSLList osGetAvatarList()
@@ -6482,85 +13486,217 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return new LSLList(result);
         }
 
-        public int llReturnObjectsByOwner(string owner, int scope)
+        // ── Object return ──────────────────────────────────────────────────────
+        //
+        // SL: "Returns an integer that is the number of objects successfully returned to their owners or an ERR_* flag."
+        // Objects are RETURNED to their owners' Lost and Found, never deleted, through the core's own parcel-return call
+        // (SceneObjectGroup parcel autoreturn: AddReturn + DeRezObjects(null, ..., DeRezAction.Return)) - the pair Halcyon's
+        // Scene.returnObjects makes. YEngine's LSL_Api has neither function, so there is no LSL_Api call to match.
+
+        /// <summary>
+        /// Who granted PERMISSION_RETURN_OBJECTS. SL: "If the script is owned by an agent, PERMISSION_RETURN_OBJECTS may be
+        /// granted by the owner. If the script is owned by a group, this permission may be granted by an agent belonging
+        /// to the group's 'Owners' role." Any other granter, or none, is ERR_RUNTIME_PERMISSIONS. (Halcyon's
+        /// canUseReturnPermission answers ERR_PARCEL_PERMISSIONS for a group granter outside the Owners role; the rule is
+        /// about who may grant, so SL's runtime-permission code is used.)
+        /// </summary>
+        private int CheckReturnPermission(TaskInventoryItem item)
         {
-            // Faithful port from Halcyon, adapted for Legion
-            const int ERR_MALFORMED_PARAMS = -3;
-            const int ERR_RUNTIME_PERMISSIONS = -4;
-            const int ERR_GENERIC = -1;
-            const int PERMISSION_RETURN_OBJECTS = 0x10000;
-            const int OBJECT_RETURN_PARCEL = 1;
-            const int OBJECT_RETURN_PARCEL_OWNER = 2;
-            const int OBJECT_RETURN_REGION = 4;
+            if ((item.PermsMask & PERMISSION_RETURN_OBJECTS) == 0 || item.PermsGranter.IsZero())
+                return ERR_RUNTIME_PERMISSIONS;
+            // The script's owner is its object's owner (a group for a deeded object), as the other permission checks
+            // here read it.
+            UUID scriptOwner = m_host.OwnerID;
+            bool groupOwned = !m_host.GroupID.IsZero() && scriptOwner == m_host.GroupID;
+            if (!groupOwned)
+                return item.PermsGranter == scriptOwner ? 0 : ERR_RUNTIME_PERMISSIONS;
+            return IsInGroupOwnersRole(item.PermsGranter, m_host.GroupID) ? 0 : ERR_RUNTIME_PERMISSIONS;
+        }
 
-            if (!UUID.TryParse(owner, out UUID targetAgentID))
-                return ERR_MALFORMED_PARAMS;
-            if (targetAgentID == UUID.Zero) return 0;
+        /// <summary>The agent holds the group's Owners role (GroupRecord.OwnerRoleID). No groups module: false.</summary>
+        private bool IsInGroupOwnersRole(UUID agent, UUID group)
+        {
+            IGroupsModule groups = World.RequestModuleInterface<IGroupsModule>();
+            GroupRecord rec = groups?.GetGroupRecord(group);
+            if (rec == null || rec.OwnerRoleID.IsZero()) return false;
+            // GroupRoleDataRequest(agent, group) lists the group's roles, not the agent's; the role-member pairs say who
+            // holds which. The granter's own client is the requester when it is here.
+            IClientAPI client = World.GetScenePresence(agent)?.ControllingClient;
+            List<GroupRoleMembersData> members = groups.GroupRoleMembersRequest(client, group);
+            return members != null && members.Any(m => m.MemberID == agent && m.RoleID == rec.OwnerRoleID);
+        }
 
-            UUID invItemID = InventorySelf();
-            if (invItemID == UUID.Zero) return ERR_GENERIC;
+        /// <summary>
+        /// The script owner may return objects over this parcel: it owns the parcel, or it is the estate owner or an
+        /// estate manager (SL lsl_definitions: "the script owner must own the parcel or be an estate manager/region
+        /// owner"; llReturnObjectsByID: "If the script is owned by an estate owner or manager, this function works for
+        /// objects located on any parcel in the region. Otherwise, the script can return objects located over land owned
+        /// by the owner of the script."). Halcyon never lets an EO/EM act on a parcel it does not own; SL is followed.
+        /// </summary>
+        private bool MayReturnOnParcel(ILandObject parcel)
+            => parcel != null && (parcel.LandData.OwnerID == m_host.OwnerID || IsEstateOwnerOrManager(m_host.OwnerID));
 
-            TaskInventoryItem item;
-            lock (m_host.TaskInventory)
+        private bool IsEstateOwnerOrManager(UUID id)
+            => !id.IsZero() && World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(id);
+
+        /// <summary>
+        /// SL: "Parcel owner, estate owner and estate managers can not have their objects returned by this method."
+        /// </summary>
+        private bool IsExemptFromReturn(SceneObjectGroup grp, ILandObject parcel)
+            => grp.OwnerID == parcel.LandData.OwnerID || IsEstateOwnerOrManager(grp.OwnerID);
+
+        /// <summary>
+        /// SL: "Throttled at max parcel land impact capacity region-wide per hour." Per region, over a rolling hour, the
+        /// prims returned may not go over the region's object capacity (MaxPrims, the most any parcel can hold).
+        /// </summary>
+        private sealed class ReturnThrottle
+        {
+            public readonly Queue<(DateTime At, int Prims)> Returned = new();
+            public int Total;
+        }
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Scene, ReturnThrottle> s_returnThrottles = new();
+        private static readonly TimeSpan ReturnThrottleWindow = TimeSpan.FromHours(1);
+
+        /// <summary>
+        /// Return <paramref name="groups"/> to their owners, as the core's parcel autoreturn does. Stops at the first
+        /// object the hourly throttle has no room for. The count of objects handed to the return, or ERR_THROTTLED when
+        /// the throttle stopped it before any, or ERR_GENERIC when the region has no inventory access module (the core's
+        /// deleter would remove the objects and never copy them, so nothing is touched).
+        /// </summary>
+        private int ReturnGroupsToOwners(List<SceneObjectGroup> groups, string reason)
+        {
+            if (groups.Count == 0) return 0;
+            if (World.RequestModuleInterface<IInventoryAccessModule>() == null)
             {
-                if (!m_host.TaskInventory.ContainsKey(invItemID)) return ERR_GENERIC;
-                item = m_host.TaskInventory[invItemID];
+                m_log.LogWarning("[PhloxAPI]: object return refused: the region has no inventory access module");
+                return ERR_GENERIC;
             }
 
-            // Check PERMISSION_RETURN_OBJECTS
-            if ((item.PermsMask & PERMISSION_RETURN_OBJECTS) == 0)
-                return ERR_RUNTIME_PERMISSIONS;
+            var ids = new List<uint>();
+            bool throttled = false;
+            ReturnThrottle throttle = s_returnThrottles.GetValue(World, _ => new ReturnThrottle());
+            lock (throttle)
+            {
+                DateTime now = DateTime.UtcNow;
+                while (throttle.Returned.Count > 0 && now - throttle.Returned.Peek().At >= ReturnThrottleWindow)
+                    throttle.Total -= throttle.Returned.Dequeue().Prims;
+                int capacity = World.RegionInfo.ObjectCapacity;
+                foreach (SceneObjectGroup grp in groups)
+                {
+                    if (throttle.Total + grp.PrimCount > capacity) { throttled = true; break; }
+                    throttle.Total += grp.PrimCount;
+                    throttle.Returned.Enqueue((now, grp.PrimCount));
+                    // Group-owned objects go back to the last owner (InventoryAccessModule.CreateItemForObject).
+                    World.AddReturn(grp.OwnerID == grp.GroupID ? grp.LastOwnerID : grp.OwnerID, grp.Name, grp.AbsolutePosition, reason);
+                    ids.Add(grp.RootPart.LocalId);
+                }
+            }
+            // One object per call, as Halcyon's by-ID return does (LandObject.cs:1425-1431): with the region's
+            // CoalesceMultipleObjectsToInventory on, one call would fold all of an owner's objects into one item.
+            foreach (uint id in ids)
+                World.DeRezObjects(null, new List<uint> { id }, UUID.Zero, DeRezAction.Return, UUID.Zero, false);
+            if (ids.Count == 0 && throttled) return ERR_THROTTLED;
+            return ids.Count;
+        }
+
+        /// <summary>The script's own item, or null.</summary>
+        private TaskInventoryItem ReturnScriptItem()
+        {
+            UUID invItemID = InventorySelf();
+            if (invItemID.IsZero()) return null;
+            lock (m_host.TaskInventory)
+                return m_host.TaskInventory.TryGetValue(invItemID, out TaskInventoryItem item) ? item : null;
+        }
+
+        /// <summary>
+        /// Halcyon llReturnObjectsByOwner's finally (LSLSystemAPI.cs:18415-18431) - its LSLError for
+        /// each failure code it reports; the code is returned as before.
+        /// </summary>
+        private int ReturnObjectsError(int rc)
+        {
+            switch (rc)
+            {
+                case ERR_GENERIC: LSLError("No parcel found for permissions to return objects"); break;
+                case ERR_PARCEL_PERMISSIONS: LSLError("No parcel/region permission to return objects"); break;
+                case ERR_RUNTIME_PERMISSIONS: LSLError("No permissions to return objects"); break;
+                case ERR_MALFORMED_PARAMS: LSLError("Bad parameters on scripted call to return objects"); break;
+            }
+            return rc;
+        }
+
+        public int llReturnObjectsByOwner(string owner, int scope)
+        {
+            // Order of the checks as Halcyon (LSLSystemAPI.cs:18348-18436).
+            if (!UUID.TryParse(owner, out UUID targetAgentID))
+                return ERR_MALFORMED_PARAMS;
+            if (targetAgentID.IsZero()) return 0;
+
+            TaskInventoryItem item = ReturnScriptItem();
+            if (item == null) { LSLError("No item found from which to run script"); return ERR_GENERIC; }   // Halcyon :18356-18360
+
+            int rc = CheckReturnPermission(item);
+            if (rc != 0) return ReturnObjectsError(rc);
+
+            if (scope != OBJECT_RETURN_PARCEL && scope != OBJECT_RETURN_PARCEL_OWNER && scope != OBJECT_RETURN_REGION)
+                return ERR_MALFORMED_PARAMS;
 
             try
             {
                 Vector3 currentPos = m_host.ParentGroup.AbsolutePosition;
                 ILandObject currentParcel = World.LandChannel.GetLandObject(currentPos.X, currentPos.Y);
-                if (currentParcel == null) return ERR_GENERIC;
+                // Halcyon reports this one only for OBJECT_RETURN_REGION (:18388-18391; the parcel scopes fail on
+                // its null parcel and return ERR_GENERIC unreported).
+                if (currentParcel == null) return scope == OBJECT_RETURN_REGION ? ReturnObjectsError(ERR_GENERIC) : ERR_GENERIC;
 
-                // Collect objects to return
-                List<SceneObjectGroup> toReturn = new List<SceneObjectGroup>();
-                EntityBase[] entities = World.GetEntities();
-
-                foreach (EntityBase ent in entities)
+                // The parcels in scope, by local id.
+                var inScope = new HashSet<int>();
+                switch (scope)
                 {
-                    if (ent is SceneObjectGroup sog && !sog.IsDeleted && !sog.IsAttachment)
-                    {
-                        if (sog.OwnerID != targetAgentID) continue;
-                        if (sog == m_host.ParentGroup) continue; // don't return ourselves
-
-                        Vector3 objPos = sog.AbsolutePosition;
-                        ILandObject objParcel = World.LandChannel.GetLandObject(objPos.X, objPos.Y);
-                        if (objParcel == null) continue;
-
-                        switch (scope)
-                        {
-                            case OBJECT_RETURN_PARCEL:
-                                if (objParcel.LandData.LocalID != currentParcel.LandData.LocalID) continue;
-                                break;
-                            case OBJECT_RETURN_PARCEL_OWNER:
-                                if (objParcel.LandData.LocalID != currentParcel.LandData.LocalID) continue;
-                                if (objParcel.LandData.OwnerID != currentParcel.LandData.OwnerID) continue;
-                                break;
-                            case OBJECT_RETURN_REGION:
-                                // all parcels
-                                break;
-                            default:
-                                return ERR_MALFORMED_PARAMS;
-                        }
-                        toReturn.Add(sog);
-                    }
+                    case OBJECT_RETURN_PARCEL:
+                        // SL: "all objects on the same parcel as the script"; lsl_definitions: "Requires the script owner
+                        // to be an estate manager or the parcel owner."
+                        if (!MayReturnOnParcel(currentParcel)) return ReturnObjectsError(ERR_PARCEL_PERMISSIONS);
+                        inScope.Add(currentParcel.LandData.LocalID);
+                        break;
+                    case OBJECT_RETURN_PARCEL_OWNER:
+                        // SL: "over parcels owned by the owner of the script".
+                        foreach (ILandObject p in World.LandChannel.AllParcels())
+                            if (p.LandData.OwnerID == m_host.OwnerID) inScope.Add(p.LandData.LocalID);
+                        if (inScope.Count == 0) return ReturnObjectsError(ERR_PARCEL_PERMISSIONS);
+                        break;
+                    case OBJECT_RETURN_REGION:
+                        // lsl_definitions: "Only works if the script is owned by the estate owner or an estate manager."
+                        // (Halcyon walks every parcel and stops at the first the owner may not touch.)
+                        if (!IsEstateOwnerOrManager(m_host.OwnerID)) return ReturnObjectsError(ERR_PARCEL_PERMISSIONS);
+                        break;
                 }
 
-                if (toReturn.Count > 0)
+                // SL: "Parcel owner, estate owner and estate managers can not have their objects returned by this method."
+                if (IsEstateOwnerOrManager(targetAgentID)) return 0;
+
+                var toReturn = new List<SceneObjectGroup>();
+                foreach (EntityBase ent in World.GetEntities())
                 {
-                    foreach (SceneObjectGroup sog in toReturn)
-                    {
-                        try { World.DeleteSceneObject(sog, false); }
-                        catch { }
-                    }
-                    m_log.LogInformation("[PhloxAPI]: llReturnObjectsByOwner returned {0} objects owned by {1}", toReturn.Count, targetAgentID);
+                    if (ent is not SceneObjectGroup sog || sog.IsDeleted || sog.IsAttachment) continue;
+                    if (sog.OwnerID != targetAgentID) continue;
+
+                    Vector3 objPos = sog.AbsolutePosition;
+                    ILandObject objParcel = World.LandChannel.GetLandObject(objPos.X, objPos.Y);
+                    if (objParcel == null) continue;
+                    if (scope != OBJECT_RETURN_REGION && !inScope.Contains(objParcel.LandData.LocalID)) continue;
+
+                    if (IsExemptFromReturn(sog, objParcel)) continue;
+                    // SL: "Objects which are owned by the group the land is set to will not be returned by this method."
+                    if (!objParcel.LandData.GroupID.IsZero() && sog.OwnerID == objParcel.LandData.GroupID) continue;
+
+                    toReturn.Add(sog);
                 }
-                return toReturn.Count;
+
+                rc = ReturnGroupsToOwners(toReturn, "scripted parcel owner return");
+                if (rc > 0)
+                    m_log.LogInformation("[PhloxAPI]: llReturnObjectsByOwner returned {0} objects owned by {1}, granted by {2} for {3}",
+                        rc, targetAgentID, item.PermsGranter, m_host.OwnerID);
+                return rc;
             }
             catch (Exception e)
             {
@@ -6568,59 +13704,57 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 return ERR_GENERIC;
             }
         }
+
         public int llReturnObjectsByID(LSLList objects)
         {
-            // Faithful port from Halcyon, adapted for Legion
-            const int ERR_MALFORMED_PARAMS = -3;
-            const int ERR_RUNTIME_PERMISSIONS = -4;
-            const int ERR_GENERIC = -1;
-            const int PERMISSION_RETURN_OBJECTS = 0x10000;
-
+            // Order of the checks as Halcyon (LSLSystemAPI.cs:18438-18497).
             try
             {
-                UUID invItemID = InventorySelf();
-                if (invItemID == UUID.Zero) return ERR_GENERIC;
+                TaskInventoryItem item = ReturnScriptItem();
+                if (item == null) { LSLError("No item found from which to run script"); return ERR_GENERIC; }   // Halcyon :18445-18449
 
-                TaskInventoryItem item;
-                lock (m_host.TaskInventory)
-                {
-                    if (!m_host.TaskInventory.ContainsKey(invItemID)) return ERR_GENERIC;
-                    item = m_host.TaskInventory[invItemID];
-                }
+                int rc = CheckReturnPermission(item);
+                if (rc != 0) return ReturnObjectsError(rc);   // Halcyon :18456-18460
 
-                if ((item.PermsMask & PERMISSION_RETURN_OBJECTS) == 0)
-                    return ERR_RUNTIME_PERMISSIONS;
-
-                int count = 0;
+                // Every element must be a key before anything moves (Halcyon :18463-18465).
+                var ids = new List<UUID>();
                 for (int i = 0; i < objects.Length; i++)
                 {
                     if (!UUID.TryParse(objects.GetLSLStringItem(i), out UUID targetId))
                         return ERR_MALFORMED_PARAMS;
-                    if (targetId == UUID.Zero) continue;
+                    ids.Add(targetId);
+                }
 
+                var toReturn = new List<SceneObjectGroup>();
+                bool parcelRefused = false;
+                foreach (UUID targetId in ids)
+                {
+                    if (targetId.IsZero()) continue;
                     SceneObjectPart part = World.GetSceneObjectPart(targetId);
-                    if (part == null) continue;
-
-                    SceneObjectGroup sog = part.ParentGroup;
+                    SceneObjectGroup sog = part?.ParentGroup;
                     if (sog == null || sog.IsDeleted || sog.IsAttachment) continue;
+                    if (toReturn.Contains(sog)) continue;   // a linkset once, whichever of its keys is given
 
-                    // Check parcel permissions: can't return parcel owner's or estate manager's objects
                     Vector3 pos = sog.AbsolutePosition;
                     ILandObject parcel = World.LandChannel.GetLandObject(pos.X, pos.Y);
                     if (parcel == null) continue;
-                    if (sog.OwnerID == parcel.LandData.OwnerID) continue;
-                    if (World.RegionInfo.EstateSettings.IsEstateManagerOrOwner(sog.OwnerID)) continue;
 
-                    try
-                    {
-                        World.DeleteSceneObject(sog, false);
-                        count++;
-                    }
-                    catch { }
+                    // SL: "... can not have their objects returned by this method, except when the object returns itself."
+                    if (sog != m_host.ParentGroup && IsExemptFromReturn(sog, parcel)) continue;
+                    if (!MayReturnOnParcel(parcel)) { parcelRefused = true; continue; }
+
+                    toReturn.Add(sog);
                 }
-                if (count > 0)
-                    m_log.LogInformation("[PhloxAPI]: llReturnObjectsByID returned {0} objects", count);
-                return count;
+
+                // Nothing returnable because of whose land the objects are on: SL's ERR_PARCEL_PERMISSIONS ("Permission
+                // lacked to perform task on specified parcel."). Halcyon adds that code into its count instead.
+                if (toReturn.Count == 0 && parcelRefused) return ERR_PARCEL_PERMISSIONS;
+
+                rc = ReturnGroupsToOwners(toReturn, "scripted parcel owner return by ID");
+                if (rc > 0)
+                    m_log.LogInformation("[PhloxAPI]: llReturnObjectsByID returned {0} objects, granted by {1} for {2}",
+                        rc, item.PermsGranter, m_host.OwnerID);
+                return rc;
             }
             catch (Exception e)
             {
@@ -6639,17 +13773,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public int llSetLinkMedia(int link, int face, LSLList parms)
         {
             ScriptSleep(1000);
-            const int LINK_ROOT = 1;
-            const int LINK_THIS = -4;
-            if (link == LINK_ROOT)
-                return SetPrimMediaParams(m_host.ParentGroup.RootPart, face, parms);
-            else if (link == LINK_THIS)
-                return SetPrimMediaParams(m_host, face, parms);
-            else
-            {
-                SceneObjectPart part = m_host.ParentGroup.GetLinkNumPart(link);
-                if (part != null) return SetPrimMediaParams(part, face, parms);
-            }
+            SceneObjectPart part = GetSingleLinkPart(link);
+            if (part != null) return SetPrimMediaParams(part, face, parms);
             return 1003; // LSL_STATUS_NOT_FOUND
         }
         public LSLList llGetPrimMediaParams(int face, LSLList parms)
@@ -6660,17 +13785,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public LSLList llGetLinkMedia(int link, int face, LSLList parms)
         {
             ScriptSleep(1000);
-            const int LINK_ROOT = 1;
-            const int LINK_THIS = -4;
-            if (link == LINK_ROOT)
-                return GetPrimMediaParams(m_host.ParentGroup.RootPart, face, parms);
-            else if (link == LINK_THIS)
-                return GetPrimMediaParams(m_host, face, parms);
-            else
-            {
-                SceneObjectPart part = m_host.ParentGroup.GetLinkNumPart(link);
-                if (part != null) return GetPrimMediaParams(part, face, parms);
-            }
+            SceneObjectPart part = GetSingleLinkPart(link);
+            if (part != null) return GetPrimMediaParams(part, face, parms);
             return new LSLList();
         }
         public int llClearPrimMedia(int face)
@@ -6681,17 +13797,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public int llClearLinkMedia(int link, int face)
         {
             ScriptSleep(1000);
-            const int LINK_ROOT = 1;
-            const int LINK_THIS = -4;
-            if (link == LINK_ROOT)
-                return ClearPrimMedia(m_host.ParentGroup.RootPart, face);
-            else if (link == LINK_THIS)
-                return ClearPrimMedia(m_host, face);
-            else
-            {
-                SceneObjectPart part = m_host.ParentGroup.GetLinkNumPart(link);
-                if (part != null) return ClearPrimMedia(part, face);
-            }
+            SceneObjectPart part = GetSingleLinkPart(link);
+            if (part != null) return ClearPrimMedia(part, face);
             return 1003; // LSL_STATUS_NOT_FOUND
         }
 
@@ -6708,22 +13815,6 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             MediaEntry me = module.GetMediaEntry(part, face);
             if (me == null) return new LSLList();
 
-            // PRIM_MEDIA_* constants
-            const int PRIM_MEDIA_ALT_IMAGE_ENABLE = 0;
-            const int PRIM_MEDIA_CONTROLS = 1;
-            const int PRIM_MEDIA_CURRENT_URL = 2;
-            const int PRIM_MEDIA_HOME_URL = 3;
-            const int PRIM_MEDIA_AUTO_LOOP = 4;
-            const int PRIM_MEDIA_AUTO_PLAY = 5;
-            const int PRIM_MEDIA_AUTO_SCALE = 6;
-            const int PRIM_MEDIA_AUTO_ZOOM = 7;
-            const int PRIM_MEDIA_FIRST_CLICK_INTERACT = 8;
-            const int PRIM_MEDIA_WIDTH_PIXELS = 9;
-            const int PRIM_MEDIA_HEIGHT_PIXELS = 10;
-            const int PRIM_MEDIA_WHITELIST_ENABLE = 11;
-            const int PRIM_MEDIA_WHITELIST = 12;
-            const int PRIM_MEDIA_PERMS_INTERACT = 13;
-            const int PRIM_MEDIA_PERMS_CONTROL = 14;
 
             List<object> res = new List<object>();
             for (int i = 0; i < rules.Length; i++)
@@ -6776,21 +13867,6 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             MediaEntry me = module.GetMediaEntry(part, face);
             if (me == null) me = new MediaEntry();
 
-            const int PRIM_MEDIA_ALT_IMAGE_ENABLE = 0;
-            const int PRIM_MEDIA_CONTROLS = 1;
-            const int PRIM_MEDIA_CURRENT_URL = 2;
-            const int PRIM_MEDIA_HOME_URL = 3;
-            const int PRIM_MEDIA_AUTO_LOOP = 4;
-            const int PRIM_MEDIA_AUTO_PLAY = 5;
-            const int PRIM_MEDIA_AUTO_SCALE = 6;
-            const int PRIM_MEDIA_AUTO_ZOOM = 7;
-            const int PRIM_MEDIA_FIRST_CLICK_INTERACT = 8;
-            const int PRIM_MEDIA_WIDTH_PIXELS = 9;
-            const int PRIM_MEDIA_HEIGHT_PIXELS = 10;
-            const int PRIM_MEDIA_WHITELIST_ENABLE = 11;
-            const int PRIM_MEDIA_WHITELIST = 12;
-            const int PRIM_MEDIA_PERMS_INTERACT = 13;
-            const int PRIM_MEDIA_PERMS_CONTROL = 14;
 
             int i = 0;
             while (i < rules.Length - 1)
@@ -6840,7 +13916,6 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             const int LSL_STATUS_OK = 0;
             const int LSL_STATUS_NOT_FOUND = 1003;
             const int LSL_STATUS_NOT_SUPPORTED = 1004;
-            const int ALL_SIDES = -1;
 
             IMoapModule module = World?.RequestModuleInterface<IMoapModule>();
             if (module == null) return LSL_STATUS_NOT_SUPPORTED;
@@ -6868,41 +13943,285 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IHttpRequestModule httpMod = World.RequestModuleInterface<IHttpRequestModule>();
             if (httpMod == null) return UUID.Zero.ToString();
 
+            bool backPressure = m_ScriptEngine?.HttpInFlightThrottle ?? false;
+            if (backPressure) HttpQueuePressureSleep();
+
             if (!httpMod.CheckThrottle(m_localID, m_host.OwnerID))
-                return UUID.Zero.ToString();
-
-            // Parse parameter pairs into list and custom headers dict
-            var paramList  = new List<string>();
-            var headers    = new Dictionary<string, string>();
-            var data       = parameters.Data;
-
-            for (int i = 0; i + 1 < data.Length; i += 2)
             {
-                int option;
-                if (!int.TryParse(data[i].ToString(), out option))
+                // SL: HTTP_VERBOSE_THROTTLE "If TRUE, shout error messages to DEBUG_CHANNEL if the outgoing request
+                // rate exceeds the server limit", TRUE unless the script sets it.
+                if (VerboseThrottle(parameters))
+                    ShoutError("llHTTPRequest: request throttled: too many HTTP requests from this object or owner.");
+                if (backPressure) ScriptSleep(HTTP_CAPPED_DELAY);
+                return UUID.Zero.ToString();
+            }
+
+            // The operator's outbound filter, where and as YEngine applies it (after the throttle, before the
+            // parameters are read).
+            if (!OutboundAllowed(httpMod, "llHttpRequest", url))
+                return string.Empty;
+
+            // Parse parameter pairs into list and custom headers dict. Header names are case-insensitive
+            // (SL: "RFC 2616 § 4.2 defines HTTP header field names as case-insensitive"), so one spelling is one header.
+            var paramList  = new List<string>();
+            var headers    = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var data       = parameters.Data;
+            int customHeaders = 0;
+
+            for (int i = 0; i < data.Length; i += 2)
+            {
+                // Halcyon LSLSystemAPI.cs:13784-13788 - a flag with no value is an error, not dropped.
+                if (i + 1 >= data.Length)
                 {
-                    ShoutError("Invalid flag in llHTTPRequest parameters.");
+                    ScriptShoutError("Invalid number of parameters in options list for llHTTPRequest.");
+                    return UUID.Zero.ToString();
+                }
+                // Halcyon's test and text (LSLSystemAPI.cs:13780-13799): the flag as the list writes it
+                // (GetLSLStringItem, so 1.0 is "1.000000" and is refused) must parse as an integer.
+                int option;
+                if (!int.TryParse(parameters.GetLSLStringItem(i), out option))
+                {
+                    ScriptShoutError("Invalid flag passed in parameters list of llHTTPRequest.");
                     return UUID.Zero.ToString();
                 }
                 string value = data[i + 1].ToString();
 
+                // Halcyon :13803-13807 - HTTP_CUSTOM_HEADER without its value is an error.
+                if (option == 5 && i + 2 >= data.Length)
+                {
+                    ScriptShoutError("Invalid number of parameters in the HTTP_CUSTOM_HEADER options for llHTTPRequest.");
+                    return UUID.Zero.ToString();
+                }
+
                 // HTTP_CUSTOM_HEADER (5) has an extra param: name, value
-                if (option == 5 && i + 2 < data.Length)
+                if (option == 5)
                 {
                     string headerName  = value;
                     string headerValue = data[i + 2].ToString();
-                    headers[headerName] = headerValue;
                     i++; // consume the extra param
+                    switch (CustomHeaderRule(headerName, headerValue))
+                    {
+                        case CustomHeader.RuntimeError:
+                            // SL: "Use HTTP_MIMETYPE to set the Content-Type header. Attempts to use HTTP_CUSTOM_HEADER to set
+                            // it will cause a runtime script error." The request is not made.
+                            ShoutError("llHTTPRequest: Content-Type cannot be set with HTTP_CUSTOM_HEADER; use HTTP_MIMETYPE.");
+                            return UUID.Zero.ToString();
+                        case CustomHeader.Dropped:
+                            continue;
+                    }
+                    // YEngine's limits (LSL_Api.llHTTPRequest): at most 8 custom headers, its forbidden-header table, and a
+                    // name and value of at most 253 characters, each with its text, so both engines refuse alike.
+                    if (customHeaders >= 8)
+                    {
+                        YEngineError("llHTTPRequest", "Max number of custom headers is 8, excess ignored");
+                        continue;
+                    }
+                    if (headerName.StartsWith("proxy-", StringComparison.OrdinalIgnoreCase)
+                        || headerName.StartsWith("sec-", StringComparison.OrdinalIgnoreCase)
+                        || (HttpForbiddenHeaders.TryGetValue(headerName, out bool fatal) && fatal))
+                    {
+                        YEngineError("llHTTPRequest", "Name is invalid as a custom header at parameter " + i);
+                        return string.Empty;
+                    }
+                    if (HttpForbiddenHeaders.ContainsKey(headerName)) continue;   // left out silently
+                    if (headerName.Length + headerValue.Length > 253)
+                    {
+                        YEngineError("llHTTPRequest", "name and value length exceds 253 characters for custom header at parameter " + i);
+                        return string.Empty;
+                    }
+                    customHeaders++;
+                    // Halcyon: "In SL, duplicate headers add to the existing header after a comma+space"
+                    headers[headerName] = headers.TryGetValue(headerName, out string earlier) ? earlier + ", " + headerValue : headerValue;
                     continue;
+                }
+
+                // HTTP_MIMETYPE becomes the Content-Type line as given, so a line break in it would write a
+                // header line of the script's choosing - an X-SecondLife-Owner-Key among them. The core now
+                // refuses any value that is not a media type (HttpRequestMimeType.IsValid: type/subtype, optional
+                // ;parameters, no control character) and YEngine reports it (LSL_Api.llHTTPRequest); Phlox checks the
+                // same function first and gives YEngine's result: its text on DEBUG_CHANNEL, a 1 s sleep, "" to the
+                // script, no request.
+                if (option == (int)HttpRequestConstants.HTTP_MIMETYPE && !HttpRequestMimeType.IsValid(value))
+                {
+                    YEngineError("llHTTPRequest", HttpRequestMimeType.InvalidMessage);
+                    ScriptSleep(1000);
+                    return string.Empty;
                 }
 
                 paramList.Add(option.ToString());
                 paramList.Add(value);
             }
 
-            UUID reqID = httpMod.StartHttpRequest(m_localID, m_itemID, url, paramList, headers, body);
+            // The simulator's own values, set last so they always win over anything the script sent
+            AddSimulatorHeaders(headers);
+
+            // Recorded against this script, so a reset or removal can end it and a late response is dropped
+            var httpPlugin = m_ScriptEngine.AsyncCommands?.HttpRequestPlugin;
+            UUID objectID = m_host.ParentGroup?.UUID ?? m_host.UUID;
+            bool capped = false;
+            UUID reqID = httpPlugin != null
+                ? httpPlugin.Start(m_itemID, objectID, () => httpMod.StartHttpRequest(m_localID, m_itemID, url, paramList, headers, body), out capped)
+                : httpMod.StartHttpRequest(m_localID, m_itemID, url, paramList, headers, body);
+            // Halcyon's in-flight caps refuse with NULL_KEY and no error; its llHTTPRequest sleeps ERROR_DELAY, 80 ms,
+            // after any request that returns NULL_KEY (LSLSystemAPI.cs:13762, 13855-13856). HttpInFlightThrottle = false:
+            // never capped, no sleep.
+            if (backPressure && (capped || reqID == UUID.Zero)) ScriptSleep(HTTP_CAPPED_DELAY);
             return reqID == UUID.Zero ? UUID.Zero.ToString() : reqID.ToString();
         }
+        /// <summary>
+        /// The core's outbound URL filter for user scripts, [Network] OutboundDisallowForUserScripts
+        /// (default: loopback, private and reserved IPv4 ranges) and OutboundDisallowForUserScriptsExcept - the one
+        /// OutboundUrlFilter object the core HttpRequestModule builds, through IHttpRequestModule.CheckAllowed, which is
+        /// what YEngine's llHTTPRequest calls (LSL_Api.cs:14762). It resolves the host and checks every IPv4 address; a
+        /// DNS error is allowed and a host with no IPv4 address is refused, both as the filter decides for YEngine. There
+        /// is no allowance for the region's own HTTP server or llRequestURL URLs, in YEngine either.
+        /// Only an absolute http or https URL is checked: the core opens nothing else (System.Uri, HttpClient).
+        /// A refused call gets YEngine's result: its Error text on DEBUG_CHANNEL, a 1 s sleep, and "" to the script, with
+        /// no request and no response event.
+        /// </summary>
+        private bool OutboundAllowed(IHttpRequestModule httpMod, string function, string url)
+        {
+            if (httpMod == null || url == null) return true;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out Uri uri)) return true;
+            if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) return true;
+            if (httpMod.CheckAllowed(uri)) return true;
+            YEngineError(function, string.Format("Request to {0} disallowed by filter", url));
+            ScriptSleep(1000);
+            return false;
+        }
+
+        /// <summary>
+        /// YEngine's LSL_Api.Error (LSL_Api.cs:15684-15696) as a script sees it: "command: message", cut to 1023
+        /// characters, on DEBUG_CHANNEL through the scene (viewers, Phlox's listens) and through WorldComm (YEngine's
+        /// listens). Unlike <see cref="ShoutError"/> there is no "Script error: " prefix, so both engines say the same text.
+        /// YEngine's listens hear it as far as llSay reaches, as ShoutError's errors are heard (SL wiki, DEBUG_CHANNEL:
+        /// "Server-generated errors are broadcast the same distance as llSay").
+        /// </summary>
+        private void YEngineError(string command, string message)
+        {
+            string text = command + ": " + message;
+            if (text.Length > 1023) text = text.Substring(0, 1023);
+            m_host?.ParentGroup?.Scene?.SimChat(text, ChatTypeEnum.DebugChannel, DEBUG_CHANNEL,
+                m_host.ParentGroup.RootPart.AbsolutePosition, m_host.Name, m_host.UUID, false);
+            ChatToWorldComm(ChatTypeEnum.Say, DEBUG_CHANNEL, text);
+        }
+
+        /// <summary>
+        /// Halcyon llHTTPRequest's queue pressure (LSLSystemAPI.cs:13757-13774): when the script's own event queue is 60%
+        /// or more full, a sleep that grows to 50 ms as it fills, so a script flooded with responses slows its requests.
+        /// </summary>
+        private void HttpQueuePressureSleep()
+        {
+            const float EVENT_LOW_SPACE_THRESHOLD = 0.4f;
+            const int LOW_SPACE_DELAY = 50;
+            float free = m_ScriptEngine.GetEventQueueFreeSpacePercentage(m_itemID);
+            if (free <= EVENT_LOW_SPACE_THRESHOLD)
+            {
+                int delay = (int)((1.0f - free / EVENT_LOW_SPACE_THRESHOLD) * LOW_SPACE_DELAY);
+                if (delay > 0) ScriptSleep(delay);
+            }
+        }
+
+        /// <summary>HTTP_VERBOSE_THROTTLE's value in the options list: TRUE unless the script sets it FALSE.</summary>
+        private static bool VerboseThrottle(LSLList parameters)
+        {
+            object[] data = parameters?.Data;
+            if (data == null) return true;
+            bool verbose = true;
+            for (int i = 0; i + 1 < data.Length; i += 2)
+            {
+                if (!int.TryParse(parameters.GetLSLStringItem(i), out int option)) return verbose;
+                if (option == (int)HttpRequestConstants.HTTP_VERBOSE_THROTTLE)
+                    verbose = int.TryParse(parameters.GetLSLStringItem(i + 1), out int v) ? v != 0 : verbose;
+                if (option == (int)HttpRequestConstants.HTTP_CUSTOM_HEADER) i++;   // its name and value
+            }
+            return verbose;
+        }
+
+        /// <summary>
+        /// YEngine's HttpForbiddenHeaders (LSL_Api.cs:295-379): true stops the request with an error, false leaves the
+        /// header out silently. Content-Type and the X-SecondLife-* names are refused before this table is read
+        /// (<see cref="CustomHeaderRule"/>).
+        /// </summary>
+        private static readonly Dictionary<string, bool> HttpForbiddenHeaders = new(StringComparer.OrdinalIgnoreCase)
+        {
+            { "Accept", true }, { "Accept-Charset", true }, { "Accept-CH", false }, { "Accept-CH-Lifetime", false },
+            { "Access-Control-Request-Headers", false }, { "Access-Control-Request-Method", false },
+            { "Accept-Encoding", false }, { "Accept-Patch", false }, { "Accept-Post", false }, { "Accept-Ranges", false },
+            { "Cache-Control", false }, { "Connection", false }, { "Content-Length", false }, { "Content-Type", true },
+            { "Cookie", false }, { "Cookie2", false }, { "Date", false }, { "Device-Memory", false }, { "DTN", false },
+            { "Early-Data", false }, { "Expect", false }, { "Feature-Policy", false }, { "From", true }, { "Host", true },
+            { "Keep-Alive", false }, { "If-Match", false }, { "If-Modified-Since", false }, { "If-None-Match", false },
+            { "If-Unmodified-Since", false }, { "Max-Forwards", false }, { "Origin", false }, { "Pragma", false },
+            { "Referer", true }, { "Server", false }, { "Set-Cookie", false }, { "Set-Cookie2", false }, { "TE", true },
+            { "Trailer", true }, { "Transfer-Encoding", false }, { "Upgrade", true }, { "User-Agent", true },
+            { "Vary", false }, { "Via", true }, { "Viewport-Width", false }, { "Warning", false }, { "Width", false },
+            { "X-Forwarded-For", false }, { "X-Forwarded-Host", false }, { "X-Forwarded-Proto", false },
+        };
+
+        private enum CustomHeader { Allowed, Dropped, RuntimeError }
+
+        /// <summary>HTTP token separators (RFC 7230): a header name containing one of these, a space or a control is not a name.</summary>
+        private const string HeaderNameSeparators = "()<>@,;:\\\"/[]?={}";
+
+        /// <summary>
+        /// What an HTTP_CUSTOM_HEADER may set. Halcyon ScriptsHttpRequests.ScriptCanChangeHeader:
+        /// every name starting "x-secondlife", in any letter case, is "reserved for internal use only" and skipped
+        /// silently (SL: "certain headers, such as the default headers, are blocked for security reasons").
+        /// Content-Type is SL's runtime script error (Halcyon skipped it silently). A name or value with a line break, or a
+        /// name that is not an HTTP token, cannot be one header and is dropped: it would write a second header line.
+        /// </summary>
+        private static CustomHeader CustomHeaderRule(string name, string value)
+        {
+            if (string.IsNullOrEmpty(name)) return CustomHeader.Dropped;
+            if (string.Equals(name, "Content-Type", StringComparison.OrdinalIgnoreCase)) return CustomHeader.RuntimeError;
+            if (name.StartsWith("x-secondlife", StringComparison.OrdinalIgnoreCase)) return CustomHeader.Dropped;
+            foreach (char c in name)
+                if (c <= ' ' || c >= 127 || HeaderNameSeparators.IndexOf(c) >= 0) return CustomHeader.Dropped;
+            if (value != null && (value.IndexOf('\r') >= 0 || value.IndexOf('\n') >= 0)) return CustomHeader.Dropped;
+            return CustomHeader.Allowed;
+        }
+
+        /// <summary>
+        /// The nine X-SecondLife-* headers SL's simulator sends (wiki llHTTPRequest), built as Halcyon's
+        /// llHTTPRequest builds them. Region: SL's "global coordinates of the region's south-west corner" (WorldLocX/Y, as
+        /// YEngine; Halcyon printed grid units). Shard: [Network] shard, default "OpenSim", the setting and default YEngine
+        /// reads, so both engines in a region report the same shard.
+        /// </summary>
+        private void AddSimulatorHeaders(Dictionary<string, string> headers)
+        {
+            foreach (string reserved in headers.Keys.Where(k => k.StartsWith("x-secondlife", StringComparison.OrdinalIgnoreCase)).ToList())
+                headers.Remove(reserved);
+
+            Vector3 position = m_host.AbsolutePosition;
+            Vector3 velocity = m_host.Velocity;
+            Quaternion rotation = m_host.RotationOffset;
+            UUID owner = m_host.OwnerID;
+            ScenePresence sp = World.GetScenePresence(owner);
+            string ownerName = sp != null ? sp.Name : OwnerNameLookup(owner);
+            RegionInfo ri = World.RegionInfo;
+            string shard = m_ScriptEngine?.ConfigSource?.Configs["Network"]?.GetString("shard", "OpenSim") ?? "OpenSim";
+            System.Globalization.CultureInfo inv = System.Globalization.CultureInfo.InvariantCulture;
+
+            headers["X-SecondLife-Shard"] = shard;
+            headers["X-SecondLife-Object-Name"] = m_host.Name;
+            headers["X-SecondLife-Object-Key"] = m_host.UUID.ToString();
+            headers["X-SecondLife-Region"] = string.Format(inv, "{0} ({1}, {2})", ri.RegionName, ri.WorldLocX, ri.WorldLocY);
+            headers["X-SecondLife-Local-Position"] = string.Format(inv, "({0:0.000000}, {1:0.000000}, {2:0.000000})", position.X, position.Y, position.Z);
+            headers["X-SecondLife-Local-Velocity"] = string.Format(inv, "({0:0.000000}, {1:0.000000}, {2:0.000000})", velocity.X, velocity.Y, velocity.Z);
+            headers["X-SecondLife-Local-Rotation"] = string.Format(inv, "({0:0.000000}, {1:0.000000}, {2:0.000000}, {3:0.000000})", rotation.X, rotation.Y, rotation.Z, rotation.W);
+            headers["X-SecondLife-Owner-Name"] = ownerName;
+            headers["X-SecondLife-Owner-Key"] = owner.ToString();
+        }
+
+        /// <summary>osKey2Name's lookup without its OSSL threat-level check: the account service, then user management.</summary>
+        private string OwnerNameLookup(UUID key)
+        {
+            UserAccount account = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
+            if (account != null) return account.Name;
+            return World?.RequestModuleInterface<IUserManagement>()?.GetUserName(key) ?? string.Empty;
+        }
+
         public void llHTTPResponse(string request_id, int status, string body)
         {
             // Sends an HTTP response back to the caller of an llRequestURL endpoint
@@ -6922,21 +14241,41 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public void llSetContentType(string request_id, int content_type)
         {
-            // LSL content_type constants: 0=text/plain, 1=text/html, 2=application/json, 3=application/xml
+            // SL's CONTENT_TYPE_* numbering, and YEngine's HTML rule (LSL_Api.llSetContentType).
             IUrlModule urlMod = World.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return;
-            if (!UUID.TryParse(request_id, out UUID reqID)) return;
+            if (!UUID.TryParse(request_id, out UUID reqID) || reqID == UUID.Zero) return;
             string mimeType = content_type switch
             {
-                1 => "text/html",
-                2 => "application/json",
-                3 => "application/xml",
-                4 => "application/llsd+xml",
-                5 => "application/llsd+json",
-                6 => "application/llsd+binary",
-                _ => "text/plain"   // CONTENT_TYPE_TEXT = 0
+                SlConst.CONTENT_TYPE_XML => "application/xml",
+                SlConst.CONTENT_TYPE_XHTML => "application/xhtml+xml",
+                SlConst.CONTENT_TYPE_ATOM => "application/atom+xml",
+                SlConst.CONTENT_TYPE_JSON => "application/json",
+                SlConst.CONTENT_TYPE_LLSD => "application/llsd+xml",
+                SlConst.CONTENT_TYPE_FORM => "application/x-www-form-urlencoded",
+                SlConst.CONTENT_TYPE_RSS => "application/rss+xml",
+                _ => "text/plain"   // CONTENT_TYPE_TEXT, and HTML until the owner check below passes
             };
             urlMod.HttpContentType(reqID, mimeType);
+            if (content_type == SlConst.CONTENT_TYPE_HTML && IsFromOwnersViewerInRegion(urlMod, reqID))
+                urlMod.HttpContentType(reqID, "text/html");
+        }
+
+        /// <summary>
+        /// Text/html is served only to the object owner's own viewer in this region, so a
+        /// script cannot serve a page to a stranger's browser (YEngine LSL_Api.llSetContentType): the
+        /// owner is present, the request came from the embedded browser, and from the owner's address.
+        /// </summary>
+        private bool IsFromOwnersViewerInRegion(IUrlModule urlMod, UUID reqID)
+        {
+            ScenePresence agent = World.GetScenePresence(m_host.ParentGroup.OwnerID);
+            if (agent == null || agent.IsChildAgent || agent.IsDeleted) return false;
+            string userAgent = urlMod.GetHttpHeader(reqID, "user-agent");
+            if (string.IsNullOrEmpty(userAgent) || userAgent.IndexOf("SecondLife", StringComparison.Ordinal) < 0) return false;
+            string logonFrom = agent.ControllingClient?.RemoteEndPoint?.Address?.ToString();
+            if (string.IsNullOrEmpty(logonFrom)) return false;
+            string requestFrom = urlMod.GetHttpHeader(reqID, "x-remote-ip")?.Trim();
+            return requestFrom != null && requestFrom.Equals(logonFrom);
         }
 
         public string llRequestURL()
@@ -6978,7 +14317,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public void llEmail(string address, string subject, string message)
         {
-            // Faithful port from Halcyon
+            // Faithful port from Halcyon (LSLSystemAPI.cs:3944-3957): the 20 s delay is in a finally, so it applies
+            // with no email module too. SL: "This function causes the script to sleep for 20.0 seconds."
             try
             {
                 IEmailModule emailModule = World?.RequestModuleInterface<IEmailModule>();
@@ -6989,7 +14329,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             {
                 m_log.LogWarning("[PhloxAPI]: llEmail exception: {0}", e.Message);
             }
-            ScriptSleep(20000);
+            finally
+            {
+                ScriptSleep(20000);
+            }
         }
         public void llGetNextEmail(string address, string subject)
         {
@@ -7011,6 +14354,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             email.numLeft
                         },
                         new DetectParams[0]));
+                // The email queue "is associated with the prim and any script in the prim can access it" (SL wiki email):
+                // every script in this prim, whatever engine runs it.
+                SceneObjectPart host = m_host;
+                OfferToOtherEngines("llGetNextEmail", () => ScriptItemsIn(new[] { host }), "email", () => new object[] {
+                    email.time ?? string.Empty, email.sender ?? string.Empty, email.subject ?? string.Empty,
+                    email.message ?? string.Empty, email.numLeft });
             }
             catch (Exception e)
             {
@@ -7047,6 +14396,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             {
                 IXMLRPC xmlrpcMod = World?.RequestModuleInterface<IXMLRPC>();
                 if (xmlrpcMod == null) { ScriptSleep(3000); return UUID.Zero.ToString(); }
+                // The same outbound filter as llHTTPRequest. YEngine does not check llSendRemoteData (core
+                // XMLRPCModule posts to dest unchecked), so here Phlox is stricter: a destination the operator's filter
+                // refuses for llHTTPRequest is refused here too, with the same result.
+                if (!OutboundAllowed(World.RequestModuleInterface<IHttpRequestModule>(), "llSendRemoteData", dest))
+                    return string.Empty;
                 ScriptSleep(3000);
                 return xmlrpcMod.SendRemoteData(m_localID, m_itemID, channel, dest, idata, sdata).ToString();
             }
@@ -7094,26 +14448,50 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public string llToUpper(string src) => src?.ToUpper() ?? string.Empty;
         public string llToLower(string src) => src?.ToLower() ?? string.Empty;
 
+        // SL's range rule for llGetSubString, llDeleteSubString, llList2List, llDeleteSubList and
+        // llListReplaceList. SL wiki: "Negative indexes count from the far end, the first item being indexed as
+        // -length, the last as -1." / "If start > end then the range operated on starts at 0 and goes to end and then
+        // starts again at start and goes to -1." / out-of-range indexes "are treated as if they were there but were
+        // removed just before output". So: add the length to a negative index once; the range is [start, end], or
+        // [0, end] + [start, -1] when start > end; indexes outside the list select nothing. Halcyon's GetSublist is
+        // this rule; its DeleteSublist and llDeleteSubString are off by one on the inverted case.
+        private static void NormaliseLslRange(int length, ref int start, ref int end)
+        {
+            if (start < 0) start += length;
+            if (end < 0) end += length;
+        }
+
+        private static bool InLslRange(int index, int start, int end)
+            => start <= end ? index >= start && index <= end : index <= end || index >= start;
+
         public string llGetSubString(string src, int start, int end)
         {
             if (src == null) return string.Empty;
             int len = src.Length;
-            if (start < 0) start = Math.Max(len + start, 0);
-            if (end < 0) end = len + end;
-            if (start > end || start >= len) return string.Empty;
-            end = Math.Min(end, len - 1);
-            return src.Substring(start, end - start + 1);
+            NormaliseLslRange(len, ref start, ref end);
+            if (start <= end)
+            {
+                int s = Math.Max(start, 0), e = Math.Min(end, len - 1);
+                return s > e ? string.Empty : src.Substring(s, e - s + 1);
+            }
+            string head = end >= 0 ? src.Substring(0, Math.Min(end, len - 1) + 1) : string.Empty;
+            string tail = start < len ? src.Substring(Math.Max(start, 0)) : string.Empty;
+            return head + tail;
         }
 
         public string llDeleteSubString(string src, int start, int end)
         {
             if (src == null) return string.Empty;
             int len = src.Length;
-            if (start < 0) start = Math.Max(len + start, 0);
-            if (end < 0) end = len + end;
-            if (start > end) return src;
-            start = Math.Max(0, start); end = Math.Min(len - 1, end);
-            return src.Remove(start, end - start + 1);
+            NormaliseLslRange(len, ref start, ref end);
+            if (start <= end)
+            {
+                int s = Math.Max(start, 0), e = Math.Min(end, len - 1);
+                return s > e ? src : src.Remove(s, e - s + 1);
+            }
+            // Inverted: [0, end] and [start, -1] go, what lies between them stays.
+            int keepFrom = Math.Max(end + 1, 0), keepTo = Math.Min(start - 1, len - 1);
+            return keepFrom > keepTo ? string.Empty : src.Substring(keepFrom, keepTo - keepFrom + 1);
         }
 
         public string llInsertString(string dst, int position, string src)
@@ -7143,6 +14521,19 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 if (matchType <= 1 && (len1 == 0 && len2 == 0)) return 1;
                 else return 0;
             }
+            try
+            {
+                return IwMatchStringCore(str, pattern, matchType);
+            }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+            {
+                ShoutError(ScriptRegex.TimedOutMessage);
+                return 0;
+            }
+        }
+
+        private static int IwMatchStringCore(string str, string pattern, int matchType)
+        {
             switch (matchType)
             {
                 case -2: return (str.IndexOf(pattern) != -1) ? 1 : 0; // IW_MATCH_INCLUDE
@@ -7150,13 +14541,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 case 0:  return str.StartsWith(pattern) ? 1 : 0;      // IW_MATCH_HEAD
                 case 1:  return str.EndsWith(pattern) ? 1 : 0;        // IW_MATCH_TAIL
                 case 2:                                                // IW_MATCH_REGEX
-                    var r = new System.Text.RegularExpressions.Regex("^" + pattern + "$");
+                    var r = ScriptRegex.Create("^" + pattern + "$");
                     return (r.Match(str).Length != 0) ? 1 : 0;
                 case 3:                                                // IW_MATCH_COUNT
-                    return System.Text.RegularExpressions.Regex.Matches(str,
-                        System.Text.RegularExpressions.Regex.Escape(pattern)).Count;
+                    return ScriptRegex.Create(System.Text.RegularExpressions.Regex.Escape(pattern)).Matches(str).Count;
                 case 4:                                                // IW_MATCH_COUNT_REGEX
-                    return System.Text.RegularExpressions.Regex.Matches(str, pattern).Count;
+                    return ScriptRegex.Create(pattern).Matches(str).Count;
             }
             return 0;
         }
@@ -7223,6 +14613,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             if (String.IsNullOrEmpty(str)) return str;
             int len = values.Length;
+            // Halcyon (LSLSystemAPI.cs:15930, 15959-15964): 100 ms whenever the tick count moved during a step
+            bool throttle = m_ScriptEngine != null && m_ScriptEngine.FormatStringThrottle;
+            ulong time1 = throttle ? InWorldz.Phlox.Util.Clock.Now : 0;
             for (int i = 0; i < len; i++)
             {
                 string pattern = "{" + Convert.ToString(i) + "}";
@@ -7236,14 +14629,47 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 else break;
                 if (str.Length > 32768)
                 {
-                    ShoutError("Return value from iwFormatString is greater than 64kb");
+                    LSLError("Return value from iwFormatString is greater than 64kb");   // Halcyon :15955
                     return String.Empty;
+                }
+                if (throttle)
+                {
+                    ulong time2 = InWorldz.Phlox.Util.Clock.Now;
+                    if (time2 > time1)
+                    {
+                        ScriptSleep(100);
+                        time1 = time2;
+                    }
                 }
             }
             return str;
         }
-        public string iwStringCodec(string str, string pattern, int operation, LSLList extraParams) { /* Requires InWorldz CodecUtil class — not available */ return str ?? string.Empty; }
-        public string iwReverseString(string src) => new string(src?.ToCharArray() ?? Array.Empty<char>());
+        /// <summary>
+        /// Halcyon's codecs, ported in Codecs/HalcyonStringCodec.cs and proven byte for byte
+        /// against Halcyon's own code (Tests/InWorldz.Phlox.Tests/Golden). Halcyon's LSLError is its ScriptShoutError: the
+        /// error on DEBUG_CHANNEL and the 15 ms chat pause (ChatThrottle).
+        /// </summary>
+        public string iwStringCodec(string str, string pattern, int operation, LSLList extraParams)
+            => Codecs.HalcyonStringCodec.iwStringCodec(new CodecHost(this), str, pattern, operation, extraParams);
+
+        private sealed class CodecHost : Codecs.HalcyonStringCodec.IHost
+        {
+            private readonly LSLSystemAPI m_api;
+            public CodecHost(LSLSystemAPI api) { m_api = api; }
+            public void LSLError(string msg) => m_api.ScriptShoutError("LSL Runtime Error: " + msg);
+            public void ScriptSleep(int delay) => m_api.ScriptSleep(delay);
+        }
+        /// <summary>
+        /// Halcyon (InWorldz.Phlox.Engine/LSLSystemAPI.cs iwReverseString): the UTF-16 code units in
+        /// reverse order, so a surrogate pair comes back with its halves swapped and a combining mark
+        /// lands before the character it followed. Kept as Halcyon has it.
+        /// </summary>
+        public string iwReverseString(string src)
+        {
+            if (src == null) return String.Empty;
+            if (src.Length <= 1) return src;
+            return new string(src.Reverse().ToArray());
+        }
         public int iwChar2Int(string src, int index)
         {
             if (String.IsNullOrEmpty(src)) return 0;
@@ -7259,10 +14685,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public string llStringTrim(string src, int trim_type)
         {
+            // SL documents STRING_TRIM_HEAD (1), STRING_TRIM_TAIL (2) and STRING_TRIM (3); any other type returns the
+            // string as it is, as Halcyon's does (LSLSystemAPI.cs:14109-14115).
             if (src == null) return string.Empty;
-            if (trim_type == 1) return src.TrimStart();
-            if (trim_type == 2) return src.TrimEnd();
-            return src.Trim();
+            if (trim_type == 1) return src.TrimStart();   // STRING_TRIM_HEAD
+            if (trim_type == 2) return src.TrimEnd();     // STRING_TRIM_TAIL
+            if (trim_type == 3) return src.Trim();        // STRING_TRIM
+            return src;
         }
 
         public string llStringToBase64(string str) => Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(str ?? ""));
@@ -7301,10 +14730,56 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return number;
         }
 
-        public string llXorBase64Strings(string s1, string s2)
+        private const string s_b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+        /// <summary>
+        /// Ported as-is from upstream LSL_Api.cs:14509-14580. wiki: deprecated in favour of
+        /// llXorBase64, sleeps 0.3 s, and "incorrectly performs an exclusive or on two Base64 strings" -
+        /// the padding quirks below ARE the documented behaviour, not a bug to fix here.
+        /// </summary>
+        public string llXorBase64Strings(string str1, string str2)
         {
-            // Deprecated per LSL spec — return empty string
-            return string.Empty;
+            int padding = 0;
+            ScriptSleep(300);
+            str1 ??= string.Empty; str2 ??= string.Empty;
+            if (str1.Length == 0) return string.Empty;
+            if (str2.Length == 0) return str1;
+
+            int len = str2.Length;
+            if ((len % 4) != 0) // LL is EVIL!!!!
+            {
+                while (str2.EndsWith("=")) str2 = str2[..^1];
+                len = str2.Length;
+                int mod = len % 4;
+                if (mod == 1) str2 = str2[..^1];
+                else if (mod == 2) str2 += "==";
+                else if (mod == 3) str2 += "=";
+            }
+
+            try
+            {
+                Convert.FromBase64String(str1);
+                Convert.FromBase64String(str2);
+            }
+            catch { return string.Empty; }
+
+            // Remove padding
+            while (str1.EndsWith('=')) { str1 = str1[..^1]; padding++; }
+            while (str2.EndsWith('=')) str2 = str2[..^1];
+
+            byte[] d1 = new byte[str1.Length];
+            byte[] d2 = new byte[str2.Length];
+            for (int i = 0; i < str1.Length; i++) { int idx = s_b64.IndexOf(str1[i]); d1[i] = (byte)(idx == -1 ? 0 : idx); }
+            for (int i = 0; i < str2.Length; i++) { int idx = s_b64.IndexOf(str2[i]); d2[i] = (byte)(idx == -1 ? 0 : idx); }
+
+            var output = new System.Text.StringBuilder(d1.Length + padding);
+            for (int pos = 0; pos < d1.Length; pos++)
+                output.Append(s_b64[d1[pos] ^ d2[pos % d2.Length]]);
+            // Here's a funny thing: LL blithely violate the base64 standard pretty much everywhere.
+            // Here, padding is added only if the first input string had it, rather than when the
+            // data actually needs it. This can result in invalid base64 being returned. Go figure.
+            while (padding-- > 0) output.Append('=');
+            return output.ToString();
         }
 
         public string llXorBase64StringsCorrect(string str1, string str2)
@@ -7451,82 +14926,73 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         // ── Lists ──────────────────────────────────────────────────────────────
 
         public int llGetListLength(LSLList src) => src?.Length ?? 0;
+        // Halcyon's llList2Integer / llList2Float / llList2String (LSLSystemAPI.cs:6533-6561) - the element as
+        // LSLList converts it, the conversion (string)list and the casts use: llList2String of 2.0 is "2.000000" and of a
+        // vector "<1.000000, 2.000000, 3.000000>" (SL wiki List: "abc123.140000<0.000000, 0.000000, 0.000000>"), not .NET's
+        // "2" / "<1, 2, 3>"; llList2Integer of 1.7 is 1 and of NaN or 1e10 -2147483648, and of "0x1F" 31, where
+        // Convert.ToInt32 rounded, saturated and threw.
         public int llList2Integer(LSLList src, int index)
         {
-            if (src == null || src.Length == 0) return 0;
-            int i = index < 0 ? src.Length + index : index;
-            if (i < 0 || i >= src.Length) return 0;
-            try { return Convert.ToInt32(src.Data[i]); } catch { return 0; }
+            if (src == null) return 0;
+            if (index < 0) index = src.Length + index;
+            return src.GetLSLIntegerItem(index);
         }
         public float llList2Float(LSLList src, int index)
         {
-            if (src == null || src.Length == 0) return 0f;
-            int i = index < 0 ? src.Length + index : index;
-            if (i < 0 || i >= src.Length) return 0f;
-            try { return (float)Convert.ToDouble(src.Data[i]); } catch { return 0f; }
+            if (src == null) return 0f;
+            if (index < 0) index = src.Length + index;
+            return src.GetLSLFloatItem(index);
         }
         public string llList2String(LSLList src, int index)
         {
-            if (src == null || src.Length == 0) return string.Empty;
-            int i = index < 0 ? src.Length + index : index;
-            if (i < 0 || i >= src.Length) return string.Empty;
-            var v = src.Data[i];
-            if (v == null) return string.Empty;
-            return v.ToString();
+            if (src == null) return string.Empty;
+            if (index < 0) index = src.Length + index;
+            return src.GetLSLStringItem(index);
         }
         public string llList2Key(LSLList src, int index)
         {
-            if (src == null || src.Length == 0) return UUID.Zero.ToString();
+            // SL: "If index describes a location not in src then null string is returned"; an element that "cannot be
+            // typecast" to a key gives the null string too. Keys are strings in Phlox's lists, so a string element is
+            // returned as it is and anything else is "", as Halcyon (:6563-6580) and YEngine answer.
+            if (src == null || src.Length == 0) return string.Empty;
             int i = index < 0 ? src.Length + index : index;
-            if (i < 0 || i >= src.Length) return UUID.Zero.ToString();
-            var v = src.Data[i];
-            return v?.ToString() ?? UUID.Zero.ToString();
+            if (i < 0 || i >= src.Length) return string.Empty;
+            return src.Data[i] is string s ? s : string.Empty;
         }
+        // Halcyon's llList2Vector / llList2Rot (:6582-6600), a string element read by Halcyon's parser.
         public Vector3 llList2Vector(LSLList src, int index)
         {
-            if (src == null || src.Length == 0) return Vector3.Zero;
-            int i = index < 0 ? src.Length + index : index;
-            if (i < 0 || i >= src.Length) return Vector3.Zero;
-            var v = src.Data[i];
-            if (v is Vector3 vec) return vec;
-            if (v is string s) try { return Vector3.Parse(s); } catch { }
-            return Vector3.Zero;
+            if (src == null) return Vector3.Zero;
+            if (index < 0) index = src.Length + index;
+            return src.GetVector3Item(index);
         }
         public Quaternion llList2Rot(LSLList src, int index)
         {
-            if (src == null || src.Length == 0) return Quaternion.Identity;
-            int i = index < 0 ? src.Length + index : index;
-            if (i < 0 || i >= src.Length) return Quaternion.Identity;
-            var v = src.Data[i];
-            if (v is Quaternion q) return q;
-            if (v is string s) try { return Quaternion.Parse(s); } catch { }
-            return Quaternion.Identity;
+            if (src == null) return Quaternion.Identity;
+            if (index < 0) index = src.Length + index;
+            return src.GetQuaternionItem(index);
         }
         public LSLList llList2List(LSLList src, int start, int end)
         {
+            // SL's range rule (see NormaliseLslRange). Start past the end no longer throws.
             if (src == null || src.Length == 0) return new LSLList();
             int len = src.Length;
-            if (start < 0) start = Math.Max(len + start, 0);
-            if (end < 0) end = len + end;
-            if (start > end) return new LSLList();
-            end = Math.Min(end, len - 1);
-            int count = end - start + 1;
-            var result = new object[count];
-            Array.Copy(src.Data, start, result, 0, count);
+            NormaliseLslRange(len, ref start, ref end);
+            var result = new List<object>();
+            for (int i = 0; i < len; i++)
+                if (InLslRange(i, start, end)) result.Add(src.Data[i]);
             return new LSLList(result);
         }
         public LSLList llDeleteSubList(LSLList src, int start, int end)
         {
+            // SL's range rule; start > end deletes [0, end] and [start, -1].
             if (src == null) return new LSLList();
             int len = src.Length;
-            if (start < 0) start = Math.Max(len + start, 0);
-            if (end < 0) end = len + end;
-            if (start > end) return src;
-            start = Math.Max(0, start); end = Math.Min(len - 1, end);
-            var result = new System.Collections.Generic.List<object>();
+            NormaliseLslRange(len, ref start, ref end);
+            var result = new List<object>();
             for (int i = 0; i < len; i++)
-                if (i < start || i > end) result.Add(src.Data[i]);
-            return new LSLList(result.ToArray());
+                if (!InLslRange(i, start, end)) result.Add(src.Data[i]);
+            return new LSLList(result);
         }
         public int llGetListEntryType(LSLList src, int index)
         {
@@ -7534,19 +15000,30 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int i = index < 0 ? src.Length + index : index;
             if (i < 0 || i >= src.Length) return 0;
             var v = src.Data[i];
-            if (v is int)       return 1; // TYPE_INTEGER
-            if (v is float || v is double) return 2; // TYPE_FLOAT
-            if (v is string)    return 3; // TYPE_STRING
-            if (v is UUID)      return 4; // TYPE_KEY
-            if (v is Vector3)   return 5; // TYPE_VECTOR
-            if (v is Quaternion) return 6; // TYPE_ROTATION
-            if (v is LSLList)   return 0; // TYPE_INVALID
+            if (v is int)       return TYPE_INTEGER;
+            if (v is float || v is double) return TYPE_FLOAT;
+            // Keys are strings in Phlox's lists: a string that parses as a UUID reports TYPE_KEY, as Halcyon
+            // (:6626-6636) and YEngine report it.
+            if (v is string sv) return UUID.TryParse(sv, out _) ? TYPE_KEY : TYPE_STRING;
+            if (v is UUID)      return TYPE_KEY;
+            if (v is Vector3)   return TYPE_VECTOR;
+            if (v is Quaternion) return TYPE_ROTATION;
+            if (v is LSLList)   return TYPE_INVALID;
             return 3; // default to string
         }
         public string llList2CSV(LSLList src)
         {
+            // Each element as (string)list writes it (LSLList.GetLSLStringItem: floats, vectors and rotations
+            // with 6 decimals, YEngine's form), joined with SL's ", " (wiki: "the values are separated with a comma and a
+            // space"). Was .NET's ToString: "2", "<2, 3, 0>".
             if (src == null || src.Length == 0) return string.Empty;
-            return string.Join(", ", System.Linq.Enumerable.Select(src.Data, o => o?.ToString() ?? string.Empty));
+            return string.Join(", ", ListElementStrings(src));
+        }
+
+        /// <summary>Every element of the list as (string)list writes it.</summary>
+        private static IEnumerable<string> ListElementStrings(LSLList src)
+        {
+            for (int i = 0; i < src.Length; i++) yield return src.GetLSLStringItem(i);
         }
         public LSLList llCSV2List(string src)
         {
@@ -7610,31 +15087,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public LSLList llList2ListStrided(LSLList src, int start, int end, int stride)
         {
-            if (src == null) return new LSLList();
+            // SL wiki: "Returns a list of all the entries in the strided list whose index is a multiple
+            // of stride in the range start to end"; "start & end will not form an exclusion range when start is past
+            // end ... instead it will act as if start was zero & end was -1"; stride "if less than 1 it is assumed to be
+            // 1". YEngine agrees; Halcyon returned [] for start == end and wrapped an inverted range.
+            if (src == null || src.Length == 0) return new LSLList();
             var result = new List<object>();
             int len = src.Length;
-            if (start < 0) start = len + start;
-            if (end < 0)   end   = len + end;
-            start = Math.Max(0, Math.Min(start, len - 1));
-            end   = Math.Max(0, Math.Min(end,   len - 1));
-            if (stride == 0) stride = 1;
-            if (start == end) return new LSLList(result);
-
-            if (stride > 0)
-            {
-                if (start <= end)
-                    for (int i = start; i <= end; i += stride) result.Add(src.Data[i]);
-                else
-                {
-                    for (int i = start; i < len; i += stride) result.Add(src.Data[i]);
-                    for (int i = 0; i <= end; i += stride) result.Add(src.Data[i]);
-                }
-            }
-            else
-            {
-                if (start >= end)
-                    for (int i = start; i >= end && i >= 0; i += stride) result.Add(src.Data[i]);
-            }
+            if (stride < 1) stride = 1;
+            NormaliseLslRange(len, ref start, ref end);
+            if (start > end) { start = 0; end = len - 1; }
+            long first = (Math.Max(start, 0) + (long)stride - 1) / stride * stride;
+            for (long i = first; i <= end && i < len; i += stride) result.Add(src.Data[i]);
             return new LSLList(result);
         }
         public LSLList llListInsertList(LSLList dest, LSLList src, int start)
@@ -7712,25 +15176,23 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public LSLList llList2ListSlice(LSLList src, int start, int end, int stride, int slice_index)
         {
-            // SL: extract the slice_index'th element from each stride in range start..end
+            // SL wiki: "Returns a list of the slice_index'th element of every stride in strided list whose index
+            // is a multiple of stride in the range start to end"; "If slice_index is negative it is counted from the end of
+            // its stride regardless of whether or not the stride exceeds the end of the list"; "start & end will form an
+            // exclusion range when start is past end"; stride "if less than 1 it is assumed to be 1". Its five examples on
+            // [0,1,2,3,4,5,6] - (0,-1,3,0) [0,3,6], (0,-1,3,1) [1,4], (1,-1,3,1) [2,5], (2,-1,3,-1) [4], (4,2,1,0)
+            // [0,1,2,4,5,6] - are the range taken by llList2List's rule (exclusion range included) and the
+            // slice_index'th element of each stride of it, the last stride short. A slice_index outside -stride .. stride-1
+            // selects nothing. Was: an inverted range gave []. YEngine differs (whole list for an inverted range, strides
+            // at multiples of stride from 0).
             if (src == null || src.Length == 0) return new LSLList();
-            int len = src.Length;
             if (stride < 1) stride = 1;
-            // Resolve negative indices
-            if (start < 0) start = len + start;
-            if (end < 0) end = len + end;
-            start = Math.Max(0, start);
-            end = Math.Min(len - 1, end);
-            // Resolve negative slice_index (counts from end of stride)
-            if (slice_index < 0) slice_index = stride + slice_index;
+            if (slice_index < 0) slice_index += stride;
             if (slice_index < 0 || slice_index >= stride) return new LSLList();
+            object[] range = llList2List(src, start, end).Data;
             var result = new List<object>();
-            for (int i = start; i <= end; i += stride)
-            {
-                int idx = i + slice_index;
-                if (idx <= end && idx < len)
-                    result.Add(src.Data[idx]);
-            }
+            for (long i = slice_index; i < range.Length; i += stride)
+                result.Add(range[i]);
             return new LSLList(result);
         }
         public LSLList llSortListStrided(LSLList src, int stride, int stride_index, int ascending)
@@ -7777,17 +15239,38 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             if (dest == null) dest = new LSLList();
             if (src == null) src = new LSLList();
+            // SL's range rule (see NormaliseLslRange). SL wiki: "If end is a negative index past the
+            // beginning, then the operating range would be [start, -1]." / "If end is a positive index past the end, then
+            // the operating range would be [0, end]." An inverted range keeps what lies between end and start and puts
+            // src after it (Halcyon and YEngine: dest.GetSublist(end + 1, start - 1) + src).
             int len = dest.Length;
-            if (start < 0) start = Math.Max(len + start, 0);
-            if (end < 0) end = len + end;
-            start = Math.Max(0, Math.Min(start, len));
-            end = Math.Max(0, Math.Min(end, len - 1));
-            var result = new System.Collections.Generic.List<object>();
-            for (int i = 0; i < start; i++) result.Add(dest.Data[i]);
-            result.AddRange(src.Data);
-            for (int i = end + 1; i < len; i++) result.Add(dest.Data[i]);
-            return new LSLList(result.ToArray());
+            NormaliseLslRange(len, ref start, ref end);
+            var result = new List<object>(len + src.Length);
+            if (start <= end)
+            {
+                int insertAt = Math.Min(Math.Max(start, 0), len);
+                for (int i = 0; i < insertAt; i++) result.Add(dest.Data[i]);
+                result.AddRange(src.Data);
+                for (int i = end >= len ? len : Math.Max(end + 1, insertAt); i < len; i++) result.Add(dest.Data[i]);
+            }
+            else
+            {
+                for (int i = Math.Max(end + 1, 0); i < Math.Min(start, len); i++) result.Add(dest.Data[i]);
+                result.AddRange(src.Data);
+            }
+            return new LSLList(result);
         }
+        // llListStatistics operations, as the compiler's DefaultConstants.cs numbers them (SL's values).
+        private const int LIST_STAT_RANGE = 0, LIST_STAT_MIN = 1, LIST_STAT_MAX = 2, LIST_STAT_MEAN = 3,
+            LIST_STAT_MEDIAN = 4, LIST_STAT_STD_DEV = 5, LIST_STAT_SUM = 6, LIST_STAT_SUM_SQUARES = 7,
+            LIST_STAT_NUM_COUNT = 8, LIST_STAT_GEOMETRIC_MEAN = 9, LIST_STAT_HARMONIC_MEAN = 100;
+
+        /// <summary>
+        /// SL: STD_DEV "Calculates the _sample_ standard deviation"; "Geometric mean applies only to numbers of the same
+        /// sign." The geometric and harmonic means are Halcyon's and YEngine's (LSL_Types.cs GeometricMean,
+        /// HarmonicMean): exp(log(product) / n), NaN when the product is negative, and n / sum(1/x), 0 when an entry is 0.
+        /// The standard deviation of one number is 0 (the sample formula divides 0 by 0 there).
+        /// </summary>
         public float llListStatistics(int operation, LSLList src)
         {
             if (src == null || src.Length == 0) return 0f;
@@ -7798,29 +15281,41 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             nums.Sort();
             switch (operation)
             {
-                case 0: return (float)(nums[nums.Count - 1] - nums[0]);                   // RANGE
-                case 1: return (float)nums[0];                                             // MIN
-                case 2: return (float)nums[nums.Count - 1];                               // MAX
-                case 3: { double s = 0; foreach (var n in nums) s += n; return (float)(s / nums.Count); } // MEAN
-                case 4: { int m = nums.Count / 2; return (nums.Count % 2 == 0) ? (float)((nums[m-1]+nums[m])/2.0) : (float)nums[m]; } // MEDIAN
-                case 5:
+                case LIST_STAT_RANGE: return (float)(nums[nums.Count - 1] - nums[0]);
+                case LIST_STAT_MIN: return (float)nums[0];
+                case LIST_STAT_MAX: return (float)nums[nums.Count - 1];
+                case LIST_STAT_MEAN: return (float)(nums.Sum() / nums.Count);
+                case LIST_STAT_MEDIAN: { int m = nums.Count / 2; return (nums.Count % 2 == 0) ? (float)((nums[m-1]+nums[m])/2.0) : (float)nums[m]; }
+                case LIST_STAT_STD_DEV:
                 {
-                    double s = 0; foreach (var n in nums) s += n; double mean = s / nums.Count;
+                    if (nums.Count < 2) return 0f;
+                    double mean = nums.Sum() / nums.Count;
                     double v = 0; foreach (var n in nums) v += (n - mean) * (n - mean);
-                    return (float)Math.Sqrt(v / nums.Count);
-                } // STD_DEV
-                case 6: { double s = 0; foreach (var n in nums) s += n; return (float)s; }          // SUM
-                case 7: { double s = 0; foreach (var n in nums) s += n * n; return (float)s; }      // SUM_SQUARES
-                case 8: return nums.Count;                                                 // NUM_COUNT
-                case 9: { double p = 1.0; foreach (var n in nums) p *= Math.Abs(n); return (float)Math.Pow(p, 1.0/nums.Count); } // GEOMETRIC_MEAN
-                case 10: { double s = 0; foreach (var n in nums) { if (n != 0) s += 1.0/n; } return s == 0 ? 0f : (float)(nums.Count/s); } // HARMONIC_MEAN
+                    return (float)Math.Sqrt(v / (nums.Count - 1));
+                }
+                case LIST_STAT_SUM: return (float)nums.Sum();
+                case LIST_STAT_SUM_SQUARES: { double s = 0; foreach (var n in nums) s += n * n; return (float)s; }
+                case LIST_STAT_NUM_COUNT: return nums.Count;
+                case LIST_STAT_GEOMETRIC_MEAN:
+                {
+                    double p = 1.0; foreach (var n in nums) p *= n;
+                    return (float)Math.Exp(Math.Log(p) / nums.Count);
+                }
+                case LIST_STAT_HARMONIC_MEAN:
+                {
+                    double s = 0; foreach (var n in nums) s += 1.0 / n;
+                    return (float)(nums.Count / s);
+                }
                 default: return 0f;
             }
         }
         public string llDumpList2String(LSLList src, string separator)
         {
+            // SL wiki: "Each element of the list is converted to string format in the result, so floats expand to
+            // six digits of precision, rotations and vectors are represented with "<" and ">" characters" - the (string)list
+            // form (Halcyon: GetLSLStringItem, LSLSystemAPI.cs:8785). Was .NET's ToString: "2", "<2, 3, 0>".
             if (src == null || src.Length == 0) return string.Empty;
-            return string.Join(separator ?? string.Empty, System.Linq.Enumerable.Select(src.Data, o => o?.ToString() ?? string.Empty));
+            return string.Join(separator ?? string.Empty, ListElementStrings(src));
         }
         public LSLList llParseString2List(string src, LSLList separators, LSLList spacers)
         {
@@ -7925,8 +15420,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             ret.Add(autoCast > 0 ? AutoCastString(temp) : (object)temp);
                         }
                     }
-                    else if (keepNulls)
+                    else if (cindex == 0 || keepNulls)
                     {
+                        // Halcyon (:7714-7718): an empty field at a leading or doubled separator is always kept.
                         totalSplits++;
                         ret.Add(string.Empty);
                     }
@@ -8028,13 +15524,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     if (len1 < len2) return 0;
                     return listCompare(list1.GetSublist(len1 - len2, len1 - 1), list2);
                 case 2:
-                    ShoutError("IW_MATCH_REGEX not implemented for iwMatchList.");
+                    ScriptShoutError("IW_MATCH_REGEX not implemented for iwMatchList.");
                     break;
                 case 3:
-                    ShoutError("IW_MATCH_COUNT not implemented for iwMatchList.");
+                    ScriptShoutError("IW_MATCH_COUNT not implemented for iwMatchList.");
                     break;
                 case 4:
-                    ShoutError("IW_MATCH_COUNT_REGEX not implemented for iwMatchList.");
+                    ScriptShoutError("IW_MATCH_COUNT_REGEX not implemented for iwMatchList.");
                     break;
             }
             return 0;
@@ -8070,7 +15566,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (stride < 1) return new LSLList(src.Data.Reverse().ToArray());
             if (src.Length % stride != 0)
             {
-                ShoutError(string.Format("Error: stride argument is {0}, but source list length is not divisible by {0}", stride));
+                ScriptShoutError(string.Format("Error: stride argument is {0}, but source list length is not divisible by {0}", stride));
                 return new LSLList();
             }
             List<object> ret = new List<object>();
@@ -8137,10 +15633,17 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public void llRequestAgentData(string id, int data)
         {
-            if (m_host == null) return;
-            if (!UUID.TryParse(id, out UUID agentId)) return;
+            if (m_host == null) { ReturnQueryKey(UUID.Zero); return; }   // Every path returns
 
-            UUID queryID = UUID.Random();
+            UUID queryID = NewDataserverQuery();
+            ReturnQueryKey(queryID);
+            // Halcyon (LSLSystemAPI.cs:5639-5651): a key that does not parse still gets a query key and an empty answer.
+            if (!UUID.TryParse(id, out UUID agentId))
+            {
+                PostDataserverEvent(queryID, string.Empty);
+                ScriptSleep(100);
+                return;
+            }
             UUID capturedQuery = queryID;
             UUID capturedAgent = agentId;
             int capturedData = data;
@@ -8152,10 +15655,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     string result = string.Empty;
                     switch (capturedData)
                     {
-                        case 1: // DATA_ONLINE — not reliably knowable, always return 0
-                            result = "0";
+                        case DATA_ONLINE:
+                            result = IsOnlineToThisScript(capturedAgent) ? "1" : "0";
                             break;
-                        case 2: // DATA_NAME
+                        case DATA_NAME:
                         {
                             ScenePresence sp = World?.GetScenePresence(capturedAgent);
                             if (sp != null)
@@ -8172,22 +15675,17 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             }
                             break;
                         }
-                        case 3: // DATA_BORN — account creation date as "YYYY-MM-DD"
-                        {
-                            UserAccount acct = World?.UserAccountService?.GetUserAccount(
-                                World.RegionInfo.ScopeID, capturedAgent);
-                            if (acct != null)
-                            {
-                                var born = DateTimeOffset.FromUnixTimeSeconds(acct.Created).UtcDateTime;
-                                result = born.ToString("yyyy-MM-dd");
-                            }
+                        case DATA_BORN: // DATA_BORN — account creation date as "YYYY-MM-DD"
+                            result = BornOf(capturedAgent);
                             break;
-                        }
-                        case 4: // DATA_RATING — removed from SL, always return zeroes
+                        case DATA_ACCOUNT_TYPE:
+                            result = AccountTypeOf(capturedAgent);
+                            break;
+                        case DATA_RATING: // DATA_RATING — removed from SL, always return zeroes
                             result = "0,0,0,0,0,0";
                             break;
-                        case 7: // DATA_PAYINFO — not exposed
-                            result = "0";
+                        case DATA_PAYINFO:
+                            result = PayInfo(capturedAgent);
                             break;
                         default:
                             result = string.Empty;
@@ -8204,55 +15702,125 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
             ScriptSleep(100);
         }
+        /// <summary>
+        /// Wiki: "Requests data about region. When data is available the dataserver event
+        /// will be raised"; DATA_SIM_POS a vector of the region's global position, DATA_SIM_STATUS
+        /// "up"/..., DATA_SIM_RATING "PG"/"MATURE"/"ADULT"/"UNKNOWN", 1.0 s sleep. Ported from upstream
+        /// LSL_Api.cs:13389-13485: the local region answers from RegionInfo; any other region is
+        /// resolved through GridService.GetRegionByName, with the hypergrid RegionSecret dance for
+        /// POS. POS is in metres (upstream returns region units against the wiki's "global position"). An unknown
+        /// region answers SL's values, DATA_SIM_STATUS "unknown" and DATA_SIM_RATING "UNKNOWN", as YEngine does.
+        /// The reply goes by the dataserver door.
+        /// </summary>
         public string llRequestSimulatorData(string simulator, int data)
         {
-            // Fires a dataserver event with the requested simulator data
-            // DATA_SIM_POS=5, DATA_SIM_STATUS=6, DATA_SIM_RATING=7
-            // For local region, answer immediately; remote regions are not supported
+            const int DATA_SIM_RELEASE = 128;
             if (World?.RegionInfo == null) return UUID.Zero.ToString();
-            string regionName = World.RegionInfo.RegionName;
-            if (!simulator.Equals(regionName, StringComparison.OrdinalIgnoreCase))
+            if (data != DATA_SIM_POS && data != DATA_SIM_STATUS && data != DATA_SIM_RATING && data != DATA_SIM_RELEASE)
             {
-                // Remote region — not supported, return zero
-                return UUID.Zero.ToString();
+                ScriptSleep(1000);
+                return UUID.Zero.ToString();   // raise no event, as upstream
             }
-            UUID queryID = UUID.Random();
-            string result = data switch
+
+            static string Rating(int maturity) => maturity switch { 0 => "PG", 1 => "MATURE", 2 => "ADULT", _ => "UNKNOWN" };
+            static string PosOf(uint worldX, uint worldY) => new Vector3(worldX, worldY, 0f).ToString();
+
+            UUID queryID = NewDataserverQuery();
+            string reply;
+            if (simulator.Equals(World.RegionInfo.RegionName, StringComparison.OrdinalIgnoreCase))
             {
-                5 => // DATA_SIM_POS
-                    new LSLList(new object[] {
-                        (float)(World.RegionInfo.RegionLocX * Constants.RegionSize),
-                        (float)(World.RegionInfo.RegionLocY * Constants.RegionSize),
-                        0f }).ToString(),
-                6 => "up", // DATA_SIM_STATUS
-                7 => World.RegionInfo.RegionSettings.Maturity.ToString(), // DATA_SIM_RATING
-                _ => string.Empty
-            };
-            System.Threading.Tasks.Task.Run(() => PostDataserverEvent(queryID, result));
+                RegionInfo ri = World.RegionInfo;
+                reply = data switch
+                {
+                    DATA_SIM_POS => PosOf(ri.WorldLocX, ri.WorldLocY),
+                    DATA_SIM_STATUS => "up",
+                    DATA_SIM_RATING => Rating(ri.RegionSettings.Maturity),
+                    _ => "OpenSim",
+                };
+            }
+            else
+            {
+                reply = data == DATA_SIM_RATING ? "UNKNOWN" : "unknown";
+                try
+                {
+                    var info = World.GridService?.GetRegionByName(World.RegionInfo.ScopeID, simulator);
+                    if (info != null)
+                    {
+                        switch (data)
+                        {
+                            case DATA_SIM_POS:
+                                // Hypergrid puts the real destination coords in RegionSecret (upstream :13437-13451).
+                                var flags = (OpenSim.Framework.RegionFlags)World.GridService.GetRegionFlags(info.ScopeID, info.RegionID);
+                                if ((flags & OpenSim.Framework.RegionFlags.Hyperlink) != 0 && ulong.TryParse(info.RegionSecret, out ulong handle))
+                                {
+                                    Utils.LongToUInts(handle, out uint rx, out uint ry);
+                                    reply = PosOf(rx, ry);
+                                }
+                                else reply = PosOf((uint)info.RegionLocX, (uint)info.RegionLocY);
+                                break;
+                            case DATA_SIM_STATUS: reply = "up"; break;
+                            case DATA_SIM_RATING: reply = Rating(info.Maturity); break;
+                            default: reply = "OpenSim"; break;
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    m_log.LogWarning("[PhloxAPI]: llRequestSimulatorData({0}) grid lookup failed: {1}", simulator, e.Message);
+                }
+            }
+            PostDataserverEvent(queryID, reply);
+            ScriptSleep(1000);
             return queryID.ToString();
         }
-
+        /// <summary>
+        /// SL wiki llGetEnv, with YEngine's reading of it (LSL_Api.llGetEnv): the name in any letter case; frame_number
+        /// the simulator's frame counter; region_start_time the Unix time the region started, and region_up_time the
+        /// seconds since; the chat ranges. Plus Halcyon's keys that tell content which platform it is on
+        /// (Scene.GetEnv, Scene.cs:855-976): script_engine "Phlox", the region's size, the version texts, and the grid's
+        /// names from [GridInfoService]. "inworldz" and "halcyon" are "", as on any server that is neither.
+        /// </summary>
         public string llGetEnv(string name)
         {
-            if (World?.RegionInfo == null) return string.Empty;
-            return name switch
+            if (World?.RegionInfo == null || name == null) return string.Empty;
+            Nini.Config.IConfig gridInfo = m_ScriptEngine?.ConfigSource?.Configs[GridInfoSection];
+            string GridInfo(string key) => gridInfo?.GetString(key, string.Empty)?.Trim() ?? string.Empty;
+            // [Chat]'s ranges, with the keys and defaults the chat module and YEngine read.
+            Nini.Config.IConfig chat = m_ScriptEngine?.ConfigSource?.Configs["Chat"];
+            string Range(string key, int fallback) => (chat?.GetInt(key, fallback) ?? fallback).ToString();
+            return name.ToLowerInvariant() switch
             {
                 "agent_limit"          => World.RegionInfo.RegionSettings.AgentLimit.ToString(),
                 "dynamic_pathfinding"  => "disabled",
                 "estate_id"            => World.RegionInfo.EstateSettings.EstateID.ToString(),
                 "estate_name"          => World.RegionInfo.EstateSettings.EstateName ?? string.Empty,
-                "frame_number"         => World.StatsReporter?.LastReportedSimFPS.ToString() ?? "0",
+                "frame_number"         => World.Frame.ToString(),
                 "region_cpu_ratio"     => "1",
                 "region_idle"          => "0",
-                "region_product_name"  => "Legion Grid",
-                "region_product_sku"   => "Legion",
-                "region_start_time"    => "0",
-                "sim_channel"          => "Legion Grid",
-                "sim_version"          => "0.9.3.0",
-                "simulator_hostname"   => System.Net.Dns.GetHostName(),
+                "region_product_name"  => World.RegionInfo.RegionType ?? string.Empty,
+                "region_product_sku"   => "OpenSim",
+                "region_start_time"    => World.UnixStartTime.ToString(),
+                "region_up_time"       => (OpenSim.Framework.Util.UnixTimeSinceEpoch() - World.UnixStartTime).ToString(),
+                "sim_channel"          => "OpenSim",
+                "sim_version"          => World.GetSimulatorVersion(),
+                "simulator_hostname"   => World.RegionInfo.ExternalHostName ?? string.Empty,
                 "region_max_prims"     => World.RegionInfo.ObjectCapacity.ToString(),
                 "region_object_bonus"  => ((float)World.RegionInfo.RegionSettings.ObjectBonus).ToString(),
-                _                      => string.Empty
+                "whisper_range"        => Range("whisper_distance", PhloxListenManager.DefaultWhisperDistance),
+                "chat_range"           => Range("say_distance", PhloxListenManager.DefaultSayDistance),
+                "shout_range"          => Range("shout_distance", PhloxListenManager.DefaultShoutDistance),
+                "grid"                 => OpenSim.Region.ScriptEngine.Shared.Api.LSL_Api.EnvGridName(World), // YEngine's own answer
+                "script_engine"        => "Phlox",
+                "region_size_x"        => World.RegionInfo.RegionSizeX.ToString(),
+                "region_size_y"        => World.RegionInfo.RegionSizeY.ToString(),
+                "region_size_z"        => ((int)Constants.RegionHeight).ToString(),
+                "short_version"        => OpenSim.VersionInfo.VersionNumber,
+                "long_version"         => World.GetSimulatorVersion(),
+                "platform"             => GridInfo("platform"),
+                "grid_management"      => GridInfo("gridmanagement"),
+                "grid_nick"            => GridInfo("gridnick"),
+                "grid_name"            => OpenSim.Region.ScriptEngine.Shared.Api.LSL_Api.EnvGridName(World),
+                _                     => string.Empty
             };
         }
         public float llGetSimStats(int statType)
@@ -8270,35 +15838,98 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (stats == null || statType < 0 || statType >= stats.Length) return 0f;
             return stats[statType];
         }
+        /// <summary>Wiki: "the most bytes used while llScriptProfiler was last active".
+        /// 0 when profiling was never started - there is no LSO fixed size to report here.</summary>
         public int llGetSPMaxMemory()
         {
-            // SL: returns peak script memory usage. Phlox doesn't track this granularly.
-            // Return a reasonable default (16KB, typical for LSL scripts)
-            return 16384;
+            var st = m_thisScript?.ScriptState;
+            if (st == null) return 0;
+            st.SampleMemoryPeak();
+            return st.PeakMemoryUsed;
         }
+        /// <summary>Ported from upstream LSL_Api.cs:4548-4556. wiki: "Returns a list of names
+        /// of animations playing in the current object"; the part tracks them in AnimationsNames.</summary>
         public LSLList llGetObjectAnimationNames()
         {
-            // SL Animesh feature — returns list of animations playing on the object.
-            // OpenSim doesn't support Animesh; return empty list.
-            return new LSLList();
+            var ret = new List<object>();
+            var names = m_host?.AnimationsNames;
+            if (names == null || names.Count == 0) return new LSLList(ret);
+            lock (names)
+                foreach (string name in names.Values) ret.Add(name);
+            return new LSLList(ret);
         }
+        /// <summary>
+        /// Ported from upstream LSL_Api.cs:4533-4541. wiki: the animation is "an item in the
+        /// inventory of the prim this script is in" - resolved by inventory name, then the default
+        /// avatar animation names, never by UUID. The part manages the set and sends the update;
+        /// whether anything moves is the mesh's business (Animesh needs a skeleton).
+        /// </summary>
         public void llStartObjectAnimation(string anim)
         {
-            // SL Animesh — not supported in OpenSim. No-op.
+            if (m_host == null) return;
+            UUID animID = OpenSim.Region.Framework.Scenes.Scripting.ScriptUtils.GetAssetIdFromItemName(m_host, anim, (int)AssetType.Animation);
+            if (animID == UUID.Zero)
+                animID = DefaultAvatarAnimations.GetDefaultAnimation(anim);
+            if (animID != UUID.Zero)
+                m_host.AddAnimation(animID, anim);
         }
+
+        /// <summary>Ported from upstream LSL_Api.cs:4543-4546 - by the same name it was started with.</summary>
         public void llStopObjectAnimation(string anim)
         {
-            // SL Animesh — not supported in OpenSim. No-op.
+            m_host?.RemoveAnimation(anim);
         }
+
+        /// <summary>
+        /// Wiki: llGetLinkSitFlags reads the flags on the link's sit target. Upstream
+        /// (LSL_Api.cs:21155-21166) hard-codes ALLOW_UNSIT | NO_COLLIDE | NO_DAMAGE as "forced" and
+        /// stores nothing; this reports the part's real state. SIT_TARGET is read-only, from
+        /// IsSitTargetSet; ALLOW_UNSIT and SCRIPTED_ONLY are the part properties ScenePresence honours
+        /// (ScenePresence.cs:2656, :3399, :3411); NO_COLLIDE and NO_DAMAGE are stored and read back.
+        /// </summary>
         public int llGetLinkSitFlags(int link)
         {
-            // SL: returns sit flags for a link. OpenSim doesn't fully implement SitFlags.
-            // Return 0 (no flags set).
-            return 0;
+            SceneObjectPart part = GetLinkParts(link).FirstOrDefault();
+            return part == null ? 0 : PartSitFlags(part);
         }
+
+        /// <summary>
+        /// One prim's SIT_FLAG_* word, for llGetLinkSitFlags and PRIM_SIT_FLAGS. Every bit is read from the scene:
+        /// SIT_TARGET from IsSitTargetSet, ALLOW_UNSIT and SCRIPTED_ONLY from the part properties OpenSim's LSL_Api
+        /// sets for PRIM_ALLOW_UNSIT and PRIM_SCRIPTED_SIT_ONLY, NO_COLLIDE and NO_DAMAGE from SitFlagsStored.
+        /// </summary>
+        private static int PartSitFlags(SceneObjectPart part)
+        {
+            int flags = part.SitFlagsStored & (SIT_FLAG_NO_COLLIDE | SIT_FLAG_NO_DAMAGE);
+            if (part.IsSitTargetSet) flags |= SIT_FLAG_SIT_TARGET;
+            if (part.AllowUnsit) flags |= SIT_FLAG_ALLOW_UNSIT;
+            if (part.ScriptedSitOnly) flags |= SIT_FLAG_SCRIPTED_ONLY;
+            return flags;
+        }
+
+        /// <summary>
+        /// Sets one prim's sit flags, for llSetLinkSitFlags and PRIM_SIT_FLAGS: every settable bit takes the word's
+        /// value, SIT_FLAG_SIT_TARGET is read-only and ignored (SL: "Read-only flag to indicate whether the link has
+        /// a sit target").
+        /// </summary>
+        private static void PartSetSitFlags(SceneObjectPart part, int flags)
+        {
+            part.AllowUnsit = (flags & SIT_FLAG_ALLOW_UNSIT) != 0;
+            part.ScriptedSitOnly = (flags & SIT_FLAG_SCRIPTED_ONLY) != 0;
+            part.SitFlagsStored = flags & (SIT_FLAG_NO_COLLIDE | SIT_FLAG_NO_DAMAGE);
+        }
+
+        /// <summary>
+        /// Wiki: "Sets flags on the link's sittarget." Upstream's is a no-op (LSL_Api.cs:21168).
+        /// Here ALLOW_UNSIT and SCRIPTED_ONLY are honoured by the region's sit path today, through the
+        /// part properties it already checks; NO_COLLIDE and NO_DAMAGE are stored for read-back only -
+        /// the presence has no seated collision-volume toggle and no damage distribution to seated
+        /// avatars (there is no damage hook for that). SIT_TARGET is read-only and ignored.
+        /// </summary>
         public void llSetLinkSitFlags(int link, int flags)
         {
-            // SL: sets sit flags for a link. OpenSim doesn't fully implement SitFlags. No-op.
+            foreach (SceneObjectPart part in GetLinkParts(link))
+                PartSetSitFlags(part, flags);
         }
         public Vector3 llLinear2sRGB(Vector3 color)
         {
@@ -8338,19 +15969,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         // Constants: LINKSETDATA_OK=0, EMEMORY=1, ENOKEY=2, EPROTECTED=3, NOTFOUND=4, NOUPDATE=5
         // Event actions: RESET=0, UPDATE=1, DELETE=2, MULTIDELETE=3
 
-        private const int LINKSETDATA_OK = 0;
-        private const int LINKSETDATA_EMEMORY = 1;
-        private const int LINKSETDATA_ENOKEY = 2;
-        private const int LINKSETDATA_EPROTECTED = 3;
-        private const int LINKSETDATA_NOTFOUND = 4;
-        private const int LINKSETDATA_NOUPDATE = 5;
 
-        private const int LINKSETDATA_RESET = 0;
-        private const int LINKSETDATA_UPDATE = 1;
-        private const int LINKSETDATA_DELETE = 2;
-        private const int LINKSETDATA_MULTIDELETE = 3;
 
-        // Bind to Tranquillity's native per-linkset limit (SL = 128KB) rather than Legion's
+        // Bind to Tranquillity's native per-linkset limit (SL = 128KB) rather than the port source's
         // Scene.m_LinkSetDataLimit (which Tranquillity does not have).
         private int LinksetDataLimit => LinksetData.LINKSETDATA_MAX;
 
@@ -8382,6 +16003,21 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return m_host.ParentGroup.LinksetData.Get(name, pass) ?? string.Empty;
         }
 
+        /// <summary>
+        /// SL wiki linkset_data: "The linkset_data event fires in all scripts in a linkset whenever the datastore has been
+        /// modified through a call to one of the llLinksetData functions." Phlox's scripts (PostObjectLinksetDataEvent fans
+        /// out to every prim), then every other engine's script in every prim of the linkset. Offered here, not from the
+        /// engine's PostObjectLinksetDataEvent, so another caller of that interface method is never offered back.
+        /// </summary>
+        private void PostLinksetData(int action, string name, string value)
+        {
+            m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, action, name, value);
+            SceneObjectGroup group = m_host.ParentGroup;
+            if (group == null) return;
+            OfferToOtherEngines("linkset_data", () => ScriptItemsIn(group.Parts), "linkset_data",
+                () => new object[] { action, name ?? string.Empty, value ?? string.Empty });
+        }
+
         public int llLinksetDataWrite(string name, string value)
         {
             if (string.IsNullOrEmpty(name))
@@ -8394,7 +16030,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 int delRet = m_host.ParentGroup.LinksetData.Remove(name);
                 if (delRet == 0)
                 {
-                    m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_DELETE, name, string.Empty);
+                    PostLinksetData(LINKSETDATA_DELETE, name, string.Empty);
                     m_host.ParentGroup.HasGroupChanged = true;
                 }
                 return delRet;
@@ -8405,7 +16041,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int ret = m_host.ParentGroup.LinksetData.AddOrUpdate(name, value);
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_UPDATE, name, value);
+                PostLinksetData(LINKSETDATA_UPDATE, name, value);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return ret;
@@ -8423,7 +16059,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 int delRet = m_host.ParentGroup.LinksetData.Remove(name, pass);
                 if (delRet == 0)
                 {
-                    m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_DELETE, name, string.Empty);
+                    PostLinksetData(LINKSETDATA_DELETE, name, string.Empty);
                     m_host.ParentGroup.HasGroupChanged = true;
                 }
                 return delRet;
@@ -8434,7 +16070,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int ret = m_host.ParentGroup.LinksetData.AddOrUpdate(name, value, pass);
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_UPDATE, name, string.Empty);
+                PostLinksetData(LINKSETDATA_UPDATE, name, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return ret;
@@ -8449,7 +16085,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int ret = m_host.ParentGroup.LinksetData.Remove(name);
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_DELETE, name, string.Empty);
+                PostLinksetData(LINKSETDATA_DELETE, name, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return ret;
@@ -8464,7 +16100,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int ret = m_host.ParentGroup.LinksetData.Remove(name, pass);
             if (ret == 0)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_DELETE, name, string.Empty);
+                PostLinksetData(LINKSETDATA_DELETE, name, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return ret;
@@ -8478,7 +16114,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             m_host.ParentGroup.LinksetData = null;
             if (changed)
             {
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_RESET, string.Empty, string.Empty);
+                PostLinksetData(LINKSETDATA_RESET, string.Empty, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
         }
@@ -8491,7 +16127,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (deleted.Length > 0)
             {
                 string deletedList = string.Join(",", deleted);
-                m_ScriptEngine.PostObjectLinksetDataEvent(m_host.LocalId, LINKSETDATA_MULTIDELETE, deletedList, string.Empty);
+                PostLinksetData(LINKSETDATA_MULTIDELETE, deletedList, string.Empty);
                 m_host.ParentGroup.HasGroupChanged = true;
             }
             return new LSLList(new object[] { deleted.Length, notDeleted });
@@ -8524,9 +16160,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             // Faithful port from Halcyon — look up animation in inventory and return metadata via dataserver
             if (m_host == null) return UUID.Zero.ToString();
             TaskInventoryItem item = FindInventoryItem(name, (int)AssetType.Animation);
-            if (item == null) { ScriptSleep(1000); return UUID.Zero.ToString(); }
+            if (item == null) { ScriptSleep(1000); return string.Empty; }   // Halcyon LSLSystemAPI.cs:5738-5739
 
-            UUID queryID = UUID.Random();
+            UUID queryID = NewDataserverQuery();
             UUID assetId = item.AssetID;
             System.Threading.ThreadPool.QueueUserWorkItem(_ =>
             {
@@ -8564,52 +16200,168 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public int llGiveMoney(string destination, int amount)
         {
-            // No economy module available in Legion
-            if (!UUID.TryParse(destination, out UUID destId) || destId == UUID.Zero)
-            { ScriptSleep(3000); return 0; }
-            if (amount <= 0) { ScriptSleep(3000); return 0; }
-
+            // SL: "Returns an integer that is always zero", forced delay 0.0. Halcyon's checks and texts
+            // (LSLSystemAPI.cs:2978-3014), without a sleep; with a money module the transfer is queued as YEngine's is
+            // (LSL_Api.llGiveMoney), from the root prim and its owner.
             TaskInventoryItem item = GetInventorySelf();
-            if (item == null) { ScriptSleep(3000); return 0; }
+            if (item == null) { LSLError("No item found from which to give money"); return 0; }
 
-            // Check PERMISSION_DEBIT (0x02)
-            if ((item.PermsMask & 0x02) == 0)
+            // PERMISSION_DEBIT (0x02), granted by the owner: Halcyon CheckRuntimePerms(item, item.OwnerID, PERMISSION_DEBIT)
+            // (:2993, :4467-4473); SL: "it must be granted by the owner". Phlox's text, as before.
+            if ((item.PermsMask & PERMISSION_DEBIT) == 0 || item.PermsGranter != item.OwnerID)
             {
-                ShoutError("llGiveMoney: PERMISSION_DEBIT not granted.");
-                ScriptSleep(3000);
+                ScriptShoutError("llGiveMoney: PERMISSION_DEBIT not granted.");
                 return 0;
             }
 
-            // No economy module — silently return 0
-            ScriptSleep(3000);
+            // Halcyon :2999-3003.
+            if (!UUID.TryParse(destination, out UUID destId)) { LSLError("Bad key in llGiveMoney"); return 0; }
+            if (destId == UUID.Zero || amount <= 0) return 0;
+
+            // Halcyon :3006-3010 - no money module is "not implemented".
+            IMoneyModule money = World?.RequestModuleInterface<IMoneyModule>();
+            if (money == null) { NotImplemented("llGiveMoney"); return 0; }
+
+            SceneObjectPart root = m_host.ParentGroup.RootPart;
+            UUID fromObject = root.UUID, fromOwner = root.OwnerID;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+                ObjectGiveMoney(money, fromObject, fromOwner, destId, amount, UUID.Zero, out string _));
             return 0;
         }
+
+        /// <summary>
+        /// Halcyon's GiveMoney checks (LSLSystemAPI.cs:3018-3062), shared by llTransferLindenDollars and iwGiveMoney: the
+        /// script item, PERMISSION_DEBIT granted by the owner, a parsable destination, a positive amount and a money module,
+        /// in that order, each failure said with Halcyon's text. Returns the money module, or null with the error tag
+        /// in <paramref name="data"/> (SERVICE_ERROR, MISSING_PERMISSION_DEBIT, INVALID_DESTINATION; INVALID_AMOUNT is
+        /// SL's tag for an amount Halcyon left to its money module).
+        /// </summary>
+        private IMoneyModule CheckGiveMoney(string destination, int amount, out UUID toId, out string data)
+        {
+            toId = UUID.Zero;
+            data = null;
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null)
+            {
+                LSLError("No item found from which to give money");
+                data = "SERVICE_ERROR";
+                return null;
+            }
+            if ((item.PermsMask & PERMISSION_DEBIT) == 0 || item.PermsGranter != item.OwnerID)
+            {
+                LSLError("No permissions to give money");
+                data = "MISSING_PERMISSION_DEBIT";
+                return null;
+            }
+            if (!UUID.TryParse(destination, out toId))
+            {
+                LSLError("Bad key in llGiveMoney");
+                data = "INVALID_DESTINATION";
+                return null;
+            }
+            if (amount <= 0)
+            {
+                data = "INVALID_AMOUNT";
+                return null;
+            }
+            IMoneyModule money = World?.RequestModuleInterface<IMoneyModule>();
+            if (money == null)
+            {
+                NotImplemented("llGiveMoney");
+                data = "SERVICE_ERROR";
+            }
+            return money;
+        }
+
+        /// <summary>One transfer from the root prim and its owner: true on success, else the module's reason.</summary>
+        private bool ObjectGiveMoney(IMoneyModule money, UUID fromObject, UUID fromOwner, UUID toId, int amount, UUID txn, out string reason)
+        {
+            try
+            {
+                if (money.ObjectGiveMoney(fromObject, fromOwner, toId, amount, txn, out reason)) return true;
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxAPI]: money transfer failed: {0}", e.Message);
+                reason = null;
+            }
+            if (string.IsNullOrEmpty(reason)) reason = "SERVICE_ERROR";
+            return false;
+        }
+
+        /// <summary>
+        /// SL: returns the key of the transaction_result(key id, integer success, string data) event that reports the
+        /// transfer; data is a CSV on success (YEngine's "destination,amount") and an error tag on failure. Halcyon posted
+        /// that event from its finally (LSLSystemAPI.cs:3083-3085). The transfer runs off the script's thread, as
+        /// YEngine's does.
+        /// </summary>
         public string llTransferLindenDollars(string destination, int amount)
         {
-            // No economy module available in Legion
-            UUID txnId = UUID.Random();
-            PostDataserverEvent(txnId, "LINDENDOLLAR_INSUFFICIENTFUNDS");
-            return txnId.ToString();
+            UUID txn = UUID.Random();
+            UUID itemId = m_itemID;
+            IMoneyModule money = CheckGiveMoney(destination, amount, out UUID toId, out string data);
+            if (money == null)
+            {
+                PostTransactionResult(itemId, txn, 0, data);
+                return txn.ToString();
+            }
+            SceneObjectPart root = m_host.ParentGroup.RootPart;
+            UUID fromObject = root.UUID, fromOwner = root.OwnerID;
+            System.Threading.ThreadPool.QueueUserWorkItem(_ =>
+            {
+                bool ok = ObjectGiveMoney(money, fromObject, fromOwner, toId, amount, txn, out string reason);
+                PostTransactionResult(itemId, txn, ok ? 1 : 0, ok ? toId + "," + amount : reason);
+            });
+            return txn.ToString();
         }
+
+        private void PostTransactionResult(UUID itemId, UUID txn, int success, string data)
+        {
+            m_ScriptEngine.PostScriptEvent(itemId, new EventParams("transaction_result",
+                new object[] { txn.ToString(), success, data ?? string.Empty }, new DetectParams[0]));
+        }
+
+        /// <summary>
+        /// Halcyon's iwGiveMoney (LSLSystemAPI.cs:3096-3100, GiveMoney with no event): the transaction id on success,
+        /// else the error tag or the money module's reason. No event. The transfer runs in the call, as Halcyon's did,
+        /// because its answer is the return value.
+        /// </summary>
         public string iwGiveMoney(string destination, int amount)
         {
-            return llTransferLindenDollars(destination, amount);
+            IMoneyModule money = CheckGiveMoney(destination, amount, out UUID toId, out string data);
+            if (money == null) return data;
+            SceneObjectPart root = m_host.ParentGroup.RootPart;
+            UUID txn = UUID.Random();
+            return ObjectGiveMoney(money, root.UUID, root.OwnerID, toId, amount, txn, out string reason) ? txn.ToString() : reason;
         }
+
+        /// <summary>SL's PAY_HIDE: the pay dialog does not show that button.</summary>
+        private const int PAY_HIDE = -1;
+
+        /// <summary>
+        /// Halcyon (LSLSystemAPI.cs:13348-13362) and YEngine (LSL_Api.llSetPayPrice): the prices go on the root prim,
+        /// which the money modules read for the pay dialog; a button the list leaves out is PAY_HIDE; the object is
+        /// marked changed so the prices persist. A call from a child prim does nothing, as SL documents ("Calling it from
+        /// a child prim has no effect") and YEngine does; Halcyon set the root's prices.
+        /// </summary>
         public void llSetPayPrice(int price, LSLList quick_pay_buttons)
         {
-            if (m_host == null) return;
-            m_host.PayPrice[0] = price;
-            if (quick_pay_buttons.Length > 0) m_host.PayPrice[1] = quick_pay_buttons.GetLSLIntegerItem(0);
-            if (quick_pay_buttons.Length > 1) m_host.PayPrice[2] = quick_pay_buttons.GetLSLIntegerItem(1);
-            if (quick_pay_buttons.Length > 2) m_host.PayPrice[3] = quick_pay_buttons.GetLSLIntegerItem(2);
-            if (quick_pay_buttons.Length > 3) m_host.PayPrice[4] = quick_pay_buttons.GetLSLIntegerItem(3);
+            SceneObjectPart root = m_host?.ParentGroup?.RootPart;
+            if (root == null || root != m_host) return;
+            int[] prices = new int[5];
+            prices[0] = price;
+            for (int i = 0; i < 4; i++)
+                prices[i + 1] = i < quick_pay_buttons.Length ? quick_pay_buttons.GetLSLIntegerItem(i) : PAY_HIDE;
+            root.PayPrice = prices;
+            m_host.ParentGroup.HasGroupChanged = true;
         }
         public float llGetEnergy() => 1.0f; // Halcyon: always 1.0
 
         // ── Misc ───────────────────────────────────────────────────────────────
 
         public void llSetPrimURL(string url) { /* Deprecated */ }
-        public void llRefreshPrimURL() { /* Deprecated - not supported */ }
+        /// <summary>SL: deprecated, "This functions currently does nothing." Halcyon's error (LSLSystemAPI.cs:13444-13449).</summary>
+        public void llRefreshPrimURL() => ScriptShoutError("llRefreshPrimURL - not yet supported");
         public void llMapDestination(string simname, Vector3 pos, Vector3 look_at)
         {
             UUID targetAvatar = UUID.Zero;
@@ -8635,12 +16387,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     try
                     {
                         // Tranquillity's SendScriptTeleportRequest signature is (objName, simName, pos, int options)
-                        // — it dropped Legion's lookAt vector ("lookat does nothing"). Pass options = 0.
+                        // — it dropped the port source's lookAt vector ("lookat does nothing"). Pass options = 0.
                         avatar.ControllingClient.SendScriptTeleportRequest(m_host.Name, simname, pos, 0);
                     }
                     catch (NullReferenceException)
                     {
-                        // Legion LLClientView.SendScriptTeleportRequest has a packet construction bug
+                        // The port source's LLClientView.SendScriptTeleportRequest has a packet construction bug
                         // where ScriptTeleportRequestPacket fields can be null. Guard against it here.
                         // This needs a separate fix in LLClientView.cs.
                     }
@@ -8661,19 +16413,30 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public int llEdgeOfWorld(Vector3 pos, Vector3 dir)
         {
-            // Returns 1 if following dir from pos reaches the edge of the region
-            if (World == null) return 0;
+            // SL: TRUE when the border dir crosses from pos has no region beyond it, FALSE when it has; "If the x and y
+            // components of dir are zero (like with ZERO_VECTOR), TRUE is always returned"; "The z component of dir is
+            // ignored". The length of dir does not matter. The ray is followed to just past the border it reaches
+            // first and the grid asked for a region there (YEngine LSL_Api.llEdgeOfWorld).
+            if (World == null) return 1;
+            if (dir.X == 0f && dir.Y == 0f) return 1;
             float sx = World.RegionInfo.RegionSizeX;
             float sy = World.RegionInfo.RegionSizeY;
-            // Step along dir until we leave the region or hit a known neighbour
-            Vector3 cur = pos;
-            for (int i = 0; i < 256; i++)
+            float px = Math.Clamp(pos.X, 0.5f, sx - 0.5f);
+            float py = Math.Clamp(pos.Y, 0.5f, sy - 0.5f);
+            float ex, ey;
+            if (dir.X == 0f) { ex = px; ey = dir.Y > 0f ? sy + 1f : -1f; }
+            else if (dir.Y == 0f) { ex = dir.X > 0f ? sx + 1f : -1f; ey = py; }
+            else
             {
-                cur += dir;
-                if (cur.X < 0 || cur.X >= sx || cur.Y < 0 || cur.Y >= sy)
-                    return 1;
+                float len = (float)Math.Sqrt(dir.X * dir.X + dir.Y * dir.Y);
+                float dx = dir.X / len, dy = dir.Y / len;
+                float tx = dx > 0f ? (sx + 1f - px) / dx : -(px + 1f) / dx;
+                float ty = dy > 0f ? (sy + 1f - py) / dy : -(py + 1f) / dy;
+                float t = Math.Min(tx, ty);
+                ex = px + t * dx;
+                ey = py + t * dy;
             }
-            return 0;
+            return RegionExistsAt(new Vector3(ex, ey, 0f)) ? 0 : 1;
         }
         public string llGetObjectPermMask2(int mask) { /* Halcyon-2 variant — not standard LSL */ return "0"; }
         public int llGetParcelFlags2(Vector3 pos) { /* Halcyon-2 variant — not standard LSL */ return 0; }
@@ -8684,18 +16447,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             Vector3 dir = end - start;
             float dist = dir.Length();
 
-            // RC_* constants
-            const int RC_MAX_HITS = 2;
-            const int RC_DETECT_PHANTOM = 3;
-            const int RC_DATA_FLAGS = 4;
-            const int RC_REJECT_TYPES = 1;
-            const int RC_GET_ROOT_KEY = 1;
-            const int RC_GET_LINK_NUM = 2;
-            const int RC_GET_NORMAL = 4;
-            const int RC_REJECT_AGENTS = 2;
-            const int RC_REJECT_PHYSICAL = 4;
-            const int RC_REJECT_NONPHYSICAL = 8;
-            const int RC_REJECT_LAND = 16;
+            // RC_* are SL's values from SlConst. The local copies here once disagreed with them, so
+            // options were mis-parsed and llCastRay dropped the normal (2b84e458b3).
 
             int count = 1;
             int dataFlags = 0;
@@ -8712,7 +16465,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (count > 16) count = 16;
             else if (count <= 0)
             {
-                ShoutError("You must request at least one result from llCastRay.");
+                ScriptShoutError("You must request at least one result from llCastRay.");
                 return new LSLList();
             }
 
@@ -8808,61 +16561,141 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             {
                 m_log.LogWarning("[PhloxAPI]: llCastRay exception: {0}", e.Message);
                 results.Clear();
-                results.Add(-3); // RCERR_CAST_TIME_EXCEEDED as generic error
+                results.Add(RCERR_CAST_TIME_EXCEEDED); // RCERR_CAST_TIME_EXCEEDED as generic error
             }
             return new LSLList(results);
         }
+        // ── JSON ───────────────────────────────────────────────────────────────
+        // The getters read the text with System.Text.Json. A leading byte-order mark is skipped, as Halcyon's
+        // StripBOM does (LSLSystemAPI.cs:15272); an integer specifier indexes an array and a string specifier names an
+        // object member, anything else is JSON_INVALID (Halcyon JsonGetSpecific, :15585-15598; YEngine JsonFind).
+
         public string llJsonGetValue(string json, LSLList specifiers)
         {
-            if (string.IsNullOrEmpty(json) || specifiers == null) return JSON_INVALID;
-            try
+            if (specifiers == null || !TryJsonFind(json, specifiers.Data, out var el)) return JSON_INVALID;
+            // SL: llJsonGetValue("true", []) is JSON_TRUE; a null value gives JSON_NULL. A string comes back unquoted;
+            // numbers, objects and arrays as their JSON text.
+            return el.ValueKind switch
             {
-                var node = SimpleJsonNavigate(json, specifiers.Data);
-                return node ?? JSON_INVALID;
-            }
-            catch { return JSON_INVALID; }
+                System.Text.Json.JsonValueKind.String => el.GetString() ?? string.Empty,
+                System.Text.Json.JsonValueKind.True   => JSON_TRUE,
+                System.Text.Json.JsonValueKind.False  => JSON_FALSE,
+                System.Text.Json.JsonValueKind.Null   => JSON_NULL,
+                _                                     => el.GetRawText()
+            };
         }
 
         public string llJsonValueType(string json, LSLList specifiers)
         {
-            const string JSON_OBJECT  = "\uFDD1";
-            const string JSON_ARRAY   = "\uFDD2";
-            const string JSON_NUMBER  = "\uFDD3";
-            const string JSON_STRING  = "\uFDD4";
-            const string JSON_NULL    = "\uFDD5";
-            const string JSON_TRUE    = "\uFDD6";
-            const string JSON_FALSE   = "\uFDD7";
-            if (string.IsNullOrEmpty(json)) return JSON_INVALID;
+            if (!TryJsonFind(json, specifiers?.Data ?? Array.Empty<object>(), out var el)) return JSON_INVALID;
+            return el.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.Object => JSON_OBJECT,
+                System.Text.Json.JsonValueKind.Array  => JSON_ARRAY,
+                System.Text.Json.JsonValueKind.Number => JSON_NUMBER,
+                System.Text.Json.JsonValueKind.String => JSON_STRING,
+                System.Text.Json.JsonValueKind.True   => JSON_TRUE,
+                System.Text.Json.JsonValueKind.False  => JSON_FALSE,
+                System.Text.Json.JsonValueKind.Null   => JSON_NULL,
+                _                                     => JSON_INVALID
+            };
+        }
+
+        /// <summary>Parse <paramref name="json"/> and follow <paramref name="path"/>; false when either fails.</summary>
+        private static bool TryJsonFind(string json, object[] path, out System.Text.Json.JsonElement found)
+        {
+            found = default;
+            if (!TryJsonParse(json, out var cur)) return false;
+            foreach (object seg in path)
+            {
+                if (cur.ValueKind == System.Text.Json.JsonValueKind.Array && seg is int idx)
+                {
+                    if (idx < 0 || idx >= cur.GetArrayLength()) return false;
+                    cur = cur[idx];
+                }
+                else if (cur.ValueKind == System.Text.Json.JsonValueKind.Object && seg is string key)
+                {
+                    if (!cur.TryGetProperty(key, out var next)) return false;
+                    cur = next;
+                }
+                else return false;
+            }
+            found = cur;
+            return true;
+        }
+
+        /// <summary>The JSON text as an element that outlives its document; false when it is not JSON.</summary>
+        private static bool TryJsonParse(string json, out System.Text.Json.JsonElement root)
+        {
+            root = default;
+            json = StripBom(json);
+            if (string.IsNullOrWhiteSpace(json)) return false;
             try
             {
-                string val = SimpleJsonNavigate(json, specifiers?.Data ?? Array.Empty<object>());
-                if (val == null) return JSON_INVALID;
-                if (val == "null") return JSON_NULL;
-                if (val == "true") return JSON_TRUE;
-                if (val == "false") return JSON_FALSE;
-                if (val.StartsWith("{")) return JSON_OBJECT;
-                if (val.StartsWith("[")) return JSON_ARRAY;
-                if (val.StartsWith("\"")) return JSON_STRING;
-                if (double.TryParse(val, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _)) return JSON_NUMBER;
-                return JSON_INVALID;
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                root = doc.RootElement.Clone();
+                return true;
             }
-            catch { return JSON_INVALID; }
+            catch (System.Text.Json.JsonException) { return false; }
         }
+
+        private static string StripBom(string s) => s?.TrimStart('﻿');
+
+        /// <summary>
+        /// A string as a JSON string: quoted, with the quote, the backslash and every control character escaped. Other
+        /// characters are written as they are (System.Text.Json's serializer would write non-ASCII as \u escapes).
+        /// </summary>
+        private static string JsonQuote(string s)
+        {
+            var sb = new StringBuilder(s.Length + 2);
+            sb.Append('"');
+            foreach (char c in s)
+            {
+                switch (c)
+                {
+                    case '"': sb.Append("\\\""); break;
+                    case '\\': sb.Append("\\\\"); break;
+                    case '\b': sb.Append("\\b"); break;
+                    case '\f': sb.Append("\\f"); break;
+                    case '\n': sb.Append("\\n"); break;
+                    case '\r': sb.Append("\\r"); break;
+                    case '\t': sb.Append("\\t"); break;
+                    default:
+                        if (c < ' ') sb.Append("\\u").Append(((int)c).ToString("x4"));
+                        else sb.Append(c);
+                        break;
+                }
+            }
+            sb.Append('"');
+            return sb.ToString();
+        }
+
+        /// <summary>A number as JSON writes one (RFC 8259): no NaN, Infinity, thousands separators or spaces.</summary>
+        private static readonly System.Text.RegularExpressions.Regex JsonNumber =
+            new(@"^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$", System.Text.RegularExpressions.RegexOptions.CultureInvariant);
 
         // LSL JSON special constants — values match Phlox DefaultConstants.cs
         private const string JSON_INVALID = "\uFDD0";
+        private const string JSON_OBJECT  = "\uFDD1";
+        private const string JSON_ARRAY   = "\uFDD2";
+        private const string JSON_NUMBER  = "\uFDD3";
+        private const string JSON_STRING  = "\uFDD4";
+        private const string JSON_NULL    = "\uFDD5";
+        private const string JSON_TRUE    = "\uFDD6";
+        private const string JSON_FALSE   = "\uFDD7";
         private const string JSON_DELETE  = "\uFDD8";
-        private const int    JSON_APPEND  = -1;
 
         public string llJsonSetValue(string json, LSLList specifiers, string value)
         {
             if (specifiers == null || specifiers.Data.Length == 0)
                 return JSON_INVALID;
-            if (string.IsNullOrEmpty(json))
-                json = "{}";  // default to empty object per LSL spec
+            json = StripBom(json);
             try
             {
+                // Empty input: the specifiers build the whole value, so an index starts an array, as Halcyon and
+                // YEngine start one (llJsonSetValue("", [0], "x") is ["x"]), and a key starts an object.
+                if (string.IsNullOrEmpty(json))
+                    return JsonNodeSerialize(JsonBuildRest(specifiers.Data, 0, value));
                 using var doc = System.Text.Json.JsonDocument.Parse(json);
                 // Clone root into a mutable structure, apply the set, serialize back
                 var root = JsonElementToNode(doc.RootElement);
@@ -8931,7 +16764,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 for (int i = 0; i < obj.Members.Count; i++)
                 {
                     if (i > 0) sb.Append(',');
-                    sb.Append(System.Text.Json.JsonSerializer.Serialize(obj.Members[i].Key));
+                    sb.Append(JsonQuote(obj.Members[i].Key));
                     sb.Append(':');
                     sb.Append(JsonNodeSerialize(obj.Members[i].Value));
                 }
@@ -8953,14 +16786,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return "null";
         }
 
-        /// <summary>Convert an LSL value string to a JNode for insertion into the tree.</summary>
+        /// <summary>
+        /// Convert an LSL value string to a JNode for insertion into the tree. JSON_TRUE, JSON_FALSE and JSON_NULL, and
+        /// the plain words true, false and null, are literals (Halcyon DetectJson and YEngine JsonSetSpecific agree);
+        /// framed JSON objects and arrays are parsed; a number is written bare only when it is a JSON number; anything
+        /// else, quoted values included, is a JSON string.
+        /// </summary>
         private static JNode JsonValueToNode(string value)
         {
             if (value == null) return new JValue("null");
-            // LSL special sentinel constants are stored as bare words
-            if (value == "\uFDD6") return new JValue("true");   // JSON_TRUE
-            if (value == "\uFDD7") return new JValue("false");  // JSON_FALSE
-            if (value == "\uFDD5") return new JValue("null");   // JSON_NULL
+            if (value == JSON_TRUE || value == "true") return new JValue("true");
+            if (value == JSON_FALSE || value == "false") return new JValue("false");
+            if (value == JSON_NULL || value == "null") return new JValue("null");
             // If it looks like JSON structure, parse it
             string trimmed = value.Trim();
             if ((trimmed.StartsWith("{") && trimmed.EndsWith("}")) ||
@@ -8973,12 +16810,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
                 catch { /* fall through to string */ }
             }
-            // Numeric?
-            if (double.TryParse(trimmed, System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out _))
-                return new JValue(trimmed);
-            // Plain string — quote it
-            return new JValue(System.Text.Json.JsonSerializer.Serialize(value));
+            if (JsonNumber.IsMatch(trimmed)) return new JValue(trimmed);
+            return new JValue(JsonQuote(value));
         }
 
         /// <summary>
@@ -9092,43 +16925,18 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
         }
 
-        private static string SimpleJsonNavigate(string json, object[] path)
+        /// <summary>
+        /// SL (llList2Json): string items "are interpreted as JSON"; true, false and null (and JSON_TRUE, JSON_FALSE,
+        /// JSON_NULL) become literals; strings are trimmed; JSON objects, arrays and quoted strings are kept as they are;
+        /// "Strings containing valid JSON numbers convert to JSON strings"; a JSON_OBJECT list must be strided key, value
+        /// pairs, else JSON_INVALID (Halcyon :15438-15444).
+        /// </summary>
+        public string llList2Json(string type, LSLList values)
         {
-            // Minimal JSON navigator — walks path keys/indices into a JSON string
-            string cur = json.Trim();
-            foreach (object seg in path)
-            {
-                cur = cur.Trim();
-                if (cur.StartsWith("{"))
-                {
-                    string key = seg.ToString();
-                    var doc = System.Text.Json.JsonDocument.Parse(cur);
-                    if (!doc.RootElement.TryGetProperty(key, out var el)) return null;
-                    cur = el.GetRawText();
-                }
-                else if (cur.StartsWith("["))
-                {
-                    if (!int.TryParse(seg.ToString(), out int idx)) return null;
-                    var doc = System.Text.Json.JsonDocument.Parse(cur);
-                    var arr = doc.RootElement;
-                    if (idx < 0 || idx >= arr.GetArrayLength()) return null;
-                    cur = arr[idx].GetRawText();
-                }
-                else return null;
-            }
-            // Unwrap string quotes
-            if (cur.StartsWith("\"") && cur.EndsWith("\""))
-                return System.Text.Json.JsonSerializer.Deserialize<string>(cur);
-            return cur;
-        }
-            public string llList2Json(string type, LSLList values)
-        {
-            const string LSL_JSON_ARRAY   = "\uFDD2";  // Phlox JSON_ARRAY constant
-            const string LSL_JSON_OBJECT  = "\uFDD1";  // Phlox JSON_OBJECT constant
             if (values == null) return JSON_INVALID;
             try
             {
-                if (type == LSL_JSON_ARRAY)
+                if (type == JSON_ARRAY)
                 {
                     var sb = new System.Text.StringBuilder("[");
                     for (int i = 0; i < values.Data.Length; i++)
@@ -9139,18 +16947,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     sb.Append(']');
                     return sb.ToString();
                 }
-                else if (type == LSL_JSON_OBJECT)
+                else if (type == JSON_OBJECT)
                 {
+                    if (values.Data.Length % 2 != 0) return JSON_INVALID;
                     var sb = new System.Text.StringBuilder("{");
-                    bool first = true;
-                    for (int i = 0; i + 1 < values.Data.Length; i += 2)
+                    for (int i = 0; i < values.Data.Length; i += 2)
                     {
-                        if (!(values.Data[i] is string)) return JSON_INVALID;
-                        if (!first) sb.Append(',');
-                        first = false;
-                        sb.Append('"');
-                        sb.Append(((string)values.Data[i]).Replace("\\", "\\\\").Replace("\"", "\\\""));
-                        sb.Append("\":");
+                        if (!(values.Data[i] is string key)) return JSON_INVALID;
+                        if (i > 0) sb.Append(',');
+                        sb.Append(JsonQuote(key));
+                        sb.Append(':');
                         sb.Append(JsonValueFromObject(values.Data[i + 1]));
                     }
                     sb.Append('}');
@@ -9161,44 +16967,67 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             catch { return JSON_INVALID; }
         }
 
+        /// <summary>One llList2Json item as JSON text.</summary>
         private static string JsonValueFromObject(object o)
         {
             if (o == null) return "null";
-            if (o is int iv)    return iv.ToString();
-            if (o is float fv)  return fv.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            if (o is double dv) return dv.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (o is int iv) return iv.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (o is float || o is double)
+            {
+                double d = Convert.ToDouble(o);
+                // JSON has no NaN or infinity; they go as strings, as YEngine writes them (LSL_Api.cs ListToJson).
+                if (double.IsNaN(d)) return "\"NaN\"";
+                if (double.IsInfinity(d)) return d > 0 ? "\"Inf\"" : "\"-Inf\"";
+                return o is float fv ? fv.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                                     : d.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
             if (o is string sv)
             {
-                if (sv == "true" || sv == "false" || sv == "null") return sv;
-                if (double.TryParse(sv, System.Globalization.NumberStyles.Any,
-                    System.Globalization.CultureInfo.InvariantCulture, out _)) return sv;
-                return "\"" + sv.Replace("\\","\\\\").Replace("\"","\\\"") + "\"";
+                string t = sv.Trim();
+                if (t == JSON_TRUE || t == "true") return "true";
+                if (t == JSON_FALSE || t == "false") return "false";
+                if (t == JSON_NULL || t == "null") return "null";
+                if (IsFramedJson(t)) return t;
+                return JsonQuote(t);
             }
-            return "\"" + o.ToString() + "\"";
+            return JsonQuote(ListElementStrings(new LSLList(new object[] { o })).First());
         }
+
+        /// <summary>An object, an array or a quoted string that is valid JSON, which llList2Json keeps as it is.</summary>
+        private static bool IsFramedJson(string t)
+        {
+            if (t.Length < 2) return false;
+            char first = t[0], last = t[t.Length - 1];
+            if (!((first == '{' && last == '}') || (first == '[' && last == ']') || (first == '"' && last == '"'))) return false;
+            return TryJsonParse(t, out _);
+        }
+
+        /// <summary>
+        /// SL (llJson2List): a single value gives "a list with 1 item"; an object "a strided list of key, value pairs";
+        /// nested objects and arrays "are returned as json strings". true, false and null give JSON_TRUE, JSON_FALSE and
+        /// JSON_NULL. Text that is not JSON comes back as a one-item list of itself, as Halcyon (:15296-15305) and
+        /// YEngine return it.
+        /// </summary>
         public LSLList llJson2List(string src)
         {
             if (string.IsNullOrEmpty(src)) return new LSLList();
-            try
+            if (!TryJsonParse(src, out var root)) return new LSLList(new object[] { StripBom(src) });
+            var result = new System.Collections.Generic.List<object>();
+            if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
             {
-                var doc = System.Text.Json.JsonDocument.Parse(src);
-                var result = new System.Collections.Generic.List<object>();
-                if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
-                {
-                    foreach (var el in doc.RootElement.EnumerateArray())
-                        result.Add(JsonElementToLSL(el));
-                }
-                else if (doc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object)
-                {
-                    foreach (var prop in doc.RootElement.EnumerateObject())
-                    {
-                        result.Add(prop.Name);
-                        result.Add(JsonElementToLSL(prop.Value));
-                    }
-                }
-                return new LSLList(result.ToArray());
+                foreach (var el in root.EnumerateArray())
+                    result.Add(JsonElementToLSL(el));
             }
-            catch { return new LSLList(); }
+            else if (root.ValueKind == System.Text.Json.JsonValueKind.Object)
+            {
+                foreach (var prop in root.EnumerateObject())
+                {
+                    result.Add(prop.Name);
+                    result.Add(JsonElementToLSL(prop.Value));
+                }
+            }
+            else result.Add(JsonElementToLSL(root));
+            return new LSLList(result.ToArray());
         }
 
         private static object JsonElementToLSL(System.Text.Json.JsonElement el)
@@ -9208,9 +17037,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 System.Text.Json.JsonValueKind.Number =>
                     el.TryGetInt32(out int i) ? (object)i : (object)el.GetSingle(),
                 System.Text.Json.JsonValueKind.String  => el.GetString() ?? string.Empty,
-                System.Text.Json.JsonValueKind.True    => 1,
-                System.Text.Json.JsonValueKind.False   => 0,
-                System.Text.Json.JsonValueKind.Null    => "null",
+                System.Text.Json.JsonValueKind.True    => JSON_TRUE,
+                System.Text.Json.JsonValueKind.False   => JSON_FALSE,
+                System.Text.Json.JsonValueKind.Null    => JSON_NULL,
                 _                                      => el.GetRawText()
             };
         }
@@ -9329,39 +17158,69 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         if (iwVerifyType(str, index) == 1) return index;
                     }
                     return 3;
-                case 1: // TYPE_INTEGER
+                case TYPE_INTEGER:
                     return int.TryParse(str, out _) ? 1 : 0;
-                case 2: // TYPE_FLOAT
+                case TYPE_FLOAT:
                     return float.TryParse(str, out _) ? 1 : 0;
-                case 4: // TYPE_KEY
+                case TYPE_KEY:
                     return UUID.TryParse(str, out _) ? 1 : 0;
-                case 5: // TYPE_VECTOR
+                case TYPE_VECTOR:
                     if (str == null || str.Count(c => c == ',') != 2) return 0;
                     return Vector3.TryParse(str, out _) ? 1 : 0;
-                case 6: // TYPE_ROTATION
+                case TYPE_ROTATION:
                     if (str == null || str.Count(c => c == ',') != 3) return 0;
                     return Quaternion.TryParse(str, out _) ? 1 : 0;
-                case 3: // TYPE_STRING
+                case TYPE_STRING:
                     return 1;
                 default:
                     return -1;
             }
         }
+        // Halcyon's Constants.GenericReturnCodes, iwGroupInvite/iwGroupEject's answers (Halcyon OpenSim/Framework/Constants.cs).
+        /// <summary>SUCCESS - Halcyon's groups module answers it when the invite or eject was done.</summary>
+        private const int HALCYON_RC_SUCCESS = 0;
+        /// <summary>ERROR - "generic error, internal server failure (like module not available)".</summary>
+        private const int HALCYON_RC_ERROR = 2;
+        /// <summary>PARAMETER - a bad group or user key, a bad group, or an unknown role.</summary>
+        private const int HALCYON_RC_PARAMETER = 3;
+        /// <summary>PERMISSION - the refusal when the script's owner is not its creator.</summary>
+        private const int HALCYON_RC_PERMISSION = 5;
+
+        /// <summary>
+        /// Halcyon's ScriptOwnerIsCreator - the calling script's owner must be its creator, so a resold
+        /// object cannot invite or eject on its new owner's behalf with someone else's script.
+        /// </summary>
+        private bool ScriptOwnerIsCreator()
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            return item != null && item.CreatorID == item.OwnerID;
+        }
+
+        /// <summary>
+        /// Halcyon (LSLSystemAPI.iwGroupInvite): PARAMETER for a bad key, a bad group or an unknown role, PERMISSION when
+        /// the script's owner is not its creator, otherwise the groups module's result. Core's IGroupsModule.InviteGroup
+        /// returns nothing, so a call it accepts answers SUCCESS; no module or a failing one answers ERROR.
+        /// </summary>
         public int iwGroupInvite(string group, string user, string role)
         {
-            // Faithful port from Halcyon
-            if (!UUID.TryParse(group, out UUID groupID) || groupID == UUID.Zero) return -3;
-            if (!UUID.TryParse(user, out UUID userID) || userID == UUID.Zero) return -3;
+            if (!UUID.TryParse(group, out UUID groupID) || groupID == UUID.Zero) return HALCYON_RC_PARAMETER;
+            if (!UUID.TryParse(user, out UUID userID) || userID == UUID.Zero) return HALCYON_RC_PARAMETER;
             if (string.IsNullOrEmpty(role)) role = "Everyone";
+
+            if (!ScriptOwnerIsCreator())
+            {
+                ScriptShoutError("LSL Runtime Error: iwGroupInvite requires the owner of the calling script to be the creator of the script.");
+                return HALCYON_RC_PERMISSION;
+            }
 
             try
             {
                 IGroupsModule groupsModule = World?.RequestModuleInterface<IGroupsModule>();
-                if (groupsModule == null) return -1;
+                if (groupsModule == null) return HALCYON_RC_ERROR;
 
                 // Look up the role by name
                 List<GroupRolesData> roles = groupsModule.GroupRoleDataRequest(null, groupID);
-                if (roles == null || roles.Count == 0) return -3;
+                if (roles == null) return HALCYON_RC_PARAMETER;   // Halcyon: "groupID bad, or internal/system error"
 
                 UUID roleID = UUID.Zero;
                 bool found = false;
@@ -9374,34 +17233,41 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                         break;
                     }
                 }
-                if (!found) return -3;
+                if (!found) return HALCYON_RC_PARAMETER;          // Halcyon: "unknown role"
 
                 groupsModule.InviteGroup(null, m_host.OwnerID, groupID, userID, roleID);
-                return 1;
+                return HALCYON_RC_SUCCESS;
             }
             catch (Exception e)
             {
                 m_log.LogWarning("[PhloxAPI]: iwGroupInvite exception: {0}", e.Message);
-                return -1;
+                return HALCYON_RC_ERROR;
             }
         }
+
+        /// <summary>Halcyon (LSLSystemAPI.iwGroupEject), with the same answers as <see cref="iwGroupInvite"/>.</summary>
         public int iwGroupEject(string group, string user)
         {
-            // Faithful port from Halcyon
-            if (!UUID.TryParse(group, out UUID groupID) || groupID == UUID.Zero) return -3;
-            if (!UUID.TryParse(user, out UUID userID) || userID == UUID.Zero) return -3;
+            if (!UUID.TryParse(group, out UUID groupID) || groupID == UUID.Zero) return HALCYON_RC_PARAMETER;
+            if (!UUID.TryParse(user, out UUID userID) || userID == UUID.Zero) return HALCYON_RC_PARAMETER;
+
+            if (!ScriptOwnerIsCreator())
+            {
+                ScriptShoutError("LSL Runtime Error: iwGroupEject requires the owner of the calling script to be the creator of the script.");
+                return HALCYON_RC_PERMISSION;
+            }
 
             try
             {
                 IGroupsModule groupsModule = World?.RequestModuleInterface<IGroupsModule>();
-                if (groupsModule == null) return -1;
+                if (groupsModule == null) return HALCYON_RC_ERROR;
                 groupsModule.EjectGroupMember(null, m_host.OwnerID, groupID, userID);
-                return 1;
+                return HALCYON_RC_SUCCESS;
             }
             catch (Exception e)
             {
                 m_log.LogWarning("[PhloxAPI]: iwGroupEject exception: {0}", e.Message);
-                return -1;
+                return HALCYON_RC_ERROR;
             }
         }
         public int iwClampInt(int value, int min, int max)
@@ -9416,14 +17282,19 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (max < min) return Math.Min(min, Math.Max(value, max));
             return Math.Min(max, Math.Max(value, min));
         }
-        public int iwIntRand(int max) { return new Random().Next(max < 0 ? max : 0, Math.Abs(max) + 1); }
+        /// <summary>Halcyon (LSLSystemAPI.cs:792-795): 0..max, or max..0 for a negative max.</summary>
+        public int iwIntRand(int max)
+        {
+            if (max < 0) return -ThreadRandom.Next((int)Math.Min(-(long)max + 1, int.MaxValue));
+            return ThreadRandom.Next((int)Math.Min((long)max + 1, int.MaxValue));
+        }
         public int iwIntRandRange(int min, int max) { if (min == max) return min; if (max < min) { int t = min; min = max; max = t; } return new Random().Next(min, max + 1); }
         public float iwFrandRange(float min, float max) { if (min == max) return min; if (max < min) { float t = min; min = max; max = t; } return (float)(new Random().NextDouble() * (max - min) + min); }
         public LSLList iwSearchLinksByName(string pattern, int matchType, int linksOnly)
         {
             if (matchType > 2)
             {
-                ShoutError("IW_MATCH_COUNT/REGEX not valid for iwSearchLinksByName");
+                ScriptShoutError("IW_MATCH_COUNT/REGEX not valid for iwSearchLinksByName");
                 return new LSLList();
             }
             List<object> ret = new List<object>();
@@ -9443,7 +17314,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             if (matchType > 2)
             {
-                ShoutError("IW_MATCH_COUNT/REGEX not valid for iwSearchLinksByDesc");
+                ScriptShoutError("IW_MATCH_COUNT/REGEX not valid for iwSearchLinksByDesc");
                 return new LSLList();
             }
             List<object> ret = new List<object>();
@@ -9563,10 +17434,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return string.Empty;
         }
 
-        public void botChangeOwner(string botID, string newOwnerID)
-        {
-            // NotImplemented in Halcyon — kept as no-op
-        }
+        // NotImplemented in Halcyon - kept as no-op. With Halcyon's error, LSLSystemAPI.cs:17301.
+        public void botChangeOwner(string botID, string newOwnerID) => NotImplemented("botChangeOwner");
 
         public LSLList botGetAllBotsInRegion()
         {
@@ -9916,10 +17785,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 Dictionary<int, object> dictOptions = new Dictionary<int, object>();
                 for (int i = 0; i < options.Length; i += 2)
                 {
+                    // Halcyon: an integer key, then an integer, float or vector value, else BOT_ERROR
+                    if (!BotOptionTypesOk(options, i, allowVector: true)) return -3; // BOT_ERROR
                     int option = options.GetLSLIntegerItem(i);
                     if (dictOptions.ContainsKey(option))
                     {
-                        ShoutError(string.Format("botFollowAvatar: options list already includes option {0}", option));
+                        ScriptShoutError(string.Format("botFollowAvatar: options list already includes option {0}", option));
                         dictOptions.Remove(option);
                     }
                     dictOptions.Add(option, options.Data[i + 1]);
@@ -9952,14 +17823,20 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             UUID id = ParseBotID(botID);
             if (id == UUID.Zero) return;
 
+            // Halcyon: a vector is a point; a number is BOT_TRAVELMODE_WAIT's duration in seconds, passed as <seconds, 0, 0>;
+            // anything else cancels the call. A point below the ground is lifted to it.
             List<Vector3> positionsMap = new List<Vector3>();
             for (int i = 0; i < positions.Length; i++)
             {
-                Vector3 pos = positions.GetVector3Item(i);
+                Vector3 pos;
+                VarType type = positions.GetItemType(i);
+                if (type == VarType.Vector) pos = positions.GetVector3Item(i);
+                else if (type == VarType.Float || type == VarType.Integer) pos = new Vector3(positions.GetLSLFloatItem(i), 0f, 0f);
+                else return;
                 pos.X = Math.Clamp(pos.X, 0f, 256f);
                 pos.Y = Math.Clamp(pos.Y, 0f, 256f);
                 pos.Z = Math.Max(pos.Z, 0f);
-                float zmin = (float)World.Heightmap[(int)Math.Clamp(pos.X, 0, 255), (int)Math.Clamp(pos.Y, 0, 255)];
+                float zmin = World.Heightmap.GetHeight(Math.Clamp(pos.X, 0f, 255.99f), Math.Clamp(pos.Y, 0f, 255.99f));
                 if (pos.Z < zmin) pos.Z = zmin;
                 positionsMap.Add(pos);
             }
@@ -9967,6 +17844,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             List<TravelMode> travelMap = new List<TravelMode>();
             for (int i = 0; i < movementTypes.Length; i++)
             {
+                if (movementTypes.GetItemType(i) != VarType.Integer) return;
                 int travel = movementTypes.GetLSLIntegerItem(i);
                 travelMap.Add((TravelMode)travel);
             }
@@ -9976,10 +17854,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             Dictionary<int, object> dictOptions = new Dictionary<int, object>();
             for (int i = 0; i < options.Length; i += 2)
             {
+                if (!BotOptionTypesOk(options, i, allowVector: false)) return;
                 int option = options.GetLSLIntegerItem(i);
                 if (dictOptions.ContainsKey(option))
                 {
-                    ShoutError(string.Format("botSetNavigationPoints: options list already includes option {0}", option));
+                    ScriptShoutError(string.Format("botSetNavigationPoints: options list already includes option {0}", option));
                     dictOptions.Remove(option);
                 }
                 dictOptions.Add(option, options.Data[i + 1]);
@@ -9988,6 +17867,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.SetBotNavigationPoints(id, positionsMap, travelMap, dictOptions, m_host.OwnerID);
+        }
+
+        /// <summary>A bot navigation option pair as Halcyon took it: an integer key, then an integer or float value (or a vector, for botFollowAvatar).</summary>
+        private static bool BotOptionTypesOk(LSLList options, int i, bool allowVector)
+        {
+            if (options.GetItemType(i) != VarType.Integer) return false;
+            VarType value = options.GetItemType(i + 1);
+            return value == VarType.Integer || value == VarType.Float || (allowVector && value == VarType.Vector);
         }
 
         public void botWanderWithin(string botID, Vector3 origin, float xDistance, float yDistance, LSLList options)
@@ -10000,10 +17887,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             Dictionary<int, object> dictOptions = new Dictionary<int, object>();
             for (int i = 0; i < options.Length; i += 2)
             {
+                if (!BotOptionTypesOk(options, i, allowVector: false)) return;
                 int option = options.GetLSLIntegerItem(i);
                 if (dictOptions.ContainsKey(option))
                 {
-                    ShoutError(string.Format("botWanderWithin: options list already includes option {0}", option));
+                    ScriptShoutError(string.Format("botWanderWithin: options list already includes option {0}", option));
                     dictOptions.Remove(option);
                 }
                 dictOptions.Add(option, options.Data[i + 1]);
@@ -10024,8 +17912,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
             {
-                UUID animID = FindInventoryItem(animation, (int)AssetType.Animation)?.AssetID ?? UUID.Zero;
-                if (animID == UUID.Zero) UUID.TryParse(animation, out animID);
+                // Inventory or built-in name, never a key (Halcyon LSLSystemAPI.cs:17841-17842, as llStartAnimation).
+                UUID animID = AnimationToStart(m_host, animation);
+                if (animID == UUID.Zero) return;
                 manager.StartBotAnimation(id, animID, animation, m_host.UUID, m_host.OwnerID);
             }
         }
@@ -10055,6 +17944,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.BotChat(id, channel, message, ChatTypeEnum.Whisper, m_host.OwnerID);
+            BotSleep();
         }
 
         public void botSay(string botID, int channel, string message)
@@ -10065,6 +17955,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.BotChat(id, channel, message, ChatTypeEnum.Say, m_host.OwnerID);
+            BotSleep();
         }
 
         public void botShout(string botID, int channel, string message)
@@ -10075,6 +17966,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.BotChat(id, channel, message, ChatTypeEnum.Shout, m_host.OwnerID);
+            BotSleep();
         }
 
         public void botStartTyping(string botID)
@@ -10085,6 +17977,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.BotChat(id, 0, string.Empty, ChatTypeEnum.StartTyping, m_host.OwnerID);
+            BotSleep();
         }
 
         public void botStopTyping(string botID)
@@ -10095,6 +17988,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.BotChat(id, 0, string.Empty, ChatTypeEnum.StopTyping, m_host.OwnerID);
+            BotSleep();
         }
 
         public void botSendInstantMessage(string botID, string userID, string message)
@@ -10132,6 +18026,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.SitBotOnObject(id, objID, m_host.OwnerID);
+            BotSleep();
         }
 
         public void botStandUp(string botID)
@@ -10142,6 +18037,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.StandBotUp(id, m_host.OwnerID);
+            BotSleep();
         }
 
         public void botTouchObject(string botID, string objectID)
@@ -10155,6 +18051,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IBotManager manager = GetBotManager();
             if (manager != null)
                 manager.BotTouchObject(id, objID, m_host.OwnerID);
+            BotSleep();
         }
 
         public void botGiveInventory(string botID, string destination, string inventory)
@@ -10167,7 +18064,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 if (id == UUID.Zero) return;
 
                 UUID destId = UUID.Zero;
-                if (!UUID.TryParse(destination, out destId)) return;
+                if (!UUID.TryParse(destination, out destId))
+                {
+                    // Halcyon said it on the public channel
+                    llSay(0, "Could not parse key " + destination);
+                    return;
+                }
 
                 bool found = false;
                 UUID objId = UUID.Zero;
@@ -10280,6 +18182,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (botSP == null) return;
 
             List<SceneObjectGroup> groups = botSP.GetAttachments();
+            var receivers = new List<UUID>();
             foreach (SceneObjectGroup group in groups)
             {
                 foreach (SceneObjectPart part in group.Parts)
@@ -10290,7 +18193,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
                     foreach (TaskInventoryItem item in itemsDictionary.Values)
                     {
-                        if (item.Type == 10) // INVENTORY_SCRIPT
+                        if (item.Type == INVENTORY_SCRIPT)
                         {
                             int linkNumber = m_host.LinkNum;
                             if (m_host.ParentGroup.PrimCount == 1)
@@ -10299,10 +18202,17 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             object[] resobj = new object[] { linkNumber, num, msg, id };
                             m_ScriptEngine.PostScriptEvent(item.ItemID,
                                 new EventParams("link_message", resobj, new DetectParams[0]));
+                            receivers.Add(item.ItemID);
                         }
                     }
                 }
             }
+            // A bot's attachments are rezzed like any avatar's, so their scripts may be another engine's: each other
+            // engine is offered the same scripts, once each.
+            int sender = m_host.ParentGroup.PrimCount == 1 ? 0 : m_host.LinkNum;
+            string text = msg ?? string.Empty, key = id ?? string.Empty;
+            OfferToOtherEngines("botMessageLinked", () => receivers, "link_message", () => new object[] { sender, num, text, key });
+            LinkMessageBackPressure(receivers);
         }
 
         // ── Bot Tagging ────────────────────────────────────────────────────────
@@ -10420,12 +18330,23 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return null;
         }
 
+        /// <summary>
+        /// The table says these requests return the query key, but their bodies were
+        /// void: the async shim (SyscallShim.RunAsync) returns only what the body hands to SysReturn,
+        /// so the script got nothing back and stopped with "Stack empty". The key goes back through
+        /// the deferred call's sequenced return (SysReturn records it on the call's SyscallContext; CompleteSyscall
+        /// posts it with the call's sequence number), and the dataserver event carries the same key.
+        /// </summary>
+        private void ReturnQueryKey(UUID queryID) => m_ScriptEngine.SysReturn(m_itemID, queryID.ToString(), 0);
+
         private void PostDataserverEvent(UUID queryID, string data)
         {
-            m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                "dataserver",
-                new object[] { queryID.ToString(), data },
-                new DetectParams[0]));
+            // The asking script gets only a reply it is still owed - one asked for before a reset, state change or
+            // unload is not posted to it (Halcyon Dataserver.RemoveEvents).
+            // Every other script in the prim gets it all the same (SL: "all scripts within the same prim
+            // where the request was made"; the wiki says nothing of a reset, state change or removal in between).
+            bool owed = m_PendingDataserver.TryRemove(queryID, out _);
+            m_ScriptEngine?.PostDataserverToPrim(m_host, owed ? UUID.Zero : m_itemID, queryID.ToString(), data);
         }
 
         private static string StripNotecardHeader(string raw)
@@ -10437,7 +18358,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int bodyStart = raw.IndexOf('\n', marker + 1);
             if (bodyStart < 0) return string.Empty;
             string body = raw.Substring(bodyStart + 1);
-            if (body.EndsWith("\n}", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 2);
+            // The body is followed by "}\n" (AssetNotecard.Encode and the viewer both write it so), which the
+            // EndsWith checks below never matched - the last line came back as "text}" with an empty line after it.
+            // "Text length N" says how long the body is; take exactly that when it fits.
+            string lenText = raw.Substring(marker + 13, bodyStart - (marker + 13)).Trim();
+            if (int.TryParse(lenText, out int declared) && declared >= 0 && declared <= body.Length)
+                return body.Substring(0, declared);
+            if (body.EndsWith("}\n", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 2);
+            else if (body.EndsWith("\n}", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 2);
             else if (body.EndsWith("}", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 1);
             return body;
         }
@@ -10451,7 +18379,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 				case SupportedEventList.Events.ATTACH:              return (ulong)scriptEvents.attach;
 				case SupportedEventList.Events.STATE_EXIT:          return (ulong)scriptEvents.state_exit;
 				case SupportedEventList.Events.TIMER:               return (ulong)scriptEvents.timer;
-				case SupportedEventList.Events.TOUCH:               return (ulong)scriptEvents.touch;
+				// touch() also asks for touch_start and touch_end. The region gives a prim each of the three only when it
+				// advertises that one (Scene.ProcessObjectGrab, ProcessObjectDeGrab), and SL's touch() is "Triggered on
+				// touch start, each minimum event delay while held, and touch end": the repeat starts at touch_start and
+				// stops at touch_end even when the state has no handler for them (the scheduler drops those events).
+				case SupportedEventList.Events.TOUCH:
+					return (ulong)(scriptEvents.touch | scriptEvents.touch_start | scriptEvents.touch_end);
 				case SupportedEventList.Events.COLLISION:           return (ulong)scriptEvents.collision;
 				case SupportedEventList.Events.COLLISION_END:       return (ulong)scriptEvents.collision_end;
 				case SupportedEventList.Events.COLLISION_START:     return (ulong)scriptEvents.collision_start;
@@ -10484,6 +18417,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 				case SupportedEventList.Events.HTTP_REQUEST:        return (ulong)scriptEvents.http_request;
 				case SupportedEventList.Events.TRANSACTION_RESULT:  return (ulong)scriptEvents.transaction_result;
 				case SupportedEventList.Events.LINKSET_DATA:        return (ulong)scriptEvents.linkset_data;
+				// The five SL events, now in both enums.
+				case SupportedEventList.Events.PATH_UPDATE:         return (ulong)scriptEvents.path_update;
+				case SupportedEventList.Events.ON_DAMAGE:           return (ulong)scriptEvents.on_damage;
+				case SupportedEventList.Events.FINAL_DAMAGE:        return (ulong)scriptEvents.final_damage;
+				case SupportedEventList.Events.ON_DEATH:            return (ulong)scriptEvents.on_death;
+				case SupportedEventList.Events.GAME_CONTROL:        return (ulong)scriptEvents.game_control;
 				// Note: the following events are intentionally deferred — each requires a
 				// coordinated two-sided change (Phlox SupportedEventList AND core OpenSim
 				// scriptEvents enum / posting infrastructure) before a case label here is safe.
@@ -10494,7 +18433,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 				//   Wiring requires adding the enum member AND confirming the pathfinding
 				//   subsystem posts it. Deferred pending evaluation.
 				// - EXPERIENCE_PERMISSIONS / EXPERIENCE_PERMISSIONS_DENIED: SL Experience
-				//   system is out of scope for Legion Grid; no OpenSim infrastructure exists.
+				//   system is out of scope for this port; no OpenSim infrastructure exists.
 				default: return 0UL;
                         }
                 }
@@ -10603,7 +18542,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             foreach (var entry in shape.RenderMaterials.entries)
             {
                 if (entry.te_index == (byte)face)
-                    return entry.id.ToString();
+                    return ConditionalMaterialNameOrUUID(m_host, entry.id.ToString());
             }
             return string.Empty;
         }
@@ -10939,7 +18878,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             var osd = GetGLTFOverrideMap(part, face);
 
             // texture
-            result.Add(osd != null && osd.ContainsKey("tex") ? osd["tex"].AsString() : string.Empty);
+            result.Add(ConditionalMaterialNameOrUUID(part, osd != null && osd.ContainsKey("tex") ? osd["tex"].AsString() : string.Empty));
             // repeats
             if (osd != null && osd.ContainsKey("rep") && osd["rep"] is OpenMetaverse.StructuredData.OSDArray repArr && repArr.Count >= 2)
                 result.Add(new Vector3((float)repArr[0].AsReal(), (float)repArr[1].AsReal(), 0f));
@@ -10976,7 +18915,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             var osd = GetGLTFOverrideMap(part, face);
 
             // texture
-            result.Add(osd != null && osd.ContainsKey(texKey) ? osd[texKey].AsString() : string.Empty);
+            result.Add(ConditionalMaterialNameOrUUID(part, osd != null && osd.ContainsKey(texKey) ? osd[texKey].AsString() : string.Empty));
             // repeats
             if (osd != null && osd.ContainsKey(repKey) && osd[repKey] is OpenMetaverse.StructuredData.OSDArray repArr && repArr.Count >= 2)
                 result.Add(new Vector3((float)repArr[0].AsReal(), (float)repArr[1].AsReal(), 0f));
@@ -11062,27 +19001,25 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             return sp.Health;
         }
 
-        public void llAdjustDamage(string id, float amount)
+        /// <summary>
+        /// SL's llAdjustDamage(integer number, float new_damage): inside on_damage, rewrite the
+        /// pending entry's amount before it lands (wiki: "modifies the amount of damage that will be applied
+        /// by the current on_damage event after it has completed"). Anywhere else: an error on DEBUG_CHANNEL,
+        /// as the wiki says. Out-of-range or negative index: silent. The older (key, amount) form,
+        /// an OpenSim-ism with the same arity, is gone - llDamage is the SL way to deal damage.
+        /// </summary>
+        public void llAdjustDamage(int number, float newDamage)
         {
-            if (!UUID.TryParse(id, out UUID agentId))
-                return;
-            ScenePresence sp = World?.GetScenePresence(agentId);
-            if (sp == null || sp.IsChildAgent || sp.Invulnerable || sp.IsViewerUIGod)
-                return;
-            if (!World.RegionInfo.RegionSettings.AllowDamage)
-                return;
-
-            float newHealth = sp.Health - amount;
-            if (newHealth <= 0f)
+            var state = m_thisScript?.ScriptState;
+            if (state?.RunningEvent == null || state.RunningEvent.EventType != InWorldz.Phlox.Types.SupportedEventList.Events.ON_DAMAGE)
             {
-                sp.setHealthWithUpdate(0f);
-                sp.Scene.EventManager.TriggerAvatarKill(m_host.LocalId, sp);
+                ShoutError("llAdjustDamage: only valid inside an on_damage handler");
+                return;
             }
-            else
-            {
-                if (newHealth > 100f) newHealth = 100f;
-                sp.setHealthWithUpdate(newHealth);
-            }
+            var vars = state.RunningEvent.DetectVars;
+            if (vars == null || number < 0 || number >= vars.Length) return;
+            vars[number].Damage = newDamage;
+            vars[number].AdjustDamage?.Invoke(newDamage);
         }
 
         public void llSetHealth(string id, float health)
@@ -11096,15 +19033,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 return;
 
             health = Math.Clamp(health, 0f, 100f);
-            if (health <= 0f)
-            {
-                sp.setHealthWithUpdate(0f);
-                sp.Scene.EventManager.TriggerAvatarKill(m_host.LocalId, sp);
-            }
-            else
-            {
-                sp.setHealthWithUpdate(health);
-            }
+            // An absolute set is a damage of (current - target) through the one door - a heal is
+            // a negative amount. Invulnerable / god presences keep their health, as the door rules.
+            sp.ApplyDamage(m_host.UUID, m_host.OwnerID, m_host.LocalId, sp.Health - health, DamageEntry.TYPE_GENERIC, true);
         }
 
 		// -- Tier 4: Pathfinding / Character System (606-628) --
@@ -11112,12 +19043,12 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 		// Region-qualified key: (regionID, prim localID). LocalIDs are unique only within
 		// a single region; in a multi-region process two prims in different regions can share
 		// a localID. Keying by (regionID, localID) prevents cross-region character state
-		// collision. See memory-session-f-plan.md (M-14).
+		// collision.
 		private (UUID, uint) CharKey => (World.RegionInfo.RegionID, m_host.LocalId);
 		private static readonly Dictionary<(UUID, uint), UUID> s_primCharacters = new();
 		private static readonly object s_charLock = new();
 
-        // Called by PhloxEngine.OnObjectBeingRemovedFromScene when a prim leaves the scene (M-14b).
+        // Called by PhloxEngine.OnObjectBeingRemovedFromScene when a prim leaves the scene.
         // Removes the dict entry and returns the botID so the caller can remove the bot from BotManager.
         // Returns UUID.Zero if no character was registered for this prim.
         internal static UUID ClearCharacter(UUID regionID, uint localID)
@@ -11134,7 +19065,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             return UUID.Zero;
         }
 
-        // Called by PhloxEngine.RemoveRegion to purge all character dict entries for a region (M-14b).
+        // Called by PhloxEngine.RemoveRegion to purge all character dict entries for a region.
         // BotManager.RemoveRegion already removes the bot NPCs; this cleans only the dict.
         internal static void ClearRegionCharacters(UUID regionID)
         {
@@ -11158,13 +19089,13 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         public LSLList llGetClosestNavPoint(Vector3 point, LSLList options)
         {
-            // No navmesh in Legion — return the requested point as the closest navigable point
+            // No navmesh in this tree — return the requested point as the closest navigable point
             return new LSLList(new object[] { point });
         }
 
         public LSLList llGetStaticPath(Vector3 start, Vector3 end, float radius, LSLList parameters)
         {
-            // No navmesh in Legion — return a straight-line path [start, end, status]
+            // No navmesh in this tree — return a straight-line path [start, end, status]
             // Status 0 = success per SL spec
             return new LSLList(new object[] { start, end, 0 });
         }
@@ -11204,7 +19135,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 			for (int i = 0; i < options.Length - 1; i += 2)
 			{
 				int opt = (int)options.Data[i];
-				if (opt == 12) // CHARACTER_DESIRED_SPEED
+				if (opt == CHARACTER_DESIRED_SPEED)
 					speed = (float)options.Data[i + 1];
 			}
 			string reason;
@@ -11237,7 +19168,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 			for (int i = 0; i < options.Length - 1; i += 2)
 			{
 				int opt = (int)options.Data[i];
-				if (opt == 12) // CHARACTER_DESIRED_SPEED
+				if (opt == CHARACTER_DESIRED_SPEED)
 				{
 					float speed = (float)options.Data[i + 1];
 					manager.SetBotSpeed(botID, speed, m_host.OwnerID);
@@ -11331,42 +19262,23 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         // ── 610–620: Experience KV Store (upgraded to use ExperienceService) ──
 
-        // ── SL Experience error codes (XP_ERROR_*) + limits, ported from Legion
-        //    (port-source-2026-07-22) to match the SL wiki XP_ERROR table 0-18.
-        //    Script-surface conformance — Experience port T1 (SS-1..9). ──
-        private const int XP_ERROR_NONE = 0;
-        private const int XP_ERROR_THROTTLED = 1;
-        private const int XP_ERROR_EXPERIENCES_DISABLED = 2;
-        private const int XP_ERROR_INVALID_PARAMETERS = 3;
-        private const int XP_ERROR_NOT_PERMITTED = 4;
-        private const int XP_ERROR_NO_EXPERIENCE = 5;
-        private const int XP_ERROR_NOT_FOUND = 6;
-        private const int XP_ERROR_INVALID_EXPERIENCE = 7;
-        private const int XP_ERROR_EXPERIENCE_DISABLED = 8;
-        private const int XP_ERROR_EXPERIENCE_SUSPENDED = 9;
-        private const int XP_ERROR_UNKNOWN_ERROR = 10;
-        private const int XP_ERROR_QUOTA_EXCEEDED = 11;
-        private const int XP_ERROR_STORE_DISABLED = 12;
-        private const int XP_ERROR_STORAGE_EXCEPTION = 13;
-        private const int XP_ERROR_KEY_NOT_FOUND = 14;
-        private const int XP_ERROR_RETRY_UPDATE = 15;
-        private const int XP_ERROR_MATURITY_EXCEEDED = 16;
-        private const int XP_ERROR_NOT_PERMITTED_LAND = 17;
-        private const int XP_ERROR_REQUEST_PERM_TIMEOUT = 18;
+        // ── SL Experience error codes (XP_ERROR_*) + limits, ported from the port source
+        //    to match the SL wiki XP_ERROR table 0-18.
+        //    Script-surface conformance with SL. ──
         // SL key-value key length cap (SL wiki llCreateKeyValue): 1011 bytes (was 255).
         private const int MAX_EXPERIENCE_KEY_LENGTH = 1011;
         // Viewer experience-property bit PROPERTY_DISABLED (indra VP_DISABLED = 1<<6);
         // used to report the llGetExperienceDetails state field.
         private const int VP_DISABLED = 1 << 6;
-        // SL per-experience KV quota: 128 MiB (was NGC's 16 MiB). T2 ports Legion DEC-2/UNV-5.
+        // SL per-experience KV quota: 128 MiB (was NGC's 16 MiB).
         private const long MAX_DATA_QUOTA = 128L * 1024 * 1024;
 
-        // UTF-8 byte count for a KV key/value — the quota basis (matches Legion's KvBytes and the
+        // UTF-8 byte count for a KV key/value — the quota basis (matches the port source's KvBytes and the
         // MySQL SUM(LENGTH(`key`)+LENGTH(`value`)) used-size on the grid backend).
         private static long KvBytes(string s) => s == null ? 0 : System.Text.Encoding.UTF8.GetByteCount(s);
 
         // True if updating `key` to `value` would push this experience's KV store over MAX_DATA_QUOTA.
-        // Delta-aware (Legion ExceedsQuota): an existing key swaps its value (key stays); a new key
+        // Delta-aware (port source ExceedsQuota): an existing key swaps its value (key stays); a new key
         // adds the whole pair. Basis: key+value UTF-8 bytes.
         private bool ExceedsQuota(PhloxExperienceAdapter expService, UUID expId, string key, string value)
         {
@@ -11377,12 +19289,13 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             return used - oldPair + newPair > MAX_DATA_QUOTA;
         }
 
-        // KV int return contract: 0 ok · -1 invalid/error · -2 duplicate (create) ·
-        // -3 CAS-fail/not-found (update) · -4 not-found (delete) · -5 quota exceeded (create/update).
-        // The ...SL wrappers translate these to the SL XP_ERROR codes.
-        public int llCreateKeyValue(string key, string value)
+        // Phlox's synchronous key-value contract, kept for the *SL names (618-620), which answer at once:
+        // 0 ok · -1 invalid/error · -2 duplicate (create) · -3 CAS-fail/not-found (update) · -5 quota exceeded · -6 value over 4095 bytes.
+        // Before SL's dataserver form these were the bodies of llCreateKeyValue / llReadKeyValue / llUpdateKeyValue(3).
+        private int SyncCreateKeyValue(string key, string value)
         {
             if (string.IsNullOrEmpty(key) || key.Length > MAX_EXPERIENCE_KEY_LENGTH) return -1;
+            if (BadKvValue(value)) return -6;   // SL's 4095-byte value limit
             var expService = GetExperienceAdapter();
             UUID expId = GetScriptExperienceId();
             if (expService == null || expId == UUID.Zero)
@@ -11392,7 +19305,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             try
             {
-                // T2/DEC-2: quota check BEFORE the write (Legion — never write-then-detect). A create
+                // Quota check BEFORE the write (as the port source — never write-then-detect). A create
                 // only ADDS a pair; reject if that would exceed 128 MiB -> -5 (llCreateKeyValueSL emits
                 // 0,11 = XP_ERROR_QUOTA_EXCEEDED). No write.
                 if (expService != null && expService.DataSizeKeyValue(expId) + KvBytes(key) + KvBytes(value) > MAX_DATA_QUOTA)
@@ -11404,12 +19317,12 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.LogWarning("[PhloxAPI]: llCreateKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llCreateKeyValueSL failed: {0}", ex.Message);
                 return -1;
             }
         }
 
-        public string llReadKeyValue(string key)
+        private string SyncReadKeyValue(string key)
         {
             if (string.IsNullOrEmpty(key)) return string.Empty;
             var expService = GetExperienceAdapter();
@@ -11423,21 +19336,22 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.LogWarning("[PhloxAPI]: llReadKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llReadKeyValueSL failed: {0}", ex.Message);
                 return string.Empty;
             }
         }
 
-        public int llUpdateKeyValue(string key, string value, string check)
+        private int SyncUpdateKeyValue(string key, string value, string check)
         {
             if (string.IsNullOrEmpty(key) || key.Length > MAX_EXPERIENCE_KEY_LENGTH) return -1;
+            if (BadKvValue(value)) return -6;   // SL's 4095-byte value limit
             var expService = GetExperienceAdapter();
             UUID expId = GetScriptExperienceId();
             if (expService == null || expId == UUID.Zero)
                 expId = m_host.OwnerID;
             try
             {
-                // T2/DEC-2: delta-aware quota check BEFORE the write (Legion ExceedsQuota). If the
+                // Delta-aware quota check BEFORE the write (port source ExceedsQuota). If the
                 // projected total after this update exceeds 128 MiB -> -5 (llUpdateKeyValueSL emits
                 // 0,11). No write. (If a CAS would also fail, quota wins at the boundary — benign.)
                 if (expService != null && ExceedsQuota(expService, expId, key, value))
@@ -11449,87 +19363,170 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
             catch (Exception ex)
             {
-                m_log.LogWarning("[PhloxAPI]: llUpdateKeyValue failed: {0}", ex.Message);
+                m_log.LogWarning("[PhloxAPI]: llUpdateKeyValueSL failed: {0}", ex.Message);
                 return -1;
             }
         }
 
-        public int llDeleteKeyValue(string key)
+        // ── SL's key-value form ──
+        // wiki: every call "Start[s] an asynchronous transaction" and returns a key; the answer is a dataserver event
+        // with that key and cdl = llDumpList2String([ 1, ... ],",") on success or [ 0, integer error ] (XP_ERROR_*).
+        // The query id is recorded (NewDataserverQuery), so an answer owed to a script that was reset, changed
+        // state or was removed in between is dropped by PostDataserverEvent. The store work runs inside the syscall,
+        // which the shim hands to the region's service lane (Defer): the scheduler thread never waits on the store,
+        // and one script's answers arrive in the order it asked.
+        // No key-value store at all (no IExperienceService) answers XP_ERROR_STORE_DISABLED.
+        // As SL: a script not compiled into an Experience (its item's ExperienceID is zero,
+        // GetScriptExperienceId) answers XP_ERROR_NO_EXPERIENCE, "This script is not associated with an experience."
+        // (wiki llGetExperienceErrorMessage; each call's page: "the script must be compiled into an Experience"), and
+        // the store is not touched. Phlox once used the owner's id here; Phlox's own names (llClearKeyValue and the
+        // *SL variants) keep that fallback, so data stored under an owner's id stays reachable through them.
+
+        private delegate string KeyValueWork(PhloxExperienceAdapter store, UUID experienceId);
+
+        private string KeyValueRequest(string fn, KeyValueWork work)
         {
-            if (string.IsNullOrEmpty(key)) return -1;
-            var expService = GetExperienceAdapter();
-            UUID expId = GetScriptExperienceId();
-            if (expService == null || expId == UUID.Zero)
-                expId = m_host.OwnerID;
-            try
+            UUID queryID = NewDataserverQuery();
+            string reply;
+            PhloxExperienceAdapter store = GetExperienceAdapter();
+            UUID expId;
+            if (store == null || !store.HasKeyValueStore)
+                reply = "0," + XP_ERROR_STORE_DISABLED;
+            else if ((expId = GetScriptExperienceId()) == UUID.Zero)
+                reply = "0," + XP_ERROR_NO_EXPERIENCE;
+            else
             {
-                bool ok = expService != null
-                    ? expService.DeleteKeyValue(expId, key)
-                    : false;
-                return ok ? 0 : -4; // -4 = key not found
+                try
+                {
+                    reply = work(store, expId);
+                }
+                catch (Exception ex)
+                {
+                    m_log.LogWarning("[PhloxAPI]: {0} failed: {1}", fn, ex.Message);
+                    reply = "0," + XP_ERROR_STORAGE_EXCEPTION;
+                }
             }
-            catch (Exception ex)
-            {
-                m_log.LogWarning("[PhloxAPI]: llDeleteKeyValue failed: {0}", ex.Message);
-                return -1;
-            }
+            PostDataserverEvent(queryID, reply);
+            return queryID.ToString();
         }
 
-        public int llKeyCountKeyValue()
-        {
-            var expService = GetExperienceAdapter();
-            UUID expId = GetScriptExperienceId();
-            if (expService == null || expId == UUID.Zero)
-                expId = m_host.OwnerID;
-            try
-            {
-                return expService?.KeyCountKeyValue(expId) ?? 0;
-            }
-            catch (Exception ex)
-            {
-                m_log.LogWarning("[PhloxAPI]: llKeyCountKeyValue failed: {0}", ex.Message);
-                return 0;
-            }
-        }
+        // SL: keys are at most 1011 bytes (wiki llCreateKeyValue); an empty key names nothing.
+        private static bool BadKvKey(string key) => string.IsNullOrEmpty(key) || KvBytes(key) > MAX_EXPERIENCE_KEY_LENGTH;
 
-        public LSLList llKeysKeyValue(int start, int count)
-        {
-            if (count <= 0) count = 100;
-            if (count > 1000) count = 1000;
-            if (start < 0) start = 0;
-            var expService = GetExperienceAdapter();
-            UUID expId = GetScriptExperienceId();
-            if (expService == null || expId == UUID.Zero)
-                expId = m_host.OwnerID;
-            try
-            {
-                var keys = expService?.KeysKeyValue(expId, start, count);
-                if (keys == null || keys.Count == 0) return new LSLList();
-                return new LSLList(keys.Select(k => (object)k).ToArray());
-            }
-            catch (Exception ex)
-            {
-                m_log.LogWarning("[PhloxAPI]: llKeysKeyValue failed: {0}", ex.Message);
-                return new LSLList();
-            }
-        }
+        private static string KvFail(int xpError) => "0," + xpError;
 
-        public int llDataSizeKeyValue()
-        {
-            var expService = GetExperienceAdapter();
-            UUID expId = GetScriptExperienceId();
-            if (expService == null || expId == UUID.Zero)
-                expId = m_host.OwnerID;
-            try
+        // SL's value limit, wiki llCreateKeyValue / llUpdateKeyValue: "As of Jan 1, 2016 maximum bytes is 1011 for
+        // key and 4095 for value for both LSO and Mono scripts." Over it is XP_ERROR_INVALID_PARAMETERS, "One of the
+        // string arguments was too big to fit in the key-value store." (wiki llGetExperienceErrorMessage). Nothing is
+        // written. Before, the store got the value: MySQL's VARCHAR(4095) column refused it (strict mode) or cut it.
+        private const int MAX_EXPERIENCE_VALUE_BYTES = 4095;
+        private static bool BadKvValue(string value) => KvBytes(value) > MAX_EXPERIENCE_VALUE_BYTES;
+
+        /// <summary>wiki: key llCreateKeyValue(string k, string v). An existing key is XP_ERROR_STORAGE_EXCEPTION.</summary>
+        public string llCreateKeyValue(string key, string value)
+            => KeyValueRequest("llCreateKeyValue", (store, expId) =>
             {
-                return (int)(expService?.DataSizeKeyValue(expId) ?? 0);
-            }
-            catch (Exception ex)
+                if (BadKvKey(key) || BadKvValue(value)) return KvFail(XP_ERROR_INVALID_PARAMETERS);
+                value ??= string.Empty;
+                if (store.DataSizeKeyValue(expId) + KvBytes(key) + KvBytes(value) > MAX_DATA_QUOTA)
+                    return KvFail(XP_ERROR_QUOTA_EXCEEDED);
+                switch (store.CreateKeyValueStatus(expId, key, value))
+                {
+                    case "success": return "1," + value;
+                    case "full": return KvFail(XP_ERROR_QUOTA_EXCEEDED);
+                    default: return KvFail(XP_ERROR_STORAGE_EXCEPTION);   // "exists" (wiki) or a store error
+                }
+            });
+
+        /// <summary>wiki: key llReadKeyValue(string k). A missing key is XP_ERROR_KEY_NOT_FOUND.</summary>
+        public string llReadKeyValue(string key)
+            => KeyValueRequest("llReadKeyValue", (store, expId) =>
             {
-                m_log.LogWarning("[PhloxAPI]: llDataSizeKeyValue failed: {0}", ex.Message);
-                return 0;
-            }
-        }
+                if (BadKvKey(key)) return KvFail(XP_ERROR_INVALID_PARAMETERS);
+                string value = store.ReadKeyValue(expId, key);
+                return value == null ? KvFail(XP_ERROR_KEY_NOT_FOUND) : "1," + value;
+            });
+
+        /// <summary>Phlox's 3-argument llUpdateKeyValue(k, v, check): the SL 4-argument call with checked = (check != "").</summary>
+        public string llUpdateKeyValue(string key, string value, string check)
+            => llUpdateKeyValue(key, value, string.IsNullOrEmpty(check) ? 0 : 1, check);
+
+        /// <summary>
+        /// wiki: key llUpdateKeyValue(string k, string v, integer checked, string original_value). XP_ERROR_RETRY_UPDATE
+        /// when checked and the stored value is not original_value; a key that does not exist "will generate a new key with
+        /// the specified value, as if you had used llCreateKeyValue" (NGC's update does not create, so it is created here).
+        /// </summary>
+        public string llUpdateKeyValue(string k, string v, int isChecked, string original_value)
+            => KeyValueRequest("llUpdateKeyValue", (store, expId) =>
+            {
+                if (BadKvKey(k) || BadKvValue(v)) return KvFail(XP_ERROR_INVALID_PARAMETERS);
+                v ??= string.Empty;
+                if (ExceedsQuota(store, expId, k, v)) return KvFail(XP_ERROR_QUOTA_EXCEEDED);
+                string status = store.UpdateKeyValueStatus(expId, k, v, isChecked != 0, original_value);
+                if (status == "missing")
+                {
+                    status = store.CreateKeyValueStatus(expId, k, v);
+                    if (status == "exists") return KvFail(XP_ERROR_RETRY_UPDATE);   // created by someone else meanwhile
+                }
+                switch (status)
+                {
+                    case "success": return "1," + v;
+                    case "mismatch": return KvFail(XP_ERROR_RETRY_UPDATE);
+                    case "full": return KvFail(XP_ERROR_QUOTA_EXCEEDED);
+                    default: return KvFail(XP_ERROR_STORAGE_EXCEPTION);
+                }
+            });
+
+        /// <summary>
+        /// wiki: key llDeleteKeyValue(string k); success is [ 1, string value ] - the value deleted, read first (as the old
+        /// tree's 5e1a8837f9 did); a missing key is XP_ERROR_STORAGE_EXCEPTION.
+        /// </summary>
+        public string llDeleteKeyValue(string key)
+            => KeyValueRequest("llDeleteKeyValue", (store, expId) =>
+            {
+                if (BadKvKey(key)) return KvFail(XP_ERROR_INVALID_PARAMETERS);
+                string old = store.ReadKeyValue(expId, key);
+                return store.DeleteKeyValueStatus(expId, key) == "success"
+                    ? "1," + (old ?? string.Empty)
+                    : KvFail(XP_ERROR_STORAGE_EXCEPTION);   // "missing" (wiki) or a store error
+            });
+
+        /// <summary>wiki: key llKeyCountKeyValue(); success is [ 1, integer pairs ].</summary>
+        public string llKeyCountKeyValue()
+            => KeyValueRequest("llKeyCountKeyValue", (store, expId) => "1," + store.KeyCountKeyValue(expId));
+
+        // wiki llKeysKeyValue: "may return fewer keys than requested if ... the result list exceeds 4096 characters".
+        private const int MAX_KEYS_REPLY_CHARS = 4096;
+
+        /// <summary>
+        /// wiki: key llKeysKeyValue(integer first, integer count); success is llDumpList2String([ 1 ] + keys, ","), and
+        /// "XP_ERROR_KEY_NOT_FOUND is returned if there index given is greater than or equal to the number of keys".
+        /// Phlox's clamps are kept: count &lt;= 0 is 100, count &gt; 1000 is 1000, first &lt; 0 is 0.
+        /// </summary>
+        public string llKeysKeyValue(int start, int count)
+            => KeyValueRequest("llKeysKeyValue", (store, expId) =>
+            {
+                if (count <= 0) count = 100;
+                if (count > 1000) count = 1000;
+                if (start < 0) start = 0;
+                if (start >= store.KeyCountKeyValue(expId)) return KvFail(XP_ERROR_KEY_NOT_FOUND);
+                List<string> keys = store.KeysKeyValue(expId, start, count);
+                var reply = new System.Text.StringBuilder("1");
+                int used = 0;
+                foreach (string k in keys)
+                {
+                    int add = (used == 0 ? 0 : 1) + k.Length;
+                    if (used + add > MAX_KEYS_REPLY_CHARS) break;
+                    reply.Append(',').Append(k);
+                    used += add;
+                }
+                return used == 0 && keys.Count == 0 ? KvFail(XP_ERROR_KEY_NOT_FOUND) : reply.ToString();
+            });
+
+        /// <summary>wiki: key llDataSizeKeyValue(); success is "1,&lt;used&gt;,&lt;quota&gt;" in bytes (Phlox's quota: 128 MiB).</summary>
+        public string llDataSizeKeyValue()
+            => KeyValueRequest("llDataSizeKeyValue", (store, expId) =>
+                "1," + store.DataSizeKeyValue(expId) + "," + MAX_DATA_QUOTA);
 
         public int llClearKeyValue()
         {
@@ -11556,40 +19553,45 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         }
 
         // The ...SL wrappers present SL's async-dataserver CSV shape "1,<value>" (success) /
-        // "0,<XP_ERROR>" (failure). T1 makes the failure payload a NUMERIC XP_ERROR code (was a
-        // free-text message), matching SL/Legion. (The underlying KV model stays synchronous —
-        // the async request-key + dataserver-event contract is a later architecture slice, not T1.)
+        // "0,<XP_ERROR>" (failure). The failure payload is a NUMERIC XP_ERROR code (was a
+        // free-text message), matching SL and the port source. They answer at once (Phlox's own names);
+        // unchanged when SL's names moved to dataserver answers. They (and
+        // llClearKeyValue) keep the owner-id fallback for a script with no Experience; SL's 4095-byte value limit applies.
         public string llCreateKeyValueSL(string key, string value)
         {
-            int result = llCreateKeyValue(key, value);
+            int result = SyncCreateKeyValue(key, value);
             if (result == 0)
                 return "1," + (value ?? string.Empty);
-            if (result == -5) // over the 128 MiB quota (T2)
+            if (result == -5) // over the 128 MiB quota
                 return "0," + XP_ERROR_QUOTA_EXCEEDED;
+            if (result == -6) // Value over SL's 4095 bytes
+                return "0," + XP_ERROR_INVALID_PARAMETERS;
             // SL: creating an existing key (or a generic KV failure) => XP_ERROR_STORAGE_EXCEPTION.
             return "0," + XP_ERROR_STORAGE_EXCEPTION;
         }
 
         public string llReadKeyValueSL(string key)
         {
-            string val = llReadKeyValue(key);
+            string val = SyncReadKeyValue(key);
             if (!string.IsNullOrEmpty(val))
                 return "1," + val;
-            // SL: a missing key => XP_ERROR_KEY_NOT_FOUND (14). (SS-4)
+            // SL: a missing key => XP_ERROR_KEY_NOT_FOUND (14).
             return "0," + XP_ERROR_KEY_NOT_FOUND;
         }
 
         public string llUpdateKeyValueSL(string key, string value, string check)
         {
-            int result = llUpdateKeyValue(key, value, check);
+            int result = SyncUpdateKeyValue(key, value, check);
             if (result == 0)
                 return "1," + (value ?? string.Empty);
-            if (result == -5) // over the 128 MiB quota (T2)
+            if (result == -5) // over the 128 MiB quota
                 return "0," + XP_ERROR_QUOTA_EXCEEDED;
+            if (result == -6) // Value over SL's 4095 bytes
+                return "0," + XP_ERROR_INVALID_PARAMETERS;
             // SL: a checked-update mismatch (CAS fail) => XP_ERROR_RETRY_UPDATE (15).
             return "0," + XP_ERROR_RETRY_UPDATE;
         }
-		
+
         // ── Tier 6: Standalone ──
 
         public string llSignRSA(string data, string privateKeyPem, string algorithm)
@@ -11647,20 +19649,6 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         // ── Tier 7: EEP Environment Functions (630–632) ──
 
-        // SL Environment parameter constants
-        private const int SKY_AMBIENT = 0;
-        private const int SKY_CLOUDS = 2;
-        private const int SKY_DOME = 4;
-        private const int SKY_GAMMA = 5;
-        private const int SKY_GLOW = 6;
-        private const int SKY_MOON = 9;
-        private const int SKY_STAR_BRIGHTNESS = 13;
-        private const int SKY_SUN = 14;
-        private const int SKY_TRACKS = 15;
-        private const int WATER_BLUR_MULTIPLIER = 100;
-        private const int WATER_FOG = 103;
-        private const int WATER_NORMAL_SCALE = 107;
-        private const int WATER_WAVE_DIRECTION = 109;
         private const int ENV_DAY_LENGTH = 200;
         private const int ENV_DAY_OFFSET = 201;
 
@@ -11811,7 +19799,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 envModule.StoreOnRegion(env);
                 envModule.WindlightRefresh(0);
             }
-            return 1; // ENV_OK
+            return ENV_OK;
         }
 
         public int llReplaceEnvironment(Vector3 pos, string environment, int track, int day_length, int day_offset)
@@ -11857,7 +19845,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 m_log.LogInformation("[PhloxAPI]: llReplaceEnvironment: EEP asset '{0}' load not yet implemented, day_length/offset applied", environment);
             }
 
-            return 1; // ENV_OK
+            return ENV_OK;
         }
 
         // ── Tier 7b: Agent Environment + User Key (633–635) ──
@@ -11867,7 +19855,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // Async lookup — fires dataserver event with the user's UUID
             if (string.IsNullOrEmpty(username)) return string.Empty;
 
-            UUID reqID = UUID.Random();
+            UUID reqID = NewDataserverQuery();
 
             // Normalize "first.last" to "first last"
             string normalized = username.Replace('.', ' ').Trim();
@@ -11883,20 +19871,17 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     var accountService = World?.RequestModuleInterface<IUserAccountService>();
                     if (accountService == null)
                     {
-                        m_ScriptEngine.PostScriptEvent(m_itemID, "dataserver",
-                            new object[] { reqID.ToString(), UUID.Zero.ToString() });
+                        PostDataserverEvent(reqID, UUID.Zero.ToString());
                         return;
                     }
                     var account = accountService.GetUserAccount(World.RegionInfo.ScopeID, firstName, lastName);
                     string result = account != null ? account.PrincipalID.ToString() : UUID.Zero.ToString();
-                    m_ScriptEngine.PostScriptEvent(m_itemID, "dataserver",
-                        new object[] { reqID.ToString(), result });
+                    PostDataserverEvent(reqID, result);
                 }
                 catch (Exception ex)
                 {
                     m_log.LogWarning("[PhloxAPI]: llRequestUserKey failed for '{0}': {1}", username, ex.Message);
-                    m_ScriptEngine.PostScriptEvent(m_itemID, "dataserver",
-                        new object[] { reqID.ToString(), UUID.Zero.ToString() });
+                    PostDataserverEvent(reqID, UUID.Zero.ToString());
                 }
             });
 
@@ -11968,13 +19953,13 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 case 11: return "experience data quota exceeded";
                 case 12: return "key-value store is disabled";
                 case 13: return "key-value store communication failed";
-                // T1/SS-5,8,9: rows 14-18 corrected to the SL wiki XP_ERROR table (were shifted:
+                // Rows 14-18 corrected to the SL wiki XP_ERROR table (were shifted:
                 // 14 said "key already exists", 15/16/17 were off by one, 18 was missing).
-                case 14: return "key doesn't exist";                       // XP_ERROR_KEY_NOT_FOUND
-                case 15: return "retry update";                           // XP_ERROR_RETRY_UPDATE
-                case 16: return "experience content rating too high";     // XP_ERROR_MATURITY_EXCEEDED
-                case 17: return "not allowed to run on this land";        // XP_ERROR_NOT_PERMITTED_LAND
-                case 18: return "experience permissions request timed out"; // XP_ERROR_REQUEST_PERM_TIMEOUT
+                case XP_ERROR_KEY_NOT_FOUND: return "key doesn't exist";
+                case XP_ERROR_RETRY_UPDATE: return "retry update";
+                case XP_ERROR_MATURITY_EXCEEDED: return "experience content rating too high";
+                case XP_ERROR_NOT_PERMITTED_LAND: return "not allowed to run on this land";
+                case XP_ERROR_REQUEST_PERM_TIMEOUT: return "experience permissions request timed out";
                 default: return "unknown error id";
             }
         }
@@ -11984,7 +19969,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // Requires PERMISSION_TRIGGER_ANIMATION
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
-            if ((item.PermsMask & 0x10) == 0) // PERMISSION_TRIGGER_ANIMATION = 0x10
+            if ((item.PermsMask & PERMISSION_TRIGGER_ANIMATION) == 0)
             {
                 ShoutError("llSetAgentRot: script does not have PERMISSION_TRIGGER_ANIMATION");
                 return;
@@ -12051,7 +20036,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
             // Find the target link part
             SceneObjectPart sitPart = null;
-            if (link == 0 || link == 1) // LINK_ROOT
+            if (link == 0 || link == LINK_ROOT)
             {
                 sitPart = m_host.ParentGroup.RootPart;
             }
@@ -12089,20 +20074,33 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             }
         }
 
-        public void llRezObjectWithParams(string inventory, LSLList paramList)
+        /// <summary>
+        /// SL wiki (LlRezObjectWithParams): "Returns a key which will be the key of the object when it
+        /// is successfully rezzed in the world. On failure, returns (key)"" (in LSL)". The key is the
+        /// rezzed root's, the one object_rez reports (upstream LSL_Api returns the rezzed group's id too,
+        /// but NULL_KEY on failure; SL's "" is kept here). The shim runs this async, so the script gets
+        /// its value only from SysReturn, handed over on every path, a throw included.
+        /// </summary>
+        public string llRezObjectWithParams(string inventory, LSLList paramList)
+        {
+            string result = String.Empty;
+            try { result = RezWithParams(inventory, paramList); }
+            finally { m_ScriptEngine.SysReturn(m_itemID, result, 0); }
+            return result;
+        }
+
+        private string RezWithParams(string inventory, LSLList paramList)
         {
             // Extended rez function from SL Combat2 system.
             // Parse the params list for REZ_POS, REZ_ROT, REZ_VEL, REZ_FLAGS, etc.
             // For now, extract basic position/rotation/velocity and delegate to existing rez logic.
 
-            if (string.IsNullOrEmpty(inventory)) return;
+            if (string.IsNullOrEmpty(inventory)) return String.Empty;
 
-            const int REZ_POS = 1;
-            const int REZ_ROT = 2;
-            const int REZ_VEL = 3;
-            const int REZ_FLAGS = 8;
-            const int REZ_DAMAGE = 4;
-            const int REZ_PARAM = 7;
+            // These were 1,2,3,8,4,7 - a private numbering that matched neither SL nor
+            // upstream, so a script written to the SL constants had every rule misread. Now the
+            // values in LSL_Constants.cs:1131-1154, the same ones DefaultConstants exposes.
+            string startString = null;
 
             Vector3 pos = m_host.AbsolutePosition;
             Quaternion rot = m_host.GetWorldRotation();
@@ -12158,6 +20156,14 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                             catch { }
                         }
                         break;
+                    case REZ_PARAM_STRING:
+                        // upstream LSL_Api.cs:3796-3803
+                        if (i + 1 < paramList.Length)
+                        {
+                            startString = paramList.Data[i + 1]?.ToString() ?? string.Empty;
+                            i += 1;
+                        }
+                        break;
                     case REZ_PARAM:
                         if (i + 1 < paramList.Length)
                         {
@@ -12179,11 +20185,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (posRelative)
                 pos = m_host.AbsolutePosition + pos * m_host.GetWorldRotation();
 
-            // Delegate to existing rez infrastructure
-            if (atRoot)
-                llRezAtRoot(inventory, pos, vel, rot, param);
-            else
-                llRezObject(inventory, pos, vel, rot, param);
+            // Delegate to existing rez infrastructure; its NULL_KEY failure is SL's "" here.
+            string key = RezObjectInternal(inventory, pos, vel, rot, param, atRoot, startString);
+            return key == UUID.Zero.ToString() ? String.Empty : key;
         }
 
         public string llGetMaterialOverride(int face, LSLList paramList)
@@ -12301,13 +20305,13 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         }
 
         // ── 651: llGetStartString ──
+        /// <summary>Ported from upstream LSL_Api.cs:4589-4593. wiki: "Returns a string that was
+        /// passed to the object's root prim on rez with llRezObjectWithParams"; blank when the object was
+        /// rezzed any other way.</summary>
         public string llGetStartString()
         {
-            // Returns the string passed to llRezObjectWithParams via REZ_PARAM
-            // In SL this is a string variant of llGetStartParameter.
-            // OpenSim/Phlox only has integer start params, so return empty string.
-            // Scripts using llRezObjectWithParams with REZ_PARAM get integer only.
-            return string.Empty;
+            string s = m_host?.ParentGroup?.RezStringParameter;
+            return string.IsNullOrEmpty(s) ? string.Empty : s;
         }
 
         // ── 652: llSetGroundTexture ──
@@ -12346,6 +20350,110 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         }
 
         // ── 653: llTargetedEmail ──
+        // ---- SL names and arities. Each is the SL behaviour, not a forward. ------------
+
+        /// <summary>wiki: llsRGB2Linear(vector srgb) - the SL spelling. Same conversion; the older
+        /// llSRGB2Linear stays as an alias. (The wiki notes the name is a misnomer - LSL colour is
+        /// Rec.709 - but the documented formula is the sRGB one both spellings implement.)</summary>
+        public Vector3 llsRGB2Linear(Vector3 srgb) => llSRGB2Linear(srgb);
+
+        /// <summary>wiki: llListSortStrided - the SL name for what Phlox shipped as llSortListStrided.
+        /// Bounds rule per the wiki: stride_index in [-stride, stride) or an empty list.</summary>
+        public LSLList llListSortStrided(LSLList src, int stride, int stride_index, int ascending)
+            => llSortListStrided(src, stride, stride_index, ascending);
+
+        /// <summary>wiki: string llSHA256String(string src) - "a string of 64 hex characters that is
+        /// the SHA-256 security hash of src", src as UTF-8, nothing appended. Distinct from the
+        /// (src, nonce) form, which hashes src + ":" + nonce.</summary>
+        public string llSHA256String(string src)
+        {
+            byte[] data = System.Text.Encoding.UTF8.GetBytes(src ?? string.Empty);
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            return Convert.ToHexString(sha.ComputeHash(data)).ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// wiki: llTargetedEmail(integer target, string subject, string message) - the address is
+        /// derived from the target. Routing follows upstream LSL_Api.cs:4362-4375: OBJECT_OWNER mails
+        /// the owner's account (skipped when the object is group-owned); ROOT_CREATOR mails the root
+        /// creator only when this script item's creator is the same person - upstream's guard against
+        /// creator spam. 20 s sleep per the wiki. 4096-character cap per upstream.
+        /// </summary>
+        public void llTargetedEmail(int target, string subject, string message)
+        {
+            const int TargetRootCreator = 1, TargetObjectOwner = 2;
+            try
+            {
+                if (m_host == null || World == null) return;
+                if ((subject ?? string.Empty).Length + (message ?? string.Empty).Length > 4096) return;
+                SceneObjectGroup parent = m_host.ParentGroup;
+                if (parent == null) return;
+
+                UUID recipient;
+                if (target == TargetObjectOwner)
+                {
+                    if (parent.OwnerID == parent.GroupID) return;
+                    recipient = parent.OwnerID;
+                }
+                else if (target == TargetRootCreator)
+                {
+                    TaskInventoryItem item = m_host.Inventory?.GetInventoryItem(m_itemID);
+                    if (item == null || item.CreatorID != parent.RootPart.CreatorID) return;
+                    recipient = parent.RootPart.CreatorID;
+                }
+                else return;
+
+                UserAccount account = World.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, recipient);
+                if (account == null || string.IsNullOrEmpty(account.Email)) return;
+
+                IEmailModule emailModule = World.RequestModuleInterface<IEmailModule>();
+                emailModule?.SendEmail(m_host.UUID, parent.OwnerID, account.Email, subject, message);
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[PhloxAPI]: llTargetedEmail exception: {0}", e.Message);
+            }
+            finally
+            {
+                ScriptSleep(20000);
+            }
+        }
+
+        /// <summary>
+        /// wiki: integer llDerezObject(key id, integer flag). Both rules from the wiki apply: the
+        /// target's rezzer must be the object hosting this script, and its owner must be the script's
+        /// owner. DEREZ_DIE deletes; DEREZ_MAKE_TEMP marks the object temporary so the simulator
+        /// removes it later; DEREZ_TO_INVENTORY needs a viewer session to receive the item and
+        /// Scene.DeRezObjects takes an IClientAPI, so it is refused (0) and logged rather than faked.
+        /// Returns 1 on success, 0 otherwise.
+        /// </summary>
+        public int llDerezObject(string id, int flag)
+        {
+            const int DerezDie = 0, DerezMakeTemp = 1, DerezToInventory = 2;
+            if (m_host == null || World == null || !UUID.TryParse(id, out UUID targetID) || targetID == UUID.Zero) return 0;
+            SceneObjectPart sop = World.GetSceneObjectPart(targetID);
+            SceneObjectGroup sog = sop?.ParentGroup;
+            if (sog == null || sog.IsDeleted || sog.IsAttachment) return 0;
+            if (sog.OwnerID != m_host.OwnerID) return 0;
+            if (sog.RezzerID != m_host.UUID && sog.RezzerID != m_host.ParentGroup?.UUID) return 0;
+            switch (flag)
+            {
+                case DerezDie:
+                    World.DeleteSceneObject(sog, false);
+                    return 1;
+                case DerezMakeTemp:
+                    sog.RootPart.AddFlag(PrimFlags.TemporaryOnRez);
+                    sog.HasGroupChanged = true;
+                    sog.ScheduleGroupForFullUpdate();
+                    return 1;
+                case DerezToInventory:
+                    m_log.LogInformation("[PhloxAPI]: llDerezObject DEREZ_TO_INVENTORY is not available server-side (needs a viewer session); {0} left in place", targetID);
+                    return 0;
+                default:
+                    return 0;
+            }
+        }
+
         public void llTargetedEmail(int targetType, string address, string subject, string message)
         {
             // SL's targeted email: targetType 0=object, 1=avatar, 2=external
@@ -12406,37 +20514,42 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         }
 
         // ── 655: llDetectedDamage ──
-        public float llDetectedDamage(int number)
+        /// <summary>
+        /// [float damage, integer damage_type, float original_damage] for pending entry n
+        /// (wiki). Inside on_damage, damage is the amount as adjusted so far; inside final_damage, what
+        /// landed. From any other handler: an empty list, as the wiki says.
+        /// </summary>
+        public LSLList llDetectedDamage(int number)
         {
-            // Returns the damage amount from a damage event
-            // Damage events aren't fully implemented in OpenSim, return 0.0
-            Stub("llDetectedDamage");
-            return 0.0f;
+            var evt = m_thisScript?.ScriptState?.RunningEvent;
+            if (evt == null) return new LSLList();
+            if (evt.EventType != InWorldz.Phlox.Types.SupportedEventList.Events.ON_DAMAGE
+                && evt.EventType != InWorldz.Phlox.Types.SupportedEventList.Events.FINAL_DAMAGE)
+                return new LSLList();
+            var vars = evt.DetectVars;
+            if (vars == null || number < 0 || number >= vars.Length) return new LSLList();
+            var d = vars[number];
+            return new LSLList(new object[] { d.Damage, d.DamageType, d.OriginalDamage });
         }
 
         // ── 656: llDamage ──
+        /// <summary>
+        /// llDamage(key target, float damage, integer damage_type): damage through the one door,
+        /// this prim as the source, so the target's attachments get on_damage (llDetectedKey == this prim)
+        /// and final_damage. Avatars only here (the wiki also allows tasks and redirects seated avatars to
+        /// their seat - not done); region damage must be on; no throttle yet. Runs as an async syscall so
+        /// the region's wait on on_damage never blocks the script thread that issued it.
+        /// </summary>
         public void llDamage(string target, float amount, int damageType)
         {
-            // SL Combat 2.0 — apply damage to an agent
-            // damageType: DAMAGE_TYPE_IMPACT=0, _BURN=1, _BLAST=2, etc.
-            // OpenSim doesn't have a full Combat 2.0 module, so we use the
-            // legacy damage system if available
-            if (World == null) return;
-
-            UUID targetId;
-            if (!UUID.TryParse(target, out targetId)) return;
-
+            if (World == null || m_host == null) return;
+            if (!UUID.TryParse(target, out UUID targetId)) return;
             ScenePresence sp = World.GetScenePresence(targetId);
             if (sp == null || sp.IsChildAgent) return;
-
-            // Try to apply damage via the legacy combat system
+            if (!World.RegionInfo.RegionSettings.AllowDamage) return;
             try
             {
-                // Check if damage is enabled in the region
-                if (!World.RegionInfo.RegionSettings.AllowDamage)
-                    return;
-
-                sp.ControllingClient.SendHealth(Math.Max(0f, sp.Health - amount));
+                sp.ApplyDamage(m_host.UUID, m_host.OwnerID, m_host.LocalId, amount, damageType, true);
             }
             catch (Exception e)
             {
@@ -12570,7 +20683,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             return expService.IsAgentGranted(experienceId, agentId);
         }
 
-        // ── D1 consent state (ported from Legion port-source-2026-07-22). One pending request per
+        // ── Consent state. One pending request per
         //    script instance (LSLSystemAPI is per-script), keyed by ItemID; the ScriptAnswerYes packet
         //    carries no ExperienceID, so the answer is correlated by TaskID + ItemID via OnScriptAnswer. ──
         private const int PERMISSION_EXPERIENCE = 0x2000;       // JoinAnExperience bit
@@ -12586,90 +20699,49 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         private readonly object m_pendingExpLock = new object();
         private IClientAPI m_expHookedClient = null;
 
+        /// <summary>
+        /// SL's list for llRequestExperiencePermissions: "equivalent to PERMISSION_TAKE_CONTROLS,
+        /// PERMISSION_TRIGGER_ANIMATION, PERMISSION_ATTACH, PERMISSION_TRACK_CAMERA, PERMISSION_CONTROL_CAMERA, and
+        /// PERMISSION_TELEPORT". The script item holds them, granted by the agent, once the Experience grants.
+        /// </summary>
+        private const int EXPERIENCE_PERMISSIONS = SlConst.PERMISSION_TAKE_CONTROLS | SlConst.PERMISSION_TRIGGER_ANIMATION |
+            SlConst.PERMISSION_ATTACH | SlConst.PERMISSION_TRACK_CAMERA | SlConst.PERMISSION_CONTROL_CAMERA | SlConst.PERMISSION_TELEPORT;
+
+        /// <summary>What llRequestExperiencePermissions does for an agent: deny, grant silently (already granted, or a trusted Experience), or ask.</summary>
+        private enum ExperienceAnswer { Denied, Granted, Trusted, Ask }
+
         // ── 659: llRequestExperiencePermissions ──
         public void llRequestExperiencePermissions(string agent, string name)
         {
             if (m_host == null || World == null) return;
             UUID agentId;
             if (!UUID.TryParse(agent, out agentId)) return;
+            ClearGrantClaim();   // The answer to this request replaces any grant a restore saved or left waiting
 
             var expService = GetExperienceAdapter();
             UUID experienceId = GetScriptExperienceId();
-
-            // No experience associated with this script -> XP_ERROR_NO_EXPERIENCE (5). (SS-7)
-            if (expService == null || experienceId == UUID.Zero)
+            ExperienceAnswer answer = DecideExperienceRequest(expService, experienceId, agentId, out int denial);
+            if (answer == ExperienceAnswer.Denied)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NO_EXPERIENCE },
+                    new object[] { agent, denial },
                     new DetectParams[0]));
                 return;
             }
 
-            // T5b block-wins: a region-BLOCKED experience is denied regardless of allow/trusted/prior-
-            // grant, land-scope XP_ERROR_NOT_PERMITTED_LAND (17). Checked FIRST (before admission,
-            // trusted, and already-granted) so block wins over everything. (Legion also has a parcel-
-            // block tier at this precedence — deferred; Tranquillity has no parcel-experience source.)
-            if (IsExperienceBlockedInRegion(expService, experienceId))
+            // Already granted -> the grant, notified at once, no dialog.
+            if (answer == ExperienceAnswer.Granted)
             {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NOT_PERMITTED_LAND },
-                    new DetectParams[0]));
-                return;
-            }
-
-            // Admission (T5): the experience must be enabled on this land — estate-ALLOWED or region-
-            // TRUSTED (estate KeyExperiences). A trusted experience is a stronger allow, so it admits
-            // here and is silently granted below (previously a trusted-but-not-allowed experience was
-            // wrongly denied 17 before the trusted check). Legion's admission also has grid-wide + parcel-
-            // ALLOW tiers, and a region/parcel BLOCK-wins tier; those have NO source in NGC (no grid-wide
-            // bit, no region-block store, no ILandObject experience methods) — the flagged T5 STOP (see
-            // experience-port-ledger.md). Not admitted -> land-scope XP_ERROR_NOT_PERMITTED_LAND (17).
-            if (!IsExperienceAdmitted(expService, experienceId))
-            {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NOT_PERMITTED_LAND },
-                    new DetectParams[0]));
-                return;
-            }
-
-            // Target agent must have a ROOT presence here -> else agent-scope XP_ERROR_NOT_PERMITTED (4).
-            ScenePresence sp = World.GetScenePresence(agentId);
-            if (sp == null || sp.IsChildAgent)
-            {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NOT_PERMITTED },
-                    new DetectParams[0]));
-                return;
-            }
-
-            // T3/D1 gate order (Legion): the agent's PERSONAL block wins over everything below and is
-            // checked BEFORE the already-granted short-circuit, so a resident who blocked this experience
-            // is never re-granted (SL code 4). (The Block-button persistence loop is T4.)
-            if (expService.IsAgentBlocked(experienceId, agentId))
-            {
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, XP_ERROR_NOT_PERMITTED }, // 4 — agent's personal block
-                    new DetectParams[0]));
-                return;
-            }
-
-            // Already granted -> notify immediately, no dialog.
-            if (expService.IsAgentGranted(experienceId, agentId))
-            {
+                SetExperienceGrant(experienceId, agentId);
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                     "experience_permissions", new object[] { agent }, new DetectParams[0]));
                 return;
             }
 
-            // T5 trusted enforcement. A region-TRUSTED experience (Tranquillity estate KeyExperiences)
-            // grants silently — no dialog. Checked AFTER agent-block (T4), so a personally-blocked
-            // experience is denied 4 even if trusted (block wins over trusted — Legion's order).
-            if (expService.GetTrustedExperiences(World.RegionInfo.RegionID).Contains(experienceId))
+            // Trusted enforcement. A region-TRUSTED experience (Tranquillity estate KeyExperiences)
+            // grants silently — no dialog.
+            if (answer == ExperienceAnswer.Trusted)
             {
                 GrantExperienceAndNotify(expService, experienceId, agentId, agent);
                 return;
@@ -12679,6 +20751,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // The Experience block on the ScriptQuestion (attached only when experienceId != Zero, guarded
             // in LLClientView) makes the viewer show the experience consent dialog. Resolves to
             // experience_permissions on Yes / _denied 4 on No/disconnect / _denied 18 on timeout.
+            ScenePresence sp = World.GetScenePresence(agentId);
             string ownerName = m_host.ParentGroup.RootPart.OwnerID.ToString();
             var ownerAcct = World?.UserAccountService?.GetUserAccount(
                 World.RegionInfo.ScopeID, m_host.ParentGroup.RootPart.OwnerID);
@@ -12691,12 +20764,97 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 PERMISSION_EXPERIENCE, experienceId);
         }
 
+        /// <summary>
+        /// The decision llRequestExperiencePermissions makes for <paramref name="agentId"/> and the script's
+        /// <paramref name="experienceId"/>, and the one a restored Experience grant is held to (<see cref="GrantSilently"/>):
+        /// a silent grant is <see cref="ExperienceAnswer.Granted"/> or <see cref="ExperienceAnswer.Trusted"/>. A denial gives
+        /// its XP_ERROR code. Nothing is written or posted here.
+        /// </summary>
+        private ExperienceAnswer DecideExperienceRequest(PhloxExperienceAdapter expService, UUID experienceId, UUID agentId, out int denial)
+        {
+            denial = XP_ERROR_NONE;
+
+            // No experience associated with this script -> XP_ERROR_NO_EXPERIENCE (5).
+            if (expService == null || experienceId == UUID.Zero)
+            {
+                denial = XP_ERROR_NO_EXPERIENCE;
+                return ExperienceAnswer.Denied;
+            }
+
+            // Block wins: a region-BLOCKED experience is denied regardless of allow/trusted/prior-
+            // grant, land-scope XP_ERROR_NOT_PERMITTED_LAND (17). Checked FIRST (before admission,
+            // trusted, and already-granted) so block wins over everything. (The port source also has a parcel-
+            // block tier at this precedence — deferred; Tranquillity has no parcel-experience source.)
+            if (IsExperienceBlockedInRegion(expService, experienceId))
+            {
+                denial = XP_ERROR_NOT_PERMITTED_LAND;
+                return ExperienceAnswer.Denied;
+            }
+
+            // Admission: the experience must be enabled on this land — estate-ALLOWED or region-
+            // TRUSTED (estate KeyExperiences). A trusted experience is a stronger allow, so it admits
+            // here and is silently granted below (previously a trusted-but-not-allowed experience was
+            // wrongly denied 17 before the trusted check). The port source's admission also has grid-wide + parcel-
+            // ALLOW tiers, and a region/parcel BLOCK-wins tier; those have NO source in NGC (no grid-wide
+            // bit, no region-block store, no ILandObject experience methods), so they are not represented.
+            // Not admitted -> land-scope XP_ERROR_NOT_PERMITTED_LAND (17).
+            if (!IsExperienceAdmitted(expService, experienceId))
+            {
+                denial = XP_ERROR_NOT_PERMITTED_LAND;
+                return ExperienceAnswer.Denied;
+            }
+
+            // Target agent must have a ROOT presence here -> else agent-scope XP_ERROR_NOT_PERMITTED (4).
+            ScenePresence sp = World.GetScenePresence(agentId);
+            if (sp == null || sp.IsChildAgent)
+            {
+                denial = XP_ERROR_NOT_PERMITTED;
+                return ExperienceAnswer.Denied;
+            }
+
+            // Gate order (as the port source): the agent's PERSONAL block wins over everything below and is
+            // checked BEFORE the already-granted short-circuit, so a resident who blocked this experience
+            // is never re-granted (SL code 4).
+            if (expService.IsAgentBlocked(experienceId, agentId))
+            {
+                denial = XP_ERROR_NOT_PERMITTED; // 4 — agent's personal block
+                return ExperienceAnswer.Denied;
+            }
+
+            // Already granted -> no dialog.
+            if (expService.IsAgentGranted(experienceId, agentId))
+                return ExperienceAnswer.Granted;
+
+            // A region-TRUSTED experience grants silently. Checked AFTER agent-block, so a personally-blocked
+            // experience is denied 4 even if trusted (block wins over trusted — the port source's order).
+            if (expService.GetTrustedExperiences(World.RegionInfo.RegionID).Contains(experienceId))
+                return ExperienceAnswer.Trusted;
+
+            return ExperienceAnswer.Ask;
+        }
+
+        /// <summary>
+        /// The script item takes the grant an Experience gives: SL's list, granted by the agent, replacing any grant it held
+        /// (controls taken for another granter are released, as a new llRequestPermissions does), and noted as that
+        /// Experience's so a restore can hold it to the same decision.
+        /// </summary>
+        private void SetExperienceGrant(UUID experienceId, UUID agentId)
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null) return;
+            if (item.PermsGranter != agentId)
+                EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
+            PermsChange(item, agentId, EXPERIENCE_PERMISSIONS);
+            NoteExperienceGrant(experienceId, agentId);
+        }
+
         // Grant + persist an experience permission and post experience_permissions. Shared by the
         // trusted-bypass path and the accepted-answer path.
         private void GrantExperienceAndNotify(PhloxExperienceAdapter expService, UUID experienceId, UUID agentId, string agent)
         {
             expService.GrantPermission(experienceId, agentId);
             expService.InvalidatePermission(experienceId, agentId);
+            SetExperienceGrant(experienceId, agentId);
             m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                 "experience_permissions", new object[] { agent }, new DetectParams[0]));
             var expInfo = expService.GetExperience(experienceId);
@@ -12789,10 +20947,10 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     new DetectParams[0]));
         }
 
-        // T5 admission — the portable subset of Legion's ladder (IsExperienceAdmittedAt): an experience
+        // Admission — the portable subset of the port source's ladder (IsExperienceAdmittedAt): an experience
         // is admitted on this land if the estate ALLOWS it OR it is region-TRUSTED (estate KeyExperiences).
-        // Legion's grid-wide + parcel-ALLOW admission tiers and the region/parcel BLOCK-wins tier have no
-        // NGC source (see the T5 STOP in experience-port-ledger.md) and are not represented here.
+        // The port source's grid-wide + parcel-ALLOW admission tiers and the region/parcel BLOCK-wins tier have no
+        // NGC source and are not represented here.
         private bool IsExperienceAdmitted(PhloxExperienceAdapter expService, UUID experienceId)
         {
             UUID regionId = World.RegionInfo.RegionID;
@@ -12800,9 +20958,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 || expService.GetTrustedExperiences(regionId).Contains(experienceId);
         }
 
-        // T5b block-wins tier (Legion IsExperienceBlockedInRegion): an experience on the estate
+        // Block-wins tier (the port source's IsExperienceBlockedInRegion): an experience on the estate
         // BlockedExperiences list is denied regardless of allow/trusted/prior-grant. Region granularity
-        // only — Legion also has a parcel-block tier with no NGC parcel-experience source (deferred).
+        // only — the port source also has a parcel-block tier with no NGC parcel-experience source (deferred).
         private bool IsExperienceBlockedInRegion(PhloxExperienceAdapter expService, UUID experienceId)
         {
             UUID regionId = World.RegionInfo.RegionID;
@@ -12820,16 +20978,16 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             UUID experienceId = GetScriptExperienceId();
             if (expService == null || experienceId == UUID.Zero) return 0;
 
-            // SS-6 (presence + agent-block in T1, admission in T5, region-block in T5b): the target agent
+            // The target agent
             // must be PARTICIPATING here — a ROOT presence in this region — with block-wins over grant, AND
             // the experience must not be region-BLOCKED and must be ADMITTED on this land (estate allow OR
-            // trusted). Legion's HasExperiencePermission also applies a parcel BLOCK-wins tier, which has no
-            // NGC source (the T5 STOP) — deferred to a separate project (region granularity only here).
+            // trusted). The port source's HasExperiencePermission also applies a parcel BLOCK-wins tier, which has no
+            // NGC source — deferred to a separate project (region granularity only here).
             ScenePresence sp = World?.GetScenePresence(agentId);
             if (sp == null || sp.IsChildAgent) return 0;
-            if (IsExperienceBlockedInRegion(expService, experienceId)) return 0; // T5b region block wins
+            if (IsExperienceBlockedInRegion(expService, experienceId)) return 0; // region block wins
             if (expService.IsAgentBlocked(experienceId, agentId)) return 0;    // agent block wins
-            if (!IsExperienceAdmitted(expService, experienceId)) return 0;     // T5: admitted on this land
+            if (!IsExperienceAdmitted(expService, experienceId)) return 0;     // admitted on this land
             return expService.IsAgentGranted(experienceId, agentId) ? 1 : 0;
         }
 
@@ -12848,7 +21006,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (exp == null)
                 return new LSLList();
 
-            // T1/SS-1: SL layout is [ name, owner key, experience id, state (int), state message,
+            // SL layout is [ name, owner key, experience id, state (int), state message,
             // group key ] — NOT the old [name, owner, description, group, maturity, ""], which
             // silently returned wrong data at every index for SL-written scripts (High severity).
             // State uses the XP_ERROR vocabulary: NONE(0) for a valid enabled experience,
@@ -13049,6 +21207,87 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (pm == null) return BotPersistError.DISABLED;
 
             return pm.SetPersistentData(id, m_host.OwnerID, key, value);
+        }
+    }
+
+    /// <summary>
+    /// SL's value counts for every prim-params rule: the one table the prim-params setter, the seated-avatar setter
+    /// and the getter walk a rule list by. The counts are SL's (secondlife/lsl-definitions, the PrimParam and
+    /// PrimParamGet rules, and the llSetPrimitiveParams / llGetPrimitiveParams wiki pages); the IW_PRIM_* rules are
+    /// Halcyon's (LSLSystemAPI.SetPrimParams / GetPrimParams), and PRIM_PHYSICS_MATERIAL is OpenSim's own
+    /// (LSL_Constants.cs, read by LSL_Api.SetPrimParams). A rule is read by its count whether or not Phlox
+    /// implements it yet, so one rule Phlox does not act on never shifts or cuts off the rules after it.
+    /// </summary>
+    internal static class PrimParamRules
+    {
+        /// <summary>
+        /// The values a rule takes after its code when setting, or -1 for a rule number none of SL, Halcyon and
+        /// OpenSim defines. PRIM_TYPE takes its shape code and then <see cref="TypeValueCount"/> more.
+        /// </summary>
+        public static int SetValueCount(int code) => code switch
+        {
+            PRIM_MATERIAL or PRIM_PHYSICS or PRIM_TEMP_ON_REZ or PRIM_PHANTOM or PRIM_POSITION or PRIM_SIZE
+                or PRIM_ROTATION or PRIM_CAST_SHADOWS or PRIM_NAME or PRIM_DESC or PRIM_ROT_LOCAL
+                or PRIM_PHYSICS_SHAPE_TYPE or PRIM_POS_LOCAL or PRIM_LINK_TARGET or PRIM_SLICE or PRIM_ALLOW_UNSIT
+                or PRIM_SCRIPTED_SIT_ONLY or PRIM_CLICK_ACTION or PRIM_SIT_FLAGS or PRIM_HEALTH => 1,
+            PRIM_TYPE => 1,
+            PRIM_FULLBRIGHT or PRIM_TEXGEN or PRIM_GLOW or PRIM_RENDER_MATERIAL or PRIM_DAMAGE
+                or PRIM_COLLISION_SOUND => 2,
+            PRIM_COLOR or PRIM_BUMP_SHINY or PRIM_TEXT or PRIM_OMEGA or PRIM_ALPHA_MODE or PRIM_SIT_TARGET => 3,
+            PRIM_PROJECTOR or PRIM_REFLECTION_PROBE => 4,
+            PRIM_TEXTURE or PRIM_POINT_LIGHT or PRIM_NORMAL or PRIM_GLTF_NORMAL => 5,
+            PRIM_GLTF_EMISSIVE => 6,
+            PRIM_FLEXIBLE or PRIM_GLTF_METALLIC_ROUGHNESS => 7,
+            PRIM_SPECULAR => 8,
+            PRIM_GLTF_BASE_COLOR => 10,
+            IW_PRIM_ALPHA => 2,
+            IW_PRIM_PROJECTOR => 5,
+            IW_PRIM_PROJECTOR_ENABLED or IW_PRIM_PROJECTOR_TEXTURE or IW_PRIM_PROJECTOR_FOV
+                or IW_PRIM_PROJECTOR_FOCUS or IW_PRIM_PROJECTOR_AMBIENCE => 1,
+            // OpenSim's own rules (LSL_Constants.cs), with the value count OpenSim's LSL_Api reads.
+            PRIM_PHYSICS_MATERIAL => 5,
+            _ => -1,
+        };
+
+
+        /// <summary>
+        /// The values PRIM_TYPE takes after its shape code: box, cylinder and prism 6, sphere 5, torus, tube and ring
+        /// 11, sculpt 2. An unknown shape code takes none, as Halcyon reads it.
+        /// </summary>
+        public static int TypeValueCount(int primType) => primType switch
+        {
+            PRIM_TYPE_BOX or PRIM_TYPE_CYLINDER or PRIM_TYPE_PRISM => 6,
+            PRIM_TYPE_SPHERE => 5,
+            PRIM_TYPE_TORUS or PRIM_TYPE_TUBE or PRIM_TYPE_RING => 11,
+            PRIM_TYPE_SCULPT => 2,
+            _ => 0,
+        };
+
+        /// <summary>
+        /// The values a rule takes after its code when getting: the face for the per-face rules, the link for
+        /// PRIM_LINK_TARGET, none for the rest. A rule number SL does not define takes none.
+        /// </summary>
+        public static int GetValueCount(int code) => code switch
+        {
+            PRIM_TEXTURE or PRIM_COLOR or PRIM_BUMP_SHINY or PRIM_FULLBRIGHT or PRIM_TEXGEN or PRIM_GLOW
+                or PRIM_SPECULAR or PRIM_NORMAL or PRIM_ALPHA_MODE or PRIM_RENDER_MATERIAL or PRIM_GLTF_NORMAL
+                or PRIM_GLTF_EMISSIVE or PRIM_GLTF_METALLIC_ROUGHNESS or PRIM_GLTF_BASE_COLOR or IW_PRIM_ALPHA
+                or PRIM_LINK_TARGET => 1,
+            _ => 0,
+        };
+
+        /// <summary>
+        /// The whole length of the setter rule starting at <paramref name="idx"/> (its code included), or -1 for a
+        /// rule number SetValueCount does not know. PRIM_TYPE's length needs its shape code, so a PRIM_TYPE with
+        /// none left is 2 long.
+        /// </summary>
+        public static int SetRuleLength(object[] data, int idx, int code)
+        {
+            int count = SetValueCount(code);
+            if (count < 0) return -1;
+            if (code == PRIM_TYPE && idx + 1 < data.Length && data[idx + 1] is int primType)
+                count += TypeValueCount(primType);
+            return 1 + count;
         }
     }
 }

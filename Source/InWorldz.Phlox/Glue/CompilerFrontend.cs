@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 
 using Antlr4.Runtime;
+using Antlr4.Runtime.Atn;
+using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using Antlr4.StringTemplate;
 
@@ -77,37 +79,78 @@ namespace InWorldz.Phlox.Glue
 
         /// <summary>
         /// Strip invisible/non-ASCII characters that can appear when scripts are
-        /// pasted from web browsers or chat clients. Characters inside string
-        /// literals (between unescaped double-quotes) are preserved.
+        /// pasted from web browsers or chat clients. String literals and comments
+        /// are copied unchanged: SL keeps a string's contents verbatim. They are
+        /// found as the lexer finds them (LSL.g4 STRING_LITERAL, COMMENT_SINGLE,
+        /// COMMENT_BLOCK): inside a string a backslash escapes exactly the next
+        /// character, and a quote inside a comment starts nothing.
         /// </summary>
-        private static string SanitizeScript(string src)
+        internal static string SanitizeScript(string src)
         {
             var sb = new System.Text.StringBuilder(src.Length);
-            bool inString = false;
-            for (int i = 0; i < src.Length; i++)
+            int i = 0, n = src.Length;
+            while (i < n)
             {
                 char c = src[i];
+                int start = i;
 
-                // Track string literal boundaries (handle escaped quotes)
-                if (c == '"' && (i == 0 || src[i - 1] != '\\'))
+                if (c == '"')
                 {
-                    inString = !inString;
-                    sb.Append(c);
+                    i++;
+                    while (i < n && src[i] != '"')
+                        i += src[i] == '\\' && i + 1 < n ? 2 : 1;
+                    i = Math.Min(i + 1, n);
+                    sb.Append(src, start, i - start);
                     continue;
                 }
 
-                if (inString)
+                if (c == '/' && i + 1 < n && src[i + 1] == '/')
                 {
-                    sb.Append(c);
+                    i += 2;
+                    while (i < n && src[i] != '\r' && src[i] != '\n') i++;
+                    sb.Append(src, start, i - start);
                     continue;
                 }
 
-                // Outside strings: keep only printable ASCII + common whitespace
+                if (c == '/' && i + 1 < n && src[i + 1] == '*')
+                {
+                    int end = src.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    i = end < 0 ? n : end + 2;
+                    sb.Append(src, start, i - start);
+                    continue;
+                }
+
+                // Outside strings and comments: keep only printable ASCII + common whitespace
                 if (c == '\t' || c == '\n' || c == '\r' || (c >= 0x20 && c <= 0x7E))
                     sb.Append(c);
                 // else: silently drop the character
+                i++;
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// A linear pre-pass over the tokens that bounds brace depth before the parser runs. The grammar's
+        /// `statement : funcBlock | funcBlockContent` (whose anonBlock is also a funcBlock) is ambiguous for every
+        /// '{', so prediction reads ahead to the matching '}' - the rest of the script - once per level, before the
+        /// counted limit can trip: a 200,000-deep script cost 501 scans of ~6 MB. Every counted block adds at most
+        /// one brace on top of the state's and the event's, so a brace depth past Block + 2 is always past the
+        /// block limit, and is reported as that limit.
+        /// </summary>
+        private static void CheckBraceDepth(CommonTokenStream tokens)
+        {
+            tokens.Fill();
+            int depth = 0;
+            foreach (IToken t in tokens.GetTokens())
+            {
+                if (t.Channel != TokenConstants.DefaultChannel) continue;
+                if (t.Text == "{")
+                {
+                    if (++depth > NestingLimits.Block + 2) throw new NestingTooDeepException(t.Line, t.Column, NestingKind.Block);
+                }
+                else if (t.Text == "}" && depth > 0) depth--;
+            }
+            tokens.Seek(0);
         }
 
         public VM.CompiledScript Compile(ICharStream input)
@@ -118,20 +161,45 @@ namespace InWorldz.Phlox.Glue
                 // Phase 1: Lex and Parse
                 // --------------------------------------------------------
                 LSLLexer lexer = new LSLLexer(input);
+                // A character the lexer does not recognise is a syntax error, as in SL. Halcyon passed lexer
+                // diagnostics to the compile listener (its LSLListenerTraceRedirector); ANTLR's default listener
+                // only printed them to the console and the lexer skipped the character.
+                LslLexerErrorListener lexerErrors = new LslLexerErrorListener(_listener);
+                lexer.RemoveErrorListeners();
+                lexer.AddErrorListener(lexerErrors);
                 CommonTokenStream tokens = new CommonTokenStream(lexer);
-                LSLParser parser = new LSLParser(tokens);
 
-                // Wire up error listener
+                // Two-stage parse. Full-context (LL) prediction resolves the grammar's dangling
+                // 'else' and its assignment chains by walking the WHOLE parser stack at every decision: the
+                // cost grew with the square of the nesting (500 nested ifs: 8.7 s; 200 chained assignments:
+                // 7.1 s) and its recursion (ParserATNSimulator.Closure_) overflowed the stack at a 10,000-branch
+                // else-if chain, below every guard. SLL prediction does not look at the outer stack, and ANTLR
+                // guarantees an SLL parse that succeeds is the tree LL would build. A script SLL rejects is
+                // parsed again with LL, so a real syntax error is reported exactly as before.
                 LslErrorListener errorListener = new LslErrorListener(_listener);
-                parser.RemoveErrorListeners();
-                parser.AddErrorListener(errorListener);
- 
-
-                LSLParser.ProgContext tree = parser.prog();
-
-                if (errorListener.ErrorCount > 0)
+                CheckBraceDepth(tokens);
+                LSLParser.ProgContext tree = null;
                 {
-                    _listener.Error(errorListener.ErrorCount + " syntax error(s)");
+                    LSLParser sll = new LSLParser(tokens);
+                    sll.Interpreter.PredictionMode = PredictionMode.SLL;
+                    sll.RemoveErrorListeners();
+                    sll.ErrorHandler = new BailErrorStrategy();
+                    try { tree = sll.prog(); }
+                    catch (ParseCanceledException) { tree = null; }
+                }
+                if (tree == null)
+                {
+                    tokens.Seek(0);
+                    LSLParser parser = new LSLParser(tokens);
+                    parser.Interpreter.PredictionMode = PredictionMode.LL;
+                    parser.RemoveErrorListeners();
+                    parser.AddErrorListener(errorListener);
+                    tree = parser.prog();
+                }
+
+                if (errorListener.ErrorCount > 0 || lexerErrors.ErrorCount > 0)
+                {
+                    _listener.Error(errorListener.ErrorCount + lexerErrors.ErrorCount + " syntax error(s)");
                     return null;
                 }
 
@@ -139,7 +207,7 @@ namespace InWorldz.Phlox.Glue
                 // Phase 2: Symbol definition pass (replaces Def tree grammar)
                 // --------------------------------------------------------
                 LSLNodeAnnotations annotations = new LSLNodeAnnotations();
-                SymbolTable symtab = new SymbolTable(tokens, Defaults.SystemMethods.Values, DefaultConstants.Constants.Values);
+                SymbolTable symtab = new SymbolTable(tokens, Defaults.AllMethods, DefaultConstants.Constants.Values);
                 symtab.StatusListener = _listener;
 
                 DefVisitor def = new DefVisitor(symtab, annotations);
@@ -209,7 +277,7 @@ namespace InWorldz.Phlox.Glue
                 asmParser.RemoveErrorListeners();
                 asmParser.AddErrorListener(asmErrorListener);
 
-                BytecodeGenerator bcgen = new BytecodeGenerator(Defaults.SystemMethods.Values);
+                BytecodeGenerator bcgen = new BytecodeGenerator(Defaults.AllMethods);
                 asmParser.SetGenerator(bcgen);
 
                 try
@@ -231,13 +299,24 @@ namespace InWorldz.Phlox.Glue
 
                 return null;
             }
+            catch (NestingTooDeepException e)
+            {
+                // A script nested past what the stack can walk is the script's error.
+                // Normally a counted limit, whose message names it ("... (limit N)").
+                _listener.Error($"line {e.Line}:{e.Column} {e.Message}");
+            }
             catch (TooManyErrorsException e)
             {
                 _listener.Error(string.Format("Too many errors {0}", e.InnerException?.Message));
             }
             catch (Exception e)
             {
-                _listener.Error(e.Message);
+                // This used to report e.Message and nothing else, so a compiler crash
+                // was indistinguishable from a fault in the script - in the log and in the
+                // owner's dialog alike. CompilerCrash.Format marks it and carries the type and
+                // stack, which the listener logs and the owner-visible path deliberately does not
+                // repeat back to the resident.
+                _listener.Error(Types.CompilerCrash.Format(e));
             }
 
             return null;
@@ -263,7 +342,7 @@ namespace InWorldz.Phlox.Glue
             asmParser.RemoveErrorListeners();
             asmParser.AddErrorListener(asmErrorListener);
 
-            BytecodeGenerator bcgen = new BytecodeGenerator(Defaults.SystemMethods.Values);
+            BytecodeGenerator bcgen = new BytecodeGenerator(Defaults.AllMethods);
             asmParser.SetGenerator(bcgen);
 
             try
@@ -328,6 +407,34 @@ namespace InWorldz.Phlox.Glue
                 throw new TooManyErrorsException("Too many errors", e);
 
             _listener?.Error($"line {line}:{charPositionInLine} {msg}");
+        }
+    }
+
+    /// <summary>
+    /// The lexer's errors, routed to the LSL listener like the parser's. Every one is counted; the first ten are
+    /// reported, the rest only counted.
+    /// </summary>
+    internal class LslLexerErrorListener : IAntlrErrorListener<int>
+    {
+        private readonly ILSLListener _listener;
+        public int ErrorCount { get; private set; }
+
+        public LslLexerErrorListener(ILSLListener listener)
+        {
+            _listener = listener;
+        }
+
+        public void SyntaxError(
+            System.IO.TextWriter output,
+            IRecognizer recognizer,
+            int offendingSymbol,
+            int line,
+            int charPositionInLine,
+            string msg,
+            RecognitionException e)
+        {
+            if (++ErrorCount <= 10)
+                _listener?.Error($"line {line}:{charPositionInLine} {msg}");
         }
     }
 }

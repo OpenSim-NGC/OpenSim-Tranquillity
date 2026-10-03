@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/legion-grid-source/OpenSim/Addons/Phlox/grammar/LSL.g4 by ANTLR 4.13.1
+// Generated from LSL.g4 by ANTLR 4.13.1
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -29,7 +29,7 @@ using IToken = Antlr4.Runtime.IToken;
 /// </summary>
 [System.CodeDom.Compiler.GeneratedCode("ANTLR", "4.13.1")]
 [System.CLSCompliant(false)]
-public interface ILSLListener : IParseTreeListener {
+public interface ILSLParseTreeListener : IParseTreeListener {
 	/// <summary>
 	/// Enter a parse tree produced by <see cref="LSLParser.prog"/>.
 	/// </summary>

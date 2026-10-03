@@ -12,6 +12,35 @@ namespace InWorldz.Phlox.Compiler
     /// </summary>
     public class DefVisitor : LSLBaseVisitor<object>
     {
+        // The recursive dispatch runs out of stack before a deeply nested tree does (DepthGuard).
+        // The counted limits (NestingLimits) are the rule, the same levels the parser counted;
+        // DepthGuard stays as the backstop. VisitChildren goes through Visit so every child is counted.
+        private readonly NestingCounter _nesting = new NestingCounter();
+
+        public override object Visit(Antlr4.Runtime.Tree.IParseTree tree)
+        {
+            DepthGuard.Check(tree);
+            NestingKind? kind = NestingCounter.Classify(tree);
+            if (!kind.HasValue) return base.Visit(tree);
+            var start = (tree as Antlr4.Runtime.ParserRuleContext)?.Start;
+            _nesting.Enter(kind.Value, start?.Line ?? 0, start?.Column ?? 0);
+            try { return base.Visit(tree); }
+            finally { _nesting.Exit(kind.Value); }
+        }
+
+        public override object VisitChildren(Antlr4.Runtime.Tree.IRuleNode node)
+        {
+            DepthGuard.Check(node);
+            object result = DefaultResult;
+            int n = node.ChildCount;
+            for (int i = 0; i < n; i++)
+            {
+                if (!ShouldVisitNextChild(node, result)) break;
+                result = AggregateResult(result, Visit(node.GetChild(i)));
+            }
+            return result;
+        }
+
         private readonly SymbolTable _symtab;
         private readonly LSLNodeAnnotations _annotations;
 
@@ -38,7 +67,7 @@ namespace InWorldz.Phlox.Compiler
             if (string.IsNullOrEmpty(typeName))
                 return SymbolTable.VOID;
 
-            Symbol sym = _symtab.Globals.Resolve(typeName);
+            Symbol sym = _symtab.Globals.Resolve(SymbolTable.CanonicalTypeName(typeName));
             if (sym is ISymbolType t) return t;
 
             _symtab.StatusListener.Error($"line 0:0 Unknown type '{typeName}'");
@@ -82,6 +111,9 @@ namespace InWorldz.Phlox.Compiler
             ISymbolType type = ResolveType(typeName);
             var sym = new VariableSymbol(varName, type);
             sym.Def = MakeDef(context.ID());
+            // A local is in scope only after its declaration, its own initialiser included (SymbolTable.ResolveVisible).
+            if (_currentScope != _symtab.Globals)
+                sym.DeclarationEndTokenIndex = context.Stop.TokenIndex;
 
             _symtab.Define(sym, _currentScope);
 

@@ -16,6 +16,35 @@ namespace InWorldz.Phlox.Compiler
     /// </summary>
     public class GenVisitor : LSLBaseVisitor<string>
     {
+        // The recursive dispatch runs out of stack before a deeply nested tree does (DepthGuard).
+        // The counted limits (NestingLimits) are the rule, the same levels the parser counted;
+        // DepthGuard stays as the backstop. VisitChildren goes through Visit so every child is counted.
+        private readonly NestingCounter _nesting = new NestingCounter();
+
+        public override string Visit(Antlr4.Runtime.Tree.IParseTree tree)
+        {
+            DepthGuard.Check(tree);
+            NestingKind? kind = NestingCounter.Classify(tree);
+            if (!kind.HasValue) return base.Visit(tree);
+            var start = (tree as Antlr4.Runtime.ParserRuleContext)?.Start;
+            _nesting.Enter(kind.Value, start?.Line ?? 0, start?.Column ?? 0);
+            try { return base.Visit(tree); }
+            finally { _nesting.Exit(kind.Value); }
+        }
+
+        public override string VisitChildren(Antlr4.Runtime.Tree.IRuleNode node)
+        {
+            DepthGuard.Check(node);
+            string result = DefaultResult;
+            int n = node.ChildCount;
+            for (int i = 0; i < n; i++)
+            {
+                if (!ShouldVisitNextChild(node, result)) break;
+                result = AggregateResult(result, Visit(node.GetChild(i)));
+            }
+            return result;
+        }
+
         private readonly SymbolTable _symtab;
         private readonly LSLNodeAnnotations _annotations;
 
@@ -43,11 +72,57 @@ namespace InWorldz.Phlox.Compiler
                 throw new Types.TooManyErrorsException("Too many errors", null);
         }
 
+        /// <summary>
+        /// The literal as assembler text that reads back as exactly the same 32-bit float. A custom format
+        /// ("0.0###...") on a float keeps only 7 significant digits, so 2147483520.0 was written 2147484000.0 (read back as
+        /// 2147483904) and 1.17549435E-38 as 0.0. The shortest round-trip digits ("R") are written out as plain decimal,
+        /// because the assembler's FLOAT token has no exponent (Assembler.g4 FLOAT).
+        /// </summary>
         private static string FormatFloat(string text)
         {
-            if (float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
-                return f.ToString("0.0##############", CultureInfo.InvariantCulture);
-            return text;
+            if (!float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out float f))
+                return text;
+            if (!float.IsFinite(f))
+                return f.ToString("0.0##############", CultureInfo.InvariantCulture);   // as before: not a number the assembler reads
+            return PlainDecimal(f.ToString("R", CultureInfo.InvariantCulture));
+        }
+
+        /// <summary>"2.1474835E+09" -> "2147483500.0", "1.1754944E-38" -> "0.000...011754944", "0.5" -> "0.5".</summary>
+        private static string PlainDecimal(string r)
+        {
+            bool negative = r.StartsWith("-", StringComparison.Ordinal);
+            if (negative) r = r.Substring(1);
+            int exponent = 0;
+            int e = r.IndexOfAny(new[] { 'E', 'e' });
+            if (e >= 0)
+            {
+                exponent = int.Parse(r.Substring(e + 1), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
+                r = r.Substring(0, e);
+            }
+            int dot = r.IndexOf('.');
+            string digits = dot < 0 ? r : r.Remove(dot, 1);
+            int pointAt = (dot < 0 ? r.Length : dot) + exponent;   // digits before the decimal point
+            string whole, fraction;
+            if (pointAt <= 0)
+            {
+                whole = "0";
+                fraction = new string('0', -pointAt) + digits;
+            }
+            else if (pointAt >= digits.Length)
+            {
+                whole = digits + new string('0', pointAt - digits.Length);
+                fraction = string.Empty;
+            }
+            else
+            {
+                whole = digits.Substring(0, pointAt);
+                fraction = digits.Substring(pointAt);
+            }
+            whole = whole.TrimStart('0');
+            if (whole.Length == 0) whole = "0";
+            fraction = fraction.TrimEnd('0');
+            if (fraction.Length == 0) fraction = "0";
+            return (negative ? "-" : string.Empty) + whole + "." + fraction;
         }
 
         private string DoPromotion(IParseTree node, string st)
@@ -670,7 +745,8 @@ namespace InWorldz.Phlox.Compiler
         {
             string funcName = GetCallName(context.postfixExpression());
             MethodSymbol methSym = funcName != null
-                ? _symtab.Globals.Resolve(funcName + "()") as MethodSymbol : null;
+                ? (GetSymbol(context) as MethodSymbol      // The type pass's choice, types and all
+                   ?? ResolveCallForGen(funcName, context.callParamList()?.expr()?.Length ?? 0)) : null;
 
             var exprs = new List<string>();
             if (context.callParamList() != null)
@@ -761,7 +837,8 @@ namespace InWorldz.Phlox.Compiler
         public override string VisitFuncCall([NotNull] LSLParser.FuncCallContext context)
         {
             string funcName = context.ID().GetText();
-            MethodSymbol methSym = _symtab.Globals.Resolve(funcName + "()") as MethodSymbol;
+            MethodSymbol methSym = GetSymbol(context) as MethodSymbol   // The type pass's choice, types and all
+                ?? ResolveCallForGen(funcName, context.callParamList()?.expr()?.Length ?? 0);
 
             var exprs = new List<string>();
             if (context.callParamList() != null)
@@ -900,9 +977,9 @@ namespace InWorldz.Phlox.Compiler
 			// Walk up the parse tree to find the nearest scope annotation
 			IScope scope = FindScopeForNode(ctx);
 
+			// The variable in scope at this point: a local declared further on is not (SymbolTable.ResolveVisible).
 			string name = idNode.GetText();
-			var sym = scope?.Resolve(name) as VariableSymbol
-				   ?? _symtab.Globals.Resolve(name) as VariableSymbol;
+			var sym = _symtab.ResolveVisible(scope ?? _symtab.Globals, name, idNode.Symbol.TokenIndex, out _) as VariableSymbol;
 
 			if (ctx.ChildCount > 1)
 				subIdx = CalcSubIndex(ctx.GetChild(ctx.ChildCount - 1).GetText());
@@ -932,8 +1009,7 @@ namespace InWorldz.Phlox.Compiler
                                 ? CalcSubIndex(subscriptToken.Text) : null;
                         IParseTree parent = ids[0].Parent;
                         IScope scope = FindScopeForNode(parent);
-			var sym = scope?.Resolve(varName) as VariableSymbol
-				   ?? _symtab.Globals.Resolve(varName) as VariableSymbol;
+			var sym = _symtab.ResolveVisible(scope ?? _symtab.Globals, varName, ids[0].Symbol.TokenIndex, out _) as VariableSymbol;
 			return (sym, subIdx, sym?.Type);
 		}
 
@@ -1018,5 +1094,31 @@ namespace InWorldz.Phlox.Compiler
             if (tree.ChildCount == 1) return IsConstantExpr(tree.GetChild(0));
             return false;
         }
+
+        /// <summary>
+        /// The type pass now annotates the call with the symbol it chose, by argument type,
+        /// and this is the fallback for a call it never annotated (an error subtree, or a tree the type
+        /// pass did not reach). The two agree on every call that type-checked.
+        ///
+        /// The same overload choice the type pass made, by the same rule - the bare name
+        /// unless its arity does not fit and a <c>name$&lt;arity&gt;</c> sibling does. Both passes
+        /// deriving the symbol the same way is what makes the emitted <c>syscall &lt;name&gt;</c>
+        /// reach the shim the type checker approved; the assembler keys its table off the same
+        /// <c>Defaults.SymbolNameFor</c>.
+        /// </summary>
+        private MethodSymbol ResolveCallForGen(string funcName, int argCount)
+        {
+            if (funcName == null) return null;
+
+            MethodSymbol bare = _symtab.Globals.Resolve(funcName + "()") as MethodSymbol;
+            if (bare == null) return null;
+            if (bare.Members.Count == argCount) return bare;
+
+            if (_symtab.Globals.Resolve(funcName + InWorldz.Phlox.Types.Defaults.OverloadSeparator + argCount + "()") is MethodSymbol overload)
+                return overload;
+
+            return bare;
+        }
+
     }
 }

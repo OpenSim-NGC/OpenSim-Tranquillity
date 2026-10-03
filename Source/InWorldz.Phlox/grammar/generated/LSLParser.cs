@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-// Generated from D:/legion-grid-source/OpenSim/Addons/Phlox/grammar/LSL.g4 by ANTLR 4.13.1
+// Generated from LSL.g4 by ANTLR 4.13.1
 
 // Unreachable code detected
 #pragma warning disable 0162
@@ -29,6 +29,8 @@ using Antlr4.Runtime.Atn;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using DFA = Antlr4.Runtime.Dfa.DFA;
+using InWorldz.Phlox.Types;
+using InWorldz.Phlox.Compiler;
 
 [System.CodeDom.Compiler.GeneratedCode("ANTLR", "4.13.1")]
 [System.CLSCompliant(false)]
@@ -130,12 +132,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_prog; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterProg(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitProg(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -200,12 +202,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_globalStmt; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterGlobalStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitGlobalStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -278,12 +280,12 @@ public partial class LSLParser : Parser {
 		public NamedStateDefContext(StateDefContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterNamedStateDef(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitNamedStateDef(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -300,12 +302,12 @@ public partial class LSLParser : Parser {
 		public DefaultStateDefContext(StateDefContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterDefaultStateDef(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitDefaultStateDef(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -375,12 +377,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_stateBlock; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterStateBlock(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitStateBlock(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -441,12 +443,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_stateBlockContent; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterStateBlockContent(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitStateBlockContent(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -497,12 +499,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_funcDef; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterFuncDef(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitFuncDef(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -576,12 +578,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_funcBlock; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterFuncBlock(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitFuncBlock(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -645,12 +647,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_statement; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterStatement(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitStatement(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -708,12 +710,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_exprStatement; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterExprStatement(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitExprStatement(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -783,12 +785,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_label_; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterLabel_(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitLabel_(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -857,12 +859,12 @@ public partial class LSLParser : Parser {
 		public ForStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterForStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitForStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -885,12 +887,12 @@ public partial class LSLParser : Parser {
 		public WhileStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterWhileStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitWhileStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -910,12 +912,12 @@ public partial class LSLParser : Parser {
 		public PostDecrementStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPostDecrementStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPostDecrementStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -935,12 +937,12 @@ public partial class LSLParser : Parser {
 		public PreIncrementStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPreIncrementStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPreIncrementStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -957,12 +959,12 @@ public partial class LSLParser : Parser {
 		public StateChangeStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterStateChangeStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitStateChangeStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -979,12 +981,12 @@ public partial class LSLParser : Parser {
 		public FuncCallStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterFuncCallStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitFuncCallStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1003,12 +1005,12 @@ public partial class LSLParser : Parser {
 		public ReturnStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterReturnStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitReturnStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1025,12 +1027,12 @@ public partial class LSLParser : Parser {
 		public AnonBlockContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterAnonBlock(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitAnonBlock(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1046,12 +1048,12 @@ public partial class LSLParser : Parser {
 		public JumpStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterJumpStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitJumpStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1079,12 +1081,12 @@ public partial class LSLParser : Parser {
 		public IfStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterIfStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitIfStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1108,12 +1110,12 @@ public partial class LSLParser : Parser {
 		public DoWhileStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterDoWhileStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitDoWhileStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1131,12 +1133,12 @@ public partial class LSLParser : Parser {
 		public LabelStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterLabelStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitLabelStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1156,12 +1158,12 @@ public partial class LSLParser : Parser {
 		public PostIncrementStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPostIncrementStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPostIncrementStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1181,12 +1183,12 @@ public partial class LSLParser : Parser {
 		public PreDecrementStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPreDecrementStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPreDecrementStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1201,12 +1203,12 @@ public partial class LSLParser : Parser {
 		public SemiStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterSemiStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitSemiStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1232,12 +1234,12 @@ public partial class LSLParser : Parser {
 		public AssignmentStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterAssignmentStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitAssignmentStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1254,12 +1256,12 @@ public partial class LSLParser : Parser {
 		public VarDeclStmtContext(FuncBlockContentContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterVarDeclStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitVarDeclStmt(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1636,12 +1638,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_lhs; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterLhs(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitLhs(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1689,12 +1691,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_funcCall; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterFuncCall(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitFuncCall(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1752,12 +1754,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_eventDef; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterEventDef(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitEventDef(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1821,12 +1823,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_paramList; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterParamList(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitParamList(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1886,12 +1888,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_paramDecl; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterParamDecl(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitParamDecl(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -1940,12 +1942,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_varDecl; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterVarDecl(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitVarDecl(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2009,12 +2011,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_callParamList; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterCallParamList(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitCallParamList(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2099,12 +2101,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_expression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2148,12 +2150,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_expr; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2203,12 +2205,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_assignmentExpression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterAssignmentExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitAssignmentExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2282,12 +2284,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_booleanExpression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterBooleanExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitBooleanExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2358,12 +2360,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_bitwiseExpression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterBitwiseExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitBitwiseExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2434,12 +2436,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_equalityExpression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterEqualityExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitEqualityExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2518,12 +2520,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_relationalExpression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterRelationalExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitRelationalExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2597,12 +2599,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_binaryBitwiseExpression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterBinaryBitwiseExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitBinaryBitwiseExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2677,12 +2679,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_additiveExpression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterAdditiveExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitAdditiveExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2753,12 +2755,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_multiplicativeExpression; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterMultiplicativeExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitMultiplicativeExpression(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2834,12 +2836,12 @@ public partial class LSLParser : Parser {
 		public UnaryBitNotContext(UnaryExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterUnaryBitNot(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitUnaryBitNot(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2857,12 +2859,12 @@ public partial class LSLParser : Parser {
 		public UnaryMinusContext(UnaryExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterUnaryMinus(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitUnaryMinus(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2879,12 +2881,12 @@ public partial class LSLParser : Parser {
 		public TypeCastExprContext(UnaryExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterTypeCastExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitTypeCastExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -2901,12 +2903,12 @@ public partial class LSLParser : Parser {
 		public UnaryBoolNotContext(UnaryExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterUnaryBoolNot(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitUnaryBoolNot(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3008,12 +3010,12 @@ public partial class LSLParser : Parser {
 		public TypeCastContext(TypeCastExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterTypeCast(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitTypeCast(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3030,12 +3032,12 @@ public partial class LSLParser : Parser {
 		public PreIncDecExprContext(TypeCastExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPreIncDecExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPreIncDecExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3108,12 +3110,12 @@ public partial class LSLParser : Parser {
 		public PreDecrementContext(PreIncDecExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPreDecrement(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPreDecrement(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3130,12 +3132,12 @@ public partial class LSLParser : Parser {
 		public PostfixExprContext(PreIncDecExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPostfixExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPostfixExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3152,12 +3154,12 @@ public partial class LSLParser : Parser {
 		public PreIncrementContext(PreIncDecExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPreIncrement(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPreIncrement(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3245,12 +3247,12 @@ public partial class LSLParser : Parser {
 		public SubscriptPostfixContext(PostfixExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterSubscriptPostfix(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitSubscriptPostfix(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3267,12 +3269,12 @@ public partial class LSLParser : Parser {
 		public PostIncrementPostfixContext(PostfixExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPostIncrementPostfix(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPostIncrementPostfix(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3289,12 +3291,12 @@ public partial class LSLParser : Parser {
 		public PrimaryExprContext(PostfixExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPrimaryExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPrimaryExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3311,12 +3313,12 @@ public partial class LSLParser : Parser {
 		public PostDecrementPostfixContext(PostfixExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterPostDecrementPostfix(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitPostDecrementPostfix(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3338,12 +3340,12 @@ public partial class LSLParser : Parser {
 		public MethodCallPostfixContext(PostfixExpressionContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterMethodCallPostfix(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitMethodCallPostfix(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3474,12 +3476,12 @@ public partial class LSLParser : Parser {
 		public StringLiteralContext(PrimaryContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterStringLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitStringLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3496,12 +3498,12 @@ public partial class LSLParser : Parser {
 		public RotationLiteralExprContext(PrimaryContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterRotationLiteralExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitRotationLiteralExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3518,12 +3520,12 @@ public partial class LSLParser : Parser {
 		public ListLiteralExprContext(PrimaryContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterListLiteralExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitListLiteralExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3538,12 +3540,12 @@ public partial class LSLParser : Parser {
 		public IntegerLiteralContext(PrimaryContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterIntegerLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitIntegerLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3558,12 +3560,12 @@ public partial class LSLParser : Parser {
 		public FloatLiteralContext(PrimaryContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterFloatLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitFloatLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3580,12 +3582,12 @@ public partial class LSLParser : Parser {
 		public VectorLiteralExprContext(PrimaryContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterVectorLiteralExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitVectorLiteralExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3604,12 +3606,12 @@ public partial class LSLParser : Parser {
 		public ParenExprContext(PrimaryContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterParenExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitParenExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3624,12 +3626,12 @@ public partial class LSLParser : Parser {
 		public IdExprContext(PrimaryContext context) { CopyFrom(context); }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterIdExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitIdExpr(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3745,12 +3747,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_vecLiteral; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterVecLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitVecLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3811,12 +3813,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_rotLiteral; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterRotLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitRotLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3876,12 +3878,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_listLiteral; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterListLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitListLiteral(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
@@ -3932,12 +3934,12 @@ public partial class LSLParser : Parser {
 		public override int RuleIndex { get { return RULE_listContents; } }
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void EnterRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.EnterListContents(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
 		public override void ExitRule(IParseTreeListener listener) {
-			ILSLListener typedListener = listener as ILSLListener;
+			ILSLParseTreeListener typedListener = listener as ILSLParseTreeListener;
 			if (typedListener != null) typedListener.ExitListContents(this);
 		}
 		[System.Diagnostics.DebuggerNonUserCode]
