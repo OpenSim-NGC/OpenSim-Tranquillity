@@ -42,11 +42,13 @@ namespace Phlox.ScriptEngine
             m_Thread.Start();
         }
 
-        public void Stop()
+        /// <returns>False if the thread was still running when the 5 s join gave up (see <see cref="StopThread"/>).</returns>
+        public bool Stop()
         {
-            StopThread();
+            bool stopped = StopThread();
             m_ScriptLoader.Stop();
             m_ExeScheduler.Stop();
+            return stopped;
         }
 
         /// <summary>

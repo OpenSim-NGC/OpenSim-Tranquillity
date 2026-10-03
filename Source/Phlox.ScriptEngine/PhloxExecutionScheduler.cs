@@ -1150,8 +1150,29 @@ namespace Phlox.ScriptEngine
         /// <summary>The engine's [InWorldz.Phlox] section, for the parts built with this scheduler (the listen manager).</summary>
         internal Nini.Config.IConfig EngineConfig => m_Engine?.Config;
 
+        // The script in a timeslice now, and whether the scheduler is halted: a stop that did not end the scheduler's thread
+        // in time halts it, and a halted scheduler starts no further timeslice or pass.
+        private readonly object m_SliceLock = new object();
+        private Interpreter m_InSlice;
+        private bool m_Halted;
+
+        /// <summary>
+        /// The scheduler runs no further script: no new pass, no new timeslice. Returns the script in a timeslice now, which
+        /// keeps running until its slice ends, or null. For a final save whose scheduler thread did not stop.
+        /// </summary>
+        internal Interpreter Halt()
+        {
+            lock (m_SliceLock)
+            {
+                m_Halted = true;
+                return m_InSlice;
+            }
+        }
+
         public WorkStatus DoWork()
         {
+            lock (m_SliceLock)
+                if (m_Halted) return new WorkStatus { NextWakeUpTime = ulong.MaxValue };
             WorkerThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
             // Script state is captured here, between timeslices, when the state thread asks for it (Halcyon
             // ExecutionScheduler.RequestStateData); the state thread only writes what it is handed.
@@ -1224,51 +1245,62 @@ namespace Phlox.ScriptEngine
                 var current = currentNode.Value;
                 int ticks = 0;
                 bool terminated = false;
-
-                m_SliceWatch.Restart();
-                while (ticks < SCRIPT_TIMESLICE)
+                lock (m_SliceLock)
                 {
-                    // A script put to sleep while it sat on the run queue (the reset throttle, on a reset from
-                    // outside its own slice) goes to the sleep heap untouched - its first opcode would overwrite the sleep.
-                    if (m_NextScript.Value.ScriptState.RunState == RuntimeState.Status.Sleeping)
-                    {
-                        CheckRunstateChange();
-                        break;
-                    }
-                    try { m_NextScript.Value.Tick(); }
-                    catch (Exception e)
-                    {
-                        // TerminateWithError marks the script Killed, but this path broke out of
-                        // the timeslice WITHOUT the Killed arm of CheckRunstateChange, so the node stayed on
-                        // the run queue and the next pass ticked the dead script again on a torn operand
-                        // stack - the "Unable to cast" and "Stack empty" stops that followed every OSSL
-                        // denial. Off the queue here, once.
-                        TerminateWithError(m_NextScript.Value, e);
-                        m_RunIndex.Remove(m_NextScript.Value.ItemId);
-                        m_RunQueue.Remove(m_NextScript);
-                        terminated = true;
-                    }
-
-                    iterations++;
-                    ticks++;
-
-                    if (terminated || CheckRunstateChange()) break;
+                    if (m_Halted) return;
+                    m_InSlice = current;
                 }
-                m_SliceWatch.Stop();
-
-                // Every timeslice marks the script for saving (Halcyon RunNextScript: "tell our state manager that we
-                // changed"), so one in a long loop, an llSleep or a blocking call is saved as it is now. A crash marked
-                // itself in TerminateWithError.
-                if (!terminated) m_Engine?.StateManager?.ScriptChanged(current);
-
-                // Guard against null after termination/removal
-			if (!terminated && m_NextScript != null && m_NextScript == currentNode)
+                try
                 {
-                    m_NextScript.Value.AddExecutionTime(m_SliceWatch.Elapsed.TotalMilliseconds);
+                    m_SliceWatch.Restart();
+                    while (ticks < SCRIPT_TIMESLICE)
+                    {
+                        // A script put to sleep while it sat on the run queue (the reset throttle, on a reset from
+                        // outside its own slice) goes to the sleep heap untouched - its first opcode would overwrite the sleep.
+                        if (m_NextScript.Value.ScriptState.RunState == RuntimeState.Status.Sleeping)
+                        {
+                            CheckRunstateChange();
+                            break;
+                        }
+                        try { m_NextScript.Value.Tick(); }
+                        catch (Exception e)
+                        {
+                            // TerminateWithError marks the script Killed, but this path broke out of
+                            // the timeslice WITHOUT the Killed arm of CheckRunstateChange, so the node stayed on
+                            // the run queue and the next pass ticked the dead script again on a torn operand
+                            // stack - the "Unable to cast" and "Stack empty" stops that followed every OSSL
+                            // denial. Off the queue here, once.
+                            TerminateWithError(m_NextScript.Value, e);
+                            m_RunIndex.Remove(m_NextScript.Value.ItemId);
+                            m_RunQueue.Remove(m_NextScript);
+                            terminated = true;
+                        }
 
-                    if (m_SliceWatch.Elapsed.TotalMilliseconds >= SLOW_THRESH_MS)
-                        m_log.LogWarning("[PhloxExe]: Slow timeslice for {0} ({1:F1}ms)",
-                            m_NextScript.Value.Script.AssetId, m_SliceWatch.Elapsed.TotalMilliseconds);
+                        iterations++;
+                        ticks++;
+
+                        if (terminated || CheckRunstateChange()) break;
+                    }
+                    m_SliceWatch.Stop();
+
+                    // Every timeslice marks the script for saving (Halcyon RunNextScript: "tell our state manager that we
+                    // changed"), so one in a long loop, an llSleep or a blocking call is saved as it is now. A crash marked
+                    // itself in TerminateWithError.
+                    if (!terminated) m_Engine?.StateManager?.ScriptChanged(current);
+
+                    // Guard against null after termination/removal
+                    if (!terminated && m_NextScript != null && m_NextScript == currentNode)
+                    {
+                        m_NextScript.Value.AddExecutionTime(m_SliceWatch.Elapsed.TotalMilliseconds);
+
+                        if (m_SliceWatch.Elapsed.TotalMilliseconds >= SLOW_THRESH_MS)
+                            m_log.LogWarning("[PhloxExe]: Slow timeslice for {0} ({1:F1}ms)",
+                                m_NextScript.Value.Script.AssetId, m_SliceWatch.Elapsed.TotalMilliseconds);
+                    }
+                }
+                finally
+                {
+                    lock (m_SliceLock) m_InSlice = null;
                 }
 
                 m_NextScript = followingScript ?? m_RunQueue.First;

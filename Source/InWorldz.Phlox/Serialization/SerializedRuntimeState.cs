@@ -141,41 +141,37 @@ namespace InWorldz.Phlox.Serialization
 
 
 
+        /// <summary>One part of the state copied, or the capture fails naming it.</summary>
+        private static T Copy<T>(string part, Func<T> copy)
+        {
+            try { return copy(); }
+            catch (Exception e)
+            {
+                throw new InvalidOperationException("the script's " + part + " could not be copied for its state: " + e.Message, e);
+            }
+        }
+
         public static SerializedRuntimeState FromRuntimeState(VM.RuntimeState state)
         {
-            // Snapshot all mutable collections up front to avoid
-            // "Collection was modified" if the execution thread touches
-            // the RuntimeState while we are serializing.
-            // Catch Exception (not just InvalidOperationException) because
-            // C5.CollectionModifiedException does not inherit from InvalidOperationException.
-            VM.StackFrame[] callsSnapshot;
-            try { callsSnapshot = state.Calls.ToArray(); }
-            catch { callsSnapshot = Array.Empty<VM.StackFrame>(); }
+            // Snapshot all mutable collections up front, so the serializer walks copies and not the live state.
+            // A part that cannot be copied (a collection changed while it was read: C5.CollectionModifiedException does
+            // not inherit from InvalidOperationException, so any exception counts) fails the whole capture. A state
+            // with an emptied part would replace the last good one, so the caller keeps that instead.
+            VM.StackFrame[] callsSnapshot = Copy("call stack", () => state.Calls.ToArray());
 
             VM.PostedEvent[] eventQueueSnapshot;
             lock (state.EventQueueLock)
-            {
-                try { eventQueueSnapshot = state.EventQueue.ToArray(); }
-                catch { eventQueueSnapshot = Array.Empty<VM.PostedEvent>(); }
-            }
+                eventQueueSnapshot = Copy("event queue", () => state.EventQueue.ToArray());
 
-            Dictionary<int, VM.ActiveListen> listensSnapshot;
-            try { listensSnapshot = new Dictionary<int, VM.ActiveListen>(state.ActiveListens); }
-            catch { listensSnapshot = new Dictionary<int, VM.ActiveListen>(); }
+            Dictionary<int, VM.ActiveListen> listensSnapshot = Copy("listens", () => new Dictionary<int, VM.ActiveListen>(state.ActiveListens));
 
-            KeyValuePair<int, object[]>[] miscSnapshot;
-            try { miscSnapshot = state.MiscAttributes.ToArray(); }
-            catch { miscSnapshot = Array.Empty<KeyValuePair<int, object[]>>(); }
+            KeyValuePair<int, object[]>[] miscSnapshot = Copy("attributes", () => state.MiscAttributes.ToArray());
 
-            object[] globalsSnapshot;
-            try { globalsSnapshot = (object[])state.Globals.Clone(); }
-            catch { globalsSnapshot = state.Globals; }
+            object[] globalsSnapshot = Copy("globals", () => (object[])state.Globals.Clone());
 
             // The operand stack was the one live collection still walked in place
             // (FromPrimitiveStack enumerates it) while the script thread pushes and pops.
-            Stack<object> operandsSnapshot;
-            try { operandsSnapshot = new Stack<object>(new Stack<object>(state.Operands)); }
-            catch { operandsSnapshot = new Stack<object>(); }
+            Stack<object> operandsSnapshot = Copy("operand stack", () => new Stack<object>(new Stack<object>(state.Operands)));
 
             SerializedRuntimeState serState = new SerializedRuntimeState();
             serState.IP = state.IP;

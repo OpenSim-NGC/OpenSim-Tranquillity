@@ -190,11 +190,19 @@ namespace Phlox.ScriptEngine
         /// scripts are captured here, on this thread. Then every queued write is tried until it commits or is given up
         /// (<see cref="MaxWriteAttempts"/>), and every write given up while this manager ran is named in the log.
         /// </summary>
-        public void Stop()
+        public void Stop() => StopExcept(UUID.Zero);
+
+        /// <summary>
+        /// As <see cref="Stop()"/>, except that <paramref name="stillRunning"/>, a script the scheduler is still running
+        /// because its thread did not stop, is not captured: its state may be changing, and its last saved row stays.
+        /// </summary>
+        public void StopExcept(UUID stillRunning)
         {
             m_Stop = true;
             m_WakeEvent.Set();
             m_Thread?.Join(5000);
+            if (!stillRunning.IsZero())
+                lock (m_Lock) m_Dirty.Remove(stillRunning);
             CaptureDirty(self: true);
             while (!DrainWrites()) { }   // each pass counts an attempt against what failed, so this ends
             List<string> givenUp;
