@@ -99,6 +99,7 @@ namespace Phlox.ScriptEngine
             public UUID AssetId;
             public byte[] Blob;
             public string Reason;
+            public long Seq;
             /// <summary>Times this write was in a transaction that did not commit.</summary>
             public int Attempts;
         }
@@ -122,15 +123,25 @@ namespace Phlox.ScriptEngine
         /// <summary>Test seam: a write for this item fails as a failed statement would. Null in production.</summary>
         internal Func<UUID, bool> FailWriteForTest;
 
-        // Items with a write still queued, across every manager in the process, and the manager that holds it. The
+        // Items with a write still queued, across every manager in the process, and how many each manager holds. The
         // managers share one file, and a script unloaded in one region and loaded in another of the same simulator (a
         // crossing, an engine switched back) must read the row its unload wrote, not the one before it.
-        private static readonly Dictionary<UUID, (StateManager Owner, int Count)> s_Pending = new Dictionary<UUID, (StateManager, int)>();
+        private static readonly Dictionary<UUID, Dictionary<StateManager, int>> s_Pending = new Dictionary<UUID, Dictionary<StateManager, int>>();
         private static readonly object s_PendingLock = new object();
+        // The order writes were queued in, across every manager, so a load sees the newest queued write for its item.
+        private static long s_WriteSeq;
 
-        // Scripts loaded in any engine of this process. The purge never deletes their rows.
-        private static readonly HashSet<UUID> s_Live = new HashSet<UUID>();
+        // Scripts loaded in any engine of this process, and the manager of the engine that loaded each last. The purge
+        // never deletes their rows, and an unload in any other manager does not write over the row (a crossing object's
+        // scripts load in the region it entered before the region it left unloads them, or after: nothing orders the two).
+        private static readonly Dictionary<UUID, StateManager> s_Live = new Dictionary<UUID, StateManager>();
         private static readonly object s_LiveLock = new object();
+
+        /// <summary>The script is loaded in an engine of this process.</summary>
+        internal static bool IsLoadedAnywhere(UUID itemId)
+        {
+            lock (s_LiveLock) return s_Live.ContainsKey(itemId);
+        }
 
         // The scheduler's wake: the state thread asks for a capture through it, and the scheduler takes the snapshots
         // on its own thread, between timeslices (Halcyon: ExecutionScheduler.RequestStateData).
@@ -322,7 +333,13 @@ namespace Phlox.ScriptEngine
                     return;
                 }
             }
-            ForgetLive(interp.ItemId);
+            if (!ForgetLive(interp.ItemId))
+            {
+                // Loaded since in another region of this simulator (a crossing whose arrival loaded first): that region's
+                // state is the newer one, and the row is its to write.
+                m_log.LogDebug("[PhloxState]: Not saving {0} at unload: it is loaded in another region now", interp.ItemId);
+                return;
+            }
             byte[] blob;
             try { blob = CaptureRow(interp); }
             catch (Exception e)
@@ -564,12 +581,15 @@ namespace Phlox.ScriptEngine
             lock (m_Lock)
             {
                 if (op.Kind == WriteKind.Save && m_LoadFailed.Contains(op.ItemId)) return;   // Never overwrite an unread row
+                op.Seq = Interlocked.Increment(ref s_WriteSeq);
                 m_Writes.Enqueue(op);
                 m_WritesQueued++;
                 lock (s_PendingLock)
                 {
-                    s_Pending.TryGetValue(op.ItemId, out var p);
-                    s_Pending[op.ItemId] = (this, p.Count + 1);
+                    if (!s_Pending.TryGetValue(op.ItemId, out var holders))
+                        s_Pending[op.ItemId] = holders = new Dictionary<StateManager, int>();
+                    holders.TryGetValue(this, out int count);
+                    holders[this] = count + 1;
                 }
             }
         }
@@ -580,13 +600,28 @@ namespace Phlox.ScriptEngine
         /// </summary>
         private static void FinishPendingWrites(UUID itemId)
         {
-            StateManager owner;
+            foreach (StateManager holder in HoldersOf(itemId)) holder.DrainWrites();
+        }
+
+        /// <summary>The managers holding a queued write for the item, the one whose write for it was queued first first.</summary>
+        private static List<StateManager> HoldersOf(UUID itemId)
+        {
+            List<StateManager> holders;
             lock (s_PendingLock)
             {
-                if (!s_Pending.TryGetValue(itemId, out var p)) return;
-                owner = p.Owner;
+                if (!s_Pending.TryGetValue(itemId, out var h)) return new List<StateManager>();
+                holders = new List<StateManager>(h.Keys);
             }
-            owner.DrainWrites();
+            if (holders.Count > 1) holders.Sort((x, y) => x.FirstQueuedFor(itemId).CompareTo(y.FirstQueuedFor(itemId)));
+            return holders;
+        }
+
+        private long FirstQueuedFor(UUID itemId)
+        {
+            lock (m_Lock)
+                foreach (var op in m_Writes)
+                    if (op.ItemId == itemId) return op.Seq;
+            return long.MaxValue;
         }
 
         /// <summary>
@@ -666,9 +701,9 @@ namespace Phlox.ScriptEngine
             {
                 foreach (var op in ops)
                 {
-                    if (!s_Pending.TryGetValue(op.ItemId, out var p) || p.Owner != this) continue;
-                    if (p.Count <= 1) s_Pending.Remove(op.ItemId);
-                    else s_Pending[op.ItemId] = (this, p.Count - 1);
+                    if (!s_Pending.TryGetValue(op.ItemId, out var holders) || !holders.TryGetValue(this, out int count)) continue;
+                    if (count > 1) holders[this] = count - 1;
+                    else if (holders.Remove(this) && holders.Count == 0) s_Pending.Remove(op.ItemId);
                 }
             }
             lock (m_Lock)
@@ -692,16 +727,11 @@ namespace Phlox.ScriptEngine
         /// </summary>
         private static WriteOp UnwrittenFor(UUID itemId)
         {
-            StateManager owner;
-            lock (s_PendingLock)
-            {
-                if (!s_Pending.TryGetValue(itemId, out var p)) return null;
-                owner = p.Owner;
-            }
             WriteOp last = null;
-            lock (owner.m_Lock)
-                foreach (var op in owner.m_Writes)
-                    if (op.ItemId == itemId && op.Kind != WriteKind.Touch) last = op;
+            foreach (StateManager holder in HoldersOf(itemId))
+                lock (holder.m_Lock)
+                    foreach (var op in holder.m_Writes)
+                        if (op.ItemId == itemId && op.Kind != WriteKind.Touch && (last == null || op.Seq > last.Seq)) last = op;
             return last;
         }
 
@@ -816,12 +846,21 @@ namespace Phlox.ScriptEngine
         private void NoteLive(UUID itemId)
         {
             lock (m_Lock) m_Live.Add(itemId);
-            lock (s_LiveLock) s_Live.Add(itemId);
+            lock (s_LiveLock) s_Live[itemId] = this;
         }
 
-        private static void ForgetLive(UUID itemId)
+        /// <summary>
+        /// The script is no longer loaded in this manager's engine. False when another manager's engine has loaded it
+        /// since, which keeps it on the list.
+        /// </summary>
+        private bool ForgetLive(UUID itemId)
         {
-            lock (s_LiveLock) s_Live.Remove(itemId);
+            lock (s_LiveLock)
+            {
+                if (s_Live.TryGetValue(itemId, out StateManager owner) && owner != this) return false;
+                s_Live.Remove(itemId);
+                return true;
+            }
         }
 
         private void MaybePurge()
@@ -861,7 +900,7 @@ namespace Phlox.ScriptEngine
                     foreach (string id in old)
                     {
                         if (UUID.TryParse(id, out UUID item))
-                            lock (s_LiveLock) if (s_Live.Contains(item)) continue;
+                            lock (s_LiveLock) if (s_Live.ContainsKey(item)) continue;
                         using var del = conn.CreateCommand();
                         del.CommandText = "DELETE FROM script_state WHERE item_id = @id";
                         del.Parameters.AddWithValue("@id", id);
