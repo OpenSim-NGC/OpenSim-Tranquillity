@@ -285,6 +285,28 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   restart." Carried state is used before the state database's row; carried state saved for
   another asset (the script was edited) gives way to the row.
 
+  What the script is told on arrival, once, after `state_entry` or the event it was in the
+  middle of (a script restored asleep or mid-event finishes that event first):
+
+  | Arrival | Event |
+  |---|---|
+  | The object crosses into another region | `changed(CHANGED_REGION)` |
+  | A worn object crosses with its wearer | `changed(CHANGED_REGION)` |
+  | The wearer teleports to another region | `changed(CHANGED_REGION \| CHANGED_TELEPORT)`, one event |
+  | The wearer teleports within the region | `changed(CHANGED_TELEPORT)` (sent by the simulator; nothing is restored) |
+  | Take and rez | `on_rez` |
+  | Wear from inventory, or log in wearing it | `on_rez`, then `attach` |
+  | The region starts | `changed(CHANGED_REGION_START)` |
+
+  As the SL wiki says for
+  [CHANGED_REGION](https://wiki.secondlife.com/wiki/CHANGED_REGION) and
+  [CHANGED_TELEPORT](https://wiki.secondlife.com/wiki/CHANGED_TELEPORT), only scripts in the
+  root prim get `CHANGED_REGION` and `CHANGED_TELEPORT`; scripts in child prims get neither.
+  YEngine posts them to every script in the object. `CHANGED_TELEPORT` goes to worn
+  objects only. A script that arrives with no state it can use starts fresh and gets
+  `state_entry`, then the same event. Nothing else is posted for a crossing or a teleport:
+  no `on_rez`, no `attach`, no `run_time_permissions`.
+
   Limits:
   - The simulator offers a crossing's states, and a teleport's attachment states, only to
     the region's default script engine (`[Startup] DefaultScriptEngine`). In a region whose
@@ -296,6 +318,11 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     rezzes. YEngine refuses Phlox's state the same way.
   - Events that arrive while an object is between regions are not held for it (no crossing
     wait).
+  - A script that arrives on a parcel where scripts may not run is paused, and the arrival's
+    `changed` event is dropped with whatever else reaches a paused script. SL queues it and
+    posts it once the object is somewhere scripts run.
+  - A seated avatar's crossing: the vehicle's script gets `CHANGED_REGION` when the vehicle
+    arrives, which can be before its riders do.
   - A script held stopped because its row could not be read carries no state.
   - Objects saved by an earlier Phlox build carry no Phlox state and start fresh as before.
 - **Carried state is checked as input from outside.** It can come from anywhere: inventory
