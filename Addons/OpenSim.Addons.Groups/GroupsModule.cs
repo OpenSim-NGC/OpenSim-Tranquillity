@@ -1177,12 +1177,16 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         EjectGroupMember(remoteClient, GetRequestingAgentID(remoteClient), groupID, ejecteeID);
     }
 
-    public void EjectGroupMember(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID ejecteeID)
+    public bool EjectGroupMember(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID ejecteeID)
     {
         if (m_debugEnabled) m_log.LogDebug("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
         // Todo: Security check?
         m_groupData.RemoveAgentFromGroup(agentID.ToString(), ejecteeID.ToString(), groupID);
+
+        // The connector does not say whether the service refused (it refuses without the Eject power),
+        // so read the membership back.
+        bool removed = m_groupData.GetAgentGroupMembership(agentID.ToString(), ejecteeID.ToString(), groupID) == null;
 
         string agentName;
         RegionInfo regionInfo;
@@ -1222,7 +1226,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
 
         GroupRecord groupInfo = m_groupData.GetGroupRecord(agentID.ToString(), groupID, null);
         if ((groupInfo == null))
-            return;
+            return removed;
 
         UserData udata = m_sceneList[0].UserManagementModule.GetUserData(ejecteeID);
         IClientAPI ejecteeClient = GetActiveRootClient(ejecteeID);
@@ -1289,6 +1293,8 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         msg.RegionID = regionInfo.RegionID.Guid;
         msg.binaryBucket = Array.Empty<byte>();
         OutgoingInstantMessage(msg, agentID);
+
+        return removed;
     }
 
     public void InviteGroupRequest(IClientAPI remoteClient, UUID groupID, UUID invitedAgentID, UUID roleID)
@@ -1296,7 +1302,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         InviteGroup(remoteClient, GetRequestingAgentID(remoteClient), groupID, invitedAgentID, roleID);
     }
 
-    public void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID)
+    public bool InviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID)
     {
         if (m_debugEnabled) m_log.LogDebug("[Groups]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
@@ -1307,13 +1313,14 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         if (group == null)
         {
             m_log.LogDebug("[Groups]: No such group {0}", groupID);
-            return;
+            return false;
         }
 
         // Todo: Security check, probably also want to send some kind of notification
         UUID InviteID = UUID.Random();
 
-        if (m_groupData.AddAgentToGroupInvite(agentID.ToString(), InviteID, groupID, roleID, invitedAgentID.ToString()))
+        bool invited = m_groupData.AddAgentToGroupInvite(agentID.ToString(), InviteID, groupID, roleID, invitedAgentID.ToString());
+        if (invited)
         {
             if (m_msgTransferModule != null)
             {
@@ -1341,6 +1348,8 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
                 OutgoingInstantMessage(msg, invitedAgentID);
             }
         }
+
+        return invited;
     }
 
     public List<DirGroupsReplyData> FindGroups(IClientAPI remoteClient, string query)

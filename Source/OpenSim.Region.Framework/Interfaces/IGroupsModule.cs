@@ -93,9 +93,21 @@ public interface IGroupsModule
     void JoinGroupRequest(IClientAPI remoteClient, UUID GroupID);
     void LeaveGroupRequest(IClientAPI remoteClient, UUID GroupID);
     void EjectGroupMemberRequest(IClientAPI remoteClient, UUID GroupID, UUID EjecteeID);
-    void EjectGroupMember(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID EjecteeID);
+
+    /// <summary>
+    /// Remove EjecteeID from the group on agentID's behalf.
+    /// </summary>
+    /// <returns>true when EjecteeID is no longer a member afterwards; false when the groups service
+    /// refused (for example the ejector lacks the Eject power).</returns>
+    bool EjectGroupMember(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID EjecteeID);
     void InviteGroupRequest(IClientAPI remoteClient, UUID GroupID, UUID InviteeID, UUID RoleID);
-    void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID InviteeID, UUID RoleID);
+
+    /// <summary>
+    /// Invite InviteeID to the group on agentID's behalf.
+    /// </summary>
+    /// <returns>true when the groups service recorded the invitation; false when it refused (for example the
+    /// inviter lacks the Invite power or the invitee is already a member) or the group could not be read.</returns>
+    bool InviteGroup(IClientAPI remoteClient, UUID agentID, UUID GroupID, UUID InviteeID, UUID RoleID);
     void NotifyChange(UUID GroupID);
 
     ulong GetFullGroupPowers(UUID agentID, UUID groupID);
