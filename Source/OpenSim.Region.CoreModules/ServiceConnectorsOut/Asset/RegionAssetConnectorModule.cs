@@ -32,6 +32,7 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
@@ -220,7 +221,13 @@ public class RegionAssetConnector : ISharedRegionModule, IAssetService
     {
         if (m_HGConnector == null || string.IsNullOrEmpty(ForeignAssetService))
             return null;
-        return m_HGConnector.Get(id , ForeignAssetService, true);
+        AssetBase asset = m_HGConnector.Get(id , ForeignAssetService, true);
+
+        // Object data another grid put here: its scripts' Experience links are cleared before the asset is
+        // stored or used on this grid.
+        if (asset is not null && asset.Type == (sbyte)AssetType.Object)
+            asset.Data = ForeignExperienceLinks.ClearInObjectXml(asset.Data);
+        return asset;
     }
 
     public AssetBase GetForeign(string id)
