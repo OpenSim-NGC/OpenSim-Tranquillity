@@ -2849,7 +2849,13 @@ namespace Phlox.ScriptEngine
             {
                 var misc = m_thisScript?.ScriptState?.MiscAttributes;
                 bool hadRecord = misc != null && misc.ContainsKey((int)RuntimeState.MiscAttr.Control);
-                if (forgetControls && hadRecord) misc.Remove((int)RuntimeState.MiscAttr.Control);
+                if (forgetControls && hadRecord)
+                {
+                    misc.Remove((int)RuntimeState.MiscAttr.Control);
+                    // The core may have ended the grant on the item already (a stand-up or Release Keys strips it before
+                    // this runs), so the item can be unchanged here: the script is saved again for the record it lost.
+                    GrantChanged();
+                }
                 ScenePresence holder = ControlsHolder(item?.PermsGranter ?? UUID.Zero, hadRecord);
                 if (holder != null)
                     using (PhloxEngine.OwnControlChange())
