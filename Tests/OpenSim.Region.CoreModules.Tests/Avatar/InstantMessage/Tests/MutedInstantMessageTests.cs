@@ -26,6 +26,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Reflection;
 using System.Text;
 using Nini.Config;
 using OpenMetaverse;
@@ -45,6 +46,10 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage.Tests;
 /// in both transfer modules. The recipient is a root agent in the region, so a delivered message reaches
 /// their client at once.
 /// </summary>
+/// <remarks>
+/// The mute list cache is process-wide; each test starts and ends with it empty. This project runs its test
+/// classes one at a time (AssemblyInfo.cs).
+/// </remarks>
 public class MutedInstantMessageTests : OpenSimTestCase
 {
     private static readonly UUID RecipientId = new("6b1e04d7-93fa-4c2e-8a57-d0c3f9a2e816");
@@ -66,8 +71,18 @@ public class MutedInstantMessageTests : OpenSimTestCase
             return agent.Equals(RecipientId) ? Encoding.UTF8.GetBytes(Text) : Array.Empty<byte>();
         }
 
-        public bool UpdateMute(MuteData mute) => true;
-        public bool RemoveMute(UUID agentID, UUID muteID, string muteName) => true;
+        public bool UpdateMute(MuteData mute)
+        {
+            Text += $"{mute.MuteType} {mute.MuteID} {mute.MuteName}|{mute.MuteFlags}\n";
+            return true;
+        }
+
+        public bool RemoveMute(UUID agentID, UUID muteID, string muteName)
+        {
+            Text = string.Concat(Text.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                .Where(l => !l.Contains(muteID.ToString())).Select(l => l + "\n"));
+            return true;
+        }
     }
 
     /// <summary>The hypergrid transfer module without its IM server connector, which needs a live HTTP server.</summary>
@@ -80,17 +95,49 @@ public class MutedInstantMessageTests : OpenSimTestCase
         }
     }
 
+    /// <summary>The file transfer the mute list module needs to be enabled; nothing is sent in these tests.</summary>
+    public class StandInXfer : DispatchProxy
+    {
+        protected override object Invoke(MethodInfo method, object[] args) => true;
+    }
+
+    public MutedInstantMessageTests()
+    {
+        InstantMessageMuteCheck.ForgetAll();
+    }
+
+    public override void Dispose()
+    {
+        InstantMessageMuteCheck.ForgetAll();
+        base.Dispose();
+    }
+
     private TestScene m_scene;
+    private TestClient m_recipientClient;
     private IMessageTransferModule m_transfer;
     private readonly List<GridInstantMessage> m_received = new();
     private readonly List<bool> m_results = new();
     private int m_undelivered;
 
-    private void SetUpRegion(string module, StandInMuteService mutes)
+    private void SetUpRegion(string module, StandInMuteService mutes, bool withMuteListModule = false)
     {
         m_scene = new SceneHelpers().SetupScene();
         if (mutes is not null)
             m_scene.RegisterModuleInterface<IMuteListService>(mutes);
+
+        if (withMuteListModule)
+        {
+            // With no permissions module everyone counts as an administrator, and the mute list module
+            // refuses to mute an administrator.
+            m_scene.Permissions.OnIsAdministrator += _ => false;
+            m_scene.RegisterModuleInterface<IXfer>(DispatchProxy.Create<IXfer, StandInXfer>());
+            IniConfigSource config = new();
+            config.AddConfig("Messaging").Set("MuteListModule", "MuteListModule");
+            MuteListModule mlm = new();
+            mlm.Initialise(config);
+            mlm.AddRegion(m_scene);
+            mlm.RegionLoaded(m_scene);
+        }
 
         if (module == "MessageTransferModule")
         {
@@ -108,7 +155,8 @@ public class MutedInstantMessageTests : OpenSimTestCase
         m_transfer.OnUndeliveredMessage += _ => m_undelivered++;
 
         ScenePresence recipient = SceneHelpers.AddScenePresence(m_scene, RecipientId);
-        ((TestClient)recipient.ControllingClient).OnReceivedInstantMessage += im => m_received.Add(im);
+        m_recipientClient = (TestClient)recipient.ControllingClient;
+        m_recipientClient.OnReceivedInstantMessage += im => m_received.Add(im);
     }
 
     private void Send(GridInstantMessage im) => m_transfer.SendInstantMessage(im, ok => m_results.Add(ok));
@@ -250,5 +298,101 @@ public class MutedInstantMessageTests : OpenSimTestCase
 
         Assert.Single(m_received);
         Assert.Equal(1, mutes.Reads);
+    }
+
+    // ---- the per-recipient cache ----------------------------------------------------------------------------
+
+    /// <summary>The recipient changes their mute list from their viewer, as the mute list module receives it.</summary>
+    private void RecipientMutes(UUID id)
+    {
+        MuteListEntryUpdate handler = (MuteListEntryUpdate)typeof(TestClient)
+            .GetField("OnUpdateMuteListEntry", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_recipientClient);
+        handler(m_recipientClient, id, "Test User", 1, 0);
+    }
+
+    private void RecipientUnmutes(UUID id)
+    {
+        MuteListEntryRemove handler = (MuteListEntryRemove)typeof(TestClient)
+            .GetField("OnRemoveMuteListEntry", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_recipientClient);
+        handler(m_recipientClient, id, "Test User");
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void ASecondMessageInsideTheLifetimeDoesNotAskTheServiceAgain(string module)
+    {
+        StandInMuteService mutes = new() { Text = Row(1, SenderId, 0) };
+        SetUpRegion(module, mutes);
+
+        Send(FromAgent(SenderId));
+        Send(FromAgent(SenderId));
+        Send(FromAgent(OtherId));
+
+        Assert.Empty(m_received.Where(im => new UUID(im.fromAgentID).Equals(SenderId)));
+        Assert.Single(m_received);
+        Assert.Equal(1, mutes.Reads);
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void AListOlderThanTheLifetimeIsReadAgain(string module)
+    {
+        StandInMuteService mutes = new();
+        SetUpRegion(module, mutes);
+        Send(FromAgent(SenderId));
+        mutes.Text = Row(1, SenderId, 0);   // changed through another simulator: this one is not told
+
+        AgeCachedList(RecipientId, InstantMessageMuteCheck.CacheLifetimeMs);
+        Send(FromAgent(SenderId));
+
+        Assert.Single(m_received);
+        Assert.Equal(2, mutes.Reads);
+    }
+
+    /// <summary>Move a cached list's read time back, as if that much time had passed.</summary>
+    private static void AgeCachedList(UUID agent, long ms)
+    {
+        FieldInfo cacheField = typeof(InstantMessageMuteCheck).GetField("m_cache", BindingFlags.NonPublic | BindingFlags.Static);
+        object cache = cacheField.GetValue(null);
+        lock (cache)
+        {
+            object[] args = { agent, null };
+            Assert.True((bool)cache.GetType().GetMethod("TryGetValue").Invoke(cache, args));
+            object entry = args[1];
+            PropertyInfo readAt = entry.GetType().GetProperty("ReadAt");
+            readAt.SetValue(entry, (long)readAt.GetValue(entry) - ms);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void AMuteAddedThroughThisRegionAppliesToTheNextMessage(string module)
+    {
+        StandInMuteService mutes = new();
+        SetUpRegion(module, mutes, withMuteListModule: true);
+        Send(FromAgent(SenderId));
+        Assert.Single(m_received);
+
+        RecipientMutes(SenderId);
+        Send(FromAgent(SenderId));
+
+        Assert.Single(m_received);
+        Assert.Equal(2, mutes.Reads);
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void AMuteRemovedThroughThisRegionAppliesToTheNextMessage(string module)
+    {
+        StandInMuteService mutes = new() { Text = Row(1, SenderId, 0) };
+        SetUpRegion(module, mutes, withMuteListModule: true);
+        Send(FromAgent(SenderId));
+        Assert.Empty(m_received);
+
+        RecipientUnmutes(SenderId);
+        Send(FromAgent(SenderId));
+
+        Assert.Single(m_received);
+        Assert.Equal(2, mutes.Reads);
     }
 }

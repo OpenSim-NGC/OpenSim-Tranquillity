@@ -48,12 +48,57 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 /// writes, "type id name|flags". A row with the text chat flag set does not mute text: LL's viewer,
 /// llmutelist.h, flagTextChat = 0x1, "If set, don't mute user's text chat". A region with no mute list
 /// service mutes nothing.
+///
+/// On a grid the list is a request to the mute list service on another server, made on the thread that
+/// sends the message. Each recipient's list is kept for <see cref="CacheLifetimeMs"/>, so a run of messages to
+/// one person asks the service once; a change the recipient makes through this simulator's mute list module
+/// drops their entry at once (<see cref="Forget"/>). A change made through another simulator shows here when
+/// the entry expires.
 /// </remarks>
 public static class InstantMessageMuteCheck
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private const int MuteFlagTextChat = 0x1;
+
+    /// <summary>How long a recipient's list is kept, in milliseconds.</summary>
+    public const long CacheLifetimeMs = 60000;
+
+    private sealed record CachedList(byte[] Data, long ReadAt);
+
+    // Per recipient, for the whole process: every region in it reads the same grid service.
+    private static readonly Dictionary<UUID, CachedList> m_cache = new();
+
+    /// <summary>Drop the cached list of this agent, after they changed it.</summary>
+    public static void Forget(UUID agentID)
+    {
+        lock (m_cache)
+            m_cache.Remove(agentID);
+    }
+
+    /// <summary>Drop every cached list.</summary>
+    public static void ForgetAll()
+    {
+        lock (m_cache)
+            m_cache.Clear();
+    }
+
+    private static byte[] ReadList(IMuteListService mutes, UUID agentID)
+    {
+        long now = Environment.TickCount64;
+        lock (m_cache)
+        {
+            if (m_cache.TryGetValue(agentID, out CachedList cached) && now - cached.ReadAt < CacheLifetimeMs)
+                return cached.Data;
+        }
+
+        // A service that throws is not cached: the next message asks again. A null answer (no list, or a
+        // remote connector that could not reach the service) is kept like any other.
+        byte[] data = mutes.MuteListRequest(agentID, 0);
+        lock (m_cache)
+            m_cache[agentID] = new CachedList(data, now);
+        return data;
+    }
 
     public static bool IsMutedByRecipient(IEnumerable<Scene> scenes, GridInstantMessage im)
     {
@@ -92,7 +137,7 @@ public static class InstantMessageMuteCheck
         byte[] data;
         try
         {
-            data = mutes.MuteListRequest(to, 0);
+            data = ReadList(mutes, to);
         }
         catch (Exception e)
         {
