@@ -21,8 +21,8 @@ using Microsoft.Extensions.Logging;
 namespace OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
 
 /// <summary>
-/// Server-side baking (Design Brief §4.2 C2, ADR-001/002/004/005). S1 was the orchestrator plus a console
-/// command; S2 added the ADR-004 index and the input-hash skip; S3 is the wire — <c>RegionProtocols</c> bit 0,
+/// Server-side baking (Design Brief §4.2, ADR-001/002/004/005): the orchestrator plus a console
+/// command; the ADR-004 index and the input-hash skip; and the wire — <c>RegionProtocols</c> bit 0,
 /// the <c>AppearanceData</c> block, the <c>UpdateAvatarAppearance</c> cap with the §4.3 handshake, and a
 /// login-time bake. Config:
 /// <code>
@@ -120,7 +120,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         var enabled = ServerSideBakingRegion.ResolveEnabled(ServerSideBakingEnabled, scene.Config, regionName);
         var source = ServerSideBakingRegion.EnabledSource(scene.Config, regionName);
 
-        // S12: one line per region, naming which config decided. This is what the flip verify reads - after the
+        // One line per region, naming which config decided. This is what an operator checks - after the
         // two global lines go in and a region section comes out, every region must say "on (global)".
         m_log.LogInformation("[SSB]: region {Region}: server-side baking {State} ({Source})",
             scene.Name, enabled ? "ON" : "off", source);
@@ -191,7 +191,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         var cofVersion = CofVersionOf(scene, sp.UUID);
         var region = RegionOf(scene);
 
-        // S8, step 0: refuse a bake whose wearable set has lost a body part since the last one. Composing from a
+        // Step 0: refuse a bake whose wearable set has lost a body part since the last one. Composing from a
         // set with no skin produces a valid-looking bake of nothing, and storing it supersedes - deletes - the
         // good bakes it replaces, so the damage is not recoverable by baking again. Observed 2026-09-05: four
         // unresolvable item ids emptied slots 1-4 and the CofChanged bake that followed stored 4 and superseded 4.
@@ -284,7 +284,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         }
     }
 
-    // ------------------------------------------------------------------ S3: the cap and the login trigger
+    // ------------------------------------------------------------------ the cap and the login trigger
 
     /// <summary>
     /// Register <c>UpdateAvatarAppearance</c> for one agent. Only ever called on a flag-on region: advertising it
@@ -359,11 +359,11 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         // that is measured. Baking now would composite an outfit whose wearables still carry UUID.Zero asset ids
         // and store the result as if it were the new look.
         //
-        // S10: but DO read the folder. On a bit-0 region this POST is the only notice the sim gets that the worn
+        // But DO read the folder. On a bit-0 region this POST is the only notice the sim gets that the worn
         // SET changed - the LL viewer's AgentIsNowWearing is a four-item dummy with no callers
         // (llagentwearables.cpp:819-851), so nothing else turns a COF link into a wearable. Without this the save
         // below persists the wearables the sim already had and the bake reuses every channel, which is exactly
-        // what happened on Ebony on 2026-09-06: two shirts linked in the COF, one shirt in the Avatars record.
+        // what was seen in practice: two shirts linked in the COF, one shirt in the Avatars record.
         ApplyCofToWearables(scene, sp);
 
         // Instead the cap joins the same path the legacy route already takes: queue an appearance save, and let
@@ -376,13 +376,13 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     }
 
     /// <summary>
-    /// S10. Read the agent's Current Outfit Folder and put every wearable link it holds into the presence's
+    /// Read the agent's Current Outfit Folder and put every wearable link it holds into the presence's
     /// <see cref="AvatarAppearance.Wearables"/>, in the viewer's order. The rules are
     /// <see cref="CofWearables.Derive"/>'s; this is only the read.
     ///
     /// <para>
     /// A link is kept when its target resolves in this region and is a wearable. A link whose target cannot be
-    /// read is dropped rather than guessed at, which is what makes the S8 rule hold: its type then looks
+    /// read is dropped rather than guessed at, which is what makes the unresolvable-link rule hold: its type then looks
     /// untouched by this read and keeps what the agent already wears, instead of being emptied by an inventory
     /// lookup that failed.
     /// </para>
@@ -463,7 +463,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     /// (see <see cref="HandleUpdateAvatarAppearance"/>). Attachment changes and the login/teleport cache check
     /// also queue saves, so this fires for those as well — deliberately. A spurious trigger costs one hash check
     /// per channel and re-sends the appearance; a missed one leaves the avatar wrong until relog, so the bias is
-    /// towards triggering (S5 brief).
+    /// towards triggering.
     /// </para>
     ///
     /// <para>Runs on the appearance-save thread pool thread. The bake goes to its own work item so a slow bake

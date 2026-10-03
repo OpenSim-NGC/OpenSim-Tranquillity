@@ -5,7 +5,7 @@ namespace OpenSimNGC.Appearance.Baking.Tests;
 /// <summary>
 /// The VisualParams block must be the one a viewer sends: 253 parameters (group 0 and 3) in id order,
 /// float32-truncated bytes, worn wearable values on top of the sim's stored bytes for unworn types.
-/// Ported from the web-viewer gateway (session 14) in S0b.
+/// Ported from the web-viewer gateway.
 /// </summary>
 public class VisualParamEncoderTests
 {

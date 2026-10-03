@@ -40,7 +40,7 @@ using Xunit;
 namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory;
 
 /// <summary>
-/// S8. Two ways the stored appearance was destroyed by a region that was only trying to save it.
+/// Two ways the stored appearance was destroyed by a region that was only trying to save it.
 ///
 /// <para><b>The live loss.</b> On 2026-09-05 a stock viewer carrying a stale inventory cache from a previous grid
 /// named four item ids that exist nowhere in <c>inventoryitems</c>. <c>SetAppearanceAssets</c> logged
@@ -50,7 +50,7 @@ namespace OpenSim.Region.CoreModules.Avatar.AvatarFactory;
 /// wearable slots 1-4 disappeared from the stored record entirely. The agent's Current Outfit folder still linked
 /// perfectly good skin, eyes and hair items throughout.</para>
 ///
-/// <para><b>Why the existing suite could not catch it.</b> <c>AvatarFactoryNowWearingTests</c> covers S0c, which
+/// <para><b>Why the existing suite could not catch it.</b> <c>AvatarFactoryNowWearingTests</c> covers the merge of a partial list, which
 /// is the same failure from the other direction - there the viewer LISTED fewer slots than were worn. Every one
 /// of its cases uses item ids the inventory can resolve, so the "listed but unresolvable" branch was never
 /// entered. And no appearance test had ever driven a child presence.</para>
@@ -117,7 +117,7 @@ public class AvatarFactoryAppearanceIntegrityTests : OpenSimTestCase
 
     /// <summary>
     /// The item id cannot be resolved, so nothing can be said about the asset behind it - but the agent is still
-    /// wearing a skin, and the region must not decide otherwise. Before S8 this slot came out empty.
+    /// wearing a skin, and the region must not decide otherwise. Before the fix this slot came out empty.
     /// </summary>
     [Fact]
     public void An_item_the_region_cannot_resolve_keeps_its_slot()
@@ -158,8 +158,8 @@ public class AvatarFactoryAppearanceIntegrityTests : OpenSimTestCase
     /// A child presence's appearance is a copy carried for drawing; the root region owns it. Saving from one means
     /// resolving another region's inventory view and writing the answer as fact.
     ///
-    /// <para>This drives the real timer drain rather than the close flush, because the close flush has had a child
-    /// guard since S0b and would pass either way. <c>DelayBeforeAppearanceSave = 0</c> makes the queue drain on
+    /// <para>This drives the real timer drain rather than the close flush, because the close flush already had a child
+    /// guard and would pass either way. <c>DelayBeforeAppearanceSave = 0</c> makes the queue drain on
     /// the next 500 ms tick.</para>
     /// </summary>
     [Fact]

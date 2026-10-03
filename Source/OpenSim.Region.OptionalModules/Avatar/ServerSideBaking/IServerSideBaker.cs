@@ -8,7 +8,7 @@ using OpenSimNGC.Appearance.Baking;
 
 namespace OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
 
-/// <summary>Why a server-side bake was requested. S1 uses only <see cref="Console"/>.</summary>
+/// <summary>Why a server-side bake was requested.</summary>
 public enum BakeReason
 {
     Console,

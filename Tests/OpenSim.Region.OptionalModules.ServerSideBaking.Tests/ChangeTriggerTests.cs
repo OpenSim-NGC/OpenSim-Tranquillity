@@ -10,8 +10,8 @@ using Xunit.Abstractions;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S5 Part 1 — the change trigger. A rebake happens when the region has finished applying an outfit change
-/// <b>and</b> persisted it, never on the arrival of the change (Ledger Q-16, Design Brief §4.6).
+/// The change trigger. A rebake happens when the region has finished applying an outfit change
+/// <b>and</b> persisted it, never on the arrival of the change (Design Brief §4.6).
 ///
 /// <para>
 /// Both signals a change produces reach that point. The legacy route queues an appearance save in
@@ -28,7 +28,7 @@ public class ChangeTriggerTests
 
     private static readonly UUID Agent = new("a7d2ff2e-dc32-44d8-aa61-3d22070a4964");
     // An arbitrary fixed instant. Deliberately not a timestamp from any log: the spacings in these tests are
-    // constructed, not observed (Ledger Q-6).
+    // constructed, not observed.
     private static readonly DateTime T0 = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private static ServerSideBakingRegion On(TimeSpan? debounce = null)
@@ -52,7 +52,7 @@ public class ChangeTriggerTests
 
     /// <summary>
     /// A single outfit change produces more than one signal, and a slam produces several. The exact spread is
-    /// unmeasured (Ledger Q-6), so the window is sized against the 5 s save delay rather than against it;
+    /// unmeasured, so the window is sized against the 5 s save delay rather than against it;
     /// everything inside the window collapses into the one bake that was already claimed. The spacings below are
     /// illustrative, not observations.
     /// </summary>

@@ -5,7 +5,7 @@ using Xunit;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S4b — the appearance-version parameter. The <c>AppearanceData</c> block S3 added is not sufficient on its own:
+/// The appearance-version parameter. The <c>AppearanceData</c> block is not sufficient on its own:
 /// the viewer reads the version from the block <b>and</b> from visual parameter 11000, prefers the parameter, and
 /// throws the whole message away when the two disagree.
 ///
@@ -82,7 +82,7 @@ public class AppearanceVersionParamTests
     /// <summary>
     /// The choice <c>ScenePresence.SendAppearanceToAgentNF</c> makes, replayed: 1 on a copy for an avatar this region
     /// baked; the stored array itself otherwise - except for an NPC, which is never baked anywhere and says 0 on a
-    /// copy (SSB-NPC-1: its stored byte is the owner's, which is 1 on a server-bake region).
+    /// copy (its stored byte is the owner's, which is 1 on a server-bake region).
     /// </summary>
     private static byte[] ParamsForSend(byte[] stored, int cofVersion, bool isNpc = false)
         => cofVersion >= 0 ? AvatarAppearance.WithAppearanceVersion(stored, 1)
@@ -124,7 +124,7 @@ public class AppearanceVersionParamTests
         Assert.Equal(storedBefore, stored);
         Assert.Equal(0, sent[AvatarAppearance.APPEARANCE_VERSION_PARAM_INDEX]);
 
-        // and the packet body is byte-identical to the pre-S3 form
+        // and the packet body is byte-identical to the form before the AppearanceData block
         Assert.Equal(AppearanceBodyBeforeS3(stored), AppearanceBody(sent, -1));
     }
 
@@ -148,10 +148,10 @@ public class AppearanceVersionParamTests
     }
 
     /// <summary>
-    /// SSB-NPC-1: an NPC's stored parameters are a clone of its owner's, so on a server-bake region slot 251 holds
+    /// An NPC's stored parameters are a clone of its owner's, so on a server-bake region slot 251 holds
     /// the owner's 1 - while the region never baked the NPC and sends no block. A 1 beside no block sends the viewer
     /// to the appearance service under the NPC's UUID, where there is no index. The NPC's message says 0, on a
-    /// copy: the stored clone is untouched, and the body is the pre-S3 form for the same parameters with 0 in it.
+    /// copy: the stored clone is untouched, and the body is the form before the AppearanceData block for the same parameters with 0 in it.
     /// </summary>
     [Fact]
     public void AnUnbakedNpcSaysZeroOnACopyWhateverItsOwnerStored()

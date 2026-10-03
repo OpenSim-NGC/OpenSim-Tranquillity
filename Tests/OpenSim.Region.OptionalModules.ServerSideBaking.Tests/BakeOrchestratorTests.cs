@@ -10,8 +10,8 @@ using Xunit;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// Seam tests for <see cref="BakeOrchestrator"/> (S1 Part 2): no Scene, no ScenePresence, a fake asset service.
-/// Tests 1 and 3 use Truly Bazar's golden fixtures (fetched, never committed) and skip when they are absent.
+/// Seam tests for <see cref="BakeOrchestrator"/>: no Scene, no ScenePresence, a fake asset service.
+/// Tests 1 and 3 use the truly-stock golden fixtures (fetched, never committed) and skip when they are absent.
 /// </summary>
 public class BakeOrchestratorTests
 {
@@ -175,13 +175,13 @@ public class BakeOrchestratorTests
         Assert.Equal(4, assets.Stored.Count);
     }
 
-    // ------------------------------------------------------------------ 4. worn but assetless (S1d)
+    // ------------------------------------------------------------------ 4. worn but assetless
 
     /// <summary>
     /// A worn slot with no asset behind it is a real worn wearable, not an empty slot: the viewer counts
     /// wearables, not textures (LLTexLayerTemplate::updateWearableCache, lltexlayer.cpp:1615-1638), so it still
     /// contributes its layers' morph masks. Resolve must hand it to the library as an empty WearableInput of
-    /// its type rather than dropping it (Ledger Q-12; MORPH-MASK-PASS.md 2.4).
+    /// its type rather than dropping it (MORPH-MASK-PASS.md 2.4).
     /// </summary>
     [Fact]
     public void Resolve_WornButAssetlessSlot_ReachesTheLibraryAsAWearableInput()
@@ -189,7 +189,7 @@ public class BakeOrchestratorTests
         var assets = new FakeAssetService();
         var wearables = new AvatarWearable[AvatarWearable.MAX_WEARABLES];
         for (var i = 0; i < wearables.Length; i++) wearables[i] = new AvatarWearable();
-        // a shirt slot that is worn (a real item) with no asset, exactly as Aleric Fenwood wears his
+        // a shirt slot that is worn (a real item) with no asset, exactly as the aleric-max reference avatar wears it
         wearables[(int)WearableType.Shirt].Add(new UUID("77c41e39-38f9-f75a-0000-585989bf0000"), UUID.Zero);
 
         var r = BakeOrchestrator.Resolve(wearables, null, assets, new TexLayerCompositor(), 512);
@@ -204,7 +204,7 @@ public class BakeOrchestratorTests
     }
 
     /// <summary>
-    /// S1c decision 3, answered end to end. RED through S1d; green from S1e, which fixed it.
+    /// An undrawn channel, answered end to end. This was red until the NothingDrawn result fixed it.
     ///
     /// An assetless Skirt slot makes the library produce a Skirt channel (SkiaBakeBackend.ChannelsFor adds it
     /// whenever a Skirt wearable is worn, textures or not). Every layer of that channel is then skipped —
@@ -215,9 +215,9 @@ public class BakeOrchestratorTests
     ///
     /// On any avatar whose Skirt slot is occupied by a default item with no asset, a server bake would therefore
     /// paint a solid dark skirt over whatever face 19 held. The pre-existing trigger is a real Skirt wearable
-    /// carrying no skirt texture; S1d widened it to assetless slots, which are common.
+    /// carrying no skirt texture; assetless slots widen it, and they are common.
     ///
-    /// S1e closes it: the library reports BakeResult.NothingDrawn for a channel where every layer was skipped,
+    /// The fix: the library reports BakeResult.NothingDrawn for a channel where every layer was skipped,
     /// and StoreAndApply neither stores nor applies such a bake — the outcome is Skipped, "nothing drawn for
     /// this channel", and the face keeps what it had.
     /// </summary>
@@ -249,8 +249,8 @@ public class BakeOrchestratorTests
     }
 
     /// <summary>
-    /// The other side of the S1e rule, so it cannot be satisfied by discarding transparent bakes instead: a
-    /// channel that DID draw is stored and applied even when every pixel it drew is transparent. Truly Bazar's
+    /// The other side of the nothing-drawn rule, so it cannot be satisfied by discarding transparent bakes instead: a
+    /// channel that DID draw is stored and applied even when every pixel it drew is transparent. The truly-stock outfit's
     /// bald hair is exactly this — a 4x4 fully transparent hair texture — and its bake is the correct bake.
     /// </summary>
     [Fact]

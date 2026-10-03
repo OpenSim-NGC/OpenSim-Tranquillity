@@ -12,7 +12,7 @@ using OpenSim.Services.Interfaces;
 namespace OpenSim.Server.Handlers.Appearance;
 
 /// <summary>
-/// Robust connector for the <c>agent_appearance_service</c> read path (Design Brief C4, ADR-002), in the shape
+/// Robust connector for the <c>agent_appearance_service</c> read path (ADR-002), in the shape
 /// <c>XBakesConnector</c> established: a <see cref="ServiceConnector"/> that loads its
 /// <c>LocalServiceModule</c> from its own config section and registers one
 /// <see cref="SimpleStreamHandler"/> on the server it is given.

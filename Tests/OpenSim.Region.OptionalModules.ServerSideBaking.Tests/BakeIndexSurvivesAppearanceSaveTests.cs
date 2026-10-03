@@ -13,7 +13,7 @@ using Xunit;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S3 Part 0 — Ledger Q-14. Against the <b>real</b> <see cref="AvatarService"/>, not a fake of it: an appearance
+/// Against the <b>real</b> <see cref="AvatarService"/>, not a fake of it: an appearance
 /// save must leave the ADR-004 bake index alone, and a bake after a save must still reuse.
 /// </summary>
 public class BakeIndexSurvivesAppearanceSaveTests
@@ -65,7 +65,7 @@ public class BakeIndexSurvivesAppearanceSaveTests
             => Rows.Where(r => r.Key.Item1 == id).ToDictionary(r => r.Key.Item2, r => r.Value);
     }
 
-    /// <summary>The real service over the row table, through the S3 test seam.</summary>
+    /// <summary>The real service over the row table, through a test seam.</summary>
     private sealed class TestableAvatarService : AvatarService
     {
         public TestableAvatarService(IAvatarData db) : base(new IniConfigSource(), db) { }
@@ -83,7 +83,7 @@ public class BakeIndexSurvivesAppearanceSaveTests
     // ------------------------------------------------------------------ 1. the delete is still load-bearing
 
     /// <summary>
-    /// The reason <c>SetAvatar</c> deletes everything first, pinned so the Q-14 fix cannot be "just stop
+    /// The reason <c>SetAvatar</c> deletes everything first, pinned so the index fix cannot be "just stop
     /// deleting". Take a shirt off and its <c>Wearable</c> row must go with it; leave the row and
     /// <c>ToAvatarAppearance</c> puts the shirt back on, because it reads those keys additively.
     /// </summary>
@@ -191,7 +191,7 @@ public class BakeIndexSurvivesAppearanceSaveTests
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "..", "..", "Source", "OpenSimNGC.Appearance.Baking.Tests", "Golden", "truly-stock", "fixtures"));
 
     /// <summary>
-    /// The whole point of Q-14, end to end: bake, let an appearance save run through the real service, bake again.
+    /// The whole point of the index fix, end to end: bake, let an appearance save run through the real service, bake again.
     /// Before the fix the second run recomposited all five channels. Now it reuses all five.
     /// </summary>
     [GoldenFixturesFact("truly-stock")]

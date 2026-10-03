@@ -386,7 +386,7 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
 
     public void QueueAppearanceSave(UUID agentid)
     {
-        // S8: a child presence's appearance is a copy of the root's, carried for drawing. It is not authoritative
+        // A child presence's appearance is a copy of the root's, carried for drawing. It is not authoritative
         // and must never reach the avatar service - see the guard in SaveAppearance for what happened when it did.
         var queueing = m_scene?.GetScenePresence(agentid);
         if (queueing is not null && queueing.IsChildAgent)
@@ -892,7 +892,7 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
             }
             if (sp.IsChildAgent)
             {
-                // S8: the authoritative write barrier. Everything below resolves items against THIS region's
+                // The authoritative write barrier. Everything below resolves items against THIS region's
                 // inventory view and then writes the result to the avatar service; on a child presence that is a
                 // write about an avatar another region owns, made from a presence that is only a copy. On
                 // 2026-09-05 a save that ran on a non-root presence resolved four body-part items it could not
@@ -916,8 +916,8 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
             // The appearance is now applied AND persisted: SetAppearanceAssets has resolved every worn item to
             // its asset id, and the avatar service has the result. This is the only point in the region where
             // both are true, which is why server-side baking triggers off it rather than off the arrival of a
-            // change (Design Brief §4.6, Ledger Q-16). Uncommented in S5; the event has existed unused since
-            // before this fork.
+            // change (Design Brief §4.6). The event existed unused since before this fork; this call is what
+            // raises it.
             m_scene.EventManager.TriggerAvatarAppearanceChanged(sp);
         }
     }
@@ -962,7 +962,7 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
                     }
                     else
                     {
-                        // S8: KEEP the slot. The message this replaced said "setting to default" and the code
+                        // KEEP the slot. The message this replaced said "setting to default" and the code
                         // then did something worse than that - it removed the wearable outright, so the slot went
                         // empty, and because the very next statement in SaveAppearance persists the whole
                         // appearance (and AvatarService.SetAvatar deletes every row before rewriting,
@@ -972,9 +972,10 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
                         // not at all, or an item from another grid will all produce it, and in each case the
                         // wearable the agent already has is the better answer than none.
                         //
-                        // This is the same failure S0c fixed for a different input. There the viewer LISTED fewer
+                        // This is the same failure the merge in Client_OnAvatarNowWearing fixes for a different
+                        // input. There the viewer LISTED fewer
                         // slots than were worn and the unlisted ones were dropped; here the slot IS listed and
-                        // the item behind it cannot be resolved. S0c merged instead of replacing; this keeps
+                        // the item behind it cannot be resolved. That fix merges instead of replacing; this keeps
                         // instead of removing. Both leave the last known good wearable in place.
                         //
                         // Inherited from upstream unchanged (OpenSim-NGC develop a68d59f232,
@@ -1308,7 +1309,7 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
             return;
         }
 
-        // S0c (Ledger R-4 / Q-3): merge the viewer's list INTO the existing wearables instead of
+        // Merge the viewer's list INTO the existing wearables instead of
         // starting from an empty set. Historically this built a fresh AvatarAppearance with
         // copyWearables=false and filled only the slots the viewer mentioned, so any partial
         // AgentIsNowWearing (incomplete inventory fetch, bot, gateway) silently deleted every

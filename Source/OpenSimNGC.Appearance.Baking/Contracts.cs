@@ -123,7 +123,7 @@ public sealed record BakeResult(
     /// It matters because such a bake is not blank: the layer set's alpha starts opaque
     /// (LLTexLayerSet::render clears to opaque black) and only a mask layer would have carved it, so an undrawn
     /// channel encodes as a solid near-black image. A caller that stored it would paint that over the avatar —
-    /// the defect S1d found on an assetless skirt slot. Callers should not store or apply such a bake.
+    /// a defect seen on an assetless skirt slot. Callers should not store or apply such a bake.
     /// </para>
     /// </summary>
     public bool NothingDrawn { get; init; }

@@ -7,9 +7,9 @@ using OpenSim.Region.ClientStack.LindenCaps.AIS;
 namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 
 /// <summary>
-/// The backend surface the fetch routes need (A1 Part 1), against an in-memory inventory: folder and item reads,
+/// The backend surface the fetch routes need, against an in-memory inventory: folder and item reads,
 /// sub-folders, the COF resolve, link-target resolution and the depth walk. No Scene, no ScenePresence — the
-/// composition is exactly what Phase 2 will reuse on Robust (Ledger P-2).
+/// composition is exactly what Phase 2 will reuse on Robust.
 /// </summary>
 [TestFixture]
 public class AisInventoryTests

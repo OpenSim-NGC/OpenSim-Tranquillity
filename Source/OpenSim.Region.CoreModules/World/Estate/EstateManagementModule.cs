@@ -1487,7 +1487,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                     sendExperienceLists[remote_client] = invoice;
             }
 
-            // T5b: BLOCKED experience add/remove (viewer BLOCKED_ADD = 1<<6 = 64,
+            // BLOCKED experience add/remove (viewer BLOCKED_ADD = 1<<6 = 64,
             // BLOCKED_REMOVE = 1<<7 = 128 — previously received and DISCARDED). Mirrors the
             // allowed branches; the block-wins tier of the admission ladder reads this list.
             if ((estateAccessType & 64) != 0) // add blocked experience

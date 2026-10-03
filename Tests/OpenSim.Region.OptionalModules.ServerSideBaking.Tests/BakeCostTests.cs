@@ -12,8 +12,8 @@ using Xunit.Abstractions;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S2 Part 2 — Ledger Q-10: where does the bake second go? The live cold bake was 2788 ms for five channels at
-/// BakeSize 1024 (Truly) and 3078 ms (Aleric), with no instrumentation to say which phase owned it. This runs the
+/// Where does the bake second go? A cold bake on a running region was 2788 ms for five channels at
+/// BakeSize 1024 (truly-stock) and 3078 ms (aleric-max), with no instrumentation to say which phase owned it. This runs the
 /// same two outfits through the same orchestrator at the same size with <see cref="BakeTimings"/> attached, cold
 /// and then warm, and writes the split to <c>Golden/last-run-cost-&lt;set&gt;.txt</c> next to the golden harness's
 /// own reports.
@@ -23,7 +23,7 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// library code, the same textures, the same size, the same quality the module ships. The two I/O phases are not:
 /// the asset service here is a <see cref="FakeAssetService"/>, a dictionary in memory, so its fetch and store
 /// figures are a floor of roughly zero rather than an estimate of what MySQL and Robust cost. That is exactly what
-/// makes the arithmetic useful — the CPU phases are measured, so on the live sim asset I/O is whatever is left
+/// makes the arithmetic useful — the CPU phases are measured, so on a running sim asset I/O is whatever is left
 /// over, and the run's own INFO line now prints both halves.
 /// </para>
 ///
@@ -74,7 +74,7 @@ public class BakeCostTests
         var appearance = new AvatarAppearance();
 
         // The compositor lazily loads avatar_lad.xml and 56 mask TGAs on first use and caches resampled masks.
-        // On the live sim that happens once per region lifetime, not once per bake, so it is warmed away here
+        // On a running sim that happens once per region lifetime, not once per bake, so it is warmed away here
         // rather than charged to the cold bake — and how much it is, is reported.
         var warmup = System.Diagnostics.Stopwatch.StartNew();
         BakeOrchestrator.Run(Agent, BakeReason.Console, wearables, vp, new AvatarAppearance(), assets, null,

@@ -253,7 +253,7 @@ public class BackendTests
         _ = assets;
     }
 
-    // ---------------- a worn wearable with no texture asset (S1c, Docs/MORPH-MASK-PASS.md 2.4) ----------------
+    // ---------------- a worn wearable with no texture asset (Docs/MORPH-MASK-PASS.md 2.4) ----------------
 
     /// <summary>
     /// The rule: a morph-mask layer with a local_texture contributes the mask of the top worn wearable of its
@@ -331,7 +331,7 @@ public class BackendTests
         Assert.True(Diff(shortThenLong, shortOnly) > 4, "two shirts must not give the first shirt's mask");
     }
 
-    // ---------------- a channel where nothing was drawn (S1e) ----------------
+    // ---------------- a channel where nothing was drawn ----------------
 
     private static string TrulyFixtures([CallerFilePath] string here = "")
         => Path.GetFullPath(Path.Combine(Path.GetDirectoryName(here)!, "Golden", "truly-stock", "fixtures"));
@@ -340,7 +340,7 @@ public class BackendTests
     /// BakeResult.NothingDrawn is set only when every colour layer of the channel was skipped. An assetless
     /// Skirt slot is exactly that case: skirt_fabric has no texture, skirt_fabric_alpha is a mask layer and
     /// skirt_tattoo needs a Universal, so nothing reaches the canvas — and because the set's alpha starts
-    /// opaque, what encodes is a solid image, not a blank one. S1d found this painting a dark skirt onto face 19.
+    /// opaque, what encodes is a solid image, not a blank one. This once painted a dark skirt onto face 19.
     /// </summary>
     [Fact]
     public void a_channel_whose_every_layer_was_skipped_reports_nothing_drawn()
@@ -353,7 +353,7 @@ public class BackendTests
         Assert.True(s.NothingDrawn, "an all-skipped skirt channel must report NothingDrawn: " + string.Join(" | ", s.Fidelity.Notes));
         Assert.All(s.Fidelity.Notes, n => Assert.Contains("skipped", n));
         // it still encodes a full image - that is the hazard: an undrawn channel is not an empty bake, and how
-        // opaque it comes out depends on which mask layers the outfit skipped (on a real outfit S1d measured 96.5%
+        // opaque it comes out depends on which mask layers the outfit skipped (on a real outfit it measured 96.5%
         // opaque near-black). The orchestrator must decide on this flag, never on the pixels.
         Assert.NotEmpty(s.J2kBytes);
         Assert.Equal(64, J2kCodec.Decode(s.J2kBytes).W);

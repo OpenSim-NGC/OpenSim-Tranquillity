@@ -9,17 +9,17 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS;
 /// interface only (Ledger P-2): no Scene, no ScenePresence. Phase 1 implements it over the region's
 /// <c>IInventoryService</c>; Phase 2 hosts the same handler on Robust over the service directly.
 ///
-/// A0 defines the surface; every member is implemented in A1+. Links are ordinary <see cref="InventoryItemBase"/>
+/// The inventory surface AIS needs. Links are ordinary <see cref="InventoryItemBase"/>
 /// rows with <c>AssetType.Link</c> / <c>AssetType.LinkFolder</c>; the handler splits them out of item lists into
 /// the <c>_embedded.links</c> collection (spec §1c), and resolves their targets with <see cref="GetItems"/>
-/// (tree state T5: the service has no link-aware fetch).
+/// (the service has no link-aware fetch).
 /// </summary>
 public interface IAisInventoryBackend
 {
     /// <summary>The agent's folder of a system type (spec §1b: "current" = <c>FolderType.CurrentOutfit</c>); null if absent.</summary>
     InventoryFolderBase GetFolderForType(UUID agentId, FolderType type);
 
-    /// <summary>A folder with its current <c>Version</c> freshly read (tree state T4); null if absent or not the agent's.</summary>
+    /// <summary>A folder with its current <c>Version</c> freshly read; null if absent or not the agent's.</summary>
     InventoryFolderBase GetFolder(UUID agentId, UUID folderId);
 
     /// <summary>A folder's direct children: sub-folders and items (links included in <c>Items</c>), with the folder's version.</summary>
@@ -41,10 +41,10 @@ public interface IAisInventoryBackend
     /// <summary>One item (or link) by id; null if absent or not the agent's.</summary>
     InventoryItemBase GetItem(UUID agentId, UUID itemId);
 
-    /// <summary>Create a folder under its <c>ParentID</c>. The data layer bumps the parent's version (S0a V6).</summary>
+    /// <summary>Create a folder under its <c>ParentID</c>. The data layer bumps the parent's version.</summary>
     bool AddFolder(InventoryFolderBase folder);
 
-    /// <summary>Create an item or link under its <c>Folder</c>. Bumps the parent's version (S0a V6).</summary>
+    /// <summary>Create an item or link under its <c>Folder</c>. Bumps the parent's version.</summary>
     bool AddItem(InventoryItemBase item);
 
     /// <summary>Update an item's mutable fields (name, description, flags, asset, permissions).</summary>
@@ -76,9 +76,9 @@ public interface IAisInventoryBackend
     AisAssetTransaction ApplyAssetTransaction(UUID agentId, UUID transactionId, InventoryItemBase item);
 
     /// <summary>
-    /// A worn wearable's asset just changed (S9). The region points the presence's wearable at the new asset and
+    /// A worn wearable's asset just changed. The region points the presence's wearable at the new asset and
     /// queues an appearance save; the save resolves every worn item afresh, persists the result and raises the
-    /// S5 change trigger, and the bake's own input hash then decides whether anything is recomputed - so an edit
+    /// change trigger, and the bake's own input hash then decides whether anything is recomputed - so an edit
     /// that changed nothing visible costs one hash check per channel and no compositing.
     ///
     /// <para>
@@ -93,14 +93,14 @@ public interface IAisInventoryBackend
     /// <summary>Update a folder's mutable fields (name, type, parent on move).</summary>
     bool UpdateFolder(InventoryFolderBase folder);
 
-    /// <summary>Delete items (and links) by id. Bumps each parent's version (S0a V6).</summary>
+    /// <summary>Delete items (and links) by id. Bumps each parent's version.</summary>
     bool DeleteItems(UUID agentId, IReadOnlyList<UUID> itemIds);
 
     /// <summary>
     /// Delete folders by id, recursively. <paramref name="onlyIfTrash"/> is the inventory service's Trash
     /// restriction: with it true a folder outside Trash or Lost And Found is silently skipped and the call still
     /// succeeds. AIS passes **false** — the LL viewer deletes any non-protected folder wherever it sits — which is
-    /// why <c>IInventoryService</c> gained the three-argument overload in A2b (Ledger A-Q9).
+    /// why <c>IInventoryService</c> gained the three-argument overload.
     /// </summary>
     bool DeleteFolders(UUID agentId, IReadOnlyList<UUID> folderIds, bool onlyIfTrash);
 

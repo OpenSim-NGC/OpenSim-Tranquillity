@@ -7,7 +7,7 @@ using SkiaSharp;
 namespace OpenSimNGC.Appearance.Baking;
 
 /// <summary>
-/// JPEG 2000 in and out via CoreJ2K.Skia (the encoder the rest of the tree uses; S0a V7).
+/// JPEG 2000 in and out via CoreJ2K.Skia (the encoder the rest of the tree uses).
 /// Encoding is SINGLE-TILE: CoreJ2K's default 256x256 tiling produces codestreams that render blank in
 /// viewers (upstream #201), so the tile is always the whole image.
 /// </summary>

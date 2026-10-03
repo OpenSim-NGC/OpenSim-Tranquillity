@@ -8,7 +8,7 @@ using Xunit;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S4 Part 2 — viewer contract V6. The login response advertises <c>agent_appearance_service</c> when the grid
+/// The login response advertises <c>agent_appearance_service</c> when the grid
 /// has one and <b>omits the key entirely</b> when it does not.
 ///
 /// <para>
@@ -16,7 +16,7 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// value only when non-empty, and <c>LLVOAvatar::getImageURL</c> warns
 /// "AgentAppearanceServiceURL not set - Baked texture requests will fail" and returns "" when it is unset
 /// (<c>llvoavatar.cpp:5901-5906</c>). On a bit-0 region that means the avatar never textures — which is exactly
-/// what Ebony produced when S3's flag was flipped before this service existed.
+/// what a region produced when its flag was turned on before this service existed.
 /// </para>
 /// </summary>
 public class LoginResponseAdvertisementTests
@@ -45,7 +45,7 @@ public class LoginResponseAdvertisementTests
     /// not), and <c>ToOSDMap</c> passes it straight to <c>ArrayListToOSDArray</c> (:664), so the LLSD form of a
     /// default-constructed response always throws and silently degrades to the failure map. Production never hits
     /// it because the real constructor fills it in. Setting it here is the fixture, not a workaround for anything
-    /// S4 introduced.
+    /// this service introduced.
     /// </summary>
     private static LLLoginResponse Fresh(string url)
     {
