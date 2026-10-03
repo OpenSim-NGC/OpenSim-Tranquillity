@@ -12200,14 +12200,14 @@ public void llDetachFromAvatar()
                         res.Add(new LSL_Integer(0));
                         res.Add(new LSL_Float(0f)); // ambiance
                         res.Add(new LSL_Float(0f)); // clip
-                        res.Add(new LSL_Float(0f)); // flags
+                        res.Add(new LSL_Integer(0)); // flags
                     }
                     else
                     {
                         res.Add(new LSL_Integer(1));
                         res.Add(new LSL_Float(shape.ReflectionProbe.Ambiance)); // ambiance
                         res.Add(new LSL_Float(shape.ReflectionProbe.ClipDistance)); // clip
-                        res.Add(new LSL_Float(shape.ReflectionProbe.Flags)); // flags
+                        res.Add(new LSL_Integer(shape.ReflectionProbe.Flags)); // flags
                     }
                     break;
 
@@ -18170,7 +18170,7 @@ public void llDetachFromAvatar()
                     res.Add(new LSL_Integer(0));
                     res.Add(new LSL_Float(0f)); // ambiance
                     res.Add(new LSL_Float(0f)); // clip
-                    res.Add(new LSL_Float(0f)); // flags
+                    res.Add(new LSL_Integer(0)); // flags
                     break;
 
                 case ScriptBaseClass.PRIM_GLOW:
