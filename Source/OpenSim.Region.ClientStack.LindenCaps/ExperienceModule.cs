@@ -78,7 +78,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
     private void EventManager_OnAvatarEnteringNewParcel(ScenePresence avatar, int localLandID, UUID regionID)
     {
-        UpdateScriptExperiencePerms(avatar, false);
+        UpdateScriptExperiencePerms(avatar, false, UUID.Zero);
     }
 
     public void RemoveRegion(Scene scene)
@@ -383,7 +383,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
                 ScenePresence scenePresence;
                 if (m_scene.TryGetScenePresence(avatar_id, out scenePresence))
                 {
-                    UpdateScriptExperiencePerms(scenePresence, true);
+                    UpdateScriptExperiencePerms(scenePresence, true, experience_id);
                 }
             }
         }
@@ -654,7 +654,12 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
     // These need to be added to the existing AccessList enum!
     public const int ACCESS_LIST_ALLOWED = 8;
 
-    private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent)
+    /// <summary>
+    /// Ends the Experience grants the avatar gave that may no longer stand. via_agent is true when the avatar
+    /// blocked blockedExperience (SL: experience_permissions_denied is raised when "The agent has blocked the
+    /// experience from the experience profile"), false when the avatar entered a new parcel.
+    /// </summary>
+    private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent, UUID blockedExperience)
     {
         var land = m_scene.LandChannel.GetLandObject(avatar.AbsolutePosition);
 
@@ -676,19 +681,14 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
                     if (item.PermsMask == 408628 && item.PermsGranter == avatar.UUID)
                     {
                         if (!allowed.Contains(item.ExperienceID))
-                        {
-                            item.PermsGranter = UUID.Zero;
-                            item.PermsMask = 0;
-
-                            foreach (var e in m_ScriptModules)
-                            {
-                                e.PostScriptEvent(item.ItemID, "experience_permissions_denied", new Object[] {
-                                    avatar.UUID.ToString(),
-                                    // I've decided to just hard code the ints rather than include Shared.Api.Runtime in LindenCaps
-                                    via_agent ? 4 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED*/ : 17 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED_LAND*/
-                                });
-                            }
-                        }
+                            EndExperienceGrant(part, item, avatar.UUID, via_agent);
+                    }
+                    // A block ends every grant the avatar gave to a script of the blocked Experience, whatever mask
+                    // the script engine recorded for it: the item carries no other mark of an Experience grant.
+                    else if (via_agent && blockedExperience != UUID.Zero && item.ExperienceID == blockedExperience &&
+                        item.PermsGranter == avatar.UUID && item.PermsMask != 0)
+                    {
+                        EndExperienceGrant(part, item, avatar.UUID, via_agent);
                     }
                 }
             });
@@ -702,6 +702,26 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
                 }
             }
         });
+    }
+
+    private void EndExperienceGrant(SceneObjectPart part, TaskInventoryItem item, UUID agent, bool via_agent)
+    {
+        // I've decided to just hard code the ints rather than include Shared.Api.Runtime in LindenCaps
+        int reason = via_agent ? 4 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED*/ : 17 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED_LAND*/;
+        int revokedMask = item.PermsMask;
+
+        item.PermsGranter = UUID.Zero;
+        item.PermsMask = 0;
+
+        foreach (var e in m_ScriptModules)
+        {
+            e.PostScriptEvent(item.ItemID, "experience_permissions_denied", new Object[] {
+                agent.ToString(),
+                reason
+            });
+        }
+
+        m_scene.EventManager.TriggerExperiencePermissionsRevoked(part.UUID, item.ItemID, agent, item.ExperienceID, revokedMask, reason);
     }
 
     public bool IsExperienceEnabled(UUID experience_id)

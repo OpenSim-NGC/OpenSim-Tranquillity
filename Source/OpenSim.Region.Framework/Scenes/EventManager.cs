@@ -537,6 +537,21 @@ public class EventManager
     public event ScriptControlsReleased OnScriptControlsReleased;
 
     /// <summary>
+    /// Triggered when the core ends a script's permission grant because the avatar who gave it may no longer be
+    /// reached through the script's Experience: the avatar blocked the Experience (reason 4,
+    /// XP_ERROR_NOT_PERMITTED) or entered a parcel where it cannot run (reason 17, XP_ERROR_NOT_PERMITTED_LAND).
+    /// </summary>
+    /// <remarks>
+    /// Raised once per script item, after the item's PermsGranter and PermsMask have been cleared and
+    /// experience_permissions_denied has been posted to every script module. revokedMask is the mask the grant
+    /// had. Any script engine can subscribe and release what it keeps for the grant (taken controls, a saved
+    /// grant); an engine ignores items it does not run. Triggered by <see cref="TriggerExperiencePermissionsRevoked"/>
+    /// in OpenSim.Region.ClientStack.LindenCaps.ExperienceModule.
+    /// </remarks>
+    public delegate void ExperiencePermissionsRevoked(UUID partId, UUID itemId, UUID granterId, UUID experienceId, int revokedMask, int reason);
+    public event ExperiencePermissionsRevoked OnExperiencePermissionsRevoked;
+
+    /// <summary>
     /// TODO: Should be triggered when a physics object starts moving.
     /// </summary>
     public delegate void ScriptMovingStartEvent(uint localID);
@@ -2590,6 +2605,27 @@ public class EventManager
                 {
                     m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScriptControlsReleased failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerExperiencePermissionsRevoked(UUID partId, UUID itemId, UUID granterId, UUID experienceId, int revokedMask, int reason)
+    {
+        ExperiencePermissionsRevoked handlerExperiencePermissionsRevoked = OnExperiencePermissionsRevoked;
+        if (handlerExperiencePermissionsRevoked != null)
+        {
+            foreach (ExperiencePermissionsRevoked d in handlerExperiencePermissionsRevoked.GetInvocationList())
+            {
+                try
+                {
+                    d(partId, itemId, granterId, experienceId, revokedMask, reason);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerExperiencePermissionsRevoked failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
             }
