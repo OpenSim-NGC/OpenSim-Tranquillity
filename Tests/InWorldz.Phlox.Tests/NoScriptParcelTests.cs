@@ -874,4 +874,45 @@ public class NoScriptParcelTests
         after = l.Counters();
         Assert.Equal(0, after.Evaluated - before.Evaluated);
     }
+
+    /// <summary>
+    /// A script whose object arrives by crossing onto a parcel where it may not run: its arrival changed(CHANGED_REGION)
+    /// is posted with the restore, the parcel check then pauses it, and a paused script drops arriving events other than
+    /// state_entry and state_exit. When the parcel later allows it, it runs on with its state and the dropped event does
+    /// not come back.
+    /// </summary>
+    [Fact]
+    public void AScriptArrivingOnANoScriptParcelIsPausedAndItsArrivalEventIsDropped()
+    {
+        const string Src = @"
+            integer n;
+            default {
+                state_entry() { n = 5; llSay(0, ""state_entry""); }
+                changed(integer c) { llSay(0, ""changed "" + (string)c); }
+                touch_start(integer t) { n++; llSay(0, ""n="" + (string)n); }
+            }";
+        const int PrimCrossing = 2;
+        UUID asset = UUID.Random(), item = UUID.Random();
+        using (var h1 = new SchedulerHarness())
+        {
+            SavedStateRig.Rez(h1, h1.Prim, Src, asset, item, 0, false, 1);
+            Assert.True(h1.PumpUntil(() => h1.Said.Contains("state_entry")), SavedStateRig.SaidText(h1));
+            h1.SaveState(item);
+        }
+
+        using var l = new Land();
+        var box = l.AddObject("box", West, Resident);
+        l.Rez(box.RootPart, Src, stateSource: PrimCrossing, itemId: item, assetId: asset);
+        Assert.True(l.PumpUntil(() => l.Paused(item)), "not paused: " + l.H.StatusOf(item));
+        l.Pump();
+        Assert.DoesNotContain(l.H.Said, s => s.StartsWith("changed", StringComparison.Ordinal));
+        Assert.DoesNotContain("state_entry", l.H.Said);
+
+        l.SetFlags(l.WestParcel, otherScripts: true, groupScripts: false);
+        Assert.True(l.PumpUntil(() => !l.Paused(item)), "not resumed: " + l.H.StatusOf(item));
+        l.H.PostTouch(item);
+        Assert.True(l.PumpUntil(() => l.Said("n=6")), SavedStateRig.SaidText(l.H));
+        Assert.DoesNotContain(l.H.Said, s => s.StartsWith("changed", StringComparison.Ordinal));
+        Assert.DoesNotContain("state_entry", l.H.Said);
+    }
 }

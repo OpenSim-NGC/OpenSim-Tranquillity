@@ -54,6 +54,7 @@ public class ExperienceWithdrawnTests
     internal class ChangingEstate : DispatchProxy
     {
         public UUID Experience, Visitor;
+        public bool VisitorBlocked;
         public readonly List<UUID> Allowed = new(), Trusted = new(), Blocked = new();
 
         public static ChangingEstate Create(UUID experience, UUID visitor, out IExperienceModule module)
@@ -71,7 +72,8 @@ public class ExperienceWithdrawnTests
             lock (Allowed)
             {
                 if (m.Name == nameof(IExperienceModule.GetExperiencePermission))
-                    return (UUID)a[0] == Visitor && (UUID)a[1] == Experience ? ExperiencePermission.Allowed : ExperiencePermission.None;
+                    return (UUID)a[0] == Visitor && (UUID)a[1] == Experience
+                        ? (VisitorBlocked ? ExperiencePermission.Blocked : ExperiencePermission.Allowed) : ExperiencePermission.None;
                 if (m.Name == nameof(IExperienceModule.GetEstateAllowedExperiences)) return Allowed.ToArray();
                 if (m.Name == nameof(IExperienceModule.GetEstateKeyExperiences)) return Trusted.ToArray();
                 if (m.Name == nameof(IExperienceModule.GetEstateBlockedExperiences)) return Blocked.ToArray();
@@ -195,6 +197,26 @@ public class ExperienceWithdrawnTests
         r.H.PumpUntilIdle(TimeSpan.FromSeconds(2));
 
         Assert.DoesNotContain(r.H.Said, s => s.StartsWith("xpdenied=", StringComparison.Ordinal));
+        Assert.Equal("perms=" + ExperiencePerms + " key=" + r.Visitor, r.Report());
+    }
+    /// <summary>
+    /// A grant from the Experience replaces the grant the script held, and the controls it took for that other granter are
+    /// released, as a new llRequestPermissions releases them (SL llRequestPermissions: "Scripts may hold permissions for
+    /// only one agent at a time").
+    /// </summary>
+    [Fact]
+    public void AnExperienceGrantReleasesControlsTakenForAnotherGranter()
+    {
+        using var r = new Rig();
+        var other = SceneHelpers.AddScenePresence(r.H.Scene, UUID.Random());
+        TaskInventoryItem item = r.H.Prim.Inventory.GetInventoryItem(r.Item);
+        lock (r.H.Prim.TaskInventory) { item.PermsGranter = other.UUID; item.PermsMask = 0x4; }
+        r.Command("take", "took");
+        Assert.True(r.H.PumpUntil(() => other.HasScriptControls(r.Item)), "the controls were never taken");
+
+        r.Command("xp " + r.Visitor, "xp=" + r.Visitor);
+
+        Assert.False(other.HasScriptControls(r.Item), "the other granter's controls are still taken");
         Assert.Equal("perms=" + ExperiencePerms + " key=" + r.Visitor, r.Report());
     }
 }

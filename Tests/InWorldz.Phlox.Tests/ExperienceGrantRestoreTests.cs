@@ -274,6 +274,31 @@ public class ExperienceGrantRestoreTests
         NoPermissionEvents(h);
     }
 
+    /// <summary>
+    /// A carried grant is held to the decision llRequestExperiencePermissions makes: an Experience the estate blocks, one
+    /// it neither allows nor trusts, and one the granter has blocked give nothing back and leave no claim.
+    /// </summary>
+    [Theory]
+    [InlineData("blocked in the region")]
+    [InlineData("not allowed in the region")]
+    [InlineData("blocked by the avatar")]
+    public void CarriedExperienceGrantIsNotRestoredWhereTheExperienceWouldBeDenied(string why)
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID, visitor = UUID.Random(), experience = UUID.Random();
+        var estate = ExperienceWithdrawnTests.ChangingEstate.Create(experience, visitor, out IExperienceModule module);
+        h.Scene.RegisterModuleInterface(module);
+        if (why == "blocked in the region") estate.Blocked.Add(experience);
+        else if (why == "not allowed in the region") estate.Allowed.Clear();
+        else estate.VisitorBlocked = true;
+        SceneHelpers.AddScenePresence(h.Scene, visitor);
+        var item = RezWithCarried(h, owner, experience, st => Forge(st, visitor, ExperiencePerms, owner, experience), out var copy);
+        Assert.Equal(0, MaskOf(copy, item));
+        Assert.False(Api(h, item).HasGrantClaim, why);
+        Assert.Equal(Perms(0, UUID.Zero), Report(h, item));
+        NoPermissionEvents(h);
+    }
+
     [Fact]
     public void ForgedCarriedExperienceTheScriptIsNotInRestoresNothing()
     {
