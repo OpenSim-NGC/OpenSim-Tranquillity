@@ -65,6 +65,8 @@ namespace Phlox.ScriptEngine
         //       between per-call connections (the wal-index recovery race is the one BUSY the provider
         //       does not retry); loads use the reader under the manager's own read lock.
         private const int BUSY_TIMEOUT_MS = 5000;
+        private readonly int m_BusyTimeoutMs = BUSY_TIMEOUT_MS;
+        private readonly bool m_ShortTimeout;
         private static readonly object s_WriterLock = new object();
         private readonly object m_ReadLock = new object();
         private SQLiteConnection m_Writer;
@@ -97,11 +99,28 @@ namespace Phlox.ScriptEngine
             public UUID AssetId;
             public byte[] Blob;
             public string Reason;
+            /// <summary>Times this write was in a transaction that did not commit.</summary>
+            public int Attempts;
         }
         private readonly Queue<WriteOp> m_Writes = new Queue<WriteOp>();
         private long m_WritesQueued;
         private long m_WritesDone;
+        private long m_WritesAbandoned;
         private readonly object m_DrainLock = new object();
+
+        /// <summary>
+        /// A write that did not commit stays queued, in its place, and is tried again with the writes after it; after this
+        /// many failed attempts it is given up with an error that names it. Each attempt against a locked database waits
+        /// out the busy timeout first, so this bounds a lock of several busy timeouts.
+        /// </summary>
+        internal const int MaxWriteAttempts = 5;
+
+        /// <summary>Writes committed, and writes given up after <see cref="MaxWriteAttempts"/> (diagnostics and tests).</summary>
+        internal long WritesDone { get { lock (m_Lock) return m_WritesDone; } }
+        internal long WritesAbandoned { get { lock (m_Lock) return m_WritesAbandoned; } }
+
+        /// <summary>Test seam: a write for this item fails as a failed statement would. Null in production.</summary>
+        internal Func<UUID, bool> FailWriteForTest;
 
         // Items with a write still queued, across every manager in the process, and the manager that holds it. The
         // managers share one file, and a script unloaded in one region and loaded in another of the same simulator (a
@@ -137,8 +156,16 @@ namespace Phlox.ScriptEngine
         public StateManager(PhloxEngine engine) : this(engine, DB_FILE) { }
 
         /// <summary>The DB file is a parameter so a test can run against a temp file.</summary>
-        internal StateManager(PhloxEngine engine, string dbFile)
+        internal StateManager(PhloxEngine engine, string dbFile) : this(engine, dbFile, BUSY_TIMEOUT_MS) { }
+
+        /// <summary>
+        /// A test's manager whose connections give up on a locked database after <paramref name="busyTimeoutMs"/>, statement
+        /// retries included, instead of the production busy timeout.
+        /// </summary>
+        internal StateManager(PhloxEngine engine, string dbFile, int busyTimeoutMs)
         {
+            m_BusyTimeoutMs = busyTimeoutMs;
+            m_ShortTimeout = busyTimeoutMs != BUSY_TIMEOUT_MS;
             m_Engine = engine;
             m_DbFile = dbFile;
             StateRowMaxAgeDays = Math.Max(0, engine?.Config?.GetInt("StateRowMaxAgeDays", 0) ?? 0);
@@ -160,7 +187,8 @@ namespace Phlox.ScriptEngine
         /// <summary>
         /// The final save. The caller stops the scheduler first (PhloxEngine.OnShutdown, RemoveRegion), as Halcyon's
         /// MasterScheduler.Stop joined its thread before the state manager's backup, so no script runs while the dirty
-        /// scripts are captured here, on this thread. Then every queued write is done.
+        /// scripts are captured here, on this thread. Then every queued write is tried until it commits or is given up
+        /// (<see cref="MaxWriteAttempts"/>), and every write given up while this manager ran is named in the log.
         /// </summary>
         public void Stop()
         {
@@ -168,7 +196,11 @@ namespace Phlox.ScriptEngine
             m_WakeEvent.Set();
             m_Thread?.Join(5000);
             CaptureDirty(self: true);
-            DrainWrites();
+            while (!DrainWrites()) { }   // each pass counts an attempt against what failed, so this ends
+            List<string> givenUp;
+            lock (m_Lock) givenUp = new List<string>(m_GivenUp);
+            if (givenUp.Count > 0)
+                m_log.LogError("[PhloxState]: {0} state writes were not saved: {1}", givenUp.Count, string.Join(", ", givenUp));
         }
 
         public void Dispose()
@@ -341,6 +373,21 @@ namespace Phlox.ScriptEngine
             carried = fromObject != null;
             if (carried) return fromObject;
 
+            // A write for this item the database has not taken yet is its newest state: a save is restored from what it
+            // holds, a removal leaves no state. The row on disk is older than either.
+            if (UnwrittenFor(itemId) is WriteOp unwritten)
+            {
+                m_log.LogWarning("[PhloxState]: The state database has not taken the last {0} of {1} yet; the script is restored from it",
+                    unwritten.Kind, itemId);
+                if (unwritten.Kind != WriteKind.Save || unwritten.AssetId != assetId) return null;
+                try { return Decode(unwritten.Blob); }
+                catch (Exception e)
+                {
+                    m_log.LogWarning("[PhloxState]: The queued state of {0} does not decode; it starts fresh: {1}", itemId, e.Message);
+                    return null;
+                }
+            }
+
             byte[] blob = null;
             bool read = false;
             Exception last = null;
@@ -449,7 +496,8 @@ namespace Phlox.ScriptEngine
                 foreach (var interp in scripts)
                     if (!m_LoadFailed.Contains(interp.ItemId)) m_Dirty[interp.ItemId] = interp;
             CaptureDirty(self: false);
-            WaitForWrites();
+            if (!WaitForWrites())
+                m_log.LogWarning("[PhloxState]: Not every state could be written now; the rest stay queued and are tried again");
         }
 
         /// <summary>The row's blob; null when there is no row or it is for another asset. InvalidDataException: not a blob.</summary>
@@ -533,30 +581,39 @@ namespace Phlox.ScriptEngine
             owner.DrainWrites();
         }
 
-        /// <summary>Every write queued before this call is done when it returns.</summary>
-        internal void WaitForWrites()
+        /// <summary>
+        /// Every write queued before this call has been tried when it returns. True when each one committed or was given up;
+        /// false when some are still queued because the database refused them (they are tried again later).
+        /// </summary>
+        internal bool WaitForWrites()
         {
             long target;
             lock (m_Lock) target = m_WritesQueued;
             if (m_Thread != null && m_Thread.IsAlive)
             {
                 m_WakeEvent.Set();
-                long until = Environment.TickCount64 + 2 * BUSY_TIMEOUT_MS;
+                long until = Environment.TickCount64 + 2 * m_BusyTimeoutMs;
                 lock (m_Lock)
                 {
-                    while (m_WritesDone < target)
+                    while (m_WritesDone + m_WritesAbandoned < target)
                     {
                         long left = until - Environment.TickCount64;
                         if (left <= 0) break;
                         Monitor.Wait(m_Lock, (int)left);
                     }
-                    if (m_WritesDone >= target) return;
+                    if (m_WritesDone + m_WritesAbandoned >= target) return true;
                 }
             }
-            DrainWrites();
+            return DrainWrites();
         }
 
-        private void DrainWrites()
+        /// <summary>
+        /// Write the queue in order. A batch is one transaction: when it does not commit none of it is applied, each write in
+        /// it that took part counts an attempt, the ones at <see cref="MaxWriteAttempts"/> are given up with an error naming
+        /// them, and the rest go back to the front of the queue, before any write queued since. Only a committed write is
+        /// counted done and clears its item's pending mark. False when writes are left queued for a later pass.
+        /// </summary>
+        private bool DrainWrites()
         {
             lock (m_DrainLock)
             {
@@ -565,27 +622,79 @@ namespace Phlox.ScriptEngine
                     List<WriteOp> batch;
                     lock (m_Lock)
                     {
-                        if (m_Writes.Count == 0) return;
+                        if (m_Writes.Count == 0) return true;
                         batch = new List<WriteOp>(m_Writes);
                         m_Writes.Clear();
                     }
-                    WriteBatch(batch);
-                    lock (s_PendingLock)
+                    if (WriteBatch(batch))
                     {
-                        foreach (var op in batch)
-                        {
-                            if (!s_Pending.TryGetValue(op.ItemId, out var p) || p.Owner != this) continue;
-                            if (p.Count <= 1) s_Pending.Remove(op.ItemId);
-                            else s_Pending[op.ItemId] = (this, p.Count - 1);
-                        }
+                        Settle(batch, committed: true);
+                        continue;
                     }
+                    var givenUp = batch.FindAll(op => op.Attempts >= MaxWriteAttempts);
+                    batch.RemoveAll(op => op.Attempts >= MaxWriteAttempts);
+                    foreach (var op in givenUp)
+                        m_log.LogError("[PhloxState]: Gave up the {0} of the state of {1} after {2} failed attempts ({3}); the state database does not hold it",
+                            op.Kind, op.ItemId, op.Attempts, LastFlushError);
                     lock (m_Lock)
                     {
-                        m_WritesDone += batch.Count;
-                        Monitor.PulseAll(m_Lock);
+                        var later = new List<WriteOp>(m_Writes);
+                        m_Writes.Clear();
+                        foreach (var op in batch) m_Writes.Enqueue(op);
+                        foreach (var op in later) m_Writes.Enqueue(op);
                     }
+                    Settle(givenUp, committed: false);
+                    // A write given up may have been what failed: the rest are tried again now. Otherwise the next pass does.
+                    if (givenUp.Count == 0 || batch.Count == 0) return false;
                 }
             }
+        }
+
+        /// <summary>The writes are finished, committed or given up: their pending marks go and the waiters are woken.</summary>
+        private void Settle(List<WriteOp> ops, bool committed)
+        {
+            if (ops.Count == 0) return;
+            lock (s_PendingLock)
+            {
+                foreach (var op in ops)
+                {
+                    if (!s_Pending.TryGetValue(op.ItemId, out var p) || p.Owner != this) continue;
+                    if (p.Count <= 1) s_Pending.Remove(op.ItemId);
+                    else s_Pending[op.ItemId] = (this, p.Count - 1);
+                }
+            }
+            lock (m_Lock)
+            {
+                if (committed) m_WritesDone += ops.Count;
+                else
+                {
+                    m_WritesAbandoned += ops.Count;
+                    foreach (var op in ops) m_GivenUp.Add(op.Kind + " " + op.ItemId);
+                }
+                Monitor.PulseAll(m_Lock);
+            }
+        }
+
+        /// <summary>Writes given up since this manager started, as "Kind item" (named again at shutdown).</summary>
+        private readonly List<string> m_GivenUp = new List<string>();
+
+        /// <summary>
+        /// The write still queued for this item in whichever manager of this simulator holds it, a save or a removal: the
+        /// item's newest state, which the database could not take yet. Null when none is queued.
+        /// </summary>
+        private static WriteOp UnwrittenFor(UUID itemId)
+        {
+            StateManager owner;
+            lock (s_PendingLock)
+            {
+                if (!s_Pending.TryGetValue(itemId, out var p)) return null;
+                owner = p.Owner;
+            }
+            WriteOp last = null;
+            lock (owner.m_Lock)
+                foreach (var op in owner.m_Writes)
+                    if (op.ItemId == itemId && op.Kind != WriteKind.Touch) last = op;
+            return last;
         }
 
         private void FlushLoop()
@@ -621,8 +730,14 @@ namespace Phlox.ScriptEngine
             m_RequestCapture?.Invoke();
         }
 
-        private void WriteBatch(List<WriteOp> batch)
+        /// <summary>
+        /// The batch in one transaction; true when it committed. A write that fails ends the transaction, which rolls back:
+        /// a busy or locked database counts an attempt against every write in the batch, any other failure only against
+        /// the write that failed.
+        /// </summary>
+        private bool WriteBatch(List<WriteOp> batch)
         {
+            WriteOp current = null;
             try
             {
                 lock (s_WriterLock)
@@ -631,20 +746,27 @@ namespace Phlox.ScriptEngine
                     using var tx = conn.BeginTransaction();
                     foreach (var op in batch)
                     {
-                        try { Apply(conn, op); }
-                        catch (Exception e)
-                        {
-                            m_log.LogWarning("[PhloxState]: Failed to {0} the state of {1}: {2}", op.Kind, op.ItemId, e.Message);
-                        }
+                        current = op;
+                        if (FailWriteForTest != null && FailWriteForTest(op.ItemId))
+                            throw new SQLiteException(SQLiteErrorCode.IoErr, "write failed (test)");
+                        Apply(conn, op);
                     }
+                    current = null;
                     tx.Commit();
                 }
+                return true;
             }
             catch (Exception e)
             {
+                // SQLITE_BUSY (5) and SQLITE_LOCKED (6), with their extended codes.
+                bool busy = e is SQLiteException se && ((int)se.ResultCode & 0xFF) is 5 or 6;
+                if (current == null || busy) foreach (var op in batch) op.Attempts++;
+                else current.Attempts++;
                 Interlocked.Increment(ref FlushFailures);
                 LastFlushError = e.Message;
-                m_log.LogError("[PhloxState]: Batch flush failed: {0}", e.Message);
+                m_log.LogWarning("[PhloxState]: A batch of {0} state writes did not commit{1}; none of it is applied and it is tried again: {2}",
+                    batch.Count, current == null ? "" : " at the " + current.Kind + " of " + current.ItemId, e.Message);
+                return false;
             }
         }
 
@@ -821,10 +943,11 @@ namespace Phlox.ScriptEngine
 
         private SQLiteConnection OpenConnection()
         {
-            var conn = new SQLiteConnection($"Data Source={m_DbFile};BusyTimeout={BUSY_TIMEOUT_MS}");
+            string extra = m_ShortTimeout ? ";DefaultTimeout=1" : "";   // a test's short wait: statement retries end within a second
+            var conn = new SQLiteConnection($"Data Source={m_DbFile};BusyTimeout={m_BusyTimeoutMs}{extra}");
             conn.Open();
             using var pragma = conn.CreateCommand();
-            pragma.CommandText = $"PRAGMA busy_timeout={BUSY_TIMEOUT_MS}";   // (b) every connection waits instead of throwing
+            pragma.CommandText = $"PRAGMA busy_timeout={m_BusyTimeoutMs}";   // (b) every connection waits instead of throwing
             pragma.ExecuteNonQuery();
             return conn;
         }
