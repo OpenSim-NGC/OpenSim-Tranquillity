@@ -46,7 +46,7 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 /// are checked. For an object's message the sender is muted when the recipient muted the object's owner
 /// (fromAgentID) or the object itself. The list comes from IMuteListService in the lines MuteListService
 /// writes, "type id name|flags". A row with the text chat flag set does not mute text: LL's viewer,
-/// llmutelist.h, flagTextChat = 0x1, "If set don't mute user's text chat". A region with no mute list
+/// llmutelist.h, flagTextChat = 0x1, "If set, don't mute user's text chat". A region with no mute list
 /// service mutes nothing.
 /// </remarks>
 public static class InstantMessageMuteCheck
