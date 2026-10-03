@@ -25,13 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Reflection;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Region.Framework.Interfaces;
+using OpenSim.Region.ScriptEngine.Interfaces;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 
 public class Dataserver
 {
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
     private ObjectJobEngine m_WorkPool;
 
     public AsyncCommandManager m_CmdManager;
@@ -68,11 +74,7 @@ public class Dataserver
     public string RequestWithImediatePost(uint localID, UUID itemID, string reply)
     {
         string ID = UUID.Random().ToString();
-        m_CmdManager.m_ScriptEngine.PostObjectEvent(localID,
-                new EventParams("dataserver", new Object[]
-                        { new LSL_Types.LSLString(ID),
-                        new LSL_Types.LSLString(reply)},
-                new DetectParams[0]));
+        PostToEveryEngine(m_CmdManager.m_ScriptEngine, localID, ID, reply);
         return ID;
     }
 
@@ -205,13 +207,55 @@ public class Dataserver
             DataserverRequests.Remove(identifier);
         }
 
-        m_CmdManager.m_ScriptEngine.PostObjectEvent(ds.localID,
+        PostToEveryEngine(m_CmdManager.m_ScriptEngine, ds.localID, ds.ID.ToString(), reply);
+    }
+
+    /// <summary>
+    /// Posts a dataserver event (key, data) to every script in the prim, whichever script engine of the region runs it.
+    /// </summary>
+    /// <remarks>
+    /// SL (wiki dataserver): "Dataserver requests will trigger dataserver events in all scripts within the same prim
+    /// where the request was made", and "dataserver events will not be triggered in scripts contained in other prims in
+    /// the same linked object"; each script checks the query key. A region can run more than one engine, and each engine
+    /// posts only to the scripts it runs, so each engine is given the event once. The calling engine gets exactly what it
+    /// always got, first; any other engine of the region gets plain values (string key, string data), as core modules
+    /// post to any engine, in an array of its own, since an engine may convert arguments in place. Local ids are per
+    /// region, so no other region's engine is given it. An exception from another engine is logged and goes no further:
+    /// it neither reaches the caller nor keeps the event from the engines after it.
+    /// </remarks>
+    public static void PostToEveryEngine(IScriptEngine own, uint localID, string key, string data)
+    {
+        own.PostObjectEvent(localID,
                 new EventParams("dataserver", new Object[]
                 {
-                    new LSL_Types.LSLString(ds.ID.ToString()),
-                    new LSL_Types.LSLString(reply)
+                    new LSL_Types.LSLString(key),
+                    new LSL_Types.LSLString(data)
                 },
                 new DetectParams[0]));
+
+        IScriptModule[] modules = own.World?.RequestModuleInterfaces<IScriptModule>();
+        if (modules == null)
+            return;
+
+        List<IScriptEngine> others = new List<IScriptEngine>();
+        foreach (IScriptModule m in modules)
+        {
+            if (m is IScriptEngine e && e != own && !others.Contains(e))
+                others.Add(e);
+        }
+
+        foreach (IScriptEngine e in others)
+        {
+            try
+            {
+                e.PostObjectEvent(localID,
+                        new EventParams("dataserver", new object[] { key, data }, new DetectParams[0]));
+            }
+            catch (Exception ex)
+            {
+                m_log.LogError(ex, "[DATASERVER]: {0} failed to post dataserver to prim {1}", e.ScriptEngineName, localID);
+            }
+        }
     }
 
     public void RemoveEvents(uint localID, UUID itemID)
