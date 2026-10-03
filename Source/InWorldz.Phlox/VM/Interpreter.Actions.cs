@@ -12,6 +12,13 @@ namespace InWorldz.Phlox.VM
 {
     public partial class Interpreter
     {
+        /// <summary>
+        /// The most values a script's operand stack holds; a push past it stops the script with its out-of-memory error.
+        /// In SL a script's stack is part of its memory (SL wiki, LSL Script Memory: running out is a "Stack-Heap
+        /// Collision"), at least 4 bytes a value, so no script within <see cref="MemoryInfo.MAX_MEMORY"/> holds more.
+        /// </summary>
+        public const int MaxOperands = MemoryInfo.MAX_MEMORY / 4;
+
         public void SafeOperandsPush(object obj)
         {
             if (obj == null)
@@ -19,6 +26,9 @@ namespace InWorldz.Phlox.VM
 
             /*if (obj is Sentinel)
                 throw new VMException("Attempt to push sentinel operand.\n" + DumpState());*/
+
+            if (_state.Operands.Count >= MaxOperands)
+                throw new VMException("Out of memory: more than " + MaxOperands + " values on the stack");
 
             _state.Operands.Push(obj);
         }
@@ -1849,7 +1859,7 @@ namespace InWorldz.Phlox.VM
             }
 
             object[] res = SLua.LuaLib.CallMulti(funcId, args);
-            for (int i = 0; i < res.Length; i++) _state.Operands.Push(res[i] ?? (object)LuaNil.Instance);
+            for (int i = 0; i < res.Length; i++) SafeOperandsPush(res[i] ?? (object)LuaNil.Instance);
             SafeOperandsPush(res.Length); // runtime count on top
         }
 
@@ -1878,7 +1888,7 @@ namespace InWorldz.Phlox.VM
 
             if (caps == null) { SafeOperandsPush(0); return; }
             for (int i = 0; i < k; i++)
-                _state.Operands.Push(i < caps.Count ? (caps[i] ?? (object)LuaNil.Instance) : LuaNil.Instance);
+                SafeOperandsPush(i < caps.Count ? (caps[i] ?? (object)LuaNil.Instance) : LuaNil.Instance);
             SafeOperandsPush(1);
         }
 

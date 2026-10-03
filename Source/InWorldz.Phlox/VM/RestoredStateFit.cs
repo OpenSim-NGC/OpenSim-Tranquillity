@@ -69,8 +69,10 @@ namespace InWorldz.Phlox.VM
             if (!Enum.IsDefined(typeof(RuntimeState.Status), st.RunState)) return "an unknown run state";
 
             int frames = st.Calls?.Count ?? 0;
+            int operands = st.Operands?.Count ?? 0;
             if (st.IsMidEvent && frames == 0) return "a running event with no call frame";
             if (st.RunState == RuntimeState.Status.Waiting && frames > 0) return "call frames on a waiting script";
+            if (operands > Interpreter.MaxOperands) return $"{operands} values on its stack, above the limit of {Interpreter.MaxOperands}";
             if (frames > 0)
             {
                 if (st.IP < 0 || st.IP >= codeLength) return "the execution position is outside the script's code";
@@ -81,6 +83,8 @@ namespace InWorldz.Phlox.VM
                     if (f.ReturnAddress < 0 || f.ReturnAddress > codeLength) return "a return address is outside the script's code";
                     if (f.Locals == null) return "a call frame has no locals";
                 }
+                string badCall = CheckValueCalls(st.Calls.ToArray(), script.ByteCode, operands);
+                if (badCall != null) return badCall;
             }
             if (st.RunningEvent != null && !Enum.IsDefined(typeof(SupportedEventList.Events), st.RunningEvent.EventType))
                 return "the running event is of an unknown type";
@@ -92,7 +96,12 @@ namespace InWorldz.Phlox.VM
             var walk = new ValueWalk(codeLength);
             walk.All(st.Globals);
             if (st.Operands != null) walk.All(st.Operands);
-            if (st.Calls != null) foreach (StackFrame f in st.Calls) walk.All(f.Locals);
+            if (st.Calls != null)
+                foreach (StackFrame f in st.Calls)
+                {
+                    walk.All(f.Locals);
+                    if (f.Closure != null) walk.All(new object[] { f.Closure });
+                }
             if (st.RunningEvent?.Args != null) walk.All(st.RunningEvent.Args);
             if (st.EventQueue != null) foreach (PostedEvent e in st.EventQueue) walk.All(e.Args);
             if (walk.Problem != null) return walk.Problem;
@@ -115,6 +124,34 @@ namespace InWorldz.Phlox.VM
                 return "a function's argument or local count is out of range";
             if (codeLength != int.MaxValue && (fn.Address < 0 || fn.Address >= codeLength))
                 return "a function's address is outside the script's code";
+            return null;
+        }
+
+        /// <summary>
+        /// A frame's Wanted and OperandBase drive how many values its return pushes or pops (Op_Ret). Only Op_CallV sets
+        /// them, from the "callv argc, wanted" instruction the frame returns past and from the operand stack's depth at
+        /// that call; every other frame keeps -1 and 0. So a value-call frame must return just past a callv asking for
+        /// exactly its Wanted, and the operand bases of the value calls, bottom frame first, never go down and never pass
+        /// the operand stack. <paramref name="topFirst"/> is the call stack as <see cref="Stack{T}.ToArray"/> gives it.
+        /// </summary>
+        private static string CheckValueCalls(StackFrame[] topFirst, byte[] code, int operands)
+        {
+            int floor = 0;
+            for (int i = topFirst.Length - 1; i >= 0; i--)
+            {
+                StackFrame f = topFirst[i];
+                if (f.Wanted == -1)
+                {
+                    if (f.OperandBase != 0) return "a named call frame carries an operand base";
+                    continue;
+                }
+                if (f.Wanted < -1) return "a call frame wants a negative number of results";
+                int site = f.ReturnAddress - 9;                          // opcode byte, then argc and wanted, 4 bytes each
+                if (site < 0 || code[site] != (byte)OpCode.callv || Util.Encoding.GetInt(code, f.ReturnAddress - 4) != f.Wanted)
+                    return "a value call's wanted count is not what its call site asks for";
+                if (f.OperandBase < floor || f.OperandBase > operands) return "a value call's operand base does not fit the operand stack";
+                floor = f.OperandBase;
+            }
             return null;
         }
 
@@ -190,6 +227,11 @@ namespace InWorldz.Phlox.VM
                         break;
                     case UpvalCell cell:
                         One(cell.Value, depth + 1);
+                        break;
+                    case LuaGmatch gm:
+                        // Op_GmatchNext scans from Pos to the end of Src; a script's iterator never stands outside it.
+                        if (gm.Src == null || gm.Pat == null || gm.Pos < 0 || gm.Pos > gm.Src.Length + 1)
+                            Problem = "a string.gmatch iterator's position is outside its string";
                         break;
                     case object[] arr:
                         foreach (object m in arr) One(m, depth + 1);
