@@ -168,12 +168,26 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
             return false;
         }
 
-        if (!m_outboundUrlFilter.CheckAllowed(new Uri(url)))
+        Uri uri = new(url);
+        if (!m_outboundUrlFilter.CheckAllowed(uri))
             return false;
 
-        var client = new System.Net.Http.HttpClient();
+        // Every redirect hop is checked by the filtering handler. A connection straight to the target goes only to
+        // an address the filter allows; one to the default proxy is left alone.
+        var client = new System.Net.Http.HttpClient(new OutboundUrlFilterRedirectHandler(
+            m_outboundUrlFilter, m_outboundUrlFilter.CreateHandler(System.Net.Http.HttpClient.DefaultProxy), 50));
         var requestState = new RequestState(url, requestID);
-        client.GetAsync(url).ContinueWith((task) => HttpRequestReturn(task, requestState));
+        client.GetAsync(uri).ContinueWith((task) =>
+        {
+            try
+            {
+                HttpRequestReturn(task, requestState);
+            }
+            finally
+            {
+                client.Dispose();
+            }
+        });
         return true;
     }
 
