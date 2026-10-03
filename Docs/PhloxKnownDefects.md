@@ -396,6 +396,12 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     here). A granter who has not arrived yet leaves it waiting; it is decided when that avatar
     arrives anywhere in the region, as such a grant needs no seat or attachment. Neither
     `run_time_permissions` nor `experience_permissions` is posted by a restore.
+  - A grant from an Experience ends when its granter enters a parcel where the Experience
+    cannot run: the estate blocks it, or neither allows nor trusts it. The script loses the
+    grant and the controls it took, and gets `experience_permissions_denied` with
+    `XP_ERROR_NOT_PERMITTED_LAND` (17), as SL lists under "The experience can no longer run":
+    "The agent has moved to a parcel where the experience cannot run"
+    ([experience_permissions_denied](https://wiki.secondlife.com/wiki/Experience_permissions_denied)).
   - States saved by an earlier Phlox build hold no grant and restore without one.
   - When a region starts, once the scripts it starts have loaded, one line in the log says
     how many came back with their saved state and how many of those got a grant back:
@@ -719,6 +725,12 @@ message it sends for a refused rez.
 
 ### Events
 - `game_control` compiles but is never raised.
+- When an avatar blocks an Experience from its profile, SL ends the Experience's grants and
+  posts `experience_permissions_denied` ("The agent has blocked the experience from the
+  experience profile"). The simulator does not tell Phlox, so a Phlox script keeps the grant
+  and calls that use it (controls, animations, the camera, `llTeleportAgent`) still work.
+  `llSitOnLink`, `llSetAgentEnvironment` and `llReplaceAgentEnvironment`, which ask the
+  Experience on every call, are refused.
 - `money` is raised only when the region has a money module.
 
 ### Engine
