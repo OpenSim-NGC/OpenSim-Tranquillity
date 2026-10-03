@@ -173,6 +173,47 @@ public class StateWriteRetryTests
         Assert.Equal(1, m.WritesAbandoned);
     }
 
+    /// <summary>A value nested past the bound a saved state may hold.</summary>
+    private static InWorldz.Phlox.Types.LSLTable TooDeep()
+    {
+        var t = new InWorldz.Phlox.Types.LSLTable();
+        for (int i = 0; i < InWorldz.Phlox.Serialization.SerializedLSLTable.MaxNesting + 1; i++)
+        {
+            var outer = new InWorldz.Phlox.Types.LSLTable();
+            outer.Set(1, t);
+            t = outer;
+        }
+        return t;
+    }
+
+    /// <summary>
+    /// A script whose state cannot be captured fails at every flush while it runs: the warning is written once, the last
+    /// saved row stays, and the warning comes again only after a capture of it has succeeded.
+    /// </summary>
+    [Fact]
+    public void AScriptThatCannotBeCapturedIsWarnedOfOnceUntilACaptureSucceeds()
+    {
+        string db = NewDb();
+        var compiled = Compiled();
+        using var m = new StateManager(null, db, ShortBusyMs);
+        var s = Script(compiled);
+        s.ScriptState.Globals[0] = 7;
+        m.SaveNow(new[] { s });   // the last good row
+        Assert.True(HasRow(db, s.ItemId));
+
+        s.ScriptState.Globals[0] = TooDeep();
+        for (int i = 0; i < 3; i++) m.SaveNow(new[] { s });
+        Assert.Equal(1, m.CaptureFailureWarnings);
+        Assert.Equal(7, m.LoadState(s.ItemId, compiled.AssetId).ToRuntimeState().Globals[0]);   // the row is the old one
+
+        s.ScriptState.Globals[0] = 9;
+        m.SaveNow(new[] { s });
+        Assert.Equal(9, m.LoadState(s.ItemId, compiled.AssetId).ToRuntimeState().Globals[0]);
+        s.ScriptState.Globals[0] = TooDeep();
+        m.SaveNow(new[] { s });
+        Assert.Equal(2, m.CaptureFailureWarnings);
+    }
+
     /// <summary>A load of an item whose save the database has not taken yet restores that save, not the older row.</summary>
     [Fact]
     public void ALoadSeesASaveTheDatabaseHasNotTakenYet()

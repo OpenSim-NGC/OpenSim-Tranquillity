@@ -288,14 +288,30 @@ namespace Phlox.ScriptEngine
                 {
                     Interlocked.Increment(ref FlushFailures);
                     LastFlushError = e.Message;
-                    m_log.LogWarning("[PhloxState]: Failed to capture {0}: {1}", interp.ItemId, e.Message);
+                    // A script whose state cannot be captured (tables nested past the bound) fails at every flush while it
+                    // runs: the warning is written once, until a capture of it succeeds again.
+                    bool first;
+                    lock (m_Lock) first = m_CaptureFailing.Add(interp.ItemId);
+                    if (first)
+                    {
+                        Interlocked.Increment(ref CaptureFailureWarnings);
+                        m_log.LogWarning("[PhloxState]: Failed to capture {0}: {1}; its last saved state is kept, and this is not logged again until a capture of it succeeds",
+                            interp.ItemId, e.Message);
+                    }
+                    else m_log.LogDebug("[PhloxState]: Failed to capture {0} again: {1}", interp.ItemId, e.Message);
                     continue;
                 }
+                lock (m_Lock) m_CaptureFailing.Remove(interp.ItemId);
                 if (self) Interlocked.Increment(ref SelfCaptures);
                 else Interlocked.Increment(ref SchedulerCaptures);
                 Queue(new WriteOp { Kind = WriteKind.Save, ItemId = interp.ItemId, AssetId = interp.Script.AssetId, Blob = blob });
             }
         }
+
+        /// <summary>Scripts whose last capture failed, and so were warned of once.</summary>
+        private readonly HashSet<UUID> m_CaptureFailing = new HashSet<UUID>();
+        /// <summary>Capture failures written to the log as warnings (diagnostics and tests).</summary>
+        internal int CaptureFailureWarnings;
 
         /// <summary>
         /// The script's state for its database row, with the grant its item holds now (none held, none saved). A grant
@@ -327,6 +343,7 @@ namespace Phlox.ScriptEngine
             {
                 m_Dirty.Remove(interp.ItemId);
                 m_Live.Remove(interp.ItemId);
+                m_CaptureFailing.Remove(interp.ItemId);
                 if (m_LoadFailed.Contains(interp.ItemId))
                 {
                     m_log.LogInformation("[PhloxState]: Not saving {0}: its state row could not be read this run and is kept as it was", interp.ItemId);
@@ -368,6 +385,7 @@ namespace Phlox.ScriptEngine
             {
                 m_Dirty.Remove(itemId);
                 m_Live.Remove(itemId);
+                m_CaptureFailing.Remove(itemId);
                 m_LoadFailed.Remove(itemId);
             }
             ForgetLive(itemId);
