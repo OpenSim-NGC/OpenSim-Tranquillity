@@ -1549,6 +1549,25 @@ public class UserProfileModule : IProfileModule, INonSharedRegionModule
             return null;
         return (UserPreferences)Pref;
     }
+
+    /// <summary>
+    /// The partner on a user's profile, from this grid's profiles service. A foreign user's home grid is not
+    /// asked, so their partner cannot be read.
+    /// </summary>
+    public bool TryGetUserPartner(UUID userID, out UUID partnerID)
+    {
+        partnerID = UUID.Zero;
+        if (!Enabled || m_userManagementModule is null)
+            return false;
+        if (GetUserProfileServerURI(userID, out string serverURI) || string.IsNullOrWhiteSpace(serverURI))
+            return false;
+
+        UserProfileProperties props = new() { UserId = userID };
+        if (!GetProfileData(ref props, false, serverURI, out _))
+            return false;
+        partnerID = props.PartnerId;
+        return true;
+    }
     #endregion User Preferences
 
     #region Avatar Properties
