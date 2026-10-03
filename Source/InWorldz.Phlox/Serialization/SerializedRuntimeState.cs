@@ -141,13 +141,23 @@ namespace InWorldz.Phlox.Serialization
 
 
 
-        /// <summary>One part of the state copied, or the capture fails naming it.</summary>
+        /// <summary>A copy that fails (the collection changed while it was read) is tried this many times in all.</summary>
+        private const int CopyAttempts = 10;
+
+        /// <summary>
+        /// One part of the state copied. A collection another thread changes while it is read throws; that is transient,
+        /// and the copy is tried again. When every attempt fails the capture fails naming the part.
+        /// </summary>
         private static T Copy<T>(string part, Func<T> copy)
         {
-            try { return copy(); }
-            catch (Exception e)
+            for (int attempt = 1; ; attempt++)
             {
-                throw new InvalidOperationException("the script's " + part + " could not be copied for its state: " + e.Message, e);
+                try { return copy(); }
+                catch (Exception) when (attempt < CopyAttempts) { }
+                catch (Exception e)
+                {
+                    throw new InvalidOperationException("the script's " + part + " could not be copied for its state: " + e.Message, e);
+                }
             }
         }
 
