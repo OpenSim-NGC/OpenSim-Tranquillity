@@ -10,8 +10,8 @@
     
     
     
-    <Reference Include="XMLRPC">
-      <HintPath>..\..\bin\XMLRPC.dll</HintPath>
+    <Reference Include="xmlrpc">
+      <HintPath>..\..\bin\xmlrpc.dll</HintPath>
       <Private>False</Private>
     </Reference>
   </ItemGroup>
