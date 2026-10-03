@@ -383,8 +383,11 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - From the region's own state database (a restart): the grant comes back whole, when the
     object's owner is still the owner saved with it. Otherwise nothing comes back. A grant
     still waiting for its granter when the state was saved is decided as carried state
-    below, from a row too; and a row saved after the object has gone (a derez) holds no
-    grant.
+    below, from a row too. A row saved when the object can no longer be found keeps the
+    grant the script holds, which Phlox notes in the state each time the grant changes:
+    after a derez, at a region stop (the simulator empties the scene before the final
+    save) and when a region is removed from the engine. A grant still waiting for its
+    granter is never saved as a grant in such a row.
   - From state carried inside an object (take and rez, take copy, attach, login, teleport,
     crossing): only what `llRequestPermissions` would grant at that moment without a
     dialog comes back, by the same decision: the granter wears the object (take controls,
