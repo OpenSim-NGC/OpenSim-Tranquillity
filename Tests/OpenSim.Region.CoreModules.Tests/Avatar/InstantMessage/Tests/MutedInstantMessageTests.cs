@@ -439,7 +439,8 @@ public class MutedInstantMessageTests : OpenSimTestCase
 
     /// <summary>
     /// A mute list service on another server that answers only after a delay, reached through the grid's mute
-    /// list connector. WebUtil's shared HTTP handlers are process-wide and are put back afterwards.
+    /// list connector. With headersFirst it sends the reply's headers and first byte at once and the rest of the
+    /// body after the delay. WebUtil's shared HTTP handlers are process-wide and are put back afterwards.
     /// </summary>
     private sealed class SlowMuteServer : IDisposable
     {
@@ -449,9 +450,14 @@ public class MutedInstantMessageTests : OpenSimTestCase
         private readonly SocketsHttpHandler m_savedNoRedir = WebUtil.SharedSocketsHttpHandlerNoRedir;
         public readonly string Url;
         public int Requests;
+        public int Finished;
+        private readonly bool m_headersFirst;
+        private readonly string m_list;
 
-        public SlowMuteServer(TimeSpan delay)
+        public SlowMuteServer(TimeSpan delay, bool headersFirst = false, string list = "")
         {
+            m_headersFirst = headersFirst;
+            m_list = list;
             WebUtil.SetupHTTPClients(false, false, null, 4);
             int port;
             using (TcpListener probe = new(IPAddress.Loopback, 0))
@@ -478,13 +484,21 @@ public class MutedInstantMessageTests : OpenSimTestCase
                 {
                     try
                     {
-                        await Task.Delay(delay, m_stop.Token);
                         byte[] bytes = Encoding.UTF8.GetBytes(ServerUtils.BuildXmlResponse(
-                            new Dictionary<string, object> { ["result"] = string.Empty }));
+                            new Dictionary<string, object> { ["result"] = Convert.ToBase64String(Encoding.UTF8.GetBytes(m_list)) }));
                         ctx.Response.ContentType = "text/xml";
                         ctx.Response.ContentLength64 = bytes.Length;
-                        await ctx.Response.OutputStream.WriteAsync(bytes);
+                        int first = 0;
+                        if (m_headersFirst)
+                        {
+                            await ctx.Response.OutputStream.WriteAsync(bytes.AsMemory(0, 1));
+                            await ctx.Response.OutputStream.FlushAsync();
+                            first = 1;
+                        }
+                        await Task.Delay(delay, m_stop.Token);
+                        await ctx.Response.OutputStream.WriteAsync(bytes.AsMemory(first));
                         ctx.Response.Close();
+                        Interlocked.Increment(ref Finished);
                     }
                     catch { try { ctx.Response.Abort(); } catch { } }
                 });
@@ -594,5 +608,47 @@ public class MutedInstantMessageTests : OpenSimTestCase
 
         Assert.Empty(m_received);
         Assert.Equal(2, mutes.Reads);
+    }
+
+    [Fact]
+    public void AReplyThatStallsAfterItsHeadersHoldsAnImNoLongerThanTheReadTimeout()
+    {
+        SetUpRegion("MessageTransferModule", null);
+        m_slowServer = new SlowMuteServer(TimeSpan.FromSeconds(12), headersFirst: true);
+        m_scene.RegisterModuleInterface<IMuteListService>(new MuteListServicesConnector(m_slowServer.Url));
+
+        Stopwatch first = Stopwatch.StartNew();
+        Send(FromAgent(SenderId));
+        first.Stop();
+
+        Assert.Single(m_received);
+        Assert.True(first.Elapsed < TimeSpan.FromSeconds(8), $"IM took {first.Elapsed}");
+        Assert.Equal(1, m_slowServer.Requests);
+        Assert.Equal(1, ReadWarnings());
+    }
+
+    [Fact]
+    public void ALateAnswerFromAnAbandonedReadIsIgnored()
+    {
+        SetUpRegion("MessageTransferModule", null);
+        // The late answer mutes the sender; the read that asked for it gave up at the limit.
+        m_slowServer = new SlowMuteServer(TimeSpan.FromSeconds(5), headersFirst: true, list: Row(1, SenderId, 0));
+        m_scene.RegisterModuleInterface<IMuteListService>(new MuteListServicesConnector(m_slowServer.Url));
+
+        Send(FromAgent(SenderId));
+        Assert.Single(m_received);
+
+        // Wait for the server to have sent the late answer, then give the abandoned read time to finish with
+        // it: a window in which the cache must NOT change.
+        Stopwatch wait = Stopwatch.StartNew();
+        while (Volatile.Read(ref m_slowServer.Finished) == 0 && wait.Elapsed < TimeSpan.FromSeconds(30))
+            Thread.Sleep(100);
+        Assert.Equal(1, Volatile.Read(ref m_slowServer.Finished));
+        Thread.Sleep(1000);
+
+        Send(FromAgent(SenderId));
+
+        Assert.Equal(2, m_received.Count);
+        Assert.Equal(1, m_slowServer.Requests);
     }
 }

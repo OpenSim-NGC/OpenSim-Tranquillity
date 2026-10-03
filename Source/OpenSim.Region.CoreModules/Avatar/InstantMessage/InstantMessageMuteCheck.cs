@@ -56,8 +56,9 @@ namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 /// own viewer fills it (<see cref="Remember"/>). A change made through another simulator shows here when the
 /// entry expires.
 ///
-/// The read for a message is given <see cref="ReadTimeoutSeconds"/>. A read that fails or times out lets the
-/// message through, is kept for the cache lifetime like a "no list" answer, and logs one warning at most once
+/// The read for a message is given <see cref="ReadTimeoutSeconds"/> in total: the service's own request is
+/// given that long, and the message waits for the whole read (request, reply headers and body) no longer than
+/// that. A read that fails or runs past the limit lets the message through, is kept for the cache lifetime like a "no list" answer, and logs one warning at most once
 /// per <see cref="CacheLifetimeMs"/>, so a dead service costs at most one short wait per recipient per minute.
 /// </remarks>
 public static class InstantMessageMuteCheck
@@ -120,12 +121,26 @@ public static class InstantMessageMuteCheck
 
         // A read that fails or times out counts as "no list" and is kept like any other answer, so a dead
         // service is asked at most once per recipient per lifetime.
-        byte[] data;
+        byte[] data = null;
+        Exception failure = null;
+        Task<byte[]> read = Task.Run(() => mutes.MuteListRequest(agentID, 0, ReadTimeoutSeconds));
         try
         {
-            data = mutes.MuteListRequest(agentID, 0, ReadTimeoutSeconds);
+            if (read.Wait(TimeSpan.FromSeconds(ReadTimeoutSeconds)))
+                data = read.Result;
+            else
+            {
+                // Abandoned: whatever it answers later is ignored, and a late failure is observed here.
+                failure = new TimeoutException($"no answer in {ReadTimeoutSeconds} s");
+                _ = read.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            }
         }
-        catch (Exception e)
+        catch (AggregateException e)
+        {
+            failure = e.InnerException ?? e;
+        }
+
+        if (failure is not null)
         {
             data = null;
             bool warn;
@@ -136,7 +151,7 @@ public static class InstantMessageMuteCheck
                     s_lastReadWarning = now;
             }
             if (warn)
-                m_log.LogWarning("[INSTANT MESSAGE]: mute list of {0} could not be read, messages are delivered unchecked: {1}", agentID, e.Message);
+                m_log.LogWarning("[INSTANT MESSAGE]: mute list of {0} could not be read, messages are delivered unchecked: {1}", agentID, failure.Message);
         }
 
         lock (m_cache)
