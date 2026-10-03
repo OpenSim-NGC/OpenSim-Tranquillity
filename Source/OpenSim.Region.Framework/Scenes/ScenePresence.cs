@@ -3165,20 +3165,12 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             PrevSitOffset = m_pos; // Save sit offset
             UnRegisterSeatControls(part.ParentGroup.UUID);
 
-            TaskInventoryDictionary taskIDict = part.TaskInventory;
-            if (taskIDict != null)
-            {
-                lock (taskIDict)
-                {
-                    foreach (UUID taskID in taskIDict.Keys)
-                    {
-                        UnRegisterControlEventsToScript(LocalId, taskID);
-                        taskIDict[taskID].PermsMask &= ~(
-                            2048 | //PERMISSION_CONTROL_CAMERA
-                            4); // PERMISSION_TAKE_CONTROLS
-                    }
-                }
-            }
+            // SL llSetCameraParams: "The PERMISSION_CONTROL_CAMERA permission is automatically revoked when the
+            // avatar stands up from or detaches the object". Every prim of the object, and only grants this avatar
+            // made: a script holds permissions "for only one agent at a time" (llRequestPermissions).
+            part.ParentGroup.RemoveScriptsPermissions(this,
+                    2048 | //PERMISSION_CONTROL_CAMERA
+                    4); // PERMISSION_TAKE_CONTROLS
 
             ControllingClient.SendClearFollowCamProperties(part.ParentUUID);
 
@@ -3482,7 +3474,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         if (ParentID != 0)
         {
-            if (agent_id.Equals(ParentPart.UUID))
+            if (part.UUID.Equals(ParentPart.UUID))
                 return; // already sitting here, ignore
             StandUp();
         }
@@ -6003,12 +5995,17 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     public void HandleForceReleaseControls(IClientAPI remoteClient, UUID agentID)
     {
         UUID[] released;
+        List<SceneObjectGroup> holders = new();
         lock (scriptedcontrols)
         {
             foreach (ScriptControllers c in scriptedcontrols.Values)
             {
                 SceneObjectGroup sog = m_scene.GetSceneObjectGroup(c.objectID);
-                if(sog != null && !sog.IsDeleted && sog.RootPart.PhysActor != null)
+                if (sog == null || sog.IsDeleted)
+                    continue;
+                if (!holders.Contains(sog))
+                    holders.Add(sog);
+                if(sog.RootPart.PhysActor != null)
                     sog.RootPart.PhysActor.OnPhysicsRequestingCameraData -= physActor_OnPhysicsRequestingCameraData;
             }
 
@@ -6017,8 +6014,18 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         }
         ControllingClient.SendTakeControls(int.MaxValue, false, false);
 
+        // SL llTakeControls: PERMISSION_TAKE_CONTROLS "can be revoked ... if the user chooses Release Keys from the
+        // viewer".
+        foreach (SceneObjectGroup sog in holders)
+            sog.RemoveScriptsPermissions(this, 4); // PERMISSION_TAKE_CONTROLS
+
         if (released != null)
             m_scene.EventManager.TriggerScriptControlsReleased(UUID, released);
+
+        // A forced release also stands the avatar up, as SL does (Halcyon ScenePresence.HandleForceReleaseControls:
+        // "SL stands up the user on a forced controls release"), unless PRIM_ALLOW_UNSIT holds it in its seat.
+        if (IsSatOnObject && !ExperienceHoldsSeat())
+            StandUp();
     }
 
     public void HandleRevokePermissions(UUID objectID, uint permissions )
