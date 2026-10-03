@@ -731,6 +731,13 @@ namespace Phlox.ScriptEngine
         internal bool HasGrantClaim => m_grantClaim != null;
 
         /// <summary>
+        /// The avatar a waiting grant needs on or wearing the object (any claim not from an Experience), or zero. Such a
+        /// granter of an unworn object that just crossed is a rider still to come. Scheduler thread.
+        /// </summary>
+        internal UUID WaitingSeatGranter
+            => m_grantClaim is GrantClaim claim && claim.Experience.IsZero() ? claim.Granter : UUID.Zero;
+
+        /// <summary>
         /// A grant from an Experience waits for <paramref name="agentId"/>. Such a grant needs no seat or attachment, so the
         /// avatar's arrival anywhere in the region decides it. Scheduler thread.
         /// </summary>

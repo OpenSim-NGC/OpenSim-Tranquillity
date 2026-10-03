@@ -491,7 +491,17 @@ namespace Phlox.ScriptEngine
                 interp.Script.FindEvent(interp.ScriptState.LSLState,
                     (int)SupportedEventList.Events.CHANGED) != null)
             {
-                PostEvent(req.ItemID, new PostedEvent
+                SceneObjectGroup group = req.Prim.ParentGroup;
+                if (req.StateSource == (int)StateSource.PrimCrossing && group != null && !group.IsAttachment
+                    && GroupAwaitsRider(group, null))
+                    m_HeldArrivals.Add(new HeldArrival
+                    {
+                        ItemId = req.ItemID,
+                        Group = group,
+                        Change = arrivalChange,
+                        Deadline = InWorldz.Phlox.Util.Clock.Now + ArrivalRiderWaitMs
+                    });
+                else PostEvent(req.ItemID, new PostedEvent
                 {
                     EventType = SupportedEventList.Events.CHANGED,
                     Args = new object[] { arrivalChange }
@@ -548,6 +558,84 @@ namespace Phlox.ScriptEngine
                 default:
                     return 0;
             }
+        }
+
+        // ── An arrival event that waits for riders ─────────────────────────────
+
+        /// <summary>
+        /// How long a crossing object's changed(CHANGED_REGION) waits for riders still to come, in milliseconds. Halcyon
+        /// waits with no limit (Scene.cs AddSceneObjectFromOtherRegion posts it only when AvatarsToExpect is 0;
+        /// ScenePresence.ContinueSitAsRootAgent posts it when the last rider arrives), so a rider who never arrives
+        /// leaves the script with no event. Here the wait ends after this long: the core sends the riders after the
+        /// object, a far crossing a second later (SceneObjectGroup.CrossAsync), and a rider is in the region only once
+        /// the viewer has completed the move; ten seconds leaves room for a slow link while an object holding a grant
+        /// from someone who is not coming gets its event late by no more than that.
+        /// </summary>
+        internal const ulong ArrivalRiderWaitMs = 10_000;
+
+        private sealed class HeldArrival
+        {
+            public UUID ItemId;
+            public SceneObjectGroup Group;
+            public int Change;
+            public ulong Deadline;
+            public readonly HashSet<UUID> Arrived = new();
+        }
+
+        // Scheduler thread only (FinishedLoading and DoWork both run on it).
+        private readonly List<HeldArrival> m_HeldArrivals = new();
+
+        /// <summary>
+        /// Does a script in <paramref name="group"/> hold a grant waiting for an avatar to arrive on the object (not one
+        /// from an Experience, which needs no seat), from an avatar not in <paramref name="arrived"/>? The core crosses
+        /// the object before its riders (SceneObjectGroup.CrossAsync) and tells the new region nothing of
+        /// them, so such a grant is the sign that a rider is still to come.
+        /// </summary>
+        private bool GroupAwaitsRider(SceneObjectGroup group, HashSet<UUID> arrived)
+        {
+            foreach (SceneObjectPart part in group.Parts)
+                foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                    if (m_Apis.TryGetValue(item.ItemID, out LSLSystemAPI api)
+                        && api.WaitingSeatGranter is UUID granter && granter.IsNotZero()
+                        && (arrived == null || !arrived.Contains(granter)))
+                        return true;
+            return false;
+        }
+
+        /// <summary>
+        /// A crossing object's changed(CHANGED_REGION) waits until the riders it expects have arrived and their waiting
+        /// grants are decided, so the script sees their grant inside the event, as Halcyon posts it once the last rider is
+        /// seated (ScenePresence.ContinueSitAsRootAgent). An avatar's arrival counts once it has been handled
+        /// (ProcessArrivedAvatars), seated on the object or not. The wait ends after <see cref="ArrivalRiderWaitMs"/>
+        /// whatever has arrived; the event is posted once. The script runs its other events meanwhile.
+        /// </summary>
+        private void ProcessHeldArrivals()
+        {
+            if (m_HeldArrivals.Count == 0) return;
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            for (int i = m_HeldArrivals.Count - 1; i >= 0; i--)
+            {
+                HeldArrival held = m_HeldArrivals[i];
+                if (!m_AllScripts.ContainsKey(held.ItemId) || held.Group.IsDeleted)
+                {
+                    m_HeldArrivals.RemoveAt(i);
+                    continue;
+                }
+                if (now < held.Deadline && GroupAwaitsRider(held.Group, held.Arrived)) continue;
+                m_HeldArrivals.RemoveAt(i);
+                PostEvent(held.ItemId, new PostedEvent
+                {
+                    EventType = SupportedEventList.Events.CHANGED,
+                    Args = new object[] { held.Change }
+                });
+            }
+        }
+
+        private ulong EarliestHeldArrival()
+        {
+            ulong earliest = ulong.MaxValue;
+            foreach (HeldArrival held in m_HeldArrivals) earliest = Math.Min(earliest, held.Deadline);
+            return earliest;
         }
 
         // ── Event posting ──────────────────────────────────────────────────────
@@ -659,6 +747,7 @@ namespace Phlox.ScriptEngine
         /// <summary>Events posted to this item and not yet moved into its queue are dropped (reset).</summary>
         private void DropPendingEvents(UUID itemId)
         {
+            m_HeldArrivals.RemoveAll(held => held.ItemId == itemId);
             lock (m_PendingEvents)
             {
                 if (m_PendingEvents.Count == 0) return;
@@ -1055,6 +1144,7 @@ namespace Phlox.ScriptEngine
             }
             ProcessObjectStateRequests();
             ProcessArrivedAvatars();
+            ProcessHeldArrivals();   // After the arrivals, whose waiting grants it waits for
             CheckSleepingScripts();
             ProcessEventQueue();
             ExpireDeferredEvents();
@@ -1074,7 +1164,7 @@ namespace Phlox.ScriptEngine
             {
                 WorkWasDone = hadRunnable,
                 WorkIsPending = HasWork(),
-                NextWakeUpTime = Math.Min(nextWake, EarliestServiceDeadline())
+                NextWakeUpTime = Math.Min(Math.Min(nextWake, EarliestServiceDeadline()), EarliestHeldArrival())
             };
         }
 
@@ -1830,6 +1920,7 @@ namespace Phlox.ScriptEngine
             if (world == null) return;
             foreach (UUID agentId in batch)
             {
+                foreach (HeldArrival held in m_HeldArrivals) held.Arrived.Add(agentId);
                 ScenePresence sp = world.GetScenePresence(agentId);
                 if (sp == null || sp.IsChildAgent || sp.IsDeleted) continue;
                 var groups = new List<SceneObjectGroup>();

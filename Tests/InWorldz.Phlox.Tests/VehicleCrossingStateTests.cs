@@ -32,8 +32,8 @@ namespace InWorldz.Phlox.Tests;
 /// and the record of the controls it took wait as a claim. Taken controls on a seated avatar travel in the core's agent
 /// data for every engine.
 /// </summary>
-// Runs in parallel: regions (7310, 7310), (7310, 7309), (7320, 7320) and (7320, 7319) are used by no other test; the
-// scenes, engines and items are its own.
+// Runs in parallel: regions (7310, 7310), (7310, 7309), (7320, 7320), (7320, 7319), (7350, 7350) and (7350, 7349) are
+// used by no other test; the scenes, engines and items are its own.
 public class VehicleCrossingStateTests
 {
     private const string Vehicle = @"
@@ -233,5 +233,50 @@ public class VehicleCrossingStateTests
         typeof(ScenePresence).GetMethod("SendControlsToScripts", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(sp, new object[] { 1u });   // AGENT_CONTROL_AT_POS, CONTROL_FWD
         Assert.True(WaitFor(() => b.Heard("ctl " + driver)), "region B: " + b.Text());
+    }
+
+    private const string ToldOnArrival = @"
+        default {
+            state_entry() { llSay(0, ""entry""); }
+            changed(integer c) { llSay(0, ""changed "" + (string)c + "" perms="" + (string)llGetPermissions() + "" key="" + (string)llGetPermissionsKey()); }
+        }";
+
+    /// <summary>
+    /// A vehicle crosses before its driver. Its script's changed(CHANGED_REGION) waits until the driver has arrived seated
+    /// and the grant waiting for the driver is decided, so the script reads the driver's grant inside the event, once
+    /// (Halcyon posts it when the last rider is seated, ScenePresence.ContinueSitAsRootAgent).
+    /// </summary>
+    [Fact]
+    public void AVehicleScriptIsToldOfTheCrossingOnceItsDriverHasArrivedWithTheDriversGrant()
+    {
+        var (a, b) = TwoRegions(7350);
+        using var ra = a;
+        using var rb = b;
+
+        var sog = SceneHelpers.AddSceneObject(a.Scene, "Example Vehicle", UUID.Random());
+        sog.AbsolutePosition = new Vector3(128, 3, 30);
+        UUID objectId = sog.UUID;
+        UUID item = UUID.Random();
+        TaskInventoryHelpers.AddScript(a.Scene.AssetService, sog.RootPart, item, UUID.Random(), "told", ToldOnArrival);
+        sog.CreateScriptInstances(0, true, a.Engine.Name, 1);
+        Assert.True(WaitFor(() => a.Heard("entry")), a.Text());
+
+        UUID driver = UUID.Random();
+        var invA = sog.RootPart.Inventory.GetInventoryItem(item);
+        invA.PermsGranter = driver;
+        invA.PermsMask = 0x4 | 0x10;   // TAKE_CONTROLS | TRIGGER_ANIMATION
+
+        sog.UpdateGroupPosition(new Vector3(128, -5, 30));
+        Assert.True(WaitFor(() => b.Scene.GetSceneObjectGroup(objectId) != null), "the vehicle did not reach region B");
+        Assert.True(WaitFor(() => Api(b, item) != null), "the script did not start in region B");
+        Assert.True(WaitFor(() => Api(b, item).HasGrantClaim), "no claim waits in region B");
+        var there = b.Scene.GetSceneObjectGroup(objectId);
+
+        // The driver arrives as the core's crossing brings it: a child agent here, seated back on the vehicle when its
+        // move completes, before OnMakeRootAgent (ScenePresence.MakeRootAgent).
+        ArrivalWaitsForRidersTests.ArriveSeated(b.Scene, driver, there);
+
+        Assert.True(WaitFor(() => b.Heard("changed 256 perms=20 key=" + driver)), "region B: " + b.Text());
+        lock (b.Said) Assert.Single(b.Said, s => s.StartsWith("changed 256 ", StringComparison.Ordinal));
     }
 }
