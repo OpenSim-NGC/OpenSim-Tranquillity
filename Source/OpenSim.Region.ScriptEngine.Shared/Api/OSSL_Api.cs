@@ -2112,8 +2112,6 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
 
     private void MessageObject(UUID objUUID, string message)
     {
-        object[] resobj = new object[] { new LSL_String(m_host.UUID.ToString()), new LSL_String(message) };
-
         SceneObjectPart sceneOP = World.GetSceneObjectPart(objUUID);
 
         if (sceneOP == null) // prior to patching, PostObjectEvent() would cause a throw exception to be shouted instead.
@@ -2122,9 +2120,9 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
             return;
         }
 
-        m_ScriptEngine.PostObjectEvent(
-            sceneOP.LocalId, new EventParams(
-                "dataserver", resobj, Array.Empty<DetectParams>()));
+        // Every script in that prim gets it, whichever engine of the region runs it (OpenSim wiki osMessageObject:
+        // "All scripts with dataserver event will receive it"); the sender's prim key is the query key.
+        Plugins.Dataserver.PostToEveryEngine(m_ScriptEngine, sceneOP.LocalId, m_host.UUID.ToString(), message);
     }
 
 
