@@ -434,7 +434,8 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
                     { "SalePrice", item.SalePrice.ToString() },
                     { "SaleType", item.SaleType.ToString() },
                     { "Flags", item.Flags.ToString() },
-                    { "CreationDate", item.CreationDate.ToString() }
+                    { "CreationDate", item.CreationDate.ToString() },
+                    { "ExperienceID", item.ExperienceID.ToString() }
                 });
 
         return CheckReturn(ret);
@@ -466,7 +467,8 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
                     { "SalePrice", item.SalePrice.ToString() },
                     { "SaleType", item.SaleType.ToString() },
                     { "Flags", item.Flags.ToString() },
-                    { "CreationDate", item.CreationDate.ToString() }
+                    { "CreationDate", item.CreationDate.ToString() },
+                    { "ExperienceID", item.ExperienceID.ToString() }
                 });
 
         bool result = CheckReturn(ret);
@@ -744,6 +746,9 @@ public class XInventoryServicesConnector : BaseServiceConnector, IInventoryServi
             };
             if (data.TryGetValue("CreatorData", out object oCreatorData))
                 item.CreatorData = (string)oCreatorData;
+            // Absent from a server that predates the field: no Experience.
+            if (data.TryGetValue("ExperienceID", out object oExperienceID) && UUID.TryParse(oExperienceID as string, out UUID experienceID))
+                item.ExperienceID = experienceID;
             return item;
         }
         catch (Exception e)

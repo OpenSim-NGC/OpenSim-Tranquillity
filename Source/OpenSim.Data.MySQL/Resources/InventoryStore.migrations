@@ -40,3 +40,8 @@ CREATE TABLE IF NOT EXISTS `inventoryfolders` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 COMMIT;
+
+:VERSION 8         #----- add script experience link to inventoryitems
+BEGIN;
+ALTER TABLE `inventoryitems` ADD COLUMN `experienceID` char(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+COMMIT;

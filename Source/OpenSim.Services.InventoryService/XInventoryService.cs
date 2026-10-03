@@ -844,7 +844,8 @@ public class XInventoryService : ServiceBase, IInventoryService
             SalePrice = item.salePrice,
             SaleType = (byte)item.saleType,
             Flags = (uint)item.flags,
-            CreationDate = item.creationDate
+            CreationDate = item.creationDate,
+            ExperienceID = item.experienceID
         };
     }
 
@@ -871,7 +872,8 @@ public class XInventoryService : ServiceBase, IInventoryService
             salePrice = item.SalePrice,
             saleType = (int)item.SaleType,
             flags = (int)item.Flags,
-            creationDate = item.CreationDate
+            creationDate = item.CreationDate,
+            experienceID = item.ExperienceID
         };
     }
 

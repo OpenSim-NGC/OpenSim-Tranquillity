@@ -205,3 +205,8 @@ Alter table inventoryitems Rename Column "SaleType" to "saleType";
 
 Commit;
 
+
+:VERSION 11         #----- add script experience link to inventoryitems
+BEGIN;
+ALTER TABLE inventoryitems ADD COLUMN "experienceID" uuid NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+COMMIT;
