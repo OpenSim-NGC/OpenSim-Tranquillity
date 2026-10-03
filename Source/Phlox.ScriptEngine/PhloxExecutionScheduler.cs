@@ -612,16 +612,25 @@ namespace Phlox.ScriptEngine
         /// Does a script in <paramref name="group"/> hold a grant waiting for an avatar to arrive on the object (not one
         /// from an Experience, which needs no seat), from an avatar not in <paramref name="arrived"/>? The core crosses
         /// the object before its riders (SceneObjectGroup.CrossAsync) and tells the new region nothing of
-        /// them, so such a grant is the sign that a rider is still to come.
+        /// them, so such a grant is the sign that a rider is still to come. A script of the object whose carried state
+        /// has not been loaded yet counts as waiting too: its grant is not decided until it loads (the core hands every
+        /// script's state over before it starts any, SceneObjectGroup.SetState, and they load one by one).
         /// </summary>
         private bool GroupAwaitsRider(SceneObjectGroup group, HashSet<UUID> arrived)
         {
+            StateManager states = m_Engine?.StateManager;
             foreach (SceneObjectPart part in group.Parts)
                 foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
-                    if (m_Apis.TryGetValue(item.ItemID, out LSLSystemAPI api)
-                        && api.WaitingSeatGranter is UUID granter && granter.IsNotZero()
-                        && (arrived == null || !arrived.Contains(granter)))
+                {
+                    if (m_Apis.TryGetValue(item.ItemID, out LSLSystemAPI api))
+                    {
+                        if (api.WaitingSeatGranter is UUID granter && granter.IsNotZero()
+                            && (arrived == null || !arrived.Contains(granter)))
+                            return true;
+                    }
+                    else if (states != null && states.HasCarried(item.ItemID))
                         return true;
+                }
             return false;
         }
 

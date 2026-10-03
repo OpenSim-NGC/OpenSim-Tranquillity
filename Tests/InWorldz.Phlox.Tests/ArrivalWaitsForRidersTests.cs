@@ -197,6 +197,83 @@ public class ArrivalWaitsForRidersTests
         Assert.Equal(new[] { "changed 256 perms=0 key=" + UUID.Zero }, ArrivalLines(h));
     }
 
+    private const string Holder = @"
+        default {
+            state_entry() { llSay(0, ""entry2""); }
+            touch_start(integer t) { llSay(0, ""perms2="" + (string)llGetPermissions()); }
+        }";
+
+    /// <summary>
+    /// A script's state as a crossing carries it: <paramref name="source"/> run once in the harness prim, captured, with
+    /// the grant from <paramref name="granter"/> (zero for none); the source script is then removed.
+    /// </summary>
+    private static (UUID Asset, byte[] Blob) Carried(SchedulerHarness h, string source, string started, UUID granter, int mask)
+    {
+        var asset = UUID.Random();
+        var item = UUID.Random();
+        TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, item, asset, "source", source);
+        Assert.True(h.Prim.Inventory.CreateScriptInstance(item, 0, false, Phlox, NewRez));
+        Assert.True(h.PumpUntil(() => h.Said.Contains(started)), SavedStateRig.SaidText(h));
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+        SerializedRuntimeState st = StateManager.Decode(StateManager.CaptureBlob((Interpreter)h.InterpreterFor(item)));
+        if (granter.IsNotZero())
+        {
+            st.PermsGranter = granter.ToString();
+            st.GrantedPermsMask = mask;
+            st.PermsOwner = h.Prim.OwnerID.ToString();
+        }
+        byte[] blob;
+        using (var ms = new MemoryStream()) { Serializer.Serialize(ms, st); blob = ms.ToArray(); }
+        SavedStateRig.PostRemove(h, h.Prim, item);
+        h.Prim.Inventory.RemoveInventoryItem(item);
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+        return (asset, blob);
+    }
+
+    /// <summary>
+    /// A vehicle with two scripts crosses before its rider. Both states came with it; the root script, with a changed
+    /// handler and no grant, loads first, and the script holding the rider's grant loads later. The root's
+    /// changed(CHANGED_REGION) waits for the later script to load and its claim to be decided by the rider's arrival.
+    /// </summary>
+    [Fact]
+    public void TheEventWaitsForAScriptOfTheObjectThatHasNotLoadedYetAndHoldsTheRidersGrant()
+    {
+        using var clock = new FrozenClock();
+        using var h = Harness();
+        UUID rider = UUID.Random();
+        var root = Carried(h, Vehicle, "entry", UUID.Zero, 0);
+        var holder = Carried(h, Holder, "entry2", rider, TakeControls | TriggerAnimation);
+
+        var copy = SceneHelpers.AddSceneObject(h.Scene, "Example Vehicle", h.Prim.OwnerID);
+        copy.AbsolutePosition = h.Prim.AbsolutePosition + new Vector3(4, 0, 0);
+        UUID rootItem = UUID.Random(), holderItem = UUID.Random();
+        TaskInventoryHelpers.AddScript(h.Scene.AssetService, copy.RootPart, rootItem, root.Asset, "vehicle", Vehicle);
+        TaskInventoryHelpers.AddScript(h.Scene.AssetService, copy.RootPart, holderItem, holder.Asset, "holder", Holder);
+        // The crossing hands over every script's state before any starts (SceneObjectGroup.SetState).
+        SavedStateRig.States(h).Carry(rootItem, root.Asset, root.Blob);
+        SavedStateRig.States(h).Carry(holderItem, holder.Asset, holder.Blob);
+        h.ClearSaid(rootItem);
+
+        Assert.True(copy.RootPart.Inventory.CreateScriptInstance(rootItem, 0, false, Phlox, PrimCrossing));
+        Assert.True(h.PumpUntil(() => h.InterpreterFor(rootItem) != null), "the root script did not load");
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+        Assert.Equal(0, ChangedLines(h));   // the other script has not loaded yet
+
+        Assert.True(copy.RootPart.Inventory.CreateScriptInstance(holderItem, 0, false, Phlox, PrimCrossing));
+        Assert.True(h.PumpUntil(() => h.InterpreterFor(holderItem) != null), "the second script did not load");
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+        Assert.True(Api(h, holderItem).HasGrantClaim);
+        Assert.Equal(0, ChangedLines(h));   // its claim waits for the rider
+
+        ArriveSeated(h.Scene, rider, copy);
+        Assert.True(h.PumpUntil(() => ChangedLines(h) > 0), SavedStateRig.SaidText(h));
+        Assert.Equal(TakeControls | TriggerAnimation, copy.RootPart.Inventory.GetInventoryItem(holderItem).PermsMask);
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+        Assert.Equal(new[] { "changed 256 perms=0 key=" + UUID.Zero }, ArrivalLines(h));
+        Assert.DoesNotContain("entry", h.Said);
+        Assert.DoesNotContain("entry2", h.Said);
+    }
+
     // ── no wait ──────────────────────────────────────────────────────────────
 
     /// <summary>
