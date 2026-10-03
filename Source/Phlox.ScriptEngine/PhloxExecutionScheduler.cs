@@ -460,8 +460,9 @@ namespace Phlox.ScriptEngine
 
             // The start-up events, in SL's order: state_entry (a fresh script, posted above) or the restored queue,
             // then on_rez ("on_rez will be triggered prior to attach when attaching from inventory or during
-            // login"), then attach, then changed(CHANGED_REGION_START) for every script started by the region's start,
-            // fresh or restored (YEngine XMRInstCtor posts them in this order; Halcyon posts on_rez, then changed).
+            // login"), then attach, then the changed event the start brings (ArrivalChange), fresh or restored (YEngine
+            // XMRInstCtor posts them in this order; Halcyon posts on_rez, then changed). A script restored in the middle
+            // of an event or asleep gets them on its own queue, after that event.
             // An attachment worn from inventory gets attach from here only: the core starts its scripts with
             // AttachedRez and raises no OnAttach for it (AttachmentsModule.AttachObjectInternal).
             if (req.PostOnRez)
@@ -485,15 +486,15 @@ namespace Phlox.ScriptEngine
                 });
             }
 
-            if (req.StateSource == (int)StateSource.RegionStart &&
+            int arrivalChange = ArrivalChange(req);
+            if (arrivalChange != 0 &&
                 interp.Script.FindEvent(interp.ScriptState.LSLState,
                     (int)SupportedEventList.Events.CHANGED) != null)
             {
-                const int CHANGED_REGION_START = 0x400;
                 PostEvent(req.ItemID, new PostedEvent
                 {
                     EventType = SupportedEventList.Events.CHANGED,
-                    Args = new object[] { CHANGED_REGION_START }
+                    Args = new object[] { arrivalChange }
                 });
             }
 
@@ -509,6 +510,44 @@ namespace Phlox.ScriptEngine
             EvaluateParcelRule(req.ItemID);
 
             m_WorkArrived();
+        }
+
+        /// <summary>
+        /// The changed() bits a script's start brings, from the state source the core starts it with, or 0.
+        /// <list type="bullet">
+        /// <item>RegionStart: CHANGED_REGION_START, to every script ("The region this object is in has just come
+        /// online").</item>
+        /// <item>PrimCrossing (an object crossing, or a worn object crossing with its wearer) and Teleporting (worn objects
+        /// arriving with a wearer who teleported): CHANGED_REGION, and CHANGED_TELEPORT for an attachment, as one event
+        /// (YEngine XMRInstCtor: CHANGED_REGION | CHANGED_TELEPORT). SL wiki CHANGED_REGION: "The object has changed region
+        /// by crossing a region boundary (or by teleporting, if attached). This event only occurs in the root prim of a
+        /// linkset"; CHANGED_TELEPORT: "This event only occurs in the root prim of an attachment". So a script in a child
+        /// prim gets neither. The teleport bit goes to an attachment only: the core also starts an unworn object's
+        /// scripts as Teleporting when the object's owner is in the region and arrived there by teleport
+        /// (EntityTransferModule.GetStateSource asks the owner's presence for any object).</item>
+        /// </list>
+        /// A teleport within a region restores nothing; the core posts its CHANGED_TELEPORT itself
+        /// (EntityTransferModule.TeleportAgentWithinRegion).
+        /// </summary>
+        private static int ArrivalChange(PhloxLoadRequest req)
+        {
+            const int CHANGED_REGION = 0x100, CHANGED_TELEPORT = 0x200, CHANGED_REGION_START = 0x400;
+            switch ((StateSource)req.StateSource)
+            {
+                case StateSource.RegionStart:
+                    return CHANGED_REGION_START;
+
+                case StateSource.PrimCrossing:
+                case StateSource.Teleporting:
+                    if (req.Prim == null || !req.Prim.IsRoot) return 0;
+                    bool worn = req.Prim.ParentGroup?.IsAttachment == true;
+                    return req.StateSource == (int)StateSource.Teleporting && worn
+                        ? CHANGED_REGION | CHANGED_TELEPORT
+                        : CHANGED_REGION;
+
+                default:
+                    return 0;
+            }
         }
 
         // ── Event posting ──────────────────────────────────────────────────────
