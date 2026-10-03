@@ -2677,12 +2677,17 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// The grant changed, perhaps with no event run (a stand-up, Release Keys, an owner change): the script is saved
-        /// again, so its row never keeps a grant the item no longer holds, which a restart would give back whole.
+        /// The grant changed, perhaps with no event run (a stand-up, Release Keys, an owner change): the state notes the
+        /// item's grant now, so a save that can no longer find the item (a region stop, a derez) holds the grant the
+        /// script holds, and the script is saved again, so its row never keeps a grant the item no longer holds, which a
+        /// restart would give back whole.
         /// </summary>
         private void GrantChanged()
         {
-            if (m_thisScript != null) m_ScriptEngine?.StateManager?.ScriptChanged(m_thisScript);
+            if (m_thisScript == null) return;
+            if (m_thisScript.ScriptState is RuntimeState st && GetInventorySelf() is TaskInventoryItem item)
+                NoteItemGrant(st, item, m_host.OwnerID);
+            m_ScriptEngine?.StateManager?.ScriptChanged(m_thisScript);
         }
 
         private int GetImplicitPermissions(TaskInventoryItem item, UUID agentID)

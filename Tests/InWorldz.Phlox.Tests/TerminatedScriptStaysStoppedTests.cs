@@ -134,7 +134,7 @@ public class TerminatedScriptStaysStoppedTests
             h1.PumpUntil(() => h1.RunStateOf(itemId) == "Killed");
             Assert.Equal(1, h1.Said.Count(s => s == "up"));
             Assert.Equal("Killed", h1.RunStateOf(itemId));
-            h1.ShutdownStateManager();   // the only save a region stop makes - no SaveState / ScriptUnloaded
+            h1.StopRegionAsTheSimulatorDoes();   // the only save a region stop makes - no SaveState / ScriptUnloaded
         }
 
         using var h2 = Scene();
