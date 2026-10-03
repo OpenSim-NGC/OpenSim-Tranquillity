@@ -12,6 +12,7 @@ using System.Linq;
 using InWorldz.Phlox.Serialization;
 using InWorldz.Phlox.Util;
 using InWorldz.Phlox.VM;
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -29,9 +30,10 @@ namespace InWorldz.Phlox.Tests;
 /// posts it only once the last rider is seated (ScenePresence.ContinueSitAsRootAgent). Halcyon waits with no limit; here
 /// the wait ends after PhloxExecutionScheduler.ArrivalRiderWaitMs, and the event is posted once. An object with no
 /// waiting grant, a worn object and a teleport get the event at once, as before.
+/// Also here: the line the region's start writes once its scripts have loaded.
 /// </summary>
-// In the "phlox-state" collection: the timed tests set the engine clock (Clock.SetSourceForTesting), which is
-// process-wide.
+// In the "phlox-state" collection: the timed tests set the engine clock (Clock.SetSourceForTesting) and the log test
+// swaps the process's logger factory (LoggerProvider.LoggerFactory); both are process-wide.
 [Collection("phlox-state")]
 public class ArrivalWaitsForRidersTests
 {
@@ -223,5 +225,75 @@ public class ArrivalWaitsForRidersTests
         Touch(h, item);
         Assert.Equal(new[] { "changed " + change + " perms=0 key=" + UUID.Zero },
             ArrivalLines(h));
+    }
+
+    // ── the region start's line ──────────────────────────────────────────────
+
+    private sealed class Capture : ILoggerFactory, ILoggerProvider
+    {
+        public readonly List<string> Lines = new();
+        public ILogger CreateLogger(string category) => new L(this);
+        public void AddProvider(ILoggerProvider provider) { }
+        public void Dispose() { }
+        private sealed class L : ILogger
+        {
+            private readonly Capture m_c;
+            public L(Capture c) => m_c = c;
+            public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(LogLevel level) => true;
+            public void Log<TState>(LogLevel level, EventId id, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            { if (level == LogLevel.Information) lock (m_c.Lines) m_c.Lines.Add(formatter(state, exception)); }
+        }
+    }
+
+    /// <summary>
+    /// A region starts with three scripts: two restored from their rows, one of them with its owner's grant, and one
+    /// new. Once they have loaded, one line counts them, with no ids and no names.
+    /// </summary>
+    [Fact]
+    public void TheRegionStartSaysHowManyScriptsAndGrantsWereRestored()
+    {
+        const string Src = "default { state_entry() { llSay(0, \"entry\"); } }";
+        UUID owner = UUID.Random();
+        UUID assetA = UUID.Random(), assetB = UUID.Random(), assetC = UUID.Random();
+        UUID itemA = UUID.Random(), itemB = UUID.Random(), itemC = UUID.Random();
+
+        using (var h1 = new SchedulerHarness())
+        {
+            foreach (SceneObjectPart p in h1.Prim.ParentGroup.Parts) p.OwnerID = owner;
+            var invA = TaskInventoryHelpers.AddScript(h1.Scene.AssetService, h1.Prim, itemA, assetA, "a", Src);
+            TaskInventoryHelpers.AddScript(h1.Scene.AssetService, h1.Prim, itemB, assetB, "b", Src);
+            Assert.Equal(2, h1.Prim.ParentGroup.CreateScriptInstances(0, false, Phlox, RegionStart));
+            h1.Prim.ParentGroup.ResumeScripts();
+            Assert.True(h1.PumpUntil(() => h1.Said.Count(s => s == "entry") == 2), SavedStateRig.SaidText(h1));
+            invA.PermsGranter = owner;
+            invA.PermsMask = Debit;
+            h1.PumpUntilIdle(TimeSpan.FromSeconds(2));
+            h1.SaveState(itemA);
+            h1.SaveState(itemB);
+            SavedStateRig.WaitForWrites(h1);
+        }
+
+        var capture = new Capture();
+        ILoggerFactory previous = LoggerProvider.LoggerFactory;
+        LoggerProvider.LoggerFactory = capture;
+        try
+        {
+            using var h2 = new SchedulerHarness();
+            foreach (SceneObjectPart p in h2.Prim.ParentGroup.Parts) p.OwnerID = owner;
+            TaskInventoryHelpers.AddScript(h2.Scene.AssetService, h2.Prim, itemA, assetA, "a", Src);
+            TaskInventoryHelpers.AddScript(h2.Scene.AssetService, h2.Prim, itemB, assetB, "b", Src);
+            TaskInventoryHelpers.AddScript(h2.Scene.AssetService, h2.Prim, itemC, assetC, "c", Src);
+            Assert.Equal(3, h2.Prim.ParentGroup.CreateScriptInstances(0, false, Phlox, RegionStart));
+            h2.Prim.ParentGroup.ResumeScripts();
+            h2.Engine.StartProcessing();
+            const string expected = "[PhloxExe]: Region start: 2 scripts restored, 1 with a permission grant put back";
+            Assert.True(h2.PumpUntil(() => { lock (capture.Lines) return capture.Lines.Contains(expected); }),
+                "no start line: " + string.Join(" | ", capture.Lines.Where(l => l.Contains("Region start"))));
+            Assert.Equal(1, h2.Said.Count(s => s == "entry"));   // only the new script started fresh
+            h2.PumpUntilIdle(TimeSpan.FromSeconds(2));
+            lock (capture.Lines) Assert.Single(capture.Lines, l => l == expected);
+        }
+        finally { LoggerProvider.LoggerFactory = previous; }
     }
 }

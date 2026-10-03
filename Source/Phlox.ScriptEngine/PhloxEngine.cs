@@ -1825,6 +1825,7 @@ namespace Phlox.ScriptEngine
 
             m_Scene.EventManager.TriggerEmptyScriptCompileQueue(0, string.Empty);
             m_log.LogInformation("[PhloxEngine]: StartProcessing fired TriggerEmptyScriptCompileQueue(0) — RegionReady LoginLock release signal");
+            m_ScriptLoader?.NoteStartPosted();   // the restore summary, once the start's loads have settled
         }
         public float GetScriptExecutionTime(List<UUID> itemIDs)
         {

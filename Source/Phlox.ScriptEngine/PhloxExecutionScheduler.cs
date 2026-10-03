@@ -351,6 +351,12 @@ namespace Phlox.ScriptEngine
                 {
                     sysApi.RestoreSavedGrant(restoredFromCarried);
                     sysApi.DropGrantRecordsWithoutGrant();
+                    if (req.StateSource == (int)StateSource.RegionStart)
+                    {
+                        m_StartRestored++;
+                        if (req.Prim.Inventory?.GetInventoryItem(req.ItemID)?.PermsMask is int mask && mask != 0)
+                            m_StartRestoredGrants++;
+                    }
                     // Resume where the script stopped, instead of forcing Waiting.
                     //
                     // The saved state carries RunState, Calls, TopFrame, RunningEvent, EventQueue and a
@@ -558,6 +564,23 @@ namespace Phlox.ScriptEngine
                 default:
                     return 0;
             }
+        }
+
+        // ── The region start's restore summary ─────────────────────────────────
+
+        // Scripts the region's start restored from their saved state, and those of them given a permission grant back.
+        // Scheduler thread only.
+        private int m_StartRestored, m_StartRestoredGrants;
+
+        /// <summary>
+        /// One line once the region's start has loaded its scripts: how many came back with their saved state, and how
+        /// many of those got a permission grant back (<see cref="LSLSystemAPI.RestoreSavedGrant"/>). Master scheduler
+        /// thread, from the loader.
+        /// </summary>
+        internal void WriteStartSummary()
+        {
+            m_log.LogInformation("[PhloxExe]: Region start: {0} scripts restored, {1} with a permission grant put back",
+                m_StartRestored, m_StartRestoredGrants);
         }
 
         // ── An arrival event that waits for riders ─────────────────────────────

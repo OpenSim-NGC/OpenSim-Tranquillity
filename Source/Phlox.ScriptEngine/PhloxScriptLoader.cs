@@ -98,6 +98,11 @@ namespace Phlox.ScriptEngine
         // queues is touched only on the master scheduler thread (DoWork), as the rest of the loader always was.
         private readonly System.Collections.Concurrent.BlockingCollection<CompileJob> m_CompileQueue = new();
         private readonly System.Collections.Concurrent.ConcurrentQueue<CompileJob> m_FinishedCompiles = new();
+        private int m_CompilesOutstanding;   // handed to the compile thread and not yet taken back by DoWork
+
+        // Set when the region's start has posted every script it starts (StartProcessing); DoWork then writes the
+        // start's restore summary once the loads have settled.
+        private volatile bool m_StartSummaryDue;
         private readonly System.Threading.Thread m_CompileThread;
         private volatile bool m_Stopped;
         // The text-compile job in flight per asset: a second load of the same asset joins it instead of compiling again.
@@ -305,6 +310,11 @@ namespace Phlox.ScriptEngine
                 didWork |= ProcessNextLoadOrUnload();
                 didWork |= ProcessNextCompile();
                 didWork |= ProcessFinishedCompiles();
+                if (m_StartSummaryDue && LoadsSettled())
+                {
+                    m_StartSummaryDue = false;
+                    m_ExeScheduler.WriteStartSummary();
+                }
             }
             catch (Exception ex)
             {
@@ -317,6 +327,30 @@ namespace Phlox.ScriptEngine
                 WorkIsPending = HasPendingWork(),
                 NextWakeUpTime = ulong.MaxValue
             };
+        }
+
+        private void AddCompile(CompileJob job)
+        {
+            System.Threading.Interlocked.Increment(ref m_CompilesOutstanding);
+            m_CompileQueue.Add(job);
+        }
+
+        /// <summary>
+        /// The region's start has posted all its scripts (the core calls StartProcessing after CreateScriptInstances).
+        /// Once every load posted so far has settled, one line says how many were restored (<see
+        /// cref="PhloxExecutionScheduler.WriteStartSummary"/>).
+        /// </summary>
+        internal void NoteStartPosted()
+        {
+            m_StartSummaryDue = true;
+            m_WorkArrived();
+        }
+
+        /// <summary>No load waits to be read, fetched, compiled or started.</summary>
+        private bool LoadsSettled()
+        {
+            if (HasPendingWork() || System.Threading.Volatile.Read(ref m_CompilesOutstanding) > 0) return false;
+            lock (m_AssetLock) return m_WaitingForAsset.Count == 0;
         }
 
         private bool HasPendingWork()
@@ -735,7 +769,7 @@ namespace Phlox.ScriptEngine
             job = new CompileJob { AssetId = assetId, ScriptText = req.ScriptText };
             job.Requests.Add(req);
             m_InFlight[assetId] = job;
-            if (!m_Stopped) m_CompileQueue.Add(job);
+            if (!m_Stopped) AddCompile(job);
         }
 
         private void BlockPrim(PhloxLoadRequest req)
@@ -793,6 +827,7 @@ namespace Phlox.ScriptEngine
             while (m_FinishedCompiles.TryDequeue(out CompileJob job))
             {
                 any = true;
+                System.Threading.Interlocked.Decrement(ref m_CompilesOutstanding);
                 if (m_InFlight.TryGetValue(job.AssetId, out var current) && current == job) m_InFlight.Remove(job.AssetId);
                 try { FinishJob(job); }
                 catch (Exception e) { m_log.LogError(e, "[PhloxLoader]: starting compiled {0} failed", job.AssetId); }
@@ -1047,7 +1082,7 @@ namespace Phlox.ScriptEngine
             // (the fetch is asynchronous), so they block no prim.
             var job = new CompileJob { AssetId = pending.AssetId, ScriptText = pending.ScriptText, FromAssetServer = true };
             job.Requests.AddRange(pending.Requests);
-            if (!m_Stopped) m_CompileQueue.Add(job);
+            if (!m_Stopped) AddCompile(job);
             return true;
         }
 
