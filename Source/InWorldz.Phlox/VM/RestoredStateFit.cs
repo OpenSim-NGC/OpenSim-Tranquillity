@@ -55,8 +55,9 @@ namespace InWorldz.Phlox.VM
         /// <summary>
         /// After the state is built for <paramref name="script"/>: the state index, the globals, the execution position,
         /// the queued events and the memory in use must fit the script. Memory in use is recomputed from the values the
-        /// state holds (never taken from it) and must be within <see cref="MemoryInfo.MAX_MEMORY"/>; the event queue is held
-        /// to what <see cref="RuntimeState.QueueEvent"/> accepts. Null when it fits, otherwise why not.
+        /// state holds (never taken from it) and must be within <see cref="MemoryInfo.MAX_MEMORY"/>, as must the values on
+        /// the operand stack and each event's arguments, on their own; the event queue is held to what
+        /// <see cref="RuntimeState.QueueEvent"/> accepts. Null when it fits, otherwise why not.
         /// </summary>
         public static string Check(RuntimeState st, CompiledScript script)
         {
@@ -105,6 +106,15 @@ namespace InWorldz.Phlox.VM
             if (st.RunningEvent?.Args != null) walk.All(st.RunningEvent.Args);
             if (st.EventQueue != null) foreach (PostedEvent e in st.EventQueue) walk.All(e.Args);
             if (walk.Problem != null) return walk.Problem;
+
+            // Memory in use counts what a running script's does: its base memory, its globals and its frames' locals
+            // (Interpreter's constructor, MemoryInfo.AddCall and ReplaceStored). The operand stack and event arguments
+            // are not counted there, and nothing would take them off again, so they stay out of this figure and are
+            // each held to the script's memory limit on their own. A state captured while a larger passing value stood
+            // on the stack is refused like any other misfit, and the script starts fresh.
+            string tooBig = Within(st.Operands?.ToArray(), "the values on its stack")
+                ?? Within(st.RunningEvent?.Args, "the running event's arguments");
+            if (tooBig != null) return tooBig;
 
             int used = script.CalcBaseMemorySize() + SizeOf(st.Globals);
             if (st.Calls != null)
@@ -178,10 +188,18 @@ namespace InWorldz.Phlox.VM
                         return $"a queued {e.EventType} carries {args} arguments where its handler takes {handler.NumberOfArguments}";
                 }
                 e.Args ??= Array.Empty<object>();
+                string tooBig = Within(e.Args, $"a queued {e.EventType}'s arguments");
+                if (tooBig != null) return tooBig;
                 limit.QueueEvent(e);
             }
             st.EventQueue = kept;
             return null;
+        }
+
+        private static string Within(object[] values, string what)
+        {
+            int size = SizeOf(values);
+            return size > MemoryInfo.MAX_MEMORY ? $"{what} take {size} bytes, above the limit of {MemoryInfo.MAX_MEMORY}" : null;
         }
 
         private static int SizeOf(object[] values)
