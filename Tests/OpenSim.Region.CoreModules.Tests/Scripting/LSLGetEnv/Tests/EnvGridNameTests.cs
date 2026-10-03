@@ -25,22 +25,55 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using OpenMetaverse;
+using Nini.Config;
+using OpenSim.Framework;
+using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.ScriptEngine.Shared.Api;
+using OpenSim.Tests.Common;
+using Xunit;
 
-namespace OpenSim.Framework;
+namespace OpenSim.Region.CoreModules.Scripting.LSLGetEnv.Tests;
 
-public interface IProfileModule
+/// <summary>
+/// LSL_Api.EnvGridName, the answer to llGetEnv("grid") in both script engines: the configured grid name, or ""
+/// when none is configured.
+/// </summary>
+public class EnvGridNameTests : OpenSimTestCase
 {
-    void RequestAvatarProperties(IClientAPI remoteClient, UUID avatarID);
+    private static GridInfo Info(string gridName)
+    {
+        IniConfigSource config = new IniConfigSource();
+        if (gridName is not null)
+            config.AddConfig("GridInfo").Set("gridname", gridName);
+        // An IP literal as the default gatekeeper, so the constructor needs no DNS lookup.
+        return new GridInfo(config, "http://127.0.0.1:9000/");
+    }
 
-    /// <summary>
-    /// A user's preferences as the profiles service holds them. Visible is false when the user has
-    /// ticked "Only friends and groups know I'm online".
-    /// </summary>
-    /// <remarks>
-    /// This is a service call: do not make it on a thread the region cannot afford to block.
-    /// </remarks>
-    /// <returns>null if they cannot be read.</returns>
-    UserPreferences GetUserPreferences(UUID userID) => null;
+    [Fact]
+    public void AConfiguredNameIsReturned()
+    {
+        Scene scene = new SceneHelpers().SetupScene();
+        scene.SceneGridInfo = Info("Example Grid");
 
+        Assert.Equal("Example Grid", LSL_Api.EnvGridName(scene));
+    }
+
+    [Fact]
+    public void NoConfiguredNameAnswersEmpty()
+    {
+        Scene scene = new SceneHelpers().SetupScene();
+        scene.SceneGridInfo = Info(null);
+
+        Assert.Equal(string.Empty, LSL_Api.EnvGridName(scene));
+    }
+
+    [Fact]
+    public void NoGridInfoOrNoSceneAnswersEmpty()
+    {
+        Scene scene = new SceneHelpers().SetupScene();
+        scene.SceneGridInfo = null;
+
+        Assert.Equal(string.Empty, LSL_Api.EnvGridName(scene));
+        Assert.Equal(string.Empty, LSL_Api.EnvGridName(null));
+    }
 }

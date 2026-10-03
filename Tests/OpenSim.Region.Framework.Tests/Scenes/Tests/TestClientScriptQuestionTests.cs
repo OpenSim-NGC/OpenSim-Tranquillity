@@ -26,21 +26,40 @@
  */
 
 using OpenMetaverse;
+using OpenSim.Framework;
+using OpenSim.Region.Framework.Scenes;
+using OpenSim.Tests.Common;
+using Xunit;
 
-namespace OpenSim.Framework;
+namespace OpenSim.Region.Framework.Scenes.Tests;
 
-public interface IProfileModule
+/// <summary>
+/// The TestClient helpers for script permission questions: SendScriptQuestion is recorded, and FireScriptAnswer
+/// answers through OnScriptAnswer the way the viewer's ScriptAnswerYes packet does.
+/// </summary>
+public class TestClientScriptQuestionTests : OpenSimTestCase
 {
-    void RequestAvatarProperties(IClientAPI remoteClient, UUID avatarID);
+    [Fact]
+    public void AQuestionIsRecordedAndAnAnswerIsRaised()
+    {
+        Scene scene = new SceneHelpers().SetupScene();
+        ScenePresence sp = SceneHelpers.AddScenePresence(scene, TestHelpers.ParseTail(0x1));
+        TestClient client = (TestClient)sp.ControllingClient;
 
-    /// <summary>
-    /// A user's preferences as the profiles service holds them. Visible is false when the user has
-    /// ticked "Only friends and groups know I'm online".
-    /// </summary>
-    /// <remarks>
-    /// This is a service call: do not make it on a thread the region cannot afford to block.
-    /// </remarks>
-    /// <returns>null if they cannot be read.</returns>
-    UserPreferences GetUserPreferences(UUID userID) => null;
+        UUID task = UUID.Random();
+        UUID item = UUID.Random();
+        client.SendScriptQuestion(task, "Object", "Owner", item, 0x10, UUID.Zero);
 
+        Assert.Equal((task, item, 0x10), Assert.Single(client.ScriptQuestions));
+
+        (IClientAPI who, UUID task, UUID item, int answer)? got = null;
+        client.OnScriptAnswer += (c, t, i, a) => got = (c, t, i, a);
+        client.FireScriptAnswer(task, item, 0x10);
+
+        Assert.NotNull(got);
+        Assert.Same(client, got.Value.who);
+        Assert.Equal(task, got.Value.task);
+        Assert.Equal(item, got.Value.item);
+        Assert.Equal(0x10, got.Value.answer);
+    }
 }

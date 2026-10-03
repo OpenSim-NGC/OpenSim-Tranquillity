@@ -6609,9 +6609,24 @@ public void llDetachFromAvatar()
             case "shout_range":
                 return m_shoutdistance.ToString();
 
+            case "grid":
+                return EnvGridName(World);
+
             default:
                 return "";
         }
+    }
+
+    /// <summary>
+    /// llGetEnv("grid") in both script engines: the grid name osGetGridName reads (Scene.SceneGridInfo.GridName,
+    /// from GridName or gridname in [Const], [GridInfo] or [SimulatorFeatures]). A grid with no name configured
+    /// returns "", as an unknown key does, not GridInfo's stand-in name for one.
+    /// </summary>
+    public static string EnvGridName(Scene scene)
+    {
+        const string unconfigured = "Another bad configured grid"; // GridInfo's stand-in when no name is configured
+        string name = scene?.SceneGridInfo?.GridName;
+        return string.IsNullOrEmpty(name) || name == unconfigured ? string.Empty : name;
     }
 
     /// <summary>
