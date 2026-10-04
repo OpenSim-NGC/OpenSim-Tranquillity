@@ -330,6 +330,12 @@ public class XferModule : INonSharedRegionModule, IXfer
         private int burstSize; // additional packets, so can be zero
         private int retries;
 
+        /// <summary>
+        /// Data bytes in each SendXferPacket, as LL's sender uses (llxfer.cpp, LL_XFER_CHUNK_SIZE = 1000).
+        /// Packet N carries the data from N * PacketPayload; packet 0 also starts with the 4-byte total length.
+        /// </summary>
+        public const int PacketPayload = 1000;
+
         public XferDownLoad(string fileName, byte[] data, ulong xferID, IClientAPI client, int burstsz)
         {
             FileName = fileName;
@@ -368,12 +374,11 @@ public class XferModule : INonSharedRegionModule, IXfer
                 }
                 else
                 {
-                    // payload of 1024bytes
-                    LastPacket = Data.Length >> 10;
-                    lastBytes = Data.Length & 0x3ff;
+                    LastPacket = Data.Length / PacketPayload;
+                    lastBytes = Data.Length % PacketPayload;
                     if(lastBytes == 0)
                     {
-                        lastBytes = 1024;
+                        lastBytes = PacketPayload;
                         LastPacket--;
                     }
                 }
@@ -412,11 +417,11 @@ public class XferModule : INonSharedRegionModule, IXfer
             }
             else
             {
-                pktsize = 1024;
+                pktsize = PacketPayload;
                 pktid = (uint)pkt;
             }
 
-            remoteClient.SendXferPacket(XferID, pktid, Data, pkt << 10, pktsize, true);
+            remoteClient.SendXferPacket(XferID, pktid, Data, pkt * PacketPayload, pktsize, true);
 
             lastSentPacket = pkt;
         }
