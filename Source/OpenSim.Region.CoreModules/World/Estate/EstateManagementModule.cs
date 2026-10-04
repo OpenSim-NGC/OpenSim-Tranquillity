@@ -1281,6 +1281,17 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         }
     }
 
+    /// <summary>
+    /// Send the estate's allowed, trusted (key) and blocked Experience lists to a client,
+    /// as the reply to its estateexperiencedelta request.
+    /// </summary>
+    public void SendEstateExperienceLists(IClientAPI remoteClient, UUID invoice)
+    {
+        EstateSettings es = Scene.RegionInfo.EstateSettings;
+        remoteClient.SendEstateExperiences(invoice, es.AllowedExperiences, es.KeyExperiences,
+            es.BlockedExperiences, es.EstateID);
+    }
+
     private void execExpDeltaRequests(object o)
     {
         IClientAPI remote_client;
@@ -1313,13 +1324,8 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                     TriggerEstateInfoChange();
                 }
 
-                EstateSettings es = Scene.RegionInfo.EstateSettings;
                 foreach (KeyValuePair<IClientAPI, UUID> kvp in sendExperienceLists)
-                {
-                    IClientAPI cli = kvp.Key;
-                    UUID invoive = kvp.Value;
-                    cli.SendEstateExperiences(invoive, es.AllowedExperiences, es.KeyExperiences, es.EstateID);
-                }
+                    SendEstateExperienceLists(kvp.Key, kvp.Value);
 
                 sendExperienceLists.Clear();
                 otherEstates.Clear();

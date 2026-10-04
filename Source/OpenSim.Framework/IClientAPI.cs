@@ -1279,7 +1279,7 @@ public interface IClientAPI
     void SendDetailedEstateData(UUID invoice, string estateName, uint estateID, uint parentEstate, uint estateFlags,
                                 uint sunPosition, UUID covenant, uint covenantChanged, string abuseEmail, UUID estateOwner);
 
-    void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, uint estateID);
+    void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, UUID[] blocked, uint estateID);
 
     /// <summary>
     /// Send land properties to the client.
