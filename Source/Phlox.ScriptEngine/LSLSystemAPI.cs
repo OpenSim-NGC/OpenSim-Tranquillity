@@ -864,9 +864,20 @@ namespace Phlox.ScriptEngine
             if (GetExperienceAdapter() is not PhloxExperienceAdapter expService) return;
             if (DecideExperienceRequest(expService, experience, agentId, out int denial) != ExperienceAnswer.Denied
                 || denial != XP_ERROR_NOT_PERMITTED_LAND) return;
-            EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
+            EndExperienceGrant();
             m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                 "experience_permissions_denied", new object[] { agentId.ToString(), XP_ERROR_NOT_PERMITTED_LAND }, new DetectParams[0]));
+        }
+
+        /// <summary>
+        /// A grant that may no longer stand ends with the controls it took, and the state forgets it, so a save (a region
+        /// stop's included, which cannot read the item) holds no grant a restart would give back.
+        /// </summary>
+        private void EndExperienceGrant()
+        {
+            EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
+            ForgetExperienceGrant();
+            GrantChanged();
         }
 
         private void ForgetExperienceGrant()
