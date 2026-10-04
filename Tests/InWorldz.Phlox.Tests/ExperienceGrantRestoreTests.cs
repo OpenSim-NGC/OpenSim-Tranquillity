@@ -9,6 +9,7 @@ using System;
 using System.IO;
 using System.Linq;
 using InWorldz.Phlox.Serialization;
+using InWorldz.Phlox.Types;
 using InWorldz.Phlox.VM;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -364,6 +365,96 @@ public class ExperienceGrantRestoreTests
         SceneHelpers.AddScenePresence(h.Scene, visitor);
         var item = RezWithCarried(h, owner, experience, st => Forge(st, visitor, ExperiencePerms | Debit, owner, experience), out var copy);
         Assert.Equal(ExperiencePerms, MaskOf(copy, item));
+    }
+
+    // ── the script's Experience is its item's, never the state's ─────────────
+
+    private static SerializedPostedEvent QueuedExperienceGrant(UUID agent)
+        => SerializedPostedEvent.FromPostedEvent(new PostedEvent
+        {
+            EventType = SupportedEventList.Events.EXPERIENCE_PERMISSIONS,
+            Args = new object[] { agent.ToString() }
+        });
+
+    /// <summary>
+    /// Carried state names an Experience and a grant from it while the script item names none (an object whose item lost
+    /// its Experience on the way here, or forged state): the granter is not here yet, and no claim is left waiting for them.
+    /// </summary>
+    [Fact]
+    public void CarriedExperienceGrantForAnItemInNoExperienceLeavesNoClaim()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID, visitor = UUID.Random(), experience = UUID.Random();
+        Region(h, experience, visitor);
+        var item = RezWithCarried(h, owner, UUID.Zero, st => Forge(st, visitor, ExperiencePerms, owner, experience), out var copy);
+        Assert.Equal(0, MaskOf(copy, item));
+        Assert.False(Api(h, item).HasGrantClaim);
+        Assert.False(Api(h, item).HasExperienceClaimFor(visitor));
+
+        var sp = SceneHelpers.AddScenePresence(h.Scene, visitor);   // arrives: nothing was waiting for them
+        h.Scene.EventManager.TriggerOnMakeRootAgent(sp);
+        h.PumpUntilIdle(TimeSpan.FromSeconds(3));
+        Assert.Equal(0, MaskOf(copy, item));
+        Assert.Equal(Perms(0, UUID.Zero), Report(h, item));
+        NoPermissionEvents(h);
+    }
+
+    /// <summary>
+    /// Carried state for an item in no Experience, its granter here, with an experience_permissions event still on its
+    /// queue: no grant, and the event is not delivered.
+    /// </summary>
+    [Fact]
+    public void CarriedExperienceGrantAndQueuedGrantEventForAnItemInNoExperienceGiveNothing()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID, visitor = UUID.Random(), experience = UUID.Random();
+        Region(h, experience, visitor);
+        SceneHelpers.AddScenePresence(h.Scene, visitor);
+        var item = RezWithCarried(h, owner, UUID.Zero, st =>
+        {
+            Forge(st, visitor, ExperiencePerms, owner, experience);
+            st.EventQueue = new[] { QueuedExperienceGrant(visitor) };
+        }, out var copy);
+        Assert.Equal(0, MaskOf(copy, item));
+        Assert.False(Api(h, item).HasGrantClaim);
+        Assert.Equal(Perms(0, UUID.Zero), Report(h, item));
+        NoPermissionEvents(h);
+    }
+
+    /// <summary>The same carried state for an item that names that Experience keeps both the grant and the queued event.</summary>
+    [Fact]
+    public void CarriedExperienceGrantAndQueuedGrantEventForAnItemInThatExperienceAreKept()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID, visitor = UUID.Random(), experience = UUID.Random();
+        Region(h, experience, visitor);
+        SceneHelpers.AddScenePresence(h.Scene, visitor);
+        var item = RezWithCarried(h, owner, experience, st =>
+        {
+            Forge(st, visitor, ExperiencePerms, owner, experience);
+            st.EventQueue = new[] { QueuedExperienceGrant(visitor) };
+        }, out var copy);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("xp=" + visitor)), "the queued event was not delivered: " + SavedStateRig.SaidText(h));
+        Assert.Equal(ExperiencePerms, MaskOf(copy, item));
+        Assert.Equal(Perms(ExperiencePerms, visitor), Report(h, item));
+        Assert.Equal(1, h.Said.Count(s => s == "xp=" + visitor));
+    }
+
+    /// <summary>A row noting an Experience the item no longer names gives nothing back and says nothing.</summary>
+    [Fact]
+    public void ARowForAnItemThatNoLongerNamesTheExperienceGivesNoGrantBack()
+    {
+        UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        GrantAndSave(owner, visitor, experience, asset, item);
+
+        using var h2 = Restart(owner, asset, item, UUID.Zero);
+        Assert.Equal(Perms(0, UUID.Zero), Report(h2, item));
+        Assert.False(Api(h2, item).HasGrantClaim);
+        NoPermissionEvents(h2);
+        h2.SaveState(item);
+        SavedStateRig.WaitForWrites(h2);
+        Assert.Null(RowState(item).PermsGranter);
+        Assert.Null(RowState(item).PermsExperience);
     }
 
     // ── what ends the note ───────────────────────────────────────────────────

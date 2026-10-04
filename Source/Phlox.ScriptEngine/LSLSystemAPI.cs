@@ -773,6 +773,9 @@ namespace Phlox.ScriptEngine
         /// it now with no dialog, by the same decision (<see cref="DecideExperienceRequest"/>): the script is still in
         /// that Experience, the Experience is allowed here, and the granter, here, still allows it. Its granter need not
         /// wear or sit on the object, so a claim for it is decided when that avatar arrives anywhere in the region.
+        /// Wherever it is restored from, it is honoured only while the script item names that same Experience; otherwise
+        /// it ends before the script runs. Carried state for an item in no Experience also loses any experience_permissions
+        /// event waiting on its queue: no Experience gave this script a grant.
         /// </para>
         /// </summary>
         internal void RestoreSavedGrant(bool carried)
@@ -788,6 +791,15 @@ namespace Phlox.ScriptEngine
             bool unverified = st.PermsUnverified;
             ClearSavedGrant(st);
             TaskInventoryItem item = GetInventorySelf();
+            if (carried && item != null && item.ExperienceID.IsZero()) DropQueuedExperienceGrants(st);
+            if (item != null && noted && !experience.IsZero() && experience != item.ExperienceID)
+            {
+                // The script's Experience is its task item's (TaskInventoryItem.ExperienceID), never the state's: a grant
+                // noted with an Experience the item does not name ends here, before the script runs, as a grant the land
+                // ends, and leaves no claim. Nothing is posted: the script was never told of this grant here.
+                EndExperienceGrant();
+                return;
+            }
             if (item == null || !noted || granter.IsZero() || mask == 0 || owner.IsZero() || owner != m_host.OwnerID) return;
             if (!carried && !unverified)
             {
@@ -801,6 +813,28 @@ namespace Phlox.ScriptEngine
                 return;
             }
             GrantSilently(item, granter, mask, experience);
+        }
+
+        /// <summary>
+        /// Carried state for a script in no Experience: experience_permissions events on its queue go, since the script's
+        /// item names no Experience that could have granted it anything.
+        /// </summary>
+        private void DropQueuedExperienceGrants(RuntimeState st)
+        {
+            bool dropped = false;
+            lock (st.EventQueueLock)
+            {
+                if (st.EventQueue == null || st.EventQueue.Count == 0) return;
+                PostedEvent[] queued = st.EventQueue.ToArray();
+                if (!queued.Any(e => e.EventType == SupportedEventList.Events.EXPERIENCE_PERMISSIONS)) return;
+                st.EventQueue.Clear();
+                foreach (PostedEvent e in queued)
+                {
+                    if (e.EventType == SupportedEventList.Events.EXPERIENCE_PERMISSIONS) dropped = true;
+                    else st.EventQueue.Add(e);
+                }
+            }
+            if (dropped) GrantChanged();
         }
 
         /// <summary>

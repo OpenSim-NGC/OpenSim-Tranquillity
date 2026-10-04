@@ -434,6 +434,12 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     here). A granter who has not arrived yet leaves it waiting; it is decided when that avatar
     arrives anywhere in the region, as such a grant needs no seat or attachment. Neither
     `run_time_permissions` nor `experience_permissions` is posted by a restore.
+  - A script's Experience is the one its script item names, never one named in saved state or
+    in state that came with the object. A saved grant noted with an Experience the item does
+    not name, whether from the region's own state database or carried in the object, ends
+    before the script runs, with no event and nothing left waiting for its granter. State
+    that came with an object whose script is in no Experience also loses any
+    `experience_permissions` event still on its queue.
   - A grant from an Experience ends when its granter enters a parcel where the Experience
     cannot run: the estate blocks it, or neither allows nor trusts it. The script loses the
     grant and the controls it took, and gets `experience_permissions_denied` with
