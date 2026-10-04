@@ -29,7 +29,9 @@ namespace InWorldz.Phlox.Tests;
 /// llRequestExperiencePermissions would grant it now with no dialog (the script is still in that Experience, the
 /// Experience is allowed here, the granter is here and still allows it), and a granter not here yet leaves it waiting as a
 /// claim, decided when that avatar arrives anywhere in the region. No run_time_permissions and no experience_permissions
-/// is posted by a restore.
+/// is posted by a restore. The script's Experience is its item's: a grant noted with an Experience the item does not name
+/// ends at the restore, with no event. A grant from this simulator's state database whose Experience the land no longer
+/// lets run ends at the restore, with one experience_permissions_denied.
 /// </summary>
 // Runs in parallel: each test has its own harnesses, avatars, items, assets and Experience module (registered on its own
 // scene), and rows under random item ids in the state database every harness shares; nothing process-wide is changed.
@@ -487,6 +489,69 @@ public class ExperienceGrantRestoreTests
         SavedStateRig.WaitForWrites(h2);
         Assert.Null(RowState(item).PermsGranter);
         Assert.Null(RowState(item).PermsExperience);
+    }
+
+    // ── a restart onto land where the Experience can no longer run ───────────
+
+    /// <summary>
+    /// A region restart whose region has an Experience module that answers as <paramref name="estate"/> does. The game
+    /// script's grant came from <paramref name="experience"/>; its granter is not in the region.
+    /// </summary>
+    private static SchedulerHarness RestartWithEstate(UUID owner, UUID asset, UUID item, UUID experience, Action<ExperienceWithdrawnTests.ChangingEstate> estate, UUID visitor)
+    {
+        var h2 = new SchedulerHarness();
+        SetOwner(h2.Prim.ParentGroup, owner);
+        var state = ExperienceWithdrawnTests.ChangingEstate.Create(experience, visitor, out IExperienceModule module);
+        estate(state);
+        h2.Scene.RegisterModuleInterface(module);
+        var inv = TaskInventoryHelpers.AddScript(h2.Scene.AssetService, h2.Prim, item, asset, "game", Game);
+        inv.ExperienceID = experience;
+        Assert.Equal(1, h2.Prim.ParentGroup.CreateScriptInstances(0, false, Phlox, RegionStart));
+        h2.Prim.ParentGroup.ResumeScripts();
+        Assert.True(h2.PumpUntil(() => h2.InterpreterFor(item) != null), "the script did not load");
+        h2.PumpUntilIdle(TimeSpan.FromSeconds(5));
+        Assert.DoesNotContain("entry", h2.Said);
+        return h2;
+    }
+
+    [Fact]
+    public void ARestartWhereTheLandStillAllowsTheExperienceKeepsItsGrantSilently()
+    {
+        UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        GrantAndSave(owner, visitor, experience, asset, item);
+
+        using var h2 = RestartWithEstate(owner, asset, item, experience, _ => { }, visitor);
+        Assert.Equal(Perms(ExperiencePerms, visitor), Report(h2, item));
+        NoPermissionEvents(h2);
+    }
+
+    /// <summary>
+    /// SL wiki experience_permissions_denied, "When experience can no longer run": the grant ends, and the script is told
+    /// once with XP_ERROR_NOT_PERMITTED_LAND (17), at the start, not when its granter next moves.
+    /// </summary>
+    [Theory]
+    [InlineData("no longer allowed")]
+    [InlineData("blocked by the estate")]
+    public void ARestartWhereTheLandNoLongerLetsTheExperienceRunEndsItsGrantWithOneDenial(string why)
+    {
+        UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        GrantAndSave(owner, visitor, experience, asset, item);
+
+        using var h2 = RestartWithEstate(owner, asset, item, experience, e =>
+        {
+            if (why == "no longer allowed") e.Allowed.Clear();
+            else e.Blocked.Add(experience);
+        }, visitor);
+        Assert.True(h2.PumpUntil(() => h2.Said.Contains("xpdenied=17")), why + ": " + SavedStateRig.SaidText(h2));
+        Assert.Equal(Perms(0, UUID.Zero), Report(h2, item));
+        Assert.Equal(0, h2.Prim.Inventory.GetInventoryItem(item).PermsMask);
+        Assert.Equal(1, h2.Said.Count(s => s.StartsWith("xpdenied=", StringComparison.Ordinal)));
+        Assert.DoesNotContain(h2.Said, s => s.StartsWith("xp=", StringComparison.Ordinal));
+
+        // The ended grant is not in the next row either.
+        h2.SaveState(item);
+        SavedStateRig.WaitForWrites(h2);
+        Assert.Null(RowState(item).PermsGranter);
     }
 
     // ── what ends the note ───────────────────────────────────────────────────

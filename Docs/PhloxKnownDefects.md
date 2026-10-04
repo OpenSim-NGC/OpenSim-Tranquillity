@@ -427,7 +427,10 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     `llGetPermissions` and `llGetPermissionsKey` answer them as in SL
     ([llRequestExperiencePermissions](https://wiki.secondlife.com/wiki/LlRequestExperiencePermissions)),
     and the grant is saved as that Experience's. From the region's own state database it
-    comes back whole, as any grant. From carried state it comes back only when
+    comes back whole, as any grant, unless the region no longer lets the Experience run (the
+    estate blocks it, or neither allows nor trusts it): then it ends as the script starts, and
+    the script gets `experience_permissions_denied` with `XP_ERROR_NOT_PERMITTED_LAND` (17)
+    once, as below for a parcel. From carried state it comes back only when
     `llRequestExperiencePermissions` would grant it at that moment with no dialog: the script
     is still in that Experience, the Experience is allowed in the region and not blocked, and
     the granter is in the region, has not blocked it, and has allowed it (or it is trusted
