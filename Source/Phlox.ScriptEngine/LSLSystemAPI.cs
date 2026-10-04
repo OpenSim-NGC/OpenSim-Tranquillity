@@ -21147,6 +21147,16 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (!UUID.TryParse(experienceId, out expId))
                 return new LSLList();
 
+            // SL wiki llGetExperienceDetails: "If experience_id is NULL_KEY, then information about the script's
+            // experience is returned. In this situation, if the script isn't associated with an experience, an empty
+            // list is returned."
+            if (expId.IsZero())
+            {
+                expId = GetScriptExperienceId();
+                if (expId.IsZero())
+                    return new LSLList();
+            }
+
             var expService = GetExperienceAdapter();
             if (expService == null)
                 return new LSLList();

@@ -571,6 +571,11 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - `llGetUsername` returns "First Last" where YEngine returns "first.last". Both answer only for
   an avatar the region holds (root or child agent), else `""`; `llRequestUsername` answers for
   anyone.
+- `llGetExperienceDetails(NULL_KEY)` gives the details of the script's own Experience, the one
+  its script item names, and an empty list for a script in no Experience, as SL documents: "If
+  experience_id is NULL_KEY, then information about the script's experience is returned. In
+  this situation, if the script isn't associated with an experience, an empty list is returned"
+  ([LlGetExperienceDetails](https://wiki.secondlife.com/wiki/LlGetExperienceDetails)).
 - Start-up events come in SL's order: `state_entry` (a new script), then `on_rez`, then
   `attach` (an attachment worn from inventory), then `changed(CHANGED_REGION_START)`, which every
   script started by the region's start gets, new or restored. YEngine posts them in the same order.
