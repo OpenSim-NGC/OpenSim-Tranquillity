@@ -20971,6 +20971,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
             PermsChange(item, agentId, EXPERIENCE_PERMISSIONS);
             NoteExperienceGrant(experienceId, agentId);
+            // PermsChange noted the item's grant before it was the Experience's; note it again, so a save that cannot read
+            // the item (a region stop's) keeps the grant as that Experience's.
+            GrantChanged();
         }
 
         // Grant + persist an experience permission and post experience_permissions. Shared by the

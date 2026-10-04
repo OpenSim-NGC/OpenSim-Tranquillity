@@ -440,6 +440,38 @@ public class ExperienceGrantRestoreTests
         Assert.Equal(1, h.Said.Count(s => s == "xp=" + visitor));
     }
 
+    /// <summary>
+    /// The engine's own row for a script whose item still names the Experience, saved by a real region stop (Scene.Close,
+    /// the final save after the scene is emptied), gives the grant back whole on the next start, still that Experience's.
+    /// </summary>
+    [Fact]
+    public void ARowForAnItemThatStillNamesTheExperienceSurvivesARegionStopAndStart()
+    {
+        UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        using (var h1 = new SchedulerHarness())
+        {
+            SetOwner(h1.Prim.ParentGroup, owner);
+            Region(h1, experience, visitor);
+            SceneHelpers.AddScenePresence(h1.Scene, visitor);
+            var inv = TaskInventoryHelpers.AddScript(h1.Scene.AssetService, h1.Prim, item, asset, "game", Game);
+            inv.ExperienceID = experience;
+            Assert.True(h1.Prim.Inventory.CreateScriptInstance(item, 0, false, Phlox, RegionStart));
+            h1.Prim.ParentGroup.ResumeScripts();
+            Assert.True(h1.PumpUntil(() => h1.Said.Contains("entry")), SavedStateRig.SaidText(h1));
+            Command(h1, "xp " + visitor, "xp=" + visitor);
+            h1.PumpUntilIdle(TimeSpan.FromSeconds(2));
+            h1.StopRegionAsTheSimulatorDoes();
+        }
+        Assert.Equal(experience.ToString(), RowState(item).PermsExperience);
+
+        using var h2 = Restart(owner, asset, item, experience);
+        Assert.Equal(Perms(ExperiencePerms, visitor), Report(h2, item));
+        NoPermissionEvents(h2);
+        h2.SaveState(item);
+        SavedStateRig.WaitForWrites(h2);
+        Assert.Equal(experience.ToString(), RowState(item).PermsExperience);
+    }
+
     /// <summary>A row noting an Experience the item no longer names gives nothing back and says nothing.</summary>
     [Fact]
     public void ARowForAnItemThatNoLongerNamesTheExperienceGivesNoGrantBack()
