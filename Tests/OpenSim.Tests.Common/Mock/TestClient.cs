@@ -65,6 +65,10 @@ public class TestClient : IClientAPI, IClientCore
 
     public event Action<UUID> OnReceivedSendRebakeAvatarTextures;
 
+    public event Action<string> OnReceivedAlertMessage;
+    public event Action<UUID, int, UUID[], uint> OnReceivedEstateList;
+    public event Action<UUID, EstateBan[], uint> OnReceivedBannedUserList;
+
     public delegate void TestClientOnSendRegionTeleportDelegate(
         ulong regionHandle, byte simAccess, IPEndPoint regionExternalEndPoint,
         uint locationID, uint flags, string capsURL);
@@ -864,6 +868,15 @@ public class TestClient : IClientAPI, IClientCore
         OnAvatarNowWearing?.Invoke(this, e);
     }
 
+    /// <summary>
+    /// Test seam: raise <see cref="OnUpdateEstateAccessDeltaRequest"/> as if an EstateOwnerMessage
+    /// "estateaccessdelta" had arrived.
+    /// </summary>
+    public void TriggerEstateAccessDelta(UUID invoice, int estateAccessType, UUID user)
+    {
+        OnUpdateEstateAccessDeltaRequest?.Invoke(this, invoice, estateAccessType, user);
+    }
+
     public void SendTriggeredSound(UUID soundID, UUID ownerID, UUID objectID, UUID parentID, ulong handle, Vector3 position, float gain)
     {
     }
@@ -875,6 +888,7 @@ public class TestClient : IClientAPI, IClientCore
 
     public void SendAlertMessage(string message)
     {
+        OnReceivedAlertMessage?.Invoke(message);
     }
 
     public void SendAgentAlertMessage(string message, bool modal)
@@ -1101,10 +1115,12 @@ public class TestClient : IClientAPI, IClientCore
 
     public void SendEstateList(UUID invoice, int code, UUID[] Data, uint estateID)
     {
+        OnReceivedEstateList?.Invoke(invoice, code, Data, estateID);
     }
 
     public void SendBannedUserList(UUID invoice, EstateBan[] banlist, uint estateID)
     {
+        OnReceivedBannedUserList?.Invoke(invoice, banlist, estateID);
     }
 
     public void SendRegionInfoToEstateMenu(RegionInfoForEstateMenuArgs args)

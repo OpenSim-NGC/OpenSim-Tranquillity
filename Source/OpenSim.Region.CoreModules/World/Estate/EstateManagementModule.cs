@@ -1185,8 +1185,11 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                     sendAllowedOrBanList[remote_client] = invoice;
             }
 
-            // last the ones only for owners of this region
-            if (!Scene.Permissions.CanIssueEstateCommand(agentID, true))
+            // last the ones only for owners of this region: manager add and remove (256, 512).
+            // A request without them was handled above and gets no owner-only refusal, so an
+            // estate manager who changes access, groups or bans is not told it failed.
+            // LL's viewer offers the manager list to the owner only (LLPanelEstateAccess::updateControls).
+            if ((estateAccessType & (256 | 512)) != 0 && !Scene.Permissions.CanIssueEstateCommand(agentID, true))
             {
                     remote_client.SendAlertMessage("Method EstateAccess Failed, you don't have permissions");
                     continue;
