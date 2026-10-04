@@ -808,7 +808,7 @@ namespace Phlox.ScriptEngine
                     // The land no longer lets the grant's Experience run (the estate blocks it, or neither allows nor
                     // trusts it now): it ends at the restore as it ends when its avatar enters such a parcel
                     // (ExperienceLandChanged), told once with XP_ERROR_NOT_PERMITTED_LAND. SL wiki
-                    // experience_permissions_denied, "When experience can no longer run".
+                    // experience_permissions_denied, "The experience can no longer run".
                     EndExperienceGrant();
                     m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                         "experience_permissions_denied", new object[] { granter.ToString(), XP_ERROR_NOT_PERMITTED_LAND }, new DetectParams[0]));

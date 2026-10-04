@@ -526,7 +526,7 @@ public class ExperienceGrantRestoreTests
     }
 
     /// <summary>
-    /// SL wiki experience_permissions_denied, "When experience can no longer run": the grant ends, and the script is told
+    /// SL wiki experience_permissions_denied, "The experience can no longer run": the grant ends, and the script is told
     /// once with XP_ERROR_NOT_PERMITTED_LAND (17), at the start, not when its granter next moves.
     /// </summary>
     [Theory]
