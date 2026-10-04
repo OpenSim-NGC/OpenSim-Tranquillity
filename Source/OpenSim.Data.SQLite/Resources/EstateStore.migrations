@@ -80,4 +80,23 @@ ALTER TABLE `estate_settings`
     ADD COLUMN `AllowEnviromentOverride` tinyint not null default 0;
 COMMIT;
 
+:VERSION 13
+BEGIN;
+CREATE TABLE IF NOT EXISTS estate_allowed_experiences (
+  EstateID int(10) NOT NULL,
+  uuid char(36) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS estate_allowed_experiences_estate_id on estate_allowed_experiences(EstateID);
 
+CREATE TABLE IF NOT EXISTS estate_key_experiences (
+  EstateID int(10) NOT NULL,
+  uuid char(36) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS estate_key_experiences_estate_id on estate_key_experiences(EstateID);
+
+CREATE TABLE IF NOT EXISTS estate_blocked_experiences (
+  EstateID int(10) NOT NULL,
+  uuid char(36) NOT NULL
+);
+CREATE INDEX IF NOT EXISTS estate_blocked_experiences_estate_id on estate_blocked_experiences(EstateID);
+COMMIT;
