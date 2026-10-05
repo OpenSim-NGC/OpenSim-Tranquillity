@@ -49,6 +49,11 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
     private readonly ExpiringCache<UUID, J2KLayerInfo[]> m_decodedCache = new ExpiringCache<UUID, J2KLayerInfo[]>();
     /// <summary>List of client methods to notify of results of decode</summary>
     private readonly Dictionary<UUID, List<DecodedCallback>> m_notifyList = new Dictionary<UUID, List<DecodedCallback>>();
+    /// <summary>
+    /// Asset cache name prefix for a texture's layer table. Builds that guessed the table for every
+    /// texture stored it under "j2k"; a new prefix keeps those guessed tables from being read back.
+    /// </summary>
+    private const string LayerCachePrefix = "j2klayers";
     /// <summary>Cache that will store decoded JPEG2000 layer boundary data</summary>
     private IAssetCache m_cache;
     private IAssetCache Cache
@@ -230,8 +235,13 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
                 var j2k = J2kImage.FromBytes(j2kData);
                 if (j2k != null)
                 {
-                    // Extract layer information from CoreJ2K - create default layers for now
-                    layers = CreateDefaultLayers(j2kData.Length);
+                    // Read the layer boundaries from the packet heads
+                    layers = J2KLayerBoundaryReader.Read(j2kData);
+                    if (layers == null)
+                    {
+                        m_log.LogWarning("[J2KDecoderModule]: Failed to decode layer data for texture " + assetID + ", guessing sane defaults");
+                        layers = CreateDefaultLayers(j2kData.Length);
+                    }
                     components = j2k.NumberOfComponents;
                     decodedSuccessfully = true;
                     // Cache decoded layers
@@ -301,7 +311,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
 
         if (Cache != null)
         {
-            string assetID = "j2k" + AssetId.ToString();
+            string assetID = LayerCachePrefix + AssetId.ToString();
 
             AssetBase layerDecodeAsset = new AssetBase(assetID, assetID, (sbyte)AssetType.Notecard, m_CreatorID.ToString());
             layerDecodeAsset.Local = true;
@@ -335,7 +345,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
         }
         else if (Cache != null)
         {
-            string assetName = "j2k" + AssetId.ToString();
+            string assetName = LayerCachePrefix + AssetId.ToString();
             AssetBase layerDecodeAsset;
             Cache.Get(assetName, out layerDecodeAsset);
 

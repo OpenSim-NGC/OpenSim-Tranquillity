@@ -96,6 +96,78 @@ public class J2KLayerBoundaryTests
         AssertSameLayers(expected, cached);
     }
 
+    [Fact]
+    public void ReaderReturnsTheLayerStartsTheSopMarkersShow()
+    {
+        byte[] data = Encode("layer");
+
+        Assert.Equal(OracleLayerStarts(data), J2KLayerBoundaryReader.ReadLayerStarts(data));
+        AssertSameLayers(ToLayers(OracleLayerStarts(data), data.Length), J2KLayerBoundaryReader.Read(data));
+    }
+
+    [Fact]
+    public void ReaderGivesOffsetsInTheFileForAJp2File()
+    {
+        byte[] raw = Encode("layer");
+        byte[] jp2 = Encode("layer", fileFormat: true);
+
+        // The JP2 file wraps the same codestream, which starts at its SOC marker FF 4F FF 51
+        int offset = jp2.AsSpan().IndexOf(new byte[] { 0xFF, 0x4F, 0xFF, 0x51 });
+        Assert.True(offset > 0);
+        Assert.Equal(raw, jp2.AsSpan(offset, raw.Length).ToArray());
+
+        Assert.Equal(OracleLayerStarts(raw).Select(s => s + offset).ToArray(), J2KLayerBoundaryReader.ReadLayerStarts(jp2));
+    }
+
+    [Theory]
+    [InlineData("res")]
+    [InlineData("res-pos")]
+    [InlineData("pos-comp")]
+    [InlineData("comp-pos")]
+    public void ReaderHasNoTableForACodestreamThatIsNotLayerFirst(string progression)
+    {
+        byte[] data = Encode(progression);
+
+        Assert.Null(J2KLayerBoundaryReader.ReadLayerStarts(data));
+        Assert.Null(J2KLayerBoundaryReader.Read(data));
+    }
+
+    [Fact]
+    public void ReaderHasNoTableForMoreThanOneTile()
+    {
+        byte[] data = Encode("layer", tiles: "64 64");
+
+        Assert.Null(J2KLayerBoundaryReader.ReadLayerStarts(data));
+    }
+
+    [Fact]
+    public void ReaderThrowsNothingForTruncatedOrGarbageBytes()
+    {
+        byte[] data = Encode("layer");
+        List<byte[]> inputs = new List<byte[]>();
+        foreach (int length in new[] { 0, 1, 2, 4, 16, 64, 200, data.Length / 4, data.Length / 2, data.Length - 1 })
+            inputs.Add(data.AsSpan(0, length).ToArray());
+
+        Random random = new Random(11);
+        for (int i = 0; i < 20; i++)
+        {
+            byte[] garbage = new byte[random.Next(1, 4000)];
+            random.NextBytes(garbage);
+            inputs.Add(garbage);
+
+            // A valid main header followed by garbage
+            byte[] mixed = (byte[])data.Clone();
+            random.NextBytes(mixed.AsSpan(OracleLayerStarts(data)[0]));
+            inputs.Add(mixed);
+        }
+
+        foreach (byte[] input in inputs)
+        {
+            Assert.Null(Record.Exception(() => J2KLayerBoundaryReader.ReadLayerStarts(input)));
+            Assert.Null(Record.Exception(() => J2KLayerBoundaryReader.Read(input)));
+        }
+    }
+
     /// <summary>The byte offset where each layer's first packet starts, from the SOP markers.</summary>
     internal static int[] OracleLayerStarts(byte[] data)
     {
@@ -142,9 +214,9 @@ public class J2KLayerBoundaryTests
 
     /// <summary>
     /// A 128x128 RGB image with five quality layers in the given progression order, SOP markers on,
-    /// as a raw codestream.
+    /// as a raw codestream or a JP2 file.
     /// </summary>
-    internal static byte[] Encode(string progression, string? tiles = null)
+    internal static byte[] Encode(string progression, string? tiles = null, bool fileFormat = false)
     {
         using SKBitmap bitmap = new SKBitmap(128, 128, SKColorType.Rgb888x, SKAlphaType.Opaque);
         Random random = new Random(7);
@@ -154,7 +226,7 @@ public class J2KLayerBoundaryTests
 
         ParameterList pl = new ParameterList(J2kImage.GetDefaultEncoderParameterList());
         pl["verbose"] = "off";
-        pl["file_format"] = "off";
+        pl["file_format"] = fileFormat ? "on" : "off";
         pl["Alayers"] = "0.05 0.2 0.5 1.0 2.0";
         pl["Aptype"] = progression;
         pl["Psop"] = "on";
