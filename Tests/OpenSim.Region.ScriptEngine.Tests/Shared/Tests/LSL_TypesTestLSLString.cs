@@ -39,7 +39,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Sets up dictionaries and arrays used in the tests.
         /// </summary>
-        [OneTimeSetUp]
+        public LSL_TypesTestLSLString()
+        {
+            // xunit builds a new instance for every test, so the NUnit one-time setup runs here.
+            SetUpDataSets();
+        }
+
         public void SetUpDataSets()
         {
             m_doubleStringSet = new Dictionary<double, string>();
@@ -93,7 +98,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             foreach (KeyValuePair<double, string> number in m_doubleStringSet)
             {
-                testString = (LSL_Types.LSLString) new LSL_Types.LSLFloat(number.Key);
+                testString = new LSL_Types.LSLString(new LSL_Types.LSLFloat(number.Key));
                 Assert.Equal(number.Value, testString.m_string);
             }
         }

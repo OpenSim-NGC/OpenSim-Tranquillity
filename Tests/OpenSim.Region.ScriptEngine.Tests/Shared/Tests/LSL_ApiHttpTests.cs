@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Nini.Config;
 using System.Net;
 
 using OpenMetaverse;
@@ -37,6 +38,11 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
 using OpenSim.Tests.Common;
+
+// These tests exercise scenes that share process-wide static state (MainServer,
+// Util.FireAndForgetMethod, static caps registries), so they cannot run in parallel. The same
+// declaration, for the same reason, is in OpenSim.Region.CoreModules.Tests/AssemblyInfo.cs.
+[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
 
 namespace OpenSim.Region.ScriptEngine.Shared.Tests
 {
@@ -52,14 +58,25 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private TaskInventoryItem m_scriptItem;
         private LSL_Api m_lslApi;
 
-        [OneTimeSetUp]
+        public LSL_ApiHttpTests()
+        {
+            // xunit builds a new instance for every test, so the NUnit one-time setup runs here.
+            TestFixtureSetUp();
+        }
+
         public void TestFixtureSetUp()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
             Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
         }
 
-        [OneTimeTearDown]
+        public override void Dispose()
+        {
+            TearDown();
+            TestFixureTearDown();
+            base.Dispose();
+        }
+
         public void TestFixureTearDown()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
@@ -75,7 +92,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // This is an unfortunate bit of clean up we have to do because MainServer manages things through static
             // variables and the VM is not restarted between tests.
             uint port = 9999;
-            MainServer.RemoveHttpServer(port);
+            MainServer.Instance.RemoveHttpServer(port);
 
             m_engine = new MockScriptEngine();
             m_urlModule = new UrlModule();
@@ -83,11 +100,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             IConfigSource config = new IniConfigSource();
             config.AddConfig("Network");
             config.Configs["Network"].Set("ExternalHostNameForLSL", "127.0.0.1");
+            // The URL module serves from this port; without it the module asks for its default port 9000.
+            config.Configs["Network"].Set("http_listener_port", port);
             m_scene = new SceneHelpers().SetupScene();
 
             BaseHttpServer server = new BaseHttpServer(port);
-            MainServer.AddHttpServer(server);
-            MainServer.Instance = server;
+            MainServer.Instance.AddHttpServer(server);
 
             server.Start();
 
@@ -117,25 +135,25 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             {
                 // Check that the initial number of URLs is correct
-                Assert.True(m_lslApi.llGetFreeURLs().value));
+                Assert.Equal(m_urlModule.TotalUrls - 1, m_lslApi.llGetFreeURLs().value);
             }
 
             {
                 // Check releasing a non-url
                 m_lslApi.llReleaseURL("GARBAGE");
-                Assert.True(m_lslApi.llGetFreeURLs().value));
+                Assert.Equal(m_urlModule.TotalUrls - 1, m_lslApi.llGetFreeURLs().value);
             }
 
             {
                 // Check releasing a non-existing url
                 m_lslApi.llReleaseURL("http://example.com");
-                Assert.True(m_lslApi.llGetFreeURLs().value));
+                Assert.Equal(m_urlModule.TotalUrls - 1, m_lslApi.llGetFreeURLs().value);
             }
 
             {
                 // Check URL release
                 m_lslApi.llReleaseURL(returnedUri);
-                Assert.True(m_lslApi.llGetFreeURLs().value));
+                Assert.Equal(m_urlModule.TotalUrls, m_lslApi.llGetFreeURLs().value);
 
                 HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(returnedUri);
 
@@ -159,7 +177,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             {
                 // Check releasing the same URL again
                 m_lslApi.llReleaseURL(returnedUri);
-                Assert.True(m_lslApi.llGetFreeURLs().value));
+                Assert.Equal(m_urlModule.TotalUrls, m_lslApi.llGetFreeURLs().value);
             }
         }
 
@@ -169,28 +187,28 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             TestHelpers.InMethod();
 
             string requestId = m_lslApi.llRequestURL();
-            Assert.True(requestId)));
+            Assert.NotEqual(UUID.Zero.ToString(), requestId);
             string returnedUri;
 
             {
                 // Check that URL is correctly set up
-                Assert.True(m_lslApi.llGetFreeURLs().value));
+                Assert.Equal(m_urlModule.TotalUrls - 1, m_lslApi.llGetFreeURLs().value);
 
-                Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
+                Assert.True(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 
                 List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-                Assert.Equal(,);
+                Assert.Equal(1, events.Count);
                 EventParams eventParams = events[0];
-                Assert.Equal(,);
+                Assert.Equal("http_request", eventParams.EventName);
 
                 UUID returnKey;
                 string rawReturnKey = eventParams.Params[0].ToString();
                 string method = eventParams.Params[1].ToString();
                 returnedUri = eventParams.Params[2].ToString();
 
-                Assert.That(UUID.TryParse(rawReturnKey, out returnKey));
-                Assert.Equal(,);
-                Assert.That(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute));
+                Assert.True(UUID.TryParse(rawReturnKey, out returnKey));
+                Assert.Equal(ScriptBaseClass.URL_REQUEST_GRANTED, method);
+                Assert.True(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute));
             }
 
             {
@@ -205,21 +223,21 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
                 AssertHttpResponse(returnedUri, testResponse);
 
-                Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
+                Assert.True(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 
                 List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-                Assert.Equal(,);
+                Assert.Equal(1, events.Count);
                 EventParams eventParams = events[0];
-                Assert.Equal(,);
+                Assert.Equal("http_request", eventParams.EventName);
 
                 UUID returnKey;
                 string rawReturnKey = eventParams.Params[0].ToString();
                 string method = eventParams.Params[1].ToString();
                 string body = eventParams.Params[2].ToString();
 
-                Assert.That(UUID.TryParse(rawReturnKey, out returnKey));
-                Assert.Equal(,);
-                Assert.Equal(,);
+                Assert.True(UUID.TryParse(rawReturnKey, out returnKey));
+                Assert.Equal("GET", method);
+                Assert.Equal("", body);
             }
         }
 
@@ -233,7 +251,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 {
                     using (StreamReader reader = new StreamReader(stream))
                     {
-                        Assert.True(reader.ReadToEnd()));
+                        Assert.Equal(expectedResponse, reader.ReadToEnd());
                     }
                 }
             }

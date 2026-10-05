@@ -92,7 +92,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 LSL_List resList
                     = apiGrp1.llGetLinkPrimitiveParams(1, new LSL_List(new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.Equal(,);
+                Assert.Equal(1, resList.Length);
             }
 
             // Check 2 prim case
@@ -106,7 +106,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                             new LSL_Integer(2),
                             new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.Equal(,);
+                Assert.Equal(2, resList.Length);
             }
 
             // Check invalid parameters are ignored
@@ -114,7 +114,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 LSL_List resList
                     = apiGrp1.llGetLinkPrimitiveParams(3, new LSL_List(new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.Equal(,);
+                Assert.Equal(0, resList.Length);
             }
 
             // Check all parameters are ignored if an initial bad link is given
@@ -128,7 +128,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                             new LSL_Integer(1),
                             new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.Equal(,);
+                Assert.Equal(0, resList.Length);
             }
 
             // Check only subsequent parameters are ignored when we hit the first bad link number
@@ -142,7 +142,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                             new LSL_Integer(3),
                             new LSL_Integer(ScriptBaseClass.PRIM_ROTATION)));
 
-                Assert.Equal(,);
+                Assert.Equal(1, resList.Length);
             }
         }
 
@@ -160,7 +160,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
                 new SceneObjectPart(UUID.Zero, PrimitiveBaseShape.Default,
                 Vector3.Zero, Quaternion.Identity,
                 Vector3.Zero) { Name = obj1Name, UUID = objUuid };
-            Assert.That(scene.AddNewSceneObject(new SceneObjectGroup(part1), false));
+            Assert.True(scene.AddNewSceneObject(new SceneObjectGroup(part1), false));
 
             LSL_Api apiGrp1 = new LSL_Api();
             apiGrp1.Initialize(m_engine, part1, null);
@@ -389,7 +389,6 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             Assert.Equal(vecCheck.z, vecReturned.z, VECTOR_COMPONENT_ACCURACY,
                 "TestllSetPrimitiveParams " + msg + " vector check fail on z component");
         }
-
-    }
         */
+    }
 }
