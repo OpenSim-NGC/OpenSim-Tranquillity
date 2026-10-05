@@ -5654,6 +5654,12 @@ public void llDetachFromAvatar()
 
         List<SceneObjectPart> parts = GetLinkParts(linknumber);
 
+        // SL (wiki llMessageLinked): "It triggers a link_message event with the same parameters num, str, and id in
+        // all scripts in the prim(s) described by link." A region can run more than one script engine, and each engine
+        // posts only to the scripts it runs, so the region's other engines are offered every targeted script item too.
+        List<IScriptEngine> otherEngines = OtherScriptEngines();
+        List<UUID> scriptItems = otherEngines is null ? null : new List<UUID>();
+
         UUID partItemID;
         foreach (SceneObjectPart part in parts)
         {
@@ -5674,9 +5680,65 @@ public void llDetachFromAvatar()
                     m_ScriptEngine.PostScriptEvent(partItemID,
                             new EventParams("link_message",
                             resobj, Array.Empty<DetectParams>()));
+
+                    scriptItems?.Add(partItemID);
                 }
             }
         }
+
+        if (scriptItems is null || scriptItems.Count == 0)
+            return;
+
+        int senderLinkNumber = m_host.ParentGroup.PrimCount == 1 ? 0 : m_host.LinkNum;
+        foreach (IScriptEngine engine in otherEngines)
+            PostLinkMessageTo(engine, scriptItems, senderLinkNumber, num, msg, id);
+    }
+
+    /// <summary>
+    /// The region's script engines other than this script's own, each once (an engine may both register and stack
+    /// itself as the region's IScriptModule), or null when there are none. Local ids and items are per region, so only
+    /// this region's engines are returned.
+    /// </summary>
+    private List<IScriptEngine> OtherScriptEngines()
+    {
+        IScriptModule[] modules = World?.RequestModuleInterfaces<IScriptModule>();
+        if (modules is null)
+            return null;
+
+        List<IScriptEngine> others = null;
+        foreach (IScriptModule m in modules)
+        {
+            if (m is IScriptEngine e && e != m_ScriptEngine && (others is null || !others.Contains(e)))
+                (others ??= new List<IScriptEngine>()).Add(e);
+        }
+        return others;
+    }
+
+    /// <summary>
+    /// Offers a link message to another engine for each targeted script item, once each; the engine delivers it only to
+    /// the items it runs. Another engine gets plain values (int sender, int num, string str, string id), as core modules
+    /// post to any engine, in an array of its own per post, since an engine may convert arguments in place. An exception
+    /// from that engine is logged once for this message and goes no further: its later items, the engines after it and
+    /// the sending script are not affected.
+    /// </summary>
+    private void PostLinkMessageTo(IScriptEngine engine, List<UUID> scriptItems, int sender, int num, string msg, string id)
+    {
+        Exception failure = null;
+        foreach (UUID itemID in scriptItems)
+        {
+            try
+            {
+                engine.PostScriptEvent(itemID,
+                        new EventParams("link_message", new object[] { sender, num, msg, id }, Array.Empty<DetectParams>()));
+            }
+            catch (Exception e)
+            {
+                failure ??= e;
+            }
+        }
+
+        if (failure is not null)
+            m_log.LogError(failure, "[LSL API]: {0} failed to post link_message from prim {1}", engine.ScriptEngineName, m_host.LocalId);
     }
 
     public void llPushObject(string target, LSL_Vector impulse, LSL_Vector ang_impulse, int local)
