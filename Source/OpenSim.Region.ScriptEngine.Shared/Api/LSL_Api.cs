@@ -10914,14 +10914,18 @@ public void llDetachFromAvatar()
                            return new LSL_List();
                         }
 
-                        // not SL compatible since we don't have a independent flag to control active target but use the values of offset and rotation
-                        if(active == 1)
+                        // SL: "If the active value is 0 the sit target is deactivated. If it is nonzero the prim's sit
+                        // target is set to the indicated offset and rotation." and "Unlike llLinkSitTarget(), an offset
+                        // of <0.0, 0.0, 0.0> may be explicitly set". The region stores do not save
+                        // SceneObjectPart.SitTargetActive, so a target at a zero offset keeps a 1e-5 m offset here:
+                        // without it the target would be lost when the region restarts.
+                        if(active != 0)
                         {
                             if(offset.x == 0 && offset.y == 0 && offset.z == 0 && sitrot.s == 1.0)
-                                offset.z = 1e-5f; // hack
+                                offset.z = 1e-5f;
                             SitTarget(part,offset,sitrot);
                         }
-                        else if(active == 0)
+                        else
                             SitTarget(part, Vector3.Zero , Quaternion.Identity);
 
                         break;
@@ -18969,7 +18973,7 @@ public void llDetachFromAvatar()
             if (part.ParentGroup.IsAttachment)
                 return new LSL_Integer(ScriptBaseClass.SIT_INVALID_OBJECT);
 
-            if (part.SitTargetOrientationLL == Quaternion.Identity && part.SitTargetPosition == Vector3.Zero)
+            if (!part.IsSitTargetSet)
                 return new LSL_Integer(ScriptBaseClass.SIT_NO_SIT_TARGET);
 
             if (part.SitTargetAvatar != UUID.Zero)
