@@ -48,6 +48,7 @@ namespace OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests;
 /// is answered there, never forwarded: no test here, and no version of the module under test, sends a packet off
 /// this machine.
 /// </remarks>
+[Collection("OutboundProcessWideState")]
 public class XmlRpcOutboundFilterTests : OpenSimTestCase
 {
     private const string PortToken = "PORT";

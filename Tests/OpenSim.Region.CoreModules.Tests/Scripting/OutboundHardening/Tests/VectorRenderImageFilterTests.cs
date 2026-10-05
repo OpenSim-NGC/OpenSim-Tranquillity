@@ -45,6 +45,7 @@ namespace OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests;
 /// every fetch the module makes - to any address, by any version of the module - lands at that proxy and is
 /// answered there. Nothing leaves this machine.
 /// </remarks>
+[Collection("OutboundProcessWideState")]
 public class VectorRenderImageFilterTests : OpenSimTestCase
 {
     private const string PortToken = "PORT";

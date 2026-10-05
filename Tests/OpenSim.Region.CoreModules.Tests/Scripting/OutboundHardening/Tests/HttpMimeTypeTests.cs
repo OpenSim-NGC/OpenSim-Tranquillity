@@ -41,9 +41,10 @@ namespace OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests;
 /// reach the wire exactly as before.
 /// </summary>
 /// <remarks>
-/// The destination is a listener this test runs on 127.0.0.1. HttpRequestModule does not filter the first URL
-/// (the script engine does), so every version of the module sends only there.
+/// The destination is a listener this test runs on 127.0.0.1, which the test's configuration excepts from the
+/// outbound filter because the module connects only to addresses the filter allows.
 /// </remarks>
+[Collection("OutboundProcessWideState")]
 public class HttpMimeTypeTests : OpenSimTestCase
 {
     private const string ForgedOwner = "00000000-0000-0000-0000-00000000dead";
@@ -56,7 +57,7 @@ public class HttpMimeTypeTests : OpenSimTestCase
     {
         IConfigSource config = new IniConfigSource();
         config.AddConfig("Startup");
-        config.AddConfig("Network");
+        config.AddConfig("Network").Set("OutboundDisallowForUserScriptsExcept", "127.0.0.1/32");
         m_scene = new SceneHelpers().SetupScene();
         m_module.Initialise(config);
         m_module.AddRegion(m_scene);

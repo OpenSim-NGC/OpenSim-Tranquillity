@@ -59,6 +59,7 @@ namespace OpenSim.Region.CoreModules.Scripting.CrossEngine.Tests;
 /// pump (Shared/Api/Plugins) serves it. The "other" engine is only an IScriptModule of the region, as a second engine
 /// is. No network is used: completed requests are handed to the real core modules directly.
 /// </summary>
+[Collection("OutboundProcessWideState")]
 public class CrossEngineScriptResponseTests : OpenSimTestCase
 {
     private static readonly TimeSpan Limit = TimeSpan.FromSeconds(30);
@@ -67,7 +68,9 @@ public class CrossEngineScriptResponseTests : OpenSimTestCase
     {
         IniConfigSource config = new IniConfigSource();
         config.AddConfig("Startup");
-        config.AddConfig("Network");
+        // The module's filter is process-wide and set up by whichever test builds a module first; this matches the
+        // exception the tests that send real requests to a local listener need.
+        config.AddConfig("Network").Set("OutboundDisallowForUserScriptsExcept", "127.0.0.1/32");
         return config;
     }
 

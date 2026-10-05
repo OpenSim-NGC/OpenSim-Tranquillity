@@ -719,11 +719,28 @@ public class SendRemoteDataRequest: IServiceRequest
         HttpClient hclient = null;
         try
         {
-            // The shared no-redirect handler behind a handler that follows redirects itself and filters every
-            // hop; otherwise as WebUtil.GetNewGlobalHttpClient(-1), whose handler follows up to 10 unfiltered.
-            // Neither handler is disposed with the client: the inner one is shared.
-            hclient = new HttpClient(
-                new OutboundUrlFilterRedirectHandler(UrlFilter, WebUtil.SharedSocketsHttpHandlerNoRedir, 10), false)
+            // A handler that follows redirects itself and filters every hop, over a handler that connects only to
+            // addresses the filter allows; otherwise as WebUtil.GetNewGlobalHttpClient(-1), whose handler follows
+            // up to 10 unfiltered. The new handler takes the shared no-redirect handler's proxy and options, so a
+            // proxy carries the same requests as before.
+            SocketsHttpHandler shared = WebUtil.SharedSocketsHttpHandlerNoRedir;
+            SocketsHttpHandler inner = new()
+            {
+                AllowAutoRedirect = false,
+                AutomaticDecompression = DecompressionMethods.None,
+                ConnectTimeout = shared.ConnectTimeout,
+                PreAuthenticate = false,
+                UseCookies = false,
+                UseProxy = shared.UseProxy,
+                MaxConnectionsPerServer = shared.MaxConnectionsPerServer,
+                PooledConnectionIdleTimeout = shared.PooledConnectionIdleTimeout,
+                PooledConnectionLifetime = shared.PooledConnectionLifetime,
+                SslOptions = shared.SslOptions,
+            };
+            if (shared.UseProxy)
+                inner.Proxy = shared.Proxy;
+            UrlFilter.ApplyTo(inner);
+            hclient = new HttpClient(new OutboundUrlFilterRedirectHandler(UrlFilter, inner, 10), true)
             {
                 Timeout = TimeSpan.FromMilliseconds(30000),
                 MaxResponseContentBufferSize = 250 * 1024 * 1024,
