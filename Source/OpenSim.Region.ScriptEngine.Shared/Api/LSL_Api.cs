@@ -3421,6 +3421,8 @@ public class LSL_Api : ILSL_Api, IScriptApi
                         new LSL_String(
                         group.RootPart.UUID.ToString()) },
                         Array.Empty<DetectParams>()));
+                string rezzedKey = group.RootPart.UUID.ToString();
+                PostToOtherScriptEngines("object_rez", [m_host], () => new object[] { rezzedKey });
 
                 if (notAttachment)
                 {
@@ -3937,6 +3939,8 @@ public class LSL_Api : ILSL_Api, IScriptApi
                         new LSL_String(groot.UUID.ToString())
                     ],
                     Array.Empty<DetectParams>()));
+            string rezzedKey = groot.UUID.ToString();
+            PostToOtherScriptEngines("object_rez", [m_host], () => new object[] { rezzedKey });
 
             if(soundVol > 0 && !string.IsNullOrEmpty(sound) && m_SoundModule is not null)
             {
@@ -4333,7 +4337,71 @@ public void llDetachFromAvatar()
                     new LSL_String(email.message),
                     new LSL_Integer(email.numLeft)},
                 Array.Empty<DetectParams>()));
+        PostToOtherScriptEngines("email", [m_host],
+                () => new object[] { email.time, email.sender, email.subject, email.message, email.numLeft });
+    }
 
+    /// <summary>
+    /// Offers an event that was just posted through this script's own engine to the region's other script engines,
+    /// for every script item of the given prims, each once. A region can run more than one script engine, and an
+    /// engine posts only to the scripts it runs, so without this another engine's scripts never get the event.
+    /// Which scripts SL names (SL wiki): object_rez "Triggers in all running scripts with an object_rez event, AND in
+    /// the same prim as the script calling llRezObject or llRezAtRoot."; email: "The email queue is associated with the
+    /// prim and any script in the prim can access it."; linkset_data "fires in all scripts in a linkset whenever the
+    /// datastore has been modified through a call to one of the llLinksetData functions."
+    /// Each item is offered to each other engine once (this script's own engine is not among them), by item, so no
+    /// engine's own prim or linkset rule widens it; an engine delivers only to the scripts it runs. Another engine gets
+    /// plain values, as core modules post to any engine, in an array of its own per post, since an engine may convert
+    /// arguments in place. An exception from an engine is logged once for this event and goes no further: its later
+    /// items, the engines after it and the calling script are not affected. A region with no other engine returns
+    /// after one module lookup.
+    /// </summary>
+    private void PostToOtherScriptEngines(string eventName, SceneObjectPart[] parts, Func<object[]> plainArgs)
+    {
+        IScriptModule[] modules = World?.RequestModuleInterfaces<IScriptModule>();
+        if (modules is null)
+            return;
+
+        // An engine may both register and stack itself as the region's IScriptModule; it is one engine.
+        List<IScriptEngine> engines = null;
+        foreach (IScriptModule m in modules)
+        {
+            if (m is IScriptEngine e && e != m_ScriptEngine && (engines is null || !engines.Contains(e)))
+                (engines ??= new List<IScriptEngine>()).Add(e);
+        }
+        if (engines is null)
+            return;
+
+        List<UUID> scriptItems = new List<UUID>();
+        foreach (SceneObjectPart part in parts)
+        {
+            foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
+            {
+                if (item.Type == ScriptBaseClass.INVENTORY_SCRIPT)
+                    scriptItems.Add(item.ItemID);
+            }
+        }
+        if (scriptItems.Count == 0)
+            return;
+
+        foreach (IScriptEngine engine in engines)
+        {
+            Exception failure = null;
+            foreach (UUID itemID in scriptItems)
+            {
+                try
+                {
+                    engine.PostScriptEvent(itemID, new EventParams(eventName, plainArgs(), Array.Empty<DetectParams>()));
+                }
+                catch (Exception e)
+                {
+                    failure ??= e;
+                }
+            }
+
+            if (failure is not null)
+                m_log.LogError(failure, "[LSL API]: {0} failed to post {1} from prim {2}", engine.ScriptEngineName, eventName, m_host.LocalId);
+        }
     }
 
     public void llTargetedEmail(LSL_Integer target, LSL_String subject, LSL_String message)
@@ -17749,6 +17817,8 @@ public void llDetachFromAvatar()
                 new LSL_String(
                 group.RootPart.UUID.ToString()) },
                 Array.Empty<DetectParams>()));
+        string rezzedKey = group.RootPart.UUID.ToString();
+        PostToOtherScriptEngines("object_rez", [m_host], () => new object[] { rezzedKey });
     }
 
     public LSL_Key llTransferLindenDollars(LSL_Key destination, LSL_Integer amount)
@@ -20968,6 +21038,8 @@ public void llDetachFromAvatar()
         m_ScriptEngine.PostObjectEvent(
             rootPrim.LocalId,
             new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+        PostToOtherScriptEngines("linkset_data", rootPrim.ParentGroup.Parts,
+            () => new object[] { ScriptBaseClass.LINKSETDATA_RESET, string.Empty, string.Empty });
 
         rootPrim.ParentGroup.HasGroupChanged = true;
     }
@@ -21085,6 +21157,8 @@ public void llDetachFromAvatar()
             m_ScriptEngine.PostObjectEvent(
                 rootPrim.LocalId,
                 new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+            PostToOtherScriptEngines("linkset_data", rootPrim.ParentGroup.Parts,
+                () => new object[] { ScriptBaseClass.LINKSETDATA_UPDATE, name.m_string, value.m_string });
 
             rootPrim.ParentGroup.HasGroupChanged = true;
 
@@ -21139,6 +21213,8 @@ public void llDetachFromAvatar()
             m_ScriptEngine.PostObjectEvent(
                 m_host.LocalId, 
                 new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+            PostToOtherScriptEngines("linkset_data", rootPrim.ParentGroup.Parts,
+                () => new object[] { ScriptBaseClass.LINKSETDATA_MULTIDELETE, removed_keys, string.Empty });
 
             rootPrim.ParentGroup.HasGroupChanged = true;
 
@@ -21171,8 +21247,10 @@ public void llDetachFromAvatar()
             };
 
             m_ScriptEngine.PostObjectEvent(
-                rootPrim.LocalId, 
+                rootPrim.LocalId,
                 new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+            PostToOtherScriptEngines("linkset_data", rootPrim.ParentGroup.Parts,
+                () => new object[] { ScriptBaseClass.LINKSETDATA_DELETE, name.m_string, string.Empty });
 
             rootPrim.ParentGroup.HasGroupChanged = true;
 
