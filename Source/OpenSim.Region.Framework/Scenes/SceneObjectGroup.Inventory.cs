@@ -533,17 +533,18 @@ public partial class SceneObjectGroup : EntityBase
         if (objXMLData.Length == 0)
             return;
 
-        IScriptModule scriptModule = null;
-
+        // The default engine is offered each state first, then the region's other engines, so a state
+        // reaches the engine that owns the script. Each engine refuses a state that is not its own.
+        List<IScriptModule> scriptModules = new();
         foreach (IScriptModule sm in s.RequestModuleInterfaces<IScriptModule>())
         {
             if (sm.ScriptEngineName == s.DefaultScriptEngine)
-                scriptModule = sm;
+                scriptModules.Insert(0, sm);
             else
-                scriptModule ??= sm;
+                scriptModules.Add(sm);
         }
 
-        if (scriptModule is null)
+        if (scriptModules.Count == 0)
             return;
 
         XmlDocument doc = new();
@@ -576,10 +577,26 @@ public partial class SceneObjectGroup : EntityBase
 
         foreach (XmlNode n in dataE.ChildNodes)
         {
-            XmlElement stateE = (XmlElement)n;
-            UUID itemID = new(stateE.GetAttribute("UUID"));
+            // One unusable state must not cost the object's other scripts theirs.
+            if (n is not XmlElement stateE || !UUID.TryParse(stateE.GetAttribute("UUID"), out UUID itemID))
+            {
+                m_log.LogWarning($"[SCENE OBJECT GROUP]: Skipped a script state without a valid item id in object {Name} id: {UUID}");
+                continue;
+            }
 
-            scriptModule.SetXMLState(itemID, n.OuterXml);
+            string stateXml = n.OuterXml;
+            foreach (IScriptModule scriptModule in scriptModules)
+            {
+                try
+                {
+                    if (scriptModule.SetXMLState(itemID, stateXml))
+                        break;
+                }
+                catch (Exception e)
+                {
+                    m_log.LogWarning($"[SCENE OBJECT GROUP]: Script engine {scriptModule.ScriptEngineName} failed to take the state of script {itemID} in object {Name} id: {UUID}: {e.Message}");
+                }
+            }
         }
     }
 
