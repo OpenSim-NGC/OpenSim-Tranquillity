@@ -581,6 +581,10 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - `llGetUsername` returns "First Last" where YEngine returns "first.last". Both answer only for
   an avatar the region holds (root or child agent), else `""`; `llRequestUsername` answers for
   anyone.
+- `llManageEstateAccess` never bans the estate owner's partner, the partner named on the estate
+  owner's profile, as Halcyon refused it: the call returns `FALSE`, nothing changes, and neither
+  an IM nor an error is sent, as for the estate owner. When the estate owner's profile cannot be
+  read, the ban goes ahead and the region's log says so. SL documents no partner rule.
 - `llGetExperienceDetails(NULL_KEY)` gives the details of the script's own Experience, the one
   its script item names, and an empty list for a script in no Experience, as SL documents: "If
   experience_id is NULL_KEY, then information about the script's experience is returned. In

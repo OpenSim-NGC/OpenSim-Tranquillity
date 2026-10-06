@@ -3233,7 +3233,7 @@ namespace Phlox.ScriptEngine
         /// silently. A change that is already so (AlreadySet), a NULL_KEY and an unknown action are FALSE. A ban never
         /// touches the estate owner or a manager ("never process EO"), the object's owner, or a god (YEngine, and NGC's
         /// estate tools: "Cannot ban a Administrator"); it takes the avatar off the allowed list and sends them away.
-        /// Halcyon's estate-owner's-partner rule is not ported: NGC has no partner lookup in the region.
+        /// Nor is the estate owner's partner banned (<see cref="IsEstateOwnersPartner"/>).
         /// </summary>
         private bool ManageEstateAccess(int action, UUID key)
         {
@@ -3277,7 +3277,8 @@ namespace Phlox.ScriptEngine
                     StoreEstate(es);
                     return true;
                 case EstateBannedAgentAdd:
-                    if (es.IsEstateManagerOrOwner(key) || key == m_host.OwnerID || World.Permissions.IsGod(key))
+                    if (es.IsEstateManagerOrOwner(key) || key == m_host.OwnerID || World.Permissions.IsGod(key)
+                        || IsEstateOwnersPartner(es, key))
                         return false;
                     // Halcyon clears the allowed entry even when the avatar is already banned.
                     if (allowed) es.RemoveEstateUser(key);
@@ -3303,6 +3304,24 @@ namespace Phlox.ScriptEngine
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// <paramref name="key"/> is the partner on the estate owner's profile (Halcyon EstateBanUser refuses a ban of
+        /// the estate owner's partner, IsEstateOwnerPartner). A profile that cannot be read guards nobody, so a profiles
+        /// service that cannot be reached does not stop estate management; it is logged. This is a service call, made
+        /// here on the deferred call's thread, not the scheduler's.
+        /// </summary>
+        private bool IsEstateOwnersPartner(EstateSettings es, UUID key)
+        {
+            IProfileModule profiles = World.RequestModuleInterface<IProfileModule>();
+            if (profiles == null || es.EstateOwner.IsZero()) return false;
+            if (!profiles.TryGetUserPartner(es.EstateOwner, out UUID partner))
+            {
+                m_log.LogWarning("[PhloxAPI]: llManageEstateAccess could not read the estate owner's partner; the ban of {0} is not checked against it", key);
+                return false;
+            }
+            return partner.IsNotZero() && partner == key;
         }
 
         private void StoreEstate(EstateSettings es) => World.EstateDataServiceSafe?.StoreEstateSettings(es);
