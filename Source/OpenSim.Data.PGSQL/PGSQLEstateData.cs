@@ -363,7 +363,7 @@ public class PGSQLEstateStore : IEstateDataStore
                 cmd.Parameters.AddWithValue("banTime", 0);
                 foreach (EstateBan b in es.EstateBans)
                 {
-                    cmd.Parameters["EstateID"].Value = b.EstateID;
+                    cmd.Parameters["EstateID"].Value = (int)es.EstateID;
                     cmd.Parameters["bannedUUID"].Value = b.BannedUserID.Guid;
                     cmd.Parameters["banningUUID"].Value = b.BanningUserID.Guid;
                     cmd.Parameters["banTime"].Value = b.BanTime;

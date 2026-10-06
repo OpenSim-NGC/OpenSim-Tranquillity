@@ -76,7 +76,9 @@ public sealed class MySQLServerFactAttribute : FactAttribute
 /// Saves an estate with a ban, a manager, an allowed user and an allowed group through one estate store, loads it
 /// back through a second store on the same database (as a region does after a restart) and compares every stored
 /// value of each list: for the ban the banned avatar, the banning avatar and the ban time, the three ban values
-/// the estateban table keeps for an avatar ban.
+/// the estateban table keeps for an avatar ban. A second test saves bans, reloads them through a new store, saves
+/// the loaded estate again and loads it once more: the stores do not set EstateBan.EstateID when they load a ban,
+/// so a save must file each ban under the estate being saved.
 ///
 /// SQLite uses a throwaway in-memory database. PostgreSQL and MySQL each get a new database on the server named by
 /// the environment, dropped when the test ends. No process-wide state: each test has its own database and drops
@@ -103,15 +105,33 @@ public class EstateStoreListsRoundTripTests : IDisposable
     }
 
     [Fact]
-    public void SQLite_EstateWithABan_ReadsBackEveryList()
+    public void SQLite_EstateWithABan_ReadsBackEveryList() => RoundTrip(SQLiteStores());
+
+    [PGSQLServerFact]
+    public void PGSQL_EstateWithABan_ReadsBackEveryList() => RoundTrip(PGSQLStores());
+
+    [MySQLServerFact]
+    public void MySQL_EstateWithABan_ReadsBackEveryList() => RoundTrip(MySQLStores());
+
+    [Fact]
+    public void SQLite_LoadedBans_SurviveASecondSave() => ResaveRoundTrip(SQLiteStores());
+
+    [PGSQLServerFact]
+    public void PGSQL_LoadedBans_SurviveASecondSave() => ResaveRoundTrip(PGSQLStores());
+
+    [MySQLServerFact]
+    public void MySQL_LoadedBans_SurviveASecondSave() => ResaveRoundTrip(MySQLStores());
+
+    /// <summary>Opens a new SQLite estate store on one throwaway in-memory database per call of this method.</summary>
+    private Func<IEstateDataStore> SQLiteStores()
     {
         string conn = "FullUri=file:estatert_" + Guid.NewGuid().ToString("N") + "?mode=memory&cache=shared;";
-        // Shared-cache memory databases live while a connection is open; this one keeps it for the second store.
+        // Shared-cache memory databases live while a connection is open; this one keeps it for the later stores.
         SQLiteConnection anchor = new SQLiteConnection(conn);
         anchor.Open();
         m_cleanup.Add(anchor.Dispose);
 
-        RoundTrip(() =>
+        return () =>
         {
             SQLiteEstateStore store = new SQLiteEstateStore(conn);
             // The store has no close of its own: its connection lives as long as the region process does.
@@ -120,11 +140,11 @@ public class EstateStoreListsRoundTripTests : IDisposable
             if (c != null)
                 m_cleanup.Add(c.Dispose);
             return store;
-        });
+        };
     }
 
-    [PGSQLServerFact]
-    public void PGSQL_EstateWithABan_ReadsBackEveryList()
+    /// <summary>Creates a new database on the PostgreSQL server and opens estate stores on it.</summary>
+    private Func<IEstateDataStore> PGSQLStores()
     {
         string server = Environment.GetEnvironmentVariable(PGSQLServerFactAttribute.EnvVar);
         string name = "estatert_" + Guid.NewGuid().ToString("N");
@@ -139,16 +159,16 @@ public class EstateStoreListsRoundTripTests : IDisposable
             PGSQLAdmin(admin, $"DROP DATABASE IF EXISTS \"{name}\"");
         });
 
-        RoundTrip(() =>
+        return () =>
         {
             PGSQLEstateStore store = new PGSQLEstateStore();
             store.Initialise(conn);
             return store;
-        });
+        };
     }
 
-    [MySQLServerFact]
-    public void MySQL_EstateWithABan_ReadsBackEveryList()
+    /// <summary>Creates a new database on the MySQL or MariaDB server and opens estate stores on it.</summary>
+    private Func<IEstateDataStore> MySQLStores()
     {
         string server = Environment.GetEnvironmentVariable(MySQLServerFactAttribute.EnvVar);
         string name = "estatert_" + Guid.NewGuid().ToString("N");
@@ -163,12 +183,12 @@ public class EstateStoreListsRoundTripTests : IDisposable
             MySQLAdmin(admin, $"DROP DATABASE IF EXISTS `{name}`");
         });
 
-        RoundTrip(() =>
+        return () =>
         {
             MySQLEstateStore store = new MySQLEstateStore();
             store.Initialise(conn);
             return store;
-        });
+        };
     }
 
     private static void PGSQLAdmin(string admin, string sql)
@@ -224,5 +244,45 @@ public class EstateStoreListsRoundTripTests : IDisposable
         Assert.Equal(new[] { manager }, loaded.EstateManagers);
         Assert.Equal(new[] { user }, loaded.EstateAccess);
         Assert.Equal(new[] { group }, loaded.EstateGroups);
+    }
+
+    private static void ResaveRoundTrip(Func<IEstateDataStore> openStore)
+    {
+        UUID firstRegion = UUID.Random();
+        UUID region = UUID.Random();
+        UUID banned = UUID.Random();
+        UUID banned2 = UUID.Random();
+        UUID banning = UUID.Random();
+
+        IEstateDataStore writer = openStore();
+        // Another estate is created first, so the estate under test does not have id 1, the id a new EstateBan has.
+        EstateSettings first = writer.LoadEstateSettings(firstRegion, true);
+        writer.LinkRegion(firstRegion, (int)first.EstateID);
+        EstateSettings saved = writer.LoadEstateSettings(region, true);
+        Assert.NotEqual(1u, saved.EstateID);
+        saved.EstateName = "Example Estate";
+        saved.AddBan(new EstateBan { EstateID = saved.EstateID, BannedUserID = banned, BanningUserID = banning, BanTime = 1700000201 });
+        saved.AddBan(new EstateBan { EstateID = saved.EstateID, BannedUserID = banned2, BanningUserID = banning, BanTime = 1700000202 });
+        writer.StoreEstateSettings(saved);
+        writer.LinkRegion(region, (int)saved.EstateID);
+
+        // As after a restart: a new store loads the estate, and the loaded estate is saved again unchanged.
+        IEstateDataStore restarted = openStore();
+        EstateSettings loaded = restarted.LoadEstateSettings(region, false);
+        Assert.Equal(2, loaded.EstateBans.Length);
+        restarted.StoreEstateSettings(loaded);
+
+        IEstateDataStore reader = openStore();
+        EstateBan[] bans = reader.LoadEstateSettings(region, false).EstateBans.OrderBy(b => b.BanTime).ToArray();
+        Assert.Equal(2, bans.Length);
+        Assert.Equal(banned, bans[0].BannedUserID);
+        Assert.Equal(banning, bans[0].BanningUserID);
+        Assert.Equal(1700000201, bans[0].BanTime);
+        Assert.Equal(banned2, bans[1].BannedUserID);
+        Assert.Equal(banning, bans[1].BanningUserID);
+        Assert.Equal(1700000202, bans[1].BanTime);
+
+        // The bans must not have been filed under another estate either.
+        Assert.Empty(reader.LoadEstateSettings(firstRegion, false).EstateBans);
     }
 }
