@@ -216,4 +216,52 @@ public class ExperienceStateTests
         r.Service.LookupFails = false;
         Assert.Equal(r.Granted, r.Request());
     }
+
+    // ── llGetExperienceDetails ──
+
+    [Fact]
+    public void AnEnabledExperiencesDetailsSayNoError()
+    {
+        using var r = new Rig(0);
+        string[] d = r.Details();
+        Assert.Equal(6, d.Length);
+        Assert.Equal("0", d[3]);
+        Assert.Equal("no error", d[4]);
+    }
+
+    [Fact]
+    public void ADisabledExperiencesDetailsSayExperienceDisabled()
+    {
+        using var r = new Rig(Disabled);
+        string[] d = r.Details();
+        Assert.Equal("8", d[3]);
+        Assert.Equal("experience is disabled", d[4]);
+    }
+
+    [Fact]
+    public void ASuspendedExperiencesDetailsSayExperienceSuspended()
+    {
+        using var r = new Rig(Suspended);
+        string[] d = r.Details();
+        Assert.Equal("9", d[3]);
+        Assert.Equal("experience is suspended", d[4]);
+    }
+
+    [Fact]
+    public void TheDetailsOfAnExperienceBothDisabledAndSuspendedSayDisabled()
+    {
+        using var r = new Rig(Disabled | Suspended);
+        Assert.Equal("8", r.Details()[3]);
+    }
+
+    [Fact]
+    public void EachDetailsCallReportsTheExperiencesStateAtThatCall()
+    {
+        using var r = new Rig(Suspended);
+        Assert.Equal("9", r.Details()[3]);
+        r.Properties = 0;
+        Assert.Equal("0", r.Details()[3]);
+        r.Properties = Disabled;
+        Assert.Equal("8", r.Details()[3]);
+    }
 }

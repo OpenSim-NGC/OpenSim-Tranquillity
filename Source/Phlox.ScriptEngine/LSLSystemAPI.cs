@@ -21302,11 +21302,11 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // group key ] — NOT the old [name, owner, description, group, maturity, ""], which
             // silently returned wrong data at every index for SL-written scripts (High severity).
             // State uses the XP_ERROR vocabulary: NONE(0) for a valid enabled experience,
-            // EXPERIENCE_DISABLED(8) when the viewer PROPERTY_DISABLED bit is set. The message comes
-            // from llGetExperienceErrorMessage so the state and its text can never drift apart.
-            int state = (exp.Properties & VP_DISABLED) != 0
-                ? XP_ERROR_EXPERIENCE_DISABLED
-                : XP_ERROR_NONE;
+            // EXPERIENCE_DISABLED(8) when the viewer PROPERTY_DISABLED bit is set, EXPERIENCE_SUSPENDED(9)
+            // when PROPERTY_SUSPENDED is (ExperienceStateError; YEngine's llGetExperienceDetails reports the
+            // same two). The message comes from llGetExperienceErrorMessage so the state and its text can
+            // never drift apart.
+            int state = ExperienceStateError(exp.Properties);
             return new LSLList(new object[]
             {
                 exp.Name ?? string.Empty,
