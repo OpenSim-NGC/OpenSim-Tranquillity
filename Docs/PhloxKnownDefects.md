@@ -557,8 +557,9 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - `llCastRay` that the physics engine refuses (for example a cast over the engine's time or hit budget) returns
   `[RCERR_CAST_TIME_EXCEEDED]`. The region log gets at most one warning per script per minute for it: the first
   refused cast writes one at once, and the next, written by the first cast refused after the minute is up, gives the
-  number of casts refused since that script's line before. Before, every refused cast wrote its own line, so a
-  script casting in a loop could write thousands a second.
+  number of casts refused since that script's warning before:
+  `[PhloxAPI]: llCastRay refused for script <item id> in <object>; refused casts since its last warning: <count>; reason: <reason>`.
+  Before, every refused cast wrote its own line, so a script casting in a loop could write thousands a second.
 - `llPushObject` with `local` TRUE turns the impulse by the target's rotation, avatar or object, as the SL wiki says:
   "if TRUE uses the local axis of target, if FALSE uses the region axis"
   ([LlPushObject](https://wiki.secondlife.com/wiki/LlPushObject)). YEngine does the same. A local push on an avatar

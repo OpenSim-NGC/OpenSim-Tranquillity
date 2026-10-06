@@ -16731,8 +16731,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             m_castRayRefusedSinceLine = 0;
             m_castRayRefusedLineWritten = true;
             m_castRayRefusedLineDueOn = now + CastRayRefusedLineIntervalMs;
-            m_log.LogWarning("[PhloxAPI]: llCastRay: {0} cast{1} refused for script {2} in {3} since this script's last such line: {4}",
-                refused, refused == 1 ? "" : "s", m_itemID, m_host?.Name, reason);
+            m_log.LogWarning("[PhloxAPI]: llCastRay refused for script {0} in {1}; refused casts since its last warning: {2}; reason: {3}",
+                m_itemID, m_host?.Name, refused, reason);
         }
         // ── JSON ───────────────────────────────────────────────────────────────
         // The getters read the text with System.Text.Json. A leading byte-order mark is skipped, as Halcyon's

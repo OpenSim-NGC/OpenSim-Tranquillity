@@ -98,6 +98,11 @@ public class CastRayRefusedLogTests
 
         public LSLSystemAPI Script(UUID item) => new LSLSystemAPI(H.Engine, H.Prim, H.Prim.LocalId, item);
 
+        /// <summary>The whole warning a script's refused casts write, with the count since its warning before.</summary>
+        public string Line(UUID item, int refused)
+            => "[PhloxAPI]: llCastRay refused for script " + item + " in " + H.Prim.Name
+               + "; refused casts since its last warning: " + refused + "; reason: cast budget exceeded";
+
         public List<string> Lines()
         {
             lock (m_capture.Lines) return m_capture.Lines.Where(l => l.Contains("llCastRay")).ToList();
@@ -145,8 +150,7 @@ public class CastRayRefusedLogTests
         }
         var lines = r.Lines();
         Assert.Single(lines);
-        Assert.Contains("llCastRay: 1 cast refused for script " + item, lines[0]);
-        Assert.EndsWith(": cast budget exceeded", lines[0]);
+        Assert.Equal(r.Line(item, 1), lines[0]);
     }
 
     [Fact]
@@ -163,13 +167,13 @@ public class CastRayRefusedLogTests
         CastRefused(api, 1);                         // the minute is up: 499 + 1 + this one
         var lines = r.Lines();
         Assert.Equal(2, lines.Count);
-        Assert.Contains("llCastRay: 501 casts refused for script " + item, lines[1]);
+        Assert.Equal(r.Line(item, 501), lines[1]);
         CastRefused(api, 7);                         // a new minute starts at that line
         Assert.Equal(2, r.Lines().Count);
         r.Now += Minute;
         CastRefused(api, 1);
         Assert.Equal(3, r.Lines().Count);
-        Assert.Contains("llCastRay: 8 casts refused for script " + item, r.Lines()[2]);
+        Assert.Equal(r.Line(item, 8), r.Lines()[2]);
     }
 
     [Fact]
@@ -183,15 +187,15 @@ public class CastRayRefusedLogTests
         CastRefused(apiB, 3);
         var first = r.Lines();
         Assert.Equal(2, first.Count);
-        Assert.Contains("llCastRay: 1 cast refused for script " + a, first[0]);
-        Assert.Contains("llCastRay: 1 cast refused for script " + b, first[1]);
+        Assert.Equal(r.Line(a, 1), first[0]);
+        Assert.Equal(r.Line(b, 1), first[1]);
         r.Now += Minute;
         CastRefused(apiA, 1);
         CastRefused(apiB, 1);
         var lines = r.Lines();
         Assert.Equal(4, lines.Count);
-        Assert.Contains("llCastRay: 10 casts refused for script " + a, lines[2]);
-        Assert.Contains("llCastRay: 3 casts refused for script " + b, lines[3]);
+        Assert.Equal(r.Line(a, 10), lines[2]);
+        Assert.Equal(r.Line(b, 3), lines[3]);
     }
 
     [Fact]
