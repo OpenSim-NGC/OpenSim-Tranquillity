@@ -705,12 +705,19 @@ name) promises.
 and gives the error "llRefreshPrimURL - not yet supported", as Halcyon did; SL documents it as
 deprecated and doing nothing.
 
-`iwCheckRezError` answers from the region's rez checks: `IW_REZ_NO_LAND_PARCEL` where there is
+`iwCheckRezError` answers from the region's rez checks: `IW_REZ_NOT_PERMITTED` for an owner the
+region blocks from rezzing (asked first, as Halcyon did), `IW_REZ_NO_LAND_PARCEL` where there is
 no parcel, `IW_REZ_NOT_PERMITTED` where the owner may not rez, `IW_REZ_PARCEL_LAND_IMPACT`
 where the prims would go over the parcel's limits, otherwise `IW_REZ_OK`. It never returns
 `IW_REZ_REGION_SCENIC` or `IW_REZ_REGION_LAND_IMPACT`. `isTemp` is not used, as in Halcyon.
 When the prims would not fit, the region's prim-limit module may also send the owner the
 message it sends for a refused rez.
+
+A region can block an owner from rezzing (the console's `block owner`, or `[BlockedOwners]
+BlockEstateBanned`). A Phlox script whose object's owner is blocked rezzes nothing: `llRezObject`,
+`llRezAtRoot`, `llRezObjectWithParams`, `iwRezObject`, `iwRezAtRoot` and `iwRezAt` fail with no
+error and a 100 ms pause, before any other check, as Halcyon's bad-user check did. SL has no
+such list.
 
 ### Functions that act only in part
 - `llRezObjectWithParams`:

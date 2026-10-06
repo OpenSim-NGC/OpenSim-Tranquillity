@@ -5878,7 +5878,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// The checks and errors of Halcyon's iwRezAt (LSLSystemAPI.cs:3155-3245), which every rez function shares. A NaN
+        /// The checks and errors of Halcyon's iwRezAt (LSLSystemAPI.cs:3155-3245), which every rez function shares. An
+        /// owner the region blocks from rezzing is refused first, silently, with 100 ms. A NaN
         /// rotation, a position over 10 m away, an item that is not an object and a refused rez each shout their own
         /// text and cost no delay; a missing item and a rez cost 100 ms (Halcyon's sleepTime). Halcyon was silent for a
         /// missing item; Phlox keeps its error for it (SL: an error is shouted). The scene does not say why a rez was
@@ -5886,6 +5887,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// </summary>
         private List<SceneObjectGroup> RezChecked(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot)
         {
+            if (OwnerBlockedFromRezzing())
+            {
+                ScriptSleep(100);
+                return null;
+            }
             if (RezRotationIsNaN(rot)) return null;
             if (m_host == null || World == null) return null;
 
@@ -5943,8 +5949,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// <summary>
         /// Halcyon iwRezAt (LSLSystemAPI.cs:3168-3173) refuses a NaN rotation with this error and no delay
         /// (sleepTime = 0), before its 10 m check. Its rez calls were long-running, so ShoutError: no pause.
-        /// Halcyon's other guard there, IsBadUser (:3160-3166), reads a nuke/blacklist-owner list NGC core does not have.
         /// </summary>
+        /// <summary>
+        /// Halcyon's iwRezAt asked the region's bad-user list before any other check (LSLSystemAPI.cs:3160-3166) and, for
+        /// such an owner, failed silently with a 100 ms sleep. The region's list here is the core's blocked-owner hook
+        /// (IBlockedOwnerModule). The region would refuse the rez itself as well; asking first keeps the refusal silent,
+        /// so a blocked owner's rezzers do not shout an error on every attempt.
+        /// </summary>
+        private bool OwnerBlockedFromRezzing()
+            => m_host != null && World?.RequestModuleInterface<IBlockedOwnerModule>()?.IsBlocked(m_host.OwnerID) == true;
+
         private bool RezRotationIsNaN(Quaternion rot)
         {
             if (!(float.IsNaN(rot.X) || float.IsNaN(rot.Y) || float.IsNaN(rot.Z) || float.IsNaN(rot.W))) return false;
@@ -6181,7 +6195,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         /// <summary>
         /// Could the owner rez <paramref name="landImpact"/> prims at <paramref name="pos"/>? Halcyon's Scene.CheckRezError
-        /// (Scene.cs:2341-2367), answered by the checks a rez itself goes through: no parcel there; the region's rez
+        /// (Scene.cs:2341-2367), answered by the checks a rez itself goes through: an owner the region blocks from rezzing
+        /// (asked first, as Halcyon asked IsBadUser, Scene.cs:2343-2344); no parcel there; the region's rez
         /// permission (CanRezObject, asked with no prims as Halcyon asked it); the same permission asked with the prims the
         /// rez would add (the prim-limit checks hang off it). IW_REZ_REGION_SCENIC and IW_REZ_REGION_LAND_IMPACT are never
         /// returned: there are no scenic regions, and no region-wide total is checked apart from the parcels'. isTemp is
@@ -6189,6 +6204,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// </summary>
         public int iwCheckRezError(Vector3 pos, int isTemp, int landImpact)
         {
+            if (OwnerBlockedFromRezzing()) return IW_REZ_NOT_PERMITTED;
             if (World?.LandChannel?.GetLandObject(pos.X, pos.Y) == null) return IW_REZ_NO_LAND_PARCEL;
             UUID owner = m_host.OwnerID;
             if (!World.Permissions.CanRezObject(0, owner, pos)) return IW_REZ_NOT_PERMITTED;
