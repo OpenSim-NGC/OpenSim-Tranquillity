@@ -165,6 +165,7 @@ public class MuteListModule : ISharedRegionModule
         }
 
         Byte[] data = m_service.MuteListRequest(client.AgentId, crc);
+        InstantMessageMuteCheck.Remember(client.AgentId, data);
         if (data == null)
         {
             if(crc == 0)
@@ -220,6 +221,7 @@ public class MuteListModule : ISharedRegionModule
         mute.Stamp = Util.UnixTimeSinceEpoch();
 
         m_service.UpdateMute(mute);
+        InstantMessageMuteCheck.Forget(agentID);
     }
 
     private void OnRemoveMuteListEntry(IClientAPI client, UUID muteID, string muteName)
@@ -227,6 +229,7 @@ public class MuteListModule : ISharedRegionModule
         if (!m_Enabled || IsForeign(client))
             return;
         m_service.RemoveMute(client.AgentId, muteID, muteName);
+        InstantMessageMuteCheck.Forget(client.AgentId);
     }
 }
 
