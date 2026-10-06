@@ -1268,12 +1268,15 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         EjectGroupMember(remoteClient, GetRequestingAgentID(remoteClient), groupID, ejecteeID);
     }
 
-    public void EjectGroupMember(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID ejecteeID)
+    public bool EjectGroupMember(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID ejecteeID)
     {
         if (m_debugEnabled) m_log.LogDebug("[GROUPS]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
         // Todo: Security check?
         m_groupData.RemoveAgentFromGroup(agentID, ejecteeID, groupID);
+
+        // The connector does not say whether the service refused, so read the membership back.
+        bool removed = m_groupData.GetAgentGroupMembership(agentID, ejecteeID, groupID) == null;
 
         string agentName;
         RegionInfo regionInfo;
@@ -1313,7 +1316,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
 
         GroupRecord groupInfo = m_groupData.GetGroupRecord(agentID, groupID, null);
         if (groupInfo == null)
-            return;
+            return removed;
 
         IClientAPI ejecteeClient = GetActiveRootClient(ejecteeID);
 
@@ -1382,6 +1385,8 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         msg.RegionID = regionInfo.RegionID.Guid;
         msg.binaryBucket = Array.Empty<byte>();
         OutgoingInstantMessage(msg, agentID);
+
+        return removed;
     }
 
     public void InviteGroupRequest(IClientAPI remoteClient, UUID groupID, UUID invitedAgentID, UUID roleID)
@@ -1389,7 +1394,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
         InviteGroup(remoteClient, GetRequestingAgentID(remoteClient), groupID, invitedAgentID, roleID);
     }
 
-    public void InviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID)
+    public bool InviteGroup(IClientAPI remoteClient, UUID agentID, UUID groupID, UUID invitedAgentID, UUID roleID)
     {
         if (m_debugEnabled) m_log.LogDebug("[GROUPS]: {0} called", System.Reflection.MethodBase.GetCurrentMethod().Name);
 
@@ -1464,6 +1469,8 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
                 OutgoingInstantMessage(msg, invitedAgentID);
             }
         }
+
+        return inviteInfo != null;
     }
 
     public List<DirGroupsReplyData> FindGroups(IClientAPI remoteClient, string query)

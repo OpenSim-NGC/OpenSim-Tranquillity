@@ -23,6 +23,7 @@
     <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
+    <ProjectReference Include="..\..\Addons\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj" />
     <ProjectReference Include="..\..\Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
   </ItemGroup>
 

@@ -43,4 +43,18 @@ public interface IProfileModule
     /// <returns>null if they cannot be read.</returns>
     UserPreferences GetUserPreferences(UUID userID) => null;
 
+    /// <summary>
+    /// The partner named on a user's profile, as the profiles service holds it.
+    /// </summary>
+    /// <remarks>
+    /// This is a service call: do not make it on a thread the region cannot afford to block.
+    /// </remarks>
+    /// <returns>false if the profile cannot be read; partnerID is then UUID.Zero. true with UUID.Zero when
+    /// the user has no partner.</returns>
+    bool TryGetUserPartner(UUID userID, out UUID partnerID)
+    {
+        partnerID = UUID.Zero;
+        return false;
+    }
+
 }
