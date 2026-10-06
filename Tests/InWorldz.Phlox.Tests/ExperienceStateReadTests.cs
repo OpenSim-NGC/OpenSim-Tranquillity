@@ -417,4 +417,71 @@ public class ExperienceStateReadTests
         Assert.True(r.Sp.HasScriptControls(r.Item("s1")));
         Assert.Equal(before, r.Service.Lookups);
     }
+
+    // ── a region stop ──
+
+    [Fact]
+    public void NoReadStartsOnceTheRegionStops()
+    {
+        using var r = new Rig();
+        r.Script("s1", r.X);
+        r.Grant("s1");
+        r.H.PumpUntilIdle(TimeSpan.FromSeconds(2));
+
+        r.XProperties = Suspended;
+        r.H.StopRegionAsTheSimulatorDoes();
+        int before = r.Service.Lookups;
+        r.Exe.ReadExperienceStatesNow();
+        r.H.PumpFor(TimeSpan.FromSeconds(1));
+        Assert.Equal(before, r.Service.Lookups);
+        Assert.False(r.Exe.ExperienceStateReadRunning);
+        Assert.Equal(0, r.Denials("s1"));
+        Assert.Equal(ExperiencePerms, r.MaskOf("s1"));
+    }
+
+    [Fact]
+    public void AReadInFlightAtTheStopEndsNoGrantAfterTheFinalSaveAndLeavesNothingRunning()
+    {
+        using var r = new Rig();
+        r.Script("s1", r.X);
+        r.Grant("s1");
+        r.H.PumpUntilIdle(TimeSpan.FromSeconds(2));
+
+        // A read is waiting on the service when the region stops; the service then answers that X is suspended.
+        r.Service.Gate = new ManualResetEventSlim(false);
+        int before = r.Service.Lookups;
+        r.Exe.ReadExperienceStatesNow();
+        Assert.True(r.H.PumpUntil(() => r.Service.Lookups == before + 1), "the read never asked");
+        r.XProperties = Suspended;
+        r.H.StopRegionAsTheSimulatorDoes();
+        Assert.Equal(r.X.ToString(), StateManager.Decode(SavedStateRig.Row(r.Item("s1"))!.Value.Blob).PermsExperience);
+
+        r.Service.Gate.Set();
+        Assert.True(r.H.PumpUntil(() => !r.Exe.ExperienceStateReaderAlive), "the reader is still running");
+        r.H.PumpFor(TimeSpan.FromSeconds(1));
+        Assert.Equal(0, r.Denials("s1"));
+        Assert.Equal(ExperiencePerms, r.MaskOf("s1"));
+        Assert.Equal(r.X.ToString(), StateManager.Decode(SavedStateRig.Row(r.Item("s1"))!.Value.Blob).PermsExperience);
+    }
+
+    [Fact]
+    public void AReadInFlightAtTheStopMakesNoFurtherLookup()
+    {
+        using var r = new Rig();
+        r.Script("sx", r.X);
+        r.Script("sy", r.Y);
+        r.Grant("sx");
+        r.Grant("sy");
+        r.H.PumpUntilIdle(TimeSpan.FromSeconds(2));
+
+        // Two Experiences to read; the region stops while the first lookup waits.
+        r.Service.Gate = new ManualResetEventSlim(false);
+        int before = r.Service.Lookups;
+        r.Exe.ReadExperienceStatesNow();
+        Assert.True(r.H.PumpUntil(() => r.Service.Lookups == before + 1), "the read never asked");
+        r.H.StopRegionAsTheSimulatorDoes();
+        r.Service.Gate.Set();
+        Assert.True(r.H.PumpUntil(() => !r.Exe.ExperienceStateReaderAlive), "the reader is still running");
+        Assert.Equal(before + 1, r.Service.Lookups);
+    }
 }

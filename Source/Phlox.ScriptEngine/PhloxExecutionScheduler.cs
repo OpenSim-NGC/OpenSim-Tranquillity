@@ -2072,6 +2072,7 @@ namespace Phlox.ScriptEngine
         private int m_ExperienceStateReadAsked;               // any thread (ReadExperienceStatesNow)
         private ulong m_LastExperienceStateWarning;
         private int m_ExperienceStateFailuresUnreported;
+        private volatile bool m_ExperienceStateReadsStopped;   // any thread
         private volatile Thread m_ExperienceStateReader;
 
         /// <summary>A read is running (scheduler thread; tests).</summary>
@@ -2100,18 +2101,32 @@ namespace Phlox.ScriptEngine
         /// </summary>
         internal void ExperienceCannotRun(UUID experience, int code)
         {
+            if (m_ExperienceStateReadsStopped) return;
             lock (m_ExperienceStateAnswers) m_ExperienceStateAnswers.Enqueue(new ExperienceStateAnswer { Experience = experience, Code = code });
             m_WorkArrived?.Invoke();
         }
 
-        /// <summary>When the next read is due, for DoWork's wake time; never while one runs.</summary>
+        /// <summary>
+        /// The region is stopping (called before the scheduler thread is stopped and the final save is made): no read
+        /// starts from here on, a read in flight makes no further lookup, and no answer ends a grant. The lookup in flight
+        /// cannot be cancelled (the core's lookup takes no cancellation); the reader thread ends as soon as it returns.
+        /// Any thread.
+        /// </summary>
+        internal void StopExperienceStateReads()
+        {
+            m_ExperienceStateReadsStopped = true;
+            lock (m_ExperienceStateAnswers) m_ExperienceStateAnswers.Clear();
+        }
+
+        /// <summary>When the next read is due, for DoWork's wake time; never while one runs or after the stop.</summary>
         private ulong NextExperienceStateRead()
-            => m_ExperienceStateReadRunning || m_NextExperienceStateRead == 0
+            => m_ExperienceStateReadRunning || m_ExperienceStateReadsStopped || m_NextExperienceStateRead == 0
                 ? ulong.MaxValue
                 : Math.Min(m_NextExperienceStateRead, m_SoonExperienceStateRead);
 
         private void ProcessExperienceStates()
         {
+            if (m_ExperienceStateReadsStopped) return;
             ApplyExperienceStateAnswers();
             ulong now = InWorldz.Phlox.Util.Clock.Now;
             if (m_NextExperienceStateRead == 0) m_NextExperienceStateRead = now + ExperienceStateReadIntervalMs;
@@ -2151,6 +2166,7 @@ namespace Phlox.ScriptEngine
         {
             foreach (UUID id in ids)
             {
+                if (m_ExperienceStateReadsStopped) return;
                 var answer = new ExperienceStateAnswer { Experience = id };
                 try
                 {
@@ -2161,9 +2177,11 @@ namespace Phlox.ScriptEngine
                 {
                     answer.Failure = e.Message;
                 }
+                if (m_ExperienceStateReadsStopped) return;
                 lock (m_ExperienceStateAnswers) m_ExperienceStateAnswers.Enqueue(answer);
                 m_WorkArrived?.Invoke();
             }
+            if (m_ExperienceStateReadsStopped) return;
             lock (m_ExperienceStateAnswers) m_ExperienceStateAnswers.Enqueue(new ExperienceStateAnswer { RoundDone = true });
             m_WorkArrived?.Invoke();
         }

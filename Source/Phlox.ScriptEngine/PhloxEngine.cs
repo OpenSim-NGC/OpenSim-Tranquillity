@@ -593,6 +593,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnAvatarEnteringNewParcel   -= OnAvatarEnteringNewParcelForExperiences;
             m_Scene.EventManager.OnExperiencePermissionsRevoked -= OnExperiencePermissionsRevoked;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
+            m_ExeScheduler?.StopExperienceStateReads();   // Before the final save: no read may end a grant after it
             bool stopped = m_MasterScheduler == null || m_MasterScheduler.Stop();
             AsyncCommands?.Shutdown();
             m_Scene = null;
@@ -673,7 +674,9 @@ namespace Phlox.ScriptEngine
         {
             m_log.LogInformation("[PhloxEngine]: Shutdown event, flushing script state");
             // The scheduler stops first, so the final save is of scripts that are no longer running (Halcyon
-            // MasterScheduler.Stop joins the execution thread before the state manager's backup).
+            // MasterScheduler.Stop joins the execution thread before the state manager's backup). No read of an
+            // Experience's state starts or ends a grant from here on, so none can after the final save.
+            m_ExeScheduler?.StopExperienceStateReads();
             SaveStateAtStop(m_MasterScheduler == null || m_MasterScheduler.StopThread());
             StateManager = null;
         }
