@@ -221,4 +221,74 @@ public class EventQueueDropLogTests : IDisposable
         _out.WriteLine(string.Join("\n", FullLines(c)));
         Assert.Equal(new[] { Line(c, "137 DATASERVER events") }, FullLines(c));
     }
+
+    /// <summary>Asleep for 200 s from "nap"; a touch it would run when awake.</summary>
+    private const string LongSleeper = @"
+        default {
+            state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""L entry""); }
+            listen(integer c, string n, key k, string m) {
+                if (m == ""nap"") { llSay(0, ""L asleep""); llSleep(200.0); llSay(0, ""L woke""); }
+            }
+            touch_start(integer t) { }
+        }";
+
+    private void Touches(UUID item, int n)
+    {
+        for (int i = 0; i < n; i++) H.PostTouch(item);
+        RunUntil(() => false, 1);                                      // the posts are handled, the clock barely moves
+    }
+
+    /// <summary>Pump with the clock moved 100 ms at a time when idle, up to <paramref name="clock"/>.</summary>
+    private void RunTo(ulong clock)
+    {
+        var wall = DateTime.UtcNow.AddSeconds(60);
+        while (m_now < clock && DateTime.UtcNow < wall)
+            if (!H.PumpOnceBusy()) m_now = Math.Min(clock, m_now + 100);
+    }
+
+    /// <summary>
+    /// A run that lasts writes a line each 60 s of the engine's clock with the drops since the line before, and one at
+    /// its end with the rest: a queue that stays full for three minutes still shows in the log, once a minute.
+    /// </summary>
+    [Fact]
+    public void ARunThatLastsWritesALineEachMinuteWithTheDropsSinceTheLast()
+    {
+        UUID l = Start(LongSleeper, "L");
+        Say("nap");
+        Assert.True(RunUntil(() => H.Said.Contains("L asleep")), Said);
+
+        ulong t0 = m_now;
+        Touches(l, 70);                                                // 64 wait, 6 dropped: the run starts
+        Assert.Equal(0.0f, H.Engine.GetEventQueueFreeSpacePercentage(l));
+        RunTo(t0 + 30_000);
+        Touches(l, 5);
+        RunTo(t0 + 59_000);
+        Assert.Empty(FullLines(l));                                    // not a minute yet
+        RunTo(t0 + 61_000);
+        Assert.Equal(new[] { Line(l, "11 TOUCH_START events") }, FullLines(l));
+
+        RunTo(t0 + 90_000);
+        Touches(l, 7);
+        RunTo(t0 + 121_000);
+        Assert.Equal(new[] { Line(l, "11 TOUCH_START events"), Line(l, "7 TOUCH_START events") }, FullLines(l));
+
+        RunTo(t0 + 150_000);
+        Touches(l, 3);
+        RunTo(t0 + 181_000);
+        Assert.Equal(3, FullLines(l).Length);
+        Assert.Equal(Line(l, "3 TOUCH_START events"), FullLines(l)[2]);
+
+        RunTo(t0 + 190_000);
+        Touches(l, 2);
+        Assert.Equal(0.0f, H.Engine.GetEventQueueFreeSpacePercentage(l));
+        RunTo(t0 + 205_000);                                           // it wakes at 200 s and drains: the run ends
+        Assert.True(RunUntil(() => H.Engine.GetEventQueueFreeSpacePercentage(l) == 1.0f), Said);
+        RunUntil(() => false, 10);
+        _out.WriteLine(string.Join("\n", FullLines(l)));
+        Assert.Equal(new[]
+        {
+            Line(l, "11 TOUCH_START events"), Line(l, "7 TOUCH_START events"),
+            Line(l, "3 TOUCH_START events"), Line(l, "2 TOUCH_START events"),
+        }, FullLines(l));
+    }
 }
