@@ -20972,7 +20972,8 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         /// state is the Experience service's at this request (the adapter asks the service each time); the request runs on
         /// the service lane, so a slow service delays only this script. A lookup that fails is XP_ERROR_NOT_FOUND (6), SL
         /// wiki llGetExperienceErrorMessage: "The sim was unable to verify the validity of the experience. Retrying after a
-        /// short wait is advised." An Experience the service does not know has no state to judge, and the request goes on.
+        /// short wait is advised." An Experience the service answers it does not know is XP_ERROR_INVALID_EXPERIENCE (7),
+        /// SL wiki llGetExperienceErrorMessage: "The script is associated with an experience that no longer exists."
         /// A grant the script already holds is not affected.
         /// </summary>
         private int ExperienceStateDenial(PhloxExperienceAdapter expService, UUID experienceId)
@@ -20987,7 +20988,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 m_log.LogWarning("[PhloxAPI]: llRequestExperiencePermissions could not look up experience {0}: {1}", experienceId, ex.Message);
                 return XP_ERROR_NOT_FOUND;
             }
-            return info == null ? XP_ERROR_NONE : ExperienceStateError(info.Properties);
+            return info == null ? XP_ERROR_INVALID_EXPERIENCE : ExperienceStateError(info.Properties);
         }
 
         /// <summary>

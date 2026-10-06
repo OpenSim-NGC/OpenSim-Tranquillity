@@ -59,6 +59,8 @@ public class ExperienceStateTests
     {
         public ExperienceInfo Info;
         public volatile bool LookupFails;
+        /// <summary>The service answers that it has no such Experience (an empty answer), as for one that was deleted.</summary>
+        public volatile bool Unknown;
         public readonly ConcurrentDictionary<(UUID, UUID), bool> Permissions = new();
 
         public static StateService Create(ExperienceInfo info)
@@ -78,7 +80,7 @@ public class ExperienceStateTests
                     if (LookupFails) throw new InvalidOperationException("Experience service unreachable");
                     var ids = (UUID[])a[0];
                     // A copy, as the service hands out: a later change to the stored Experience is not seen through it.
-                    return ids.Contains(Info.public_id)
+                    return ids.Contains(Info.public_id) && !Unknown
                         ? new[] { new ExperienceInfo { public_id = Info.public_id, owner_id = Info.owner_id, group_id = Info.group_id,
                                                        name = Info.name, properties = Info.properties } }
                         : Array.Empty<ExperienceInfo>();
@@ -214,6 +216,18 @@ public class ExperienceStateTests
         r.Service.LookupFails = true;
         Assert.Equal(r.Denied(6), r.Request());
         r.Service.LookupFails = false;
+        Assert.Equal(r.Granted, r.Request());
+    }
+
+    [Fact]
+    public void AnExperienceTheServiceDoesNotKnowIsRefusedWithInvalidExperience()
+    {
+        // SL wiki llGetExperienceErrorMessage, XP_ERROR_INVALID_EXPERIENCE (7): "The script is associated with an
+        // experience that no longer exists."
+        using var r = new Rig(0);
+        r.Service.Unknown = true;
+        Assert.Equal(r.Denied(7), r.Request());
+        r.Service.Unknown = false;
         Assert.Equal(r.Granted, r.Request());
     }
 

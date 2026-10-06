@@ -76,6 +76,8 @@ internal class OneExperience : DispatchProxy
         if (m.Name == nameof(IExperienceModule.GetExperiencePermission))
             return (UUID)a[0] == m_grantedBy && (UUID)a[1] == m_experience ? ExperiencePermission.Allowed : ExperiencePermission.None;
         if (m.Name == nameof(IExperienceModule.GetEstateAllowedExperiences)) return new[] { m_experience };
+        if (m.Name == nameof(IExperienceModule.GetExperienceInfo))   // known to the service, and enabled
+            return (UUID)a[0] == m_experience ? new ExperienceInfo { public_id = m_experience, name = "Example Experience" } : null;
         var rt = m.ReturnType;
         return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);
     }
