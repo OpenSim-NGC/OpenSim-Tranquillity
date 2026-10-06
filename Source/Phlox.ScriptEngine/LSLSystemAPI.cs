@@ -915,6 +915,24 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
+        /// The core ended the grant <paramref name="agentId"/> gave this script through <paramref name="experience"/>
+        /// (EventManager.OnExperiencePermissionsRevoked): the avatar blocked the Experience, SL wiki
+        /// experience_permissions_denied, "The agent has blocked the experience from the experience profile". The core
+        /// has already cleared the item's grant and posted experience_permissions_denied to the script, so the script is
+        /// told nothing more here: what the engine keeps for the grant ends as when the land ends it, and a request this
+        /// script is still waiting on from that avatar under that Experience ends unanswered, since the core's denial is
+        /// its answer. An item whose grant has since gone to another avatar is left alone. Scheduler thread.
+        /// </summary>
+        internal void ExperienceGrantEndedByCore(UUID agentId, UUID experience)
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || World == null) return;
+            if (item.PermsGranter != UUID.Zero && item.PermsGranter != agentId) return;
+            CancelPendingExperiencePermFor(agentId, experience);
+            EndExperienceGrant();
+        }
+
+        /// <summary>
         /// A grant that may no longer stand ends with the controls it took, and the state forgets it, so a save (a region
         /// stop's included, which cannot read the item) holds no grant a restart would give back.
         /// </summary>
@@ -21070,6 +21088,29 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     pending.Timer?.Dispose();
                     m_pendingExpPerms.Remove(m_itemID);
                 }
+                clientToUnhook = m_expHookedClient;
+                m_expHookedClient = null;
+            }
+            if (clientToUnhook != null)
+            {
+                clientToUnhook.OnScriptAnswer -= HandleExperienceScriptAnswer;
+                clientToUnhook.OnConnectionClosed -= HandleExperienceConnectionClosed;
+            }
+        }
+
+        /// <summary>
+        /// The request still waiting ends with no answer when it asks <paramref name="agentId"/> for
+        /// <paramref name="experience"/>: its timeout is stopped, the client unhooked, nothing posted.
+        /// </summary>
+        private void CancelPendingExperiencePermFor(UUID agentId, UUID experience)
+        {
+            IClientAPI clientToUnhook = null;
+            lock (m_pendingExpLock)
+            {
+                if (!m_pendingExpPerms.TryGetValue(m_itemID, out PendingExperiencePerm pending)
+                    || pending.AgentId != agentId || pending.ExperienceId != experience) return;
+                pending.Timer?.Dispose();
+                m_pendingExpPerms.Remove(m_itemID);
                 clientToUnhook = m_expHookedClient;
                 m_expHookedClient = null;
             }

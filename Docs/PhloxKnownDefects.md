@@ -449,6 +449,13 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     `XP_ERROR_NOT_PERMITTED_LAND` (17), as SL lists under "The experience can no longer run":
     "The agent has moved to a parcel where the experience cannot run"
     ([experience_permissions_denied](https://wiki.secondlife.com/wiki/Experience_permissions_denied)).
+  - When an avatar blocks an Experience from its profile, the simulator ends every grant that
+    avatar gave to a script of that Experience and posts `experience_permissions_denied` with
+    `XP_ERROR_NOT_PERMITTED` (4), as SL lists: "The agent has blocked the experience from the
+    experience profile". The script gets that event once, loses the controls it took, and a
+    region restart does not give the grant back. A request the script is still waiting on from
+    that avatar ends with that one answer. The same avatar's grants to scripts of other
+    Experiences, and other avatars' grants, stay.
   - States saved by an earlier Phlox build hold no grant and restore without one.
   - When a region starts, once the scripts it starts have loaded, one line in the log says
     how many came back with their saved state and how many of those got a grant back:
@@ -789,12 +796,10 @@ such list.
 
 ### Events
 - `game_control` compiles but is never raised.
-- When an avatar blocks an Experience from its profile, SL ends the Experience's grants and
-  posts `experience_permissions_denied` ("The agent has blocked the experience from the
-  experience profile"). The simulator does not tell Phlox, so a Phlox script keeps the grant
-  and calls that use it (controls, animations, the camera, `llTeleportAgent`) still work.
-  `llSitOnLink`, `llSetAgentEnvironment` and `llReplaceAgentEnvironment`, which ask the
-  Experience on every call, are refused.
+- When an avatar blocks an Experience from its profile while a script that holds no grant from
+  that avatar is waiting on `llRequestExperiencePermissions` for it, the simulator raises
+  nothing: the request is answered by the avatar's answer to the dialog, or after 5 minutes
+  with `XP_ERROR_REQUEST_PERM_TIMEOUT`.
 - `money` is raised only when the region has a money module.
 
 ### Engine
