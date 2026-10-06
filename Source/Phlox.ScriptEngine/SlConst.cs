@@ -384,10 +384,12 @@ namespace Phlox.ScriptEngine
 
         // ── XP_* ──────────────────────────────────────────────────────────
         public const int XP_ERROR_EXPERIENCE_DISABLED = 8;
+        public const int XP_ERROR_EXPERIENCE_SUSPENDED = 9;
         public const int XP_ERROR_INVALID_PARAMETERS = 3;
         public const int XP_ERROR_KEY_NOT_FOUND = 14;
         public const int XP_ERROR_MATURITY_EXCEEDED = 16;
         public const int XP_ERROR_NONE = 0;
+        public const int XP_ERROR_NOT_FOUND = 6;
         public const int XP_ERROR_NOT_PERMITTED = 4;
         public const int XP_ERROR_NOT_PERMITTED_LAND = 17;
         public const int XP_ERROR_NO_EXPERIENCE = 5;

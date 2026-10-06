@@ -19455,6 +19455,20 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         // Viewer experience-property bit PROPERTY_DISABLED (indra VP_DISABLED = 1<<6);
         // used to report the llGetExperienceDetails state field.
         private const int VP_DISABLED = 1 << 6;
+        // Viewer experience-property bit PROPERTY_SUSPENDED (indra VP_SUSPENDED = 1<<7; the core's ExperienceFlags.Suspended).
+        private const int VP_SUSPENDED = 1 << 7;
+
+        /// <summary>
+        /// The XP_ERROR an Experience's own state gives, from its viewer property bits. SL wiki llGetExperienceErrorMessage:
+        /// XP_ERROR_EXPERIENCE_DISABLED (8) "The experience owner has temporarily disabled the experience.";
+        /// XP_ERROR_EXPERIENCE_SUSPENDED (9) "The experience has been suspended by Linden Lab customer support." With both
+        /// bits set, disabled is the answer, as YEngine checks it first (LSL_Api llRequestExperiencePermissions and
+        /// llGetExperienceDetails).
+        /// </summary>
+        private static int ExperienceStateError(int properties)
+            => (properties & VP_DISABLED) != 0 ? XP_ERROR_EXPERIENCE_DISABLED
+             : (properties & VP_SUSPENDED) != 0 ? XP_ERROR_EXPERIENCE_SUSPENDED
+             : XP_ERROR_NONE;
         // SL per-experience KV quota: 128 MiB (was NGC's 16 MiB).
         private const long MAX_DATA_QUOTA = 128L * 1024 * 1024;
 
@@ -20905,7 +20919,10 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
             var expService = GetExperienceAdapter();
             UUID experienceId = GetScriptExperienceId();
-            ExperienceAnswer answer = DecideExperienceRequest(expService, experienceId, agentId, out int denial);
+            int denial = expService == null || experienceId.IsZero() ? XP_ERROR_NONE : ExperienceStateDenial(expService, experienceId);
+            ExperienceAnswer answer = denial != XP_ERROR_NONE
+                ? ExperienceAnswer.Denied
+                : DecideExperienceRequest(expService, experienceId, agentId, out denial);
             if (answer == ExperienceAnswer.Denied)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
@@ -20947,6 +20964,30 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             sp.ControllingClient.SendScriptQuestion(
                 m_host.UUID, m_host.ParentGroup.RootPart.Name, ownerName, m_itemID,
                 PERMISSION_EXPERIENCE, experienceId);
+        }
+
+        /// <summary>
+        /// llRequestExperiencePermissions is refused for an Experience that cannot run at all: disabled by its owner (8) or
+        /// suspended (9), <see cref="ExperienceStateError"/>. Checked before the land and the agent, as YEngine does. The
+        /// state is the Experience service's at this request (the adapter asks the service each time); the request runs on
+        /// the service lane, so a slow service delays only this script. A lookup that fails is XP_ERROR_NOT_FOUND (6), SL
+        /// wiki llGetExperienceErrorMessage: "The sim was unable to verify the validity of the experience. Retrying after a
+        /// short wait is advised." An Experience the service does not know has no state to judge, and the request goes on.
+        /// A grant the script already holds is not affected.
+        /// </summary>
+        private int ExperienceStateDenial(PhloxExperienceAdapter expService, UUID experienceId)
+        {
+            PhloxExperienceAdapter.PhloxExperienceInfo info;
+            try
+            {
+                info = expService.GetExperience(experienceId);
+            }
+            catch (Exception ex)
+            {
+                m_log.LogWarning("[PhloxAPI]: llRequestExperiencePermissions could not look up experience {0}: {1}", experienceId, ex.Message);
+                return XP_ERROR_NOT_FOUND;
+            }
+            return info == null ? XP_ERROR_NONE : ExperienceStateError(info.Properties);
         }
 
         /// <summary>
