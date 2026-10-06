@@ -554,6 +554,11 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   The SL wiki says of `llGroundNormal`: "This function does not return a unit vector."
 - `llApplyImpulse` in an attachment pushes the wearer, as in YEngine and Halcyon. `llApplyRotationalImpulse` in an
   attachment does nothing, as the SL wiki says ("It does not work on attachments"); Halcyon turned the wearer.
+- `llCastRay` that the physics engine refuses (for example a cast over the engine's time or hit budget) returns
+  `[RCERR_CAST_TIME_EXCEEDED]`. The region log gets at most one warning per script per minute for it: the first
+  refused cast writes one at once, and the next, written by the first cast refused after the minute is up, gives the
+  number of casts refused since that script's line before. Before, every refused cast wrote its own line, so a
+  script casting in a loop could write thousands a second.
 - `llGetPos` and `PRIM_POSITION` of a child prim in an attachment give the child's offset turned by the wearer's
   rotation plus the wearer's position (Halcyon's rule). YEngine gives the child's position from the attachment
   root's rotation, which does not follow the wearer turning.

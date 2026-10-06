@@ -16695,11 +16695,34 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.LogWarning("[PhloxAPI]: llCastRay exception: {0}", e.Message);
+                CountRefusedCastRay(e.Message);
                 results.Clear();
                 results.Add(RCERR_CAST_TIME_EXCEEDED); // RCERR_CAST_TIME_EXCEEDED as generic error
             }
             return new LSLList(results);
+        }
+
+        // A cast the physics engine refuses (a time or hit budget it enforces, or any other failure) returns
+        // RCERR_CAST_TIME_EXCEEDED. A script casting in a tight loop can be refused thousands of times a second, so the
+        // log gets at most one line per script each CastRayRefusedLineIntervalMs of the engine's clock: the first
+        // refused cast writes one at once, and after that the first cast refused once the interval has passed writes
+        // the next, with the number refused since the line before. Each script has its own API object, so no lock.
+        internal const ulong CastRayRefusedLineIntervalMs = 60_000;
+        private bool m_castRayRefusedLineWritten;
+        private ulong m_castRayRefusedLineDueOn;
+        private int m_castRayRefusedSinceLine;
+
+        private void CountRefusedCastRay(string reason)
+        {
+            m_castRayRefusedSinceLine++;
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            if (m_castRayRefusedLineWritten && now < m_castRayRefusedLineDueOn) return;
+            int refused = m_castRayRefusedSinceLine;
+            m_castRayRefusedSinceLine = 0;
+            m_castRayRefusedLineWritten = true;
+            m_castRayRefusedLineDueOn = now + CastRayRefusedLineIntervalMs;
+            m_log.LogWarning("[PhloxAPI]: llCastRay: {0} cast{1} refused for script {2} in {3} since this script's last such line: {4}",
+                refused, refused == 1 ? "" : "s", m_itemID, m_host?.Name, reason);
         }
         // ── JSON ───────────────────────────────────────────────────────────────
         // The getters read the text with System.Text.Json. A leading byte-order mark is skipped, as Halcyon's
