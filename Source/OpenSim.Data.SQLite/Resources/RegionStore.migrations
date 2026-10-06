@@ -428,3 +428,9 @@ COMMIT;
 BEGIN;
 ALTER TABLE primitems ADD COLUMN experienceID char(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
 COMMIT;
+
+:VERSION 45         #----- add the sit target state to prims
+# NULL: the state follows the sit target offset and rotation, as for every row saved before this step.
+BEGIN;
+ALTER TABLE prims ADD COLUMN SitTargetActive integer default NULL;
+COMMIT;

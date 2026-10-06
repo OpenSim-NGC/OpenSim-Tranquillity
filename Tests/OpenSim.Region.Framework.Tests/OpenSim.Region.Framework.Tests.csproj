@@ -27,6 +27,7 @@
     <ProjectReference Include="..\..\Source\OpenSim.Data.Null\OpenSim.Data.Null.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data.PGSQL\OpenSim.Data.PGSQL.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services.SimulationService\OpenSim.Services.SimulationService.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
