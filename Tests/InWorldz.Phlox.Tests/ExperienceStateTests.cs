@@ -62,6 +62,17 @@ public class ExperienceStateTests
         /// <summary>The service answers that it has no such Experience (an empty answer), as for one that was deleted.</summary>
         public volatile bool Unknown;
         public readonly ConcurrentDictionary<(UUID, UUID), bool> Permissions = new();
+        /// <summary>More Experiences the service knows, beside <see cref="Info"/>.</summary>
+        public readonly ConcurrentDictionary<UUID, ExperienceInfo> Others = new();
+        /// <summary>Experience lookups asked of the service, counted as they arrive.</summary>
+        public int Lookups => System.Threading.Volatile.Read(ref m_lookups);
+        private int m_lookups;
+        /// <summary>When set, a lookup waits for it before it answers, as a service that is slow to answer.</summary>
+        public volatile System.Threading.ManualResetEventSlim Gate;
+        /// <summary>How long a lookup waits for <see cref="Gate"/> before it answers anyway.</summary>
+        public TimeSpan GateTimeout = System.Threading.Timeout.InfiniteTimeSpan;
+        /// <summary>The thread each lookup was asked on, by name.</summary>
+        public readonly ConcurrentQueue<string> LookupThreads = new();
 
         public static StateService Create(ExperienceInfo info)
         {
@@ -77,13 +88,19 @@ public class ExperienceStateTests
             {
                 case nameof(IExperienceService.GetExperienceInfos):
                 {
+                    var thread = System.Threading.Thread.CurrentThread;
+                    LookupThreads.Enqueue(thread.Name ?? "(unnamed " + thread.ManagedThreadId + ")");
+                    System.Threading.Interlocked.Increment(ref m_lookups);
+                    Gate?.Wait(GateTimeout);
                     if (LookupFails) throw new InvalidOperationException("Experience service unreachable");
                     var ids = (UUID[])a[0];
                     // A copy, as the service hands out: a later change to the stored Experience is not seen through it.
-                    return ids.Contains(Info.public_id) && !Unknown
-                        ? new[] { new ExperienceInfo { public_id = Info.public_id, owner_id = Info.owner_id, group_id = Info.group_id,
-                                                       name = Info.name, properties = Info.properties } }
-                        : Array.Empty<ExperienceInfo>();
+                    static ExperienceInfo Copy(ExperienceInfo i) => new ExperienceInfo
+                    {
+                        public_id = i.public_id, owner_id = i.owner_id, group_id = i.group_id, name = i.name, properties = i.properties
+                    };
+                    if (ids.Contains(Info.public_id) && !Unknown) return new[] { Copy(Info) };
+                    return ids.Where(Others.ContainsKey).Select(id => Copy(Others[id])).ToArray();
                 }
                 case nameof(IExperienceService.FetchExperiencePermissions):
                 {
@@ -203,6 +220,8 @@ public class ExperienceStateTests
         Assert.Equal(r.Granted, r.Request());
         r.Properties = Suspended;
         Assert.Equal(r.Denied(9), r.Request());
+        // The refusal's lookup also ends the grant the script held from A since the request before, told with the same code.
+        Assert.True(r.H.PumpUntil(() => r.H.Said.Count(s => s == r.Denied(9)) == 2), SavedStateRig.SaidText(r.H));
         r.Properties = 0;
         Assert.Equal(r.Granted, r.Request());
     }

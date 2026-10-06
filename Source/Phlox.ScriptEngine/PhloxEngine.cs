@@ -1123,6 +1123,15 @@ namespace Phlox.ScriptEngine
             if (sp != null && !sp.IsChildAgent) m_ExeScheduler?.RequestExperienceLandCheck(sp.UUID);
         }
 
+        /// <summary>A script here was given back a grant from an Experience (a restore): its state is read shortly.</summary>
+        internal void ExperienceGrantRestored() => m_ExeScheduler?.ExperienceGrantRestored();
+
+        /// <summary>
+        /// A lookup for a script call found <paramref name="experience"/> disabled or suspended: every grant held from it
+        /// here ends, told with <paramref name="code"/>. Any thread.
+        /// </summary>
+        internal void ExperienceCannotRun(UUID experience, int code) => m_ExeScheduler?.ExperienceCannotRun(experience, code);
+
         // The core ended a script's grant because its avatar may no longer be reached through the script's Experience
         // (ExperienceModule: the avatar blocked it, or YEngine's grant on entering a parcel). The core cleared the item and
         // posted experience_permissions_denied; the script's own records end on the scheduler thread. Ignored once the
