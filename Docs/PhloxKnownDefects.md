@@ -564,6 +564,13 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   ([LlPushObject](https://wiki.secondlife.com/wiki/LlPushObject)). YEngine does the same. A local push on an avatar
   used to be turned by the pushing prim's rotation. `ang_impulse` is not applied to an avatar ("ang_impulse is
   ignored when applying to agents or their attachments"), and Phlox does not apply it to objects either.
+- `llPushObject` on land where pushing is restricted, by the parcel's Restrict Pushing or by the region's setting:
+  an object may push its owner, and so an attachment may push its wearer, as the SL wiki says: "In no-push areas an
+  object can only push its owner or itself." Phlox used to refuse it. Pushing another avatar there still works only
+  for an object owned by the land's owner or by the estate owner or an estate manager, and on a region that restricts
+  pushing, an avatar with no parcel under it can only be pushed by its own objects. YEngine allows an object to push its
+  owner on both settings, but refuses when the region restricts pushing and finds no parcel; YEngine also lets any
+  object push on group-owned land, and does not give estate managers an exception.
 - `llGetPos` and `PRIM_POSITION` of a child prim in an attachment give the child's offset turned by the wearer's
   rotation plus the wearer's position (Halcyon's rule). YEngine gives the child's position from the attachment
   root's rotation, which does not follow the wearer turning.

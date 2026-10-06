@@ -29,6 +29,8 @@
 using System;
 using System.Collections.Generic;
 using OpenMetaverse;
+using OpenSim.Framework;
+using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Tests.Common;
@@ -159,5 +161,159 @@ public class PushObjectTests
         Api(h, pusher).llPushObject(sp.UUID.ToString(), Impulse, new Vector3(0, 0, 5), 1);
         Assert.Single(actor.Forces);
         Assert.Empty(actor.AngularForces);
+    }
+
+    // ---- push-restricted land ----
+    // SL wiki LlPushObject: "Only works on land where Push is not restricted or where the script is owned by the land
+    // owner." and "In no-push areas an object can only push its owner or itself." The parcel's Restrict Pushing
+    // (PARCEL_FLAG_RESTRICT_PUSHOBJECT) and the region's (REGION_FLAG_RESTRICT_PUSHOBJECT) are each a no-push area.
+
+    public static IEnumerable<object[]> NoPushAreas() => new[] { new object[] { "parcel" }, new object[] { "region" } };
+
+    /// <summary>One parcel over the whole region, owned by <paramref name="landOwner"/>, with pushing restricted on it or on the region.</summary>
+    private static ILandObject NoPush(SchedulerHarness h, string area, UUID landOwner)
+    {
+        var land = new StripLand(h.Scene, ((int)Constants.RegionSize, landOwner));
+        h.Scene.LandChannel = land;
+        ILandObject parcel = land.Parcels[0];
+        if (area == "parcel") parcel.LandData.Flags |= (uint)ParcelFlags.RestrictPushObject;
+        else h.Scene.RegionInfo.RegionSettings.RestrictPushing = true;
+        return parcel;
+    }
+
+    private static void Own(SchedulerHarness h, UUID owner)
+    {
+        foreach (SceneObjectPart p in h.Prim.ParentGroup.Parts) p.OwnerID = owner;
+    }
+
+    private static void Push(SchedulerHarness h, ScenePresence sp)
+        => Api(h, h.Prim).llPushObject(sp.UUID.ToString(), Impulse, Vector3.Zero, 0);
+
+    [Theory]
+    [MemberData(nameof(NoPushAreas))]
+    public void OnNoPushLandAnObjectPushesItsOwner(string area)
+    {
+        using var h = new SchedulerHarness();
+        Pusher(h, new Vector3(100, 100, 25));
+        var (sp, actor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        Own(h, sp.UUID);
+        NoPush(h, area, UUID.Random());
+        Push(h, sp);
+        Assert.Single(actor.Forces);
+        Near(Impulse, actor.Forces[0]);
+    }
+
+    [Theory]
+    [MemberData(nameof(NoPushAreas))]
+    public void OnNoPushLandAnAttachmentPushesItsWearer(string area)
+    {
+        using var h = new SchedulerHarness();
+        var (sp, actor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        Own(h, sp.UUID);
+        var sog = h.Prim.ParentGroup;
+        sog.AttachedAvatar = sp.UUID;
+        sog.IsAttachment = true;
+        sp.AddAttachment(sog);
+        NoPush(h, area, UUID.Random());
+        Push(h, sp);
+        Assert.Single(actor.Forces);
+    }
+
+    [Theory]
+    [MemberData(nameof(NoPushAreas))]
+    public void OnNoPushLandAnObjectDoesNotPushAnotherAvatar(string area)
+    {
+        using var h = new SchedulerHarness();
+        Pusher(h, new Vector3(100, 100, 25));
+        var (owner, ownerActor) = Avatar(h, new Vector3(98, 100, 25), Quaternion.Identity);
+        var (other, otherActor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        Own(h, owner.UUID);
+        NoPush(h, area, UUID.Random());
+        Push(h, other);
+        Assert.Empty(otherActor.Forces);
+        Assert.Empty(ownerActor.Forces);
+    }
+
+    [Theory]
+    [MemberData(nameof(NoPushAreas))]
+    public void OnNoPushLandAnAttachmentDoesNotPushAnotherAvatar(string area)
+    {
+        using var h = new SchedulerHarness();
+        var (wearer, _) = Avatar(h, new Vector3(100, 100, 25), Quaternion.Identity);
+        var (other, otherActor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        Own(h, wearer.UUID);
+        var sog = h.Prim.ParentGroup;
+        sog.AttachedAvatar = wearer.UUID;
+        sog.IsAttachment = true;
+        wearer.AddAttachment(sog);
+        NoPush(h, area, UUID.Random());
+        Push(h, other);
+        Assert.Empty(otherActor.Forces);
+    }
+
+    [Theory]
+    [MemberData(nameof(NoPushAreas))]
+    public void OnNoPushLandTheLandOwnersObjectStillPushesAnotherAvatar(string area)
+    {
+        using var h = new SchedulerHarness();
+        Pusher(h, new Vector3(100, 100, 25));
+        var (other, actor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        UUID landOwner = UUID.Random();
+        Own(h, landOwner);
+        NoPush(h, area, landOwner);
+        Push(h, other);
+        Assert.Single(actor.Forces);
+    }
+
+    [Theory]
+    [MemberData(nameof(NoPushAreas))]
+    public void OnNoPushLandTheEstateOwnersObjectStillPushesAnotherAvatar(string area)
+    {
+        using var h = new SchedulerHarness();
+        Pusher(h, new Vector3(100, 100, 25));
+        var (other, actor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        UUID estateOwner = UUID.Random();
+        Own(h, estateOwner);
+        h.Scene.RegionInfo.EstateSettings.EstateOwner = estateOwner;
+        NoPush(h, area, UUID.Random());
+        Push(h, other);
+        Assert.Single(actor.Forces);
+    }
+
+    [Fact]
+    public void OnARegionThatRestrictsPushingWithNoParcelAnotherAvatarIsNotPushed()
+    {
+        using var h = new SchedulerHarness();
+        Pusher(h, new Vector3(100, 100, 25));
+        var (other, actor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        h.Scene.LandChannel = TwoParcels.Create(null, null);   // GetLandObject finds no parcel
+        h.Scene.RegionInfo.RegionSettings.RestrictPushing = true;
+        Push(h, other);
+        Assert.Empty(actor.Forces);
+    }
+
+    [Fact]
+    public void AGodIsNotPushedByAnotherOwnersObjectEvenWherePushingIsAllowed()
+    {
+        using var h = new SchedulerHarness();
+        Pusher(h, new Vector3(100, 100, 25));
+        var (god, actor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        god.IsViewerUIGod = true;
+        Push(h, god);
+        Assert.Empty(actor.Forces);
+        Own(h, god.UUID);
+        Push(h, god);
+        Assert.Single(actor.Forces);
+    }
+
+    [Fact]
+    public void WherePushingIsAllowedAnyObjectPushesAnyAvatar()
+    {
+        using var h = new SchedulerHarness();
+        Pusher(h, new Vector3(100, 100, 25));
+        var (other, actor) = Avatar(h, new Vector3(102, 100, 25), Quaternion.Identity);
+        h.Scene.LandChannel = new StripLand(h.Scene, ((int)Constants.RegionSize, UUID.Random()));
+        Push(h, other);
+        Assert.Single(actor.Forces);
     }
 }

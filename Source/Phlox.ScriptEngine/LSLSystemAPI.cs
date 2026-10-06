@@ -6040,7 +6040,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
             if (pusheeIsAvatar)
             {
-                if (pushRestricted)
+                // SL wiki LlPushObject: "In no-push areas an object can only push its owner or itself." An object
+                // pushing its owner, which includes an attachment pushing its wearer, is allowed whether the region
+                // or the parcel restricts pushing; YEngine allows it in both too.
+                if (m_host.OwnerID == targetID)
+                {
+                    pushAllowed = true;
+                }
+                else if (pushRestricted)
                 {
                     ILandObject land = World.LandChannel.GetLandObject(pusheePos.X, pusheePos.Y);
                     if (land == null) return;
