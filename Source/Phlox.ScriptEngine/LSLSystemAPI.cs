@@ -6088,8 +6088,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 PhysicsActor pa = pusheeAv.PhysicsActor;
                 if (pa != null)
                 {
+                    // SL wiki LlPushObject, local: "if TRUE uses the local axis of target, if FALSE uses the region
+                    // axis." The target here is the avatar, so its rotation turns the push, as YEngine does; an
+                    // object target is turned by its own rotation in ApplyImpulse below.
                     if (local != 0)
-                        appliedImpulse *= m_host.GetWorldRotation();
+                        appliedImpulse *= pusheeAv.GetWorldRotation();
                     pa.AddForce(appliedImpulse, true);
                 }
             }

@@ -559,6 +559,11 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   refused cast writes one at once, and the next, written by the first cast refused after the minute is up, gives the
   number of casts refused since that script's line before. Before, every refused cast wrote its own line, so a
   script casting in a loop could write thousands a second.
+- `llPushObject` with `local` TRUE turns the impulse by the target's rotation, avatar or object, as the SL wiki says:
+  "if TRUE uses the local axis of target, if FALSE uses the region axis"
+  ([LlPushObject](https://wiki.secondlife.com/wiki/LlPushObject)). YEngine does the same. A local push on an avatar
+  used to be turned by the pushing prim's rotation. `ang_impulse` is not applied to an avatar ("ang_impulse is
+  ignored when applying to agents or their attachments"), and Phlox does not apply it to objects either.
 - `llGetPos` and `PRIM_POSITION` of a child prim in an attachment give the child's offset turned by the wearer's
   rotation plus the wearer's position (Halcyon's rule). YEngine gives the child's position from the attachment
   root's rotation, which does not follow the wearer turning.
