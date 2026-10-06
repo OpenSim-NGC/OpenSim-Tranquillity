@@ -777,6 +777,11 @@ such list.
 - `PRIM_PHYSICS_MATERIAL` can be set, but reading it returns nothing.
 - `PRIM_SIT_FLAGS`: `SIT_FLAG_NO_COLLIDE` and `SIT_FLAG_NO_DAMAGE` are stored for read-back
   only.
+- `PRIM_SIT_TARGET` with a nonzero active value sets a target at `ZERO_VECTOR` with
+  `ZERO_ROTATION`, as SL documents, and it reads back exactly. The region database does not
+  save the target's on/off state, so after a region restart such a target is off (a take and
+  rez, a crossing or an archive keep it). YEngine keeps it across a restart by storing a
+  1e-5 m offset, which reads back.
 - For seated avatars, only position and rotation rules apply.
 - `PRIM_MATERIAL` with a value outside 0 to 7 is ignored (Halcyon refused the whole call).
 - `PRIM_FLEXIBLE` makes the whole object phantom when it turns a prim flexible, as YEngine does.

@@ -3503,22 +3503,18 @@ namespace Phlox.ScriptEngine
         /// outside this range are automatically rounded to the nearest limit"; Halcyon does not cap). An inactive one
         /// is removed: zero offset, identity rotation. The ll functions pass active only for a non-zero offset, as SL
         /// ("If offset == &lt;0.0, 0.0, 0.0&gt; then the sit target is removed"); Halcyon also keeps a zero offset with a
-        /// turned rotation. The scene holds no active flag apart from the offset and rotation (IsSitTargetSet), so an
-        /// active target at ZERO_VECTOR and ZERO_ROTATION reads back, and sits, as none (Docs/PhloxKnownDefects.md).
+        /// turned rotation. The state is set with the offset and rotation (SceneObjectPart.SetSitTarget), so PRIM_SIT_TARGET
+        /// can make a target at ZERO_VECTOR and ZERO_ROTATION active, as SL ("an offset of &lt;0.0, 0.0, 0.0&gt; may be
+        /// explicitly set"). The region stores do not save that state: after a region restart such a target is off.
         /// </summary>
         private static void PrimSetSitTarget(SceneObjectPart part, bool active, Vector3 offset, Quaternion rot)
         {
             if (active)
-            {
-                part.SitTargetPosition = new Vector3(Math.Clamp(offset.X, -300f, 300f),
-                    Math.Clamp(offset.Y, -300f, 300f), Math.Clamp(offset.Z, -300f, 300f));
-                part.SitTargetOrientation = NormalizedRot(rot);   // Halcyon Rot2Quaternion; core assumes a unit rotation
-            }
+                part.SetSitTarget(true, new Vector3(Math.Clamp(offset.X, -300f, 300f),
+                    Math.Clamp(offset.Y, -300f, 300f), Math.Clamp(offset.Z, -300f, 300f)),
+                    NormalizedRot(rot));   // Halcyon Rot2Quaternion; core assumes a unit rotation
             else
-            {
-                part.SitTargetPosition = Vector3.Zero;
-                part.SitTargetOrientation = Quaternion.Identity;
-            }
+                part.SetSitTarget(false, Vector3.Zero, Quaternion.Identity);
             if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
             part.ScheduleFullUpdate();
         }
