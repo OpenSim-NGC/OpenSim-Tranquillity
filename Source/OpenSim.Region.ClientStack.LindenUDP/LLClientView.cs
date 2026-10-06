@@ -6489,7 +6489,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         } while (TotalnumberIDs > 0);
     }
 
-    public void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, uint estateID)
+    public void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, UUID[] blocked, uint estateID)
     {
         EstateOwnerMessagePacket packet = new EstateOwnerMessagePacket();
         packet.AgentData.TransactionID = UUID.Random();
@@ -6498,7 +6498,11 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         packet.MethodData.Invoice = invoice;
         packet.MethodData.Method = Utils.StringToBytes("setexperience");
 
-        int numberIDs = allowed.Length + key.Length;
+        // Layout read by LL's viewer (llfloaterregioninfo.cpp, LLDispatchSetEstateExperience):
+        // [0] estate id, [1] send_to_agent_only, [2] num blocked, [3] num trusted, [4] num allowed,
+        // then the blocked, trusted and allowed ids in that order. The viewer replaces all three
+        // lists from this one reply, so every list is sent each time.
+        int numberIDs = blocked.Length + key.Length + allowed.Length;
 
         EstateOwnerMessagePacket.ParamListBlock[] returnblock = new EstateOwnerMessagePacket.ParamListBlock[5 + numberIDs];
 
@@ -6510,11 +6514,17 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         returnblock[0].Parameter = Utils.StringToBytes(estateID.ToString());
 
         returnblock[1].Parameter = Utils.StringToBytes("0");
-        returnblock[2].Parameter = Utils.StringToBytes("0");
+        returnblock[2].Parameter = Utils.StringToBytes(blocked.Length.ToString());
         returnblock[3].Parameter = Utils.StringToBytes(key.Length.ToString());
         returnblock[4].Parameter = Utils.StringToBytes(allowed.Length.ToString());
 
         int j = 5;
+
+        for (int i = 0; i < blocked.Length; i++)
+        {
+            returnblock[j].Parameter = blocked[i].GetBytes();
+            j++;
+        }
 
         for (int i = 0; i < key.Length; i++)
         {

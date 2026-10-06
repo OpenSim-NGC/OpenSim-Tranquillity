@@ -1447,9 +1447,12 @@ public class TestClient : IClientAPI, IClientCore
     public void FireScriptAnswer(UUID taskID, UUID itemID, int answer)
         => OnScriptAnswer?.Invoke(this, taskID, itemID, answer);
 
-    public void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, uint estateID)
+    /// <summary>Every estate Experience lists reply sent to this client.</summary>
+    public List<(UUID Invoice, UUID[] Allowed, UUID[] Key, UUID[] Blocked, uint EstateID)> EstateExperienceReplies { get; } = new();
+
+    public void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, UUID[] blocked, uint estateID)
     {
-        throw new NotImplementedException();
+        lock (EstateExperienceReplies) EstateExperienceReplies.Add((invoice, allowed, key, blocked, estateID));
     }
 
     public void SendPickInfoReply(UUID pickID, UUID creatorID, bool topPick, UUID parcelID, string name, string desc, UUID snapshotID, string user, string originalName, string simName, Vector3d posGlobal, int sortOrder, bool enabled)
