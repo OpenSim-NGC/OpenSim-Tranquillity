@@ -19986,6 +19986,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         // ── Tier 7b: Agent Environment + User Key (633–635) ──
 
+        /// <summary>YEngine's m_sleepMsOnRequestAgentData, which its llRequestUserKey sleeps (LSL_Api.cs:157).</summary>
+        private const int USER_KEY_REQUEST_DELAY = 100;
+
         public string llRequestUserKey(string username)
         {
             // Async lookup — fires dataserver event with the user's UUID
@@ -20020,6 +20023,17 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     PostDataserverEvent(reqID, UUID.Zero.ToString());
                 }
             });
+
+            // YEngine (LSL_Api.cs llRequestUserKey) pauses 100 ms after a request that goes to the user-account lookup;
+            // an avatar in this region it answers at once, with no pause.
+            bool here = false;
+            World?.ForEachScenePresence(sp =>
+            {
+                if (!here && !sp.IsChildAgent
+                    && sp.Firstname.Equals(firstName, StringComparison.OrdinalIgnoreCase)
+                    && sp.Lastname.Equals(lastName, StringComparison.OrdinalIgnoreCase)) here = true;
+            });
+            if (!here) ScriptSleep(USER_KEY_REQUEST_DELAY);
 
             return reqID.ToString();
         }
