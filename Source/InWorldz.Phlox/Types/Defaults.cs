@@ -6861,6 +6861,21 @@ namespace InWorldz.Phlox.Types
                 ParamNames = new string[] { "avatarKey", "notecard", "includeHuds" },
                 TableIndex = 966
             }},
+            // OSSL_Api.cs osMakeNotecard, both forms: the text as one string, or a list written one item per line.
+            {"osMakeNotecard", new FunctionSig {
+                FunctionName = "osMakeNotecard",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] { VarType.String, VarType.String },
+                ParamNames = new string[] { "notecardName", "contents" },
+                TableIndex = 967
+            }},
+            {"osMakeNotecard__2", new FunctionSig {
+                FunctionName = "osMakeNotecard",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] { VarType.String, VarType.List },
+                ParamNames = new string[] { "notecardName", "contents" },
+                TableIndex = 968
+            }},
          };
 
         /// <summary>

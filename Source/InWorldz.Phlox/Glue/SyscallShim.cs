@@ -1051,6 +1051,8 @@ private static string ConvToString(object o)
 								Shim_osPerlinNoise2D,                 //964
 								Shim_osAgentSaveAppearance,           //965
 								Shim_osAgentSaveAppearance3,          //966
+								Shim_osMakeNotecard,                  //967
+								Shim_osMakeNotecardList,              //968
         };
 
         /// <summary>
@@ -7399,6 +7401,20 @@ private static string ConvToString(object o)
             string p0 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
             string ret = self._systemAPI.osAgentSaveAppearance(p0, p1, p2);
             self._interpreter.SafeOperandsPush(ConvToLSLType(ret));
+        }
+        // An asset write can leave the process, so both forms run on the service lane; a refusal by the [OSSL] gate
+        // is raised in the script from there.
+        static private void Shim_osMakeNotecard(SyscallShim self)
+        {
+            string p1 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
+            string p0 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
+            Defer(self, "osMakeNotecard", new object[] { p0, p1 }, () => { self._systemAPI.osMakeNotecard(p0, p1); return null; }, null, false);
+        }
+        static private void Shim_osMakeNotecardList(SyscallShim self)
+        {
+            LSLList p1 = ConvToLSLList(self._interpreter.ScriptState.Operands.Pop());
+            string p0 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
+            Defer(self, "osMakeNotecard", new object[] { p0, p1 }, () => { self._systemAPI.osMakeNotecard(p0, p1); return null; }, null, false);
         }
         // The type-discriminated overloads
         static private void Shim_osSetProjectionParamsKey(SyscallShim self)

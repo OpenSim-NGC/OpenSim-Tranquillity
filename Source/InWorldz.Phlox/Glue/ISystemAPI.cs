@@ -481,6 +481,10 @@ namespace InWorldz.Phlox.Glue
         string osAgentSaveAppearance(string avatarKey, string notecard);
         /// <summary>OSSL_Api.cs:3499 - VeryHigh.</summary>
         string osAgentSaveAppearance(string avatarKey, string notecard, int includeHuds);
+        /// <summary>OSSL_Api.cs:2174 - High. Writes a notecard of the text and a newline into the script's prim.</summary>
+        void osMakeNotecard(string notecardName, string contents);
+        /// <summary>OSSL_Api.cs:2180 - High. The same, one list item per line.</summary>
+        void osMakeNotecard(string notecardName, LSLList contents);
 
         int osApproxEquals(float a, float b);
         int osApproxEquals(float a, float b, float margin);
