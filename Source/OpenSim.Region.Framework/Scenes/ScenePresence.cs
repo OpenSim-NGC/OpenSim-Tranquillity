@@ -907,6 +907,14 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         set
         {
+            // The value comes from the viewer's agent update, from agent data sent by another
+            // simulator and from scripts. One that is not finite or too short to be a rotation is
+            // ignored and the previous rotation kept, because the stored value is sent to other
+            // viewers, to neighbouring regions and to the physics engine. Not logged: a client
+            // could send one in every agent update.
+            if (!IsUsableRotation(value))
+                return;
+
             m_bodyRot = value;
 
             if (PhysicsActor != null)
@@ -922,6 +930,14 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
             }
 //                m_log.LogDebug("[SCENE PRESENCE]: Body rot for {0} set to {1}", Name, m_bodyRot);
         }
+    }
+
+    // 1e-6 is the squared-length bound LLClientView's avatar update serialiser already uses
+    // for a rotation too short to normalise.
+    private static bool IsUsableRotation(Quaternion q)
+    {
+        return float.IsFinite(q.X) && float.IsFinite(q.Y) && float.IsFinite(q.Z) && float.IsFinite(q.W)
+            && q.X * q.X + q.Y * q.Y + q.Z * q.Z + q.W * q.W >= 1e-6f;
     }
 
     // Used for limited viewer 'fake' user rotations.
