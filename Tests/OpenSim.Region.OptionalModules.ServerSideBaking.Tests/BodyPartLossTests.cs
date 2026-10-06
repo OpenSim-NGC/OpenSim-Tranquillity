@@ -6,7 +6,7 @@ using Xunit;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S8. A bake made from a wearable set that has lost a body part is not a bake of a different outfit - it is a
+/// A bake made from a wearable set that has lost a body part is not a bake of a different outfit - it is a
 /// bake of nothing, and storing it is destructive, because a new bake supersedes (deletes) the asset it replaces
 /// (ADR-004). Baking again cannot undo it.
 ///

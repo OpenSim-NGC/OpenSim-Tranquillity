@@ -60,7 +60,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
 
             // This is an unfortunate bit of clean up we have to do because MainServer manages things through static
             // variables and the VM is not restarted between tests.
-            // T1: MainServer is instance-based now; OpenSimTestCase removed the previous default server, so this one becomes DefaultServer.
+            // MainServer is instance-based now; OpenSimTestCase removed the previous default server, so this one becomes DefaultServer.
             MainServer.Instance.RemoveHttpServer(port);
 
             m_server = new BaseHttpServer(port, false, "","","");

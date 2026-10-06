@@ -21,13 +21,13 @@ public enum AisMode
 /// <summary>
 /// The InventoryAPIv3 / LibraryAPIv3 cap handler: one per agent per cap, mounted at a random cap path. Parses the
 /// request with <see cref="AisRouter"/> and dispatches on <see cref="AisOperation"/>. Holds only an agent id, a
-/// backend and its cap path (Ledger P-2) so the same class can be mounted on Robust in Phase 2.
+/// backend and its cap path so the same class can be mounted on Robust in Phase 2.
 ///
-/// <para>A1 implemented the **read** surface: <c>GET /item</c>, <c>/category/{id}/children</c> (whole and subset),
-/// <c>/categories</c>, <c>/links</c>, <c>/category/current/links</c> and <c>/orphans</c>. A2 adds the
+/// <para>The **read** surface: <c>GET /item</c>, <c>/category/{id}/children</c> (whole and subset),
+/// <c>/categories</c>, <c>/links</c>, <c>/category/current/links</c> and <c>/orphans</c>. It also has the
 /// **single-object mutations**: <c>PATCH /item</c>, <c>PATCH /category</c>, <c>DELETE /item</c> and
 /// <c>DELETE /category</c>, each answering with the delta envelope of §1d-bis. SlamFolder, PurgeDescendents,
-/// CreateInventory and COPY are still 501 (A3/A4). Every mutation is 405 on the library cap.</para>
+/// CreateInventory and COPY are handled too. Every mutation is 405 on the library cap.</para>
 ///
 /// <para><b>Which collections a response carries.</b> The viewer derives a folder's descendent count only when
 /// <c>_embedded</c> has all three of <c>categories</c>, <c>items</c>, <c>links</c> — or, for a Current Outfit or
@@ -116,7 +116,7 @@ public sealed class AisHandler : SimpleStreamHandler
                     return;
 
                 // A slam REPLACES a folder's links, so an absent body cannot be read as "replace them with
-                // nothing" - that is the defect this session closed. The other mutating routes keep today's
+                // nothing". The other mutating routes keep today's
                 // empty-map behaviour deliberately: their semantics are not in scope here.
                 case AisBodyStatus.NoBody when route.Operation == AisOperation.SlamFolder:
                     m_log.LogWarning("[AIS]: SlamFolder on {Path} from agent {Agent} arrived with no body; refused rather than read as an empty slam",
@@ -506,7 +506,7 @@ public sealed class AisHandler : SimpleStreamHandler
         WithFolderLock(item.Folder, route, response, () =>
         {
 
-            // S9: captured before ApplyToItem, which mutates the item in place.
+            // Captured before ApplyToItem, which mutates the item in place.
             var assetBefore = item.AssetID;
 
             var applied = AisMutation.ApplyToItem(body, item);
@@ -539,7 +539,7 @@ public sealed class AisHandler : SimpleStreamHandler
                 item = m_backend.GetItem(m_agentId, route.Id) ?? item;
             }
 
-            // S9: an edit to a WORN wearable is the one appearance change nothing else tells the region about. The
+            // An edit to a WORN wearable is the one appearance change nothing else tells the region about. The
             // worn set does not move (the viewer keeps the item id), so no AgentIsNowWearing follows, and the
             // UpdateAvatarAppearance POST is deferred behind pending uploads and can arrive stale. This PATCH is the
             // moment the new asset exists and is known, so it is where the save is queued.
@@ -583,7 +583,7 @@ public sealed class AisHandler : SimpleStreamHandler
     /// <summary>
     /// DELETE /item/{id}. No content: the removal travels as <c>_removed_items</c> and the parent's new version
     /// as <c>_updated_category_versions</c> (§1d-bis). The parent is read **after** the delete, so the version is
-    /// the post-operation one the data layer bumped (S0a V6, tree state T3/T4).
+    /// the post-operation one the data layer bumped.
     /// </summary>
     private void RemoveItem(AisRoute route, IOSHttpResponse response)
     {
@@ -612,7 +612,7 @@ public sealed class AisHandler : SimpleStreamHandler
     /// reuses and the no-rollback reasoning).
     ///
     /// <para>The destination folder id travels in the HTTP <c>Destination</c> header
-    /// (<c>llcorehttputil.cpp:1135</c>, A1). The tid carries a quirk: when the viewer does **not** want
+    /// (<c>llcorehttputil.cpp:1135</c>). The tid carries a quirk: when the viewer does **not** want
     /// sub-folders it appends the literal <c>,depth=0</c> to the tid value rather than adding a query parameter
     /// (<c>llaisapi.cpp:275-278</c>), which <see cref="AisRouter"/> already splits out into the <c>depth</c>
     /// query value — so <c>depth == 0</c> here means "this folder only".</para>
@@ -1015,9 +1015,9 @@ public sealed class AisHandler : SimpleStreamHandler
     /// <c>onDescendentsPurgedFromServer</c> for a category, <c>llinventorymodel.cpp:2019-2023</c>), so they are
     /// implied rather than enumerated.
     ///
-    /// <para><b>Deletion is not restricted to Trash</b> (A2b, Ledger A-Q9 resolved). The call passes
-    /// <c>onlyIfTrash: false</c> through the <c>IInventoryService</c> overload added in A2b, because the viewer
-    /// deletes any non-protected folder wherever it sits (<c>llviewerinventory.cpp:1545-1568</c>, read in A2). The
+    /// <para><b>Deletion is not restricted to Trash.</b> The call passes
+    /// <c>onlyIfTrash: false</c> through the three-argument <c>IInventoryService</c> overload, because the viewer
+    /// deletes any non-protected folder wherever it sits (<c>llviewerinventory.cpp:1545-1568</c>). The
     /// result is still verified by re-reading the folder rather than trusting the return value, since the service
     /// returns true even when it deleted nothing.</para>
     ///
@@ -1076,7 +1076,7 @@ public sealed class AisHandler : SimpleStreamHandler
         (short)FolderType.MarkplaceStock,
         // FT_MARKETPLACE_VERSION (55) is unprotected in the viewer's table but this tree's FolderType has no
         // member for it, so it falls through to the protected default. It is a marketplace type no OpenSim grid
-        // creates; see the session decisions.
+        // creates.
     };
 
     /// <summary>The unused ensemble range, entered as unprotected in the viewer's table (`llfoldertype.cpp:106-109`).</summary>
@@ -1106,8 +1106,8 @@ public sealed class AisHandler : SimpleStreamHandler
 
     /// <summary>
     /// 200 with an LLSD XML body. The viewer sends and reads LLSD XML and sets both <c>Content-Type</c> and
-    /// <c>Accept</c> to <c>application/llsd+xml</c> on every AIS request (A-Q2, resolved A1:
-    /// <c>llcorehttputil.cpp:1219-1222</c> <c>checkDefaultHeaders</c>; bodies serialised with
+    /// <c>Accept</c> to <c>application/llsd+xml</c> on every AIS request
+    /// (<c>llcorehttputil.cpp:1219-1222</c> <c>checkDefaultHeaders</c>; bodies serialised with
     /// <c>LLSDSerialize::toXML</c> at <c>:144</c>, <c>:169</c>, <c>:193</c> and parsed with
     /// <c>LLSDSerialize::fromXML</c> at <c>:123</c>).
     ///

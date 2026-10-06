@@ -7,7 +7,7 @@ using Xunit;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S3 Part 1 — the wire. The §4.3 COF handshake in all four of its branches, the per-region flag, and the one
+/// The wire. The §4.3 COF handshake in all four of its branches, the per-region flag, and the one
 /// thing ADR-001 will not tolerate: that a flag-off region's <c>AvatarAppearance</c> packet is byte-for-byte the
 /// packet it was before server-side baking existed.
 /// </summary>
@@ -92,7 +92,7 @@ public class WireTests
         Assert.Equal(9, d.Version);
     }
 
-    // ------------------------------------------------------------------ anti-livelock (Ledger R-2)
+    // ------------------------------------------------------------------ anti-livelock
 
     [Fact]
     public void Handshake_TooManyMismatchesInTheWindow_BakesAnyway()
@@ -164,7 +164,7 @@ public class WireTests
     // simulatorDefault, region section, region value  ->  expected
     [InlineData(false, null, null, false)]              // nothing anywhere: off, which is what every shipped ini says
     [InlineData(true, null, null, true)]                // simulator-wide on, no region section
-    [InlineData(false, "Ebony", "true", true)]          // the case S3 ships for: one region opts in
+    [InlineData(false, "Ebony", "true", true)]          // one region opts in
     [InlineData(true, "Ebony", "false", false)]         // and a region can opt out of a simulator-wide on
     [InlineData(false, "Elm", "true", false)]           // a section for a different region does not apply
     public void FlagResolvesPerRegionLikeAisEnabledDoes(bool simulatorDefault, string section, string value, bool expected)
@@ -220,7 +220,7 @@ public class WireTests
 
     /// <summary>
     /// The AvatarAppearance packet body as <c>LLClientView.SendAppearance</c> writes it, replayed here field for
-    /// field so the two forms can be compared without a UDP server. The layout under test is the one thing S3
+    /// field so the two forms can be compared without a UDP server. The layout under test is the one thing the wire change
     /// changed in a hot path: the AppearanceData block, which was a hard-coded count of 0 and is now a count of 0
     /// or one 9-byte block.
     /// </summary>
@@ -265,7 +265,7 @@ public class WireTests
     }
 
     /// <summary>
-    /// The pre-S3 form, transcribed from the code as it stood at 95c3eefbbe: a single zero byte where the
+    /// The form before the AppearanceData block, transcribed from the code as it stood at 95c3eefbbe: a single zero byte where the
     /// AppearanceData count goes, and nothing else different.
     /// </summary>
     private static byte[] AppearanceBodyBeforeS3(byte[] textureEntry, byte[] visualParams, float hover)

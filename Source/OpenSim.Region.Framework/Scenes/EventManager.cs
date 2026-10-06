@@ -730,13 +730,13 @@ public class EventManager
     public event AvatarKillData OnAvatarKilled;
 
     /// <summary>
-    /// PHLOX-10. Damage is about to be applied to a presence: the batch is MUTABLE - a handler
+    /// Damage is about to be applied to a presence: the batch is MUTABLE - a handler
     /// (the script engine's on_damage) may rewrite each entry's Amount before it lands. Raised
     /// synchronously from ScenePresence.ApplyDamage; handlers must return before the damage applies.
     /// </summary>
     public delegate void AvatarDamageData(ScenePresence avatar, List<DamageEntry> batch);
     public event AvatarDamageData OnAvatarDamage;
-    /// <summary>PHLOX-10. The batch has been applied; Amount is what landed. final_damage hangs here.</summary>
+    /// <summary>The batch has been applied; Amount is what landed. final_damage hangs here.</summary>
     public event AvatarDamageData OnAvatarDamageApplied;
 
     /*

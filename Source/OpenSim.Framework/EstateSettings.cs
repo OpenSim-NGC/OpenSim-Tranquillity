@@ -294,7 +294,7 @@ public class EstateSettings
         set { l_KeyExperiences = new List<UUID>(value); }
     }
 
-    // Region/estate BLOCKED experiences (T5b) — the block-wins tier of the admission ladder.
+    // Region/estate BLOCKED experiences — the block-wins tier of the admission ladder.
     // A third list next to AllowedExperiences + KeyExperiences, same shape/persistence.
     private List<UUID> l_BlockedExperiences = new List<UUID>();
 

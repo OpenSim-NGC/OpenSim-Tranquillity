@@ -277,7 +277,7 @@ public class ChatModule : ISharedRegionModule
             }
         }
 
-        // PHLOX-9b. Object chat on DEBUG_CHANNEL is for the object's OWNER: script errors and the API's
+        // Object chat on DEBUG_CHANNEL is for the object's OWNER: script errors and the API's
         // "no permission / not found" lines. The SL wiki says the sim broadcasts and "most viewers filter
         // out messages received on DEBUG_CHANNEL from objects owned by others" - not every viewer
         // does, and a bystander can get the script-warning box for someone else's prim.

@@ -14,7 +14,7 @@ public static class AisMutation
 {
     /// <summary>
     /// Fields of an item PATCH this tree can store. The viewer sends the item's **whole** <c>asLLSD()</c> map with
-    /// <c>asset_id</c>/<c>shadow_id</c> swapped for <c>hash_id</c> (A-Q3, <c>llviewerinventory.cpp:435-454</c> and
+    /// <c>asset_id</c>/<c>shadow_id</c> swapped for <c>hash_id</c> (<c>llviewerinventory.cpp:435-454</c> and
     /// <c>:1399-1422</c>), so most keys in a body are just the item as the viewer already had it. Anything not
     /// listed here is ignored rather than refused — refusing would fail every ordinary rename.
     ///
@@ -87,8 +87,8 @@ public static class AisMutation
 
     /// <summary>
     /// Applies the storable fields of <paramref name="body"/> to <paramref name="item"/> and reports what it did.
-    /// <c>parent_id</c> is deliberately **not** applied: a move changes two folders' versions and is not part of
-    /// A2 (see the session's decisions), so a body whose parent differs is treated as an unchanged parent.
+    /// <c>parent_id</c> is deliberately **not** applied: a move changes two folders' versions and is not handled
+    /// here, so a body whose parent differs is treated as an unchanged parent.
     /// </summary>
     public static Applied ApplyToItem(OSDMap body, InventoryItemBase item)
     {

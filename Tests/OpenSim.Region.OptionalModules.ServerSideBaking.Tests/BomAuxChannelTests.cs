@@ -10,9 +10,9 @@ using Xunit.Abstractions;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S5 Part 2 — the five Bakes-on-Mesh aux channels (leftarm, leftleg, aux1, aux2, aux3). The library has produced
-/// them since S0b and nothing has ever exercised them, because no test avatar wears a Universal wearable and
-/// neither reference set has one (Ledger Q-11). This drives them with a synthetic Universal instead.
+/// The five Bakes-on-Mesh aux channels (leftarm, leftleg, aux1, aux2, aux3). The library has always produced
+/// them and nothing had exercised them, because no test avatar wears a Universal wearable and
+/// neither reference set has one. This drives them with a synthetic Universal instead.
 ///
 /// <para>
 /// A synthetic fixture is the honest limit of what can be tested without content. See
@@ -212,7 +212,7 @@ public class BomAuxChannelTests
             var c = outcome.Channels.Single(x => x.Channel == channel);
             var token = channel.ToString().ToLowerInvariant();
 
-            // the token the viewer sends resolves to this channel (S4's map)
+            // the token the viewer sends resolves to this channel (the appearance service's map)
             Assert.Equal(BakeIndex.BakeKey(channel), AppearanceChannels.BakeKeyFor(token));
 
             var got = svc.GetBake(Agent, token, c.AssetId);

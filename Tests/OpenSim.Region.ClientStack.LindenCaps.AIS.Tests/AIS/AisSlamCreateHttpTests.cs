@@ -14,7 +14,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 
 /// <summary>
 /// SlamFolder and CreateInventory over HTTP. The tests that earn their keep here are the failure ones: a slam is
-/// several independent writes with no transaction underneath (Ledger A-R2), so what matters is exactly what the
+/// several independent writes with no transaction underneath, so what matters is exactly what the
 /// folder looks like when one of them fails.
 /// </summary>
 [TestFixture]
@@ -552,7 +552,7 @@ public class AisSlamCreateHttpTests
 
     /// <summary>
     /// An empty MAP is not an empty slam. The viewer sends a bare LLSD <b>array</b> and never <c>{}</c>
-    /// (spec A-Q3, <c>llappearancemgr.cpp:2209-2245</c>), so <c>{}</c> can only be a client we do not know or a
+    /// (<c>llappearancemgr.cpp:2209-2245</c>), so <c>{}</c> can only be a client we do not know or a
     /// body that arrived damaged — and under replacement semantics the safe reading of both is "refuse".
     /// </summary>
     [Test]

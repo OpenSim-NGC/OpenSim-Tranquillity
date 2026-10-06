@@ -42,8 +42,8 @@ public static class AisInventory
     }
 
     /// <summary>
-    /// The items a set of links points at. There is no link-aware fetch in <c>IInventoryService</c> (tree state
-    /// T5), so this does what the existing descendents cap does: collect the <c>AssetType.Link</c> rows' asset ids
+    /// The items a set of links points at. There is no link-aware fetch in <c>IInventoryService</c>,
+    /// so this does what the existing descendents cap does: collect the <c>AssetType.Link</c> rows' asset ids
     /// and resolve them with one <c>GetMultipleItems</c>
     /// (<c>Source/OpenSim.Capabilities.Handlers/FetchInventory/FetchInvDescHandler.cs:424-460</c>,
     /// <c>ProcessLinks</c>). Links to links are dropped for the same reason that handler drops them (:454-457):
@@ -113,7 +113,7 @@ public static class AisInventory
         return expanded;
     }
 
-    /// <summary>The agent's Current Outfit folder (spec §1b, tree state T2); null when the agent has none.</summary>
+    /// <summary>The agent's Current Outfit folder (spec §1b); null when the agent has none.</summary>
     public static InventoryFolderBase GetCurrentOutfit(IAisInventoryBackend backend, UUID agentId)
         => GetSystemFolder(backend, agentId, FolderType.CurrentOutfit);
 
@@ -180,7 +180,7 @@ public static class AisInventory
     /// Folders whose <c>ParentID</c> names a folder that is not in the agent's skeleton — the only orphan class
     /// this tree can find without walking every folder's contents. Orphaned **items** are not reported: the
     /// inventory service has no query for them and finding them would mean listing every folder
-    /// (<c>IInventoryService</c> surface, tree state T5). An empty result is therefore "no orphan folders", not
+    /// (<c>IInventoryService</c> surface). An empty result is therefore "no orphan folders", not
     /// "no orphans of any kind", and the route says so in its own documentation.
     /// </summary>
     public static AisOrphans FindOrphans(IAisInventoryBackend backend, UUID agentId)

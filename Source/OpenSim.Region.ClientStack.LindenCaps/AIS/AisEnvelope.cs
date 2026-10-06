@@ -9,7 +9,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS;
 /// Builds the LLSD maps the viewer parses: items, links, categories and the <c>_embedded</c> collections
 /// (AIS-V3-SPEC.md §1c/§1d).
 ///
-/// <para><b>Field set (A-Q1, resolved A1).</b> <c>LLInventoryItem::fromLLSD</c>
+/// <para><b>Field set.</b> <c>LLInventoryItem::fromLLSD</c>
 /// (<c>indra/llinventory/llinventory.cpp:984-1183</c>) reads exactly: <c>item_id</c> (:1004),
 /// <c>parent_id</c> (:1010), <c>thumbnail</c>{<c>asset_id</c>} (:1016) or <c>thumbnail_id</c> (:1037),
 /// <c>favorite</c>{<c>toggled</c>} (:1043), <c>permissions</c> (:1054), <c>sale_info</c> (:1060),
@@ -33,7 +33,7 @@ namespace OpenSim.Region.ClientStack.LindenCaps.AIS;
 /// <c>LLSDInventoryItem.cs</c> for the same reason as above: it is what the region already sends and the viewer
 /// already accepts. That <c>LLViewerInventoryItem::unpackMessage(const LLSD&amp;)</c> (called at
 /// <c>llaisapi.cpp:1223</c>) delegates to <c>fromLLSD</c> is likewise UNVERIFIED — <c>llviewerinventory.cpp</c>
-/// is not permitted this session.</para>
+/// was not read.</para>
 /// </summary>
 public static class AisEnvelope
 {
@@ -95,7 +95,7 @@ public static class AisEnvelope
     /// id is the link row's asset id. The viewer overwrites a link's permissions and sale info with defaults
     /// (<c>llaisapi.cpp:1278-1283</c>, <c>:1303-1307</c>), so they are not emitted. The remaining fields match the
     /// link maps the viewer itself builds for SlamFolder — <c>name</c>, <c>desc</c>, <c>linked_id</c>, <c>type</c>
-    /// (<c>llappearancemgr.cpp:2230-2234</c>, A-Q3).
+    /// (<c>llappearancemgr.cpp:2230-2234</c>).
     /// </summary>
     public static OSDMap Link(InventoryItemBase link, UUID agentId) => new()
     {
@@ -112,7 +112,7 @@ public static class AisEnvelope
     };
 
     /// <summary>
-    /// One category. <c>version</c> is the folder's freshly read version (tree state T4);
+    /// One category. <c>version</c> is the folder's freshly read version;
     /// <paramref name="embedded"/> is attached only when this category's contents are being expanded — a category
     /// must carry all three collections or none, because the viewer derives its descendent count from having all
     /// three and refuses to version a folder without one (spec §1c/§1e, risk A-R3).

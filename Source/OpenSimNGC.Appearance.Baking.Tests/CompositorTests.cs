@@ -7,7 +7,7 @@ namespace OpenSimNGC.Appearance.Baking.Tests;
 /// The compositor against the embedded avatar_lad.xml and mask files, with synthetic wearables whose textures
 /// are flat colours, so every assertion is about semantics: scaling instead of tiling, layer order,
 /// parameter-driven masks, tints, alpha wearables masking the body, and the fidelity gate.
-/// Ported from the web-viewer gateway's CompositorTests (sessions 11–13) in S0b.
+/// Ported from the web-viewer gateway's CompositorTests.
 /// </summary>
 public class CompositorTests
 {

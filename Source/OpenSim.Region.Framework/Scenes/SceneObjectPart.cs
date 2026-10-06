@@ -1410,7 +1410,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     }
 
     /// <summary>
-    /// PHLOX-7b. The two SIT_FLAG_* bits the sit path cannot act on yet - SIT_FLAG_NO_COLLIDE (0x10) and
+    /// The two SIT_FLAG_* bits the sit path cannot act on yet - SIT_FLAG_NO_COLLIDE (0x10) and
     /// SIT_FLAG_NO_DAMAGE (0x20) - stored so llGetLinkSitFlags reads back what llSetLinkSitFlags set.
     /// ALLOW_UNSIT and SCRIPTED_ONLY live in AllowUnsit / ScriptedSitOnly, which ScenePresence honours;
     /// SIT_TARGET is read-only, derived from IsSitTargetSet. Not persisted, like its siblings.
@@ -2059,7 +2059,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     }
 
     /// <summary>
-    /// PROPS-1. Push full ObjectProperties to everyone in the region.
+    /// Push full ObjectProperties to everyone in the region.
     ///
     /// <para>
     /// The touch and sit labels a viewer shows in its context menu come from the FULL

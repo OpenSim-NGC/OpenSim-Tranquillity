@@ -100,8 +100,8 @@ public class XInventoryService : ServiceBase, IInventoryService
     /// "missing" and both create. <see cref="EnsureSystemFolder"/> is right that nothing inside it can close
     /// that window; a lock outside it can.
     ///
-    /// <para><b>This closes the race for a single Robust instance only.</b> Legion Grid runs one, so it is closed
-    /// there. A multi-instance or multi-simulator deployment that calls this concurrently from two processes is
+    /// <para><b>This closes the race for a single Robust instance only.</b> A grid that runs one is covered.
+    /// A multi-instance or multi-simulator deployment that calls this concurrently from two processes is
     /// still exposed, and for those the safety net is <see cref="WarnOnDuplicateSystemFolders"/>, which reports
     /// the damage rather than preventing it. Only a unique constraint would prevent it, and the suitcase makes
     /// <c>(agentID, type)</c> unavailable - see the remarks on that method.</para>
@@ -248,8 +248,8 @@ public class XInventoryService : ServiceBase, IInventoryService
     /// of the check.</b> Three things legitimately repeat a system type and none of them is a fault:</para>
     /// <list type="bullet">
     ///   <item><b>The HG suitcase.</b> <c>HGSuitcaseInventoryService.CreateSystemFolders</c> builds a complete
-    ///   second set of system folders under <c>My Suitcase</c> (type 100) - Current Outfit included. On Legion
-    ///   Grid that accounted for seven accounts that looked like they had two Current Outfit folders each and did
+    ///   second set of system folders under <c>My Suitcase</c> (type 100) - Current Outfit included. On one
+    ///   grid that accounted for seven accounts that looked like they had two Current Outfit folders each and did
     ///   not. <c>sysFolders</c> is parented to the root, so the suitcase subtree is already excluded.</item>
     ///   <item><b>The calling-card chain</b>, <c>Calling Cards</c> -> <c>Friends</c> -> <c>All</c>, three folders
     ///   deep all typed <c>CallingCard</c>, created by <see cref="CreateUserInventory"/> itself. Only the first is
@@ -322,9 +322,9 @@ public class XInventoryService : ServiceBase, IInventoryService
         // from every snapshot this returns - and EnsureSystemFolder reads that snapshot to decide whether the
         // folder already exists. The answer was therefore always "missing" for Textures, on every call, and each
         // call created another one. That is not a race; it is deterministic, and the data shows it exactly:
-        // type 0 was the ONLY type with root-level duplicates on Legion Grid, and the account Direct Delivery
+        // type 0 was the ONLY type with root-level duplicates on one grid's data, and the account Direct Delivery
         // calls CreateUserInventory on for every delivery had NINE "Textures" folders, all version 1 and empty,
-        // beside the one real one. Nothing else duplicated. Only the A-R8 re-read added to EnsureSystemFolder
+        // beside the one real one. Nothing else duplicated. Only the re-read added to EnsureSystemFolder
         // stopped it growing further, by catching the miss one query later.
         XInventoryFolder[] sysFolders = Array.FindAll(allFolders, f => f.type >= 0);
 

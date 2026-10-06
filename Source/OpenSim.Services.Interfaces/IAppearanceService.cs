@@ -4,14 +4,14 @@ using OpenSim.Framework;
 namespace OpenSim.Services.Interfaces;
 
 /// <summary>
-/// The read side of server-side baking (Design Brief C4, ADR-002): given an agent, a bake channel and the asset
+/// The read side of server-side baking (ADR-002): given an agent, a bake channel and the asset
 /// UUID the viewer believes that channel holds, hand back the stored bake.
 ///
 /// <para>
 /// This is what the LL viewer fetches from on a bit-0 region. It stops compositing there and asks
 /// <c>agent_appearance_service</c> for every other avatar's bakes, so with no such service an avatar on such a
-/// region never textures — which is precisely what a bit-0 region without S4 produces, and why the build plan
-/// puts S4 before any flag flip.
+/// region never textures — which is precisely what a bit-0 region without this service produces, and why the
+/// service must be in place before any region turns the flag on.
 /// </para>
 /// </summary>
 public interface IAppearanceService

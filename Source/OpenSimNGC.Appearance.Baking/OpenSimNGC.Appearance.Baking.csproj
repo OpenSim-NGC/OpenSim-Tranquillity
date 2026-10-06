@@ -10,8 +10,8 @@
       * The only OpenMetaverse dependency is OpenMetaverse.Types (for OpenMetaverse.UUID).
         Directory.Build.props injects all five UtopiaSkye.OpenMetaverse* packages tree-wide;
         the four that are not needed are removed below so the dependency graph stays honest.
-      * SkiaSharp and CoreJ2K.Skia are pinned to the versions the rest of the tree uses
-        (S0a verification V8 / V7). CoreJ2K.Skia is a plain NuGet package, so it can be
+      * SkiaSharp and CoreJ2K.Skia are pinned to the versions the rest of the tree uses.
+        CoreJ2K.Skia is a plain NuGet package, so it can be
         referenced here directly — no region code is pulled in.
   -->
 
@@ -40,7 +40,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Versions match the rest of the tree: see Docs/feature/ssb-appearance/S0a-VERIFICATION.md V7/V8. -->
+    <!-- Versions match the rest of the tree. -->
     <PackageReference Include="SkiaSharp" Version="4.151.1" />
     <PackageReference Include="CoreJ2K.Skia" Version="2.3.3.91" />
   </ItemGroup>

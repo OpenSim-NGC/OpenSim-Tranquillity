@@ -76,7 +76,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     /// discard the viewer may ask for available in the codestream. It costs nothing --
     /// at 1024x1024 the output is smaller at 5 levels than at 4.
     ///
-    /// DRAW-1: the output must be the RAW CODESTREAM, not a JP2 file. CoreJ2K's default wraps the
+    /// The output must be the RAW CODESTREAM, not a JP2 file. CoreJ2K's default wraps the
     /// codestream in JP2 boxes (jP, ftyp, jp2h, jp2c - the codestream itself started at byte 77 of every
     /// dynamic texture this shipped), and the viewer's decoder is created for bare codestreams only
     /// (opj_create_decompress(OPJ_CODEC_J2K), indra/llimagej2coj/llimagej2coj.cpp:311 and :385), so
@@ -587,7 +587,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                             Color = drawColor,
                             IsAntialias = true
                         };
-                        // DRAW-1: the pen position is the TOP-LEFT of the text, as System.Drawing's DrawString took it
+                        // The pen position is the TOP-LEFT of the text, as System.Drawing's DrawString took it
                         // and as every script written against upstream expects; SkiaSharp's DrawText takes the
                         // BASELINE, which put "MoveTo 20,20; Text Hello" with its glyphs ABOVE y=20. Ascent is negative.
                         canvas.DrawText(nextLine, startPoint.X, startPoint.Y - myFont.Metrics.Ascent, SKTextAlign.Left, myFont, textPaint);

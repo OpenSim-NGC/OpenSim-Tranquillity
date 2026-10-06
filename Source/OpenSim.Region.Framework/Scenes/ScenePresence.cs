@@ -4404,7 +4404,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if (cofVersion >= 0)
             visualParams = AvatarAppearance.WithAppearanceVersion(Appearance.VisualParams, 1);
         else if (IsNPC)
-            // SSB-NPC-1: an NPC's appearance is a clone of its owner's, parameter 11000 included, and an owner on a
+            // An NPC's appearance is a clone of its owner's, parameter 11000 included, and an owner on a
             // server-bake region sends that parameter as 1. Nothing ever bakes an NPC, so its message has no
             // AppearanceData block - and a parameter of 1 beside no block puts the viewer on the server-bake path
             // for this avatar (resolve_appearance_version prefers the parameter), which fetches every baked face
@@ -5351,7 +5351,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         if (Invulnerable || IsViewerUIGod)
             return;
 
-        // PHLOX-10: the physics frame's collisions become ONE damage batch through the one door,
+        // The physics frame's collisions become ONE damage batch through the one door,
         // ApplyDamage. The amounts are the ones this block always computed; the Health arithmetic
         // and the kill live in ApplyDamage now. A Damage-bearing prim still dies on contact.
         if (coldata.Count > 0)
@@ -5406,10 +5406,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     }
 
     /// <summary>
-    /// PHLOX-10. The one door for damage to this avatar. Every door that used to do its own Health
+    /// The one door for damage to this avatar. Every door that used to do its own Health
     /// arithmetic - the physics frame's collisions, llAdjustDamage, llSetHealth, llDamage - builds a
     /// <see cref="DamageEntry"/> and comes through here, so the SL damage events have one place to
-    /// hang off. Gods and the invulnerable take nothing (as the collision path always ruled).
+    /// hang off. Gods and the invulnerable take nothing (as the collision path always had it).
     /// Health is clamped to 0..100; at 0 the client is told and <see cref="EventManager.TriggerAvatarKill"/>
     /// fires with the last entry's local id, exactly once.
     /// </summary>

@@ -9,7 +9,7 @@ using Xunit;
 namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests;
 
 /// <summary>
-/// PHLOX-9b. Object chat on DEBUG_CHANNEL reaches the object's owner and nobody else. The SL wiki
+/// Object chat on DEBUG_CHANNEL reaches the object's owner and nobody else. The SL wiki
 /// (https://wiki.secondlife.com/wiki/DEBUG_CHANNEL) says the sim broadcasts and "most viewers filter out
 /// messages received on DEBUG_CHANNEL from objects owned by others"; not every viewer does, and a
 /// second avatar can get the script-warning box for another owner's prim. The sim

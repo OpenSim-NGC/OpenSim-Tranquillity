@@ -16,7 +16,7 @@ public sealed record CopyOutcome(
 
 /// <summary>
 /// COPY /category/{sourceId} on the library cap, with the destination folder in the <c>Destination</c> header
-/// (A1: <c>headers-&gt;append(HTTP_OUT_HEADER_DESTINATION, dest)</c>, <c>llcorehttputil.cpp:1135</c>).
+/// (<c>headers-&gt;append(HTTP_OUT_HEADER_DESTINATION, dest)</c>, <c>llcorehttputil.cpp:1135</c>).
 ///
 /// <para><b>Permissions are the tree's existing library-copy rule, reused rather than reinvented.</b>
 /// <c>Scene.Inventory.CopyInventoryItem</c> finds the item in <c>LibraryService.LibraryRootFolder</c> first, and

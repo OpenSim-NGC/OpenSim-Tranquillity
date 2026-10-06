@@ -12,22 +12,22 @@ using Caps = OpenSim.Framework.Capabilities.Caps;
 namespace OpenSim.Region.ClientStack.LindenCaps.AIS;
 
 /// <summary>
-/// Region-side host for the AIS v3 inventory cap (Ledger A-D1). Config:
+/// Region-side host for the AIS v3 inventory cap. Config:
 /// <code>
 /// [AIS]
 ///     Enabled = false
 /// </code>
-/// When enabled it registers <c>InventoryAPIv3</c> for every agent from <c>OnRegisterCaps</c> (tree state T1: the
+/// When enabled it registers <c>InventoryAPIv3</c> for every agent from <c>OnRegisterCaps</c> (the
 /// cap must be registered on the agent's Caps under that exact name; the viewer requests the name itself). When
-/// disabled it registers nothing, so the viewer never sees the cap and keeps its legacy paths (risk A-R1).
-/// <c>LibraryAPIv3</c> is deliberately not registered (Ledger A-D3).
+/// disabled it registers nothing, so the viewer never sees the cap and keeps its legacy paths.
+/// <c>LibraryAPIv3</c> is registered as well; see <see cref="LibraryCapName"/>.
 /// </summary>
 public class AISv3Module : ISharedRegionModule
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(AISv3Module));
 
     public const string CapName = "InventoryAPIv3";
-    /// <summary>The library cap. Same handler, library owner as the agent, mutations refused (John's Phase 1 ruling; supersedes A-D3).</summary>
+    /// <summary>The library cap. Same handler, library owner as the agent, mutations refused.</summary>
     public const string LibraryCapName = "LibraryAPIv3";
     public const string ConfigSection = "AIS";
 
@@ -38,7 +38,7 @@ public class AISv3Module : ISharedRegionModule
     /// variable-path handlers in different dictionaries and only the latter is matched by prefix
     /// (<c>BaseHttpServer.TryGetSimpleStreamHandler</c>, <c>AddSimpleStreamHandler</c>), so registering the
     /// default way makes every AIS request 404 before the handler is entered, while the seed capabilities
-    /// response still looks correct — which is exactly how this was first found, on a live region.
+    /// response still looks correct — which is exactly how this was first found, on a running region.
     /// </summary>
     public const bool VarPath = true;
 
@@ -86,7 +86,7 @@ public class AISv3Module : ISharedRegionModule
     }
 
     /// <summary>
-    /// S12: which config decided this region's flag - <c>"region section"</c> when the region's own section carries
+    /// Which config decided this region's flag - <c>"region section"</c> when the region's own section carries
     /// an <c>AIS_Enabled</c> key, <c>"global"</c> otherwise. For the startup line only; see
     /// <c>ServerSideBakingRegion.EnabledSource</c>, which answers the same question for the other lane in the same
     /// words, because the flip verify reads both.
@@ -109,8 +109,8 @@ public class AISv3Module : ISharedRegionModule
         var regionName = scene.RegionInfo?.RegionName;
         var enabled = ResolveEnabled(Enabled, scene.Config, regionName);
 
-        // S12: one line per region, naming which config decided - the same shape the SSB lane logs, so the flip
-        // verify reads one console for both.
+        // One line per region, naming which config decided - the same shape server-side baking logs, so one
+        // console shows both.
         m_log.LogInformation("[AIS]: region {Region}: AIS v3 {State} ({Source})",
             scene.Name, enabled ? "ON" : "off", EnabledSource(scene.Config, regionName));
 
@@ -149,7 +149,7 @@ public class AISv3Module : ISharedRegionModule
         scene.EventManager.OnRegisterCaps -= handler;
     }
     /// <summary>
-    /// Both caps are registered together when enabled, and neither when disabled (tree state T1: a cap reaches
+    /// Both caps are registered together when enabled, and neither when disabled (a cap reaches
     /// the viewer only if it is registered under its exact name and the viewer asked for it; the viewer asks for
     /// both, `llaisapi.cpp:72-76`). LibraryAPIv3 runs the same handler over the library service with the library
     /// owner as its agent id, and refuses every mutation with 405.
@@ -225,13 +225,13 @@ public class AISv3Module : ISharedRegionModule
         };
 
     /// <summary>
-    /// S9. Turns "this item's asset changed" into "rebake if it mattered". Kept here, not in the backend, for the
+    /// Turns "this item's asset changed" into "rebake if it mattered". Kept here, not in the backend, for the
     /// same reason as the transaction resolver: <see cref="InventoryServiceBackend"/> stays free of <c>Scene</c>
-    /// (Ledger P-2) and Phase 2 on Robust, which has no presence to update, simply has no observer.
+    /// and Phase 2 on Robust, which has no presence to update, simply has no observer.
     ///
     /// <para>
-    /// Queuing rather than baking is deliberate and is the same ordering the cap uses (Q-16): the save resolves
-    /// every worn item to its current asset, persists the result and raises the S5 trigger, and the bake's own
+    /// Queuing rather than baking is deliberate and is the same ordering the cap uses: the save resolves
+    /// every worn item to its current asset, persists the result and raises the change trigger, and the bake's own
     /// per-channel input hash then decides what is recomputed. An edit that changed nothing visible costs one
     /// hash check per channel.
     /// </para>
@@ -240,7 +240,7 @@ public class AISv3Module : ISharedRegionModule
         => (agentId, itemId, newAssetId) =>
         {
             ScenePresence sp = scene.GetScenePresence(agentId);
-            if (sp is null || sp.IsChildAgent) return;   // S8: a child presence never drives an appearance save
+            if (sp is null || sp.IsChildAgent) return;   // a child presence never drives an appearance save
 
             if (!AisWornAssets.ApplyTo(sp.Appearance, itemId, newAssetId))
                 return;                                  // not worn here, or already carrying this asset
@@ -294,7 +294,7 @@ public class AISv3Module : ISharedRegionModule
         /// <summary>Hands a transaction id and the item to whatever knows about asset transactions (A16).</summary>
         public delegate AisAssetTransaction AssetTransactionResolver(UUID agentId, UUID transactionId, InventoryItemBase item);
 
-        /// <summary>Told that an item's asset changed, so a worn one can rebake (S9).</summary>
+        /// <summary>Told that an item's asset changed, so a worn one can rebake.</summary>
         public delegate void WornAssetObserver(UUID agentId, UUID itemId, UUID newAssetId);
 
         private readonly IInventoryService m_service;
@@ -507,7 +507,7 @@ public class AISv3Module : ISharedRegionModule
     /// The LibraryAPIv3 backend: the shared library over <see cref="ILibraryService"/>, which holds the whole
     /// tree in memory (<c>GetAllFolders</c>, <c>InventoryFolderImpl.RequestListOfFolders/RequestListOfItems</c>).
     /// Read-only by construction — every mutator returns false and the handler answers 405 before reaching them
-    /// (John's Phase 1 ruling). The agent id is the library owner, so the same handler code needs no library
+    /// The agent id is the library owner, so the same handler code needs no library
     /// special case beyond its mode.
     /// </summary>
     public sealed class LibraryServiceBackend : IAisInventoryBackend

@@ -1773,7 +1773,7 @@ public partial class Scene : SceneBase
                 CheckAtTargets();
 
                 // Phlox: fire moving_start/moving_end on general physical movement
-                // (mirrors Legion Grid heartbeat ordering — right after CheckAtTargets).
+                // (right after CheckAtTargets in the heartbeat).
                 CheckMovingTransitions();
 
                 // Update SceneObjectGroups that have scheduled themselves for updates
@@ -2019,12 +2019,11 @@ public partial class Scene : SceneBase
     }
 
     // Phlox: minimum squared velocity (linear or angular) for a physical group to
-    // be considered "moving". Ported from Legion Grid Scene.cs.
+    // be considered "moving".
     private const float MOVING_VELOCITY_THRESHOLD_SQ = 0.01f;
 
     // Phlox: fire moving_start / moving_end on GENERAL (physical) movement, not just
-    // keyframed motion. Legion-exclusive heartbeat trigger ported from Legion Grid
-    // Scene.cs; invoked from Heartbeat() immediately after CheckAtTargets().
+    // keyframed motion. Invoked from Heartbeat() immediately after CheckAtTargets().
     private void CheckMovingTransitions()
     {
         ForEachSOG(sog =>

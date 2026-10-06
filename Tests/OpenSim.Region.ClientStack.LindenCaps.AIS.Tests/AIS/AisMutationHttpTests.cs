@@ -141,7 +141,7 @@ public class AisMutationHttpTests
     }
 
     /// <summary>
-    /// The viewer sends the item's whole <c>asLLSD</c> map (A-Q3, <c>llviewerinventory.cpp:435-454</c>), so a
+    /// The viewer sends the item's whole <c>asLLSD</c> map (<c>llviewerinventory.cpp:435-454</c>), so a
     /// body is mostly keys carrying values that have not changed. The ones this tree has no column for —
     /// <c>thumbnail</c>, <c>favorite</c>, <c>created_at</c> — and the invariants <c>type</c> / <c>inv_type</c> /
     /// <c>parent_id</c> are ignored rather than refused, because refusing would fail every ordinary rename.
@@ -299,7 +299,7 @@ public class AisMutationHttpTests
     [Test]
     public void a_refused_transaction_does_not_fire_the_worn_wearable_rebake()
     {
-        // S9's hook is keyed on the asset actually changing, so a refusal must leave it silent - it did before this
+        // The worn-asset hook is keyed on the asset actually changing, so a refusal must leave it silent - it did before this
         // fix and it must keep doing so, or a refused edit would cost a bake of an outfit that did not change.
         var b = Inventory();
         var transaction = UUID.Random();

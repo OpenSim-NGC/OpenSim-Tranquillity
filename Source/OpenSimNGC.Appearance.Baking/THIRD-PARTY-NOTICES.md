@@ -37,14 +37,14 @@ not be confirmed against that checkout and is recorded here as a claim, not a fa
 **Origin:** Linden Lab Second Life viewer, directory `indra/newview/character/`: the parameter alpha masks,
 the skin base images, eye whites and the Bakes-on-Mesh `aux_base.tga` that the `layer_set` definitions of
 `avatar_lad.xml` name by file. The compositor cannot reproduce a bake without them (every clothing layer is
-shaped by one), so they ship with the library alongside `avatar_lad.xml` (ADR-007 extended in S0b).
+shaped by one), so they ship with the library alongside `avatar_lad.xml` (ADR-007, extended to cover them).
 
 **Licence:** the same as `avatar_lad.xml` above: GNU LGPL 2.1 with the Linden Lab viewer linking exception.
 Embedded unmodified as data resources; not compiled or linked.
 
 **Source:** the Linden Lab viewer source tree (viewer 26.1.1 per
-`indra/newview/VIEWER_VERSION.txt`), directory `indra/newview/character/`. The files were first taken (S0b,
-2026-09-03) from the copy redistributed inside the `LibreMetaverse` 3.1.4 NuGet package; in S0d every one of
+`indra/newview/VIEWER_VERSION.txt`), directory `indra/newview/character/`. The files were first taken (2026-09-03)
+from the copy redistributed inside the `LibreMetaverse` 3.1.4 NuGet package; later every one of
 the 56 was re-verified byte for byte (SHA-256 below) against the viewer tree and found identical, so the viewer
 tree is the recorded source. `avatar_lad.xml` also names `head_wrinkles_highlights_alpha.tga`, which exists in
 neither the viewer tree nor the package; only a bump-pass layer references it and bump layers are never rendered

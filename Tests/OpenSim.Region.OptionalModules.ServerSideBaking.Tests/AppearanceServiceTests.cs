@@ -10,7 +10,7 @@ using Xunit;
 namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 
 /// <summary>
-/// S4 Part 1 — the <c>agent_appearance_service</c> read path (ADR-002), against the real
+/// The <c>agent_appearance_service</c> read path (ADR-002), against the real
 /// <see cref="AppearanceService"/> over a fake avatar service and a fake asset service.
 /// </summary>
 public class AppearanceServiceTests
@@ -187,7 +187,7 @@ public class AppearanceServiceTests
     }
 
     /// <summary>
-    /// The Q-14 interaction, end to end for this route: an appearance save must not take the index with it, or
+    /// The bake-index interaction, end to end for this route: an appearance save must not take the index with it, or
     /// every bake fetch starts 404ing the moment an agent changes anything.
     /// </summary>
     [Fact]
@@ -199,7 +199,7 @@ public class AppearanceServiceTests
         avatars.SetAppearance(Agent, new AvatarAppearance());
 
         // FakeAvatarService.SetAppearance reproduces the real delete-everything-first behaviour, so this is the
-        // pre-S3 outcome; the real AvatarService preserves the Bake* namespace and is tested separately.
+        // outcome before the index was preserved; the real AvatarService preserves the Bake* namespace and is tested separately.
         Assert.Null(svc.GetBake(Agent, "head", headAsset));
     }
 }

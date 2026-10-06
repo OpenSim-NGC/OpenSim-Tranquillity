@@ -13,8 +13,8 @@ using OpenSim.Tests.Common;
 namespace OpenSim.Region.ClientStack.LindenCaps.AIS.Tests;
 
 /// <summary>
-/// Every A1 fetch route driven over HTTP against the handler with an in-memory backend, asserting the envelope
-/// the viewer parses (AIS-V3-SPEC.md §1c/§1d) and the shapes the A0 fixtures pin. These are the cases that catch
+/// Every fetch route driven over HTTP against the handler with an in-memory backend, asserting the envelope
+/// the viewer parses (AIS-V3-SPEC.md §1c/§1d) and the shapes the golden fixtures pin. These are the cases that catch
 /// real divergence — links kept out of <c>items</c>, the depth shapes, a subset naming a child that is not there,
 /// an empty COF, an unknown id — not just the happy paths.
 /// </summary>
@@ -401,7 +401,7 @@ public class AisFetchRoutesHttpTests
 
     /// <summary>
     /// The live envelopes carry exactly the keys the golden fixtures pin — no extra keys, none missing. The
-    /// fixtures were corrected in A1 to the field set A-Q1 resolved: <c>type</c>, <c>inv_type</c> and
+    /// fixtures carry the field set the viewer reads: <c>type</c>, <c>inv_type</c> and
     /// <c>sale_type</c> as integers (<c>LLInventoryItem::fromLLSD</c> accepts either, llinventory.cpp:1108-1135,
     /// and integers are what this tree already sends, LLSDInventoryItem.cs:33-68), and no <c>last_owner_id</c>
     /// in <c>permissions</c> for the same reason.
