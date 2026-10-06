@@ -411,6 +411,68 @@ public class ScriptCleanupTests
         Quiet(r, 800, "nosensor");
     }
 
+    /// <summary>
+    /// A sensor sweep already under way when the script changes state. The sensor plugin holds its repeater lock for the
+    /// whole pass (CheckSenseRepeaterEvents -> SensorSweep -> PostScriptEvent). The state statement queues state_exit and
+    /// state_entry (PhloxExecutionScheduler.OnStateChange) and only then releases the sensor (LSLSystemAPI
+    /// ReleaseScriptResources -> SensorRepeat.RemoveScript), which waits for that lock. So the sweep's no_sensor is posted
+    /// behind state_entry and runs in the new state. SL State: "The event queue is cleared." "Repeating sensors are
+    /// released." A helper thread stands in for the sweep: it holds the plugin's lock, waits (no clock) until the state
+    /// change has queued state_entry, posts the no_sensor as SensorSweep does, and lets go.
+    /// </summary>
+    [Fact]
+    public void ASweepUnderWayAtAStateChangeDoesNotReachTheNewState()
+    {
+        using var r = new Rig();
+        // a 30 s repeat: no sweep of its own comes in the test; the helper's is the only one
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); llSensorRepeat(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI, 30.0); llSay(0, ""armed""); }
+                listen(integer c, string n, key k, string m) { if (m == ""state"") state other; }
+                no_sensor() { llSay(0, ""old nosensor""); }
+            }
+            state other {
+                state_entry() { llSay(0, ""other""); llMessageLinked(LINK_THIS, 0, ""check"", NULL_KEY); }
+                no_sensor() { llSay(0, ""late nosensor""); }
+                link_message(integer s, integer n, string str, key k) { llSay(0, ""checked""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
+        Assert.Equal(1, r.Sensors);
+
+        object sweepLock = Field(r.H.Engine.AsyncCommands.SensorRepeatPlugin, "SenseRepeatListLock");
+        object pending = Field(r.Exe, "m_PendingEvents");
+        bool StateEntryQueued()
+        {
+            lock (pending)
+                foreach (object pe in (IEnumerable)pending)
+                    if (((PostedEvent)pe.GetType().GetField("Evt")!.GetValue(pe)).EventType == InWorldz.Phlox.Types.SupportedEventList.Events.STATE_ENTRY)
+                        return true;
+            return false;
+        }
+
+        using var sweeping = new System.Threading.ManualResetEventSlim(false);
+        bool sawStateEntry = false, posted = false;
+        var sweep = new System.Threading.Thread(() =>
+        {
+            lock (sweepLock)
+            {
+                sweeping.Set();
+                sawStateEntry = System.Threading.SpinWait.SpinUntil(StateEntryQueued, TimeSpan.FromSeconds(30));
+                r.H.Engine.PostScriptEvent(id, new EventParams("no_sensor", Array.Empty<object>(), Array.Empty<DetectParams>()));
+                posted = true;
+            }
+        }) { IsBackground = true };
+        sweep.Start();
+        Assert.True(sweeping.Wait(TimeSpan.FromSeconds(30)), "the stand-in sweep never started");
+
+        r.Say(7, "state");
+        Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the new state never ran: " + r.H.Diagnose(id));
+        Assert.True(sweep.Join(TimeSpan.FromSeconds(30)) && posted, "the stand-in sweep never posted");
+        Assert.True(sawStateEntry, "the state change did not queue state_entry while the sweep held the lock");
+        Assert.Equal(0, r.Sensors);
+        Assert.Equal(0, r.Count("late nosensor"));   // SL: "Repeating sensors are released." "The event queue is cleared."
+    }
+
     // ── late replies ───────────────────────────────────────────────────────────
 
     [Fact]
