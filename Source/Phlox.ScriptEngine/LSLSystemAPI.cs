@@ -6027,10 +6027,6 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// Halcyon iwRezAt (LSLSystemAPI.cs:3168-3173) refuses a NaN rotation with this error and no delay
-        /// (sleepTime = 0), before its 10 m check. Its rez calls were long-running, so ShoutError: no pause.
-        /// </summary>
-        /// <summary>
         /// Halcyon's iwRezAt asked the region's bad-user list before any other check (LSLSystemAPI.cs:3160-3166) and, for
         /// such an owner, failed silently with a 100 ms sleep. The region's list here is the core's blocked-owner hook
         /// (IBlockedOwnerModule). The region would refuse the rez itself as well; asking first keeps the refusal silent,
@@ -6039,6 +6035,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         private bool OwnerBlockedFromRezzing()
             => m_host != null && World?.RequestModuleInterface<IBlockedOwnerModule>()?.IsBlocked(m_host.OwnerID) == true;
 
+        /// <summary>
+        /// Halcyon iwRezAt (LSLSystemAPI.cs:3168-3173) refuses a NaN rotation with this error and no delay
+        /// (sleepTime = 0), before its 10 m check. Its rez calls were long-running, so ShoutError: no pause.
+        /// </summary>
         private bool RezRotationIsNaN(Quaternion rot)
         {
             if (!(float.IsNaN(rot.X) || float.IsNaN(rot.Y) || float.IsNaN(rot.Z) || float.IsNaN(rot.W))) return false;
