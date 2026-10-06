@@ -9,6 +9,7 @@ using System;
 using System.IO;
 using System.Linq;
 using InWorldz.Phlox.Serialization;
+using InWorldz.Phlox.Types;
 using InWorldz.Phlox.VM;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -28,7 +29,9 @@ namespace InWorldz.Phlox.Tests;
 /// llRequestExperiencePermissions would grant it now with no dialog (the script is still in that Experience, the
 /// Experience is allowed here, the granter is here and still allows it), and a granter not here yet leaves it waiting as a
 /// claim, decided when that avatar arrives anywhere in the region. No run_time_permissions and no experience_permissions
-/// is posted by a restore.
+/// is posted by a restore. The script's Experience is its item's: a grant noted with an Experience the item does not name
+/// ends at the restore, with no event. A grant from this simulator's state database whose Experience the land no longer
+/// lets run ends at the restore, with one experience_permissions_denied.
 /// </summary>
 // Runs in parallel: each test has its own harnesses, avatars, items, assets and Experience module (registered on its own
 // scene), and rows under random item ids in the state database every harness shares; nothing process-wide is changed.
@@ -274,6 +277,31 @@ public class ExperienceGrantRestoreTests
         NoPermissionEvents(h);
     }
 
+    /// <summary>
+    /// A carried grant is held to the decision llRequestExperiencePermissions makes: an Experience the estate blocks, one
+    /// it neither allows nor trusts, and one the granter has blocked give nothing back and leave no claim.
+    /// </summary>
+    [Theory]
+    [InlineData("blocked in the region")]
+    [InlineData("not allowed in the region")]
+    [InlineData("blocked by the avatar")]
+    public void CarriedExperienceGrantIsNotRestoredWhereTheExperienceWouldBeDenied(string why)
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID, visitor = UUID.Random(), experience = UUID.Random();
+        var estate = ExperienceWithdrawnTests.ChangingEstate.Create(experience, visitor, out IExperienceModule module);
+        h.Scene.RegisterModuleInterface(module);
+        if (why == "blocked in the region") estate.Blocked.Add(experience);
+        else if (why == "not allowed in the region") estate.Allowed.Clear();
+        else estate.VisitorBlocked = true;
+        SceneHelpers.AddScenePresence(h.Scene, visitor);
+        var item = RezWithCarried(h, owner, experience, st => Forge(st, visitor, ExperiencePerms, owner, experience), out var copy);
+        Assert.Equal(0, MaskOf(copy, item));
+        Assert.False(Api(h, item).HasGrantClaim, why);
+        Assert.Equal(Perms(0, UUID.Zero), Report(h, item));
+        NoPermissionEvents(h);
+    }
+
     [Fact]
     public void ForgedCarriedExperienceTheScriptIsNotInRestoresNothing()
     {
@@ -339,6 +367,191 @@ public class ExperienceGrantRestoreTests
         SceneHelpers.AddScenePresence(h.Scene, visitor);
         var item = RezWithCarried(h, owner, experience, st => Forge(st, visitor, ExperiencePerms | Debit, owner, experience), out var copy);
         Assert.Equal(ExperiencePerms, MaskOf(copy, item));
+    }
+
+    // ── the script's Experience is its item's, never the state's ─────────────
+
+    private static SerializedPostedEvent QueuedExperienceGrant(UUID agent)
+        => SerializedPostedEvent.FromPostedEvent(new PostedEvent
+        {
+            EventType = SupportedEventList.Events.EXPERIENCE_PERMISSIONS,
+            Args = new object[] { agent.ToString() }
+        });
+
+    /// <summary>
+    /// Carried state names an Experience and a grant from it while the script item names none (an object whose item lost
+    /// its Experience on the way here, or forged state): the granter is not here yet, and no claim is left waiting for them.
+    /// </summary>
+    [Fact]
+    public void CarriedExperienceGrantForAnItemInNoExperienceLeavesNoClaim()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID, visitor = UUID.Random(), experience = UUID.Random();
+        Region(h, experience, visitor);
+        var item = RezWithCarried(h, owner, UUID.Zero, st => Forge(st, visitor, ExperiencePerms, owner, experience), out var copy);
+        Assert.Equal(0, MaskOf(copy, item));
+        Assert.False(Api(h, item).HasGrantClaim);
+        Assert.False(Api(h, item).HasExperienceClaimFor(visitor));
+
+        var sp = SceneHelpers.AddScenePresence(h.Scene, visitor);   // arrives: nothing was waiting for them
+        h.Scene.EventManager.TriggerOnMakeRootAgent(sp);
+        h.PumpUntilIdle(TimeSpan.FromSeconds(3));
+        Assert.Equal(0, MaskOf(copy, item));
+        Assert.Equal(Perms(0, UUID.Zero), Report(h, item));
+        NoPermissionEvents(h);
+    }
+
+    /// <summary>
+    /// Carried state for an item in no Experience, its granter here, with an experience_permissions event still on its
+    /// queue: no grant, and the event is not delivered.
+    /// </summary>
+    [Fact]
+    public void CarriedExperienceGrantAndQueuedGrantEventForAnItemInNoExperienceGiveNothing()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID, visitor = UUID.Random(), experience = UUID.Random();
+        Region(h, experience, visitor);
+        SceneHelpers.AddScenePresence(h.Scene, visitor);
+        var item = RezWithCarried(h, owner, UUID.Zero, st =>
+        {
+            Forge(st, visitor, ExperiencePerms, owner, experience);
+            st.EventQueue = new[] { QueuedExperienceGrant(visitor) };
+        }, out var copy);
+        Assert.Equal(0, MaskOf(copy, item));
+        Assert.False(Api(h, item).HasGrantClaim);
+        Assert.Equal(Perms(0, UUID.Zero), Report(h, item));
+        NoPermissionEvents(h);
+    }
+
+    /// <summary>The same carried state for an item that names that Experience keeps both the grant and the queued event.</summary>
+    [Fact]
+    public void CarriedExperienceGrantAndQueuedGrantEventForAnItemInThatExperienceAreKept()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID, visitor = UUID.Random(), experience = UUID.Random();
+        Region(h, experience, visitor);
+        SceneHelpers.AddScenePresence(h.Scene, visitor);
+        var item = RezWithCarried(h, owner, experience, st =>
+        {
+            Forge(st, visitor, ExperiencePerms, owner, experience);
+            st.EventQueue = new[] { QueuedExperienceGrant(visitor) };
+        }, out var copy);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("xp=" + visitor)), "the queued event was not delivered: " + SavedStateRig.SaidText(h));
+        Assert.Equal(ExperiencePerms, MaskOf(copy, item));
+        Assert.Equal(Perms(ExperiencePerms, visitor), Report(h, item));
+        Assert.Equal(1, h.Said.Count(s => s == "xp=" + visitor));
+    }
+
+    /// <summary>
+    /// The engine's own row for a script whose item still names the Experience, saved by a real region stop (Scene.Close,
+    /// the final save after the scene is emptied), gives the grant back whole on the next start, still that Experience's.
+    /// </summary>
+    [Fact]
+    public void ARowForAnItemThatStillNamesTheExperienceSurvivesARegionStopAndStart()
+    {
+        UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        using (var h1 = new SchedulerHarness())
+        {
+            SetOwner(h1.Prim.ParentGroup, owner);
+            Region(h1, experience, visitor);
+            SceneHelpers.AddScenePresence(h1.Scene, visitor);
+            var inv = TaskInventoryHelpers.AddScript(h1.Scene.AssetService, h1.Prim, item, asset, "game", Game);
+            inv.ExperienceID = experience;
+            Assert.True(h1.Prim.Inventory.CreateScriptInstance(item, 0, false, Phlox, RegionStart));
+            h1.Prim.ParentGroup.ResumeScripts();
+            Assert.True(h1.PumpUntil(() => h1.Said.Contains("entry")), SavedStateRig.SaidText(h1));
+            Command(h1, "xp " + visitor, "xp=" + visitor);
+            h1.PumpUntilIdle(TimeSpan.FromSeconds(2));
+            h1.StopRegionAsTheSimulatorDoes();
+        }
+        Assert.Equal(experience.ToString(), RowState(item).PermsExperience);
+
+        using var h2 = Restart(owner, asset, item, experience);
+        Assert.Equal(Perms(ExperiencePerms, visitor), Report(h2, item));
+        NoPermissionEvents(h2);
+        h2.SaveState(item);
+        SavedStateRig.WaitForWrites(h2);
+        Assert.Equal(experience.ToString(), RowState(item).PermsExperience);
+    }
+
+    /// <summary>A row noting an Experience the item no longer names gives nothing back and says nothing.</summary>
+    [Fact]
+    public void ARowForAnItemThatNoLongerNamesTheExperienceGivesNoGrantBack()
+    {
+        UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        GrantAndSave(owner, visitor, experience, asset, item);
+
+        using var h2 = Restart(owner, asset, item, UUID.Zero);
+        Assert.Equal(Perms(0, UUID.Zero), Report(h2, item));
+        Assert.False(Api(h2, item).HasGrantClaim);
+        NoPermissionEvents(h2);
+        h2.SaveState(item);
+        SavedStateRig.WaitForWrites(h2);
+        Assert.Null(RowState(item).PermsGranter);
+        Assert.Null(RowState(item).PermsExperience);
+    }
+
+    // ── a restart onto land where the Experience can no longer run ───────────
+
+    /// <summary>
+    /// A region restart whose region has an Experience module that answers as <paramref name="estate"/> does. The game
+    /// script's grant came from <paramref name="experience"/>; its granter is not in the region.
+    /// </summary>
+    private static SchedulerHarness RestartWithEstate(UUID owner, UUID asset, UUID item, UUID experience, Action<ExperienceWithdrawnTests.ChangingEstate> estate, UUID visitor)
+    {
+        var h2 = new SchedulerHarness();
+        SetOwner(h2.Prim.ParentGroup, owner);
+        var state = ExperienceWithdrawnTests.ChangingEstate.Create(experience, visitor, out IExperienceModule module);
+        estate(state);
+        h2.Scene.RegisterModuleInterface(module);
+        var inv = TaskInventoryHelpers.AddScript(h2.Scene.AssetService, h2.Prim, item, asset, "game", Game);
+        inv.ExperienceID = experience;
+        Assert.Equal(1, h2.Prim.ParentGroup.CreateScriptInstances(0, false, Phlox, RegionStart));
+        h2.Prim.ParentGroup.ResumeScripts();
+        Assert.True(h2.PumpUntil(() => h2.InterpreterFor(item) != null), "the script did not load");
+        h2.PumpUntilIdle(TimeSpan.FromSeconds(5));
+        Assert.DoesNotContain("entry", h2.Said);
+        return h2;
+    }
+
+    [Fact]
+    public void ARestartWhereTheLandStillAllowsTheExperienceKeepsItsGrantSilently()
+    {
+        UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        GrantAndSave(owner, visitor, experience, asset, item);
+
+        using var h2 = RestartWithEstate(owner, asset, item, experience, _ => { }, visitor);
+        Assert.Equal(Perms(ExperiencePerms, visitor), Report(h2, item));
+        NoPermissionEvents(h2);
+    }
+
+    /// <summary>
+    /// SL wiki experience_permissions_denied, "The experience can no longer run": the grant ends, and the script is told
+    /// once with XP_ERROR_NOT_PERMITTED_LAND (17), at the start, not when its granter next moves.
+    /// </summary>
+    [Theory]
+    [InlineData("no longer allowed")]
+    [InlineData("blocked by the estate")]
+    public void ARestartWhereTheLandNoLongerLetsTheExperienceRunEndsItsGrantWithOneDenial(string why)
+    {
+        UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        GrantAndSave(owner, visitor, experience, asset, item);
+
+        using var h2 = RestartWithEstate(owner, asset, item, experience, e =>
+        {
+            if (why == "no longer allowed") e.Allowed.Clear();
+            else e.Blocked.Add(experience);
+        }, visitor);
+        Assert.True(h2.PumpUntil(() => h2.Said.Contains("xpdenied=17")), why + ": " + SavedStateRig.SaidText(h2));
+        Assert.Equal(Perms(0, UUID.Zero), Report(h2, item));
+        Assert.Equal(0, h2.Prim.Inventory.GetInventoryItem(item).PermsMask);
+        Assert.Equal(1, h2.Said.Count(s => s.StartsWith("xpdenied=", StringComparison.Ordinal)));
+        Assert.DoesNotContain(h2.Said, s => s.StartsWith("xp=", StringComparison.Ordinal));
+
+        // The ended grant is not in the next row either.
+        h2.SaveState(item);
+        SavedStateRig.WaitForWrites(h2);
+        Assert.Null(RowState(item).PermsGranter);
     }
 
     // ── what ends the note ───────────────────────────────────────────────────
@@ -414,6 +627,43 @@ public class ExperienceGrantRestoreTests
         Assert.Equal(0, MaskOf(copy, item));
         Assert.True(Api(h, item).HasGrantClaim);   // still waiting for a seat or a wearer, as before
         NoPermissionEvents(h);
+    }
+
+    /// <summary>
+    /// A grant the land ended (its avatar entered a parcel where the Experience can no longer run) stays ended across a
+    /// real region stop (Scene.Close) and start: the row holds no grant, and the restored script holds none.
+    /// </summary>
+    [Fact]
+    public void AGrantTheLandEndedStaysEndedAfterARegionStopAndStart()
+    {
+        UUID owner = UUID.Random(), experience = UUID.Random(), visitor = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        using (var h1 = new SchedulerHarness())
+        {
+            SetOwner(h1.Prim.ParentGroup, owner);
+            var estate = ExperienceWithdrawnTests.ChangingEstate.Create(experience, visitor, out IExperienceModule module);
+            h1.Scene.RegisterModuleInterface(module);
+            ScenePresence sp = SceneHelpers.AddScenePresence(h1.Scene, visitor);
+            var inv = TaskInventoryHelpers.AddScript(h1.Scene.AssetService, h1.Prim, item, asset, "game", Game);
+            inv.ExperienceID = experience;
+            Assert.True(h1.Prim.Inventory.CreateScriptInstance(item, 0, false, Phlox, RegionStart));
+            h1.Prim.ParentGroup.ResumeScripts();
+            Assert.True(h1.PumpUntil(() => h1.Said.Contains("entry")), SavedStateRig.SaidText(h1));
+            Command(h1, "xp " + visitor, "xp=" + visitor);
+
+            lock (estate.Allowed) estate.Allowed.Clear();
+            h1.Scene.EventManager.TriggerAvatarEnteringNewParcel(sp, 1, h1.Scene.RegionInfo.RegionID);
+            Assert.True(h1.PumpUntil(() => h1.Said.Contains("xpdenied=17")), SavedStateRig.SaidText(h1));
+            h1.PumpUntilIdle(TimeSpan.FromSeconds(2));
+            h1.StopRegionAsTheSimulatorDoes();
+        }
+        SerializedRuntimeState row = RowState(item);
+        Assert.Equal(0, row.GrantedPermsMask);
+        Assert.True(string.IsNullOrEmpty(row.PermsGranter), "the row holds a granter");
+        Assert.True(string.IsNullOrEmpty(row.PermsExperience), "the row notes an Experience");
+
+        using var h2 = Restart(owner, asset, item, experience);
+        Assert.Equal(Perms(0, UUID.Zero), Report(h2, item));
+        NoPermissionEvents(h2);
     }
 
     /// <summary>The older contract (no tag 29) reads a state this build writes: protobuf skips the unknown field.</summary>

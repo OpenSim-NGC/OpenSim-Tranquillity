@@ -323,6 +323,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptControlsReleased    += OnScriptControlsReleased;
             m_Scene.EventManager.OnRemovePresence            += OnRemovePresenceForControls;
             m_Scene.EventManager.OnMakeRootAgent             += OnMakeRootAgentForControls;
+            m_Scene.EventManager.OnAvatarEnteringNewParcel   += OnAvatarEnteringNewParcelForExperiences;
             if (PhysicsThrottle) m_Scene.EventManager.OnFrame += OnFrameForPhysicsTime;
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
@@ -588,13 +589,14 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptControlsReleased    -= OnScriptControlsReleased;
             m_Scene.EventManager.OnRemovePresence            -= OnRemovePresenceForControls;
             m_Scene.EventManager.OnMakeRootAgent             -= OnMakeRootAgentForControls;
+            m_Scene.EventManager.OnAvatarEnteringNewParcel   -= OnAvatarEnteringNewParcelForExperiences;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
-            m_MasterScheduler?.Stop();
+            bool stopped = m_MasterScheduler == null || m_MasterScheduler.Stop();
             AsyncCommands?.Shutdown();
             m_Scene = null;
-			
-			StateManager?.Stop();
-			StateManager = null;
+
+            SaveStateAtStop(stopped);
+            StateManager = null;
         }
 
         public void Close() { }
@@ -670,10 +672,28 @@ namespace Phlox.ScriptEngine
             m_log.LogInformation("[PhloxEngine]: Shutdown event, flushing script state");
             // The scheduler stops first, so the final save is of scripts that are no longer running (Halcyon
             // MasterScheduler.Stop joins the execution thread before the state manager's backup).
-            if (m_MasterScheduler != null && !m_MasterScheduler.StopThread())
-                m_log.LogWarning("[PhloxEngine]: The script scheduler did not stop within 5 s; saving script state anyway");
-            StateManager?.Stop();
+            SaveStateAtStop(m_MasterScheduler == null || m_MasterScheduler.StopThread());
             StateManager = null;
+        }
+
+        /// <summary>
+        /// The final save, after the scheduler was asked to stop. When its thread did not stop (a script held inside a call
+        /// past the 5 s join), the scheduler is halted so it starts no further timeslice, and the script it is still
+        /// running is not captured: its state may be changing, and its last saved row stays. Every other script is saved.
+        /// </summary>
+        internal void SaveStateAtStop(bool schedulerStopped)
+        {
+            UUID running = UUID.Zero;
+            if (!schedulerStopped)
+            {
+                running = m_ExeScheduler?.Halt()?.ItemId ?? UUID.Zero;
+                if (running.IsZero())
+                    m_log.LogWarning("[PhloxEngine]: The script scheduler did not stop within 5 s; it runs no further script, and script state is saved");
+                else
+                    m_log.LogWarning("[PhloxEngine]: The script scheduler did not stop within 5 s; it is still running {0}, whose last saved state is kept; every other script is saved",
+                        running);
+            }
+            StateManager?.StopExcept(running);
         }
 
         private void OnObjectBeingRemovedFromScene(SceneObjectGroup obj)
@@ -1094,16 +1114,27 @@ namespace Phlox.ScriptEngine
             if (sp != null) m_ExeScheduler?.RequestAvatarArrived(sp.UUID);
         }
 
+        // An avatar entered a parcel: a grant it gave from an Experience ends where the Experience cannot run (SL wiki
+        // experience_permissions_denied, "The agent has moved to a parcel where the experience cannot run").
+        private void OnAvatarEnteringNewParcelForExperiences(ScenePresence sp, int localLandID, UUID regionID)
+        {
+            if (sp != null && !sp.IsChildAgent) m_ExeScheduler?.RequestExperienceLandCheck(sp.UUID);
+        }
+
         /// <summary>
-        /// The grant a database row saves: the script item's grant now, with the object's owner. When the part has gone (a
-        /// derez) the grant noted last stays.
+        /// The grant a database row saves: the script item's grant now, with the object's owner. When the part or the
+        /// item cannot be found, the grant the state noted is saved: the state notes the item's grant each time it
+        /// changes, and the scene can no longer return the part at a region stop (Scene.Close empties the scene graph
+        /// before it raises the shutdown event the final save runs on; RemoveRegion lets the scene go before it) or at
+        /// a derez's unload save. A note that is a claim from carried state still waiting for its granter is cleared:
+        /// a row never holds one as a grant.
         /// </summary>
         internal void NoteGrantForRow(InWorldz.Phlox.VM.Interpreter interp)
         {
             SceneObjectPart part = m_Scene?.GetSceneObjectPart(interp.HostLocalId);
             TaskInventoryItem item = part?.Inventory?.GetInventoryItem(interp.ItemId);
-            if (item == null) return;
-            LSLSystemAPI.NoteItemGrant(interp.ScriptState, item, part.OwnerID);
+            if (item != null) LSLSystemAPI.NoteItemGrant(interp.ScriptState, item, part.OwnerID);
+            else if (interp.ScriptState.PermsUnverified) LSLSystemAPI.ClearSavedGrant(interp.ScriptState);
         }
 
         /// <summary>A script took or released controls.</summary>

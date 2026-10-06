@@ -1,4 +1,4 @@
-/* Copyright (c) 2026 Legion Grid / Tranquillity integration
+/* Copyright (c) 2026 Legion Builds
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -13,7 +13,7 @@ namespace Phlox.ScriptEngine
     /// SL-shaped binding for Phlox over Tranquillity's native <see cref="LinksetData"/> store.
     ///
     /// Phlox's <c>llLinksetData*</c> implementation (in LSLSystemAPI) was written against a
-    /// Legion-shaped API (Free/Get/Remove/AddOrUpdate/...). Tranquillity's native LinksetData
+    /// key-value store API (Free/Get/Remove/AddOrUpdate/...). Tranquillity's native LinksetData
     /// provides the same capabilities under different names and with non-SL return codes
     /// (-1/1/2), which Tranquillity's YEngine translates to SL codes in its own LSL_Api.
     ///

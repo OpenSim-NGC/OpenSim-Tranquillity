@@ -302,7 +302,7 @@ public class GrantRestoreTests
         ((OpenSim.Framework.ForceReleaseControls)release.GetValue(client)!).Invoke(client, sp.UUID);
         Assert.True(h.PumpUntil(() => !HasControlRecord(h, item)), "Release Keys did not end the controls");
         Assert.Equal(TriggerAnimation, inv.PermsMask);
-        h.ShutdownStateManager();
+        h.StopRegionAsTheSimulatorDoes();
         SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
         Assert.Equal(0, row.GrantedPermsMask & TakeControls);
     }
@@ -522,6 +522,216 @@ public class GrantRestoreTests
         Assert.Equal(TakeControls | TriggerAnimation, inv.PermsMask);   // debit needs a dialog: asked again
         Assert.False(Api(h, item).HasGrantClaim);
         Assert.DoesNotContain(h.Said, s => s.StartsWith("rtp=", StringComparison.Ordinal));
+    }
+
+    // ── a region stop: the final save finds no object in the scene ───────────
+
+    /// <summary>
+    /// The seat script in an object <paramref name="owner"/> owns, rezzed, with the owner here answering its dialog for
+    /// <paramref name="mask"/>. Returns the item id.
+    /// </summary>
+    private static UUID RezAndGrantByDialog(SchedulerHarness h, UUID owner, UUID asset, int mask)
+    {
+        SetOwner(h.Prim.ParentGroup, owner);
+        var client = (TestClient)SceneHelpers.AddScenePresence(h.Scene, owner).ControllingClient;
+        UUID item = UUID.Random();
+        TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, item, asset, "seat", Seat);
+        Assert.True(h.Prim.Inventory.CreateScriptInstance(item, 0, false, Phlox, NewRez));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("entry")), SavedStateRig.SaidText(h));
+        int asked = client.ScriptQuestions.Count;
+        Command(h, "ask " + owner + " " + mask);
+        Assert.True(h.PumpUntil(() => client.ScriptQuestions.Count > asked), "no permission question was sent");
+        client.FireScriptAnswer(h.Prim.UUID, item, mask);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("rtp=" + mask)), SavedStateRig.SaidText(h));
+        Assert.Equal(mask, h.Prim.Inventory.GetInventoryItem(item).PermsMask);
+        return item;
+    }
+
+    /// <summary>The restarted script holds <paramref name="mask"/> from <paramref name="owner"/>, with no run_time_permissions.</summary>
+    private static void AssertGrantBack(SchedulerHarness h2, UUID item, UUID owner, int mask)
+    {
+        Assert.Equal(mask, h2.Prim.Inventory.GetInventoryItem(item).PermsMask);
+        Assert.Equal(owner, h2.Prim.Inventory.GetInventoryItem(item).PermsGranter);
+        Assert.Equal("perms=" + mask + " key=" + owner, Report(h2, item));
+        Assert.DoesNotContain(h2.Said, s => s.StartsWith("rtp=", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The owner grants a rezzed object's script by dialog and the region stops right after, before any other save: the
+    /// final save runs after the core emptied the scene, and still holds the grant, which a restart gives back.
+    /// </summary>
+    [Fact]
+    public void AnOwnersGrantOnARezzedObjectSurvivesARegionStop()
+    {
+        UUID owner = UUID.Random(), asset = UUID.Random(), item;
+        using (var h = new SchedulerHarness())
+        {
+            item = RezAndGrantByDialog(h, owner, asset, TriggerAnimation);
+            h.StopRegionAsTheSimulatorDoes();
+        }
+        SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
+        Assert.Equal(TriggerAnimation, row.GrantedPermsMask);
+        Assert.Equal(owner.ToString(), row.PermsGranter);
+        Assert.False(row.PermsUnverified);
+        using var h2 = Restart(owner, asset, item);
+        AssertGrantBack(h2, item, owner, TriggerAnimation);
+    }
+
+    /// <summary>
+    /// A grant already in a row, and the script runs again before the region stops: the final save, with no object in the
+    /// scene to read the grant from, keeps the grant the state holds.
+    /// </summary>
+    [Fact]
+    public void AGrantSavedEarlierSurvivesARegionStopAfterTheScriptRanAgain()
+    {
+        UUID owner = UUID.Random(), asset = UUID.Random(), item;
+        using (var h = new SchedulerHarness())
+        {
+            item = RezAndGrantByDialog(h, owner, asset, TriggerAnimation | Debit);
+            h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+            SavedStateRig.States(h).SaveNow(new[] { (Interpreter)h.InterpreterFor(item) });
+            Command(h, "nothing");   // the script runs, so the final save captures it again
+            h.StopRegionAsTheSimulatorDoes();
+        }
+        using var h2 = Restart(owner, asset, item);
+        AssertGrantBack(h2, item, owner, TriggerAnimation | Debit);
+    }
+
+    /// <summary>
+    /// The region removed from the engine (PhloxEngine.RemoveRegion), whose final save runs after the engine let the
+    /// scene go: the grant the state holds is saved.
+    /// </summary>
+    [Fact]
+    public void AnOwnersGrantSurvivesTheRegionBeingRemovedFromTheEngine()
+    {
+        UUID owner = UUID.Random(), asset = UUID.Random(), item;
+        using (var h = new SchedulerHarness())
+        {
+            item = RezAndGrantByDialog(h, owner, asset, TriggerAnimation);
+            h.Engine.RemoveRegion(h.Scene);
+        }
+        using var h2 = Restart(owner, asset, item);
+        AssertGrantBack(h2, item, owner, TriggerAnimation);
+    }
+
+    /// <summary>
+    /// A derez disposes the object before the unload save runs, as Scene.DeleteSceneObject does; the row keeps the grant
+    /// the script held, and the object back in this simulator with no carried state gets it back whole.
+    /// </summary>
+    [Fact]
+    public void AGrantHeldWhenItsObjectIsDerezzedIsKeptInTheUnloadRow()
+    {
+        UUID owner = UUID.Random(), asset = UUID.Random(), item;
+        using (var h = new SchedulerHarness())
+        {
+            item = RezAndGrantByDialog(h, owner, asset, TriggerAnimation);
+            h.Scene.DeleteSceneObject(h.Prim.ParentGroup, false);
+            Assert.True(h.PumpUntil(() => h.InterpreterFor(item) == null), "the script was not unloaded");
+            SavedStateRig.WaitForWrites(h);
+        }
+        using var h2 = Restart(owner, asset, item);
+        AssertGrantBack(h2, item, owner, TriggerAnimation);
+    }
+
+    /// <summary>
+    /// A claim noted for carry, then a region stop: the final save finds no object, and the row holds no grant, as for
+    /// the unload save below.
+    /// </summary>
+    [Fact]
+    public void AClaimNotedForCarryIsNotSavedAsAGrantByARegionStop()
+    {
+        UUID owner, item, asset;
+        using (var h = new SchedulerHarness())
+        {
+            owner = h.Prim.OwnerID;
+            item = RezWithCarried(h, owner, st => Forge(st, UUID.Random(), Debit | TakeControls, owner), false, out var copy);
+            Assert.True(Api(h, item).HasGrantClaim);
+            asset = copy.RootPart.Inventory.GetInventoryItem(item).AssetID;
+            Assert.NotEqual(string.Empty, h.Engine.GetXMLState(item));   // the capture for carry notes the claim
+            Command(h, "nothing");   // the script runs, so the final save captures it
+            h.StopRegionAsTheSimulatorDoes();
+        }
+        SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
+        Assert.Equal(0, row.GrantedPermsMask);
+        Assert.True(string.IsNullOrEmpty(row.PermsGranter));
+        using var h2 = Restart(owner, asset, item);
+        Assert.Equal(0, h2.Prim.Inventory.GetInventoryItem(item).PermsMask);
+    }
+
+    // ── a claim never reaches a row as a grant ───────────────────────────────
+
+    /// <summary>
+    /// A carried grant naming an avatar who is not here waits as a claim. A capture for the object to carry notes the
+    /// claim in the state; the object then goes, so the unload save finds no item. The row holds no grant, and a restart
+    /// from it gives none.
+    /// </summary>
+    [Fact]
+    public void AClaimNotedForCarryIsNotSavedAsAGrantWhenTheObjectGoesBeforeTheUnloadSave()
+    {
+        UUID owner, item, asset;
+        using (var h = new SchedulerHarness())
+        {
+            owner = h.Prim.OwnerID;
+            UUID absent = UUID.Random();
+            item = RezWithCarried(h, owner, st => Forge(st, absent, Debit | TakeControls, owner), false, out var copy);
+            Assert.True(Api(h, item).HasGrantClaim);
+            asset = copy.RootPart.Inventory.GetInventoryItem(item).AssetID;
+            Assert.NotEqual(string.Empty, h.Engine.GetXMLState(item));   // the capture for carry
+
+            h.Scene.DeleteSceneObject(copy, false);
+            Assert.True(h.PumpUntil(() => h.InterpreterFor(item) == null), "the script was not unloaded");
+            SavedStateRig.WaitForWrites(h);
+        }
+        SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
+        using (var h2 = Restart(owner, asset, item))
+        {
+            Assert.Equal(0, h2.Prim.Inventory.GetInventoryItem(item).PermsMask);
+            Assert.Equal("perms=0 key=" + UUID.Zero, Report(h2, item));
+        }
+        Assert.Equal(0, row.GrantedPermsMask);
+        Assert.True(string.IsNullOrEmpty(row.PermsGranter));
+    }
+
+    /// <summary>A row whose grant is marked as a claim noted for carry is decided as carried state: debit needs a dialog.</summary>
+    [Fact]
+    public void ARowHoldingAnUnverifiedClaimIsDecidedAsCarriedState()
+    {
+        UUID owner = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
+        SaveInFirstRegion(owner, asset, item, (h, inv) => { inv.PermsGranter = owner; inv.PermsMask = Debit; });
+        var saved = SavedStateRig.Row(item)!.Value;
+        SerializedRuntimeState st = StateManager.Decode(saved.Blob);
+        Assert.False(st.PermsUnverified);   // the item's own grant
+        st.PermsUnverified = true;
+        using (var ms = new MemoryStream())
+        {
+            Serializer.Serialize(ms, st);
+            SavedStateRig.PutRow(item, asset, ms.ToArray(), saved.SavedAt);
+        }
+
+        using var h2 = Restart(owner, asset, item, h => SceneHelpers.AddScenePresence(h.Scene, owner));
+        Assert.Equal(0, h2.Prim.Inventory.GetInventoryItem(item).PermsMask);
+        Assert.Equal("perms=0 key=" + UUID.Zero, Report(h2, item));
+    }
+
+    /// <summary>The claim's mark travels in the state (tag 30); a state written before it reads as unmarked.</summary>
+    [Fact]
+    public void TheUnverifiedMarkRoundTripsAndAnOlderStateReadsUnmarked()
+    {
+        var st = new SerializedRuntimeState { LSLState = 1, BytecodeIdentity = "b" };
+        Forge(st, UUID.Random(), TakeControls, UUID.Random());
+        st.PermsUnverified = true;
+        byte[] blob;
+        using (var ms = new MemoryStream()) { Serializer.Serialize(ms, st); blob = ms.ToArray(); }
+        Assert.True(StateManager.Decode(blob).PermsUnverified);
+        Assert.True(StateManager.Decode(blob).ToRuntimeState().PermsUnverified);
+        using (var read = new MemoryStream(blob))
+            Assert.Equal(TakeControls, Serializer.Deserialize<OlderState>(read).GrantedPermsMask);   // an older build skips it
+
+        var older = new OlderState { LSLState = 1, BytecodeIdentity = "b", PermsGranter = UUID.Random().ToString(), GrantedPermsMask = Debit };
+        using (var ms = new MemoryStream()) { Serializer.Serialize(ms, older); blob = ms.ToArray(); }
+        SerializedRuntimeState back = StateManager.Decode(blob);
+        Assert.False(back.PermsUnverified);
+        Assert.Equal(Debit, back.GrantedPermsMask);
     }
 
     [Fact]

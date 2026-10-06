@@ -265,10 +265,32 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   `script_state_rejected` table of the state database and the script starts fresh, as
   YEngine resets a script whose state file is bad. When the database itself fails (busy or
   locked), the script is held stopped and its row kept, and the next restart tries again.
+- **Writes the database refuses.** A save or a delete the database does not take (busy,
+  locked, or failing) stays queued in order and is tried again; a batch of writes is all
+  or nothing. A write that fails five times is given up, with an error in the log naming
+  the script. At shutdown every queued write is tried to that bound, and the log names
+  each write that was not saved. A script loaded while its last save is still queued is
+  restored from that save, not from the older row.
+- **A state that cannot be saved.** A script whose tables nest more than 200 deep, or that
+  holds a closure referring back to itself, keeps running, but its state cannot be saved
+  while it is so. Its older saved state is not kept for a restart to resume from: the row
+  is moved to the `script_state_rejected` table, with one error in the log naming the
+  script ("cannot be captured ... cannot be restored in its place"), and a restart starts
+  the script fresh with `state_entry`. As soon as its state can be saved again, the next
+  save writes a normal row. The error is written once, and again only after a later save of
+  it has worked. A save that fails only because the state changed while it was copied
+  keeps the older row.
+- **Shutdown with a script stuck in a call.** The final save waits 5 seconds for the
+  script scheduler to stop. If a script is still inside a call then, the scheduler runs
+  nothing further, that script keeps its last saved state, and every other script is
+  saved. A part of a script's state that cannot be copied fails that script's save; it is
+  never saved empty.
 - **When rows go.** Deleting a script from a prim deletes its row. A derez, take or crossing
   keeps it; an object that comes back carrying its state uses that state first. `[InWorldz.Phlox]
   StateRowMaxAgeDays` (default 0, off) deletes rows not saved or loaded for that many days
-  whose scripts are not loaded in the simulator.
+  whose scripts are not loaded in the simulator. When an object crosses between two regions
+  of one simulator, the region it left never writes over the row the region it entered has
+  saved, whichever region handles the move first.
 - **State carried inside objects.** Phlox puts a script's saved state in its serialized
   object, in YEngine's envelope
   (`<State Engine="InWorldz.Phlox" UUID="item" Asset="asset" Version="1"><ScriptState>...`),
@@ -329,7 +351,9 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     whatever has arrived, and the event comes once. The script runs its other events
     meanwhile. Halcyon waits for every rider the same way, with no limit. A rider whose
     grant no script in the vehicle holds is not waited for, as the simulator does not tell
-    the new region which riders are coming.
+    the new region which riders are coming. A script of the vehicle that arrived with state
+    and has not loaded yet counts as holding such a grant until it has loaded, within the
+    same 10 seconds.
   - A script held stopped because its row could not be read carries no state.
   - Objects saved by an earlier Phlox build carry no Phlox state and start fresh as before.
 - **Carried state is checked as input from outside.** It can come from anywhere: inventory
@@ -357,7 +381,13 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   crossing; [llRequestPermissions](https://wiki.secondlife.com/wiki/LlRequestPermissions)
   says only "Permissions persist across state changes".
   - From the region's own state database (a restart): the grant comes back whole, when the
-    object's owner is still the owner saved with it. Otherwise nothing comes back.
+    object's owner is still the owner saved with it. Otherwise nothing comes back. A grant
+    still waiting for its granter when the state was saved is decided as carried state
+    below, from a row too. A row saved when the object can no longer be found keeps the
+    grant the script holds, which Phlox notes in the state each time the grant changes:
+    after a derez, at a region stop (the simulator empties the scene before the final
+    save) and when a region is removed from the engine. A grant still waiting for its
+    granter is never saved as a grant in such a row.
   - From state carried inside an object (take and rez, take copy, attach, login, teleport,
     crossing): only what `llRequestPermissions` would grant at that moment without a
     dialog comes back, by the same decision: the granter wears the object (take controls,
@@ -382,6 +412,14 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     while the item holds their grant, and wait with a grant that waits.
   - `llResetScript`, an owner change and a new `llRequestPermissions` or
     `llRequestExperiencePermissions` clear the saved grant and a waiting one.
+  - A permission request still waiting for its answer, from `llRequestPermissions` or
+    `llRequestExperiencePermissions`, ends when the script is reset, the object changes
+    owner, or the script leaves the region (derez, crossing, teleport): an answer that comes
+    later does nothing, and posts no event. The SL wiki says so for
+    [llRequestExperiencePermissions](https://wiki.secondlife.com/wiki/LlRequestExperiencePermissions)
+    ("Outstanding permission requests will be lost if the script is de-rezzed, moved to
+    another region, or reset"); the llRequestPermissions page says nothing on it, and the
+    same rule is applied.
   - A grant from an Experience: when `llRequestExperiencePermissions` grants (the agent
     allowed the Experience before, the Experience is trusted here, or the agent accepts the
     dialog), the script holds the permissions SL lists for it (take controls, trigger
@@ -389,13 +427,28 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     `llGetPermissions` and `llGetPermissionsKey` answer them as in SL
     ([llRequestExperiencePermissions](https://wiki.secondlife.com/wiki/LlRequestExperiencePermissions)),
     and the grant is saved as that Experience's. From the region's own state database it
-    comes back whole, as any grant. From carried state it comes back only when
+    comes back whole, as any grant, unless the region no longer lets the Experience run (the
+    estate blocks it, or neither allows nor trusts it): then it ends as the script starts, and
+    the script gets `experience_permissions_denied` with `XP_ERROR_NOT_PERMITTED_LAND` (17)
+    once, as below for a parcel. From carried state it comes back only when
     `llRequestExperiencePermissions` would grant it at that moment with no dialog: the script
     is still in that Experience, the Experience is allowed in the region and not blocked, and
     the granter is in the region, has not blocked it, and has allowed it (or it is trusted
     here). A granter who has not arrived yet leaves it waiting; it is decided when that avatar
     arrives anywhere in the region, as such a grant needs no seat or attachment. Neither
     `run_time_permissions` nor `experience_permissions` is posted by a restore.
+  - A script's Experience is the one its script item names, never one named in saved state or
+    in state that came with the object. A saved grant noted with an Experience the item does
+    not name, whether from the region's own state database or carried in the object, ends
+    before the script runs, with no event and nothing left waiting for its granter. State
+    that came with an object whose script is in no Experience also loses any
+    `experience_permissions` event still on its queue.
+  - A grant from an Experience ends when its granter enters a parcel where the Experience
+    cannot run: the estate blocks it, or neither allows nor trusts it. The script loses the
+    grant and the controls it took, and gets `experience_permissions_denied` with
+    `XP_ERROR_NOT_PERMITTED_LAND` (17), as SL lists under "The experience can no longer run":
+    "The agent has moved to a parcel where the experience cannot run"
+    ([experience_permissions_denied](https://wiki.secondlife.com/wiki/Experience_permissions_denied)).
   - States saved by an earlier Phlox build hold no grant and restore without one.
   - When a region starts, once the scripts it starts have loaded, one line in the log says
     how many came back with their saved state and how many of those got a grant back:
@@ -521,6 +574,11 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - `llGetUsername` returns "First Last" where YEngine returns "first.last". Both answer only for
   an avatar the region holds (root or child agent), else `""`; `llRequestUsername` answers for
   anyone.
+- `llGetExperienceDetails(NULL_KEY)` gives the details of the script's own Experience, the one
+  its script item names, and an empty list for a script in no Experience, as SL documents: "If
+  experience_id is NULL_KEY, then information about the script's experience is returned. In
+  this situation, if the script isn't associated with an experience, an empty list is returned"
+  ([LlGetExperienceDetails](https://wiki.secondlife.com/wiki/LlGetExperienceDetails)).
 - Start-up events come in SL's order: `state_entry` (a new script), then `on_rez`, then
   `attach` (an attachment worn from inventory), then `changed(CHANGED_REGION_START)`, which every
   script started by the region's start gets, new or restored. YEngine posts them in the same order.
@@ -719,6 +777,12 @@ message it sends for a refused rez.
 
 ### Events
 - `game_control` compiles but is never raised.
+- When an avatar blocks an Experience from its profile, SL ends the Experience's grants and
+  posts `experience_permissions_denied` ("The agent has blocked the experience from the
+  experience profile"). The simulator does not tell Phlox, so a Phlox script keeps the grant
+  and calls that use it (controls, animations, the camera, `llTeleportAgent`) still work.
+  `llSitOnLink`, `llSetAgentEnvironment` and `llReplaceAgentEnvironment`, which ask the
+  Experience on every call, are refused.
 - `money` is raised only when the region has a money module.
 
 ### Engine

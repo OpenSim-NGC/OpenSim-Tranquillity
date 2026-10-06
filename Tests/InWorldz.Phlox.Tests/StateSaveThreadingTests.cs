@@ -70,7 +70,7 @@ public class StateSaveThreadingTests
             h1.PumpFor(TimeSpan.FromSeconds(3));   // the first save after state_entry
             h1.PostTouch(item);
             Assert.True(h1.PumpUntil(() => h1.Said.Contains("b") && h1.RunStateOf(item) == "Sleeping"), SavedStateRig.SaidText(h1));
-            h1.ShutdownStateManager();
+            h1.StopRegionAsTheSimulatorDoes();
         }
         using var h2 = new SchedulerHarness();
         h2.RezScript(src, asset, item);

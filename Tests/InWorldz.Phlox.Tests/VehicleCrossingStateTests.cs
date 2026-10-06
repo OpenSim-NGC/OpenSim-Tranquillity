@@ -43,7 +43,7 @@ public class VehicleCrossingStateTests
             listen(integer c, string nm, key k, string m) { n++; llSay(0, ""n="" + (string)n + "" sp="" + (string)llGetStartParameter()); }
         }";
 
-    private sealed class Region : IDisposable
+    internal sealed class Region : IDisposable
     {
         public TestScene Scene;
         public PhloxEngine Engine;
@@ -74,7 +74,7 @@ public class VehicleCrossingStateTests
         return r;
     }
 
-    private static (Region A, Region B) TwoRegions(uint x = 7310)
+    internal static (Region A, Region B) TwoRegions(uint x = 7310)
     {
         var etmA = new EntityTransferModule();
         var etmB = new EntityTransferModule();
@@ -101,7 +101,7 @@ public class VehicleCrossingStateTests
         return (Start(a, dir), Start(b, dir));
     }
 
-    private static bool WaitFor(Func<bool> done, double seconds = 30)
+    internal static bool WaitFor(Func<bool> done, double seconds = 30)
     {
         var until = DateTime.UtcNow.AddSeconds(seconds);
         while (DateTime.UtcNow < until)
@@ -169,7 +169,7 @@ public class VehicleCrossingStateTests
             touch_start(integer t) { llSay(0, ""perms="" + (string)llGetPermissions() + "" key="" + (string)llGetPermissionsKey()); }
         }";
 
-    private static LSLSystemAPI Api(Region r, UUID item)
+    internal static LSLSystemAPI Api(Region r, UUID item)
     {
         var exe = SavedStateRig.Field(r.Engine, "m_ExeScheduler");
         var apis = (Dictionary<UUID, LSLSystemAPI>)SavedStateRig.Field(exe, "m_Apis");

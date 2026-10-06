@@ -255,15 +255,17 @@ public sealed class SchedulerHarness : IDisposable
     }
 
     /// <summary>
-    /// The real shutdown save. PhloxEngine.OnShutdown calls StateManager.Stop() and nothing else - no
-    /// ScriptUnloaded for any script - so only the dirty set reaches the row. SaveState above is the unload path,
-    /// which a region stop never takes.
+    /// A region stop as the simulator does it: the core's Scene.Close, which persists the objects, empties the scene
+    /// graph (SceneGraph.Close) and only then raises the shutdown event (SceneBase.Close -> TriggerShutdown) on which
+    /// Phlox stops its scheduler and makes the final save. That save takes only the scripts marked changed (no
+    /// ScriptUnloaded for any script; <see cref="SaveState"/> is the unload path, which a region stop never takes), and
+    /// finds no object in the scene. Afterwards the harness is only disposed.
     /// </summary>
-    public void ShutdownStateManager()
+    public void StopRegionAsTheSimulatorDoes()
     {
-        var sm = StateManagerOf();
-        Assert.NotNull(sm);
-        sm.GetType().GetMethod("Stop")!.Invoke(sm, null);
+        Assert.NotNull(StateManagerOf());
+        Scene.Close();
+        Assert.Null(StateManagerOf());   // the shutdown event reached Phlox, which saved and let its state manager go
     }
 
     public UUID RezScript(string source, UUID assetId = default)

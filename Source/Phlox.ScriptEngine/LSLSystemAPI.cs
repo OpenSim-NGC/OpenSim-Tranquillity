@@ -575,6 +575,7 @@ namespace Phlox.ScriptEngine
         /// <item>URLs: reset and unload (SL: "Any granted URLs are released"; "deleting the prim ... release URLs"). Kept across a state
         /// change (SL: "Unlike listeners, URLs persist across state changes").</item>
         /// <item>XML-RPC channels and llSendRemoteData: unload only (Halcyon RemoveScript; its reset did nothing and SL says nothing).</item>
+        /// <item>permission requests still waiting for an answer, both kinds: reset and unload (<see cref="CancelPermissionRequests"/>).</item>
         /// </list>
         /// </summary>
         internal void ReleaseScriptResources(ScriptEnd end)
@@ -600,7 +601,10 @@ namespace Phlox.ScriptEngine
             }
 
             if (end != ScriptEnd.StateChange)
+            {
                 m_ScriptEngine?.World?.RequestModuleInterface<IUrlModule>()?.ScriptRemoved(m_itemID);
+                CancelPermissionRequests();
+            }
         }
 
         // Dataserver query ids this script is still owed a reply for. A reply whose id is not here was asked for before a
@@ -760,11 +764,18 @@ namespace Phlox.ScriptEngine
         /// "Permissions persist across state changes".
         /// </para>
         /// <para>
+        /// A claim noted for carry (<see cref="NoteGrantForCarry"/>) is marked unverified; wherever it is restored from, a
+        /// row included, it is decided as carried state, never given back whole.
+        /// </para>
+        /// <para>
         /// A grant from an Experience (llRequestExperiencePermissions) is noted with that Experience. From a row it comes
         /// back whole, as any grant. From carried state it comes back only when llRequestExperiencePermissions would grant
         /// it now with no dialog, by the same decision (<see cref="DecideExperienceRequest"/>): the script is still in
         /// that Experience, the Experience is allowed here, and the granter, here, still allows it. Its granter need not
         /// wear or sit on the object, so a claim for it is decided when that avatar arrives anywhere in the region.
+        /// Wherever it is restored from, it is honoured only while the script item names that same Experience; otherwise
+        /// it ends before the script runs. Carried state for an item in no Experience also loses any experience_permissions
+        /// event waiting on its queue: no Experience gave this script a grant.
         /// </para>
         /// </summary>
         internal void RestoreSavedGrant(bool carried)
@@ -777,11 +788,32 @@ namespace Phlox.ScriptEngine
                          && UUID.TryParse(st.PermsGranter, out granter) && UUID.TryParse(st.PermsOwner, out owner)
                          && (string.IsNullOrEmpty(st.PermsExperience) || UUID.TryParse(st.PermsExperience, out experience));
             int mask = st.GrantedPermsMask;
+            bool unverified = st.PermsUnverified;
             ClearSavedGrant(st);
             TaskInventoryItem item = GetInventorySelf();
-            if (item == null || !noted || granter.IsZero() || mask == 0 || owner.IsZero() || owner != m_host.OwnerID) return;
-            if (!carried)
+            if (carried && item != null && item.ExperienceID.IsZero()) DropQueuedExperienceGrants(st);
+            if (item != null && noted && !experience.IsZero() && experience != item.ExperienceID)
             {
+                // The script's Experience is its task item's (TaskInventoryItem.ExperienceID), never the state's: a grant
+                // noted with an Experience the item does not name ends here, before the script runs, as a grant the land
+                // ends, and leaves no claim. Nothing is posted: the script was never told of this grant here.
+                EndExperienceGrant();
+                return;
+            }
+            if (item == null || !noted || granter.IsZero() || mask == 0 || owner.IsZero() || owner != m_host.OwnerID) return;
+            if (!carried && !unverified)
+            {
+                if (!experience.IsZero() && ExperienceCannotRunOnThisLand(experience))
+                {
+                    // The land no longer lets the grant's Experience run (the estate blocks it, or neither allows nor
+                    // trusts it now): it ends at the restore as it ends when its avatar enters such a parcel
+                    // (ExperienceLandChanged), told once with XP_ERROR_NOT_PERMITTED_LAND. SL wiki
+                    // experience_permissions_denied, "The experience can no longer run".
+                    EndExperienceGrant();
+                    m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                        "experience_permissions_denied", new object[] { granter.ToString(), XP_ERROR_NOT_PERMITTED_LAND }, new DetectParams[0]));
+                    return;
+                }
                 SetRestoredGrant(item, granter, mask, experience);
                 return;
             }
@@ -792,6 +824,28 @@ namespace Phlox.ScriptEngine
                 return;
             }
             GrantSilently(item, granter, mask, experience);
+        }
+
+        /// <summary>
+        /// Carried state for a script in no Experience: experience_permissions events on its queue go, since the script's
+        /// item names no Experience that could have granted it anything.
+        /// </summary>
+        private void DropQueuedExperienceGrants(RuntimeState st)
+        {
+            bool dropped = false;
+            lock (st.EventQueueLock)
+            {
+                if (st.EventQueue == null || st.EventQueue.Count == 0) return;
+                PostedEvent[] queued = st.EventQueue.ToArray();
+                if (!queued.Any(e => e.EventType == SupportedEventList.Events.EXPERIENCE_PERMISSIONS)) return;
+                st.EventQueue.Clear();
+                foreach (PostedEvent e in queued)
+                {
+                    if (e.EventType == SupportedEventList.Events.EXPERIENCE_PERMISSIONS) dropped = true;
+                    else st.EventQueue.Add(e);
+                }
+            }
+            if (dropped) GrantChanged();
         }
 
         /// <summary>
@@ -834,6 +888,43 @@ namespace Phlox.ScriptEngine
             st.ExperienceGrant = experience.ToString();
         }
 
+        /// <summary>The script item's grant is one an Experience gave <paramref name="agentId"/>. Scheduler thread.</summary>
+        internal bool HoldsExperienceGrantFrom(UUID agentId)
+            => m_thisScript?.ScriptState is RuntimeState st && !string.IsNullOrEmpty(st.ExperienceGrant)
+               && UUID.TryParse(st.ExperienceGranter, out UUID granter) && granter == agentId;
+
+        /// <summary>
+        /// <paramref name="agentId"/>, who gave this script its grant from an Experience, entered a parcel. SL wiki
+        /// experience_permissions_denied, under "The experience can no longer run": "The agent has moved to a parcel where
+        /// the experience cannot run." When the land refuses the Experience by the decision llRequestExperiencePermissions
+        /// makes (XP_ERROR_NOT_PERMITTED_LAND: blocked here, or neither allowed nor trusted here), the grant ends with the
+        /// controls it took and experience_permissions_denied is posted with that code, as the core does for YEngine's
+        /// grants (ExperienceModule.UpdateScriptExperiencePerms). Scheduler thread.
+        /// </summary>
+        internal void ExperienceLandChanged(UUID agentId)
+        {
+            if (m_thisScript?.ScriptState is not RuntimeState st || !UUID.TryParse(st.ExperienceGrant, out UUID experience)) return;
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || item.PermsGranter != agentId || World == null) return;
+            if (GetExperienceAdapter() is not PhloxExperienceAdapter expService) return;
+            if (DecideExperienceRequest(expService, experience, agentId, out int denial) != ExperienceAnswer.Denied
+                || denial != XP_ERROR_NOT_PERMITTED_LAND) return;
+            EndExperienceGrant();
+            m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                "experience_permissions_denied", new object[] { agentId.ToString(), XP_ERROR_NOT_PERMITTED_LAND }, new DetectParams[0]));
+        }
+
+        /// <summary>
+        /// A grant that may no longer stand ends with the controls it took, and the state forgets it, so a save (a region
+        /// stop's included, which cannot read the item) holds no grant a restart would give back.
+        /// </summary>
+        private void EndExperienceGrant()
+        {
+            EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
+            ForgetExperienceGrant();
+            GrantChanged();
+        }
+
         private void ForgetExperienceGrant()
         {
             if (m_thisScript?.ScriptState is not RuntimeState st) return;
@@ -869,7 +960,7 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// The grant this script's state carries to its next region: the item's grant, else a claim still waiting for its
-        /// granter, as it was carried here. Scheduler thread, before the capture.
+        /// granter, as it was carried here and marked unverified. Scheduler thread, before the capture.
         /// </summary>
         internal void NoteGrantForCarry()
         {
@@ -879,7 +970,7 @@ namespace Phlox.ScriptEngine
             if (item.PermsGranter != UUID.Zero && item.PermsMask != 0)
                 NoteItemGrant(st, item, m_host.OwnerID);
             else if (m_grantClaim is GrantClaim claim)
-                NoteGrant(st, claim.Granter, claim.Mask, claim.Owner, claim.Experience);
+                NoteGrant(st, claim.Granter, claim.Mask, claim.Owner, claim.Experience, unverified: true);
             else
                 ClearSavedGrant(st);
         }
@@ -902,20 +993,22 @@ namespace Phlox.ScriptEngine
             NoteGrant(st, item.PermsGranter, item.PermsMask, objectOwner, experience);
         }
 
-        private static void NoteGrant(RuntimeState st, UUID granter, int mask, UUID owner, UUID experience)
+        private static void NoteGrant(RuntimeState st, UUID granter, int mask, UUID owner, UUID experience, bool unverified = false)
         {
             st.PermsGranter = granter.ToString();
             st.GrantedPermsMask = mask;
             st.PermsOwner = owner.ToString();
             st.PermsExperience = experience.IsZero() ? null : experience.ToString();
+            st.PermsUnverified = unverified;
         }
 
-        private static void ClearSavedGrant(RuntimeState st)
+        internal static void ClearSavedGrant(RuntimeState st)
         {
             st.PermsGranter = null;
             st.GrantedPermsMask = 0;
             st.PermsOwner = null;
             st.PermsExperience = null;
+            st.PermsUnverified = false;
         }
 
         /// <summary>
@@ -2589,6 +2682,31 @@ namespace Phlox.ScriptEngine
         /// <summary>The mask the pending question asked for; an answer is stored ANDed with it.</summary>
         private int m_requestedPerms;
 
+        /// <summary>
+        /// Guards the waiting llRequestPermissions question. An answer comes on the client's thread; it is checked and
+        /// applied under this lock, so once <see cref="CancelPermissionRequests"/> has returned no answer to the ended
+        /// question can still be applied.
+        /// </summary>
+        private readonly object m_permRequestLock = new object();
+
+        /// <summary>
+        /// Every permission request still waiting for its answer ends, from llRequestPermissions and from
+        /// llRequestExperiencePermissions: the answer handlers are unhooked and the Experience request's timeout is
+        /// stopped, so a late answer installs nothing and posts no event. SL wiki llRequestExperiencePermissions:
+        /// "Outstanding permission requests will be lost if the script is de-rezzed, moved to another region, or reset."
+        /// The llRequestPermissions page says nothing on a waiting request, and the same rule is applied to it. Called on a
+        /// reset, an unload (a derez, a crossing or teleport out, a recompile, a shutdown) and an owner change.
+        /// </summary>
+        internal void CancelPermissionRequests()
+        {
+            lock (m_permRequestLock)
+            {
+                ClearWaitingForScriptAnswer(m_waitingForScriptAnswer);
+                m_requestedPerms = 0;
+            }
+            CancelPendingExperiencePerm();
+        }
+
         private UUID InventorySelf()
         {
             return GetInventorySelf()?.ItemID ?? UUID.Zero;
@@ -2615,12 +2733,17 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// The grant changed, perhaps with no event run (a stand-up, Release Keys, an owner change): the script is saved
-        /// again, so its row never keeps a grant the item no longer holds, which a restart would give back whole.
+        /// The grant changed, perhaps with no event run (a stand-up, Release Keys, an owner change): the state notes the
+        /// item's grant now, so a save that can no longer find the item (a region stop, a derez) holds the grant the
+        /// script holds, and the script is saved again, so its row never keeps a grant the item no longer holds, which a
+        /// restart would give back whole.
         /// </summary>
         private void GrantChanged()
         {
-            if (m_thisScript != null) m_ScriptEngine?.StateManager?.ScriptChanged(m_thisScript);
+            if (m_thisScript == null) return;
+            if (m_thisScript.ScriptState is RuntimeState st && GetInventorySelf() is TaskInventoryItem item)
+                NoteItemGrant(st, item, m_host.OwnerID);
+            m_ScriptEngine?.StateManager?.ScriptChanged(m_thisScript);
         }
 
         private int GetImplicitPermissions(TaskInventoryItem item, UUID agentID)
@@ -2668,16 +2791,18 @@ namespace Phlox.ScriptEngine
             return true;
         }
 
+        /// <summary>Under <see cref="m_permRequestLock"/>.</summary>
         private void ClearWaitingForScriptAnswer(IClientAPI client)
         {
             if (m_waitingForScriptAnswer == null || client != m_waitingForScriptAnswer) return;
             client.OnScriptAnswer -= handleScriptAnswer;
+            client.OnConnectionClosed -= handleConnectionClosed;
             m_waitingForScriptAnswer = null;
         }
 
         private void handleConnectionClosed(IClientAPI client)
         {
-            ClearWaitingForScriptAnswer(client);
+            lock (m_permRequestLock) ClearWaitingForScriptAnswer(client);
         }
 
         private void handleScriptAnswer(IClientAPI client, UUID taskID, UUID itemID, int answer)
@@ -2685,21 +2810,22 @@ namespace Phlox.ScriptEngine
             if (taskID != m_host.UUID) return;
             // Every script in the prim listens on the same client; an answer is for one item.
             if (itemID != m_itemID) return;
-            if (m_waitingForScriptAnswer == null || client != m_waitingForScriptAnswer) return;
-            ClearWaitingForScriptAnswer(client);
-            UUID invItemID = InventorySelf();
-            if (invItemID == UUID.Zero) return;
-            // A viewer can only grant what was asked; extra bits in the answer are not a grant.
-            int granted = answer & m_requestedPerms;
-            if ((granted & SlConst.PERMISSION_TAKE_CONTROLS) == 0)
-                EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
-            TaskInventoryItem item;
-            lock (m_host.TaskInventory)
-                item = m_host.TaskInventory[invItemID];
-            PermsChange(item, client.AgentId, granted);
-            m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                "run_time_permissions", new object[] { (int)item.PermsMask },
-                new DetectParams[0]));
+            lock (m_permRequestLock)
+            {
+                // The question this answer belongs to must still be waiting: a reset, an owner change or an unload ends it.
+                if (m_waitingForScriptAnswer == null || client != m_waitingForScriptAnswer) return;
+                ClearWaitingForScriptAnswer(client);
+                TaskInventoryItem item = GetInventorySelf();
+                if (item == null) return;
+                // A viewer can only grant what was asked; extra bits in the answer are not a grant.
+                int granted = answer & m_requestedPerms;
+                if ((granted & SlConst.PERMISSION_TAKE_CONTROLS) == 0)
+                    EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
+                PermsChange(item, client.AgentId, granted);
+                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                    "run_time_permissions", new object[] { (int)item.PermsMask },
+                    new DetectParams[0]));
+            }
         }
 
         public void llRequestPermissions(string agent, int perm)
@@ -2766,15 +2892,17 @@ namespace Phlox.ScriptEngine
             lock (m_host.TaskInventory)
                 item = m_host.TaskInventory[invItemID];
 
-            if (m_waitingForScriptAnswer != presence.ControllingClient)
+            lock (m_permRequestLock)
             {
-                ClearWaitingForScriptAnswer(m_waitingForScriptAnswer);
-                presence.ControllingClient.OnScriptAnswer += handleScriptAnswer;
-                presence.ControllingClient.OnConnectionClosed += handleConnectionClosed;
-                m_waitingForScriptAnswer = presence.ControllingClient;
+                if (m_waitingForScriptAnswer != presence.ControllingClient)
+                {
+                    ClearWaitingForScriptAnswer(m_waitingForScriptAnswer);
+                    presence.ControllingClient.OnScriptAnswer += handleScriptAnswer;
+                    presence.ControllingClient.OnConnectionClosed += handleConnectionClosed;
+                    m_waitingForScriptAnswer = presence.ControllingClient;
+                }
+                m_requestedPerms = perm;
             }
-
-            m_requestedPerms = perm;
             presence.ControllingClient.SendScriptQuestion(
                 m_host.UUID, m_host.ParentGroup.RootPart.Name, ownerName, invItemID, perm,
                 GetScriptExperienceId());
@@ -2849,7 +2977,13 @@ namespace Phlox.ScriptEngine
             {
                 var misc = m_thisScript?.ScriptState?.MiscAttributes;
                 bool hadRecord = misc != null && misc.ContainsKey((int)RuntimeState.MiscAttr.Control);
-                if (forgetControls && hadRecord) misc.Remove((int)RuntimeState.MiscAttr.Control);
+                if (forgetControls && hadRecord)
+                {
+                    misc.Remove((int)RuntimeState.MiscAttr.Control);
+                    // The core may have ended the grant on the item already (a stand-up or Release Keys strips it before
+                    // this runs), so the item can be unchanged here: the script is saved again for the record it lost.
+                    GrantChanged();
+                }
                 ScenePresence holder = ControlsHolder(item?.PermsGranter ?? UUID.Zero, hadRecord);
                 if (holder != null)
                     using (PhloxEngine.OwnControlChange())
@@ -2905,10 +3039,12 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// The object has a new owner. Halcyon clears every item's grant (ApplyNextOwnerPermissions, Rationalize) and so
-        /// does the core (ChangeInventoryOwner), but neither lets go of controls the old grant took. Scheduler thread.
+        /// does the core (ChangeInventoryOwner), but neither lets go of controls the old grant took. A request the script
+        /// was still waiting on under the old owner ends too. Scheduler thread.
         /// </summary>
         internal void OwnerChanged()
         {
+            CancelPermissionRequests();
             ClearGrantClaim();
             EndPermissions(ALL_PERMISSIONS, releaseControls: true, forgetControls: true);
         }
@@ -20846,6 +20982,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
             PermsChange(item, agentId, EXPERIENCE_PERMISSIONS);
             NoteExperienceGrant(experienceId, agentId);
+            // PermsChange noted the item's grant before it was the Experience's; note it again, so a save that cannot read
+            // the item (a region stop's) keeps the grant as that Experience's.
+            GrantChanged();
         }
 
         // Grant + persist an experience permission and post experience_permissions. Shared by the
@@ -20886,7 +21025,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 }
                 var pending = new PendingExperiencePerm { AgentId = agentId, ExperienceId = experienceId, Client = client };
                 pending.Timer = new System.Threading.Timer(
-                    _ => ResolveExperiencePerm(m_itemID, granted: false, errorCode: XP_ERROR_REQUEST_PERM_TIMEOUT),
+                    _ => ResolveExperiencePerm(pending, null, granted: false, errorCode: XP_ERROR_REQUEST_PERM_TIMEOUT),
                     null, EXPERIENCE_PERM_TIMEOUT_MS, System.Threading.Timeout.Infinite);
                 m_pendingExpPerms[m_itemID] = pending;
             }
@@ -20896,55 +21035,76 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         // a non-zero PERMISSION_EXPERIENCE bit means accepted, zero means denied.
         private void HandleExperienceScriptAnswer(IClientAPI client, UUID taskID, UUID itemID, int answer)
         {
-            if (taskID != m_host.UUID) return;
+            if (taskID != m_host.UUID || itemID != m_itemID) return;
             bool granted = (answer & PERMISSION_EXPERIENCE) != 0;
-            ResolveExperiencePerm(itemID, granted, granted ? XP_ERROR_NONE : XP_ERROR_NOT_PERMITTED);
+            ResolveExperiencePerm(null, client, granted, granted ? XP_ERROR_NONE : XP_ERROR_NOT_PERMITTED);
         }
 
-        // Agent disconnected mid-dialog: resolve every pending request on this client as denied.
+        // Agent disconnected mid-dialog: the request it was asked is denied.
         private void HandleExperienceConnectionClosed(IClientAPI client)
-        {
-            List<UUID> pendingKeys;
-            lock (m_pendingExpLock)
-                pendingKeys = new List<UUID>(m_pendingExpPerms.Keys);
-            foreach (UUID itemId in pendingKeys)
-                ResolveExperiencePerm(itemId, granted: false, errorCode: XP_ERROR_NOT_PERMITTED);
-        }
+            => ResolveExperiencePerm(null, client, granted: false, errorCode: XP_ERROR_NOT_PERMITTED);
 
-        // Single resolution point for grant / user-deny / timeout / disconnect. Removes the pending
-        // entry atomically (first resolver wins — no double-post), disposes the timer, unhooks the
-        // client once nothing is pending; the grant + script event happen OUTSIDE the lock.
-        private void ResolveExperiencePerm(UUID itemID, bool granted, int errorCode)
+        /// <summary>
+        /// The request still waiting ends with no answer (<see cref="CancelPermissionRequests"/>): its timeout is stopped,
+        /// the client unhooked, nothing posted.
+        /// </summary>
+        private void CancelPendingExperiencePerm()
         {
-            PendingExperiencePerm pending;
-            IClientAPI clientToUnhook = null;
+            IClientAPI clientToUnhook;
             lock (m_pendingExpLock)
             {
-                if (!m_pendingExpPerms.TryGetValue(itemID, out pending))
-                    return; // already resolved by another path
-                m_pendingExpPerms.Remove(itemID);
-                pending.Timer?.Dispose();
-                if (m_pendingExpPerms.Count == 0 && m_expHookedClient != null)
+                if (m_pendingExpPerms.TryGetValue(m_itemID, out PendingExperiencePerm pending))
                 {
-                    clientToUnhook = m_expHookedClient;
-                    m_expHookedClient = null;
+                    pending.Timer?.Dispose();
+                    m_pendingExpPerms.Remove(m_itemID);
                 }
+                clientToUnhook = m_expHookedClient;
+                m_expHookedClient = null;
             }
             if (clientToUnhook != null)
             {
                 clientToUnhook.OnScriptAnswer -= HandleExperienceScriptAnswer;
                 clientToUnhook.OnConnectionClosed -= HandleExperienceConnectionClosed;
             }
+        }
 
-            string agent = pending.AgentId.ToString();
-            var expService = GetExperienceAdapter();
-            if (granted && expService != null)
-                GrantExperienceAndNotify(expService, pending.ExperienceId, pending.AgentId, agent);
-            else
-                m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
-                    "experience_permissions_denied",
-                    new object[] { agent, errorCode },
-                    new DetectParams[0]));
+        // Single resolution point for grant / user-deny / timeout / disconnect. The request this resolution belongs to
+        // must be the one still waiting: the timer's own request, or one asked of the answering client. A request a
+        // reset, owner change or unload ended, or a newer one, is not resolved by it. The entry is removed and the grant
+        // or denial applied under the lock (first resolver wins, no double-post), so a cancel that has returned leaves
+        // nothing still to be applied.
+        private void ResolveExperiencePerm(PendingExperiencePerm expected, IClientAPI client, bool granted, int errorCode)
+        {
+            IClientAPI clientToUnhook = null;
+            lock (m_pendingExpLock)
+            {
+                if (!m_pendingExpPerms.TryGetValue(m_itemID, out PendingExperiencePerm pending))
+                    return; // already resolved by another path, or ended
+                if (expected != null && pending != expected) return;
+                if (client != null && pending.Client != client) return;
+                m_pendingExpPerms.Remove(m_itemID);
+                pending.Timer?.Dispose();
+                if (m_pendingExpPerms.Count == 0 && m_expHookedClient != null)
+                {
+                    clientToUnhook = m_expHookedClient;
+                    m_expHookedClient = null;
+                }
+
+                string agent = pending.AgentId.ToString();
+                var expService = GetExperienceAdapter();
+                if (granted && expService != null)
+                    GrantExperienceAndNotify(expService, pending.ExperienceId, pending.AgentId, agent);
+                else
+                    m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                        "experience_permissions_denied",
+                        new object[] { agent, errorCode },
+                        new DetectParams[0]));
+            }
+            if (clientToUnhook != null)
+            {
+                clientToUnhook.OnScriptAnswer -= HandleExperienceScriptAnswer;
+                clientToUnhook.OnConnectionClosed -= HandleExperienceConnectionClosed;
+            }
         }
 
         // Admission — the portable subset of the port source's ladder (IsExperienceAdmittedAt): an experience
@@ -20966,6 +21126,15 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             UUID regionId = World.RegionInfo.RegionID;
             return expService.GetBlockedExperiences(regionId).Contains(experienceId);
         }
+
+        /// <summary>
+        /// The land refuses <paramref name="experienceId"/> as llRequestExperiencePermissions does with
+        /// XP_ERROR_NOT_PERMITTED_LAND: blocked here, or neither allowed nor trusted here. False when the region has no
+        /// Experience service to ask.
+        /// </summary>
+        private bool ExperienceCannotRunOnThisLand(UUID experienceId)
+            => World != null && GetExperienceAdapter() is PhloxExperienceAdapter expService
+               && (IsExperienceBlockedInRegion(expService, experienceId) || !IsExperienceAdmitted(expService, experienceId));
 
         // ── 660: llAgentInExperience ──
         public int llAgentInExperience(string agent)
@@ -20997,6 +21166,16 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             UUID expId;
             if (!UUID.TryParse(experienceId, out expId))
                 return new LSLList();
+
+            // SL wiki llGetExperienceDetails: "If experience_id is NULL_KEY, then information about the script's
+            // experience is returned. In this situation, if the script isn't associated with an experience, an empty
+            // list is returned."
+            if (expId.IsZero())
+            {
+                expId = GetScriptExperienceId();
+                if (expId.IsZero())
+                    return new LSLList();
+            }
 
             var expService = GetExperienceAdapter();
             if (expService == null)
