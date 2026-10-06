@@ -705,6 +705,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         ret["AssetType"] = item.AssetType.ToString();
         ret["BasePermissions"] = item.BasePermissions.ToString();
         ret["CreationDate"] = item.CreationDate.ToString();
+        ret["ExperienceID"] = item.ExperienceID.ToString();
         if (item.CreatorId != null)
             ret["CreatorId"] = item.CreatorId.ToString();
         else
@@ -771,6 +772,9 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         item.SaleType = byte.Parse(data["SaleType"].ToString());
         item.Flags = uint.Parse(data["Flags"].ToString());
         item.CreationDate = int.Parse(data["CreationDate"].ToString());
+        // Absent from a region that predates the field: no Experience.
+        if (data.TryGetValue("ExperienceID", out object experience) && UUID.TryParse(experience?.ToString(), out UUID experienceID))
+            item.ExperienceID = experienceID;
 
         return item;
     }
