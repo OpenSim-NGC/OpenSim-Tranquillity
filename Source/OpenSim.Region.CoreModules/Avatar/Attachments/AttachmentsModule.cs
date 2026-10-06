@@ -358,6 +358,13 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
             }
 
             List<SceneObjectGroup> attachments = new(ad.AttachmentObjects.Count);
+
+            // An avatar arriving from another grid (through the Hypergrid gatekeeper) brings attachments that
+            // grid's simulator serialized: their scripts' Experience links are cleared.
+            AgentCircuitData circuit = m_scene.AuthenticateHandler?.GetAgentCircuitData(sp.UUID);
+            bool fromAnotherGrid = circuit is not null &&
+                (circuit.teleportFlags & (uint)Constants.TeleportFlags.ViaHGLogin) != 0;
+
             int i = 0;
             for (int indx = 0; indx < ad.AttachmentObjects.Count; ++indx)
             {
@@ -366,7 +373,13 @@ public class AttachmentsModule : IAttachmentsModule, INonSharedRegionModule
                     sog.LocalId = 0;
                     sog.RootPart.ClearUpdateSchedule();
 
-                    sog.SetState(ad.AttachmentObjectStates[i++], m_scene);
+                    string state = ad.AttachmentObjectStates[i++];
+                    if (fromAnotherGrid)
+                    {
+                        ForeignExperienceLinks.ClearInObject(sog);
+                        state = ForeignExperienceLinks.ClearInScriptState(state);
+                    }
+                    sog.SetState(state, m_scene);
                     attachments.Add(sog);
                 }
             }
