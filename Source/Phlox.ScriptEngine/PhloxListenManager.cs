@@ -94,6 +94,10 @@ namespace Phlox.ScriptEngine
         // Every listen this engine holds in the region, active or switched off, for the per-region cap.
         private int m_ListenCount;
 
+        /// <summary>Tests only: called on the delivering thread with the listening item and channel once a line of chat has
+        /// matched a listen and before its event is posted, so a test can hold a delivery that is under way.</summary>
+        internal Action<UUID, int> BeforePostForTest;
+
         /// <summary>How many listens this engine's scripts hold in the region.</summary>
         public int ListenCount { get { lock (m_Lock) return m_ListenCount; } }
 
@@ -499,6 +503,7 @@ namespace Phlox.ScriptEngine
                 if (IsRateLimited(entry.ItemID)) continue;
 
                 // Match — build and queue the event
+                BeforePostForTest?.Invoke(entry.ItemID, entry.Channel);
                 PostListenEvent(entry, channel, speakerName, speakerKey, message);
             }
         }

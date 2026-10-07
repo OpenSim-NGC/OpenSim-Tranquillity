@@ -413,12 +413,12 @@ public class ScriptCleanupTests
 
     /// <summary>
     /// A sensor sweep already under way when the script changes state. The sensor plugin holds its repeater lock for the
-    /// whole pass (CheckSenseRepeaterEvents -> SensorSweep -> PostScriptEvent). The state statement queues state_exit and
-    /// state_entry (PhloxExecutionScheduler.OnStateChange) and only then releases the sensor (LSLSystemAPI
-    /// ReleaseScriptResources -> SensorRepeat.RemoveScript), which waits for that lock. So the sweep's no_sensor is posted
-    /// behind state_entry and runs in the new state. SL State: "The event queue is cleared." "Repeating sensors are
-    /// released." A helper thread stands in for the sweep: it holds the plugin's lock, waits (no clock) until the state
-    /// change has queued state_entry, posts the no_sensor as SensorSweep does, and lets go.
+    /// whole pass (CheckSenseRepeaterEvents -> SensorSweep -> PostScriptEvent), and the state change's release of the
+    /// sensor (LSLSystemAPI ReleaseScriptResources -> SensorRepeat.RemoveScript) waits for that lock. The sweep's
+    /// no_sensor must not run after the state statement, in either state. SL State: "The event queue is cleared."
+    /// "Repeating sensors are released." A helper thread stands in for the sweep: it holds the plugin's lock, waits (no
+    /// clock) until the state change has begun - the release drops the script's listens before it reaches the sensor -
+    /// posts the no_sensor as SensorSweep does, and lets go.
     /// </summary>
     [Fact]
     public void ASweepUnderWayAtAStateChangeDoesNotReachTheNewState()
@@ -438,26 +438,17 @@ public class ScriptCleanupTests
             }");
         Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
         Assert.Equal(1, r.Sensors);
+        Assert.Equal(1, r.Listens);
 
         object sweepLock = Field(r.H.Engine.AsyncCommands.SensorRepeatPlugin, "SenseRepeatListLock");
-        object pending = Field(r.Exe, "m_PendingEvents");
-        bool StateEntryQueued()
-        {
-            lock (pending)
-                foreach (object pe in (IEnumerable)pending)
-                    if (((PostedEvent)pe.GetType().GetField("Evt")!.GetValue(pe)).EventType == InWorldz.Phlox.Types.SupportedEventList.Events.STATE_ENTRY)
-                        return true;
-            return false;
-        }
-
         using var sweeping = new System.Threading.ManualResetEventSlim(false);
-        bool sawStateEntry = false, posted = false;
+        bool sawChange = false, posted = false;
         var sweep = new System.Threading.Thread(() =>
         {
             lock (sweepLock)
             {
                 sweeping.Set();
-                sawStateEntry = System.Threading.SpinWait.SpinUntil(StateEntryQueued, TimeSpan.FromSeconds(30));
+                sawChange = System.Threading.SpinWait.SpinUntil(() => r.Listens == 0, TimeSpan.FromSeconds(30));
                 r.H.Engine.PostScriptEvent(id, new EventParams("no_sensor", Array.Empty<object>(), Array.Empty<DetectParams>()));
                 posted = true;
             }
@@ -468,9 +459,123 @@ public class ScriptCleanupTests
         r.Say(7, "state");
         Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the new state never ran: " + r.H.Diagnose(id));
         Assert.True(sweep.Join(TimeSpan.FromSeconds(30)) && posted, "the stand-in sweep never posted");
-        Assert.True(sawStateEntry, "the state change did not queue state_entry while the sweep held the lock");
+        Assert.True(sawChange, "the state change did not release the listens while the sweep held the lock");
         Assert.Equal(0, r.Sensors);
         Assert.Equal(0, r.Count("late nosensor"));   // SL: "Repeating sensors are released." "The event queue is cleared."
+        Assert.Equal(0, r.Count("old nosensor"));    // and the old state's handler does not run it after the state statement
+    }
+
+    /// <summary>
+    /// An event already posted when the state statement runs, and not yet taken into the script's queue, is cleared with
+    /// the queue: it runs neither in the old state's handler after the statement nor in the new state. llSensor posts its
+    /// result on the script's own thread, so its no_sensor is waiting when the next statement changes state.
+    /// </summary>
+    [Fact]
+    public void AnEventPostedJustBeforeTheStateStatementDoesNotRunAfterIt()
+    {
+        using var r = new Rig();
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""armed""); }
+                listen(integer c, string n, key k, string m) { llSensor(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI); state other; }
+                no_sensor() { llSay(0, ""old nosensor""); }
+                state_exit() { llSay(0, ""exit""); }
+            }
+            state other {
+                state_entry() { llSay(0, ""other""); llMessageLinked(LINK_THIS, 0, ""check"", NULL_KEY); }
+                no_sensor() { llSay(0, ""new nosensor""); }
+                link_message(integer s, integer n, string str, key k) { llSay(0, ""checked""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
+
+        r.Say(7, "go");
+        Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the new state never ran: " + r.H.Diagnose(id));
+        Assert.Equal(1, r.Count("exit"));
+        Assert.Equal(1, r.Count("other"));
+        Assert.Equal(0, r.Count("old nosensor"));   // SL State: "The event queue is cleared."
+        Assert.Equal(0, r.Count("new nosensor"));
+    }
+
+    /// <summary>
+    /// A line of chat that has matched a listen of the old state, with its event not yet posted when the state change
+    /// releases the listen, is not delivered: not to the old state's handler and not to the new state. SL State: "All
+    /// listens are released." The listen manager's test hook holds the delivery between the match and the post while the
+    /// script changes state; the delivery then goes on.
+    /// </summary>
+    [Fact]
+    public void AListenDeliveryUnderWayAtAStateChangeDoesNotReachTheNewState()
+    {
+        using var r = new Rig();
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); llListen(8, """", NULL_KEY, """"); llSay(0, ""armed""); }
+                listen(integer c, string n, key k, string m) { if (c == 7) state other; else llSay(0, ""old heard""); }
+            }
+            state other {
+                state_entry() { llSay(0, ""other""); }
+                listen(integer c, string n, key k, string m) { llSay(0, ""new heard""); }
+                link_message(integer s, integer n, string str, key k) { llSay(0, ""checked""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
+        Assert.Equal(2, r.Listens);
+
+        var listens = r.H.Engine.ListenManager;
+        using var matched = new System.Threading.ManualResetEventSlim(false);
+        using var goOn = new System.Threading.ManualResetEventSlim(false);
+        listens.BeforePostForTest = (item, channel) =>
+        {
+            if (item != id || channel != 8) return;
+            matched.Set();
+            goOn.Wait(TimeSpan.FromSeconds(30));
+        };
+        var delivery = new System.Threading.Thread(() => listens.DeliverChat(8, "tester", UUID.Random(), "late"))
+            { IsBackground = true };
+        delivery.Start();
+        Assert.True(matched.Wait(TimeSpan.FromSeconds(30)), "the delivery never matched the listen");
+
+        r.Say(7, "state");
+        Assert.True(r.PumpUntil(() => r.Count("other") == 1), "the new state never ran: " + r.H.Diagnose(id));
+        Assert.Equal(0, r.Listens);
+        goOn.Set();
+        Assert.True(delivery.Join(TimeSpan.FromSeconds(30)), "the delivery never finished");
+        listens.BeforePostForTest = null;
+
+        // Posted after the delivery finished, so once it has run anything the delivery posted has run before it
+        r.H.Engine.PostScriptEvent(id, new EventParams("link_message", new object[] { 0, 0, "check", UUID.Zero.ToString() }, Array.Empty<DetectParams>()));
+        Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the check never ran: " + r.H.Diagnose(id));
+        Assert.Equal(0, r.Count("new heard"));
+        Assert.Equal(0, r.Count("old heard"));
+    }
+
+    /// <summary>
+    /// What a state change keeps: the timer goes on into the new state (SL llSetTimerEvent: "The timer persists across
+    /// state changes"), and state_exit then state_entry run once each, in that order, also with a sensor repeat, a listen
+    /// and an event waiting at the change.
+    /// </summary>
+    [Fact]
+    public void TheTimerAndTheStateEventsSurviveTheStateChange()
+    {
+        using var r = new Rig();
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); llSensorRepeat(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI, 30.0); llSay(0, ""armed""); }
+                listen(integer c, string n, key k, string m) { llSetTimerEvent(0.2); llSensor(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI); state other; }
+                state_exit() { llSay(0, ""exit""); }
+                timer() { llSay(0, ""old tick""); }
+            }
+            state other {
+                state_entry() { llSay(0, ""entry""); }
+                timer() { llSetTimerEvent(0.0); llSay(0, ""new tick""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
+
+        r.Say(7, "go");
+        Assert.True(r.PumpUntil(() => r.Count("new tick") == 1), "the timer did not carry into the new state: " + r.H.Diagnose(id));
+        var said = r.H.Said.Where(s => s == "exit" || s == "entry").ToList();
+        Assert.Equal(new[] { "exit", "entry" }, said);
+        Assert.Equal(0, r.Count("old tick"));
+        Assert.Equal(0, r.Sensors);
+        Assert.Equal(0, r.Listens);
     }
 
     // ── late replies ───────────────────────────────────────────────────────────
