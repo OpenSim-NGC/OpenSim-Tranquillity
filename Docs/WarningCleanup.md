@@ -16,9 +16,23 @@ do not close warnings by blanket suppression.
   - CS0436: Meshing (151), ubODEMeshing (84), Phlox.ScriptEngine (29).
   - Isolate implementation namespaces without replacing meshing algorithms or
     Phlox's adapted async plugins with upstream implementations.
-- [ ] **Batch 2 / Tier 2: obsolete production APIs - 66**
-  - CS0618 (34), SYSLIB0014 (27), SYSLIB0039 (4), SYSLIB0057 (1).
-  - Review replacements and TLS policy; preserve intended interoperability.
+- [ ] **Batch 2 / Tier 2: obsolete production APIs - 39 closed, 27 remaining**
+  - [x] **2a: compiler, rendering, TLS and certificate loading - 39 closed**
+    - CS0618 (34), SYSLIB0039 (4), SYSLIB0057 (1).
+  - [ ] **2b: shared HTTP transport and startup defaults - 14**
+    - SYSLIB0014: Framework (1), Framework.Servers.HttpServer (4),
+      Framework.Servers (1), Server.Base (5), GridServer (1),
+      RegionServer (1), ConsoleClient (1).
+    - Preserve authorization, timeouts, callback outcomes, certificate policy
+      and process settings when migrating away from WebRequest/ServicePointManager.
+  - [ ] **2c: downloads and service connectors - 6**
+    - SYSLIB0014: CoreModules (2), Services.Connectors (2), LLLoginService (1),
+      ApplicationPlugins.LoadRegions (1).
+    - Preserve streaming ownership, file handling, status-code handling and retries.
+  - [ ] **2d: optional voice/XML-RPC/broker and payment transports - 7**
+    - SYSLIB0014: OptionalModules (5), GloebitMoneyModule (2).
+    - Exercise payment callbacks and failures against local fixtures; do not
+      contact live payment services for validation.
 - [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 68**
   - CA2017 (26), CA2022 (10), CA2023 (1), CS0114 (8), CS0108 (1),
     CS0659 (1), CS0649 (2), CS9192 (9), CS9193 (10).
@@ -56,7 +70,8 @@ from the original log, all in unchanged files:
 | OpenSim.Framework.Servers.HttpServer | CA2022 | 1 | 3 |
 | OpenSimNGC.Appearance.Baking | CS1573 | 3 | 7 |
 
-Thus the reconciled inventory is **661 occurrences: 264 closed and 397 remaining**.
+After Batch 1 the reconciled inventory was 661 occurrences: 264 closed and
+397 remaining. After Batch 2a it is **661 occurrences: 303 closed and 358 remaining**.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
 
@@ -94,4 +109,49 @@ dotnet test Tests/OpenSim.Region.CoreModules.Tests/OpenSim.Region.CoreModules.Te
   -c Release --filter 'FullyQualifiedName~PrimMesherIdentityTests'
 dotnet test Tests/InWorldz.Phlox.Tests/InWorldz.Phlox.Tests.csproj \
   -c Release --filter 'FullyQualifiedName~AsyncCommandIdentityTests|FullyQualifiedName~ScriptCleanupTests|FullyQualifiedName~BotDetectTests|FullyQualifiedName~DetectDataSourceTests|FullyQualifiedName~PhloxCrossEngineHttpResponseTests'
+```
+
+## Batch 2a implementation and verification
+
+The user selected a contained 39-warning sub-batch before the wider HTTP
+transport migrations, and selected operating-system TLS defaults for script HTTP.
+
+- Compiler definition and branch locations now reference ANTLR4 `IToken`
+  directly, rather than constructing obsolete `LSLAst` compatibility objects.
+  Semantic data remains in `LSLNodeAnnotations`. Tests pin duplicate-definition
+  and missing-return messages to the identifier's original line and column.
+  `Symbol.Def` and branch node/constructor types are a source/binary API change
+  for external compiler consumers; those consumers must update and rebuild.
+- Skia drawing uses explicit `SKSamplingOptions.Default`, preserving the previous
+  default sampling, and `SKPathBuilder` for polygon construction. Tests verify
+  opacity, filled/stroked polygons, closed edges and dynamic texture integration.
+- Both script HTTP handlers use `SslProtocols.None` (OS policy) instead of
+  explicitly enabling TLS 1.0/1.1. Certificate verification flags are unchanged.
+  Legacy TLS-only endpoints may stop working; upgrade them or review OS policy,
+  rather than silently re-enabling deprecated protocols in application code.
+- HTTP certificates use `X509CertificateLoader`, retaining both PKCS#12
+  (with private key/password) and certificate-only input. Loading errors retain
+  their underlying exception. Tests cover correct/empty/wrong PKCS#12 passwords,
+  certificate identity, private keys and hostname matching.
+
+Verification:
+
+- Full non-incremental Release rebuild: **358 warnings, 0 errors**.
+- CS0618, SYSLIB0039, SYSLIB0057 and CS0436: **0 remaining**.
+- No new diagnostic messages compared with the Batch 1 inventory.
+- Selected CoreModules tests: **80 passed**, including TLS 1.2/1.3 loopback
+  requests for both `HTTP_VERIFY_CERT` modes.
+- Selected Phlox compiler/drawing tests: **85 passed**.
+
+On Linux, these test outputs do not currently copy the Skia native asset.
+The first test runs failed with `DllNotFoundException`; rerunning with the
+matching, already cached Skia 4.151.1 library passed. No packages were changed.
+For this checkout the repeatable commands are:
+
+```sh
+export LD_LIBRARY_PATH="/var/opt/opensim/.nuget/packages/skiasharp.nativeassets.linux/4.151.1/runtimes/linux-x64/native${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+dotnet test Tests/OpenSim.Region.CoreModules.Tests/OpenSim.Region.CoreModules.Tests.csproj \
+  -c Release --filter 'FullyQualifiedName~ModernSkiaRenderingTests|FullyQualifiedName~HttpCertificateLoadingTests|FullyQualifiedName~HttpMimeTypeTests|FullyQualifiedName~VectorRenderImageFilterTests|FullyQualifiedName~PrimMesherIdentityTests|FullyQualifiedName~OutboundWiringTests'
+dotnet test Tests/InWorldz.Phlox.Tests/InWorldz.Phlox.Tests.csproj \
+  -c Release --filter 'FullyQualifiedName~CompilerHarnessTests|FullyQualifiedName~CompileTimeTypeErrorTests|FullyQualifiedName~UseBeforeDefineTests|FullyQualifiedName~BuiltinOverloadTests|FullyQualifiedName~CompilerCrashTests|FullyQualifiedName~OsslDrawTests|FullyQualifiedName~AsyncCommandIdentityTests'
 ```

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 using InWorldz.Phlox.Compiler.BranchAnalyze;
@@ -77,8 +78,7 @@ namespace InWorldz.Phlox.Compiler
             // Mirrors Analyze.g methodDef / methodOut
             string typeName = context.TYPE() != null ? SymbolTable.CanonicalTypeName(context.TYPE().GetText()) : null;
 
-            // Build a synthetic LSLAst for the FunctionBranch node (used for line info only).
-            LSLAst defNode = new LSLAst(context.ID().Symbol) { Text = context.ID().GetText() };
+            IToken defNode = context.ID().Symbol;
 
             _currentBranch = new FunctionBranch(defNode, typeName);
 
@@ -95,7 +95,7 @@ namespace InWorldz.Phlox.Compiler
         public override object VisitEventDef([NotNull] LSLParser.EventDefContext context)
         {
             // Events are void — treat like a void function for branch analysis.
-            LSLAst defNode = new LSLAst(context.ID().Symbol) { Text = context.ID().GetText() };
+            IToken defNode = context.ID().Symbol;
             _currentBranch = new FunctionBranch(defNode, null);  // null = void
 
             VisitChildren(context);

@@ -255,7 +255,7 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
                                         var canvas = surface.Canvas;
                                         var srcRect = SKRect.Create(0, 0, image.Width, image.Height);
                                         var dstRect = SKRect.Create(0, 0, newSize.width, newSize.height);
-                                        canvas.DrawImage(image, srcRect, dstRect);
+                                        canvas.DrawImage(image, srcRect, dstRect, SKSamplingOptions.Default);
                                         canvas.Flush();
 
                                         using (var resized = surface.Snapshot())

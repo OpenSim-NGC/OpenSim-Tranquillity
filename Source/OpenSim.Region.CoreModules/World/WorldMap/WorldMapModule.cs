@@ -1307,7 +1307,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                             int sx = regionSizeX;
                             int sy = regionSizeY;
                             SKRect dst = new SKRect(x, spanY - y - sy, x + sx, spanY - y);
-                            canvas.DrawBitmap(localSk, dst);
+                            canvas.DrawBitmap(localSk, dst, SKSamplingOptions.Default);
 
                             if (m_exportPrintRegionName)
                             {
@@ -1349,7 +1349,7 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                                         int sx = r.RegionSizeX;
                                         int sy = r.RegionSizeY;
                                         SKRect dst = new SKRect(x, spanY - y - sy, x + sx, spanY - y);
-                                        canvas.DrawBitmap(sk, dst);
+                                        canvas.DrawBitmap(sk, dst, SKSamplingOptions.Default);
 
                                         if (m_exportPrintRegionName && r.RegionHandle == m_regionHandle)
                                         {

@@ -148,7 +148,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         PooledConnectionLifetime = TimeSpan.FromMinutes(3)
                     };
                     //shhnc.SslOptions.ClientCertificates = null,
-                    shhnc.SslOptions.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Tls13;
+                    shhnc.SslOptions.EnabledSslProtocols = SslProtocols.None;
                     shhnc.SslOptions.CertificateRevocationCheckMode = X509RevocationMode.NoCheck;
                     shhnc.SslOptions.RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
                     {
@@ -189,7 +189,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                     };
 
                     //shhnc.SslOptions.ClientCertificates = null,
-                    shh.SslOptions.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Tls13;
+                    shh.SslOptions.EnabledSslProtocols = SslProtocols.None;
                     shh.SslOptions.CertificateRevocationCheckMode = X509RevocationMode.NoCheck;
                     shh.SslOptions.RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
                     {
