@@ -178,8 +178,7 @@ public class GatekeeperServiceConnector : SimulationServiceConnector
             if (!File.Exists(filename))
             {
                 m_log.LogDebug("[GATEKEEPER SERVICE CONNECTOR]: downloading...");
-                using(WebClient c = new WebClient())
-                    c.DownloadFile(imageURL, filename);
+                WebUtil.DownloadFile(imageURL, filename);
             }
             else
             {

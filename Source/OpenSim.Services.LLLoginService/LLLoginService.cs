@@ -175,11 +175,12 @@ public class LLLoginService : ILoginService
         {
             try
             { 
-                using (WebClient client = new())
-                    m_WelcomeMessage = client.DownloadString(m_MessageUrl);
+                using HttpClient client = WebUtil.GetNewGlobalHttpClient(100000);
+                m_WelcomeMessage = client.GetStringAsync(m_MessageUrl).GetAwaiter().GetResult();
             }
-            catch               
+            catch (Exception e)
             {
+                m_log.LogWarning(e, "[LOGIN SERVICE]: Unable to download welcome message; using configured WelcomeMessage.");
                 m_WelcomeMessage = null;
             }
         }

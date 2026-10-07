@@ -108,12 +108,12 @@ public sealed class GridServerRuntime : IGridServerRuntime
             _certificateProvisioner.Provision(serverConfig);
 
             int dnsTimeout = serverConfig.GetInt("DnsTimeout", 30000);
-            try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
+            WebUtil.ConfigureHTTPDefaults(null, null, dnsTimeout, null);
 
             _noVerifyCertChain = serverConfig.GetBoolean("NoVerifyCertChain", _noVerifyCertChain);
             _noVerifyCertHostname = serverConfig.GetBoolean("NoVerifyCertHostname", _noVerifyCertHostname);
 
-            WebUtil.SetupHTTPClients(_noVerifyCertChain, _noVerifyCertHostname, null, 32);
+            WebUtil.SetupHTTPClients(_noVerifyCertChain, _noVerifyCertHostname, null, 0);
 
             string registryLocation = serverConfig.GetString("RegistryLocation", ".");
 

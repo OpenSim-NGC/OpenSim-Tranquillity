@@ -16,20 +16,20 @@ do not close warnings by blanket suppression.
   - CS0436: Meshing (151), ubODEMeshing (84), Phlox.ScriptEngine (29).
   - Isolate implementation namespaces without replacing meshing algorithms or
     Phlox's adapted async plugins with upstream implementations.
-- [ ] **Batch 2 / Tier 2: obsolete production APIs - 39 closed, 27 remaining**
+- [x] **Batch 2 / Tier 2: obsolete production APIs - 66 closed, 0 remaining**
   - [x] **2a: compiler, rendering, TLS and certificate loading - 39 closed**
     - CS0618 (34), SYSLIB0039 (4), SYSLIB0057 (1).
-  - [ ] **2b: shared HTTP transport and startup defaults - 14**
+  - [x] **2b: shared HTTP transport and startup defaults - 14 closed**
     - SYSLIB0014: Framework (1), Framework.Servers.HttpServer (4),
       Framework.Servers (1), Server.Base (5), GridServer (1),
       RegionServer (1), ConsoleClient (1).
     - Preserve authorization, timeouts, callback outcomes, certificate policy
       and process settings when migrating away from WebRequest/ServicePointManager.
-  - [ ] **2c: downloads and service connectors - 6**
+  - [x] **2c: downloads and service connectors - 6 closed**
     - SYSLIB0014: CoreModules (2), Services.Connectors (2), LLLoginService (1),
       ApplicationPlugins.LoadRegions (1).
     - Preserve streaming ownership, file handling, status-code handling and retries.
-  - [ ] **2d: optional voice/XML-RPC/broker and payment transports - 7**
+  - [x] **2d: optional voice/XML-RPC/broker and payment transports - 7 closed**
     - SYSLIB0014: OptionalModules (5), GloebitMoneyModule (2).
     - Exercise payment callbacks and failures against local fixtures; do not
       contact live payment services for validation.
@@ -71,9 +71,87 @@ from the original log, all in unchanged files:
 | OpenSimNGC.Appearance.Baking | CS1573 | 3 | 7 |
 
 After Batch 1 the reconciled inventory was 661 occurrences: 264 closed and
-397 remaining. After Batch 2a it is **661 occurrences: 303 closed and 358 remaining**.
+397 remaining. After Batch 2 it is **661 occurrences: 330 closed and 331 remaining**.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
+
+## Batch 2b implementation and verification
+
+- Shared REST posters, session posters, asynchronous XML requests and the console
+  client now use HttpClient with shared, policy-configured handlers. XML/form
+  encoding, authorization, session envelopes and 10/20/100-second timeouts remain.
+- Asynchronous requester failures are logged and complete once with the default
+  response; poster/console success callbacks are not invoked on failure. Callback
+  exceptions are logged instead of escaping an unobserved asynchronous callback.
+  Synchronous session errors propagate as HttpRequestException rather than WebException.
+- Startup connection limits and idle timeouts now configure SocketsHttpHandler.
+  The user approved mapping DnsTimeout to pooled-connection lifetime: expiration
+  retires connections so subsequent connections resolve DNS again; this is not a
+  process-wide DNS-cache TTL and does not abort active requests. -1 disables expiry,
+  and 0 disables reuse. Server Startup defaults to 30000 milliseconds.
+- TCP_NODELAY remains enabled. UseNagleAlgorithm=true is unsupported and explicitly
+  logged. Certificate chain/hostname settings remain on the shared handlers, not a
+  process-global ServicePointManager callback.
+- Full non-incremental Release rebuild: **344 warnings, 0 errors**; exactly
+  **14 SYSLIB0014 removed**, no added diagnostic messages.
+- Selected CoreModules transport/outbound tests: **84 passed**. Selected startup,
+  configuration and host lifecycle tests: **17 passed**.
+- Live integration of Batch 2a was reported good except for a sit setter package
+  compilation issue that the user will address separately; its cause is unverified.
+
+## Batch 2c/2d implementation and verification
+
+- Archive and terrain downloads stream through a response-owning wrapper. Disposing
+  the returned stream disposes the HTTP response and client; terrain URI loading
+  now disposes its download on both success and failure. Header timeout remains
+  100 seconds and each streamed read has a five-minute timeout. Empty files and
+  failed statuses still fail explicitly; unknown-length responses remain supported.
+- Map-image downloads use a temporary file beside the destination and replace it
+  only after a complete transfer. Failed transfers clean up their own temporary
+  file instead of leaving a truncated cache entry or destroying an existing file.
+- HELO still uses GET and reads X-Handlers-Provided. Welcome messages retain their
+  configured fallback, now with an explicit warning on download failure. Region
+  loading retains its 30-second timeout, three attempts/two-second waits for empty
+  results, and permits HTTP 404 only when allow_regionless is enabled.
+- Groups and money XML-RPC preserve their wire encoding, keep-alive choices,
+  verification header and client certificates. Request failures now propagate
+  HttpRequestException/OperationCanceledException to existing error handling.
+  NSL's NoVerifyCert header is still a header, not a new TLS-policy override.
+- Vivox and FreeSwitch retain their existing module-specific certificate policies
+  in dedicated, pooled handlers, disposed when modules close. Those policies do
+  not weaken the shared handler's certificate checks. OS TLS policy still applies.
+- Concierge broker posts now use UTF-8 byte lengths and task-based cancellation;
+  failures are explicitly logged without leaking abort timers.
+- Gloebit request building no longer sends network data synchronously. Async
+  responses are completely read and validated as JSON objects before one
+  continuation is invoked. HTTP/network/parse/callback failures are logged, with
+  no success callback fabricated. Existing domain failure maps still reach the
+  continuation; payment decisions and application retry logic are unchanged.
+  As before, a transport failure does not invent a financial completion result.
+- The old public GloebitWebResponseCallback APM implementation was removed;
+  external code directly referencing that helper must update and rebuild.
+- Search/mutelist XML-RPC requests now pass the shared HttpClient into the
+  library's existing overload so startup certificate/proxy policy stays consistent
+  after removal of the process-global certificate callback.
+- Full non-incremental Release rebuild: **331 warnings, 0 errors**.
+  Relative to Batch 2a, exactly **27 SYSLIB0014 removed**, with no added diagnostic
+  messages. CS0436, CS0618, SYSLIB0014, SYSLIB0039 and SYSLIB0057 are all zero.
+- Selected CoreModules tests: **128 passed** across REST/callbacks, real
+  connection-limit thresholds, downloads/retries, archive/terrain regressions,
+  outbound filtering, TLS, module-specific transport and local payment fixtures.
+  Selected process/configuration/grid/region/money host lifecycle tests:
+  **23 passed** (**151 selected tests total**).
+  Money client-certificate and FreeSwitch HTTPS CONNECT tests use local TLS servers.
+  No live voice/payment endpoints were contacted; no new live integration tests
+  or deployment were performed by the assistant.
+
+Repeat the transport tests with the cached Linux Skia asset:
+
+```sh
+LD_LIBRARY_PATH=/var/opt/opensim/.nuget/packages/skiasharp.nativeassets.linux/4.151.1/runtimes/linux-x64/native \
+dotnet test Tests/OpenSim.Region.CoreModules.Tests/OpenSim.Region.CoreModules.Tests.csproj \
+  -c Release --filter 'FullyQualifiedName~SharedRestTransportTests|FullyQualifiedName~HttpDownloadTests|FullyQualifiedName~OptionalHttpTransportTests|FullyQualifiedName~Archiver|FullyQualifiedName~Terrain|FullyQualifiedName~HttpMimeTypeTests|FullyQualifiedName~OutboundWiringTests|FullyQualifiedName~XmlRpcOutboundFilterTests'
+```
 
 ## Batch 1 implementation
 

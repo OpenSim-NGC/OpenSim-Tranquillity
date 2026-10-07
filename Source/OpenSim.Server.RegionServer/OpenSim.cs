@@ -131,7 +131,7 @@ public class OpenSim : OpenSimBase
             m_consolePrompt = startupConfig.GetString("ConsolePrompt", @"Region (\R) ");
 
             int dnsTimeout = startupConfig.GetInt("DnsTimeout", 30000);
-            try { ServicePointManager.DnsRefreshTimeout = dnsTimeout; } catch { }
+            WebUtil.ConfigureHTTPDefaults(null, null, dnsTimeout, null);
         }
 
         m_log.LogInformation("[OPENSIM MAIN]: Using async_call_method " + Util.FireAndForgetMethod);

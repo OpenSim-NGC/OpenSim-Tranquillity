@@ -433,7 +433,8 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
     /// <param name="pathToTerrainHeightmap">The URI to the terrain height map</param>
     public void LoadFromStream(string filename, Uri pathToTerrainHeightmap)
     {
-        LoadFromStream(filename, URIFetch(pathToTerrainHeightmap));
+        using Stream stream = URIFetch(pathToTerrainHeightmap);
+        LoadFromStream(filename, stream);
     }
 
     public void LoadFromStream(string filename, Stream stream)
@@ -508,21 +509,7 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
 
     private static Stream URIFetch(Uri uri)
     {
-        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(uri);
-
-        // request.Credentials = credentials;
-
-        request.ContentLength = 0;
-        request.KeepAlive = false;
-
-        WebResponse response = request.GetResponse();
-        Stream file = response.GetResponseStream();
-
-        if (response.ContentLength == 0)
-            throw new Exception($"{uri} returned an empty file");
-
-        // return new BufferedStream(file, (int) response.ContentLength);
-        return new BufferedStream(file, 1000000);
+        return WebUtil.OpenHttpStream(uri);
     }
 
     /// <summary>

@@ -102,9 +102,7 @@ public abstract class BaseOpenSimServer : ServerBase
 
         m_NoVerifyCertChain = startupConfig.GetBoolean("NoVerifyCertChain", m_NoVerifyCertChain);
         m_NoVerifyCertHostname = startupConfig.GetBoolean("NoVerifyCertHostname", m_NoVerifyCertHostname);
-        ServicePointManager.ServerCertificateValidationCallback = ValidateServerCertificate;
-
-        WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 32 );
+        WebUtil.SetupHTTPClients(m_NoVerifyCertChain, m_NoVerifyCertHostname, null, 0);
     }
 
     protected override void ShutdownSpecific()

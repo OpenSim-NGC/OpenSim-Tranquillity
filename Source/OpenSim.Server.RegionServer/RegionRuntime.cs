@@ -69,7 +69,7 @@ public sealed class RegionRuntime : IRegionRuntime
             if (_initialized)
                 return;
 
-            // Apply process-level defaults (culture, ServicePointManager, thread
+            // Apply process-level defaults (culture, HTTP transport, thread
             // pool) that previously executed at the top of Application.Main().
             _processSetupService.Apply(new ProcessSetupOptions
             {
