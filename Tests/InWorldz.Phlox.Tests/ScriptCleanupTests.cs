@@ -629,7 +629,19 @@ public class ScriptCleanupTests
         var listens = r.H.Engine.ListenManager;
         listens.MaxListenEventsPerSecond = 0;   // no per-script cap: every line the flood sends is delivered
         long beats = 0, lines = 0;
-        var pump = Run("pump", () => { while (!Stopping()) { System.Threading.Interlocked.Increment(ref beats); if (!r.H.PumpOnceBusy()) System.Threading.Thread.Yield(); } });
+        // The prim's inventory is changed on the pump thread, between pumps: LSLSystemAPI.GetInventorySelf locks the
+        // dictionary itself, not the TaskInventoryDictionary lock the core's writers take, so a change from another
+        // thread can break its enumeration. That is not what this test is about.
+        var inventoryChanges = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+        var pump = Run("pump", () =>
+        {
+            while (!Stopping())
+            {
+                System.Threading.Interlocked.Increment(ref beats);
+                while (inventoryChanges.TryDequeue(out var change)) change();
+                if (!r.H.PumpOnceBusy()) System.Threading.Thread.Yield();
+            }
+        });
         var flood = Run("flood", () =>
         {
             UUID speaker = UUID.Random();
@@ -662,9 +674,16 @@ public class ScriptCleanupTests
                 if (Stopping()) return;
                 UUID gone = flippers.Keys.First();
                 flippers.TryRemove(gone, out _);
-                r.Delete(r.H.Prim, gone);
-                flippers[r.Rez(r.H.Prim, flipper)] = 0;
-                System.Threading.Interlocked.Increment(ref removals);
+                int done = 0;
+                inventoryChanges.Enqueue(() =>
+                {
+                    r.Delete(r.H.Prim, gone);
+                    flippers[r.Rez(r.H.Prim, flipper)] = 0;
+                    System.Threading.Interlocked.Increment(ref removals);
+                    System.Threading.Volatile.Write(ref done, 1);
+                });
+                // the pump stops taking changes once the test stops it
+                if (!System.Threading.SpinWait.SpinUntil(() => Stopping() || System.Threading.Volatile.Read(ref done) != 0, TimeSpan.FromSeconds(10))) return;
             }
         });
         foreach (var t in new[] { pump, flood, resets, removal }) t.Start();
