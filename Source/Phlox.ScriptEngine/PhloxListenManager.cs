@@ -44,6 +44,7 @@ namespace Phlox.ScriptEngine
         public System.Text.RegularExpressions.Regex MsgRegex;
         public int RegexBitfield;   // as osListenRegex was given it; 0 for llListen
         public bool Active;
+        public bool Removed;        // set under the manager's lock when the listen is removed
     }
 
     internal class PhloxListenManager
@@ -296,6 +297,7 @@ namespace Phlox.ScriptEngine
 
         private void IndexRemove(ListenEntry entry)
         {
+            entry.Removed = true;   // a delivery that matched it before now does not post (PostListenEvent)
             if (!m_ByChannel.TryGetValue(entry.Channel, out var list)) return;
             list.Remove(entry);
             if (list.Count == 0) m_ByChannel.Remove(entry.Channel);
@@ -629,7 +631,14 @@ namespace Phlox.ScriptEngine
                     }
                 };
 
-                m_Scheduler.PostEvent(entry.ItemID, evt);
+                // Posted under the lock Remove takes, and only while the listen is still registered: once a reset, a
+                // state change or llListenRemove has removed it, a delivery that matched it before does not post. So the
+                // state change's release returns only after such a post has landed, and its queue clear takes it.
+                lock (m_Lock)
+                {
+                    if (entry.Removed) return;
+                    m_Scheduler.PostEvent(entry.ItemID, evt);
+                }
 
                 m_log.LogDebug(
                     "[PhloxListen]: Delivered listen ch={0} from '{1}' to item={2}",

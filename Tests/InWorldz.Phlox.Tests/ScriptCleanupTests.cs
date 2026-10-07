@@ -442,7 +442,7 @@ public class ScriptCleanupTests
 
         object sweepLock = Field(r.H.Engine.AsyncCommands.SensorRepeatPlugin, "SenseRepeatListLock");
         using var sweeping = new System.Threading.ManualResetEventSlim(false);
-        bool sawChange = false, posted = false;
+        bool sawChange = false, posted = false, signalled = false;
         var sweep = new System.Threading.Thread(() =>
         {
             lock (sweepLock)
@@ -450,6 +450,8 @@ public class ScriptCleanupTests
                 sweeping.Set();
                 sawChange = System.Threading.SpinWait.SpinUntil(() => r.Listens == 0, TimeSpan.FromSeconds(30));
                 r.H.Engine.PostScriptEvent(id, new EventParams("no_sensor", Array.Empty<object>(), Array.Empty<DetectParams>()));
+                // an event a caller waits on, posted in the same window: it is done with whether it runs or is cleared
+                r.H.Engine.PostScriptEvent(id, new EventParams("touch_start", new object[] { 1 }, Array.Empty<DetectParams>()), () => signalled = true);
                 posted = true;
             }
         }) { IsBackground = true };
@@ -458,6 +460,7 @@ public class ScriptCleanupTests
 
         r.Say(7, "state");
         Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the new state never ran: " + r.H.Diagnose(id));
+        Assert.True(r.PumpUntil(() => System.Threading.Volatile.Read(ref signalled)), "a waiter was left waiting: " + r.H.Diagnose(id));
         Assert.True(sweep.Join(TimeSpan.FromSeconds(30)) && posted, "the stand-in sweep never posted");
         Assert.True(sawChange, "the state change did not release the listens while the sweep held the lock");
         Assert.Equal(0, r.Sensors);

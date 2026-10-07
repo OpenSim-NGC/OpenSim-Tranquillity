@@ -520,7 +520,11 @@ namespace InWorldz.Phlox.VM
             TopFrame = null;
             Calls.Clear();
             Operands.Clear();
-            lock (EventQueueLock) EventQueue.Clear();
+            lock (EventQueueLock)
+            {
+                foreach (PostedEvent evt in EventQueue) evt.SignalCompleted();   // no waiter waits for a cleared event
+                EventQueue.Clear();
+            }
         }
 
         public DetectVariables GetDetectVariables(int index)
