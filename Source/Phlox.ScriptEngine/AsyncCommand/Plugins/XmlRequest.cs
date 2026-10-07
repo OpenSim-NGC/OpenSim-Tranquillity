@@ -34,10 +34,9 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.CoreModules.Scripting.XMLRPC;
 using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api;
 using LSL_Types = OpenSim.Region.ScriptEngine.Shared.LSL_Types;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
+namespace Phlox.ScriptEngine.AsyncCommand.Plugins
 {
     public class XmlRequest
     {

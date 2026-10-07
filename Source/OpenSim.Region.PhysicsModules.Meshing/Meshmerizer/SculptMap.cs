@@ -27,7 +27,7 @@
 
 using SkiaSharp;
 
-namespace PrimMesher;
+namespace OpenSim.Region.PhysicsModules.Meshing.PrimMesher;
 
 public class SculptMap
 {
@@ -176,4 +176,3 @@ public class SculptMap
         return scaledImage;
     }
 }
-

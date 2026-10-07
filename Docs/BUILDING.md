@@ -28,6 +28,9 @@ Where Configuration is either Debug or Release and Platform is either linux-x64 
 For testing workflows (including YEngine state-load telemetry configuration and commands),
 see Docs/TESTING.txt.
 
+For the ranked build-warning backlog and batch completion criteria, see
+[WarningCleanup.md](WarningCleanup.md).
+
 ## Plugin discovery
 
 Plugin discovery now always uses DotNetCorePlugins. The old `PluginDiscovery`

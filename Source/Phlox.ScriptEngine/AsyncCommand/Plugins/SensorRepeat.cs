@@ -38,9 +38,8 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
+namespace Phlox.ScriptEngine.AsyncCommand.Plugins
 {
     public class SensorRepeat
     {

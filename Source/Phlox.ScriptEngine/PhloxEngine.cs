@@ -16,7 +16,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api;
+using Phlox.ScriptEngine.AsyncCommand;
 using OpenSim.Services.Interfaces;
 
 using Microsoft.Extensions.Logging;

@@ -40,11 +40,11 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
+using Phlox.ScriptEngine.AsyncCommand.Plugins;
 
 using Microsoft.Extensions.Logging;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api
+namespace Phlox.ScriptEngine.AsyncCommand
 {
     /// <summary>
     /// Handles LSL commands that take a long time and return an event:
