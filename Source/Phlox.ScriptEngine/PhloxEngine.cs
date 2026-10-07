@@ -324,6 +324,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnRemovePresence            += OnRemovePresenceForControls;
             m_Scene.EventManager.OnMakeRootAgent             += OnMakeRootAgentForControls;
             m_Scene.EventManager.OnAvatarEnteringNewParcel   += OnAvatarEnteringNewParcelForExperiences;
+            m_Scene.EventManager.OnExperiencePermissionsRevoked += OnExperiencePermissionsRevoked;
             if (PhysicsThrottle) m_Scene.EventManager.OnFrame += OnFrameForPhysicsTime;
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
@@ -590,6 +591,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnRemovePresence            -= OnRemovePresenceForControls;
             m_Scene.EventManager.OnMakeRootAgent             -= OnMakeRootAgentForControls;
             m_Scene.EventManager.OnAvatarEnteringNewParcel   -= OnAvatarEnteringNewParcelForExperiences;
+            m_Scene.EventManager.OnExperiencePermissionsRevoked -= OnExperiencePermissionsRevoked;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
             bool stopped = m_MasterScheduler == null || m_MasterScheduler.Stop();
             AsyncCommands?.Shutdown();
@@ -1119,6 +1121,16 @@ namespace Phlox.ScriptEngine
         private void OnAvatarEnteringNewParcelForExperiences(ScenePresence sp, int localLandID, UUID regionID)
         {
             if (sp != null && !sp.IsChildAgent) m_ExeScheduler?.RequestExperienceLandCheck(sp.UUID);
+        }
+
+        // The core ended a script's grant because its avatar may no longer be reached through the script's Experience
+        // (ExperienceModule: the avatar blocked it, or YEngine's grant on entering a parcel). The core cleared the item and
+        // posted experience_permissions_denied; the script's own records end on the scheduler thread. Ignored once the
+        // region's stop has begun (the state manager is gone) and for items this engine does not run.
+        private void OnExperiencePermissionsRevoked(UUID partId, UUID itemId, UUID granterId, UUID experienceId, int revokedMask, int reason)
+        {
+            if (StateManager == null) return;
+            m_ExeScheduler?.RequestExperienceGrantEnded(itemId, granterId, experienceId);
         }
 
         /// <summary>

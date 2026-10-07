@@ -915,6 +915,24 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
+        /// The core ended the grant <paramref name="agentId"/> gave this script through <paramref name="experience"/>
+        /// (EventManager.OnExperiencePermissionsRevoked): the avatar blocked the Experience, SL wiki
+        /// experience_permissions_denied, "The agent has blocked the experience from the experience profile". The core
+        /// has already cleared the item's grant and posted experience_permissions_denied to the script, so the script is
+        /// told nothing more here: what the engine keeps for the grant ends as when the land ends it, and a request this
+        /// script is still waiting on from that avatar under that Experience ends unanswered, since the core's denial is
+        /// its answer. An item whose grant has since gone to another avatar is left alone. Scheduler thread.
+        /// </summary>
+        internal void ExperienceGrantEndedByCore(UUID agentId, UUID experience)
+        {
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || World == null) return;
+            if (item.PermsGranter != UUID.Zero && item.PermsGranter != agentId) return;
+            CancelPendingExperiencePermFor(agentId, experience);
+            EndExperienceGrant();
+        }
+
+        /// <summary>
         /// A grant that may no longer stand ends with the controls it took, and the state forgets it, so a save (a region
         /// stop's included, which cannot read the item) holds no grant a restart would give back.
         /// </summary>
@@ -3215,7 +3233,7 @@ namespace Phlox.ScriptEngine
         /// silently. A change that is already so (AlreadySet), a NULL_KEY and an unknown action are FALSE. A ban never
         /// touches the estate owner or a manager ("never process EO"), the object's owner, or a god (YEngine, and NGC's
         /// estate tools: "Cannot ban a Administrator"); it takes the avatar off the allowed list and sends them away.
-        /// Halcyon's estate-owner's-partner rule is not ported: NGC has no partner lookup in the region.
+        /// Nor is the estate owner's partner banned (<see cref="IsEstateOwnersPartner"/>).
         /// </summary>
         private bool ManageEstateAccess(int action, UUID key)
         {
@@ -3259,7 +3277,8 @@ namespace Phlox.ScriptEngine
                     StoreEstate(es);
                     return true;
                 case EstateBannedAgentAdd:
-                    if (es.IsEstateManagerOrOwner(key) || key == m_host.OwnerID || World.Permissions.IsGod(key))
+                    if (es.IsEstateManagerOrOwner(key) || key == m_host.OwnerID || World.Permissions.IsGod(key)
+                        || IsEstateOwnersPartner(es, key))
                         return false;
                     // Halcyon clears the allowed entry even when the avatar is already banned.
                     if (allowed) es.RemoveEstateUser(key);
@@ -3285,6 +3304,24 @@ namespace Phlox.ScriptEngine
                 default:
                     return false;
             }
+        }
+
+        /// <summary>
+        /// <paramref name="key"/> is the partner on the estate owner's profile (Halcyon EstateBanUser refuses a ban of
+        /// the estate owner's partner, IsEstateOwnerPartner). A profile that cannot be read guards nobody, so a profiles
+        /// service that cannot be reached does not stop estate management; it is logged. This is a service call, made
+        /// here on the deferred call's thread, not the scheduler's.
+        /// </summary>
+        private bool IsEstateOwnersPartner(EstateSettings es, UUID key)
+        {
+            IProfileModule profiles = World.RequestModuleInterface<IProfileModule>();
+            if (profiles == null || es.EstateOwner.IsZero()) return false;
+            if (!profiles.TryGetUserPartner(es.EstateOwner, out UUID partner))
+            {
+                m_log.LogWarning("[PhloxAPI]: llManageEstateAccess could not read the estate owner's partner; the ban of {0} is not checked against it", key);
+                return false;
+            }
+            return partner.IsNotZero() && partner == key;
         }
 
         private void StoreEstate(EstateSettings es) => World.EstateDataServiceSafe?.StoreEstateSettings(es);
@@ -3503,22 +3540,18 @@ namespace Phlox.ScriptEngine
         /// outside this range are automatically rounded to the nearest limit"; Halcyon does not cap). An inactive one
         /// is removed: zero offset, identity rotation. The ll functions pass active only for a non-zero offset, as SL
         /// ("If offset == &lt;0.0, 0.0, 0.0&gt; then the sit target is removed"); Halcyon also keeps a zero offset with a
-        /// turned rotation. The scene holds no active flag apart from the offset and rotation (IsSitTargetSet), so an
-        /// active target at ZERO_VECTOR and ZERO_ROTATION reads back, and sits, as none (Docs/PhloxKnownDefects.md).
+        /// turned rotation. The state is set with the offset and rotation (SceneObjectPart.SetSitTarget), so PRIM_SIT_TARGET
+        /// can make a target at ZERO_VECTOR and ZERO_ROTATION active, as SL ("an offset of &lt;0.0, 0.0, 0.0&gt; may be
+        /// explicitly set"). The region stores do not save that state: after a region restart such a target is off.
         /// </summary>
         private static void PrimSetSitTarget(SceneObjectPart part, bool active, Vector3 offset, Quaternion rot)
         {
             if (active)
-            {
-                part.SitTargetPosition = new Vector3(Math.Clamp(offset.X, -300f, 300f),
-                    Math.Clamp(offset.Y, -300f, 300f), Math.Clamp(offset.Z, -300f, 300f));
-                part.SitTargetOrientation = NormalizedRot(rot);   // Halcyon Rot2Quaternion; core assumes a unit rotation
-            }
+                part.SetSitTarget(true, new Vector3(Math.Clamp(offset.X, -300f, 300f),
+                    Math.Clamp(offset.Y, -300f, 300f), Math.Clamp(offset.Z, -300f, 300f)),
+                    NormalizedRot(rot));   // Halcyon Rot2Quaternion; core assumes a unit rotation
             else
-            {
-                part.SitTargetPosition = Vector3.Zero;
-                part.SitTargetOrientation = Quaternion.Identity;
-            }
+                part.SetSitTarget(false, Vector3.Zero, Quaternion.Identity);
             if (part.ParentGroup != null) part.ParentGroup.HasGroupChanged = true;
             part.ScheduleFullUpdate();
         }
@@ -5878,7 +5911,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// The checks and errors of Halcyon's iwRezAt (LSLSystemAPI.cs:3155-3245), which every rez function shares. A NaN
+        /// The checks and errors of Halcyon's iwRezAt (LSLSystemAPI.cs:3155-3245), which every rez function shares. An
+        /// owner the region blocks from rezzing is refused first, silently, with 100 ms. A NaN
         /// rotation, a position over 10 m away, an item that is not an object and a refused rez each shout their own
         /// text and cost no delay; a missing item and a rez cost 100 ms (Halcyon's sleepTime). Halcyon was silent for a
         /// missing item; Phlox keeps its error for it (SL: an error is shouted). The scene does not say why a rez was
@@ -5886,6 +5920,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// </summary>
         private List<SceneObjectGroup> RezChecked(string inventory, Vector3 pos, Vector3 vel, Quaternion rot, int param, bool atRoot)
         {
+            if (OwnerBlockedFromRezzing())
+            {
+                ScriptSleep(100);
+                return null;
+            }
             if (RezRotationIsNaN(rot)) return null;
             if (m_host == null || World == null) return null;
 
@@ -5941,9 +5980,17 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
+        /// Halcyon's iwRezAt asked the region's bad-user list before any other check (LSLSystemAPI.cs:3160-3166) and, for
+        /// such an owner, failed silently with a 100 ms sleep. The region's list here is the core's blocked-owner hook
+        /// (IBlockedOwnerModule). The region would refuse the rez itself as well; asking first keeps the refusal silent,
+        /// so a blocked owner's rezzers do not shout an error on every attempt.
+        /// </summary>
+        private bool OwnerBlockedFromRezzing()
+            => m_host != null && World?.RequestModuleInterface<IBlockedOwnerModule>()?.IsBlocked(m_host.OwnerID) == true;
+
+        /// <summary>
         /// Halcyon iwRezAt (LSLSystemAPI.cs:3168-3173) refuses a NaN rotation with this error and no delay
         /// (sleepTime = 0), before its 10 m check. Its rez calls were long-running, so ShoutError: no pause.
-        /// Halcyon's other guard there, IsBadUser (:3160-3166), reads a nuke/blacklist-owner list NGC core does not have.
         /// </summary>
         private bool RezRotationIsNaN(Quaternion rot)
         {
@@ -6181,7 +6228,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         /// <summary>
         /// Could the owner rez <paramref name="landImpact"/> prims at <paramref name="pos"/>? Halcyon's Scene.CheckRezError
-        /// (Scene.cs:2341-2367), answered by the checks a rez itself goes through: no parcel there; the region's rez
+        /// (Scene.cs:2341-2367), answered by the checks a rez itself goes through: an owner the region blocks from rezzing
+        /// (asked first, as Halcyon asked IsBadUser, Scene.cs:2343-2344); no parcel there; the region's rez
         /// permission (CanRezObject, asked with no prims as Halcyon asked it); the same permission asked with the prims the
         /// rez would add (the prim-limit checks hang off it). IW_REZ_REGION_SCENIC and IW_REZ_REGION_LAND_IMPACT are never
         /// returned: there are no scenic regions, and no region-wide total is checked apart from the parcels'. isTemp is
@@ -6189,6 +6237,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// </summary>
         public int iwCheckRezError(Vector3 pos, int isTemp, int landImpact)
         {
+            if (OwnerBlockedFromRezzing()) return IW_REZ_NOT_PERMITTED;
             if (World?.LandChannel?.GetLandObject(pos.X, pos.Y) == null) return IW_REZ_NO_LAND_PARCEL;
             UUID owner = m_host.OwnerID;
             if (!World.Permissions.CanRezObject(0, owner, pos)) return IW_REZ_NOT_PERMITTED;
@@ -21129,6 +21178,29 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     pending.Timer?.Dispose();
                     m_pendingExpPerms.Remove(m_itemID);
                 }
+                clientToUnhook = m_expHookedClient;
+                m_expHookedClient = null;
+            }
+            if (clientToUnhook != null)
+            {
+                clientToUnhook.OnScriptAnswer -= HandleExperienceScriptAnswer;
+                clientToUnhook.OnConnectionClosed -= HandleExperienceConnectionClosed;
+            }
+        }
+
+        /// <summary>
+        /// The request still waiting ends with no answer when it asks <paramref name="agentId"/> for
+        /// <paramref name="experience"/>: its timeout is stopped, the client unhooked, nothing posted.
+        /// </summary>
+        private void CancelPendingExperiencePermFor(UUID agentId, UUID experience)
+        {
+            IClientAPI clientToUnhook = null;
+            lock (m_pendingExpLock)
+            {
+                if (!m_pendingExpPerms.TryGetValue(m_itemID, out PendingExperiencePerm pending)
+                    || pending.AgentId != agentId || pending.ExperienceId != experience) return;
+                pending.Timer?.Dispose();
+                m_pendingExpPerms.Remove(m_itemID);
                 clientToUnhook = m_expHookedClient;
                 m_expHookedClient = null;
             }
