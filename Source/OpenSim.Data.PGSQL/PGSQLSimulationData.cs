@@ -347,7 +347,8 @@ public class PGSQLSimulationData : ISimulationDataStore
             ""ClickAction"" = :ClickAction, ""Material"" = :Material, ""CollisionSound"" = :CollisionSound, ""CollisionSoundVolume"" = :CollisionSoundVolume, ""PassTouches"" = :PassTouches,
             ""LinkNumber"" = :LinkNumber, ""MediaURL"" = :MediaURL, ""DynAttrs"" = :DynAttrs, ""Vehicle"" = :Vehicle,
             ""PhysInertia"" = :PhysInertia, ""standtargetx"" =:standtargetx, ""standtargety"" =:standtargety, ""standtargetz"" =:standtargetz,
-            ""sitactrange"" =:sitactrange, ""pseudocrc"" = :pseudocrc, ""sopanims"" = :sopanims, ""linksetdata"" =:linksetdata, ""StartStr"" = :StartStr 
+            ""sitactrange"" =:sitactrange, ""pseudocrc"" = :pseudocrc, ""sopanims"" = :sopanims, ""linksetdata"" =:linksetdata, ""StartStr"" = :StartStr,
+            ""SitTargetActive"" = :SitTargetActive
             WHERE ""UUID"" = :UUID ;
 
         INSERT INTO
@@ -362,7 +363,7 @@ public class PGSQLSimulationData : ISimulationDataStore
             ""ForceMouselook"", ""ScriptAccessPin"", ""AllowedDrop"", ""DieAtEdge"", ""SalePrice"", ""SaleType"", ""ColorR"", ""ColorG"", ""ColorB"", ""ColorA"",
             ""ParticleSystem"", ""ClickAction"", ""Material"", ""CollisionSound"", ""CollisionSoundVolume"", ""PassTouches"", ""LinkNumber"", ""MediaURL"", ""DynAttrs"",
             ""PhysicsShapeType"", ""Density"", ""GravityModifier"", ""Friction"", ""Restitution"", ""PassCollisions"", ""RotationAxisLocks"", ""RezzerID"" , ""Vehicle"", ""PhysInertia"",
-            ""standtargetx"", ""standtargety"", ""standtargetz"", ""sitactrange"", ""pseudocrc"", ""sopanims"", ""linksetdata"", ""StartStr""
+            ""standtargetx"", ""standtargety"", ""standtargetz"", ""sitactrange"", ""pseudocrc"", ""sopanims"", ""linksetdata"", ""StartStr"", ""SitTargetActive""
             ) Select
             :UUID, :CreationDate, :Name, :Text, :Description, :SitName, :TouchName, :ObjectFlags, :OwnerMask, :NextOwnerMask, :GroupMask,
             :EveryoneMask, :BaseMask, :PositionX, :PositionY, :PositionZ, :GroupPositionX, :GroupPositionY, :GroupPositionZ, :VelocityX,
@@ -374,7 +375,7 @@ public class PGSQLSimulationData : ISimulationDataStore
             :ForceMouselook, :ScriptAccessPin, :AllowedDrop, :DieAtEdge, :SalePrice, :SaleType, :ColorR, :ColorG, :ColorB, :ColorA,
             :ParticleSystem, :ClickAction, :Material, :CollisionSound, :CollisionSoundVolume, :PassTouches, :LinkNumber, :MediaURL, :DynAttrs,
             :PhysicsShapeType, :Density, :GravityModifier, :Friction, :Restitution, :PassCollisions, :RotationAxisLocks, :RezzerID, :Vehicle, :PhysInertia,
-            :standtargetx, :standtargety, :standtargetz,:sitactrange, :pseudocrc, :sopanims, :LinksetData, :StartStr
+            :standtargetx, :standtargety, :standtargetz,:sitactrange, :pseudocrc, :sopanims, :LinksetData, :StartStr, :SitTargetActive
             where not EXISTS (SELECT ""UUID"" FROM prims WHERE ""UUID"" = :UUID);
         ";
 
@@ -1291,6 +1292,9 @@ public class PGSQLSimulationData : ISimulationDataStore
                             Convert.ToSingle(primRow["SitTargetOrientY"]),
                             Convert.ToSingle(primRow["SitTargetOrientZ"]),
                             Convert.ToSingle(primRow["SitTargetOrientW"]));
+        // NULL (every row saved before the column existed): the state follows the offset and rotation, as before.
+        if (primRow["SitTargetActive"] is not DBNull)
+            prim.SitTargetActive = Convert.ToInt32(primRow["SitTargetActive"]) != 0;
 
         prim.StandOffset = new Vector3(
                            Convert.ToSingle(primRow["standtargetx"]),
@@ -1782,6 +1786,12 @@ public class PGSQLSimulationData : ISimulationDataStore
         parameters.Add(_Database.CreateParameter("SitTargetOrientX", sitTargetOrient.X));
         parameters.Add(_Database.CreateParameter("SitTargetOrientY", sitTargetOrient.Y));
         parameters.Add(_Database.CreateParameter("SitTargetOrientZ", sitTargetOrient.Z));
+        // Only a state the offset and rotation do not give (an active target at a zero offset) is stored. Built here
+        // because CreateParameter turns null into an empty string.
+        parameters.Add(new NpgsqlParameter("SitTargetActive", NpgsqlTypes.NpgsqlDbType.Smallint)
+        {
+            Value = prim.SitTargetActiveIsExplicit ? (object)(short)(prim.SitTargetActive ? 1 : 0) : DBNull.Value
+        });
 
         Vector3 standTargetPos = prim.StandOffset;
         parameters.Add(_Database.CreateParameter("standtargetx", standTargetPos.X));

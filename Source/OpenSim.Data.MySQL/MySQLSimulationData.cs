@@ -169,7 +169,7 @@ public class MySQLSimulationData : ISimulationDataStore
                                 "PhysicsShapeType, Density, GravityModifier, " +
                                 "Friction, Restitution, Vehicle, PhysInertia, DynAttrs, " +
                                 "RotationAxisLocks, sopanims, sitactrange, pseudocrc, " +
-                                "linksetdata, AllowUnsit, ScriptedSitOnly, StartStr " +
+                                "linksetdata, AllowUnsit, ScriptedSitOnly, StartStr, SitTargetActive " +
                                 ") values (" + "?UUID, " +
                                 "?CreationDate, ?Name, ?Text, " +
                                 "?Description, ?SitName, ?TouchName, " +
@@ -205,7 +205,7 @@ public class MySQLSimulationData : ISimulationDataStore
                                 "?PhysicsShapeType, ?Density, ?GravityModifier, " +
                                 "?Friction, ?Restitution, ?Vehicle, ?PhysInertia, ?DynAttrs," +
                                 "?RotationAxisLocks, ?sopanims, ?sitactrange, ?pseudocrc, " +
-                                "?linksetdata, ?AllowUnsit, ?ScriptedSitOnly, ?StartStr)";
+                                "?linksetdata, ?AllowUnsit, ?ScriptedSitOnly, ?StartStr, ?SitTargetActive)";
 
                         FillPrimCommand(cmd, prim, obj.UUID, regionUUID);
 
@@ -1066,6 +1066,9 @@ public class MySQLSimulationData : ISimulationDataStore
             (float)row["SitTargetOrientZ"],
             (float)row["SitTargetOrientW"]
             );
+        // NULL (every row saved before the column existed): the state follows the offset and rotation, as before.
+        if (row["SitTargetActive"] is not DBNull)
+            prim.SitTargetActive = Convert.ToInt32(row["SitTargetActive"]) != 0;
 
         prim.StandOffset = new Vector3(
             (float)row["standtargetx"],
@@ -1526,6 +1529,9 @@ public class MySQLSimulationData : ISimulationDataStore
         cmd.Parameters.AddWithValue("SitTargetOrientX", sitTargetOrient.X);
         cmd.Parameters.AddWithValue("SitTargetOrientY", sitTargetOrient.Y);
         cmd.Parameters.AddWithValue("SitTargetOrientZ", sitTargetOrient.Z);
+        // Only a state the offset and rotation do not give (an active target at a zero offset) is stored.
+        cmd.Parameters.AddWithValue("SitTargetActive",
+            prim.SitTargetActiveIsExplicit ? (object)(prim.SitTargetActive ? 1 : 0) : DBNull.Value);
 
         cmd.Parameters.AddWithValue("PayPrice", prim.PayPrice[0]);
         cmd.Parameters.AddWithValue("PayButton1", prim.PayPrice[1]);

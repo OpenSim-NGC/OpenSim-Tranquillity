@@ -1321,3 +1321,9 @@ BEGIN;
 ALTER TABLE "public"."prims" ADD COLUMN IF NOT EXISTS "linksetdata" varchar default NULL;
 ALTER TABLE "public"."prims" ADD COLUMN IF NOT EXISTS "StartStr" text;
 COMMIT;
+
+:VERSION 61         #----- add the sit target state to prims
+# NULL: the state follows the sit target offset and rotation, as for every row saved before this step.
+BEGIN;
+ALTER TABLE "public"."prims" ADD COLUMN "SitTargetActive" smallint;
+COMMIT;
