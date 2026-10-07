@@ -581,6 +581,119 @@ public class ScriptCleanupTests
         Assert.Equal(0, r.Listens);
     }
 
+    /// <summary>
+    /// Chat floods the channels of scripts that change state on every line they hear, while other threads reset scripts,
+    /// delete and add them, and the scripts call llListenRemove. A listen delivery posts while it holds the listen
+    /// manager's lock, which the state change, the reset, llListenRemove and the unload take to release a listen, so this
+    /// checks that none of them freezes against a delivery: every thread, the scheduler's pump included, must finish
+    /// inside its limit. And no listen of the state a script left is heard after its state statement (SL State: "All
+    /// listens are released.").
+    /// </summary>
+    [Fact]
+    public void ListensUnderAChatFloodWithStateChangesResetsAndRemovals()
+    {
+        using var r = new Rig(resetThrottle: false, chatThrottle: false);
+        // default hears 7 (and 9, removed at once); state two hears only 8. Any other channel is an old state's listen.
+        const string flipper = @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); integer h = llListen(9, """", NULL_KEY, """"); llListenRemove(h); }
+                listen(integer c, string n, key k, string m) { if (c == 8) llSay(0, ""BAD default heard 8""); else if (c == 7) state two; }
+                link_message(integer s, integer i, string str, key k) { llSay(0, ""checked""); }
+            }
+            state two {
+                state_entry() { llSay(0, ""flip""); llListen(8, """", NULL_KEY, """"); }
+                listen(integer c, string n, key k, string m) { if (c != 8) llSay(0, ""BAD two heard "" + (string)c); else state default; }
+                link_message(integer s, integer i, string str, key k) { llSay(0, ""checked""); }
+            }";
+        // Reset by its own llResetScript and from outside, on the same channels.
+        const string resetter = @"
+            default {
+                state_entry() { llSay(0, ""fresh""); llListen(7, """", NULL_KEY, """"); llListen(8, """", NULL_KEY, """"); }
+                listen(integer c, string n, key k, string m) { if (m == ""reset"") llResetScript(); }
+                link_message(integer s, integer i, string str, key k) { llSay(0, ""checked""); }
+            }";
+        var flippers = new System.Collections.Concurrent.ConcurrentDictionary<UUID, byte>();
+        var resetters = new List<UUID>();
+        for (int i = 0; i < 4; i++) flippers[r.Rez(r.H.Prim, flipper)] = 0;
+        for (int i = 0; i < 2; i++) resetters.Add(r.Rez(r.H.Prim, resetter));
+        Assert.True(r.PumpUntil(() => r.Listens == 4 + 2 * 2), "the scripts never listened: " + r.Listens);
+
+        int stop = 0, removals = 0, outsideResets = 0;
+        bool Stopping() => System.Threading.Volatile.Read(ref stop) != 0;
+        var failures = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        System.Threading.Thread Run(string name, Action body) => new(() =>
+        {
+            try { body(); } catch (Exception e) { failures.Enqueue(e); }
+        }) { IsBackground = true, Name = name };
+
+        var listens = r.H.Engine.ListenManager;
+        listens.MaxListenEventsPerSecond = 0;   // no per-script cap: every line the flood sends is delivered
+        long beats = 0, lines = 0;
+        var pump = Run("pump", () => { while (!Stopping()) { System.Threading.Interlocked.Increment(ref beats); if (!r.H.PumpOnceBusy()) System.Threading.Thread.Yield(); } });
+        var flood = Run("flood", () =>
+        {
+            UUID speaker = UUID.Random();
+            for (int i = 0; !Stopping(); i++)
+            {
+                // as fast as the scheduler takes it: a flood that outruns it only grows its queue
+                if (r.Exe.PendingEventCount >= 100) { System.Threading.Thread.Yield(); continue; }
+                listens.DeliverChat(7 + i % 3, "flood", speaker, i % 40 == 0 ? "reset" : "x");
+                System.Threading.Interlocked.Increment(ref lines);
+            }
+        });
+        var resets = Run("resets", () =>
+        {
+            for (int i = 0; !Stopping(); i++)
+            {
+                // the next reset once the last one has started the script afresh (no clock), as a resident's would
+                int fresh = r.Count("fresh");
+                r.H.Engine.ResetScript(resetters[i % resetters.Count]);
+                System.Threading.Interlocked.Increment(ref outsideResets);
+                System.Threading.SpinWait.SpinUntil(() => Stopping() || r.Count("fresh") > fresh, TimeSpan.FromSeconds(10));
+            }
+        });
+        var removal = Run("removal", () =>
+        {
+            while (!Stopping())
+            {
+                // wait for flips between removals (no clock), so the scripts live long enough to change state
+                int seen = r.Count("flip");
+                if (!System.Threading.SpinWait.SpinUntil(() => Stopping() || r.Count("flip") >= seen + 20, TimeSpan.FromSeconds(10))) return;
+                if (Stopping()) return;
+                UUID gone = flippers.Keys.First();
+                flippers.TryRemove(gone, out _);
+                r.Delete(r.H.Prim, gone);
+                flippers[r.Rez(r.H.Prim, flipper)] = 0;
+                System.Threading.Interlocked.Increment(ref removals);
+            }
+        });
+        foreach (var t in new[] { pump, flood, resets, removal }) t.Start();
+
+        // Until enough of everything has happened, with a generous cap
+        bool enough = System.Threading.SpinWait.SpinUntil(
+            () => r.Count("flip") >= 400 && r.Count("fresh") >= 100 && System.Threading.Volatile.Read(ref removals) >= 10 || !failures.IsEmpty,
+            TimeSpan.FromSeconds(30));
+        System.Threading.Volatile.Write(ref stop, 1);
+        int pending0 = r.PendingEvents; long beats0 = System.Threading.Interlocked.Read(ref beats);
+        var stuck = new[] { pump, flood, resets, removal }.Where(t => !t.Join(TimeSpan.FromSeconds(10))).Select(t => t.Name).ToList();
+        Assert.True(stuck.Count == 0, "froze: " + string.Join(", ", stuck) + " did not finish;" +
+            $" pendingAtStop={pending0} pendingNow={r.PendingEvents} beatsAtStop={beats0} beatsNow={System.Threading.Interlocked.Read(ref beats)} lines={System.Threading.Interlocked.Read(ref lines)} enough={enough}" +
+            $" flips={r.Count("flip")} fresh={r.Count("fresh")} removals={removals} outside resets={outsideResets}");
+        Assert.True(failures.IsEmpty, string.Join("\n", failures));
+        Assert.True(enough, $"too little happened: flips={r.Count("flip")} fresh={r.Count("fresh")} removals={removals} outside resets={outsideResets}");
+
+        // A reset or a load still queued would clear the check, so they run first. Everything posted before this point
+        // has run once the check has run in every script.
+        Assert.True(r.H.PumpUntilIdle(TimeSpan.FromSeconds(30)), "the scheduler never went idle after the flood");
+        foreach (UUID id in flippers.Keys.Concat(resetters))
+            r.H.Engine.PostScriptEvent(id, new EventParams("link_message", new object[] { 0, 0, "check", UUID.Zero.ToString() }, Array.Empty<DetectParams>()));
+        int scripts = flippers.Count + resetters.Count;
+        Assert.True(r.PumpUntil(() => r.Count("checked") >= scripts), "the check never ran in every script: " + r.Count("checked") + "/" + scripts);
+        var bad = r.H.Said.Where(s => s.StartsWith("BAD", StringComparison.Ordinal)).ToList();
+        Assert.True(bad.Count == 0, $"{bad.Count} old listen event(s) ran: {string.Join(" | ", bad.GroupBy(s => s).Select(g => g.Key + " x" + g.Count()))}" +
+            $" (flips={r.Count("flip")} fresh={r.Count("fresh")} removals={removals} outside resets={outsideResets})");
+    }
+
     // ── late replies ───────────────────────────────────────────────────────────
 
     [Fact]
