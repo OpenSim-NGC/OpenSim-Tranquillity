@@ -11331,6 +11331,77 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return OpenSim.Region.OptionalModules.World.NPC.BotManager.OutfitKey(agentId, notecard).ToString();
         }
 
+        /// <summary>OSSL_Api.cs:2174-2178 - High. The text and a newline.</summary>
+        public void osMakeNotecard(string notecardName, string contents)
+        {
+            OsslCheck(TlHigh, "osMakeNotecard");
+            OsslSaveNotecard(notecardName, "Script generated notecard", contents + "\n");
+        }
+
+        /// <summary>OSSL_Api.cs:2180-2190 - High. Each list item and a newline.</summary>
+        public void osMakeNotecard(string notecardName, LSLList contents)
+        {
+            OsslCheck(TlHigh, "osMakeNotecard");
+            StringBuilder notecardData = new StringBuilder();
+            for (int i = 0; i < contents.Length; i++)
+                notecardData.Append(contents.GetLSLStringItem(i)).Append('\n');
+            OsslSaveNotecard(notecardName, "Script generated notecard", notecardData.ToString());
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:2203-2253 SaveNotecard with forceSameName false: the asset (text cut at 65536 bytes by osUTF8, as
+        /// there), then a task item owned and created by the prim's owner. A name already in the prim is never replaced:
+        /// SceneObjectPartInventory.AddInventoryItem gives the new item the next free "name 1" ... "name 255", and adds
+        /// nothing past that.
+        /// </summary>
+        private void OsslSaveNotecard(string name, string description, string data)
+        {
+            if (m_host == null || World == null) return;
+
+            AssetBase asset = new AssetBase(UUID.Random(), name, (sbyte)AssetType.Notecard, m_host.OwnerID.ToString())
+            {
+                Description = description
+            };
+
+            osUTF8 contents = new osUTF8(data, 65536);
+            int len = contents.Length;
+            osUTF8Slice utf = new osUTF8Slice(len + 128);
+            utf.AppendASCII("Linden text version 2\n{\nLLEmbeddedItems version 1\n{\ncount 0\n}\nText length ");
+            utf.AppendASCII(len.ToString());
+            utf.AppendASCII("\n");
+            utf.Append(contents);
+            utf.AppendASCII("}");
+
+            asset.Data = utf.ToArray();
+            World.AssetService.Store(asset);
+
+            TaskInventoryItem taskItem = new TaskInventoryItem
+            {
+                ParentID = m_host.UUID,
+                CreationDate = (uint)Util.UnixTimeSinceEpoch(),
+                Name = name,
+                Description = description,
+                Type = (int)AssetType.Notecard,
+                InvType = (int)InventoryType.Notecard,
+                OwnerID = m_host.OwnerID,
+                CreatorID = m_host.OwnerID,
+                BasePermissions = (uint)OpenSim.Framework.PermissionMask.All | (uint)OpenSim.Framework.PermissionMask.Export,
+                CurrentPermissions = (uint)OpenSim.Framework.PermissionMask.All | (uint)OpenSim.Framework.PermissionMask.Export,
+                EveryonePermissions = 0,
+                NextPermissions = (uint)OpenSim.Framework.PermissionMask.All,
+                GroupID = m_host.GroupID,
+                GroupPermissions = 0,
+                Flags = 0,
+                PermsGranter = UUID.Zero,
+                PermsMask = 0,
+                AssetID = asset.FullID
+            };
+            taskItem.ResetIDs(m_host.UUID);
+
+            m_host.Inventory.AddInventoryItem(taskItem, false);
+            m_host.ParentGroup.InvalidateDeepEffectivePerms();
+        }
+
         /// <summary>OSSL_Api.cs:5417 - ungated upstream.</summary>
         public int osApproxEquals(float a, float b)
         {

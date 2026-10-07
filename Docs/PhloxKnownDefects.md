@@ -478,7 +478,7 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - the LightShare `ls*` functions;
   - the `mod*` functions (`modInvoke*`, `modSendCommand`);
   - `llRemoteLoadScript`;
-  - ten OSSL functions: `osGiveLinkInventory`, `osGiveLinkInventoryList`, `osMakeNotecard`,
+  - nine OSSL functions: `osGiveLinkInventory`, `osGiveLinkInventoryList`,
     `osMessageAttachments`, `osNpcLookAt`, `osNpcSayTo`, `osReplaceAgentEnvironment`,
     `osReplaceParcelEnvironment`, `osReplaceRegionEnvironment`, `osResetEnvironment`.
 - **Spelled differently:** YEngine's `osTemperature2sRBG` is `osTemperature2sRGB` on Phlox.
@@ -486,7 +486,7 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - the `iw*` and `bot*` families (section 3);
   - some newer SL functions, for example `llSetAgentRot`, `llSortListStrided` and
     `llTransferOwnership`.
-- Phlox declares 258 OSSL functions. They honour the `[OSSL]` keys (`AllowOSFunctions`,
+- Phlox declares 259 OSSL functions. They honour the `[OSSL]` keys (`AllowOSFunctions`,
   `OSFunctionThreatLevel`, `PermissionErrorToOwner`, `Allow_<function>`,
   `Creators_<function>`) with the same meanings as YEngine.
 

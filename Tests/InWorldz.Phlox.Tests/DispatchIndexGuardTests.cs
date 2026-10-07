@@ -85,7 +85,8 @@ public class DispatchIndexGuardTests
         // RegenerateBaseline below, never by hand.
         // The type-chosen overloads added eight signatures but only ONE new NAME (osSetDynamicTextureDataFace): the other
         // seven are type-discriminated overloads of names already here, and the baseline is keyed by name.
-        Assert.Equal(932, baseline.Count);
+        // osMakeNotecard adds one name for its two forms.
+        Assert.Equal(933, baseline.Count);
     }
 
     /// <summary>
