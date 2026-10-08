@@ -28,7 +28,7 @@
 using OpenMetaverse;
 
 
-namespace PrimMesher;
+namespace OpenSim.Region.PhysicsModules.ubODEMeshing.PrimMesher;
 
 public struct Face
 {

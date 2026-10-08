@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Antlr4.Runtime;
 
 namespace InWorldz.Phlox.Compiler
 {
@@ -10,7 +11,7 @@ namespace InWorldz.Phlox.Compiler
         private string _name;
         private ISymbolType _type;
         private IScope _scope;
-        private LSLAst _def;
+        private IToken _def;
 
         public ISymbolType Type
         {
@@ -41,7 +42,7 @@ namespace InWorldz.Phlox.Compiler
             }
         }
 
-        public LSLAst Def
+        public IToken Def
         {
             get
             {

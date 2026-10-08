@@ -73,16 +73,17 @@ public class RegionLoaderWebServer : IRegionLoader
                 {
                     RegionInfo[] regionInfos = Array.Empty<RegionInfo>();
                     int regionCount = 0;
-                    HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(url);
-                    webRequest.Timeout = 30000; //30 Second Timeout
                     m_log.LogDebug("[WEBLOADER]: Sending download request to {0}", url);
 
                     try
                     {
                         string xmlSource = String.Empty;
                         m_log.LogDebug("[WEBLOADER]: Downloading region information...");
-                        using (HttpWebResponse webResponse = (HttpWebResponse)webRequest.GetResponse())
-                        using (StreamReader reader = new StreamReader(webResponse.GetResponseStream()))
+                        using HttpClient client = WebUtil.GetLegacyHttpClient(30000);
+                        using HttpRequestMessage webRequest = new(HttpMethod.Get, url);
+                        using HttpResponseMessage webResponse = client.Send(webRequest);
+                        webResponse.EnsureSuccessStatusCode();
+                        using (StreamReader reader = new(webResponse.Content.ReadAsStream()))
                         {
                             string tempStr;
                             while ((tempStr = reader.ReadLine()) != null)
@@ -112,15 +113,9 @@ public class RegionLoaderWebServer : IRegionLoader
                             }
                         }
                     }
-                    catch (WebException ex)
+                    catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound && allowRegionless)
                     {
-                        if (((HttpWebResponse)ex.Response).StatusCode == HttpStatusCode.NotFound)
-                        {
-                            if (!allowRegionless)
-                                throw;
-                        }
-                        else
-                            throw;
+                        m_log.LogWarning("[WEBLOADER]: Region configuration was not found; allow_regionless is enabled.");
                     }
 
                     if (regionCount > 0 || allowRegionless)

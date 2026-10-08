@@ -452,16 +452,16 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
             Uri requestURI = new Uri(new Uri(gridInfoURI), "json_grid_info");
             m_log.LogInformation("[GLOEBITMONEYMODULE] Constructed and requesting URI = {0}", requestURI);
             
-            HttpWebRequest request = (HttpWebRequest) WebRequest.Create(requestURI);
-            request.Method = "GET";
             try 
             {
-                // Get the response
-                HttpWebResponse response = (HttpWebResponse) request.GetResponse();
-                string status = response.StatusDescription;
+                using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
+                using HttpRequestMessage request = new(HttpMethod.Get, requestURI);
+                using HttpResponseMessage response = client.Send(request);
+                response.EnsureSuccessStatusCode();
+                string status = response.ReasonPhrase;
                 m_log.LogInformation("[GLOEBITMONEYMODULE] Grid Info status:{0}", status);
 
-                using(StreamReader response_stream = new StreamReader(response.GetResponseStream())) 
+                using(StreamReader response_stream = new StreamReader(response.Content.ReadAsStream()))
                 {
                     string response_str = response_stream.ReadToEnd();
                     m_log.LogInformation("[GLOEBITMONEYMODULE] Grid Info:{0}", response_str);
@@ -1308,14 +1308,11 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
             // Request balance from Gloebit.  Request Auth from Gloebit if necessary
             realBal = m_apiW.GetUserBalance(agentID, true, client.Name);
         }
-        catch (WebException we)
+        catch (HttpRequestException we)
         {
             string errorMessage = we.Message;
-            if (we.Status == WebExceptionStatus.ProtocolError)
-            {
-                using (HttpWebResponse webResponse = (HttpWebResponse)we.Response)
-                    errorMessage = String.Format("[{0}] {1}",webResponse.StatusCode,webResponse.StatusDescription);
-            }
+            if (we.StatusCode.HasValue)
+                errorMessage = String.Format("[{0}] {1}", we.StatusCode.Value, we.Message);
             m_log.LogError(errorMessage);
             m_log.LogError(we.ToString());
             client.SendAlertMessage(we.Message + " ");

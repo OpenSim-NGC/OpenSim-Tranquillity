@@ -591,7 +591,7 @@ namespace Phlox.ScriptEngine
             {
                 // Halcyon ScriptLoader: AsyncCommandManager.RemoveScript(engine, localId, itemId) - sensor, HTTP, XML-RPC
                 if (m_ScriptEngine != null && async != null)
-                    OpenSim.Region.ScriptEngine.Shared.Api.AsyncCommandManager.RemoveScript(m_ScriptEngine, m_localID, m_itemID);
+                    Phlox.ScriptEngine.AsyncCommand.AsyncCommandManager.RemoveScript(m_ScriptEngine, m_localID, m_itemID);
             }
             else
             {

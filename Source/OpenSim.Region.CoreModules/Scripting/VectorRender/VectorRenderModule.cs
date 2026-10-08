@@ -654,7 +654,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                     {
                         var srcRect = SKRect.Create(0, 0, image.Width, image.Height);
                         var dstRect = SKRect.Create(startPoint.X, startPoint.Y, x, y);
-                        canvas.DrawImage(image, srcRect, dstRect);
+                        canvas.DrawImage(image, srcRect, dstRect, SKSamplingOptions.Default);
                         image.Dispose();
                     }
                     else
@@ -712,14 +712,15 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                     SKPoint[] points = null;
                     GetParams(partsDelimiter, ref nextLine, 11, ref points);
                     var fillPaint = new SKPaint { Color = drawColor, Style = SKPaintStyle.Fill };
-                    using (var path = new SKPath())
+                    using (var builder = new SKPathBuilder())
                     {
                         if (points != null && points.Length > 0)
                         {
-                            path.MoveTo(points[0]);
+                            builder.MoveTo(points[0]);
                             for (int i = 1; i < points.Length; i++)
-                                path.LineTo(points[i]);
-                            path.Close();
+                                builder.LineTo(points[i]);
+                            builder.Close();
+                            using var path = builder.Detach();
                             canvas.DrawPath(path, fillPaint);
                         }
                     }
@@ -729,14 +730,15 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                 {
                     SKPoint[] points = null;
                     GetParams(partsDelimiter, ref nextLine, 7, ref points);
-                    using (var path = new SKPath())
+                    using (var builder = new SKPathBuilder())
                     {
                         if (points != null && points.Length > 0)
                         {
-                            path.MoveTo(points[0]);
+                            builder.MoveTo(points[0]);
                             for (int i = 1; i < points.Length; i++)
-                                path.LineTo(points[i]);
-                            path.Close();
+                                builder.LineTo(points[i]);
+                            builder.Close();
+                            using var path = builder.Detach();
                             canvas.DrawPath(path, drawPaint);
                         }
                     }

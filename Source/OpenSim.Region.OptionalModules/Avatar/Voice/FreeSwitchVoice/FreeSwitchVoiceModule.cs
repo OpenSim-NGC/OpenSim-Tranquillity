@@ -51,6 +51,12 @@ namespace OpenSim.Region.OptionalModules.Avatar.Voice.FreeSwitchVoice;
 public class FreeSwitchVoiceModule : ISharedRegionModule, IVoiceModule
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private readonly System.Lazy<SocketsHttpHandler> m_httpHandler = new(() =>
+    {
+        SocketsHttpHandler handler = WebUtil.CreateLegacyHttpHandler();
+        handler.SslOptions.RemoteCertificateValidationCallback = CustomCertificateValidation;
+        return handler;
+    });
 
     // Capability string prefixes
     //private static readonly string m_chatSessionRequestPath = "0209/";
@@ -213,6 +219,8 @@ public class FreeSwitchVoiceModule : ISharedRegionModule, IVoiceModule
 
     public void Close()
     {
+        if (m_httpHandler.IsValueCreated)
+            m_httpHandler.Value.Dispose();
     }
 
     public string Name
@@ -539,31 +547,28 @@ public class FreeSwitchVoiceModule : ISharedRegionModule, IVoiceModule
         int fwdresponsecode = 200;
         string fwdresponsecontenttype = "text/xml";
 
-        HttpWebRequest forwardreq = (HttpWebRequest)WebRequest.Create(forwardaddress);
-        forwardreq.Method = method;
-        forwardreq.ContentType = contenttype;
-        forwardreq.KeepAlive = false;
-        forwardreq.ServerCertificateValidationCallback = CustomCertificateValidation;
+        using HttpClient client = new(m_httpHandler.Value, false) { Timeout = TimeSpan.FromSeconds(100) };
+        using HttpRequestMessage forwardreq = new(new HttpMethod(method), forwardaddress);
+        forwardreq.Headers.ConnectionClose = true;
 
         if (method == "POST")
         {
             byte[] contentreq = Util.UTF8.GetBytes(body);
-            forwardreq.ContentLength = contentreq.Length;
-            Stream reqStream = forwardreq.GetRequestStream();
-            reqStream.Write(contentreq, 0, contentreq.Length);
-            reqStream.Close();
+            forwardreq.Content = new ByteArrayContent(contentreq);
+            forwardreq.Content.Headers.TryAddWithoutValidation("Content-Type", contenttype);
         }
 
-        using (HttpWebResponse fwdrsp = (HttpWebResponse)forwardreq.GetResponse())
+        using (HttpResponseMessage fwdrsp = client.Send(forwardreq))
         {
+            fwdrsp.EnsureSuccessStatusCode();
             Encoding encoding = Util.UTF8;
 
-            using (Stream s = fwdrsp.GetResponseStream())
+            using (Stream s = fwdrsp.Content.ReadAsStream())
             {
                 using (StreamReader fwdresponsestream = new StreamReader(s))
                 {
                     fwdresponsestr = fwdresponsestream.ReadToEnd();
-                    fwdresponsecontenttype = fwdrsp.ContentType;
+                    fwdresponsecontenttype = fwdrsp.Content.Headers.ContentType?.ToString() ?? string.Empty;
                     fwdresponsecode = (int)fwdrsp.StatusCode;
                 }
             }

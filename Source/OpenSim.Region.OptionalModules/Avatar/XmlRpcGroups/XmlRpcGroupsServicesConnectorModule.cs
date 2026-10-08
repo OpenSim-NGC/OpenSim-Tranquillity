@@ -1137,30 +1137,26 @@ namespace Nwc.XmlRpc
         /// <returns><c>XmlRpcResponse</c> The response generated.</returns>
         public XmlRpcResponse Send(String url)
         {
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-            if (request == null)
-                throw new XmlRpcException(XmlRpcErrorCodes.TRANSPORT_ERROR,
-                              XmlRpcErrorCodes.TRANSPORT_ERROR_MSG + ": Could not create request with " + url);
-            request.Method = "POST";
-            request.ContentType = "text/xml";
-            request.AllowWriteStreamBuffering = true;
-            request.KeepAlive = !_disableKeepAlive;
-            request.Timeout = 30000;
-
-            using (Stream stream = request.GetRequestStream())
+            using HttpClient client = OpenSim.Framework.WebUtil.GetLegacyHttpClient(30000);
+            using HttpRequestMessage request = new(HttpMethod.Post, url);
+            request.Headers.ConnectionClose = _disableKeepAlive;
+            using (MemoryStream stream = new())
             {
                 using (XmlTextWriter xml = new XmlTextWriter(stream, Encoding.ASCII))
                 {
                     _serializer.Serialize(xml, this);
                     xml.Flush();
+                    request.Content = new ByteArrayContent(stream.ToArray());
                 }
             }
+            request.Content.Headers.TryAddWithoutValidation("Content-Type", "text/xml");
 
             XmlRpcResponse resp;
 
-            using (HttpWebResponse response = (HttpWebResponse)request.GetResponse())
+            using (HttpResponseMessage response = client.Send(request))
             {
-                using (Stream s = response.GetResponseStream())
+                response.EnsureSuccessStatusCode();
+                using (Stream s = response.Content.ReadAsStream())
                 {
                     using (StreamReader input = new StreamReader(s))
                     {

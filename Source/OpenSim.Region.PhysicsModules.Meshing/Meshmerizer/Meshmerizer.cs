@@ -36,7 +36,8 @@ using SkiaSharp;
 using CoreJ2K;
 using CoreJ2K.Configuration;
 using System.IO.Compression;
-using PrimMesher;
+using OpenSim.Region.PhysicsModules.Meshing.PrimMesher;
+using PrimMesher = OpenSim.Region.PhysicsModules.Meshing.PrimMesher;
 using Nini.Config;
 
 using Microsoft.Extensions.Logging;

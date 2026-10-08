@@ -335,21 +335,6 @@ public class ConciergeModule : ChatModule, ISharedRegionModule
         }
     }
 
-    internal class BrokerState
-    {
-        public string Uri;
-        public string Payload;
-        public HttpWebRequest Poster;
-        public Timer Timer;
-
-        public BrokerState(string uri, string payload, HttpWebRequest poster)
-        {
-            Uri = uri;
-            Payload = payload;
-            Poster = poster;
-        }
-    }
-
     protected void UpdateBroker(Scene scene)
     {
         if (String.IsNullOrEmpty(m_brokerURI))
@@ -372,91 +357,31 @@ public class ConciergeModule : ChatModule, ISharedRegionModule
         list.Append("</avatars>");
         string payload = list.ToString();
 
-        // post via REST to broker
-        HttpWebRequest updatePost = WebRequest.Create(uri) as HttpWebRequest;
-        updatePost.Method = "POST";
-        updatePost.ContentType = "text/xml";
-        updatePost.ContentLength = payload.Length;
-        updatePost.UserAgent = "OpenSim.Concierge";
-
-
-        BrokerState bs = new BrokerState(uri, payload, updatePost);
-        bs.Timer = new Timer(delegate(object state)
-                             {
-                                 BrokerState b = state as BrokerState;
-                                 b.Poster.Abort();
-                                 b.Timer.Dispose();
-                                 m_log.LogDebug("[Concierge]: async broker POST abort due to timeout");
-                             }, bs, m_brokerUpdateTimeout * 1000, Timeout.Infinite);
-
-        try
-        {
-            updatePost.BeginGetRequestStream(UpdateBrokerSend, bs);
-            m_log.LogDebug("[Concierge] async broker POST to {0} started", uri);
-        }
-        catch (WebException we)
-        {
-            m_log.LogError("[Concierge] async broker POST to {0} failed: {1}", uri, we.Status);
-        }
+        _ = PostBrokerUpdateAsync(uri, payload);
     }
 
-    private void UpdateBrokerSend(IAsyncResult result)
+    protected async Task PostBrokerUpdateAsync(string uri, string payload)
     {
-        BrokerState bs = null;
         try
         {
-            bs = result.AsyncState as BrokerState;
-            string payload = bs.Payload;
-            HttpWebRequest updatePost = bs.Poster;
-
-            using (StreamWriter payloadStream = new StreamWriter(updatePost.EndGetRequestStream(result)))
+            using HttpClient client = WebUtil.GetLegacyHttpClient(m_brokerUpdateTimeout * 1000);
+            using HttpRequestMessage request = new(HttpMethod.Post, uri);
+            request.Headers.UserAgent.ParseAdd("OpenSim.Concierge");
+            request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(payload));
+            request.Content.Headers.TryAddWithoutValidation("Content-Type", "text/xml");
+            using HttpResponseMessage response = await client.SendAsync(request).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
             {
-                payloadStream.Write(payload);
-                payloadStream.Close();
+                string content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                m_log.LogError("[Concierge]: broker update to {Url} failed with status {Status}: {Content}",
+                    uri, response.StatusCode, content);
+                return;
             }
-            updatePost.BeginGetResponse(UpdateBrokerDone, bs);
+            m_log.LogDebug("[Concierge]: broker update: status {Status}", response.StatusCode);
         }
-        catch (WebException we)
+        catch (Exception e)
         {
-            m_log.LogDebug("[Concierge]: async broker POST to {0} failed: {1}", bs.Uri, we.Status);
-        }
-        catch (Exception)
-        {
-            m_log.LogDebug("[Concierge]: async broker POST to {0} failed", bs.Uri);
-        }
-    }
-
-    private void UpdateBrokerDone(IAsyncResult result)
-    {
-        BrokerState bs = null;
-        try
-        {
-            bs = result.AsyncState as BrokerState;
-            HttpWebRequest updatePost = bs.Poster;
-            using (HttpWebResponse response = updatePost.EndGetResponse(result) as HttpWebResponse)
-            {
-                m_log.LogDebug("[Concierge] broker update: status {0}", response.StatusCode);
-            }
-            bs.Timer.Dispose();
-        }
-        catch (WebException we)
-        {
-            m_log.LogError("[Concierge] broker update to {0} failed with status {1}", bs.Uri, we.Status);
-            if (null != we.Response)
-            {
-                using (HttpWebResponse resp = we.Response as HttpWebResponse)
-                {
-                    m_log.LogError("[Concierge] response from {0} status code: {1}", bs.Uri, resp.StatusCode);
-                    m_log.LogError("[Concierge] response from {0} status desc: {1}", bs.Uri, resp.StatusDescription);
-                    m_log.LogError("[Concierge] response from {0} server:      {1}", bs.Uri, resp.Server);
-
-                    if (resp.ContentLength > 0)
-                    {
-                        using(StreamReader content = new StreamReader(resp.GetResponseStream()))
-                            m_log.LogError("[Concierge] response from {0} content:     {1}", bs.Uri, content.ReadToEnd());
-                    }
-                }
-            }
+            m_log.LogError(e, "[Concierge]: async broker POST to {Url} failed", uri);
         }
     }
 

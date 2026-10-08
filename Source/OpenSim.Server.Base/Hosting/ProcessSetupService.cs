@@ -7,7 +7,6 @@
  * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
-using System.Net;
 using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
 
@@ -35,29 +34,11 @@ public sealed class ProcessSetupService : IProcessSetupService
         if (options.SetDefaultCurrentCulture)
             Culture.SetDefaultCurrentCulture();
 
-        if (options.DefaultConnectionLimit.HasValue)
-            ServicePointManager.DefaultConnectionLimit = options.DefaultConnectionLimit.Value;
+        WebUtil.ConfigureHTTPDefaults(options.DefaultConnectionLimit, options.MaxServicePointIdleTime,
+            options.DnsRefreshTimeout, options.Expect100Continue);
 
-        if (options.MaxServicePointIdleTime.HasValue)
-            ServicePointManager.MaxServicePointIdleTime = options.MaxServicePointIdleTime.Value;
-
-        if (options.Expect100Continue.HasValue)
-            ServicePointManager.Expect100Continue = options.Expect100Continue.Value;
-
-        if (options.UseNagleAlgorithm.HasValue)
-            ServicePointManager.UseNagleAlgorithm = options.UseNagleAlgorithm.Value;
-
-        if (options.DnsRefreshTimeout.HasValue)
-        {
-            try
-            {
-                ServicePointManager.DnsRefreshTimeout = options.DnsRefreshTimeout.Value;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Failed to set DnsRefreshTimeout; runtime defaults remain in effect.");
-            }
-        }
+        if (options.UseNagleAlgorithm == true)
+            _logger.LogWarning("UseNagleAlgorithm=true is not supported by the shared HTTP transport; TCP_NODELAY remains enabled.");
 
         if (options.ConfigureThreadPoolMaxThreads)
         {

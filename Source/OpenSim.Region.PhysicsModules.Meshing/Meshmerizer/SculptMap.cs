@@ -27,7 +27,7 @@
 
 using SkiaSharp;
 
-namespace PrimMesher;
+namespace OpenSim.Region.PhysicsModules.Meshing.PrimMesher;
 
 public class SculptMap
 {
@@ -72,7 +72,7 @@ public class SculptMap
                 SKBitmap scaled = new SKBitmap(width, height, bm.ColorType, bm.AlphaType);
                 using (var canvas = new SKCanvas(scaled))
                 {
-                    canvas.DrawBitmap(bm, new SKRect(0, 0, width, height));
+                    canvas.DrawBitmap(bm, new SKRect(0, 0, width, height), SKSamplingOptions.Default);
                 }
                 bm.Dispose();
                 bm = scaled;
@@ -170,10 +170,9 @@ public class SculptMap
         using (var canvas = new SKCanvas(scaledImage))
         {
             // Draw the source image onto the canvas, scaling to fit the destination size.
-            canvas.DrawBitmap(srcImage, new SKRect(0, 0, destWidth, destHeight));
+            canvas.DrawBitmap(srcImage, new SKRect(0, 0, destWidth, destHeight), SKSamplingOptions.Default);
         }
         srcImage.Dispose();
         return scaledImage;
     }
 }
-

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Antlr4.Runtime;
 
 namespace InWorldz.Phlox.Compiler.BranchAnalyze
 {
@@ -20,7 +21,7 @@ namespace InWorldz.Phlox.Compiler.BranchAnalyze
 
     public class Branch : Statement
     {
-        public LSLAst Node;
+        public IToken Node;
         public Statement FirstStatement;
         public Statement LastStatement;
 
@@ -54,7 +55,7 @@ namespace InWorldz.Phlox.Compiler.BranchAnalyze
 
         }
 
-        public Branch(LSLAst node, Branch parent)
+        public Branch(IToken node, Branch parent)
             : base(parent)
         {
             Node = node;
@@ -97,7 +98,7 @@ namespace InWorldz.Phlox.Compiler.BranchAnalyze
     {
         public string Type;
 
-        public FunctionBranch(LSLAst node, string type)
+        public FunctionBranch(IToken node, string type)
             : base(node, null)
         {
             Type = type;

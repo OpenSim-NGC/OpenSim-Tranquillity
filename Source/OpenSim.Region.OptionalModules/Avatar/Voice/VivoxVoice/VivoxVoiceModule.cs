@@ -76,6 +76,12 @@ public class VivoxVoiceModule : ISharedRegionModule
 
     // Infrastructure
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private readonly System.Lazy<SocketsHttpHandler> m_httpHandler = new(() =>
+    {
+        SocketsHttpHandler handler = WebUtil.CreateLegacyHttpHandler();
+        handler.SslOptions.RemoteCertificateValidationCallback = WebUtil.ValidateServerCertificateNoChecks;
+        return handler;
+    });
     private static readonly Object vlock  = new Object();
 
     // Control info, e.g. vivox server, admin user, admin password
@@ -372,6 +378,8 @@ public class VivoxVoiceModule : ISharedRegionModule
     {
         if (m_pluginEnabled)
             VivoxLogout();
+        if (m_httpHandler.IsValueCreated)
+            m_httpHandler.Value.Dispose();
     }
 
     public Type ReplaceableInterface
@@ -1186,15 +1194,11 @@ public class VivoxVoiceModule : ISharedRegionModule
                 // Otherwise prepare the request
                 //m_log.LogDebug("[VivoxVoice] Sending request <{0}>", requrl);
 
-                HttpWebRequest req = (HttpWebRequest)WebRequest.Create(requrl);
-                req.ServerCertificateValidationCallback = WebUtil.ValidateServerCertificateNoChecks; // vivox servers have invalid certs
-
-                // We are sending just parameters, no content
-                req.ContentLength = 0;
-
-                // Send request and retrieve the response
-                using (HttpWebResponse rsp = (HttpWebResponse)req.GetResponse())
-                using (Stream s = rsp.GetResponseStream())
+                using HttpClient client = new(m_httpHandler.Value, false) { Timeout = TimeSpan.FromSeconds(100) };
+                using HttpRequestMessage req = new(HttpMethod.Get, requrl);
+                using HttpResponseMessage rsp = client.Send(req);
+                rsp.EnsureSuccessStatusCode();
+                using (Stream s = rsp.Content.ReadAsStream())
                 using (XmlTextReader rdr = new XmlTextReader(s))
                 {
                     rdr.DtdProcessing = DtdProcessing.Ignore;

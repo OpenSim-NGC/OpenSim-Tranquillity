@@ -625,7 +625,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
                 using (var surface = SKSurface.Create(new SKImageInfo(mapbmp.Width, mapbmp.Height)))
                 using (var canvas = surface.Canvas)
                 {
-                    canvas.DrawBitmap(mapbmp, 0, 0);
+                    canvas.DrawBitmap(mapbmp, 0, 0, SKSamplingOptions.Default);
 
                     for (int s = 0; s < sortedZHeights.Length; s++)
                     {
@@ -634,8 +634,9 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
                             DrawStruct rectDrawStruct = z_sort[sortedlocalIds[s]];
                             for (int r = 0; r < rectDrawStruct.trns.Length; r++)
                             {
-                                using var path = new SKPath();
-                                path.AddPoly(rectDrawStruct.trns[r].pts, true);
+                                using var builder = new SKPathBuilder();
+                                builder.AddPoly(rectDrawStruct.trns[r].pts, true);
+                                using var path = builder.Detach();
                                 canvas.DrawPath(path, rectDrawStruct.brush);
                             }
                         }

@@ -140,9 +140,10 @@ public class OpenSearchModule : ISearchModule, ISharedRegionModule
         try
         {
             XmlRpcRequest Req = new XmlRpcRequest(method, SendParams);
-            Resp = Req.Send(m_SearchServer, 30000);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(30000);
+            Resp = Req.Send(m_SearchServer, client);
         }
-        catch (WebException ex)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or WebException)
         {
             m_log.LogError("[SEARCH]: Unable to connect to Search " +
                     "Server {0}.  Exception {1}", m_SearchServer, ex);

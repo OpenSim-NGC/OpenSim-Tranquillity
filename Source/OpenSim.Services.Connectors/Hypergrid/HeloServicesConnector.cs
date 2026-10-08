@@ -89,16 +89,12 @@ public class HeloServicesConnector
 
         try
         {
-            HttpWebRequest req = (HttpWebRequest)HttpWebRequest.Create(m_ServerURI);
-            // Eventually we need to switch to HEAD
-            /* req.Method = "HEAD"; */
-
-            using (WebResponse response = req.GetResponse())
-            {
-                if (response.Headers.Get("X-Handlers-Provided") == null) // just in case this ever returns a null
-                    return string.Empty;
-                return response.Headers.Get("X-Handlers-Provided");
-            }
+            using HttpClient client = WebUtil.GetLegacyHttpClient(100000, verifyCertificate: true);
+            using HttpRequestMessage request = new(HttpMethod.Get, m_ServerURI);
+            using HttpResponseMessage response = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            return response.Headers.TryGetValues("X-Handlers-Provided", out var handlers)
+                ? string.Join(", ", handlers) : string.Empty;
         }
         catch (Exception e)
         {

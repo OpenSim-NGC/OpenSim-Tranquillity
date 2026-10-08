@@ -25,6 +25,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
+using System.Security.Authentication;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Region.CoreModules.Scripting.HttpRequest;
@@ -181,5 +188,75 @@ public class HttpMimeTypeTests : OpenSimTestCase
         Assert.Equal(200, done.Status);
         Assert.Equal("pong", done.ResponseBody);
         Assert.Equal("POST", m_server.Requests.Single().Method);
+    }
+
+    [Theory]
+    [InlineData(SslProtocols.Tls12, true)]
+    [InlineData(SslProtocols.Tls12, false)]
+    [InlineData(SslProtocols.Tls13, true)]
+    [InlineData(SslProtocols.Tls13, false)]
+    public async Task SystemTlsDefaultsConnectToModernServers(SslProtocols protocol, bool verifyCertificate)
+    {
+        using var key = RSA.Create(2048);
+        var certRequest = new CertificateRequest("CN=localhost", key, HashAlgorithmName.SHA256,
+            RSASignaturePadding.Pkcs1);
+        using var certificate = certRequest.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1),
+            DateTimeOffset.UtcNow.AddDays(1));
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        Task<SslProtocols> server = ServeTls(listener, certificate, protocol, cancellation.Token);
+
+        try
+        {
+            int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            List<string> parameters = new()
+            {
+                ((int)HttpRequestConstants.HTTP_VERIFY_CERT).ToString(), verifyCertificate ? "1" : "0"
+            };
+            UUID id = m_module.StartHttpRequest(1, UUID.Random(), $"https://localhost:{port}/tls",
+                parameters, new Dictionary<string, string>(), "");
+            Assert.NotEqual(UUID.Zero, id);
+
+            Assert.Equal(protocol, await server);
+            IHttpServiceRequest? done;
+            do
+            {
+                done = m_module.GetNextCompletedRequest();
+                if (done is null)
+                    await Task.Delay(20, cancellation.Token);
+            } while (done is null);
+
+            Assert.Equal(id, done.ReqID);
+            Assert.Equal(200, done.Status);
+            Assert.Equal("pong", done.ResponseBody);
+        }
+        finally
+        {
+            cancellation.Cancel();
+            listener.Stop();
+        }
+    }
+
+    private static async Task<SslProtocols> ServeTls(TcpListener listener, X509Certificate2 certificate,
+        SslProtocols protocol, CancellationToken cancellation)
+    {
+        using var client = await listener.AcceptTcpClientAsync(cancellation);
+        using var stream = new SslStream(client.GetStream());
+        await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+        {
+            ServerCertificate = certificate,
+            EnabledSslProtocols = protocol
+        }, cancellation);
+        using var reader = new StreamReader(stream, Encoding.ASCII, false, 1024, leaveOpen: true);
+        string? line;
+        do
+        {
+            line = await reader.ReadLineAsync(cancellation);
+        } while (!string.IsNullOrEmpty(line));
+
+        await stream.WriteAsync(Encoding.ASCII.GetBytes(
+            "HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\npong"), cancellation);
+        return stream.SslProtocol;
     }
 }

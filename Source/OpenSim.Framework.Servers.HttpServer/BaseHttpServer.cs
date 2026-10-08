@@ -215,7 +215,9 @@ public class BaseHttpServer : IHttpServer
     {
         try
         {
-            m_cert = new X509Certificate2(CPath, CPass);
+            m_cert = X509Certificate2.GetCertContentType(CPath) == X509ContentType.Pkcs12
+                ? X509CertificateLoader.LoadPkcs12FromFile(CPath, CPass)
+                : X509CertificateLoader.LoadCertificateFromFile(CPath);
             X509Extension ext = m_cert.Extensions["2.5.29.17"];
             if(ext != null)
             {
@@ -253,9 +255,9 @@ public class BaseHttpServer : IHttpServer
             }
             m_certCN = m_cert.GetNameInfo(X509NameType.SimpleName, false);
         }
-        catch
+        catch (Exception e)
         {
-            throw new Exception("SSL cert load error");
+            throw new Exception("SSL cert load error", e);
         }
     }
 

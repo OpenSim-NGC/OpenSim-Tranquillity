@@ -25,12 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Net;
-using System.Text;
-using System.Xml;
 using System.Xml.Serialization;
-
-using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Servers.HttpServer;
 
@@ -41,9 +36,6 @@ public delegate void ReturnResponse<T>(T reponse);
 /// </summary>
 public class RestObjectPosterResponse<TResponse>
 {
-//        private static readonly log4net.ILog m_log
-//            = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-
     public ReturnResponse<TResponse> ResponseCallback;
 
     public void BeginPostObject<TRequest>(string requestUrl, TRequest obj)
@@ -53,55 +45,16 @@ public class RestObjectPosterResponse<TResponse>
 
     public void BeginPostObject<TRequest>(string verb, string requestUrl, TRequest obj)
     {
-        Type type = typeof (TRequest);
-
-        WebRequest request = WebRequest.Create(requestUrl);
-        request.Method = verb;
-        request.ContentType = "text/xml";
-        request.Timeout = 10000;
-
-        using (MemoryStream buffer = new MemoryStream())
-        {
-            XmlWriterSettings settings = new XmlWriterSettings();
-            settings.Encoding = Encoding.UTF8;
-
-            using (XmlWriter writer = XmlWriter.Create(buffer, settings))
-            {
-                XmlSerializer serializer = new XmlSerializer(type);
-                serializer.Serialize(writer, obj);
-                writer.Flush();
-            }
-
-            int length = (int)buffer.Length;
-            request.ContentLength = length;
-
-            using (Stream requestStream = request.GetRequestStream())
-                requestStream.Write(buffer.ToArray(), 0, length);
-        }
-
-        // IAsyncResult result = request.BeginGetResponse(AsyncCallback, request);
-        request.BeginGetResponse(AsyncCallback, request);
+        _ = PostObjectAsync(verb, requestUrl, obj);
     }
 
-    private void AsyncCallback(IAsyncResult result)
+    public Task PostObjectAsync<TRequest>(string verb, string requestUrl, TRequest obj)
     {
-        WebRequest request = (WebRequest) result.AsyncState;
-        using (WebResponse resp = request.EndGetResponse(result))
+        return RestObjectPoster.PostObjectAsync(verb, requestUrl, obj, 10000, stream =>
         {
-            TResponse deserial;
-            XmlSerializer deserializer = new XmlSerializer(typeof (TResponse));
-            Stream stream = resp.GetResponseStream();
-
-            // This is currently a bad debug stanza since it gobbles us the response...
-//                StreamReader reader = new StreamReader(stream);
-//                m_log.LogDebug("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
-
-            deserial = (TResponse) deserializer.Deserialize(stream);
-
-            if (deserial != null && ResponseCallback != null)
-            {
-                ResponseCallback(deserial);
-            }
-        }
+            TResponse deserial = (TResponse)new XmlSerializer(typeof(TResponse)).Deserialize(stream);
+            if (deserial != null)
+                ResponseCallback?.Invoke(deserial);
+        });
     }
 }

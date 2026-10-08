@@ -38,11 +38,10 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api;
 
 using Microsoft.Extensions.Logging;
 
-namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins
+namespace Phlox.ScriptEngine.AsyncCommand.Plugins
 {
     public class HttpRequest
     {

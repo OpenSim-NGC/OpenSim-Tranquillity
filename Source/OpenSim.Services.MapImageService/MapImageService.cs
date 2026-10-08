@@ -467,10 +467,10 @@ public class MapImageService : IMapImageService
                         using SKCanvas tempCanvas = new(tempBitmap);
                         tempCanvas.Clear(m_Watercolor);
 
-                        if (bottomLeft is not null) tempCanvas.DrawBitmap(bottomLeft, 0, IMAGE_WIDTH);
-                        if (bottomRight is not null) tempCanvas.DrawBitmap(bottomRight, IMAGE_WIDTH, IMAGE_WIDTH);
-                        if (topLeft is not null) tempCanvas.DrawBitmap(topLeft, 0, 0);
-                        if (topRight is not null) tempCanvas.DrawBitmap(topRight, IMAGE_WIDTH, 0);
+                        if (bottomLeft is not null) tempCanvas.DrawBitmap(bottomLeft, 0, IMAGE_WIDTH, SKSamplingOptions.Default);
+                        if (bottomRight is not null) tempCanvas.DrawBitmap(bottomRight, IMAGE_WIDTH, IMAGE_WIDTH, SKSamplingOptions.Default);
+                        if (topLeft is not null) tempCanvas.DrawBitmap(topLeft, 0, 0, SKSamplingOptions.Default);
+                        if (topRight is not null) tempCanvas.DrawBitmap(topRight, IMAGE_WIDTH, 0, SKSamplingOptions.Default);
 
                         using SKBitmap newTile = SkiaImageUtils.OpaqueResize(tempBitmap, IMAGE_WIDTH, IMAGE_WIDTH);
                         using SKData newTileData = newTile.Encode(SKEncodedImageFormat.Jpeg, JPEG_QUALITY);

@@ -12,6 +12,9 @@
   
   <ItemGroup>
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.ConsoleClient\OpenSim.ConsoleClient.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.ApplicationPlugins.LoadRegions\OpenSim.ApplicationPlugins.LoadRegions.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.Connectors\OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
@@ -19,11 +22,14 @@
     <ProjectReference Include="..\..\Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.BasicPhysics\OpenSim.Region.PhysicsModules.BasicPhysics.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.Meshing\OpenSim.Region.PhysicsModules.Meshing.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.ubODEMeshing\OpenSim.Region.PhysicsModules.ubODEMeshing.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data.Null\OpenSim.Data.Null.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
     <ProjectReference Include="..\..\Addons\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj" />
+    <ProjectReference Include="..\..\Addons\Gloebit.GloebitMoneyModule\Gloebit.GloebitMoneyModule.csproj" />
     <ProjectReference Include="..\..\Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
   </ItemGroup>
 
