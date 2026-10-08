@@ -99,6 +99,10 @@ namespace Phlox.ScriptEngine
         /// matched a listen and before its event is posted, so a test can hold a delivery that is under way.</summary>
         internal Action<UUID, int> BeforePostForTest;
 
+        /// <summary>Tests only: called with the item when all of its listens are about to be removed (a reset, a state change,
+        /// a stop), before the manager's lock is taken, so a test can deliver a line of chat at that point.</summary>
+        internal Action<UUID> BeforeRemoveForTest;
+
         /// <summary>How many listens this engine's scripts hold in the region.</summary>
         public int ListenCount { get { lock (m_Lock) return m_ListenCount; } }
 
@@ -351,6 +355,7 @@ namespace Phlox.ScriptEngine
         /// <summary>Remove ALL listens for a script: on a reset, a state change, when it stops and when it unloads.</summary>
         public void Remove(UUID itemID)
         {
+            BeforeRemoveForTest?.Invoke(itemID);
             lock (m_Lock)
             {
                 RemoveAllOf(itemID);
