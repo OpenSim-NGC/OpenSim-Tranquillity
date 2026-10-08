@@ -411,6 +411,423 @@ public class ScriptCleanupTests
         Quiet(r, 800, "nosensor");
     }
 
+    /// <summary>
+    /// A sensor sweep already under way when the script changes state. The sensor plugin holds its repeater lock for the
+    /// whole pass (CheckSenseRepeaterEvents -> SensorSweep -> PostScriptEvent), and the state change's release of the
+    /// sensor (LSLSystemAPI ReleaseScriptResources -> SensorRepeat.RemoveScript) waits for that lock. The sweep's
+    /// no_sensor must not run after the state statement, in either state. SL State: "The event queue is cleared."
+    /// "Repeating sensors are released." A helper thread stands in for the sweep: it holds the plugin's lock, waits (no
+    /// clock) until the state change has begun - the release drops the script's listens before it reaches the sensor -
+    /// posts the no_sensor as SensorSweep does, and lets go.
+    /// </summary>
+    [Fact]
+    public void ASweepUnderWayAtAStateChangeDoesNotReachTheNewState()
+    {
+        using var r = new Rig();
+        // a 30 s repeat: no sweep of its own comes in the test; the helper's is the only one
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); llSensorRepeat(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI, 30.0); llSay(0, ""armed""); }
+                listen(integer c, string n, key k, string m) { if (m == ""state"") state other; }
+                no_sensor() { llSay(0, ""old nosensor""); }
+            }
+            state other {
+                state_entry() { llSay(0, ""other""); llMessageLinked(LINK_THIS, 0, ""check"", NULL_KEY); }
+                no_sensor() { llSay(0, ""late nosensor""); }
+                link_message(integer s, integer n, string str, key k) { llSay(0, ""checked""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
+        Assert.Equal(1, r.Sensors);
+        Assert.Equal(1, r.Listens);
+
+        object sweepLock = Field(r.H.Engine.AsyncCommands.SensorRepeatPlugin, "SenseRepeatListLock");
+        using var sweeping = new System.Threading.ManualResetEventSlim(false);
+        bool sawChange = false, posted = false, signalled = false;
+        var sweep = new System.Threading.Thread(() =>
+        {
+            lock (sweepLock)
+            {
+                sweeping.Set();
+                sawChange = System.Threading.SpinWait.SpinUntil(() => r.Listens == 0, TimeSpan.FromSeconds(30));
+                r.H.Engine.PostScriptEvent(id, new EventParams("no_sensor", Array.Empty<object>(), Array.Empty<DetectParams>()));
+                // an event a caller waits on, posted in the same window: it is done with whether it runs or is cleared
+                r.H.Engine.PostScriptEvent(id, new EventParams("touch_start", new object[] { 1 }, Array.Empty<DetectParams>()), () => signalled = true);
+                posted = true;
+            }
+        }) { IsBackground = true };
+        sweep.Start();
+        Assert.True(sweeping.Wait(TimeSpan.FromSeconds(30)), "the stand-in sweep never started");
+
+        r.Say(7, "state");
+        Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the new state never ran: " + r.H.Diagnose(id));
+        Assert.True(r.PumpUntil(() => System.Threading.Volatile.Read(ref signalled)), "a waiter was left waiting: " + r.H.Diagnose(id));
+        Assert.True(sweep.Join(TimeSpan.FromSeconds(30)) && posted, "the stand-in sweep never posted");
+        Assert.True(sawChange, "the state change did not release the listens while the sweep held the lock");
+        Assert.Equal(0, r.Sensors);
+        Assert.Equal(0, r.Count("late nosensor"));   // SL: "Repeating sensors are released." "The event queue is cleared."
+        Assert.Equal(0, r.Count("old nosensor"));    // and the old state's handler does not run it after the state statement
+    }
+
+    /// <summary>
+    /// An event already posted when the state statement runs, and not yet taken into the script's queue, is cleared with
+    /// the queue: it runs neither in the old state's handler after the statement nor in the new state. llSensor posts its
+    /// result on the script's own thread, so its no_sensor is waiting when the next statement changes state.
+    /// </summary>
+    [Fact]
+    public void AnEventPostedJustBeforeTheStateStatementDoesNotRunAfterIt()
+    {
+        using var r = new Rig();
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""armed""); }
+                listen(integer c, string n, key k, string m) { llSensor(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI); state other; }
+                no_sensor() { llSay(0, ""old nosensor""); }
+                state_exit() { llSay(0, ""exit""); }
+            }
+            state other {
+                state_entry() { llSay(0, ""other""); llMessageLinked(LINK_THIS, 0, ""check"", NULL_KEY); }
+                no_sensor() { llSay(0, ""new nosensor""); }
+                link_message(integer s, integer n, string str, key k) { llSay(0, ""checked""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
+
+        r.Say(7, "go");
+        Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the new state never ran: " + r.H.Diagnose(id));
+        Assert.Equal(1, r.Count("exit"));
+        Assert.Equal(1, r.Count("other"));
+        Assert.Equal(0, r.Count("old nosensor"));   // SL State: "The event queue is cleared."
+        Assert.Equal(0, r.Count("new nosensor"));
+    }
+
+    /// <summary>
+    /// A line of chat that has matched a listen of the old state, with its event not yet posted when the state change
+    /// releases the listen, is not delivered: not to the old state's handler and not to the new state. SL State: "All
+    /// listens are released." The listen manager's test hook holds the delivery between the match and the post while the
+    /// script changes state; the delivery then goes on.
+    /// </summary>
+    [Fact]
+    public void AListenDeliveryUnderWayAtAStateChangeDoesNotReachTheNewState()
+    {
+        using var r = new Rig();
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); llListen(8, """", NULL_KEY, """"); llSay(0, ""armed""); }
+                listen(integer c, string n, key k, string m) { if (c == 7) state other; else llSay(0, ""old heard""); }
+            }
+            state other {
+                state_entry() { llSay(0, ""other""); }
+                listen(integer c, string n, key k, string m) { llSay(0, ""new heard""); }
+                link_message(integer s, integer n, string str, key k) { llSay(0, ""checked""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
+        Assert.Equal(2, r.Listens);
+
+        var listens = r.H.Engine.ListenManager;
+        using var matched = new System.Threading.ManualResetEventSlim(false);
+        using var goOn = new System.Threading.ManualResetEventSlim(false);
+        listens.BeforePostForTest = (item, channel) =>
+        {
+            if (item != id || channel != 8) return;
+            matched.Set();
+            goOn.Wait(TimeSpan.FromSeconds(30));
+        };
+        var delivery = new System.Threading.Thread(() => listens.DeliverChat(8, "tester", UUID.Random(), "late"))
+            { IsBackground = true };
+        delivery.Start();
+        Assert.True(matched.Wait(TimeSpan.FromSeconds(30)), "the delivery never matched the listen");
+
+        r.Say(7, "state");
+        Assert.True(r.PumpUntil(() => r.Count("other") == 1), "the new state never ran: " + r.H.Diagnose(id));
+        Assert.Equal(0, r.Listens);
+        goOn.Set();
+        Assert.True(delivery.Join(TimeSpan.FromSeconds(30)), "the delivery never finished");
+        listens.BeforePostForTest = null;
+
+        // Posted after the delivery finished, so once it has run anything the delivery posted has run before it
+        r.H.Engine.PostScriptEvent(id, new EventParams("link_message", new object[] { 0, 0, "check", UUID.Zero.ToString() }, Array.Empty<DetectParams>()));
+        Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the check never ran: " + r.H.Diagnose(id));
+        Assert.Equal(0, r.Count("new heard"));
+        Assert.Equal(0, r.Count("old heard"));
+    }
+
+    /// <summary>
+    /// What a state change keeps: the timer goes on into the new state (SL llSetTimerEvent: "The timer persists across
+    /// state changes"), and state_exit then state_entry run once each, in that order, also with a sensor repeat, a listen
+    /// and an event waiting at the change.
+    /// </summary>
+    [Fact]
+    public void TheTimerAndTheStateEventsSurviveTheStateChange()
+    {
+        using var r = new Rig();
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); llSensorRepeat(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI, 30.0); llSay(0, ""armed""); }
+                listen(integer c, string n, key k, string m) { llSetTimerEvent(0.2); llSensor(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI); state other; }
+                state_exit() { llSay(0, ""exit""); }
+                timer() { llSay(0, ""old tick""); }
+            }
+            state other {
+                state_entry() { llSay(0, ""entry""); }
+                timer() { llSetTimerEvent(0.0); llSay(0, ""new tick""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("armed") == 1), "never armed: " + r.H.Diagnose(id));
+
+        r.Say(7, "go");
+        Assert.True(r.PumpUntil(() => r.Count("new tick") == 1), "the timer did not carry into the new state: " + r.H.Diagnose(id));
+        var said = r.H.Said.Where(s => s == "exit" || s == "entry").ToList();
+        Assert.Equal(new[] { "exit", "entry" }, said);
+        Assert.Equal(0, r.Count("old tick"));
+        Assert.Equal(0, r.Sensors);
+        Assert.Equal(0, r.Listens);
+    }
+
+    /// <summary>
+    /// A line of chat delivered while a reset is under way does not reach the fresh script. SL llResetScript: "Listeners
+    /// are removed." "The event queue is cleared." "If it has a state_entry event, then it is queued." The listen
+    /// manager's test hook delivers the line at the moment the reset starts to release the script's listens, as a
+    /// delivery on another thread can; the fresh script's state_entry runs first and once, and the line never runs.
+    /// </summary>
+    [Fact]
+    public void AListenDeliveryUnderWayAtAResetDoesNotReachTheFreshScript()
+    {
+        using var r = new Rig();
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llSay(0, ""entry""); llListen(7, """", NULL_KEY, """"); llListen(8, """", NULL_KEY, """"); }
+                listen(integer c, string n, key k, string m) { if (c == 7) llResetScript(); else llSay(0, ""heard""); }
+                link_message(integer s, integer n, string str, key k) { llSay(0, ""checked""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("entry") == 1 && r.Listens == 2), "never listened: " + r.H.Diagnose(id));
+
+        var listens = r.H.Engine.ListenManager;
+        int delivered = 0;
+        listens.BeforeRemoveForTest = item =>
+        {
+            if (item != id || System.Threading.Interlocked.Exchange(ref delivered, 1) != 0) return;
+            listens.DeliverChat(8, "tester", UUID.Random(), "late");
+        };
+        r.Say(7, "reset");
+        Assert.True(r.PumpUntil(() => r.Count("entry") == 2), "the fresh script never ran its state_entry: " + r.H.Diagnose(id));
+        listens.BeforeRemoveForTest = null;
+        Assert.Equal(1, delivered);
+
+        // Posted after the reset, so once it has run anything the reset left behind has run before it
+        r.H.Engine.PostScriptEvent(id, new EventParams("link_message", new object[] { 0, 0, "check", UUID.Zero.ToString() }, Array.Empty<DetectParams>()));
+        Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the check never ran: " + r.H.Diagnose(id));
+        Assert.Equal(new[] { "entry", "entry", "checked" }, r.H.Said.Where(s => s == "entry" || s == "heard" || s == "checked").ToArray());
+        Assert.Equal(2, r.Listens);
+    }
+
+    /// <summary>
+    /// A sensor sweep under way when the owner resets the script (the viewer's Reset, the queued path) does not reach
+    /// the fresh script. SL llResetScript: "Timers (including repeating sensors) are cleared." "The event queue is
+    /// cleared." A helper thread stands in for the sweep, as in the state change test: it holds the sensor plugin's lock,
+    /// waits (no clock) until the reset has released the listens, posts a no_sensor and an event a caller waits on, and
+    /// lets go. state_entry runs first and once; the no_sensor never runs; the waiter is not left waiting.
+    /// </summary>
+    [Fact]
+    public void ASweepUnderWayAtAResetDoesNotReachTheFreshScript()
+    {
+        using var r = new Rig();
+        // a 30 s repeat: no sweep of its own comes in the test; the helper's is the only one
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llSay(0, ""entry""); llListen(7, """", NULL_KEY, """"); llSensorRepeat(""no-such-thing"", NULL_KEY, ACTIVE | PASSIVE, 5.0, PI, 30.0); }
+                no_sensor() { llSay(0, ""nosensor""); }
+                link_message(integer s, integer n, string str, key k) { llSay(0, ""checked""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("entry") == 1 && r.Sensors == 1 && r.Listens == 1), "never armed: " + r.H.Diagnose(id));
+
+        object sweepLock = Field(r.H.Engine.AsyncCommands.SensorRepeatPlugin, "SenseRepeatListLock");
+        using var sweeping = new System.Threading.ManualResetEventSlim(false);
+        bool sawReset = false, posted = false, signalled = false;
+        var sweep = new System.Threading.Thread(() =>
+        {
+            lock (sweepLock)
+            {
+                sweeping.Set();
+                sawReset = System.Threading.SpinWait.SpinUntil(() => r.Listens == 0, TimeSpan.FromSeconds(30));
+                r.H.Engine.PostScriptEvent(id, new EventParams("no_sensor", Array.Empty<object>(), Array.Empty<DetectParams>()));
+                r.H.Engine.PostScriptEvent(id, new EventParams("touch_start", new object[] { 1 }, Array.Empty<DetectParams>()), () => signalled = true);
+                posted = true;
+            }
+        }) { IsBackground = true };
+        sweep.Start();
+        Assert.True(sweeping.Wait(TimeSpan.FromSeconds(30)), "the stand-in sweep never started");
+
+        r.H.Engine.ResetScript(id);
+        Assert.True(r.PumpUntil(() => r.Count("entry") == 2), "the fresh script never ran its state_entry: " + r.H.Diagnose(id));
+        Assert.True(sweep.Join(TimeSpan.FromSeconds(30)) && posted, "the stand-in sweep never posted");
+        Assert.True(sawReset, "the reset did not release the listens while the sweep held the lock");
+        Assert.True(r.PumpUntil(() => System.Threading.Volatile.Read(ref signalled)), "a waiter was left waiting: " + r.H.Diagnose(id));
+
+        r.H.Engine.PostScriptEvent(id, new EventParams("link_message", new object[] { 0, 0, "check", UUID.Zero.ToString() }, Array.Empty<DetectParams>()));
+        Assert.True(r.PumpUntil(() => r.Count("checked") == 1), "the check never ran: " + r.H.Diagnose(id));
+        Assert.Equal(new[] { "entry", "entry", "checked" }, r.H.Said.Where(s => s == "entry" || s == "nosensor" || s == "checked").ToArray());
+        Assert.Equal(1, r.Sensors);   // the fresh state_entry's own repeat
+    }
+
+    /// <summary>
+    /// An event already in the script's own queue when it resets is cleared ("The event queue is cleared.") and does not
+    /// run, and a caller waiting on it is told it is done. The script is busy in a handler when the event arrives, so the
+    /// event waits in its queue; the handler then calls llResetScript.
+    /// </summary>
+    [Fact]
+    public void AnEventQueuedAtAResetIsClearedAndItsWaiterIsNotLeftWaiting()
+    {
+        using var r = new Rig();
+        var id = r.Rez(r.H.Prim, @"
+            default {
+                state_entry() { llSay(0, ""entry""); llListen(7, """", NULL_KEY, """"); }
+                listen(integer c, string n, key k, string m) { llSay(0, ""busy""); integer i; for (i = 0; i < 2000; ++i) { } llResetScript(); }
+                touch_start(integer n) { llSay(0, ""touched""); }
+            }");
+        Assert.True(r.PumpUntil(() => r.Count("entry") == 1 && r.Listens == 1), "never listened: " + r.H.Diagnose(id));
+
+        r.Say(7, "go");
+        Assert.True(r.PumpUntil(() => r.Count("busy") == 1), "the handler never ran: " + r.H.Diagnose(id));
+        bool signalled = false;
+        r.H.Engine.PostScriptEvent(id, new EventParams("touch_start", new object[] { 1 }, Array.Empty<DetectParams>()), () => signalled = true);
+        Assert.True(r.PumpUntil(() => r.Count("entry") == 2), "the fresh script never ran its state_entry: " + r.H.Diagnose(id));
+        Assert.True(r.PumpUntil(() => System.Threading.Volatile.Read(ref signalled)), "a waiter was left waiting: " + r.H.Diagnose(id));
+        Assert.Equal(0, r.Count("touched"));
+    }
+
+    /// <summary>
+    /// Chat floods the channels of scripts that change state on every line they hear, while other threads reset scripts,
+    /// delete and add them, and the scripts call llListenRemove. A listen delivery posts while it holds the listen
+    /// manager's lock, which the state change, the reset, llListenRemove and the unload take to release a listen, so this
+    /// checks that none of them freezes against a delivery: every thread, the scheduler's pump included, must finish
+    /// inside its limit. And no listen of the state a script left is heard after its state statement (SL State: "All
+    /// listens are released."), and no line heard before a reset runs in the fresh script before its state_entry (SL
+    /// llResetScript: "Listeners are removed." "The event queue is cleared.").
+    /// </summary>
+    [Fact]
+    public void ListensUnderAChatFloodWithStateChangesResetsAndRemovals()
+    {
+        using var r = new Rig(resetThrottle: false, chatThrottle: false);
+        // default hears 7 (and 9, removed at once); state two hears only 8. Any other channel is an old state's listen.
+        const string flipper = @"
+            default {
+                state_entry() { llListen(7, """", NULL_KEY, """"); integer h = llListen(9, """", NULL_KEY, """"); llListenRemove(h); }
+                listen(integer c, string n, key k, string m) { if (c == 8) llSay(0, ""BAD default heard 8""); else if (c == 7) state two; }
+                link_message(integer s, integer i, string str, key k) { llSay(0, ""checked""); }
+            }
+            state two {
+                state_entry() { llSay(0, ""flip""); llListen(8, """", NULL_KEY, """"); }
+                listen(integer c, string n, key k, string m) { if (c != 8) llSay(0, ""BAD two heard "" + (string)c); else state default; }
+                link_message(integer s, integer i, string str, key k) { llSay(0, ""checked""); }
+            }";
+        // Reset by its own llResetScript and from outside, on the same channels. A reset sets the globals to their
+        // defaults, so a listen that runs with gEntered still FALSE ran in the fresh script before its state_entry.
+        const string resetter = @"
+            integer gEntered;
+            default {
+                state_entry() { gEntered = TRUE; llSay(0, ""fresh""); llListen(7, """", NULL_KEY, """"); llListen(8, """", NULL_KEY, """"); }
+                listen(integer c, string n, key k, string m) { if (!gEntered) llSay(0, ""BAD reset heard before state_entry""); else if (m == ""reset"") llResetScript(); }
+                link_message(integer s, integer i, string str, key k) { llSay(0, ""checked""); }
+            }";
+        var flippers = new System.Collections.Concurrent.ConcurrentDictionary<UUID, byte>();
+        var resetters = new List<UUID>();
+        for (int i = 0; i < 4; i++) flippers[r.Rez(r.H.Prim, flipper)] = 0;
+        for (int i = 0; i < 2; i++) resetters.Add(r.Rez(r.H.Prim, resetter));
+        Assert.True(r.PumpUntil(() => r.Listens == 4 + 2 * 2), "the scripts never listened: " + r.Listens);
+
+        int stop = 0, removals = 0, outsideResets = 0;
+        bool Stopping() => System.Threading.Volatile.Read(ref stop) != 0;
+        var failures = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        System.Threading.Thread Run(string name, Action body) => new(() =>
+        {
+            try { body(); } catch (Exception e) { failures.Enqueue(e); }
+        }) { IsBackground = true, Name = name };
+
+        var listens = r.H.Engine.ListenManager;
+        listens.MaxListenEventsPerSecond = 0;   // no per-script cap: every line the flood sends is delivered
+        long beats = 0, lines = 0;
+        // The prim's inventory is changed on the pump thread, between pumps: LSLSystemAPI.GetInventorySelf locks the
+        // dictionary itself, not the TaskInventoryDictionary lock the core's writers take, so a change from another
+        // thread can break its enumeration. That is not what this test is about.
+        var inventoryChanges = new System.Collections.Concurrent.ConcurrentQueue<Action>();
+        var pump = Run("pump", () =>
+        {
+            while (!Stopping())
+            {
+                System.Threading.Interlocked.Increment(ref beats);
+                while (inventoryChanges.TryDequeue(out var change)) change();
+                if (!r.H.PumpOnceBusy()) System.Threading.Thread.Yield();
+            }
+        });
+        var flood = Run("flood", () =>
+        {
+            UUID speaker = UUID.Random();
+            for (int i = 0; !Stopping(); i++)
+            {
+                // as fast as the scheduler takes it: a flood that outruns it only grows its queue
+                if (r.Exe.PendingEventCount >= 100) { System.Threading.Thread.Yield(); continue; }
+                listens.DeliverChat(7 + i % 3, "flood", speaker, i % 40 == 0 ? "reset" : "x");
+                System.Threading.Interlocked.Increment(ref lines);
+            }
+        });
+        var resets = Run("resets", () =>
+        {
+            for (int i = 0; !Stopping(); i++)
+            {
+                // the next reset once the last one has started the script afresh (no clock), as a resident's would
+                int fresh = r.Count("fresh");
+                r.H.Engine.ResetScript(resetters[i % resetters.Count]);
+                System.Threading.Interlocked.Increment(ref outsideResets);
+                System.Threading.SpinWait.SpinUntil(() => Stopping() || r.Count("fresh") > fresh, TimeSpan.FromSeconds(10));
+            }
+        });
+        var removal = Run("removal", () =>
+        {
+            while (!Stopping())
+            {
+                // wait for flips between removals (no clock), so the scripts live long enough to change state
+                int seen = r.Count("flip");
+                if (!System.Threading.SpinWait.SpinUntil(() => Stopping() || r.Count("flip") >= seen + 20, TimeSpan.FromSeconds(10))) return;
+                if (Stopping()) return;
+                UUID gone = flippers.Keys.First();
+                flippers.TryRemove(gone, out _);
+                int done = 0;
+                inventoryChanges.Enqueue(() =>
+                {
+                    r.Delete(r.H.Prim, gone);
+                    flippers[r.Rez(r.H.Prim, flipper)] = 0;
+                    System.Threading.Interlocked.Increment(ref removals);
+                    System.Threading.Volatile.Write(ref done, 1);
+                });
+                // the pump stops taking changes once the test stops it
+                if (!System.Threading.SpinWait.SpinUntil(() => Stopping() || System.Threading.Volatile.Read(ref done) != 0, TimeSpan.FromSeconds(10))) return;
+            }
+        });
+        foreach (var t in new[] { pump, flood, resets, removal }) t.Start();
+
+        // Until enough of everything has happened, with a generous cap
+        bool enough = System.Threading.SpinWait.SpinUntil(
+            () => r.Count("flip") >= 400 && r.Count("fresh") >= 100 && System.Threading.Volatile.Read(ref removals) >= 10 || !failures.IsEmpty,
+            TimeSpan.FromSeconds(30));
+        System.Threading.Volatile.Write(ref stop, 1);
+        int pending0 = r.PendingEvents; long beats0 = System.Threading.Interlocked.Read(ref beats);
+        var stuck = new[] { pump, flood, resets, removal }.Where(t => !t.Join(TimeSpan.FromSeconds(10))).Select(t => t.Name).ToList();
+        Assert.True(stuck.Count == 0, "froze: " + string.Join(", ", stuck) + " did not finish;" +
+            $" pendingAtStop={pending0} pendingNow={r.PendingEvents} beatsAtStop={beats0} beatsNow={System.Threading.Interlocked.Read(ref beats)} lines={System.Threading.Interlocked.Read(ref lines)} enough={enough}" +
+            $" flips={r.Count("flip")} fresh={r.Count("fresh")} removals={removals} outside resets={outsideResets}");
+        Assert.True(failures.IsEmpty, string.Join("\n", failures));
+        Assert.True(enough, $"too little happened: flips={r.Count("flip")} fresh={r.Count("fresh")} removals={removals} outside resets={outsideResets}");
+
+        // A reset or a load still queued would clear the check, so they run first. Everything posted before this point
+        // has run once the check has run in every script.
+        Assert.True(r.H.PumpUntilIdle(TimeSpan.FromSeconds(30)), "the scheduler never went idle after the flood");
+        foreach (UUID id in flippers.Keys.Concat(resetters))
+            r.H.Engine.PostScriptEvent(id, new EventParams("link_message", new object[] { 0, 0, "check", UUID.Zero.ToString() }, Array.Empty<DetectParams>()));
+        int scripts = flippers.Count + resetters.Count;
+        Assert.True(r.PumpUntil(() => r.Count("checked") >= scripts), "the check never ran in every script: " + r.Count("checked") + "/" + scripts);
+        var bad = r.H.Said.Where(s => s.StartsWith("BAD", StringComparison.Ordinal)).ToList();
+        Assert.True(bad.Count == 0, $"{bad.Count} old listen event(s) ran: {string.Join(" | ", bad.GroupBy(s => s).Select(g => g.Key + " x" + g.Count()))}" +
+            $" (flips={r.Count("flip")} fresh={r.Count("fresh")} removals={removals} outside resets={outsideResets})");
+    }
+
     // ── late replies ───────────────────────────────────────────────────────────
 
     [Fact]

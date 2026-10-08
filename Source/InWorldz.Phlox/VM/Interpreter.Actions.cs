@@ -2426,8 +2426,11 @@ namespace InWorldz.Phlox.VM
         private void Op_StateChg()
         {
             int stateId = this.GetIntOperand();
-            this.OnStateChg(this, stateId);
+            // The API releases the listens and the sensor repeat first. The release waits for a sensor sweep or a listen
+            // delivery that is under way, so what they post lands before OnStateChg clears the queue and queues
+            // state_exit and state_entry, and is cleared with it.
             _syscallShim.OnStateChange();
+            this.OnStateChg(this, stateId);
         }
 
         private void Op_Vneg()

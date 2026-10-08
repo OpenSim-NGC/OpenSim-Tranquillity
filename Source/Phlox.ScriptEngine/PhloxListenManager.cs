@@ -44,6 +44,7 @@ namespace Phlox.ScriptEngine
         public System.Text.RegularExpressions.Regex MsgRegex;
         public int RegexBitfield;   // as osListenRegex was given it; 0 for llListen
         public bool Active;
+        public bool Removed;        // set under the manager's lock when the listen is removed
     }
 
     internal class PhloxListenManager
@@ -93,6 +94,14 @@ namespace Phlox.ScriptEngine
 
         // Every listen this engine holds in the region, active or switched off, for the per-region cap.
         private int m_ListenCount;
+
+        /// <summary>Tests only: called on the delivering thread with the listening item and channel once a line of chat has
+        /// matched a listen and before its event is posted, so a test can hold a delivery that is under way.</summary>
+        internal Action<UUID, int> BeforePostForTest;
+
+        /// <summary>Tests only: called with the item when all of its listens are about to be removed (a reset, a state change,
+        /// a stop), before the manager's lock is taken, so a test can deliver a line of chat at that point.</summary>
+        internal Action<UUID> BeforeRemoveForTest;
 
         /// <summary>How many listens this engine's scripts hold in the region.</summary>
         public int ListenCount { get { lock (m_Lock) return m_ListenCount; } }
@@ -292,6 +301,7 @@ namespace Phlox.ScriptEngine
 
         private void IndexRemove(ListenEntry entry)
         {
+            entry.Removed = true;   // a delivery that matched it before now does not post (PostListenEvent)
             if (!m_ByChannel.TryGetValue(entry.Channel, out var list)) return;
             list.Remove(entry);
             if (list.Count == 0) m_ByChannel.Remove(entry.Channel);
@@ -345,6 +355,7 @@ namespace Phlox.ScriptEngine
         /// <summary>Remove ALL listens for a script: on a reset, a state change, when it stops and when it unloads.</summary>
         public void Remove(UUID itemID)
         {
+            BeforeRemoveForTest?.Invoke(itemID);
             lock (m_Lock)
             {
                 RemoveAllOf(itemID);
@@ -499,6 +510,7 @@ namespace Phlox.ScriptEngine
                 if (IsRateLimited(entry.ItemID)) continue;
 
                 // Match — build and queue the event
+                BeforePostForTest?.Invoke(entry.ItemID, entry.Channel);
                 PostListenEvent(entry, channel, speakerName, speakerKey, message);
             }
         }
@@ -624,7 +636,14 @@ namespace Phlox.ScriptEngine
                     }
                 };
 
-                m_Scheduler.PostEvent(entry.ItemID, evt);
+                // Posted under the lock Remove takes, and only while the listen is still registered: once a reset, a
+                // state change or llListenRemove has removed it, a delivery that matched it before does not post. So the
+                // state change's release returns only after such a post has landed, and its queue clear takes it.
+                lock (m_Lock)
+                {
+                    if (entry.Removed) return;
+                    m_Scheduler.PostEvent(entry.ItemID, evt);
+                }
 
                 m_log.LogDebug(
                     "[PhloxListen]: Delivered listen ch={0} from '{1}' to item={2}",

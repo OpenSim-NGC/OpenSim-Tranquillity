@@ -611,6 +611,22 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - Start-up events come in SL's order: `state_entry` (a new script), then `on_rez`, then
   `attach` (an attachment worn from inventory), then `changed(CHANGED_REGION_START)`, which every
   script started by the region's start gets, new or restored. YEngine posts them in the same order.
+- A state change, as the SL wiki's [State](https://wiki.secondlife.com/wiki/State) page lists it: "The event queue is
+  cleared.", "All listens are released." and "Repeating sensors are released." After the `state` statement the only
+  handler of the old state that runs is `state_exit`, then the new state's `state_entry`. An event posted to the
+  script before the statement, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the
+  old state while the state changes, is dropped: it runs neither in the old state's handler nor in the new state.
+  Phlox used to run such an event after the statement, now and then, when a sensor sweep or a listen delivery was
+  under way at that moment. The timer carries on into the new state, as the SL wiki says of `llSetTimerEvent`: "The
+  timer persists across state changes".
+- A reset, as the SL wiki's [llResetScript](https://wiki.secondlife.com/wiki/LlResetScript) page lists it: "Timers
+  (including repeating sensors) are cleared.", "Listeners are removed.", "The event queue is cleared." and "If it has
+  a state_entry event, then it is queued." This holds for every reset: `llResetScript`, `llResetOtherScript`,
+  `osResetAllScripts`, the viewer's Reset, a reset asked for while the script is still compiling, and starting a
+  crashed script again. The fresh script's first event is its `state_entry`. An event posted to the script before
+  the reset, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the old script while
+  it resets, is dropped. Phlox used to run such an event in the fresh script before its `state_entry` when a sensor
+  sweep or a listen delivery was under way at that moment.
 
 ---
 

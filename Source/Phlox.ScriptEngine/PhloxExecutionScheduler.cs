@@ -756,7 +756,6 @@ namespace Phlox.ScriptEngine
             if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
 
             UnregisterFromNotifications(script);
-            DropPendingEvents(itemId);   // SL llResetScript "The event queue is cleared" - posted, not yet queued, too
             m_Engine.StateManager?.DeleteState(itemId);
             bool wasCrashed = script.ScriptState.TerminatedReason != null;
             lock (m_AllScriptsLock) m_HeldFresh.Remove(itemId);   // A reset of a held script owes it nothing more
@@ -770,11 +769,20 @@ namespace Phlox.ScriptEngine
             }
             script.SetScriptEventFlags();
 
-            PostEvent(itemId, new PostedEvent
+            // SL llResetScript: "The event queue is cleared", and with it what was posted to the script and not yet taken
+            // into the queue. Dropped only now: script.Reset() has released the listens and the sensor repeat
+            // (LSLSystemAPI.OnScriptReset), and that release waits for a listen delivery or a sensor sweep under way, so
+            // what they posted is here. Under one lock with the fresh state_entry, so nothing gets in between.
+            m_HeldArrivals.RemoveAll(held => held.ItemId == itemId);
+            lock (m_PendingEvents)
             {
-                EventType = SupportedEventList.Events.STATE_ENTRY,
-                Args = Array.Empty<object>()
-            });
+                DropPendingEventsLocked(itemId);
+                PostEvent(itemId, new PostedEvent
+                {
+                    EventType = SupportedEventList.Events.STATE_ENTRY,
+                    Args = Array.Empty<object>()
+                });
+            }
 
             if (!m_RunIndex.ContainsKey(itemId) && script.ScriptState.Enabled)
             {
@@ -789,23 +797,19 @@ namespace Phlox.ScriptEngine
             return true;
         }
 
-        /// <summary>Events posted to this item and not yet moved into its queue are dropped (reset).</summary>
-        private void DropPendingEvents(UUID itemId)
+        /// <summary>The events posted to this item and not yet moved into its queue are dropped. The caller holds m_PendingEvents.</summary>
+        private void DropPendingEventsLocked(UUID itemId)
         {
-            m_HeldArrivals.RemoveAll(held => held.ItemId == itemId);
-            lock (m_PendingEvents)
+            if (m_PendingEvents.Count == 0) return;
+            var keep = new List<PendingEvent>(m_PendingEvents.Count);
+            foreach (var pe in m_PendingEvents)
             {
-                if (m_PendingEvents.Count == 0) return;
-                var keep = new List<PendingEvent>(m_PendingEvents.Count);
-                foreach (var pe in m_PendingEvents)
-                {
-                    if (pe.ItemId == itemId) pe.Evt.SignalCompleted();   // No waiter waits for a dropped event
-                    else keep.Add(pe);
-                }
-                if (keep.Count == m_PendingEvents.Count) return;
-                m_PendingEvents.Clear();
-                foreach (var pe in keep) m_PendingEvents.Enqueue(pe);
+                if (pe.ItemId == itemId) pe.Evt.SignalCompleted();   // No waiter waits for a dropped event
+                else keep.Add(pe);
             }
+            if (keep.Count == m_PendingEvents.Count) return;
+            m_PendingEvents.Clear();
+            foreach (var pe in keep) m_PendingEvents.Enqueue(pe);
         }
 
         /// <summary>
@@ -2441,8 +2445,13 @@ namespace Phlox.ScriptEngine
             // with them, so a restore cannot bring back a listen of the state the script left.
             script.ScriptState.ActiveListens?.Clear();
 
+            // The queue is cleared, and with it what was posted to the script and not yet taken into the queue, which
+            // would otherwise run in the old state's handler after the state statement. The API has already released
+            // the listens and the sensor repeat (Interpreter.Op_StateChg runs it first), so what they posted is here.
+            // Under one lock with state_exit and state_entry, so nothing gets in between.
             lock (m_PendingEvents)
             {
+                DropPendingEventsLocked(script.ItemId);
                 PostEvent(script.ItemId, new PostedEvent
                 {
                     EventType = SupportedEventList.Events.STATE_EXIT,
