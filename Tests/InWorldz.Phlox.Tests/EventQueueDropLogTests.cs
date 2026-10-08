@@ -291,4 +291,35 @@ public class EventQueueDropLogTests : IDisposable
             Line(l, "3 TOUCH_START events"), Line(l, "2 TOUCH_START events"),
         }, FullLines(l));
     }
+
+    /// <summary>
+    /// The scheduler asks to be woken when a lasting run's line is due. The clock is moved only to the times the
+    /// scheduler asks to be woken at, as its thread waits (PhloxMasterScheduler): with the only script asleep for 200 s,
+    /// a line not among those times would be written at whatever wakes the scheduler next, up to a minute late.
+    /// </summary>
+    [Fact]
+    public void TheSchedulerWakesWhenALastingRunsLineIsDue()
+    {
+        UUID l = Start(LongSleeper, "L");
+        Say("nap");
+        Assert.True(RunUntil(() => H.Said.Contains("L asleep")), Said);
+
+        ulong t0 = m_now;
+        Touches(l, 70);                                                // 64 wait, 6 dropped: the run starts
+        ulong droppedBy = m_now;
+        Assert.Equal(0.0f, H.Engine.GetEventQueueFreeSpacePercentage(l));
+
+        var wall = DateTime.UtcNow.AddSeconds(60);
+        while (FullLines(l).Length == 0 && DateTime.UtcNow < wall)
+        {
+            if (H.PumpOnceBusy()) continue;
+            ulong wake = H.ExeWakeUpTime();                            // a DoWork at m_now, which may write the line
+            if (FullLines(l).Length > 0) break;
+            Assert.NotEqual(ulong.MaxValue, wake);
+            if (wake > m_now) m_now = wake;
+        }
+        _out.WriteLine("drops from " + t0 + " to " + droppedBy + "; line at " + m_now);
+        Assert.Equal(new[] { Line(l, "6 TOUCH_START events") }, FullLines(l));
+        Assert.InRange(m_now, t0 + 60_000, droppedBy + 60_000);
+    }
 }

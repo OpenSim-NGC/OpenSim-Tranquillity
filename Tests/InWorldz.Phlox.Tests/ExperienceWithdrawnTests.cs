@@ -77,6 +77,8 @@ public class ExperienceWithdrawnTests
                 if (m.Name == nameof(IExperienceModule.GetEstateAllowedExperiences)) return Allowed.ToArray();
                 if (m.Name == nameof(IExperienceModule.GetEstateKeyExperiences)) return Trusted.ToArray();
                 if (m.Name == nameof(IExperienceModule.GetEstateBlockedExperiences)) return Blocked.ToArray();
+                if (m.Name == nameof(IExperienceModule.GetExperienceInfo))   // known to the service, and enabled
+                    return (UUID)a[0] == Experience ? new ExperienceInfo { public_id = Experience, name = "Example Experience" } : null;
             }
             var rt = m.ReturnType;
             return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);

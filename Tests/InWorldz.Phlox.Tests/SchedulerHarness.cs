@@ -479,6 +479,9 @@ public sealed class SchedulerHarness : IDisposable
         return Pending(l) || Pending(e);
     }
 
+    /// <summary>One DoWork on the execution scheduler; the engine-clock time it asks to be woken at (ulong.MaxValue: none).</summary>
+    public ulong ExeWakeUpTime() => ((global::Phlox.ScriptEngine.PhloxExecutionScheduler)m_exe).DoWork().NextWakeUpTime;
+
     /// <summary>Exactly one DoWork on each scheduler - one timeslice, no more.</summary>
     public void PumpOnce()
     {
