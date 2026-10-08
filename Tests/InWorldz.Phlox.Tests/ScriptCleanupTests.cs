@@ -699,7 +699,8 @@ public class ScriptCleanupTests
     /// manager's lock, which the state change, the reset, llListenRemove and the unload take to release a listen, so this
     /// checks that none of them freezes against a delivery: every thread, the scheduler's pump included, must finish
     /// inside its limit. And no listen of the state a script left is heard after its state statement (SL State: "All
-    /// listens are released.").
+    /// listens are released."), and no line heard before a reset runs in the fresh script before its state_entry (SL
+    /// llResetScript: "Listeners are removed." "The event queue is cleared.").
     /// </summary>
     [Fact]
     public void ListensUnderAChatFloodWithStateChangesResetsAndRemovals()
@@ -717,11 +718,13 @@ public class ScriptCleanupTests
                 listen(integer c, string n, key k, string m) { if (c != 8) llSay(0, ""BAD two heard "" + (string)c); else state default; }
                 link_message(integer s, integer i, string str, key k) { llSay(0, ""checked""); }
             }";
-        // Reset by its own llResetScript and from outside, on the same channels.
+        // Reset by its own llResetScript and from outside, on the same channels. A reset sets the globals to their
+        // defaults, so a listen that runs with gEntered still FALSE ran in the fresh script before its state_entry.
         const string resetter = @"
+            integer gEntered;
             default {
-                state_entry() { llSay(0, ""fresh""); llListen(7, """", NULL_KEY, """"); llListen(8, """", NULL_KEY, """"); }
-                listen(integer c, string n, key k, string m) { if (m == ""reset"") llResetScript(); }
+                state_entry() { gEntered = TRUE; llSay(0, ""fresh""); llListen(7, """", NULL_KEY, """"); llListen(8, """", NULL_KEY, """"); }
+                listen(integer c, string n, key k, string m) { if (!gEntered) llSay(0, ""BAD reset heard before state_entry""); else if (m == ""reset"") llResetScript(); }
                 link_message(integer s, integer i, string str, key k) { llSay(0, ""checked""); }
             }";
         var flippers = new System.Collections.Concurrent.ConcurrentDictionary<UUID, byte>();
