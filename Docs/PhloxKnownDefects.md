@@ -660,6 +660,17 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   the reset, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the old script while
   it resets, is dropped. Phlox used to run such an event in the fresh script before its `state_entry` when a sensor
   sweep or a listen delivery was under way at that moment.
+- Notecard text, as every notecard reader reads it: `llGetNotecardLine`, `llGetNumberOfNotecardLines`,
+  `llGetNotecardLineSync`, `llFindNotecardTextSync`, `iwGetNotecardSegment`, the `iwGetLink*` notecard functions,
+  `osGetNotecard`, `osGetNotecardLine` and `osGetNumberOfNotecardLines`. A notecard's stored "Text length" counts bytes
+  of UTF-8, and Phlox reads exactly that many bytes, as YEngine does. A newline ends the line before it and does not
+  start another: text that ends with a newline has no empty line after it, and an empty notecard has no lines. The SL
+  wiki pages for `llGetNotecardLine` and `llGetNumberOfNotecardLines` do not say; this is how YEngine reads them. So a
+  notecard made by `osMakeNotecard`, which writes a newline after the string and after each list item, reads back as
+  the string's lines or the list's items. Phlox used to take the stored length as a count of characters, so text with
+  characters of more than one byte could end in a stray `}` (and, in a notecard the viewer saved, an extra empty line
+  after it); it answered one empty line more
+  than YEngine for text that ends with a newline, and `""` instead of EOF for line 0 of an empty notecard.
 
 ---
 

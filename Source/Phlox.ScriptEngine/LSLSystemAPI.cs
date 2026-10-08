@@ -329,7 +329,7 @@ namespace Phlox.ScriptEngine
                         ShoutError("Notecard '" + cardName + "' could not be found.");
                         return;
                     }
-                    var card = new PhloxNotecardCache.Card(StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data)));
+                    var card = new PhloxNotecardCache.Card(StripNotecardHeader(asset.Data));
                     cache?.Cache(assetId, card);
                     PostDataserverEvent(queryID, answer(card));
                 }
@@ -5343,8 +5343,7 @@ namespace Phlox.ScriptEngine
             {
                 AssetBase asset = World.AssetService.Get(item.AssetID.ToString());
                 if (asset == null || asset.Data == null) return "\n\n\n";
-                string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                string[] lines = body.Split('\n');
+                string[] lines = PhloxNotecardCache.Card.SplitLines(StripNotecardHeader(asset.Data));
                 if (line < 0 || line >= lines.Length) return "\n\n\n";
                 return lines[line].TrimEnd('\r');
             }
@@ -5360,8 +5359,7 @@ namespace Phlox.ScriptEngine
             {
                 AssetBase asset = World.AssetService.Get(item.AssetID.ToString());
                 if (asset == null || asset.Data == null) return -1;
-                string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                string[] lines = body.Split('\n');
+                string[] lines = PhloxNotecardCache.Card.SplitLines(StripNotecardHeader(asset.Data));
                 StringComparison comp = caseSensitive != 0
                     ? StringComparison.Ordinal
                     : StringComparison.OrdinalIgnoreCase;
@@ -13164,9 +13162,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (item == null) return null;
             AssetBase asset = World?.AssetService?.Get(item.AssetID.ToString());
             if (asset?.Data == null) return null;
-            string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-            if (body.Length == 0) return Array.Empty<string>();
-            string[] lines = body.Split('\n');
+            string[] lines = PhloxNotecardCache.Card.SplitLines(StripNotecardHeader(asset.Data));
             for (int i = 0; i < lines.Length; i++) lines[i] = lines[i].TrimEnd('\r');
             return lines;
         }
@@ -18685,21 +18681,31 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             m_ScriptEngine?.PostDataserverToPrim(m_host, owed ? UUID.Zero : m_itemID, queryID.ToString(), data);
         }
 
-        private static string StripNotecardHeader(string raw)
+        private static readonly byte[] NotecardTextLengthMarker = Encoding.ASCII.GetBytes("\nText length ");
+
+        /// <summary>
+        /// The text of a notecard asset, without the header before it and the "}" after it. "Text length N" counts
+        /// bytes of UTF-8, not characters: the viewer and OSSL's SaveNotecard both write the byte count, and YEngine's
+        /// reader takes that many bytes (SLUtil.ParseNotecardToArray). So the header is found and the text is cut in the
+        /// asset's bytes, and only then decoded.
+        /// </summary>
+        private static string StripNotecardHeader(byte[] data)
         {
-            if (string.IsNullOrEmpty(raw)) return string.Empty;
+            if (data == null || data.Length == 0) return string.Empty;
+            string raw = OpenMetaverse.Utils.BytesToString(data);
             if (!raw.StartsWith("Linden text", StringComparison.Ordinal)) return raw;
-            int marker = raw.IndexOf("\nText length ", StringComparison.Ordinal);
+            int marker = data.AsSpan().IndexOf(NotecardTextLengthMarker);
             if (marker < 0) return raw;
-            int bodyStart = raw.IndexOf('\n', marker + 1);
-            if (bodyStart < 0) return string.Empty;
-            string body = raw.Substring(bodyStart + 1);
-            // The body is followed by "}\n" (AssetNotecard.Encode and the viewer both write it so), which the
-            // EndsWith checks below never matched - the last line came back as "text}" with an empty line after it.
-            // "Text length N" says how long the body is; take exactly that when it fits.
-            string lenText = raw.Substring(marker + 13, bodyStart - (marker + 13)).Trim();
-            if (int.TryParse(lenText, out int declared) && declared >= 0 && declared <= body.Length)
-                return body.Substring(0, declared);
+            int lenStart = marker + NotecardTextLengthMarker.Length;
+            int lenEnd = data.AsSpan(lenStart).IndexOf((byte)'\n');
+            if (lenEnd < 0) return string.Empty;
+            int bodyStart = lenStart + lenEnd + 1;
+            // The text is followed by "}\n" (the viewer) or "}" (OSSL SaveNotecard). "Text length N" says how long the
+            // text is; take exactly that when it fits.
+            string lenText = Encoding.ASCII.GetString(data, lenStart, lenEnd).Trim();
+            if (int.TryParse(lenText, out int declared) && declared >= 0 && declared <= data.Length - bodyStart)
+                return Encoding.UTF8.GetString(data, bodyStart, declared);
+            string body = OpenMetaverse.Utils.BytesToString(data[bodyStart..]);
             if (body.EndsWith("}\n", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 2);
             else if (body.EndsWith("\n}", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 2);
             else if (body.EndsWith("}", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 1);
