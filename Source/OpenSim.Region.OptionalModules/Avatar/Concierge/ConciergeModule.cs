@@ -364,7 +364,7 @@ public class ConciergeModule : ChatModule, ISharedRegionModule
     {
         try
         {
-            using HttpClient client = WebUtil.GetNewGlobalHttpClient(m_brokerUpdateTimeout * 1000);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(m_brokerUpdateTimeout * 1000);
             using HttpRequestMessage request = new(HttpMethod.Post, uri);
             request.Headers.UserAgent.ParseAdd("OpenSim.Concierge");
             request.Content = new ByteArrayContent(Encoding.UTF8.GetBytes(payload));

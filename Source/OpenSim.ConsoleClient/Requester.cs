@@ -26,7 +26,6 @@
  */
 
 using System.Text;
-using Microsoft.Extensions.Logging;
 using OpenSim.Framework;
 
 namespace OpenSim.ConsoleClient;
@@ -35,8 +34,6 @@ public delegate void ReplyDelegate(string requestUrl, string requestData, string
 
 public class Requester
 {
-    private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(Requester));
-
     public static void MakeRequest(string requestUrl, string data,
             ReplyDelegate action)
     {
@@ -47,7 +44,7 @@ public class Requester
     {
         try
         {
-            using HttpClient client = WebUtil.GetNewGlobalHttpClient(100000);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
             using CancellationTokenSource cts = new(client.Timeout);
             using HttpRequestMessage request = new(HttpMethod.Post, requestUrl);
             request.Content = new ByteArrayContent(Encoding.ASCII.GetBytes(data));
@@ -61,7 +58,13 @@ public class Requester
         }
         catch (Exception e)
         {
-            m_log.LogError(e, "[CONSOLE CLIENT]: Request {Url} failed", requestUrl);
+            string operation = (Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri uri) ? uri.AbsolutePath : string.Empty) switch
+            {
+                "/StartSession/" => "Login failed",
+                string path when path.StartsWith("/ReadResponses/", StringComparison.Ordinal) => "Polling stopped; reconnect to resume",
+                _ => "Request failed"
+            };
+            System.Console.Error.WriteLine($"[CONSOLE CLIENT]: {operation}: {e.Message}");
         }
     }
 }

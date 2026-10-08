@@ -89,7 +89,7 @@ public class HeloServicesConnector
 
         try
         {
-            using HttpClient client = WebUtil.GetNewGlobalHttpClient(100000);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(100000, verifyCertificate: true);
             using HttpRequestMessage request = new(HttpMethod.Get, m_ServerURI);
             using HttpResponseMessage response = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();

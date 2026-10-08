@@ -78,7 +78,7 @@ public class VivoxVoiceModule : ISharedRegionModule
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private readonly System.Lazy<SocketsHttpHandler> m_httpHandler = new(() =>
     {
-        SocketsHttpHandler handler = WebUtil.CreateHttpHandler();
+        SocketsHttpHandler handler = WebUtil.CreateLegacyHttpHandler();
         handler.SslOptions.RemoteCertificateValidationCallback = WebUtil.ValidateServerCertificateNoChecks;
         return handler;
     });

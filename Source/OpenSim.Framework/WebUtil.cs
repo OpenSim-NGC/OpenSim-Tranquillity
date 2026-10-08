@@ -65,6 +65,7 @@ public static class WebUtil
     private static TimeSpan s_connectionLifetime = TimeSpan.FromMinutes(3);
     private static bool s_expectContinue;
     private static System.Collections.Concurrent.ConcurrentDictionary<int, SocketsHttpHandler> s_connectionHandlers = new();
+    private static System.Collections.Concurrent.ConcurrentDictionary<(int Limit, bool VerifyCertificate), Lazy<SocketsHttpHandler>> s_legacyHandlers = new();
 
     static WebUtil()
     {
@@ -271,6 +272,7 @@ public static class WebUtil
         }
         SharedSocketsHttpHandler = shh;
         s_connectionHandlers = new();
+        s_legacyHandlers = new();
     }
 
     public static HttpClient GetNewGlobalHttpClient(int timeout)
@@ -324,6 +326,38 @@ public static class WebUtil
         };
     }
 
+    /// <summary>
+    /// Retains system-proxy behavior for callers migrated from WebRequest/WebClient,
+    /// without changing the direct transport used by existing grid-service clients.
+    /// </summary>
+    public static HttpClient GetLegacyHttpClient(int timeout, int maxConnections = 0, bool verifyCertificate = false)
+    {
+        int limit = Math.Max(maxConnections, SharedSocketsHttpHandler.MaxConnectionsPerServer);
+        SocketsHttpHandler handler = s_legacyHandlers.GetOrAdd((limit, verifyCertificate), key => new(() =>
+        {
+            SocketsHttpHandler dedicated = CreateLegacyHttpHandler(key.VerifyCertificate);
+            dedicated.MaxConnectionsPerServer = key.Limit;
+            return dedicated;
+        })).Value;
+        HttpClient client = new(handler, false)
+        {
+            Timeout = TimeSpan.FromMilliseconds(timeout > 0 ? timeout : 30000),
+            MaxResponseContentBufferSize = 250 * 1024 * 1024
+        };
+        client.DefaultRequestHeaders.ExpectContinue = s_expectContinue;
+        return client;
+    }
+
+    public static SocketsHttpHandler CreateLegacyHttpHandler(bool verifyCertificate = false)
+    {
+        SocketsHttpHandler handler = CreateHttpHandler();
+        handler.UseProxy = true;
+        handler.Proxy = SharedSocketsHttpHandler.Proxy ?? HttpClient.DefaultProxy;
+        if (verifyCertificate)
+            handler.SslOptions.RemoteCertificateValidationCallback = null;
+        return handler;
+    }
+
     public static HttpRequestMessage CreateXmlRequest<TRequest>(string verb, string requestUrl, TRequest obj)
     {
         using MemoryStream buffer = new();
@@ -340,7 +374,7 @@ public static class WebUtil
         string verb, string requestUrl, TRequest obj, int timeout, IServiceAuth auth = null,
         int maxConnections = 0, bool sendBody = true)
     {
-        using HttpClient client = GetNewGlobalHttpClient(timeout, maxConnections);
+        using HttpClient client = GetLegacyHttpClient(timeout, maxConnections);
         using CancellationTokenSource cts = new(client.Timeout);
         using HttpRequestMessage request = sendBody
             ? CreateXmlRequest(verb, requestUrl, obj)
@@ -367,7 +401,7 @@ public static class WebUtil
 
     public static Stream OpenHttpStream(Uri uri)
     {
-        HttpClient client = GetNewGlobalHttpClient(100000);
+        HttpClient client = GetLegacyHttpClient(100000);
         HttpResponseMessage response = null;
         try
         {

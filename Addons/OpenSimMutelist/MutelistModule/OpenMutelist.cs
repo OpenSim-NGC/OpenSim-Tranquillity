@@ -176,7 +176,7 @@ public class MuteListModule : ISharedRegionModule
         try
         {
             XmlRpcRequest Req = new XmlRpcRequest(method, SendParams);
-            using HttpClient client = WebUtil.GetNewGlobalHttpClient(30000);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(30000);
             Resp = Req.Send(server, client);
         }
         catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or WebException)

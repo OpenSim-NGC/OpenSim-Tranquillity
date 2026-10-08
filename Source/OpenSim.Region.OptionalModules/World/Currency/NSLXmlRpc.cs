@@ -43,7 +43,7 @@ public class NSLXmlRpcRequest : XmlRpcRequest
     {
         m_log.LogInformation("[MONEY NSL RPC]: XmlRpcResponse certSend: connect to {0}", url);
 
-        using SocketsHttpHandler handler = WebUtil.CreateHttpHandler();
+        using SocketsHttpHandler handler = WebUtil.CreateLegacyHttpHandler();
         if (myClientCert != null)
             handler.SslOptions.ClientCertificates = new X509CertificateCollection { myClientCert };
         using HttpClient client = new(handler) { Timeout = TimeSpan.FromMilliseconds(timeout) };

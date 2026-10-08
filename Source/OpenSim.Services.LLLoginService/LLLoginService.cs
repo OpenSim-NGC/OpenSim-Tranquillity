@@ -175,7 +175,7 @@ public class LLLoginService : ILoginService
         {
             try
             { 
-                using HttpClient client = WebUtil.GetNewGlobalHttpClient(100000);
+                using HttpClient client = WebUtil.GetLegacyHttpClient(100000, verifyCertificate: true);
                 m_WelcomeMessage = client.GetStringAsync(m_MessageUrl).GetAwaiter().GetResult();
             }
             catch (Exception e)

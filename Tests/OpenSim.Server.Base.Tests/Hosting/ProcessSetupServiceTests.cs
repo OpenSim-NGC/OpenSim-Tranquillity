@@ -47,6 +47,31 @@ public sealed class ProcessSetupServiceTests
     }
 
     [Fact]
+    public void ApplyDefaults_PreservesThreeMinuteConnectionLifetime()
+    {
+        var savedRedir = WebUtil.SharedSocketsHttpHandler;
+        var savedNoRedir = WebUtil.SharedSocketsHttpHandlerNoRedir;
+        try
+        {
+            var sut = new ProcessSetupService(new NullLogger<ProcessSetupService>());
+            sut.ApplyDefaults();
+            WebUtil.SetupHTTPClients(false, false, null, 0);
+            Assert.Equal(TimeSpan.FromMinutes(3), WebUtil.SharedSocketsHttpHandler.PooledConnectionLifetime);
+            Assert.Equal(TimeSpan.FromMinutes(3), WebUtil.SharedSocketsHttpHandlerNoRedir.PooledConnectionLifetime);
+            using var legacy = WebUtil.CreateLegacyHttpHandler();
+            Assert.Equal(TimeSpan.FromMinutes(3), legacy.PooledConnectionLifetime);
+        }
+        finally
+        {
+            WebUtil.SharedSocketsHttpHandler.Dispose();
+            WebUtil.SharedSocketsHttpHandlerNoRedir.Dispose();
+            WebUtil.SharedSocketsHttpHandler = savedRedir;
+            WebUtil.SharedSocketsHttpHandlerNoRedir = savedNoRedir;
+            WebUtil.ConfigureHTTPDefaults(32, 30000, 180000, false);
+        }
+    }
+
+    [Fact]
     public void Apply_MapsHttpDefaultsToBothSharedHandlers()
     {
         var savedRedir = WebUtil.SharedSocketsHttpHandler;
@@ -77,7 +102,7 @@ public sealed class ProcessSetupServiceTests
             WebUtil.SharedSocketsHttpHandlerNoRedir.Dispose();
             WebUtil.SharedSocketsHttpHandler = savedRedir;
             WebUtil.SharedSocketsHttpHandlerNoRedir = savedNoRedir;
-            WebUtil.ConfigureHTTPDefaults(32, 30000, 5000, false);
+            WebUtil.ConfigureHTTPDefaults(32, 30000, 180000, false);
         }
     }
 
@@ -101,7 +126,7 @@ public sealed class ProcessSetupServiceTests
             WebUtil.SharedSocketsHttpHandlerNoRedir.Dispose();
             WebUtil.SharedSocketsHttpHandler = savedRedir;
             WebUtil.SharedSocketsHttpHandlerNoRedir = savedNoRedir;
-            WebUtil.ConfigureHTTPDefaults(32, 30000, 5000, false);
+            WebUtil.ConfigureHTTPDefaults(32, 30000, 180000, false);
         }
     }
 

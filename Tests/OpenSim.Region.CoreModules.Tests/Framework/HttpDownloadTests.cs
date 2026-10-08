@@ -105,6 +105,32 @@ public sealed class HttpDownloadTests : IDisposable
     }
 
     [Fact]
+    public void DownloadsAndHelo_UseSystemProxyAfterDirectServerSetup()
+    {
+        IWebProxy savedProxy = HttpClient.DefaultProxy;
+        try
+        {
+            HttpClient.DefaultProxy = new WebProxy(m_server.BaseUri, false);
+            m_server.Responder = _ => new RecordingHttpServer.Reply
+            {
+                Body = Encoding.UTF8.GetBytes("download"),
+                Headers = new Dictionary<string, string> { ["X-Handlers-Provided"] = "OpenSim" }
+            };
+            using (Stream stream = ArchiveHelpers.URIFetch(new Uri("http://unresolvable.invalid/archive")))
+            using (StreamReader reader = new(stream))
+                Assert.Equal("download", reader.ReadToEnd());
+            Assert.Equal("OpenSim", new HeloServicesConnector("http://unresolvable.invalid").Helo());
+            Assert.Equal(2, m_server.Requests.Count);
+            Assert.All(m_server.Requests, request => Assert.Contains("http://unresolvable.invalid/", request.RequestLine));
+            Assert.False(WebUtil.SharedSocketsHttpHandler.UseProxy);
+        }
+        finally
+        {
+            HttpClient.DefaultProxy = savedProxy;
+        }
+    }
+
+    [Fact]
     public void Helo_ReadsHandlerHeaderAndHandlesMissingHeaderOrHttpFailure()
     {
         HeloServicesConnector connector = new(m_server.BaseUri.ToString());

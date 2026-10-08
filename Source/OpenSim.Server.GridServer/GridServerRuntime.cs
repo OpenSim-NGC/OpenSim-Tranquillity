@@ -107,7 +107,7 @@ public sealed class GridServerRuntime : IGridServerRuntime
 
             _certificateProvisioner.Provision(serverConfig);
 
-            int dnsTimeout = serverConfig.GetInt("DnsTimeout", 30000);
+            int dnsTimeout = serverConfig.GetInt("DnsTimeout", 180000);
             WebUtil.ConfigureHTTPDefaults(null, null, dnsTimeout, null);
 
             _noVerifyCertChain = serverConfig.GetBoolean("NoVerifyCertChain", _noVerifyCertChain);

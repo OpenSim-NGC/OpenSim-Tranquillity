@@ -79,7 +79,7 @@ public class RegionLoaderWebServer : IRegionLoader
                     {
                         string xmlSource = String.Empty;
                         m_log.LogDebug("[WEBLOADER]: Downloading region information...");
-                        using HttpClient client = WebUtil.GetNewGlobalHttpClient(30000);
+                        using HttpClient client = WebUtil.GetLegacyHttpClient(30000);
                         using HttpRequestMessage webRequest = new(HttpMethod.Get, url);
                         using HttpResponseMessage webResponse = client.Send(webRequest);
                         webResponse.EnsureSuccessStatusCode();

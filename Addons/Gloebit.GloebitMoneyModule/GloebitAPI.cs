@@ -234,7 +234,7 @@ public class GloebitAPI {
         
         //************ PARSE AND HANDLE GET BALANCE RESPONSE *********//
         
-        using HttpClient client = WebUtil.GetNewGlobalHttpClient(100000);
+        using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
         using HttpResponseMessage response = client.Send(request);
         response.EnsureSuccessStatusCode();
         string status = response.ReasonPhrase;
@@ -480,7 +480,7 @@ public class GloebitAPI {
         
         m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync about to GetResponse");
         // **** Synchronously make web request **** //
-        using HttpClient client = WebUtil.GetNewGlobalHttpClient(100000);
+        using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
         using HttpResponseMessage response = client.Send(request);
         response.EnsureSuccessStatusCode();
         string status = response.ReasonPhrase;
@@ -1104,7 +1104,7 @@ public class GloebitAPI {
         using HttpRequestMessage request = state.request;
         try
         {
-            using HttpClient client = WebUtil.GetNewGlobalHttpClient(100000);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
             using HttpResponseMessage response = await client.SendAsync(request).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
             using StreamReader reader = new(await response.Content.ReadAsStreamAsync().ConfigureAwait(false), Encoding.UTF8);

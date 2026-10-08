@@ -16,6 +16,7 @@ using OpenSim.Region.OptionalModules.Avatar.Concierge;
 using OpenSim.Region.OptionalModules.Avatar.Voice.FreeSwitchVoice;
 using OpenSim.Region.OptionalModules.Avatar.Voice.VivoxVoice;
 using OpenSim.Region.OptionalModules.World.Currency;
+using OpenSim.Services.Connectors;
 using Xunit;
 
 namespace OpenSim.Region.CoreModules.Tests.Framework;
@@ -102,8 +103,10 @@ public sealed class OptionalHttpTransportTests : IDisposable
         Assert.Equal(2, m_server.Requests.Count);
     }
 
-    [Fact]
-    public async Task FreeSwitch_UsesConfiguredProxyAndPreservesResponseAndBody()
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task FreeSwitch_UsesExplicitOrSystemProxyAndPreservesResponseAndBody(bool explicitProxy)
     {
         using TcpListener listener = new(IPAddress.Loopback, 0);
         listener.Start();
@@ -111,8 +114,10 @@ public sealed class OptionalHttpTransportTests : IDisposable
         using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
         Task<(string Headers, byte[] Body, string? ClientCertificate)> server =
             ServeTls(listener, certificate, "voice reply", proxy: true, requireClientCertificate: false, cts.Token);
-        WebUtil.SetupHTTPClients(false, false,
-            new WebProxy($"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}", false), 4);
+        IWebProxy savedProxy = HttpClient.DefaultProxy;
+        WebProxy proxy = new($"http://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}", false);
+        HttpClient.DefaultProxy = proxy;
+        WebUtil.SetupHTTPClients(false, false, explicitProxy ? proxy : null, 4);
         FreeSwitchVoiceModule module = new();
         try
         {
@@ -131,6 +136,91 @@ public sealed class OptionalHttpTransportTests : IDisposable
         finally
         {
             module.Close();
+            HttpClient.DefaultProxy = savedProxy;
+        }
+    }
+
+    [Theory]
+    [InlineData("groups")]
+    [InlineData("money")]
+    [InlineData("concierge")]
+    [InlineData("gloebit")]
+    public async Task OptionalLegacyRequests_UseSystemProxyWithoutEnablingSharedProxy(string transport)
+    {
+        IWebProxy savedProxy = HttpClient.DefaultProxy;
+        try
+        {
+            HttpClient.DefaultProxy = new WebProxy(m_server.BaseUri, false);
+            const string url = "http://unresolvable.invalid/";
+            m_server.Responder = _ => RecordingHttpServer.Reply.Text(RpcReply);
+            switch (transport)
+            {
+                case "groups":
+                    Assert.Equal("reply", new ConfigurableKeepAliveXmlRpcRequest(
+                        "test.method", new ArrayList(), false).Send(url).Value);
+                    break;
+                case "money":
+                    Assert.Equal("reply", new NSLXmlRpcRequest(
+                        "test.method", new ArrayList()).certSend(url, null, true, 1000).Value);
+                    break;
+                case "concierge":
+                    await new TestConcierge().Post(url, "<avatars/>");
+                    break;
+                case "gloebit":
+                    m_server.Responder = _ => RecordingHttpServer.Reply.Text("{\"success\":true,\"balance\":42.5}");
+                    GloebitAPI api = new("test-app", "", "test-secret", new Uri(url), null);
+                    Assert.Equal(42.5, api.GetBalance(new GloebitUser { GloebitToken = "" }, out _));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(transport));
+            }
+            Assert.Contains("http://unresolvable.invalid/", Assert.Single(m_server.Requests).RequestLine);
+            Assert.False(WebUtil.SharedSocketsHttpHandler.UseProxy);
+        }
+        finally
+        {
+            HttpClient.DefaultProxy = savedProxy;
+        }
+    }
+
+    [Fact]
+    public void LegacyCertificatePolicies_KeepStrictFetchesSeparateFromSharedBypasses()
+    {
+        WebUtil.SetupHTTPClients(true, true, null, 4);
+        var sharedCallback = WebUtil.SharedSocketsHttpHandler.SslOptions.RemoteCertificateValidationCallback;
+        using var legacy = WebUtil.CreateLegacyHttpHandler();
+        using var strict = WebUtil.CreateLegacyHttpHandler(verifyCertificate: true);
+        Assert.Same(sharedCallback, legacy.SslOptions.RemoteCertificateValidationCallback);
+        Assert.Null(strict.SslOptions.RemoteCertificateValidationCallback);
+        Assert.Same(sharedCallback, WebUtil.SharedSocketsHttpHandler.SslOptions.RemoteCertificateValidationCallback);
+    }
+
+    [Fact]
+    public async Task Helo_RejectsUntrustedCertificateEvenWhenSharedTransportBypassesVerification()
+    {
+        WebUtil.SetupHTTPClients(true, true, null, 4);
+        using TcpListener listener = new(IPAddress.Loopback, 0);
+        listener.Start();
+        using X509Certificate2 certificate = CreateCertificate("wrong-host");
+        using CancellationTokenSource cts = new(TimeSpan.FromSeconds(10));
+        Task server = RejectTls();
+        string url = $"https://127.0.0.1:{((IPEndPoint)listener.LocalEndpoint).Port}";
+        Assert.Equal(string.Empty, new HeloServicesConnector(url).Helo());
+        await server;
+
+        async Task RejectTls()
+        {
+            using TcpClient client = await listener.AcceptTcpClientAsync(cts.Token);
+            using SslStream stream = new(client.GetStream());
+            await Assert.ThrowsAnyAsync<IOException>(async () =>
+            {
+                await stream.AuthenticateAsServerAsync(new SslServerAuthenticationOptions
+                {
+                    ServerCertificate = certificate,
+                    EnabledSslProtocols = SslProtocols.Tls12
+                }, cts.Token);
+                await ReadHeaders(stream, cts.Token);
+            });
         }
     }
 

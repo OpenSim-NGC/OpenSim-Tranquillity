@@ -454,7 +454,7 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
             
             try 
             {
-                using HttpClient client = WebUtil.GetNewGlobalHttpClient(100000);
+                using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
                 using HttpRequestMessage request = new(HttpMethod.Get, requestURI);
                 using HttpResponseMessage response = client.Send(request);
                 response.EnsureSuccessStatusCode();

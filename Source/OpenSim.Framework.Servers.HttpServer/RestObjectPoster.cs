@@ -51,7 +51,7 @@ public class RestObjectPoster
     {
         try
         {
-            using HttpClient client = WebUtil.GetNewGlobalHttpClient(timeout);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(timeout);
             using CancellationTokenSource cts = new(client.Timeout);
             using HttpRequestMessage request = WebUtil.CreateXmlRequest(verb, requestUrl, obj);
             using HttpResponseMessage response = await client.SendAsync(

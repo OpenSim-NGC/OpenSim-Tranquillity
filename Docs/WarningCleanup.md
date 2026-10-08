@@ -77,18 +77,42 @@ from the incomplete original 648-warning baseline.
 
 ## Batch 2b implementation and verification
 
+### Review follow-up verification
+
+- Restored the three-minute default lifetime in process setup and both server
+  startup paths; explicitly configured lifetimes, including -1 and 0, remain supported.
+- Separated pooled legacy/system-proxy clients from existing direct grid-service
+  clients, with strict HELO/welcome-message certificate checks and visible console
+  request errors. Script HTTP still uses OS TLS policy and its existing proxy/filter.
+- Release solution build succeeds with 0 errors (incremental build; not a new
+  warning-inventory baseline).
+- Selected transport, archive/terrain, outbound and TLS regressions: **140 passed**.
+  Selected startup/defaults and server lifecycle regressions: **26 passed**.
+  Coverage includes system proxies with direct shared handlers, optional-module
+  requests, voice HTTPS CONNECT, rejection of an untrusted HELO certificate despite
+  shared verification bypasses, and console failures without a logging host.
+- All proxy/TLS tests use local fixtures; no live grid, voice or payment endpoints
+  were contacted.
+
+### Original implementation
+
 - Shared REST posters, session posters, asynchronous XML requests and the console
   client now use HttpClient with shared, policy-configured handlers. XML/form
   encoding, authorization, session envelopes and 10/20/100-second timeouts remain.
 - Asynchronous requester failures are logged and complete once with the default
-  response; poster/console success callbacks are not invoked on failure. Callback
+  response; poster/console success callbacks are not invoked on failure. Console
+  request failures are printed to stderr without requiring a logging host; failed
+  polls explicitly report that polling stopped and reconnection is needed. Callback
   exceptions are logged instead of escaping an unobserved asynchronous callback.
   Synchronous session errors propagate as HttpRequestException rather than WebException.
 - Startup connection limits and idle timeouts now configure SocketsHttpHandler.
   The user approved mapping DnsTimeout to pooled-connection lifetime: expiration
   retires connections so subsequent connections resolve DNS again; this is not a
   process-wide DNS-cache TTL and does not abort active requests. -1 disables expiry,
-  and 0 disables reuse. Server Startup defaults to 30000 milliseconds.
+  and 0 disables reuse. Process setup and server Startup defaults are 180000
+  milliseconds, preserving the previous three-minute shared connection lifetime.
+  An explicitly configured DnsTimeout now affects pooling, unlike the old
+  ServicePointManager DNS setting.
 - TCP_NODELAY remains enabled. UseNagleAlgorithm=true is unsupported and explicitly
   logged. Certificate chain/hostname settings remain on the shared handlers, not a
   process-global ServicePointManager callback.
@@ -113,6 +137,12 @@ from the incomplete original 648-warning baseline.
   configured fallback, now with an explicit warning on download failure. Region
   loading retains its 30-second timeout, three attempts/two-second waits for empty
   results, and permits HTTP 404 only when allow_regionless is enabled.
+- Migrated WebRequest/WebClient callers retain system/environment proxy behavior
+  through separate pooled handlers. Existing direct grid-service and script HTTP
+  transports are unchanged. Explicit shared proxies also apply to legacy callers.
+  HELO and welcome-message fetches use strict certificate chain/hostname validation,
+  independent of shared NoVerifyCertChain/NoVerifyCertHostname bypasses. This preserves
+  Robust's previous checks and intentionally also enforces them in region hosting.
 - Groups and money XML-RPC preserve their wire encoding, keep-alive choices,
   verification header and client certificates. Request failures now propagate
   HttpRequestException/OperationCanceledException to existing error handling.

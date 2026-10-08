@@ -1137,7 +1137,7 @@ namespace Nwc.XmlRpc
         /// <returns><c>XmlRpcResponse</c> The response generated.</returns>
         public XmlRpcResponse Send(String url)
         {
-            using HttpClient client = OpenSim.Framework.WebUtil.GetNewGlobalHttpClient(30000);
+            using HttpClient client = OpenSim.Framework.WebUtil.GetLegacyHttpClient(30000);
             using HttpRequestMessage request = new(HttpMethod.Post, url);
             request.Headers.ConnectionClose = _disableKeepAlive;
             using (MemoryStream stream = new())

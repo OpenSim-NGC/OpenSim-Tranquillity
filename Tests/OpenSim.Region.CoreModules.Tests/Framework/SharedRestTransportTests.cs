@@ -199,6 +199,58 @@ public sealed class SharedRestTransportTests : IDisposable
     }
 
     [Fact]
+    public async Task LegacyTransport_UsesSystemProxyWithoutChangingDirectTransport()
+    {
+        IWebProxy savedProxy = HttpClient.DefaultProxy;
+        try
+        {
+            HttpClient.DefaultProxy = new WebProxy(m_server.BaseUri, false);
+            using var legacy = WebUtil.CreateLegacyHttpHandler();
+            Assert.True(legacy.UseProxy);
+            Assert.Same(HttpClient.DefaultProxy, legacy.Proxy);
+            Assert.False(WebUtil.SharedSocketsHttpHandler.UseProxy);
+            Assert.False(WebUtil.SharedSocketsHttpHandlerNoRedir.UseProxy);
+            Assert.Equal("reply", await WebUtil.SendXmlRequestAsync<string, string>(
+                "POST", "http://unresolvable.invalid/resource", "payload", 1000));
+            Assert.Contains("http://unresolvable.invalid/resource", Assert.Single(m_server.Requests).RequestLine);
+        }
+        finally
+        {
+            HttpClient.DefaultProxy = savedProxy;
+        }
+    }
+
+    [Theory]
+    [InlineData("/StartSession/", "Login failed")]
+    [InlineData("/ReadResponses/session/", "Polling stopped")]
+    [InlineData("/SessionCommand/", "Request failed")]
+    public async Task ConsoleRequester_FailuresAreVisibleWithoutLoggerAndNeverInvokeSuccess(string path, string message)
+    {
+        var savedFactory = LoggerProvider.LoggerFactory;
+        TextWriter savedError = Console.Error;
+        using StringWriter error = new();
+        try
+        {
+            LoggerProvider.LoggerFactory = Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
+            Console.SetError(error);
+            m_server.Responder = _ => new RecordingHttpServer.Reply { Status = 503 };
+            int callbacks = 0;
+            await Requester.MakeRequestAsync(new Uri(m_server.BaseUri, path).ToString(),
+                "PASS=do-not-print-this", (_, _, _) => callbacks++);
+            Assert.Equal(0, callbacks);
+            Assert.Contains(message, error.ToString());
+            Assert.Contains("503", error.ToString());
+            Assert.DoesNotContain("do-not-print-this", error.ToString());
+            Assert.Single(m_server.Requests);
+        }
+        finally
+        {
+            Console.SetError(savedError);
+            LoggerProvider.LoggerFactory = savedFactory;
+        }
+    }
+
+    [Fact]
     public async Task XmlHelper_UsesConfiguredProxy()
     {
         WebUtil.SetupHTTPClients(false, false, new WebProxy(m_server.BaseUri, false), 4);

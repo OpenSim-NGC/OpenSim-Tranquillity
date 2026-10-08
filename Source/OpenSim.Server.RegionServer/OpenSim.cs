@@ -130,7 +130,7 @@ public class OpenSim : OpenSimBase
             stpMaxThreads = startupConfig.GetInt("MaxPoolThreads", 25);
             m_consolePrompt = startupConfig.GetString("ConsolePrompt", @"Region (\R) ");
 
-            int dnsTimeout = startupConfig.GetInt("DnsTimeout", 30000);
+            int dnsTimeout = startupConfig.GetInt("DnsTimeout", 180000);
             WebUtil.ConfigureHTTPDefaults(null, null, dnsTimeout, null);
         }
 
