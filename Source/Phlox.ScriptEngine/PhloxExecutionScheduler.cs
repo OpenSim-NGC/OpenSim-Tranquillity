@@ -743,7 +743,6 @@ namespace Phlox.ScriptEngine
             if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
 
             UnregisterFromNotifications(script);
-            DropPendingEvents(itemId);   // SL llResetScript "The event queue is cleared" - posted, not yet queued, too
             m_Engine.StateManager?.DeleteState(itemId);
             bool wasCrashed = script.ScriptState.TerminatedReason != null;
             lock (m_AllScriptsLock) m_HeldFresh.Remove(itemId);   // A reset of a held script owes it nothing more
@@ -757,11 +756,20 @@ namespace Phlox.ScriptEngine
             }
             script.SetScriptEventFlags();
 
-            PostEvent(itemId, new PostedEvent
+            // SL llResetScript: "The event queue is cleared", and with it what was posted to the script and not yet taken
+            // into the queue. Dropped only now: script.Reset() has released the listens and the sensor repeat
+            // (LSLSystemAPI.OnScriptReset), and that release waits for a listen delivery or a sensor sweep under way, so
+            // what they posted is here. Under one lock with the fresh state_entry, so nothing gets in between.
+            m_HeldArrivals.RemoveAll(held => held.ItemId == itemId);
+            lock (m_PendingEvents)
             {
-                EventType = SupportedEventList.Events.STATE_ENTRY,
-                Args = Array.Empty<object>()
-            });
+                DropPendingEventsLocked(itemId);
+                PostEvent(itemId, new PostedEvent
+                {
+                    EventType = SupportedEventList.Events.STATE_ENTRY,
+                    Args = Array.Empty<object>()
+                });
+            }
 
             if (!m_RunIndex.ContainsKey(itemId) && script.ScriptState.Enabled)
             {
@@ -774,13 +782,6 @@ namespace Phlox.ScriptEngine
             }
 
             return true;
-        }
-
-        /// <summary>Events posted to this item and not yet moved into its queue are dropped (reset).</summary>
-        private void DropPendingEvents(UUID itemId)
-        {
-            m_HeldArrivals.RemoveAll(held => held.ItemId == itemId);
-            lock (m_PendingEvents) DropPendingEventsLocked(itemId);
         }
 
         /// <summary>The events posted to this item and not yet moved into its queue are dropped. The caller holds m_PendingEvents.</summary>

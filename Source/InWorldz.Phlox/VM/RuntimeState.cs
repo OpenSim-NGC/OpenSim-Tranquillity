@@ -411,7 +411,11 @@ namespace InWorldz.Phlox.VM
             TopFrame = null;
             Calls.Clear();
             Operands.Clear();
-            lock (EventQueueLock) EventQueue.Clear();   // Every mutation under the lock the saver snapshots under
+            lock (EventQueueLock)   // Every mutation under the lock the saver snapshots under
+            {
+                foreach (PostedEvent evt in EventQueue) evt.SignalCompleted();   // no waiter waits for a cleared event
+                EventQueue.Clear();
+            }
             NextWakeup = 0;
             StateCapturedOn = 0;
             TimerLastScheduledOn = 0;

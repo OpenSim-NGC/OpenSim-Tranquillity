@@ -590,6 +590,14 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   Phlox used to run such an event after the statement, now and then, when a sensor sweep or a listen delivery was
   under way at that moment. The timer carries on into the new state, as the SL wiki says of `llSetTimerEvent`: "The
   timer persists across state changes".
+- A reset, as the SL wiki's [llResetScript](https://wiki.secondlife.com/wiki/LlResetScript) page lists it: "Timers
+  (including repeating sensors) are cleared.", "Listeners are removed.", "The event queue is cleared." and "If it has
+  a state_entry event, then it is queued." This holds for every reset: `llResetScript`, `llResetOtherScript`,
+  `osResetAllScripts`, the viewer's Reset, a reset asked for while the script is still compiling, and starting a
+  crashed script again. The fresh script's first event is its `state_entry`. An event posted to the script before
+  the reset, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the old script while
+  it resets, is dropped. Phlox used to run such an event in the fresh script before its `state_entry` when a sensor
+  sweep or a listen delivery was under way at that moment.
 
 ---
 
