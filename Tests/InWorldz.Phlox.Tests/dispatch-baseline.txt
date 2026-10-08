@@ -935,3 +935,4 @@ osGetNPCList 962
 osRemoveLinkInventory 963
 osPerlinNoise2D 964
 osAgentSaveAppearance 965
+osMakeNotecard 967

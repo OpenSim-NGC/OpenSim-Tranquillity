@@ -344,6 +344,81 @@ public class PrimParamsOmegaClickSitShapeTests
     }
 
     [Fact]
+    public void PrimSitTargetActiveAtAZeroOffsetAndZeroRotationIsSetAndReadsBackExactly()
+    {
+        // SL PRIM_SIT_TARGET: "If it is nonzero the prim's sit target is set to the indicated offset and rotation" and
+        // "Unlike llLinkSitTarget(), an offset of <0.0, 0.0, 0.0> may be explicitly set". The core keeps the on/off
+        // state apart from the offset (SceneObjectPart.SetSitTarget), so nothing is added to the offset.
+        using var h = new SchedulerHarness();
+        var parts = TwoPrimLinkset(h);
+
+        Run(h, parts[0],
+            "llSetLinkPrimitiveParamsFast(2, [PRIM_SIT_TARGET, TRUE, ZERO_VECTOR, ZERO_ROTATION]); " +
+            "list got = llGetLinkPrimitiveParams(2, [PRIM_SIT_TARGET]); " +
+            "llSay(0, \"active=\" + (string)llList2Integer(got, 0)); " +
+            "llSay(0, \"same=\" + (string)(llList2Vector(got, 1) == ZERO_VECTOR && llList2Rot(got, 2) == ZERO_ROTATION));");
+
+        Assert.True(parts[1].IsSitTargetSet, "the child has no sit target");
+        Assert.Equal(Vector3.Zero, parts[1].SitTargetPosition);
+        Assert.Equal(Quaternion.Identity, parts[1].SitTargetOrientation);
+        Assert.Equal("1", Line(h, "active="));
+        Assert.Equal("1", Line(h, "same="));
+        Assert.False(parts[0].IsSitTargetSet, "the root got a sit target");
+    }
+
+    [Fact]
+    public void AnyNonzeroActiveValueSetsTheTarget()
+    {
+        using var h = new SchedulerHarness();
+        Run(h, h.Prim,
+            "llSetPrimitiveParams([PRIM_SIT_TARGET, 7, ZERO_VECTOR, ZERO_ROTATION]); " +
+            "llSay(0, \"seven=\" + (string)llList2Integer(llGetPrimitiveParams([PRIM_SIT_TARGET]), 0)); " +
+            "llSetPrimitiveParams([PRIM_SIT_TARGET, -1, <0, 0, 1>, ZERO_ROTATION]); " +
+            "llSay(0, \"minus=\" + (string)llList2Integer(llGetPrimitiveParams([PRIM_SIT_TARGET]), 0));");
+
+        Assert.Equal("1", Line(h, "seven="));
+        Assert.Equal("1", Line(h, "minus="));
+        Assert.True(h.Prim.IsSitTargetSet);
+    }
+
+    [Fact]
+    public void AZeroOffsetTargetFromTheRuleSeatsAnAvatarAndSurvivesTheObjectsXml()
+    {
+        using var h = new SchedulerHarness();
+        var parts = TwoPrimLinkset(h);
+        Run(h, parts[0], "llSetLinkPrimitiveParamsFast(2, [PRIM_SIT_TARGET, TRUE, ZERO_VECTOR, ZERO_ROTATION]);");
+
+        // The XML form is what a crossing, a take and rez and an archive carry (SceneObjectSerializer).
+        var copy = OpenSim.Region.Framework.Scenes.Serialization.SceneObjectSerializer.FromXml2Format(
+            OpenSim.Region.Framework.Scenes.Serialization.SceneObjectSerializer.ToXml2Format(parts[0].ParentGroup));
+        Assert.True(copy.GetLinkNumPart(2).IsSitTargetSet, "the copy lost the sit target");
+        Assert.Equal(Vector3.Zero, copy.GetLinkNumPart(2).SitTargetPosition);
+
+        var sp = SceneHelpers.AddScenePresence(h.Scene, UUID.Random());
+        sp.AbsolutePosition = parts[0].AbsolutePosition + new Vector3(1, 0, 0);
+        sp.HandleAgentRequestSit(sp.ControllingClient, sp.UUID, parts[0].UUID, Vector3.Zero);
+        Assert.Equal(parts[1].LocalId, sp.ParentID);
+        Assert.Equal(sp.UUID, parts[1].SitTargetAvatar);
+
+        h.ClearSaid(UUID.Zero);
+        Run(h, parts[0], "llSay(0, \"on=\" + (string)llAvatarOnLinkSitTarget(2));");
+        Assert.Equal(sp.UUID.ToString(), Line(h, "on="));
+    }
+
+    [Fact]
+    public void LlSitTargetStillRemovesAZeroOffsetTargetTheRuleSet()
+    {
+        using var h = new SchedulerHarness();
+        Run(h, h.Prim,
+            "llSetPrimitiveParams([PRIM_SIT_TARGET, TRUE, ZERO_VECTOR, ZERO_ROTATION]); " +
+            "llSitTarget(ZERO_VECTOR, ZERO_ROTATION); " +
+            "llSay(0, \"after=\" + (string)llList2Integer(llGetPrimitiveParams([PRIM_SIT_TARGET]), 0));");
+
+        Assert.Equal("0", Line(h, "after="));
+        Assert.False(h.Prim.IsSitTargetSet);
+    }
+
+    [Fact]
     public void ASitTargetOffsetIsHeldTo300MetresOnEachAxis()
     {
         using var h = new SchedulerHarness();

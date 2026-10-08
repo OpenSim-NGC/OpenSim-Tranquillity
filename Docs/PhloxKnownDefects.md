@@ -449,6 +449,13 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     `XP_ERROR_NOT_PERMITTED_LAND` (17), as SL lists under "The experience can no longer run":
     "The agent has moved to a parcel where the experience cannot run"
     ([experience_permissions_denied](https://wiki.secondlife.com/wiki/Experience_permissions_denied)).
+  - When an avatar blocks an Experience from its profile, the simulator ends every grant that
+    avatar gave to a script of that Experience and posts `experience_permissions_denied` with
+    `XP_ERROR_NOT_PERMITTED` (4), as SL lists: "The agent has blocked the experience from the
+    experience profile". The script gets that event once, loses the controls it took, and a
+    region restart does not give the grant back. A request the script is still waiting on from
+    that avatar ends with that one answer. The same avatar's grants to scripts of other
+    Experiences, and other avatars' grants, stay.
   - States saved by an earlier Phlox build hold no grant and restore without one.
   - When a region starts, once the scripts it starts have loaded, one line in the log says
     how many came back with their saved state and how many of those got a grant back:
@@ -478,7 +485,7 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - the LightShare `ls*` functions;
   - the `mod*` functions (`modInvoke*`, `modSendCommand`);
   - `llRemoteLoadScript`;
-  - ten OSSL functions: `osGiveLinkInventory`, `osGiveLinkInventoryList`, `osMakeNotecard`,
+  - nine OSSL functions: `osGiveLinkInventory`, `osGiveLinkInventoryList`,
     `osMessageAttachments`, `osNpcLookAt`, `osNpcSayTo`, `osReplaceAgentEnvironment`,
     `osReplaceParcelEnvironment`, `osReplaceRegionEnvironment`, `osResetEnvironment`.
 - **Spelled differently:** YEngine's `osTemperature2sRBG` is `osTemperature2sRGB` on Phlox.
@@ -486,7 +493,7 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - the `iw*` and `bot*` families (section 3);
   - some newer SL functions, for example `llSetAgentRot`, `llSortListStrided` and
     `llTransferOwnership`.
-- Phlox declares 258 OSSL functions. They honour the `[OSSL]` keys (`AllowOSFunctions`,
+- Phlox declares 259 OSSL functions. They honour the `[OSSL]` keys (`AllowOSFunctions`,
   `OSFunctionThreatLevel`, `PermissionErrorToOwner`, `Allow_<function>`,
   `Creators_<function>`) with the same meanings as YEngine.
 
@@ -554,6 +561,24 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   The SL wiki says of `llGroundNormal`: "This function does not return a unit vector."
 - `llApplyImpulse` in an attachment pushes the wearer, as in YEngine and Halcyon. `llApplyRotationalImpulse` in an
   attachment does nothing, as the SL wiki says ("It does not work on attachments"); Halcyon turned the wearer.
+- `llCastRay` that the physics engine refuses (for example a cast over the engine's time or hit budget) returns
+  `[RCERR_CAST_TIME_EXCEEDED]`. The region log gets at most one warning per script per minute for it: the first
+  refused cast writes one at once, and the next, written by the first cast refused after the minute is up, gives the
+  number of casts refused since that script's warning before:
+  `[PhloxAPI]: llCastRay refused for script <item id> in <object>; refused casts since its last warning: <count>; reason: <reason>`.
+  Before, every refused cast wrote its own line, so a script casting in a loop could write thousands a second.
+- `llPushObject` with `local` TRUE turns the impulse by the target's rotation, avatar or object, as the SL wiki says:
+  "if TRUE uses the local axis of target, if FALSE uses the region axis"
+  ([LlPushObject](https://wiki.secondlife.com/wiki/LlPushObject)). YEngine does the same. A local push on an avatar
+  used to be turned by the pushing prim's rotation. `ang_impulse` is not applied to an avatar ("ang_impulse is
+  ignored when applying to agents or their attachments"), and Phlox does not apply it to objects either.
+- `llPushObject` on land where pushing is restricted, by the parcel's Restrict Pushing or by the region's setting:
+  an object may push its owner, and so an attachment may push its wearer, as the SL wiki says: "In no-push areas an
+  object can only push its owner or itself." Phlox used to refuse it. Pushing another avatar there still works only
+  for an object owned by the land's owner or by the estate owner or an estate manager, and on a region that restricts
+  pushing, an avatar with no parcel under it can only be pushed by its own objects. YEngine allows an object to push its
+  owner on both settings, but refuses when the region restricts pushing and finds no parcel; YEngine also lets any
+  object push on group-owned land, and does not give estate managers an exception.
 - `llGetPos` and `PRIM_POSITION` of a child prim in an attachment give the child's offset turned by the wearer's
   rotation plus the wearer's position (Halcyon's rule). YEngine gives the child's position from the attachment
   root's rotation, which does not follow the wearer turning.
@@ -574,6 +599,10 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - `llGetUsername` returns "First Last" where YEngine returns "first.last". Both answer only for
   an avatar the region holds (root or child agent), else `""`; `llRequestUsername` answers for
   anyone.
+- `llManageEstateAccess` never bans the estate owner's partner, the partner named on the estate
+  owner's profile, as Halcyon refused it: the call returns `FALSE`, nothing changes, and neither
+  an IM nor an error is sent, as for the estate owner. When the estate owner's profile cannot be
+  read, the ban goes ahead and the region's log says so. SL documents no partner rule.
 - `llGetExperienceDetails(NULL_KEY)` gives the details of the script's own Experience, the one
   its script item names, and an empty list for a script in no Experience, as SL documents: "If
   experience_id is NULL_KEY, then information about the script's experience is returned. In
@@ -721,12 +750,19 @@ name) promises.
 and gives the error "llRefreshPrimURL - not yet supported", as Halcyon did; SL documents it as
 deprecated and doing nothing.
 
-`iwCheckRezError` answers from the region's rez checks: `IW_REZ_NO_LAND_PARCEL` where there is
+`iwCheckRezError` answers from the region's rez checks: `IW_REZ_NOT_PERMITTED` for an owner the
+region blocks from rezzing (asked first, as Halcyon did), `IW_REZ_NO_LAND_PARCEL` where there is
 no parcel, `IW_REZ_NOT_PERMITTED` where the owner may not rez, `IW_REZ_PARCEL_LAND_IMPACT`
 where the prims would go over the parcel's limits, otherwise `IW_REZ_OK`. It never returns
 `IW_REZ_REGION_SCENIC` or `IW_REZ_REGION_LAND_IMPACT`. `isTemp` is not used, as in Halcyon.
 When the prims would not fit, the region's prim-limit module may also send the owner the
 message it sends for a refused rez.
+
+A region can block an owner from rezzing (the console's `block owner`, or `[BlockedOwners]
+BlockEstateBanned`). A Phlox script whose object's owner is blocked rezzes nothing: `llRezObject`,
+`llRezAtRoot`, `llRezObjectWithParams`, `iwRezObject`, `iwRezAtRoot` and `iwRezAt` fail with no
+error and a 100 ms pause, before any other check, as Halcyon's bad-user check did. SL has no
+such list.
 
 ### Functions that act only in part
 - `llRezObjectWithParams`:
@@ -786,6 +822,11 @@ message it sends for a refused rez.
 - `PRIM_PHYSICS_MATERIAL` can be set, but reading it returns nothing.
 - `PRIM_SIT_FLAGS`: `SIT_FLAG_NO_COLLIDE` and `SIT_FLAG_NO_DAMAGE` are stored for read-back
   only.
+- `PRIM_SIT_TARGET` with a nonzero active value sets a target at `ZERO_VECTOR` with
+  `ZERO_ROTATION`, as SL documents, and it reads back exactly. The region database does not
+  save the target's on/off state, so after a region restart such a target is off (a take and
+  rez, a crossing or an archive keep it). YEngine keeps it across a restart by storing a
+  1e-5 m offset, which reads back.
 - For seated avatars, only position and rotation rules apply.
 - `PRIM_MATERIAL` with a value outside 0 to 7 is ignored (Halcyon refused the whole call).
 - `PRIM_FLEXIBLE` makes the whole object phantom when it turns a prim flexible, as YEngine does.
@@ -793,12 +834,10 @@ message it sends for a refused rez.
 
 ### Events
 - `game_control` compiles but is never raised.
-- When an avatar blocks an Experience from its profile, SL ends the Experience's grants and
-  posts `experience_permissions_denied` ("The agent has blocked the experience from the
-  experience profile"). The simulator does not tell Phlox, so a Phlox script keeps the grant
-  and calls that use it (controls, animations, the camera, `llTeleportAgent`) still work.
-  `llSitOnLink`, `llSetAgentEnvironment` and `llReplaceAgentEnvironment`, which ask the
-  Experience on every call, are refused.
+- When an avatar blocks an Experience from its profile while a script that holds no grant from
+  that avatar is waiting on `llRequestExperiencePermissions` for it, the simulator raises
+  nothing: the request is answered by the avatar's answer to the dialog, or after 5 minutes
+  with `XP_ERROR_REQUEST_PERM_TIMEOUT`.
 - `money` is raised only when the region has a money module.
 
 ### Engine

@@ -359,9 +359,11 @@ public class PGSQLEstateStore : IEstateDataStore
                 //Insert after
                 cmd.CommandText = "insert into estateban (\"EstateID\", \"bannedUUID\",\"bannedIp\", \"bannedIpHostMask\", \"bannedNameMask\", \"banningUUID\",\"banTime\" ) values ( :EstateID, :bannedUUID, '','','', :banningUUID, :banTime )";
                 cmd.Parameters.AddWithValue("bannedUUID", Guid.Empty);
+                cmd.Parameters.AddWithValue("banningUUID", Guid.Empty);
+                cmd.Parameters.AddWithValue("banTime", 0);
                 foreach (EstateBan b in es.EstateBans)
                 {
-                    cmd.Parameters["EstateID"].Value = b.EstateID;
+                    cmd.Parameters["EstateID"].Value = (int)es.EstateID;
                     cmd.Parameters["bannedUUID"].Value = b.BannedUserID.Guid;
                     cmd.Parameters["banningUUID"].Value = b.BanningUserID.Guid;
                     cmd.Parameters["banTime"].Value = b.BanTime;

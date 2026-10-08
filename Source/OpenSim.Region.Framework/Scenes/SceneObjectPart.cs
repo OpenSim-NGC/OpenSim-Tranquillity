@@ -176,8 +176,9 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// records the state explicitly, so a target at a zero offset can be active.
     /// </summary>
     /// <remarks>
-    /// The XML serializer keeps it (crossings, take and rez, archives). The region stores do not save it yet: an
-    /// object loaded from the region database has the state derived from its offset and rotation.
+    /// The XML serializer keeps it (crossings, take and rez, archives), and the region stores keep it in the prims
+    /// column SitTargetActive. Both save it only when SitTargetActiveIsExplicit; otherwise a loaded object has the
+    /// state derived from its offset and rotation.
     /// </remarks>
     [XmlIgnore]
     public bool SitTargetActive
@@ -188,10 +189,11 @@ public class SceneObjectPart : EntityBase, IDisposable
 
     /// <summary>
     /// True when SitTargetActive was set explicitly to a state the offset and rotation alone would not give
-    /// (an active target at a zero offset and identity rotation). Only then does the serializer write it.
+    /// (an active target at a zero offset and identity rotation). Only then do the serializer and the region stores
+    /// write it.
     /// </summary>
     [XmlIgnore]
-    internal bool SitTargetActiveIsExplicit
+    public bool SitTargetActiveIsExplicit
     {
         get
         {

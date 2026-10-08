@@ -129,14 +129,16 @@ public class ScriptExperiencePersistenceTests : OpenSimTestCase
         first.StoreObject(sog, regionID);
         first.Dispose();
 
-        // Put the database back to the schema before this change (RegionStore 43, no experienceID column)
-        // and write a task item row the way the older code did.
+        // Put the database back to the schema before this change (RegionStore 43, no experienceID column, and
+        // no prims SitTargetActive column, which step 45 adds) and write a task item row the way the older code did.
         UUID itemID = UUID.Random();
         using (SQLiteConnection c = new SQLiteConnection(conn))
         {
             c.Open();
             using SQLiteCommand cmd = c.CreateCommand();
             cmd.CommandText = "ALTER TABLE primitems DROP COLUMN experienceID";
+            cmd.ExecuteNonQuery();
+            cmd.CommandText = "ALTER TABLE prims DROP COLUMN SitTargetActive";
             cmd.ExecuteNonQuery();
             cmd.CommandText = "UPDATE migrations SET version = 43 WHERE name = 'RegionStore'";
             Assert.Equal(1, cmd.ExecuteNonQuery());
@@ -165,7 +167,7 @@ public class ScriptExperiencePersistenceTests : OpenSimTestCase
             c.Open();
             using SQLiteCommand cmd = c.CreateCommand();
             cmd.CommandText = "SELECT version FROM migrations WHERE name = 'RegionStore'";
-            Assert.Equal(44L, Convert.ToInt64(cmd.ExecuteScalar()));
+            Assert.Equal(45L, Convert.ToInt64(cmd.ExecuteScalar()));
             cmd.CommandText = "SELECT experienceID FROM primitems WHERE itemID = :itemID";
             cmd.Parameters.AddWithValue(":itemID", itemID.ToString());
             Assert.Equal(UUID.Zero.ToString(), (string)cmd.ExecuteScalar());
