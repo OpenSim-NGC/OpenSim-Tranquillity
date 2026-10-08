@@ -994,12 +994,8 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                 {
                     if (response.IsSuccessStatusCode)
                     {
-                        using (var s = response.Content.ReadAsStreamAsync().Result)
-                        {
-                            var data = new byte[s.Length];
-                            s.Read(data, 0, (int)s.Length);
-                            return SKImage.FromEncodedData(data);
-                        }
+                        var data = response.Content.ReadAsByteArrayAsync().Result;
+                        return SKImage.FromEncodedData(data);
                     }
                 }
             }

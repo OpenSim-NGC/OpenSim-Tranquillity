@@ -384,7 +384,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                     meshOsd = (OSDMap)osd;
                 else
                 {
-                    m_log.LogWarning("[Mesh}: unable to cast mesh asset to OSDMap");
+                    m_log.LogWarning("[MESH]: unable to cast mesh asset to OSDMap");
                     return false;
                 }
             }

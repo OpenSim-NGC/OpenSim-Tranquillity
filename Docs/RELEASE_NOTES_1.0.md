@@ -133,6 +133,12 @@ functions, updated constants, and a number of stability fixes.
 - Additional mantis fixes: 9218, 9219.
 - Added YEngine state-load failure instrumentation to inform the phase-2 state
   migration work.
+- Fixed ten stream reads that assumed a single read returns every requested byte.
+  A short read previously left the remainder of the buffer zero-filled, which
+  could truncate a cloned HTTP request body, an estate terrain download, a web
+  stats log tail or a map tile signature check.
+- Phlox's `LSLList` now overrides `GetHashCode` to agree with its `Equals`, so
+  equal lists hash alike and can be found in a dictionary or set.
 
 ---
 

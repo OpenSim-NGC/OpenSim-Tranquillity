@@ -33,11 +33,15 @@ do not close warnings by blanket suppression.
     - SYSLIB0014: OptionalModules (5), GloebitMoneyModule (2).
     - Exercise payment callbacks and failures against local fixtures; do not
       contact live payment services for validation.
-- [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 68**
-  - CA2017 (26), CA2022 (10), CA2023 (1), CS0114 (8), CS0108 (1),
-    CS0659 (1), CS0649 (2), CS9192 (9), CS9193 (10).
-  - Prioritize partial reads, logging templates and equality/hash contracts,
-    then review inheritance, initialization and ref/in calls.
+- [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 12 closed, 56 remaining**
+  - [x] **3a: partial reads, malformed templates and the hash contract - 12 closed**
+    - CA2022 (10), CA2023 (1), CS0659 (1).
+  - [ ] **3b: logging message templates - 26 remaining**
+    - CA2017 (26).
+  - [ ] **3c: inheritance and initialization - 11 remaining**
+    - CS0114 (8), CS0108 (1), CS0649 (2).
+  - [ ] **3d: ref/in call contracts - 19 remaining**
+    - CS9192 (9), CS9193 (10).
   - Counts include test occurrences; review production occurrences first.
 - [ ] **Batch 4 / Tier 3: production nullability - 13**
   - ExperienceService's CS8600, CS8603, CS8602 and CS8625 occurrences.
@@ -71,9 +75,56 @@ from the original log, all in unchanged files:
 | OpenSimNGC.Appearance.Baking | CS1573 | 3 | 7 |
 
 After Batch 1 the reconciled inventory was 661 occurrences: 264 closed and
-397 remaining. After Batch 2 it is **661 occurrences: 330 closed and 331 remaining**.
+397 remaining. After Batch 2 it was 661 occurrences: 330 closed and 331 remaining.
+After Batch 3a it is **661 occurrences: 342 closed and 319 remaining**.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
+
+## Batch 3a implementation and verification
+
+Ten `Stream.Read` calls assumed one read returns every requested byte. A short
+read left the rest of the buffer zero-filled, so the affected code silently
+worked on truncated data:
+
+- `HttpRequest.Clone` copied the request body with a single read. It now rewinds
+  the body, copies it in full and restores the original position, so a clone of a
+  partially buffered request carries the whole body instead of trailing zeros.
+- The authentication POST handler's `crypt` branch reads its capped body exactly.
+  That branch's decryption is still an unimplemented stub, so this is hardening.
+- Map tile detection reads the JPEG signature with `ReadAtLeast` and reports
+  "not a JPEG" for a file shorter than three bytes, instead of inspecting
+  uninitialized buffer bytes.
+- Vector render's image fetch reads the response body through
+  `ReadAsByteArrayAsync`, which does not depend on a seekable content stream or
+  on one read returning `Length` bytes. The outbound URL filter, redirect limit
+  and failure handling are unchanged.
+- Estate terrain download, the data snapshot notification drain and the web stats
+  log tail now read exactly, or explicitly tolerate a short read where the bytes
+  are discarded.
+- A Phlox test's loopback HTTP server keeps its deliberate single read; the
+  discarded result is now explicit.
+
+`LSLList` overrode `Object.Equals` without `GetHashCode`, so equal lists hashed
+differently and a list could not be found in a dictionary or set. It now hashes
+its length and members, with null members contributing a stable value.
+Equality itself is unchanged.
+
+The Meshmerizer's unbalanced `[Mesh}` log prefix is now `[MESH]`, matching the
+other messages in that file and leaving the template without stray braces.
+
+### Verification
+
+- Full non-incremental Release rebuild: **319 warnings, 0 errors**; exactly
+  **12 occurrences removed**, with no added diagnostic messages.
+  CA2022, CA2023 and CS0659 are all zero.
+- New regression coverage: `LSLListHashTests` (equal lists hash alike, dictionary
+  and set lookup, empty lists, differing lengths) and a `HttpRequestTests` clone
+  test whose body stream returns one byte per read.
+- Selected Phlox list/outbound/mesh tests: **61 passed**. Selected CoreModules
+  render, estate, terrain and archiver tests: **58 passed**.
+- Two failures are pre-existing on `develop` and unrelated to this batch:
+  `VersionInfoTests.TestVersionLength`, which depends on the branch name in the
+  informational version, and `AssetServerPostHandlerTests.TestGoodAssetStoreRequest`.
 
 ## Batch 2b implementation and verification
 

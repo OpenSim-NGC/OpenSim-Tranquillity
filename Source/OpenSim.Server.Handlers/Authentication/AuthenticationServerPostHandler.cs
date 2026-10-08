@@ -86,7 +86,7 @@ public class AuthenticationServerPostHandler : BaseStreamHandler
                 long length = request.Length;
                 if (length > 16384)
                     length = 16384;
-                request.Read(buffer, 0, (int)length);
+                request.ReadExactly(buffer, 0, (int)length);
 
                 return DoEncryptedMethods(buffer);
             }
