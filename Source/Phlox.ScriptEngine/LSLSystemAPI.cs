@@ -6134,7 +6134,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
             if (pusheeIsAvatar)
             {
-                if (pushRestricted)
+                // SL wiki LlPushObject: "In no-push areas an object can only push its owner or itself." An object
+                // pushing its owner, which includes an attachment pushing its wearer, is allowed whether the region
+                // or the parcel restricts pushing; YEngine allows it in both too.
+                if (m_host.OwnerID == targetID)
+                {
+                    pushAllowed = true;
+                }
+                else if (pushRestricted)
                 {
                     ILandObject land = World.LandChannel.GetLandObject(pusheePos.X, pusheePos.Y);
                     if (land == null) return;
@@ -6182,8 +6189,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 PhysicsActor pa = pusheeAv.PhysicsActor;
                 if (pa != null)
                 {
+                    // SL wiki LlPushObject, local: "if TRUE uses the local axis of target, if FALSE uses the region
+                    // axis." The target here is the avatar, so its rotation turns the push, as YEngine does; an
+                    // object target is turned by its own rotation in ApplyImpulse below.
                     if (local != 0)
-                        appliedImpulse *= m_host.GetWorldRotation();
+                        appliedImpulse *= pusheeAv.GetWorldRotation();
                     pa.AddForce(appliedImpulse, true);
                 }
             }
@@ -11425,6 +11435,77 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             mgr.SaveOutfitToDatabase(agentId, notecard, out string reason);
             if (reason != null) { ShoutError("osAgentSaveAppearance: " + reason); return UUID.Zero.ToString(); }
             return OpenSim.Region.OptionalModules.World.NPC.BotManager.OutfitKey(agentId, notecard).ToString();
+        }
+
+        /// <summary>OSSL_Api.cs:2174-2178 - High. The text and a newline.</summary>
+        public void osMakeNotecard(string notecardName, string contents)
+        {
+            OsslCheck(TlHigh, "osMakeNotecard");
+            OsslSaveNotecard(notecardName, "Script generated notecard", contents + "\n");
+        }
+
+        /// <summary>OSSL_Api.cs:2180-2190 - High. Each list item and a newline.</summary>
+        public void osMakeNotecard(string notecardName, LSLList contents)
+        {
+            OsslCheck(TlHigh, "osMakeNotecard");
+            StringBuilder notecardData = new StringBuilder();
+            for (int i = 0; i < contents.Length; i++)
+                notecardData.Append(contents.GetLSLStringItem(i)).Append('\n');
+            OsslSaveNotecard(notecardName, "Script generated notecard", notecardData.ToString());
+        }
+
+        /// <summary>
+        /// OSSL_Api.cs:2203-2253 SaveNotecard with forceSameName false: the asset (text cut at 65536 bytes by osUTF8, as
+        /// there), then a task item owned and created by the prim's owner. A name already in the prim is never replaced:
+        /// SceneObjectPartInventory.AddInventoryItem gives the new item the next free "name 1" ... "name 255", and adds
+        /// nothing past that.
+        /// </summary>
+        private void OsslSaveNotecard(string name, string description, string data)
+        {
+            if (m_host == null || World == null) return;
+
+            AssetBase asset = new AssetBase(UUID.Random(), name, (sbyte)AssetType.Notecard, m_host.OwnerID.ToString())
+            {
+                Description = description
+            };
+
+            osUTF8 contents = new osUTF8(data, 65536);
+            int len = contents.Length;
+            osUTF8Slice utf = new osUTF8Slice(len + 128);
+            utf.AppendASCII("Linden text version 2\n{\nLLEmbeddedItems version 1\n{\ncount 0\n}\nText length ");
+            utf.AppendASCII(len.ToString());
+            utf.AppendASCII("\n");
+            utf.Append(contents);
+            utf.AppendASCII("}");
+
+            asset.Data = utf.ToArray();
+            World.AssetService.Store(asset);
+
+            TaskInventoryItem taskItem = new TaskInventoryItem
+            {
+                ParentID = m_host.UUID,
+                CreationDate = (uint)Util.UnixTimeSinceEpoch(),
+                Name = name,
+                Description = description,
+                Type = (int)AssetType.Notecard,
+                InvType = (int)InventoryType.Notecard,
+                OwnerID = m_host.OwnerID,
+                CreatorID = m_host.OwnerID,
+                BasePermissions = (uint)OpenSim.Framework.PermissionMask.All | (uint)OpenSim.Framework.PermissionMask.Export,
+                CurrentPermissions = (uint)OpenSim.Framework.PermissionMask.All | (uint)OpenSim.Framework.PermissionMask.Export,
+                EveryonePermissions = 0,
+                NextPermissions = (uint)OpenSim.Framework.PermissionMask.All,
+                GroupID = m_host.GroupID,
+                GroupPermissions = 0,
+                Flags = 0,
+                PermsGranter = UUID.Zero,
+                PermsMask = 0,
+                AssetID = asset.FullID
+            };
+            taskItem.ResetIDs(m_host.UUID);
+
+            m_host.Inventory.AddInventoryItem(taskItem, false);
+            m_host.ParentGroup.InvalidateDeepEffectivePerms();
         }
 
         /// <summary>OSSL_Api.cs:5417 - ungated upstream.</summary>
@@ -16791,11 +16872,34 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             catch (Exception e)
             {
-                m_log.LogWarning("[PhloxAPI]: llCastRay exception: {0}", e.Message);
+                CountRefusedCastRay(e.Message);
                 results.Clear();
                 results.Add(RCERR_CAST_TIME_EXCEEDED); // RCERR_CAST_TIME_EXCEEDED as generic error
             }
             return new LSLList(results);
+        }
+
+        // A cast the physics engine refuses (a time or hit budget it enforces, or any other failure) returns
+        // RCERR_CAST_TIME_EXCEEDED. A script casting in a tight loop can be refused thousands of times a second, so the
+        // log gets at most one line per script each CastRayRefusedLineIntervalMs of the engine's clock: the first
+        // refused cast writes one at once, and after that the first cast refused once the interval has passed writes
+        // the next, with the number refused since the line before. Each script has its own API object, so no lock.
+        internal const ulong CastRayRefusedLineIntervalMs = 60_000;
+        private bool m_castRayRefusedLineWritten;
+        private ulong m_castRayRefusedLineDueOn;
+        private int m_castRayRefusedSinceLine;
+
+        private void CountRefusedCastRay(string reason)
+        {
+            m_castRayRefusedSinceLine++;
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            if (m_castRayRefusedLineWritten && now < m_castRayRefusedLineDueOn) return;
+            int refused = m_castRayRefusedSinceLine;
+            m_castRayRefusedSinceLine = 0;
+            m_castRayRefusedLineWritten = true;
+            m_castRayRefusedLineDueOn = now + CastRayRefusedLineIntervalMs;
+            m_log.LogWarning("[PhloxAPI]: llCastRay refused for script {0} in {1}; refused casts since its last warning: {2}; reason: {3}",
+                m_itemID, m_host?.Name, refused, reason);
         }
         // ── JSON ───────────────────────────────────────────────────────────────
         // The getters read the text with System.Text.Json. A leading byte-order mark is skipped, as Halcyon's
@@ -20096,6 +20200,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         // ── Tier 7b: Agent Environment + User Key (633–635) ──
 
+        /// <summary>YEngine's m_sleepMsOnRequestAgentData, which its llRequestUserKey sleeps (LSL_Api.cs:157).</summary>
+        private const int USER_KEY_REQUEST_DELAY = 100;
+
         public string llRequestUserKey(string username)
         {
             // Async lookup — fires dataserver event with the user's UUID
@@ -20130,6 +20237,17 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     PostDataserverEvent(reqID, UUID.Zero.ToString());
                 }
             });
+
+            // YEngine (LSL_Api.cs llRequestUserKey) pauses 100 ms after a request that goes to the user-account lookup;
+            // an avatar in this region it answers at once, with no pause.
+            bool here = false;
+            World?.ForEachScenePresence(sp =>
+            {
+                if (!here && !sp.IsChildAgent
+                    && sp.Firstname.Equals(firstName, StringComparison.OrdinalIgnoreCase)
+                    && sp.Lastname.Equals(lastName, StringComparison.OrdinalIgnoreCase)) here = true;
+            });
+            if (!here) ScriptSleep(USER_KEY_REQUEST_DELAY);
 
             return reqID.ToString();
         }

@@ -1241,6 +1241,7 @@ public class SQLiteSimulationData : ISimulationDataStore
 
         createCol(prims, "linksetdata", typeof(string));
         createCol(prims, "StartStr", typeof(string));
+        createCol(prims, "SitTargetActive", typeof(Int32));
 
         // Add in contraints
         prims.PrimaryKey = new DataColumn[] { prims.Columns["UUID"] };
@@ -1670,6 +1671,9 @@ public class SQLiteSimulationData : ISimulationDataStore
                                                      Convert.ToSingle(row["SitTargetOrientY"]),
                                                      Convert.ToSingle(row["SitTargetOrientZ"]),
                                                      Convert.ToSingle(row["SitTargetOrientW"]));
+        // NULL (every row saved before the column existed): the state follows the offset and rotation, as before.
+        if (row["SitTargetActive"] is not DBNull)
+            prim.SitTargetActive = Convert.ToInt32(row["SitTargetActive"]) != 0;
 
         prim.StandOffset = new Vector3(
                         Convert.ToSingle(row["standtargetx"]),
@@ -2106,6 +2110,8 @@ public class SQLiteSimulationData : ISimulationDataStore
         row["SitTargetOrientX"] = sitTargetOrient.X;
         row["SitTargetOrientY"] = sitTargetOrient.Y;
         row["SitTargetOrientZ"] = sitTargetOrient.Z;
+        // Only a state the offset and rotation do not give (an active target at a zero offset) is stored.
+        row["SitTargetActive"] = prim.SitTargetActiveIsExplicit ? (object)(prim.SitTargetActive ? 1 : 0) : DBNull.Value;
 
         Vector3 standTarget = prim.StandOffset;
         row["standtargetx"] = standTarget.X;
