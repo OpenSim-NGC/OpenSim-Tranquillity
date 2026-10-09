@@ -1,7 +1,7 @@
 /*
  * Copyright (c) Legion Builds
  * BotPersistenceManager.cs — Persistent bot storage and respawn system
- * Phase 34: Saves bot data to SQLite and auto-respawns on region load.
+ * Saves bot data to SQLite and auto-respawns on region load.
  */
 
 using System;
@@ -231,8 +231,8 @@ CREATE INDEX IF NOT EXISTS idx_pb_parcel ON persistent_bots(parcel_id, active);
         {
             if (!m_gridEnabled || !m_initialized) return false;
 
-            // Region-level toggle (AllowBotPersistence) will be added to
-            // RegionSettings in Phase 34b. For now, grid-level config controls it.
+            // A region-level toggle (AllowBotPersistence) in RegionSettings
+            // does not exist yet. For now, grid-level config controls it.
             return true;
         }
 
