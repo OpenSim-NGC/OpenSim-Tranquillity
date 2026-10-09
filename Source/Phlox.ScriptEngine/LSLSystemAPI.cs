@@ -541,7 +541,9 @@ namespace Phlox.ScriptEngine
         /// wait: the sensor repeat stops, the replies the script is still owed (dataserver, HTTP, XML-RPC) are dropped,
         /// and taken controls stay ("silently release controls IF this is not the result of a crossing wait disable"),
         /// so the state the crossing captures still holds them. The SensorRepeat record stays: the sensor starts again
-        /// in the next region, or here when the crossing fails (RestoreSensorAfterParcel).
+        /// in the next region, or here when the crossing fails (RestoreSensorAfterParcel). URLs stay, unlike Halcyon's: a
+        /// failed crossing leaves the object here, so they keep working; a crossing that succeeds removes the script here,
+        /// and that unload releases them (ReleaseScriptResources).
         /// </summary>
         internal void OnCrossingHold()
         {

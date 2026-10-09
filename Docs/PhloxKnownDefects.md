@@ -341,6 +341,9 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - An event that reaches a crossing object's script after its state was captured, and
     before the object has left, reaches the copy left behind and is lost when the crossing
     succeeds. Halcyon's crossing wait has the same gap.
+  - After a crossing that fails, a dataserver, HTTP or XML-RPC reply the script was waiting
+    for when the crossing started does not arrive: the hold drops the replies a script is
+    still owed, as Halcyon's crossing wait did.
   - A script that arrives on a parcel where scripts may not run is paused, and the arrival's
     `changed` event is dropped with whatever else reaches a paused script. SL queues it and
     posts it once the object is somewhere scripts run.
@@ -367,7 +370,10 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - every event that reaches the script waits on its queue, in order, up to the usual 64,
     except chat on its listens, which is dropped (Halcyon took a held script's listens away);
   - the sensor repeat stops, and replies still owed to it (dataserver, HTTP, XML-RPC) are
-    dropped, as Halcyon's crossing wait did; taken controls stay.
+    dropped, as Halcyon's crossing wait did; taken controls stay;
+  - the script's URLs stay. A crossing that succeeds releases them in the region the object
+    left, when its scripts are removed there; a crossing that fails leaves the object where
+    it was, so its URLs keep working. Halcyon released them when the hold started.
 
   The state the crossing captures includes the held events: they run in the new region, in
   the order they came, and not in the region the object left. When the crossing fails

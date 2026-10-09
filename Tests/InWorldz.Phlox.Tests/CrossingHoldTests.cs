@@ -6,9 +6,12 @@
  */
 
 using System;
+using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using OpenMetaverse;
+using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 using Xunit;
@@ -29,7 +32,7 @@ namespace InWorldz.Phlox.Tests;
 /// handler that waits holds the crossing there.
 /// </para>
 /// </summary>
-// Runs in parallel: regions (7400, 7400), (7400, 7399) up to (7450, 7450), (7450, 7449) are used by no other test; the
+// Runs in parallel: regions (7400, 7400), (7400, 7399) up to (7470, 7470), (7470, 7469) are used by no other test; the
 // scenes, engines and items are its own.
 public class CrossingHoldTests
 {
@@ -42,6 +45,42 @@ public class CrossingHoldTests
             touch_start(integer n) { llSetTimerEvent(0.3); }
             timer() { t++; llSay(0, ""tick "" + (string)t); }
         }";
+
+    private const string UrlHolder = @"
+        default {
+            state_entry() { llRequestURL(); llSay(0, ""entry""); }
+            link_message(integer s, integer n, string m, key k) { llSay(0, ""lm "" + m); }
+        }";
+
+    /// <summary>A region's URL module: the URLs each script holds, and the scripts whose URLs were released.</summary>
+    private sealed class Urls : IUrlModule
+    {
+        public readonly ConcurrentDictionary<UUID, int> HeldBy = new();
+        public readonly ConcurrentBag<UUID> ReleasedFor = new();
+        public string ExternalHostNameForLSL => "localhost";
+        public UUID RequestURL(IScriptModule engine, SceneObjectPart host, UUID itemID, Hashtable options) { HeldBy.AddOrUpdate(itemID, 1, (_, n) => n + 1); return UUID.Random(); }
+        public UUID RequestSecureURL(IScriptModule engine, SceneObjectPart host, UUID itemID, Hashtable options) => RequestURL(engine, host, itemID, options);
+        public void ReleaseURL(string url) { }
+        public void HttpResponse(UUID request, int status, string body) { }
+        public void HttpContentType(UUID request, string type) { }
+        public string GetHttpHeader(UUID request, string header) => string.Empty;
+        public int GetFreeUrls() => 100000;
+        public void ScriptRemoved(UUID itemID) { ReleasedFor.Add(itemID); HeldBy.TryRemove(itemID, out _); }
+        public void ObjectRemoved(UUID objectID) { }
+        public int GetUrlCount(UUID groupID) => 0;
+    }
+
+    private static (SceneObjectGroup Sog, UUID Item, Urls Urls) RezUrlHolder(VehicleCrossingStateTests.Region r, Vector3 pos)
+    {
+        var urls = new Urls();
+        r.Scene.RegisterModuleInterface<IUrlModule>(urls);
+        var sog = SceneHelpers.AddSceneObject(r.Scene, "Example Server", UUID.Random());
+        sog.AbsolutePosition = pos;
+        UUID item = UUID.Random();
+        TaskInventoryHelpers.AddScript(r.Scene.AssetService, sog.RootPart, item, UUID.Random(), "server", UrlHolder);
+        sog.CreateScriptInstances(0, true, r.Engine.Name, 1);
+        return (sog, item, urls);
+    }
 
     private static void LinkMessage(VehicleCrossingStateTests.Region r, UUID item, string text)
         => r.Engine.PostScriptEvent(item, "link_message", new object[] { 0, 0, text, UUID.Zero.ToString() });
@@ -237,5 +276,69 @@ public class CrossingHoldTests
         LinkMessage(a, item, "after");
         Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("lm after")), a.Text());
         Assert.False(a.Heard("heard during"), a.Text());
+    }
+
+    /// <summary>
+    /// The hold does not release the script's URLs. A crossing that succeeds removes the script from the region it
+    /// left, and that unload releases them there (SL: "deleting the prim ... release URLs").
+    /// </summary>
+    [Fact]
+    public void ASuccessfulCrossingReleasesTheScriptsUrlsInTheRegionItLeft()
+    {
+        var (a, b) = VehicleCrossingStateTests.TwoRegions(7460);
+        using var ra = a;
+        using var rb = b;
+        var (sog, item, urls) = RezUrlHolder(a, new Vector3(128, 3, 30));
+        UUID objectId = sog.UUID;
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("entry")), a.Text());
+        Assert.Equal(1, urls.HeldBy.GetValueOrDefault(item));
+
+        bool releasedDuringHold = true;
+        a.Scene.EventManager.OnGroupBeginInTransit += g =>
+        {
+            if (g.UUID != objectId) return;
+            LinkMessage(a, item, "marker");
+            Window(200);
+            releasedDuringHold = urls.ReleasedFor.Contains(item);
+        };
+
+        sog.UpdateGroupPosition(new Vector3(128, -5, 30));
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => b.Scene.GetSceneObjectGroup(objectId) != null), "the object did not reach region B");
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => b.Heard("lm marker")), "region B: " + b.Text() + " region A: " + a.Text());
+        Assert.False(releasedDuringHold);
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => urls.ReleasedFor.Contains(item)), "region A kept the script's URLs");
+        Assert.False(urls.HeldBy.ContainsKey(item));
+    }
+
+    /// <summary>
+    /// A crossing that fails leaves the object where it was, so the script keeps its URLs there. Halcyon released them
+    /// when the hold started, so a failed crossing lost them.
+    /// </summary>
+    [Fact]
+    public void AFailedCrossingKeepsTheScriptsUrls()
+    {
+        var (a, b) = VehicleCrossingStateTests.TwoRegions(7470);
+        using var ra = a;
+        using var rb = b;
+        var (sog, item, urls) = RezUrlHolder(a, new Vector3(250, 128, 30));
+        UUID objectId = sog.UUID;
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("entry")), a.Text());
+        Assert.Equal(1, urls.HeldBy.GetValueOrDefault(item));
+
+        a.Scene.EventManager.OnGroupBeginInTransit += g =>
+        {
+            if (g.UUID != objectId) return;
+            LinkMessage(a, item, "marker");
+        };
+
+        // No region lies east of region A: the crossing fails and the object is put back inside region A.
+        sog.UpdateGroupPosition(new Vector3(262, 128, 30));
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("lm marker")), a.Text());
+        Assert.Same(sog, a.Scene.GetSceneObjectGroup(objectId));
+        LinkMessage(a, item, "after");
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("lm after")), a.Text());
+        Window(500);   // no late release
+        Assert.DoesNotContain(item, urls.ReleasedFor);
+        Assert.Equal(1, urls.HeldBy.GetValueOrDefault(item));
     }
 }
