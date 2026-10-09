@@ -1930,11 +1930,23 @@ namespace Phlox.ScriptEngine
 
         // ── Physics ────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// From an attachment, physical or not, this sets a constant force on the wearer ("Used on an attachment, it
+        /// will apply the force to the avatar", SL wiki llSetForce; Halcyon SceneObjectGroup.SetForce). A local force
+        /// is handed on in the avatar's own axes for the physics engine to turn with the avatar on every step; a new
+        /// call replaces it and a zero force ends it (see PhysicsActor.SetConstantForce). Otherwise only a physical
+        /// object takes the force.
+        /// </summary>
         public void llSetForce(Vector3 force, int local)
         {
             try
             {
                 if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
+                if (m_host.ParentGroup.IsAttachment)
+                {
+                    World.GetScenePresence(m_host.ParentGroup.AttachedAvatar)?.SetConstantForce(force, local != 0);
+                    return;
+                }
                 if ((m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;

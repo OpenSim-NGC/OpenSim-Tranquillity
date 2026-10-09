@@ -50,6 +50,10 @@ namespace InWorldz.Phlox.Tests;
 ///   the root's rotation"), and the rotation is normalised; llSetLocalRot normalises too.
 /// - llApplyImpulse from an attachment pushes the wearer (Halcyon and YEngine); llApplyRotationalImpulse from one
 ///   does nothing (SL: "It does not work on attachments.").
+/// - llSetForce and llSetForceAndTorque from an attachment, physical or not, set a constant force on the wearer
+///   (SL: "Used on an attachment, it will apply the force to the avatar"); a local force keeps its frame for the
+///   engine to turn with the avatar, a new call replaces it and a zero force ends it. Detaching does not end it
+///   (Halcyon SceneObjectGroup.SetForce). An unattached object behaves as before.
 /// - llMoveToTarget keeps a target with no region beyond the edge inside the region (Halcyon).
 /// - llLookAt points +Z at the target with +Y level and +X below the horizon (SL: "keeping its forward axis
 ///   (positive x) below the horizon"); straight above or below keeps the current turn.
@@ -71,8 +75,13 @@ public class PositionRotationForceTests
     private sealed class Recorder : NullPhysicsActor
     {
         public readonly List<Vector3> Forces = new(), AngularForces = new();
+        public readonly List<(Vector3 Force, bool Local)> ConstantForces = new();
         public Vector3? Target;
+        public Vector3 SetForce;
         public override bool IsPhysical { get => true; set { } }
+        public override Vector3 Force { get => SetForce; set => SetForce = value; }
+        public override Quaternion Orientation { get; set; } = Quaternion.Identity;
+        public override void SetConstantForce(Vector3 force, bool local) { lock (ConstantForces) ConstantForces.Add((force, local)); }
         public override void AddForce(Vector3 force, bool pushforce) { lock (Forces) Forces.Add(force); }
         public override void AddAngularForce(Vector3 force, bool pushforce) { lock (AngularForces) AngularForces.Add(force); }
         public override Vector3 PIDTarget { set => Target = value; }
@@ -195,6 +204,131 @@ public class PositionRotationForceTests
         Api(h, h.Prim).llApplyRotationalImpulse(new Vector3(0, 0, 5), 0);
         Assert.Empty(actor.AngularForces);
         Assert.Empty(((Recorder)h.Prim.PhysActor).AngularForces);
+    }
+
+    // ---- llSetForce from an attachment ----
+
+    [Fact]
+    public void SetForceFromAnAttachmentReachesTheWearer()
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30), Quaternion.Identity);
+        var actor = new Recorder();
+        SetAvatarActor(sp, actor);
+        var prim = new Recorder();
+        h.Prim.PhysActor = prim;
+        Assert.Equal(0u, (uint)(h.Prim.Flags & PrimFlags.Physics));   // SL: "non-physical as well as physical"
+        Api(h, h.Prim).llSetForce(new Vector3(10, 0, 5), 0);
+        Assert.Equal(new[] { (new Vector3(10, 0, 5), false) }, actor.ConstantForces);
+        Assert.Equal(new Vector3(10, 0, 5), sp.ConstantForce);
+        Assert.Equal(Vector3.Zero, prim.SetForce);
+    }
+
+    [Fact]
+    public void SetForceFromAnAttachmentKeepsALocalForceInTheWearersAxes()
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30), Quarter);
+        var actor = new Recorder();
+        SetAvatarActor(sp, actor);
+        Api(h, h.Prim).llSetForce(new Vector3(3, 0, 0), 1);
+        // Not turned once here: the engine turns it with the avatar on every step.
+        Assert.Equal(new[] { (new Vector3(3, 0, 0), true) }, actor.ConstantForces);
+        Assert.True(sp.ConstantForceIsLocal);
+    }
+
+    [Fact]
+    public void SetForceFromAnAttachmentAgainChangesTheWearersForce()
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30), Quaternion.Identity);
+        var actor = new Recorder();
+        SetAvatarActor(sp, actor);
+        var api = Api(h, h.Prim);
+        api.llSetForce(new Vector3(10, 0, 0), 0);
+        api.llSetForce(new Vector3(0, 6, 0), 1);
+        Assert.Equal(2, actor.ConstantForces.Count);
+        Assert.Equal((new Vector3(0, 6, 0), true), actor.ConstantForces[1]);
+        Assert.Equal(new Vector3(0, 6, 0), sp.ConstantForce);
+    }
+
+    [Fact]
+    public void ZeroForceFromAnAttachmentEndsTheWearersForce()
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30), Quaternion.Identity);
+        var actor = new Recorder();
+        SetAvatarActor(sp, actor);
+        var api = Api(h, h.Prim);
+        api.llSetForce(new Vector3(10, 0, 0), 0);
+        api.llSetForce(Vector3.Zero, 0);
+        Assert.Equal((Vector3.Zero, false), actor.ConstantForces[^1]);
+        Assert.Equal(Vector3.Zero, sp.ConstantForce);
+    }
+
+    [Fact]
+    public void SetForceAndTorqueFromAnAttachmentSetsAndEndsTheWearersForce()
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30), Quaternion.Identity);
+        var actor = new Recorder();
+        SetAvatarActor(sp, actor);
+        var api = Api(h, h.Prim);
+        api.llSetForceAndTorque(new Vector3(0, 0, 8), new Vector3(0, 0, 1), 1);
+        Assert.Equal((new Vector3(0, 0, 8), true), actor.ConstantForces[^1]);
+        api.llSetForceAndTorque(Vector3.Zero, Vector3.Zero, 0);
+        Assert.Equal((Vector3.Zero, false), actor.ConstantForces[^1]);
+        Assert.Equal(Vector3.Zero, sp.ConstantForce);
+    }
+
+    [Fact]
+    public void DetachingDoesNotEndTheWearersForce()
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30), Quaternion.Identity);
+        var actor = new Recorder();
+        SetAvatarActor(sp, actor);
+        Api(h, h.Prim).llSetForce(new Vector3(10, 0, 0), 0);
+        var sog = h.Prim.ParentGroup;
+        sp.RemoveAttachment(sog);
+        sog.IsAttachment = false;
+        sog.AttachedAvatar = UUID.Zero;
+        Assert.Equal(new Vector3(10, 0, 0), sp.ConstantForce);
+        Assert.Single(actor.ConstantForces);
+        // Once detached, the object's calls no longer reach the avatar.
+        Api(h, h.Prim).llSetForce(Vector3.Zero, 0);
+        Assert.Equal(new Vector3(10, 0, 0), sp.ConstantForce);
+        Assert.Single(actor.ConstantForces);
+    }
+
+    [Fact]
+    public void SetForceOnAnUnattachedPhysicalObjectSetsItsOwnForceAsBefore()
+    {
+        using var h = new SchedulerHarness();
+        var bystander = h.Scene.GetScenePresence(h.AddClient().AgentId);
+        var avatar = new Recorder();
+        SetAvatarActor(bystander, avatar);
+        var prim = new Recorder();
+        h.Prim.PhysActor = prim;
+        h.Prim.AddFlag(PrimFlags.Physics);
+        h.Prim.ParentGroup.UpdateGroupRotationR(Quarter);
+        var api = Api(h, h.Prim);
+        api.llSetForce(new Vector3(4, 0, 0), 0);
+        Near(new Vector3(4, 0, 0), prim.SetForce);
+        api.llSetForce(new Vector3(4, 0, 0), 1);
+        Near(new Vector3(4, 0, 0) * Quarter, prim.SetForce);
+        Assert.Empty(avatar.ConstantForces);
+        Assert.Equal(Vector3.Zero, bystander.ConstantForce);
+    }
+
+    [Fact]
+    public void SetForceOnAnUnattachedNonPhysicalObjectDoesNothing()
+    {
+        using var h = new SchedulerHarness();
+        var prim = new Recorder();
+        h.Prim.PhysActor = prim;
+        Api(h, h.Prim).llSetForce(new Vector3(4, 0, 0), 0);
+        Assert.Equal(Vector3.Zero, prim.SetForce);
     }
 
     // ---- llMoveToTarget ----

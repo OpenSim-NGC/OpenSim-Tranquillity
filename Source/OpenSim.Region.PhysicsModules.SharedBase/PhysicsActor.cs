@@ -438,6 +438,26 @@ public abstract class PhysicsActor
     public abstract float APIDDamping { set;}
 
     public abstract void AddForce(Vector3 force, bool pushforce);
+
+    /// <summary>
+    /// A constant force on an avatar: what llSetForce in an attachment sets on its wearer ("Used on an attachment,
+    /// it will apply the force to the avatar", SL wiki llSetForce). ScenePresence holds the value and calls this
+    /// when a script sets it and again whenever the avatar gets a new physics actor.
+    /// </summary>
+    /// <remarks>
+    /// An engine that supports it must:
+    /// - treat <paramref name="force"/> as a force in newtons (kg m/s^2), the same scale as a prim's llSetForce, so
+    ///   the avatar accelerates by force / mass;
+    /// - when <paramref name="local"/> is false, read it in region axes; when true, in the avatar's own axes, turned
+    ///   by the avatar's current orientation on every step (it turns with the avatar);
+    /// - apply it on every simulation step, on top of walking, flying, gravity and pushes, until this is called
+    ///   again; each call replaces the previous force, and a zero force ends it.
+    /// Detaching the attachment, or removing or resetting its script, does not end it: only another call does
+    /// (Halcyon SceneObjectGroup.SetForce stores it on the avatar's actor the same way).
+    /// The default does nothing, so an engine that does not support it leaves the avatar as it was.
+    /// </remarks>
+    public virtual void SetConstantForce(Vector3 force, bool local) { }
+
     public abstract void AvatarJump(float forceZ);
     public abstract void AddAngularForce(Vector3 force, bool pushforce);
     public abstract void SetMomentum(Vector3 momentum);

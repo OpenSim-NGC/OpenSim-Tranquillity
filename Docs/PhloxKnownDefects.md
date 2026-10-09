@@ -840,10 +840,18 @@ such list.
   `"INVALID CODEC"`.
 - `iwStandTarget` and `iwLinkStandTarget` set the stand offset, which is saved with the object;
   the rotation is ignored.
-- `llSetForce` and `llSetForceAndTorque` in an attachment do nothing. SL applies the force to the wearer
+- `llSetForce` and `llSetForceAndTorque` in an attachment, physical or not, set a constant force on the wearer
   ([LlSetForce](https://wiki.secondlife.com/wiki/LlSetForce): "Used on an attachment, it will apply the force to the
-  avatar"); the region has no way to hold a constant force on an avatar. A local force (`local` TRUE) is turned once
-  by the object's rotation when it is set, not kept in the object's frame as it turns.
+  avatar"). The avatar holds it and hands it to the physics engine (`PhysicsActor.SetConstantForce`), which is to
+  apply it on every step; a local force (`local` TRUE) is in the avatar's own axes and turns with the avatar. A new
+  call from any attachment replaces it and `ZERO_VECTOR` ends it. As in Halcyon, detaching the object or resetting or
+  removing the script does not end it, so a script that should stop pushing when taken off sets `ZERO_VECTOR` in its
+  `attach` event; that works when the object is detached to inventory, but not when it is dropped, because by then
+  it is no longer an attachment. The force ends when the avatar leaves the region; it is not carried to the next one.
+  **No physics engine applies it yet**: ubODE, BulletSim and Jolt ignore it, so a region shows no effect until its
+  engine supports it.
+- `llSetForce` in an unattached physical object: a local force (`local` TRUE) is turned once by the object's rotation
+  when it is set, not kept in the object's frame as it turns.
 - `botGetProfileParams` returns `""` for `BOT_EMAIL` and `BOT_PROFILE_URL`, and the about text and image only for a
   bot in the same region; the bot manager keeps the values `botSetProfileParams` stores but does not hand them out.
 - `botSetNavigationPoints` with `BOT_TRAVELMODE_WAIT`: the bot manager moves on to the next point at once instead of
