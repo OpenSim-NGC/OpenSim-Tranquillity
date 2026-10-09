@@ -1172,6 +1172,31 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             }
         }
 
+        public bool GetBotProfile(UUID botID, out string aboutText, out string email,
+            out UUID imageID, out string profileURL)
+        {
+            aboutText = email = profileURL = string.Empty;
+            imageID = UUID.Zero;
+            BotData data = GetBot(botID);
+            if (data == null) return false;
+
+            email = data.Email;
+            profileURL = data.ProfileURL;
+            aboutText = data.AboutText;
+            imageID = data.ImageID;
+
+            // About text and image also live on the NPC (osNpcSetProfileAbout and osNpcSetProfileImage
+            // write only there, and the NPC caps the about text), so the NPC's values win while it exists.
+            Scene scene = GetBotScene(data);
+            INPC npc = scene != null ? m_npcModule?.GetNPC(botID, scene) : null;
+            if (npc != null)
+            {
+                aboutText = npc.profileAbout ?? string.Empty;
+                imageID = npc.profileImage;
+            }
+            return true;
+        }
+
         #endregion
 
         #region Outfits
