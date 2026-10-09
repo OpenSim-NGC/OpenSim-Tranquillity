@@ -50,6 +50,12 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         public UUID FollowTarget;
         public Dictionary<int, object> FollowOptions;
         public bool FollowLost;     // BOT_MOVE_AVATAR_LOST was raised and the avatar has not come back since
+        // botFollowAvatar's options, as Halcyon's AvatarFollowerDescription read them, and the follower's state.
+        public bool FollowAllowRunning, FollowAllowFlying, FollowAllowJumping, FollowNeedsSight;
+        public Vector3 FollowOffset;
+        public float FollowStartDistance, FollowStopDistance, FollowLostDistance;
+        public bool FollowAtAvatar;         // the bot stopped beside the avatar (Halcyon m_toAvatar)
+        public int FollowJumpAttempts;      // Halcyon NumberOfTimesJumpAttempted
         // Wandering runs as a navigation path of one point and, when WanderWait is not 0, a wait after it; at the
         // path's end a new point is picked (Halcyon WanderingAction).
         public bool IsWandering;
@@ -774,7 +780,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 following = m_bots.Values.Where(d => d.IsFollowing && !d.MovementPaused).ToList();
             foreach (BotData data in following)
             {
-                try { CheckFollowedAvatar(data); }
+                try { FollowStep(data); }
                 catch (Exception ex)
                 {
                     m_log.LogWarning("[BotManager]: follow check for bot {0} failed: {1}", data.BotID, ex.Message);
@@ -1057,27 +1063,64 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.IsFollowing = true;
             data.FollowTarget = targetID;
             data.FollowOptions = options;
+            ReadFollowOptions(data, options);
+            data.FollowAtAvatar = false;
+            data.FollowJumpAttempts = 0;
 
-            // Start following by moving to target's position
-            Vector3 targetPos = targetSP.AbsolutePosition;
-
-            // Apply follow offset if specified
-            if (options.TryGetValue(4 /*BOT_FOLLOW_OFFSET*/, out object offsetObj) && offsetObj is Vector3 offset)
-                targetPos += offset;
-
-            m_npcModule.MoveToTarget(botID, scene, targetPos, false, true, false);
-
+            FollowStep(data);
             return BotMovementResult.Success;
         }
 
-        private const float DEFAULT_LOST_AVATAR_DISTANCE = 1000f;   // Halcyon AvatarFollowerDescription
+        private const float DEFAULT_STOP_FOLLOW_DISTANCE = 2f;      // Halcyon AvatarFollowerDescription
+        private const float DEFAULT_START_FOLLOW_DISTANCE = 3f;
+        private const float DEFAULT_LOST_AVATAR_DISTANCE = 1000f;
+        private const float FOLLOW_JUMP_IMPULSE = 9.4f;             // what ScenePresenceAnimator gives an avatar's jump
 
-        // BOT_MOVE_AVATAR_LOST, once each time the followed avatar is lost, as Halcyon's AvatarFollower raised it:
-        // the avatar has left the region (UpdateInformation: [ZERO_VECTOR, 0.0, bot position]), or the bot is
-        // farther than BOT_LOST_AVATAR_DISTANCE (8) from the avatar plus BOT_FOLLOW_OFFSET (4)
-        // (CheckInformationBeforeMove: [avatar position, 0.0, bot position]). Halcyon passed 0.0 as the distance
-        // in both. The avatar coming back within the distance re-arms the report.
-        private void CheckFollowedAvatar(BotData data)
+        // Halcyon AvatarFollowerDescription: BOT_ALLOW_RUNNING (1), BOT_ALLOW_FLYING (2), BOT_ALLOW_JUMPING (3) and
+        // BOT_REQUIRES_LINE_OF_SIGHT (5) are integers, 1 for yes (the first three default to yes, the last to no);
+        // BOT_FOLLOW_OFFSET (4) is a vector added to the avatar's position; BOT_START_FOLLOWING_DISTANCE (6),
+        // BOT_STOP_FOLLOWING_DISTANCE (7) and BOT_LOST_AVATAR_DISTANCE (8) are metres, an integer or a float.
+        private static void ReadFollowOptions(BotData data, Dictionary<int, object> options)
+        {
+            data.FollowAllowRunning = data.FollowAllowFlying = data.FollowAllowJumping = true;
+            data.FollowNeedsSight = false;
+            data.FollowOffset = Vector3.Zero;
+            data.FollowStartDistance = DEFAULT_START_FOLLOW_DISTANCE;
+            data.FollowStopDistance = DEFAULT_STOP_FOLLOW_DISTANCE;
+            data.FollowLostDistance = DEFAULT_LOST_AVATAR_DISTANCE;
+            if (options == null) return;
+
+            foreach (KeyValuePair<int, object> kvp in options)
+            {
+                object v = kvp.Value;
+                bool number = v is int || v is float;
+                switch (kvp.Key)
+                {
+                    case 1 /*BOT_ALLOW_RUNNING*/: if (v is int run) data.FollowAllowRunning = run == 1; break;
+                    case 2 /*BOT_ALLOW_FLYING*/: if (v is int fly) data.FollowAllowFlying = fly == 1; break;
+                    case 3 /*BOT_ALLOW_JUMPING*/: if (v is int jump) data.FollowAllowJumping = jump == 1; break;
+                    case 4 /*BOT_FOLLOW_OFFSET*/: if (v is Vector3 offset) data.FollowOffset = offset; break;
+                    case 5 /*BOT_REQUIRES_LINE_OF_SIGHT*/: if (v is int sight) data.FollowNeedsSight = sight == 1; break;
+                    case 6 /*BOT_START_FOLLOWING_DISTANCE*/: if (number) data.FollowStartDistance = Convert.ToSingle(v); break;
+                    case 7 /*BOT_STOP_FOLLOWING_DISTANCE*/: if (number) data.FollowStopDistance = Convert.ToSingle(v); break;
+                    case 8 /*BOT_LOST_AVATAR_DISTANCE*/: if (number) data.FollowLostDistance = Convert.ToSingle(v); break;
+                }
+            }
+        }
+
+        // One step of following, at each nav poll, after Halcyon's AvatarFollower (CheckInformationBeforeMove,
+        // UpdateInformation and DirectFollowing):
+        // - closer than the stop distance (the start distance once the bot has stopped) the bot stops beside the avatar;
+        // - BOT_MOVE_AVATAR_LOST is raised once each time the avatar is lost: it left the region ([ZERO_VECTOR, 0.0, bot
+        //   position]), it is farther than the lost distance ([avatar position, 0.0, bot position]; the bot keeps
+        //   following, as Halcyon's did), or line of sight is required and an object is in between ([avatar position,
+        //   distance, bot position]; the bot goes no further toward it). The avatar found again re-arms it;
+        // - otherwise the bot is sent toward the avatar plus BOT_FOLLOW_OFFSET: flying when the avatar flies, or when the
+        //   avatar is more than 3 m above or below, if flying is allowed; running when the avatar runs, if running is
+        //   allowed; for an avatar a little above it, at its own height unless jumping is allowed and something taller
+        //   than the bot is in the way, when the bot jumps if it is near the foot of it.
+        // Halcyon also steered around objects along the avatar's recent positions; this goes straight for the avatar.
+        private void FollowStep(BotData data)
         {
             Scene scene = GetBotScene(data);
             ScenePresence bot = GetBotSP(data);
@@ -1094,27 +1137,94 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 return;
             }
 
-            Dictionary<int, object> options = data.FollowOptions;
-            Vector3 offset = Vector3.Zero;
-            float lostDistance = DEFAULT_LOST_AVATAR_DISTANCE;
-            if (options != null)
-            {
-                if (options.TryGetValue(4 /*BOT_FOLLOW_OFFSET*/, out object o) && o is Vector3 v) offset = v;
-                if (options.TryGetValue(8 /*BOT_LOST_AVATAR_DISTANCE*/, out object d) && (d is float || d is int))
-                    lostDistance = Convert.ToSingle(d);
-            }
+            Vector3 botPos = bot.AbsolutePosition;
+            Vector3 targetPos = target.AbsolutePosition + data.FollowOffset;
+            targetPos.X = Math.Clamp(targetPos.X, 0f, scene.RegionInfo.RegionSizeX);
+            targetPos.Y = Math.Clamp(targetPos.Y, 0f, scene.RegionInfo.RegionSizeY);
+            float distance = Vector3.Distance(targetPos, botPos);
 
-            float distance = Vector3.Distance(target.AbsolutePosition + offset, bot.AbsolutePosition);
-            if (distance > lostDistance)
+            float closeEnough = data.FollowAtAvatar ? data.FollowStartDistance : data.FollowStopDistance;
+            if (distance < closeEnough)
+            {
+                if (!data.FollowAtAvatar)
+                {
+                    m_npcModule.StopMoveToTarget(data.BotID, scene);
+                    // A bot that had to fly up to here lands (Halcyon AvatarFollower.UpdateInformation).
+                    if (data.FollowJumpAttempts > 0 && !(data.FollowAllowFlying && target.Flying))
+                        bot.Flying = false;
+                    data.FollowJumpAttempts = 0;
+                }
+                data.FollowAtAvatar = true;
+                return;
+            }
+            data.FollowAtAvatar = false;
+
+            bool outOfSight = data.FollowNeedsSight && SomethingBetween(scene, botPos, targetPos, 0f);
+            bool tooFar = distance > data.FollowLostDistance;
+            if (outOfSight || tooFar)
             {
                 if (!data.FollowLost)
                 {
                     data.FollowLost = true;
-                    FireAvatarLost(data, target.AbsolutePosition, 0.0f);
+                    FireAvatarLost(data, target.AbsolutePosition, outOfSight ? distance : 0.0f);
                 }
+                if (outOfSight) return;
             }
             else
                 data.FollowLost = false;
+
+            bool fly = data.FollowAllowFlying && target.Flying;
+            bool jump = false;
+            float dz = targetPos.Z - botPos.Z;
+            if (!fly && (dz > 0.25f || data.FollowJumpAttempts > 5))
+            {
+                if (data.FollowJumpAttempts > 5 || dz > 3f)
+                {
+                    if (data.FollowJumpAttempts <= 5) data.FollowJumpAttempts = 6;
+                    if (data.FollowAllowFlying) fly = true;
+                }
+                else if (!data.FollowAllowJumping || !SomethingBetween(scene, botPos, targetPos, bot.Appearance.AvatarHeight))
+                {
+                    data.FollowJumpAttempts--;
+                    targetPos.Z = botPos.Z + 0.15f;
+                }
+                else
+                {
+                    if (data.FollowJumpAttempts < 0) data.FollowJumpAttempts = 0;
+                    data.FollowJumpAttempts++;
+                    // Halcyon's walkTo jumped when the point was within 2 m across and more than 1.5 m up.
+                    jump = Math.Abs(targetPos.X - botPos.X) < 2f && Math.Abs(targetPos.Y - botPos.Y) < 2f && dz > 1.5f;
+                }
+            }
+            else if (!fly)
+            {
+                if (dz < -3f && data.FollowAllowFlying) fly = true;
+                data.FollowJumpAttempts--;
+            }
+
+            bool run = data.FollowAllowRunning && target.SetAlwaysRun;
+            m_npcModule.MoveToTarget(data.BotID, scene, targetPos, !fly, !fly, run);
+            if (jump && bot.IsColliding)
+                bot.PhysicsActor?.AvatarJump(FOLLOW_JUMP_IMPULSE);
+        }
+
+        // Whether an object stands on the line from 'from' to 'to': a prim, not an attachment or phantom, that the line
+        // crosses, and that is taller than minHeight. Halcyon's AvatarFollower cast a physics ray (llCastRay); this
+        // tests the objects' boxes, which needs no physics engine.
+        private static bool SomethingBetween(Scene scene, Vector3 from, Vector3 to, float minHeight)
+        {
+            Vector3 dir = to - from;
+            float length = dir.Length();
+            if (length < 0.001f) return false;
+            Ray ray = new Ray(from, dir / length);
+            foreach (SceneObjectGroup sog in scene.GetSceneObjectGroups())
+            {
+                if (sog.IsDeleted || sog.IsAttachment || sog.IsPhantom) continue;
+                EntityIntersection hit = sog.TestIntersection(ray, false, false);
+                if (hit.HitTF && hit.distance <= length && hit.obj != null && hit.obj.Scale.Z > minHeight)
+                    return true;
+            }
+            return false;
         }
 
         public void StopMovement(UUID botID, UUID ownerID)
