@@ -325,6 +325,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnMakeRootAgent             += OnMakeRootAgentForControls;
             m_Scene.EventManager.OnAvatarEnteringNewParcel   += OnAvatarEnteringNewParcelForExperiences;
             m_Scene.EventManager.OnExperiencePermissionsRevoked += OnExperiencePermissionsRevoked;
+            m_Scene.EventManager.OnScriptPermissionsRemoved += OnScriptPermissionsRemoved;
             if (PhysicsThrottle) m_Scene.EventManager.OnFrame += OnFrameForPhysicsTime;
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
@@ -592,6 +593,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnMakeRootAgent             -= OnMakeRootAgentForControls;
             m_Scene.EventManager.OnAvatarEnteringNewParcel   -= OnAvatarEnteringNewParcelForExperiences;
             m_Scene.EventManager.OnExperiencePermissionsRevoked -= OnExperiencePermissionsRevoked;
+            m_Scene.EventManager.OnScriptPermissionsRemoved -= OnScriptPermissionsRemoved;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
             m_ExeScheduler?.StopExperienceStateReads();   // Before the final save: no read may end a grant after it
             bool stopped = m_MasterScheduler == null || m_MasterScheduler.Stop();
@@ -1143,6 +1145,18 @@ namespace Phlox.ScriptEngine
         {
             if (StateManager == null) return;
             m_ExeScheduler?.RequestExperienceGrantEnded(itemId, granterId, experienceId);
+        }
+
+        // The core took permissions from a script's item without the script asking (a stand-up, a detach, Release Keys,
+        // the viewer's revoke:
+        // SceneObjectPartInventory.RemoveScriptsPermissions). Nothing is posted to the script, and CONTROL_CAMERA can go
+        // with no controls released, so OnScriptControlsReleased does not cover it; the script's state notes the item's
+        // grant again on the scheduler thread. Ignored once the region's stop has begun and for items this engine does
+        // not run.
+        private void OnScriptPermissionsRemoved(UUID partId, UUID itemId, UUID granterId, int removedMask)
+        {
+            if (StateManager == null) return;
+            m_ExeScheduler?.RequestPermissionsRemovedByCore(itemId);
         }
 
         /// <summary>

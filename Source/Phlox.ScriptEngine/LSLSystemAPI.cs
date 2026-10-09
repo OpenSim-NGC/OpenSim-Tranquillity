@@ -3103,6 +3103,15 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
+        /// The core took permissions from this script's item with no event run (EventManager.OnScriptPermissionsRemoved):
+        /// a stand-up or a detach ends CONTROL_CAMERA (SL llSetCameraParams, "automatically revoked when the avatar stands
+        /// up from or detaches the object") even from a script that took no controls. The state notes the item's grant as
+        /// it is now and the script is saved again, so its row does not keep the ended bits for a restart to give back.
+        /// Scheduler thread.
+        /// </summary>
+        internal void PermissionsRemovedByCore() => GrantChanged();
+
+        /// <summary>
         /// The object has a new owner. Halcyon clears every item's grant (ApplyNextOwnerPermissions, Rationalize) and so
         /// does the core (ChangeInventoryOwner), but neither lets go of controls the old grant took. A request the script
         /// was still waiting on under the old owner ends too. Scheduler thread.
