@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Legion Grid Contributors
+ * Copyright (c) Legion Builds
  * BotPersistenceManager.cs — Persistent bot storage and respawn system
  * Phase 34: Saves bot data to SQLite and auto-respawns on region load.
  */
