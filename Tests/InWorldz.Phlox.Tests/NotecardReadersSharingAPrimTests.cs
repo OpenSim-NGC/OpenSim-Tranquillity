@@ -25,7 +25,10 @@ namespace InWorldz.Phlox.Tests;
 /// This guards the notecard read delays: with a 0.1 s pause after each read the others are still reading when the
 /// sleeper wakes, its own answer arrives while its queue is full of theirs, and its read stops.
 /// Time is the engine's clock, moved by the test when nothing can run (and, in the second model, after every busy pump
-/// too), so a sleep takes exactly its length of that clock. The clock is process-wide, hence "phlox-state".
+/// too), so a sleep takes exactly its length of that clock. Work on another thread is not "nothing can run": a notecard
+/// fetched on the thread pool, or an object event still with the pool, holds the clock until it lands, so a loaded
+/// machine (a slow pool) does not use up the clock budget while the scripts wait for it.
+/// The clock is process-wide, hence "phlox-state".
 /// </summary>
 [Collection("phlox-state")]
 public class NotecardReadersSharingAPrimTests
@@ -68,7 +71,10 @@ public class NotecardReadersSharingAPrimTests
             H = new SchedulerHarness();
         }
 
-        /// <summary>Pump; move the clock 1 ms when nothing could run (or after every pump, see ComputeTakesTime).</summary>
+        /// <summary>
+        /// Pump; move the clock 1 ms when nothing could run (or after every busy pump, see ComputeTakesTime). While work
+        /// is on another thread (<see cref="WorkInFlight"/>) and nothing could run, the clock stands still.
+        /// </summary>
         public bool RunUntil(Func<bool> done, ulong maxClockMs)
         {
             ulong until = Now + maxClockMs;
@@ -76,10 +82,21 @@ public class NotecardReadersSharingAPrimTests
             while (!done())
             {
                 if (Now >= until || DateTime.UtcNow > wall) return false;
-                if (!H.PumpOnceBusy() || ComputeTakesTime) Now++;
+                bool busy = H.PumpOnceBusy();
+                if (busy ? ComputeTakesTime : !WorkInFlight()) Now++;
+                else if (!busy) System.Threading.Thread.Yield();
             }
             return true;
         }
+
+        /// <summary>
+        /// A dataserver request still owed its answer (a notecard fetched on the thread pool) or an object event still
+        /// with the pool (PhloxEngine.ObjectPostsInFlight). Read on this thread, which is the scheduler's here.
+        /// </summary>
+        private bool WorkInFlight()
+            => H.Engine.ObjectPostsInFlight > 0
+               || ((System.Collections.Generic.Dictionary<UUID, global::Phlox.ScriptEngine.LSLSystemAPI>)SavedStateRig.Field(
+                       SavedStateRig.Exe(H), "m_Apis")).Values.Any(api => api.PendingDataserverCount > 0);
 
         public void Say(string msg)
             => H.Scene.SimChat(msg, OpenSim.Framework.ChatTypeEnum.Region, 7, H.Prim.AbsolutePosition, "tester", UUID.Random(), false);
