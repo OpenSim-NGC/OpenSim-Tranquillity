@@ -1771,6 +1771,53 @@ public partial class Scene
         return newFolderID;
     }
 
+    /// <summary>
+    /// Give an avatar every listed item from a prim's inventory, in a new folder named <paramref name="category"/>,
+    /// or give nothing. MoveTaskInventoryItems gives what it can and alerts per item; a caller that must give a list
+    /// whole cannot check the items first, since the prim's inventory may change between that check and the move.
+    /// Here every item is checked and its inventory copy made before anything is added, so a change made while the
+    /// items are being added does not leave the folder part-filled. The avatar need not be in this region.
+    /// </summary>
+    /// <returns>The new folder's ID, or UUID.Zero with <paramref name="message"/> saying why nothing was given.</returns>
+    public UUID MoveTaskInventoryItemsAllOrNone(UUID destID, string category, SceneObjectPart host, List<UUID> items, out string message)
+    {
+        List<InventoryItemBase> agentItems = new(items.Count);
+        foreach (UUID itemID in items)
+        {
+            InventoryItemBase agentItem = CreateAgentInventoryItemFromTask(destID, host, itemID, out message);
+            if (agentItem is null)
+                return UUID.Zero;
+            agentItems.Add(agentItem);
+        }
+
+        InventoryFolderBase rootFolder = InventoryService.GetRootFolder(destID);
+        if (rootFolder is null)
+        {
+            message = "Inventory root folder not found";
+            return UUID.Zero;
+        }
+
+        UUID newFolderID = UUID.Random();
+        InventoryFolderBase newFolder = new(newFolderID, category, destID, -1, rootFolder.ID, rootFolder.Version);
+        InventoryService.AddFolder(newFolder);
+
+        for (int i = 0; i < agentItems.Count; i++)
+        {
+            agentItems[i].Folder = newFolderID;
+            AddInventoryItem(agentItems[i]);
+            RemoveNonCopyTaskItemFromPrim(host, items[i]);
+        }
+
+        if (TryGetScenePresence(destID, out ScenePresence avatar) && avatar.ControllingClient is not null)
+        {
+            SendInventoryUpdate(avatar.ControllingClient, rootFolder, true, false);
+            SendInventoryUpdate(avatar.ControllingClient, newFolder, false, true);
+        }
+
+        message = null;
+        return newFolderID;
+    }
+
     public void SendInventoryUpdate(IClientAPI client, InventoryFolderBase folder, bool fetchFolders, bool fetchItems)
     {
         if (folder is null)
