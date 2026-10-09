@@ -247,7 +247,7 @@ public class HGLureModule : ISharedRegionModule
                     }
                     else
                     {
-                        m_log.LogInformation("$[HG LURE MODULE]: Lure failed: {message}");
+                        m_log.LogInformation("$[HG LURE MODULE]: Lure failed: {0}", message);
                         client.SendAgentAlertMessage(message, true);
                     }
                 }

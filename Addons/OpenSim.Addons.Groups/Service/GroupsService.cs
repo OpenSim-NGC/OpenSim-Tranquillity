@@ -897,7 +897,7 @@ public class GroupsService : GroupsServiceBase
         MembershipData membership = m_Database.RetrieveMember(GroupID, AgentID);
         if (membership == null)
         {
-            m_log.LogDebug("[Groups]: ({0}) No such member {0} in group {1}", AgentID, GroupID);
+            m_log.LogDebug("[Groups]: ({0}) No such member in group {1}", AgentID, GroupID);
             return;
         }
 

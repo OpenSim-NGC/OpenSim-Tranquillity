@@ -168,7 +168,6 @@ public class CrossEngineObjectEventTests : OpenSimTestCase
         public Action<Rig> Prepare = _ => { };
         public Func<Rig, object> Run;
         public Func<Rig, object, object[]> Plain;
-        public Action<object[], object[]> AssertLslLike;
         public override string ToString() => Name;
     }
 

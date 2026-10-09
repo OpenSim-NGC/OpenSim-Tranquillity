@@ -56,7 +56,7 @@ public class PhloxOutboundFilterTests
                         c.ReceiveTimeout = 2000;
                         var s = c.GetStream();
                         var buf = new byte[8192];
-                        s.Read(buf, 0, buf.Length);
+                        _ = s.Read(buf, 0, buf.Length);
                         byte[] resp = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
                         s.Write(resp, 0, resp.Length);
                     }

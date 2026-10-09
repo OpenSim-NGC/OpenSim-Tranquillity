@@ -588,7 +588,7 @@ public class VivoxVoiceModule : ISharedRegionModule
                                     break;
 
                                 case "404" : // Failed to retrieve account
-                                    m_log.LogError("[VivoxVoice]: avatar \"{0}\": Get account information failed : retrieve failed");
+                                    m_log.LogError("[VivoxVoice]: avatar \"{0}\": Get account information failed : retrieve failed", avatarName);
                                     // [AMW] Sleep and retry for a fixed period? Or just abandon?
                                     break;
                             }

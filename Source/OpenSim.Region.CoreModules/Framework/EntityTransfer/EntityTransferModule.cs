@@ -1752,7 +1752,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             IPEndPoint endpoint = neighbourRegion.ExternalEndPoint;
             if(endpoint == null)
             {
-                m_log.LogDebug("{0}: CrossAgentToNewRegionAsync: failed to resolve neighbour address {0} ",neighbourRegion.ExternalHostName);
+                m_log.LogDebug("{0}: CrossAgentToNewRegionAsync: failed to resolve neighbour address", neighbourRegion.ExternalHostName);
                 return agent;
             }
 

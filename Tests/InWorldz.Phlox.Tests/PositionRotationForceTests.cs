@@ -235,7 +235,8 @@ public class PositionRotationForceTests
         var target = new Vector3(138, 138, 30);
         Api(h, h.Prim).llLookAt(target, 1f, 1f);
         var r = h.Prim.ParentGroup.GroupRotation;
-        Near(Vector3.Normalize(target - new Vector3(128, 128, 25)), Vector3.UnitZ * r);
+        Vector3 targetDirection = target - new Vector3(128, 128, 25);
+        Near(Vector3.Normalize(in targetDirection), Vector3.UnitZ * r);
         Assert.InRange((Vector3.UnitY * r).Z, -0.001f, 0.001f);
         Assert.True((Vector3.UnitX * r).Z <= 0.001f, "forward axis above the horizon: " + (Vector3.UnitX * r));
     }

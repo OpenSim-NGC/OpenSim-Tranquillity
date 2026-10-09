@@ -4,14 +4,22 @@
  */
 
 using OpenSim.Tests.Common;
+using OpenSim.Region.CoreModules.World.Terrain.FileLoaders;
+using Xunit;
 
 namespace OpenSim.Region.CoreModules.World.Terrain.Tests;
 
-/// <summary>
-/// Disabled pending conversion from NUnit to xUnit.
-/// This test class requires significant manual work to convert NUnit-specific patterns.
-/// </summary>
 public class JPEGLoaderTests : OpenSimTestCase
 {
-    // Placeholder for disabled tests
+    [Fact]
+    public void BaseAndInterfaceReferencesUseJpegContracts()
+    {
+        GenericSystemDrawing loader = new JPEG();
+        ITerrainLoader terrainLoader = (ITerrainLoader)loader;
+        using MemoryStream stream = new MemoryStream();
+
+        Assert.True(loader.SupportsTileSave());
+        Assert.Equal(".jpg", terrainLoader.FileExtension);
+        Assert.Throws<NotImplementedException>(() => loader.LoadStream(stream));
+    }
 }

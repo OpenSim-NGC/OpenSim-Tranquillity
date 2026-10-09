@@ -79,7 +79,7 @@ public class JsonStoreCommandsModule  : INonSharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.LogError(e, "[JsonStore]: initialization error: {0}");
+            m_log.LogError(e, "[JsonStore]: initialization error.");
             return;
         }
 

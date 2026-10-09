@@ -5261,7 +5261,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         TotalMass = GetMass();
         CenterOfMass = GetCenterOfMass() - AbsolutePosition;
-        CenterOfMass *= Quaternion.Conjugate(RootPart.RotationOffset);
+        Quaternion rootRotation = RootPart.RotationOffset;
+        CenterOfMass *= Quaternion.Conjugate(in rootRotation);
         Inertia = Vector3.Zero;
         aux =  Vector4.Zero;
     }

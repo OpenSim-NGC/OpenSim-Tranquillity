@@ -86,7 +86,7 @@ public class AuthenticationServerPostHandler : BaseStreamHandler
                 long length = request.Length;
                 if (length > 16384)
                     length = 16384;
-                request.Read(buffer, 0, (int)length);
+                request.ReadExactly(buffer, 0, (int)length);
 
                 return DoEncryptedMethods(buffer);
             }
@@ -245,7 +245,7 @@ public class AuthenticationServerPostHandler : BaseStreamHandler
         if (!m_AuthenticationService.SetAuthInfo(existingInfo))
         {
             m_log.LogError(
-                "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0} {1} {2}",
+                "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0}",
                 existingInfo.PrincipalID);
 
             return FailureResult();

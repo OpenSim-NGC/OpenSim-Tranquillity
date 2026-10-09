@@ -621,8 +621,9 @@ public class KeyframeMotion
                 k.StartRotation = rot;
                 if (k.Rotation.HasValue)
                 {
+                    Quaternion rotation = k.Rotation.Value;
                     if (direction == -1)
-                        k.Rotation = Quaternion.Conjugate((Quaternion)k.Rotation);
+                        k.Rotation = Quaternion.Conjugate(in rotation);
                     k.Rotation = rot * k.Rotation;
                 }
                 else

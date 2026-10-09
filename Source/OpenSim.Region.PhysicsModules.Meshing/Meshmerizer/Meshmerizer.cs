@@ -110,7 +110,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                 }
                 catch (Exception e)
                 {
-                    m_log.LogWarning("[SCULPT]: Unable to create {0} directory: ", decodedSculptMapPath, e.Message);
+                    m_log.LogWarning("[SCULPT]: Unable to create {0} directory: {1}", decodedSculptMapPath, e.Message);
                 }
 
             }
@@ -384,7 +384,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                     meshOsd = (OSDMap)osd;
                 else
                 {
-                    m_log.LogWarning("[Mesh}: unable to cast mesh asset to OSDMap");
+                    m_log.LogWarning("[MESH]: unable to cast mesh asset to OSDMap");
                     return false;
                 }
             }

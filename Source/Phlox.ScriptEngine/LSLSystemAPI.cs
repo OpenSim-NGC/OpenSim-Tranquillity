@@ -1141,7 +1141,7 @@ namespace Phlox.ScriptEngine
         public float llLog(float f) => (float)Math.Log(f);
 
         public float llVecMag(Vector3 v) => v.Length();
-        public Vector3 llVecNorm(Vector3 v) => Vector3.Normalize(v);
+        public Vector3 llVecNorm(Vector3 v) => Vector3.Normalize(in v);
         public float llVecDist(Vector3 a, Vector3 b) => Vector3.Distance(a, b);
 
         public Vector3 llRot2Euler(Quaternion r)
@@ -1163,9 +1163,10 @@ namespace Phlox.ScriptEngine
         {
             double c1 = Math.Cos(v.X/2), c2 = Math.Cos(v.Y/2), c3 = Math.Cos(v.Z/2);
             double s1 = Math.Sin(v.X/2), s2 = Math.Sin(v.Y/2), s3 = Math.Sin(v.Z/2);
-            return Quaternion.Normalize(new Quaternion(
+            Quaternion rotation = new Quaternion(
                 (float)(s1*c2*c3 + c1*s2*s3), (float)(c1*s2*c3 - s1*c2*s3),
-                (float)(s1*s2*c3 + c1*c2*s3), (float)(c1*c2*c3 - s1*s2*s3)));
+                (float)(s1*s2*c3 + c1*c2*s3), (float)(c1*c2*c3 - s1*s2*s3));
+            return Quaternion.Normalize(in rotation);
         }
 
         public Quaternion llAxes2Rot(Vector3 fwd, Vector3 left, Vector3 up)
@@ -1198,9 +1199,23 @@ namespace Phlox.ScriptEngine
             }
         }
 
-        public Vector3 llRot2Fwd(Quaternion r) => Vector3.Normalize(new Vector3(1f,0f,0f)*r);
-        public Vector3 llRot2Left(Quaternion r) => Vector3.Normalize(new Vector3(0f,1f,0f)*r);
-        public Vector3 llRot2Up(Quaternion r) => Vector3.Normalize(new Vector3(0f,0f,1f)*r);
+        public Vector3 llRot2Fwd(Quaternion r)
+        {
+            Vector3 direction = new Vector3(1f,0f,0f) * r;
+            return Vector3.Normalize(in direction);
+        }
+
+        public Vector3 llRot2Left(Quaternion r)
+        {
+            Vector3 direction = new Vector3(0f,1f,0f) * r;
+            return Vector3.Normalize(in direction);
+        }
+
+        public Vector3 llRot2Up(Quaternion r)
+        {
+            Vector3 direction = new Vector3(0f,0f,1f) * r;
+            return Vector3.Normalize(in direction);
+        }
 
         public Quaternion llRotBetween(Vector3 a, Vector3 b)
         {
@@ -1209,13 +1224,16 @@ namespace Phlox.ScriptEngine
             double magProduct = a.Length() * b.Length();
             if (magProduct == 0) return Quaternion.Identity;
             double angle = Math.Acos(Math.Max(-1.0, Math.Min(1.0, dotProduct / magProduct)));
-            Vector3 axis = Vector3.Normalize(crossProduct);
+            Vector3 axis = Vector3.Normalize(in crossProduct);
             if (float.IsNaN(axis.X)) return Quaternion.Identity;
             return Quaternion.CreateFromAxisAngle(axis, (float)angle);
         }
 
         public Quaternion llAxisAngle2Rot(Vector3 axis, float angle)
-            => Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), angle);
+        {
+            Vector3 normalizedAxis = Vector3.Normalize(in axis);
+            return Quaternion.CreateFromAxisAngle(normalizedAxis, angle);
+        }
 
         // llRot2Axis, llRot2Angle and llAngleBetween are YEngine's (LSL_Api.cs llRot2Axis / llRot2Angle /
         // llAngleBetween): the input's scale does not matter and there is no small-angle cut-off. OpenMetaverse's GetAxisAngle,
@@ -1983,7 +2001,7 @@ namespace Phlox.ScriptEngine
                 if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
                 if (!m_host.ParentGroup.IsAttachment && (m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
                 if (force.LengthSquared() > 20000f * 20000f)
-                    force = Vector3.Normalize(force) * 20000f;
+                    force = Vector3.Normalize(in force) * 20000f;
                 m_host.ApplyImpulse(force, local != 0);
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
@@ -10505,7 +10523,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (toTarget.LengthSquared() < 0.0001f)
                 return; // target is at same position, nothing to do
 
-            Vector3 up = Vector3.Normalize(toTarget);
+            Vector3 up = Vector3.Normalize(in toTarget);
             Quaternion current = m_host.ParentGroup.GroupRotation;
             Vector3 left = Vector3.Cross(Vector3.UnitZ, up);
             if (left.LengthSquared() < 1e-8f)
@@ -10516,7 +10534,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 if (left.LengthSquared() < 1e-8f) left = Vector3.UnitY;
                 if (up.Z < 0f) left = -left;
             }
-            left = Vector3.Normalize(left);
+            left = Vector3.Normalize(in left);
             Vector3 fwd = Vector3.Cross(left, up);
             Quaternion newRot = Quaternion.CreateFromRotationMatrix(new Matrix4(
                 fwd.X, fwd.Y, fwd.Z, 0f,

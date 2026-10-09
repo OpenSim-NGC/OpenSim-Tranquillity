@@ -254,7 +254,7 @@ public class GridService : GridServiceBase, IGridService
         RegionData region = null;
         if(rdatas.Count > 1)
         {
-            m_log.LogWarning("{0} Register region overlaps with {1} regions", LogHeader, scopeID, rdatas.Count);
+            m_log.LogWarning("{0} Register region {1} overlaps with {2} regions", LogHeader, scopeID, rdatas.Count);
             return reason;
         }
         else if(rdatas.Count == 1)

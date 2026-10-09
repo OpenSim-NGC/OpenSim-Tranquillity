@@ -900,6 +900,19 @@ namespace InWorldz.Phlox.Types
             return this.Equals(other);
         }
 
+        public override int GetHashCode()
+        {
+            HashCode hash = new HashCode();
+            hash.Add(_members.Count);
+
+            foreach (object member in _members)
+            {
+                hash.Add(member is null ? 0 : member.GetHashCode());
+            }
+
+            return hash.ToHashCode();
+        }
+
         #endregion
     }
 }

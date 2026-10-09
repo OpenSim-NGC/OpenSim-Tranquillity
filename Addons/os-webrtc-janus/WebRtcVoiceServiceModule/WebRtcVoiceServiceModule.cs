@@ -108,7 +108,7 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
                     m_nonSpatialVoiceService = ServerUtils.LoadPlugin<IWebRtcVoiceService>(nonSpatialDllName, [ m_Config ]);
                     if (m_nonSpatialVoiceService is null)
                     {
-                        m_log.LogError("{LogHeader} Could not load NonSpatialVoiceService from {nonSpatialDllName}");
+                        m_log.LogError("{0} Could not load NonSpatialVoiceService from {1}", LogHeader, nonSpatialDllName);
                         m_Enabled = false;
                     }
                 }
