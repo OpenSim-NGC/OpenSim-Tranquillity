@@ -21,7 +21,7 @@ namespace InWorldz.Phlox.Tests;
 /// llGetNumberOfNotecardLines, iwGetNotecardSegment, the iwGetLink variants, llGetNotecardLineSync and the
 /// osGetNotecard functions).
 /// - "Text length N" in the asset counts bytes of UTF-8, not characters: OSSL SaveNotecard writes the byte count
-///   (OsMakeNotecardTests), and the viewer writes the length of its UTF-8 text. Text with characters of more than one
+///   (OsMakeNotecardTests), and so does libomv's AssetNotecard.Encode. Text with characters of more than one
 ///   byte is read in full and nothing after it.
 /// - A text that ends with a newline has no empty line after that newline. The SL wiki pages for llGetNotecardLine and
 ///   llGetNumberOfNotecardLines do not say; YEngine's reader (SLUtil.ParseNotecardToArray, which its NotecardCache
@@ -45,8 +45,8 @@ public class NotecardReaderTests
     private static byte[] OsslForm(string text)
         => Encoding.UTF8.GetBytes(Header(Encoding.UTF8.GetByteCount(text)) + text + "}");
 
-    /// <summary>The asset as the viewer saves it: the text, then "}\n".</summary>
-    private static byte[] ViewerForm(string text)
+    /// <summary>The asset as libomv's AssetNotecard.Encode writes it: the text, then "}\n".</summary>
+    private static byte[] LibomvForm(string text)
         => Encoding.UTF8.GetBytes(Header(Encoding.UTF8.GetByteCount(text)) + text + "}\n");
 
     private static void AddCard(InventoryGivesRig r, string name, byte[] data)
@@ -118,11 +118,20 @@ public class NotecardReaderTests
 
     [Theory]
     [MemberData(nameof(Texts))]
-    public void AViewerSavedNotecardIsReadAsItsLines(string text, string[] lines)
+    public void ALibomvEncodedNotecardIsReadAsItsLines(string text, string[] lines)
     {
-        Assert.Equal(lines, SLUtil.ParseNotecardToArray(ViewerForm(text)));   // YEngine reads it so
+        // libomv writes the byte count, the text and "}\n", then a 0 byte; for an empty text it writes "Text length -1".
+        var encoded = new OpenMetaverse.Assets.AssetNotecard { BodyText = text };
+        encoded.Encode();
+        byte[] data = LibomvForm(text);
+        if (text.Length > 0)
+        {
+            Assert.Equal(data.Append((byte)0), encoded.AssetData);
+            data = encoded.AssetData;
+        }
+        Assert.Equal(lines, SLUtil.ParseNotecardToArray(data));   // YEngine reads it so
         using var r = Rig();
-        AddCard(r, "card", ViewerForm(text));
+        AddCard(r, "card", data);
         AssertReadAs(r, "card", lines);
     }
 
@@ -137,9 +146,9 @@ public class NotecardReaderTests
         string text = "head\n" + new string('é', twoByteCharacters);
         using var r = Rig();
         AddCard(r, "ossl", OsslForm(text));
-        AddCard(r, "viewer", ViewerForm(text));
+        AddCard(r, "libomv", LibomvForm(text));
         AssertReadAs(r, "ossl", new[] { "head", new string('é', twoByteCharacters) });
-        AssertReadAs(r, "viewer", new[] { "head", new string('é', twoByteCharacters) });
+        AssertReadAs(r, "libomv", new[] { "head", new string('é', twoByteCharacters) });
     }
 
     /// <summary>

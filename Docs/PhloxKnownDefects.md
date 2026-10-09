@@ -668,8 +668,8 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   wiki pages for `llGetNotecardLine` and `llGetNumberOfNotecardLines` do not say; this is how YEngine reads them. So a
   notecard made by `osMakeNotecard`, which writes a newline after the string and after each list item, reads back as
   the string's lines or the list's items. Phlox used to take the stored length as a count of characters, so text with
-  characters of more than one byte could end in a stray `}` (and, in a notecard the viewer saved, an extra empty line
-  after it); it answered one empty line more
+  characters of more than one byte could end in a stray `}` (and, when a `}` and a newline closed the text, an extra
+  empty line after it); it answered one empty line more
   than YEngine for text that ends with a newline, and `""` instead of EOF for line 0 of an empty notecard.
 
 ---

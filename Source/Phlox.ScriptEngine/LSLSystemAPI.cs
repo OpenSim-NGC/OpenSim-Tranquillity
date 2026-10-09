@@ -18685,9 +18685,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         /// <summary>
         /// The text of a notecard asset, without the header before it and the "}" after it. "Text length N" counts
-        /// bytes of UTF-8, not characters: the viewer and OSSL's SaveNotecard both write the byte count, and YEngine's
-        /// reader takes that many bytes (SLUtil.ParseNotecardToArray). So the header is found and the text is cut in the
-        /// asset's bytes, and only then decoded.
+        /// bytes of UTF-8, not characters: OSSL's SaveNotecard and libomv's AssetNotecard.Encode both write the byte
+        /// count, and YEngine's reader takes that many bytes (SLUtil.ParseNotecardToArray). So the header is found and
+        /// the text is cut in the asset's bytes, and only then decoded.
         /// </summary>
         private static string StripNotecardHeader(byte[] data)
         {
@@ -18700,8 +18700,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int lenEnd = data.AsSpan(lenStart).IndexOf((byte)'\n');
             if (lenEnd < 0) return string.Empty;
             int bodyStart = lenStart + lenEnd + 1;
-            // The text is followed by "}\n" (the viewer) or "}" (OSSL SaveNotecard). "Text length N" says how long the
-            // text is; take exactly that when it fits.
+            // The text is followed by "}\n" (libomv AssetNotecard.Encode) or "}" (OSSL SaveNotecard). "Text length N"
+            // says how long the text is; take exactly that when it fits.
             string lenText = Encoding.ASCII.GetString(data, lenStart, lenEnd).Trim();
             if (int.TryParse(lenText, out int declared) && declared >= 0 && declared <= data.Length - bodyStart)
                 return Encoding.UTF8.GetString(data, bodyStart, declared);
