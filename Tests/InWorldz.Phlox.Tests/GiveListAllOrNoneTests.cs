@@ -18,7 +18,7 @@ using Xunit.Abstractions;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// A list give to an avatar is all of the list or none of it (Halcyon LSLSystemAPI.cs:8478-8501), also when the
+/// A list give to an avatar is all of the list or none of it (Scene.MoveTaskInventoryItemsAllOrNone), also when the
 /// prim's inventory changes while the items are being added. The change is made from the scene's
 /// OnNewInventoryItemUploadComplete event, which fires as each item lands, so it falls between the first item and
 /// the second the way another script's llRemoveInventory or a permissions edit could.

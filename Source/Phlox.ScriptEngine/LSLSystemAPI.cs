@@ -5666,9 +5666,10 @@ namespace Phlox.ScriptEngine
                 World.MoveTaskInventoryItems(destId, category, source, itemIDs);
                 return IW_DELIVER_OK;
             }
-            // Halcyon gives an avatar all of the list or none of it: an item that cannot be moved aborts the give with
-            // its reason (LSLSystemAPI.cs:8478-8501). Scene.MoveTaskInventoryItemsAllOrNone does that, also when the
-            // prim's inventory changes during the give. This check only keeps an item's reason ahead of the avatar's.
+            // An item that cannot be moved aborts the give with its reason, as in Halcyon (LSLSystemAPI.cs:8478-8501;
+            // its Scene.MoveTaskInventoryItems stopped at that item). Scene.MoveTaskInventoryItemsAllOrNone also gives
+            // nothing before it, and holds when the prim's inventory changes during the give. This check only keeps an
+            // item's reason ahead of the avatar's.
             foreach (UUID itemId in itemIDs)
             {
                 TaskInventoryItem item = source.Inventory.GetInventoryItem(itemId);
