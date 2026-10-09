@@ -88,12 +88,13 @@ public class ArrivalWaitsForRidersTests
     /// handed to a new object owned by the harness prim's owner and started by the core with <paramref name="stateSource"/>.
     /// </summary>
     private static UUID ArriveWithCarried(SchedulerHarness h, UUID granter, int mask, int stateSource,
-                                          out SceneObjectGroup copy, Action<SceneObjectGroup> before = null)
+                                          out SceneObjectGroup copy, Action<SceneObjectGroup> before = null,
+                                          string script = Vehicle)
     {
         UUID owner = h.Prim.OwnerID;
         var asset = UUID.Random();
         var source = UUID.Random();
-        TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, source, asset, "source", Vehicle);
+        TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, source, asset, "source", script);
         Assert.True(h.Prim.Inventory.CreateScriptInstance(source, 0, false, Phlox, NewRez));
         Assert.True(h.PumpUntil(() => h.Said.Contains("entry")), SavedStateRig.SaidText(h));
         h.PumpUntilIdle(TimeSpan.FromSeconds(2));
@@ -115,7 +116,7 @@ public class ArrivalWaitsForRidersTests
         copy.AbsolutePosition = h.Prim.AbsolutePosition + new Vector3(4, 0, 0);
         before?.Invoke(copy);
         var item = UUID.Random();
-        TaskInventoryHelpers.AddScript(h.Scene.AssetService, copy.RootPart, item, asset, "vehicle", Vehicle);
+        TaskInventoryHelpers.AddScript(h.Scene.AssetService, copy.RootPart, item, asset, "vehicle", script);
         SavedStateRig.States(h).Carry(item, asset, blob);
         h.ClearSaid(item);
         Assert.Equal(1, copy.CreateScriptInstances(0, false, Phlox, stateSource));
@@ -157,6 +158,39 @@ public class ArrivalWaitsForRidersTests
         Touch(h, item);
         Assert.Equal(new[] { "changed 256 perms=0 key=" + UUID.Zero }, ArrivalLines(h));
         Assert.True(Api(h, item).HasGrantClaim);   // the claim still waits; only the event stopped waiting
+    }
+
+    /// <summary>
+    /// SL wiki State: on a state change the event queue is cleared. The waiting arrival event is one of the events the
+    /// script had not yet run, so a state statement while it waits drops it, as it drops the queued ones: the new state's
+    /// changed() never sees it, also once the wait is over.
+    /// </summary>
+    [Fact]
+    public void AStateChangeWhileTheArrivalWaitsDropsTheEvent()
+    {
+        const string leaves = @"
+            default {
+                state_entry() { llSay(0, ""entry""); }
+                changed(integer c) { llSay(0, ""changed "" + (string)c + "" in default""); }
+                touch_start(integer t) { llSay(0, ""touched""); state other; }
+            }
+            state other {
+                state_entry() { llSay(0, ""other""); }
+                changed(integer c) { llSay(0, ""changed "" + (string)c + "" in other""); }
+                touch_start(integer t) { llSay(0, ""touched""); }
+            }";
+        using var clock = new FrozenClock();
+        using var h = Harness();
+        UUID rider = UUID.Random();
+        var item = ArriveWithCarried(h, rider, TakeControls | TriggerAnimation, PrimCrossing, out _, script: leaves);
+        Assert.True(Api(h, item).HasGrantClaim);
+
+        Touch(h, item);   // state other
+        Assert.True(h.PumpUntil(() => h.Said.Contains("other")), SavedStateRig.SaidText(h));
+        clock.Now += PhloxExecutionScheduler.ArrivalRiderWaitMs;
+        Touch(h, item);   // a scheduler pass after the wait is over
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+        Assert.Equal(0, ChangedLines(h));
     }
 
     /// <summary>The rider arrives seated: the event comes then, and the script reads the rider's grant inside it.</summary>
