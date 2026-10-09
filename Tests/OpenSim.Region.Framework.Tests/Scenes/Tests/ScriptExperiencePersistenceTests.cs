@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Data.SQLite;
@@ -93,6 +96,17 @@ public class ScriptExperiencePersistenceTests : OpenSimTestCase
         return item;
     }
 
+    // The newest step in the SQLite RegionStore.migrations resource: the version a migrated database ends at.
+    private static long NewestRegionStoreStep()
+    {
+        Assembly assembly = typeof(SQLiteSimulationData).Assembly;
+        string name = assembly.GetManifestResourceNames().Single(n => n.EndsWith(".RegionStore.migrations"));
+        using Stream stream = assembly.GetManifestResourceStream(name);
+        using StreamReader reader = new StreamReader(stream);
+        return Regex.Matches(reader.ReadToEnd(), @"^:VERSION\s+(\d+)", RegexOptions.Multiline)
+            .Max(m => long.Parse(m.Groups[1].Value));
+    }
+
     // ---- region store (SQLite) ---------------------------------------------------------------------------------
 
     [Fact]
@@ -167,7 +181,7 @@ public class ScriptExperiencePersistenceTests : OpenSimTestCase
             c.Open();
             using SQLiteCommand cmd = c.CreateCommand();
             cmd.CommandText = "SELECT version FROM migrations WHERE name = 'RegionStore'";
-            Assert.Equal(45L, Convert.ToInt64(cmd.ExecuteScalar()));
+            Assert.Equal(NewestRegionStoreStep(), Convert.ToInt64(cmd.ExecuteScalar()));
             cmd.CommandText = "SELECT experienceID FROM primitems WHERE itemID = :itemID";
             cmd.Parameters.AddWithValue(":itemID", itemID.ToString());
             Assert.Equal(UUID.Zero.ToString(), (string)cmd.ExecuteScalar());
