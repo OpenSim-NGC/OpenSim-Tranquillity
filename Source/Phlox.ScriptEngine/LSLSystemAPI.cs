@@ -4854,13 +4854,31 @@ namespace Phlox.ScriptEngine
             if (m_ScriptEngine.ListenManager == null) { Stub("llListen (no ListenManager)"); return -1; }
             UUID filterKey = UUID.Zero;
             UUID.TryParse(id, out filterKey);
-            int handle = m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channel, name, filterKey, msg);
-            // Kept in the script's state, so a restore registers the listen again with this handle (Halcyon llListen:
-            // ScriptState.AddActiveListen).
+            return AddSavedListen(m_host.UUID, channel, name, id, filterKey, msg, 0, null);
+        }
+
+        /// <summary>
+        /// Registers a listen and keeps it in the script's state, so a restore registers it again with this handle
+        /// (Halcyon llListen: ScriptState.AddActiveListen), with its osListenRegex bitfield and, for botListen, its bot.
+        /// The listen manager keeps the record's on/off state in step with llListenControl.
+        /// </summary>
+        private int AddSavedListen(UUID hostID, int channel, string name, string id, UUID filterKey, string msg,
+                                   int regexBitfield, string botKey)
+        {
+            var saved = new ActiveListen
+            {
+                Channel = channel, Name = name, Key = id, Message = msg, RegexBitfield = regexBitfield, HostKey = botKey
+            };
+            int handle = m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, hostID, channel, name, filterKey, msg,
+                regexBitfield, saved);
             if (handle > 0)
-                m_thisScript?.ScriptState?.AddActiveListen(new ActiveListen { Handle = handle, Channel = channel, Name = name, Key = id, Message = msg });
+            {
+                saved.Handle = handle;
+                m_thisScript?.ScriptState?.AddActiveListen(saved);
+            }
             return handle;
         }
+
         public void llListenControl(int number, int active) { m_ScriptEngine.ListenManager?.SetActive(m_itemID, number, active != 0); }
         public void llListenRemove(int number)
         {
@@ -13274,7 +13292,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (!UUID.TryParse(ID, out UUID keyID)) return -1;
             if ((regexBitfield & 1) != 0) { try { ScriptRegex.Create(name).IsMatch(""); } catch { ShoutError("Name regex is invalid."); return -1; } }
             if ((regexBitfield & 2) != 0) { try { ScriptRegex.Create(msg).IsMatch(""); } catch { ShoutError("Message regex is invalid."); return -1; } }
-            return m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channelID, name, keyID, msg, regexBitfield);
+            return AddSavedListen(m_host.UUID, channelID, name, ID, keyID, msg, regexBitfield, null);
         }
 
         private string OsslCountryOf(UUID key)
@@ -18513,7 +18531,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (botSP == null) return -1;
 
             if (m_ScriptEngine.ListenManager == null) return -1;
-            return m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, botSP.UUID, channel, name, keyID, msg);
+            return AddSavedListen(botSP.UUID, channel, name, id, keyID, msg, 0, botSP.UUID.ToString());
         }
 
         public void botMessageLinked(string botID, int num, string msg, string id)
