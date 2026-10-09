@@ -3371,7 +3371,17 @@ namespace Phlox.ScriptEngine
             return partner.IsNotZero() && partner == key;
         }
 
-        private void StoreEstate(EstateSettings es) => World.EstateDataServiceSafe?.StoreEstateSettings(es);
+        /// <summary>
+        /// Stores the estate, then tells the estate's other regions, as NGC's own estate tools do
+        /// (EstateManagementModule.TriggerEstateInfoChange; EstateModule turns it into EstateConnector.SendUpdateEstate,
+        /// which reloads the estate on this simulator's regions and sends update_estate to the others) and as Halcyon does
+        /// after a ban (SaveEstateDataAndUpdateRegions). Called only for a real change.
+        /// </summary>
+        private void StoreEstate(EstateSettings es)
+        {
+            World.EstateDataServiceSafe?.StoreEstateSettings(es);
+            World.RequestModuleInterface<IEstateModule>()?.TriggerEstateInfoChange();
+        }
 
         /// <summary>
         /// Halcyon EstateBanUser "Banned, now shoo them away" (EstateManagementModule.cs:311-328): an avatar here whose
