@@ -403,6 +403,53 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             Scene ownerScene = FindSceneForRootAgent(ownerID);
             if (ownerScene == null) { reason = "Owner not found in any region"; return UUID.Zero; }
 
+            return CreateBotIn(ownerScene, UUID.Zero, firstName, lastName, startPos, outfitName, scriptItemID, ownerID,
+                owned, senseAsAgent, out reason);
+        }
+
+        /// <summary>
+        /// Brings a saved bot back into the region it was saved in, under the key it had, so a script that stored the
+        /// key still reaches it. The bot comes back as botCreateBot made it, with the creating script registered for
+        /// bot_update. If anything in the simulator already holds the key (an avatar, or another bot), the bot comes
+        /// back under a new random key instead, and the caller moves the saved record to it.
+        /// </summary>
+        public UUID RespawnBot(Scene scene, UUID botID, string firstName, string lastName, Vector3 startPos,
+            UUID scriptItemID, UUID ownerID, out string reason)
+        {
+            reason = null;
+            if (m_npcModule == null) { reason = "NPC module not available"; return UUID.Zero; }
+
+            UUID key = botID;
+            if (botID != UUID.Zero && KeyInUse(botID))
+            {
+                m_log.LogWarning("[BotManager] Key {0} is already in use; the saved bot comes back under a new key", botID);
+                key = UUID.Zero;
+            }
+
+            UUID id = CreateBotIn(scene, key, firstName, lastName, startPos, null, scriptItemID, ownerID, true, true, out reason);
+            if (id != UUID.Zero && scriptItemID != UUID.Zero)
+                BotRegisterForPathUpdateEvents(id, scriptItemID, ownerID);
+            return id;
+        }
+
+        // A bot's key is in use when this manager has a bot under it or any region here has a presence under it.
+        private bool KeyInUse(UUID key)
+        {
+            if (IsBot(key)) return true;
+            lock (m_scenes)
+            {
+                foreach (Scene s in m_scenes)
+                    if (s.GetScenePresence(key) != null) return true;
+            }
+            return false;
+        }
+
+        // Makes the bot in the given scene; agentID is the key to give it, or UUID.Zero for a new random key.
+        private UUID CreateBotIn(Scene ownerScene, UUID agentID, string firstName, string lastName, Vector3 startPos,
+            string outfitName, UUID scriptItemID, UUID ownerID, bool owned, bool senseAsAgent, out string reason)
+        {
+            reason = null;
+
             // Get appearance -- try saved outfit first, fall back to owner's appearance
             AvatarAppearance appearance = null;
 
@@ -444,8 +491,8 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
             // The bot* door always senses as agent and is always owned; osNpcCreate chooses.
             UUID npcOwner = owned ? ownerID : UUID.Zero;
-            UUID botID = m_npcModule.CreateNPC(firstName, lastName, startPos,
-                npcOwner, senseAsAgent, ownerScene, appearance);
+            UUID botID = m_npcModule.CreateNPC(firstName, lastName, startPos, agentID,
+                npcOwner, "", UUID.Zero, senseAsAgent, ownerScene, appearance);
 
             if (botID == UUID.Zero)
             {
