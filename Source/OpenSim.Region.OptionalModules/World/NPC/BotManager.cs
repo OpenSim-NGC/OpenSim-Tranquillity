@@ -9,10 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Timers;
-// Tranquillity has ImplicitUsings=enable (auto-imports System.Threading), so alias
-// Timer to System.Timers.Timer to resolve the System.Threading.Timer ambiguity.
-using Timer = System.Timers.Timer;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -54,11 +50,14 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         public UUID FollowTarget;
         public Dictionary<int, object> FollowOptions;
         public bool FollowLost;     // BOT_MOVE_AVATAR_LOST was raised and the avatar has not come back since
+        // Wandering runs as a navigation path of one point and, when WanderWait is not 0, a wait after it; at the
+        // path's end a new point is picked (Halcyon WanderingAction).
         public bool IsWandering;
         public Vector3 WanderOrigin;
         public Vector3 WanderDistances;
         public Dictionary<int, object> WanderOptions;
-        public Timer WanderTimer;
+        public TravelMode WanderMode = TravelMode.Walk;
+        public float WanderWait;
 
         // Event registration: every script item registered for bot_update (lock the list to use it)
         public List<UUID> PathEventScripts = new List<UUID>();
@@ -200,7 +199,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 {
                     if (kvp.Value.BotScene == scene)
                     {
-                        StopWanderTimer(kvp.Value);
+                        kvp.Value.IsWandering = false;
                         UnsubscribeBotCollision(kvp.Value);
                         m_npcModule?.DeleteNPC(kvp.Key, scene);
                         m_bots.Remove(kvp.Key);
@@ -288,17 +287,6 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             return UUID.Parse(Utils.MD5String(ownerID.ToString() + ":" + outfitName.ToLowerInvariant()));
         }
 
-        private void StopWanderTimer(BotData data)
-        {
-            if (data.WanderTimer != null)
-            {
-                data.WanderTimer.Stop();
-                data.WanderTimer.Dispose();
-                data.WanderTimer = null;
-            }
-            data.IsWandering = false;
-        }
-
         private void StopAllMovement(BotData data)
         {
             data.IsFollowing = false;
@@ -309,7 +297,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.NavInFlight = false;
             data.NavWaiting = false;
             data.NavFollowIndefinitely = false;
-            StopWanderTimer(data);
+            data.IsWandering = false;
             Scene scene = GetBotScene(data);
             if (scene != null)
                 m_npcModule.StopMoveToTarget(data.BotID, scene);
@@ -647,6 +635,14 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             if (data.NavPoints == null) return;
             if (data.NavIndex >= data.NavPoints.Count)
             {
+                if (data.IsWandering)
+                {
+                    // Halcyon WanderingAction.TriggerFinishedMovement picked the next point instead of reporting the
+                    // move complete. It starts at the next poll, so a wander by teleport goes one point at a time.
+                    NewWanderPath(data);
+                    HoldBot(data, 0, false);
+                    return;
+                }
                 if (data.NavFollowIndefinitely && data.NavPoints.Count > 0)
                 {
                     // Halcyon NodeGraph went back to the first point and reported it as a move on to node
@@ -1182,36 +1178,26 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.WanderDistances = distances;
             data.WanderOptions = options;
 
-            // Determine travel mode
-            bool running = false;
-            bool noFly = true;
-            if (options.TryGetValue(1 /*BOT_WANDER_MOVEMENT_TYPE*/, out object modeObj))
-            {
-                int mode = Convert.ToInt32(modeObj);
-                if (mode == 2 /*BOT_TRAVELMODE_RUN*/) running = true;
-                if (mode == 3 /*BOT_TRAVELMODE_FLY*/) noFly = false;
-            }
+            // Halcyon WanderingDescription: BOT_WANDER_MOVEMENT_TYPE (1), an integer, is the travel mode to each point
+            // (walk by default); BOT_WANDER_TIME_BETWEEN_NODES (2), an integer or float, is the seconds to wait at each
+            // point (0 by default: on to the next point at once).
+            data.WanderMode = TravelMode.Walk;
+            data.WanderWait = 0f;
+            if (options.TryGetValue(1 /*BOT_WANDER_MOVEMENT_TYPE*/, out object modeObj) && modeObj is int mode
+                && mode >= (int)TravelMode.Walk && mode <= (int)TravelMode.Teleport)
+                data.WanderMode = (TravelMode)mode;
+            if (options.TryGetValue(2 /*BOT_WANDER_TIME_BETWEEN_NODES*/, out object timeObj) && (timeObj is int || timeObj is float))
+                data.WanderWait = Convert.ToSingle(timeObj);
 
-            // Determine time between wander nodes
-            double interval = 5.0; // default 5 seconds
-            if (options.TryGetValue(2 /*BOT_WANDER_TIME_BETWEEN_NODES*/, out object timeObj))
-                interval = Convert.ToDouble(timeObj);
-
-            // Move to first random point
-            WanderToRandomPoint(data, noFly, running);
-
-            // Set up timer for subsequent wander points
-            data.WanderTimer = new Timer(interval * 1000.0);
-            data.WanderTimer.Elapsed += (s, e) => WanderToRandomPoint(data, noFly, running);
-            data.WanderTimer.AutoReset = true;
-            data.WanderTimer.Start();
+            NewWanderPath(data);
+            MoveToNextNavPoint(data, false);
         }
 
-        private void WanderToRandomPoint(BotData data, bool noFly, bool running)
+        // The next wander path: a random point within the distances of the origin, and a wait after it when there is one.
+        // Reaching the point then moves on to node 1, which raises BOT_MOVE_UPDATE only when the wait is there.
+        private void NewWanderPath(BotData data)
         {
-            if (!data.IsWandering) return;
             Scene scene = GetBotScene(data);
-            if (scene == null) return;
 
             float rx = (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * data.WanderDistances.X;
             float ry = (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * data.WanderDistances.Y;
@@ -1222,11 +1208,25 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             target.Y = Math.Clamp(target.Y, 0.5f, 255.5f);
 
             // Ensure above terrain
-            float terrainHeight = (float)scene.Heightmap[(int)target.X, (int)target.Y];
-            if (target.Z < terrainHeight)
-                target.Z = terrainHeight;
+            if (scene != null)
+            {
+                float terrainHeight = (float)scene.Heightmap[(int)target.X, (int)target.Y];
+                if (target.Z < terrainHeight)
+                    target.Z = terrainHeight;
+            }
 
-            m_npcModule.MoveToTarget(data.BotID, scene, target, noFly, true, running);
+            var points = new List<Vector3> { target };
+            var modes = new List<TravelMode> { data.WanderMode };
+            if (data.WanderWait != 0f)
+            {
+                points.Add(new Vector3(data.WanderWait, 0, 0));
+                modes.Add(TravelMode.Wait);
+            }
+            data.NavPoints = points;
+            data.NavModes = modes;
+            data.NavIndex = 0;
+            data.NavFollowIndefinitely = false;
+            data.NavTeleportAfterMs = DEFAULT_TELEPORT_AFTER_MS;
         }
 
         public Vector3 GetBotPosition(UUID botID, UUID ownerID)
