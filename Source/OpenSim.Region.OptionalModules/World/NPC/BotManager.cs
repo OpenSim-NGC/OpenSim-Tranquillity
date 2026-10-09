@@ -68,6 +68,11 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         public bool NavInFlight;
         public int NavInFlightTicks;
 
+        // A BOT_TRAVELMODE_WAIT point: the bot stands still until NavWaitUntil (Environment.TickCount64),
+        // then the nav poll moves it on.
+        public bool NavWaiting;
+        public long NavWaitUntil;
+
         // Collision-event bridge: the bot's physics actor we subscribed to, and the handler we
         // attached, so we can detach exactly that subscription on deregister/removal.
         public PhysicsActor CollisionPhysActor;
@@ -290,6 +295,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.NavPoints = null;
             data.NavIndex = 0;
             data.NavInFlight = false;
+            data.NavWaiting = false;
             StopWanderTimer(data);
             Scene scene = GetBotScene(data);
             if (scene != null)
@@ -532,9 +538,13 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             }
             else if (mode == TravelMode.Wait)
             {
-                // Wait mode -- just advance to next point
+                // Stand still for the point's X seconds (botSetNavigationPoints passes the duration as
+                // <seconds, 0, 0>), then go on; NavPollTick ends the wait. Halcyon NodeGraph.GetNextPosition
+                // waits position.X seconds on a Wait node.
+                m_npcModule.StopMoveToTarget(data.BotID, scene);
+                data.NavWaitUntil = Environment.TickCount64 + (long)(Math.Max(0f, target.X) * 1000f);
+                data.NavWaiting = true;
                 data.NavIndex++;
-                MoveToNextNavPoint(data);
             }
             else
             {
@@ -558,12 +568,24 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             {
                 inFlight = new List<BotData>();
                 foreach (BotData d in m_bots.Values)
-                    if (d.NavInFlight) inFlight.Add(d);
+                    if (d.NavInFlight || d.NavWaiting) inFlight.Add(d);
             }
 
             foreach (BotData data in inFlight)
             {
                 if (data.MovementPaused) continue;
+
+                if (data.NavWaiting)
+                {
+                    if (Environment.TickCount64 < data.NavWaitUntil) continue;
+                    data.NavWaiting = false;
+                    try { MoveToNextNavPoint(data); }
+                    catch (Exception ex)
+                    {
+                        m_log.LogWarning("[BotManager]: nav advance for bot {0} failed: {1}", data.BotID, ex.Message);
+                    }
+                    continue;
+                }
 
                 ScenePresence sp = GetBotSP(data);
                 if (sp == null) { data.NavInFlight = false; continue; }
@@ -906,8 +928,8 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             if (data == null) return;
             data.MovementPaused = false;
 
-            // Resume navigation if we had waypoints
-            if (data.NavPoints != null && data.NavIndex < data.NavPoints.Count)
+            // Resume navigation if we had waypoints. A wait in progress is left to NavPollTick to finish.
+            if (!data.NavWaiting && data.NavPoints != null && data.NavIndex < data.NavPoints.Count)
                 MoveToNextNavPoint(data);
         }
 
