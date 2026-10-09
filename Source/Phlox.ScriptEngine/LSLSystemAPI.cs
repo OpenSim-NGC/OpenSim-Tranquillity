@@ -4444,7 +4444,15 @@ namespace Phlox.ScriptEngine
             else
             {
                 UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
-                if (acct != null) name = acct.FirstName + " " + acct.LastName;
+                if (acct == null)
+                {
+                    // SL wiki llRequestUsername: "If id is not the UUID of an avatar, the dataserver event is not raised."
+                    // llRequestDisplayName: "If the request fails for any reason, there will be no error notice or
+                    // dataserver event." The query is owed nothing any more.
+                    m_PendingDataserver.TryRemove(requestID, out _);
+                    return;
+                }
+                name = acct.FirstName + " " + acct.LastName;
             }
 
             PostDataserverEvent(requestID, name);
