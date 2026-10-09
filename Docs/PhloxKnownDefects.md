@@ -673,7 +673,14 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 
 ### Events
 `bot_update(string, integer, list)` is the only event beyond SL's set. The bot manager
-raises it for the `bot*` functions.
+raises it for the `bot*` functions, as Halcyon did: `BOT_MOVE_COMPLETE` with `[bot position]` when
+a navigation path is done; `BOT_MOVE_UPDATE` with `[next node, bot position]` each time the bot
+moves on to another point (after a teleport point too, the last one included); `BOT_MOVE_FAILED`
+with `[next node, bot position]` when a move times out; `BOT_MOVE_AVATAR_LOST` with
+`[avatar position, 0.0, bot position]`, once, when a followed avatar leaves the region (the
+position is then `ZERO_VECTOR`) or is farther than `BOT_LOST_AVATAR_DISTANCE` (default 1000 m).
+It goes to every script registered with `botRegisterForNavigationEvents`, and to the script that
+created the bot with `botCreateBot`.
 
 ### `iw*` functions (82)
 | Area | Functions |
@@ -844,10 +851,13 @@ such list.
   ([LlSetForce](https://wiki.secondlife.com/wiki/LlSetForce): "Used on an attachment, it will apply the force to the
   avatar"); the region has no way to hold a constant force on an avatar. A local force (`local` TRUE) is turned once
   by the object's rotation when it is set, not kept in the object's frame as it turns.
-- `botGetProfileParams` returns `""` for `BOT_EMAIL` and `BOT_PROFILE_URL`, and the about text and image only for a
-  bot in the same region; the bot manager keeps the values `botSetProfileParams` stores but does not hand them out.
-- `botSetNavigationPoints` with `BOT_TRAVELMODE_WAIT`: the bot manager moves on to the next point at once instead of
-  waiting.
+- `botSetNavigationPoints`: a move that times out (about 60 s) raises `BOT_MOVE_FAILED` and ends the path. Halcyon
+  teleported the bot to the point and went on, after `BOT_MOVEMENT_TELEPORT_AFTER` seconds (60 by default); that
+  option and `BOT_MOVEMENT_TYPE` (`BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY` repeats the path) are not read.
+- `botWanderWithin` raises no `bot_update`. Halcyon raised `BOT_MOVE_UPDATE` as the bot reached each wander point (when
+  there was a wait between points) and `BOT_MOVE_FAILED` when it did not reach one.
+- `botFollowAvatar` walks once toward the avatar and does not keep following it; `BOT_REQUIRES_LINE_OF_SIGHT`, the
+  start and stop following distances and the allow-running, flying and jumping options are not read.
 
 ### Prim-params rules
 - `PRIM_HEALTH` and the damage type in `PRIM_DAMAGE` are accepted and dropped. Reading them
