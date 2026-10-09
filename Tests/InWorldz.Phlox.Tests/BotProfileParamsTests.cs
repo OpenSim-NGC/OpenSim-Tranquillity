@@ -27,7 +27,8 @@ namespace InWorldz.Phlox.Tests;
 /// BOT_PROFILE_URL from the stored profile). The profile is the bot's, wherever the bot stands, so a script in another
 /// region of the same simulator reads the same values.
 /// </summary>
-// No process-wide state: each test has its own scenes and bot manager, so the class runs in parallel.
+// Runs in parallel: each test has its own scenes and bot manager. The one process-wide state it touches is the grid store
+// the test regions share, and its second region stands where no other test region is.
 public class BotProfileParamsTests
 {
     private static readonly UUID Image = new UUID("6b1c3f0e-2d4a-4e8b-9c7d-5a1f2e3b4c5d");
@@ -87,7 +88,9 @@ public class BotProfileParamsTests
         {
             // A second region on the same simulator, sharing the bot manager. The bot's owner stands only there,
             // so the bot is created there; the script that reads the profile runs in the harness's region.
-            TestScene other = new SceneHelpers().SetupScene("Example Region B", UUID.Random(), 1001, 1000);
+            // Test regions share one grid store in the process: put this one where it neighbours no other test region
+            // (a neighbour of the default region at 1000,1000 would change llEdgeOfWorld in tests running beside it).
+            TestScene other = new SceneHelpers().SetupScene("Example Region B", UUID.Random(), 7360, 7360);
             SceneHelpers.SetupSceneModules(other, h.Config,
                 new AvatarFactoryModule(), new UserManagementModule(), new AttachmentsModule(), new NPCModule(),
                 new BasicInventoryAccessModule(), bots);
