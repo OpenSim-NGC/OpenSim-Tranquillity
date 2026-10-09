@@ -172,11 +172,14 @@ public class PGSQLAuthenticationData : IAuthenticationData
 
     public bool SetDataItem(UUID principalID, string item, string value)
     {
-        string sql = string.Format("update {0} set {1} = :{1} where uuid = :UUID", m_Realm, item);
+        // The auth columns are created with quoted mixed-case names, so the column is quoted as Store() quotes
+        // it; the parameter is named as written in the statement, without the quotes.
+        string sql = string.Format("update {0} set \"{1}\" = :{1} where uuid = :UUID", m_Realm, item);
         using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
         {
-            cmd.Parameters.Add(m_database.CreateParameter("\"" + item + "\"", value));
+            cmd.Parameters.Add(m_database.CreateParameter(item, value));
+            cmd.Parameters.Add(m_database.CreateParameter("UUID", principalID));
             conn.Open();
             if (cmd.ExecuteNonQuery() > 0)
                 return true;
