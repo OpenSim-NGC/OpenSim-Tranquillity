@@ -225,7 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_pb_parcel ON persistent_bots(parcel_id, active);
 
         /// <summary>
         /// Returns true if bot persistence is available for this region.
-        /// Checks both grid-level config and region-level setting.
+        /// Checks the grid-level config only, and that the database opened.
         /// </summary>
         public bool IsEnabled()
         {
