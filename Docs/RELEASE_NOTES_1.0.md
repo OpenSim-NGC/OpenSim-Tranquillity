@@ -142,6 +142,8 @@ functions, updated constants, and a number of stability fixes.
 - Corrected 26 logging templates whose placeholders did not match their
   arguments, preserving previously supplied diagnostic values across framework,
   region, service, physics, voice and optional-module logging.
+- JPEG terrain loader methods now override the image-loader base methods, so
+  calls through a base reference no longer fall back to PNG/grayscale behavior.
 
 ---
 

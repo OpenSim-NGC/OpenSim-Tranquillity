@@ -183,12 +183,12 @@ namespace InWorldz.Phlox.Compiler
         // ── State definitions ─────────────────────────────────────────────────
 
         public override string VisitNamedStateDef([NotNull] LSLParser.NamedStateDefContext context)
-            => VisitStateBlock(context.stateBlock());
+            => EmitStateBlock(context.stateBlock());
 
         public override string VisitDefaultStateDef([NotNull] LSLParser.DefaultStateDefContext context)
-            => VisitStateBlock(context.stateBlock());
+            => EmitStateBlock(context.stateBlock());
 
-        private string VisitStateBlock(LSLParser.StateBlockContext block)
+        private string EmitStateBlock(LSLParser.StateBlockContext block)
         {
             var events = new List<string>();
             if (block != null)

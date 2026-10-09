@@ -33,12 +33,12 @@ do not close warnings by blanket suppression.
     - SYSLIB0014: OptionalModules (5), GloebitMoneyModule (2).
     - Exercise payment callbacks and failures against local fixtures; do not
       contact live payment services for validation.
-- [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 38 closed, 30 remaining**
+- [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 49 closed, 19 remaining**
   - [x] **3a: partial reads, malformed templates and the hash contract - 12 closed**
     - CA2022 (10), CA2023 (1), CS0659 (1).
   - [x] **3b: logging message templates - 26 closed**
     - CA2017 (26).
-  - [ ] **3c: inheritance and initialization - 11 remaining**
+  - [x] **3c: inheritance and initialization - 11 closed**
     - CS0114 (8), CS0108 (1), CS0649 (2).
   - [ ] **3d: ref/in call contracts - 19 remaining**
     - CS9192 (9), CS9193 (10).
@@ -77,7 +77,8 @@ from the original log, all in unchanged files:
 After Batch 1 the reconciled inventory was 661 occurrences: 264 closed and
 397 remaining. After Batch 2 it was 661 occurrences: 330 closed and 331 remaining.
 After Batch 3a it was 661 occurrences: 342 closed and 319 remaining.
-After Batch 3b it is **661 occurrences: 368 closed and 293 remaining**.
+After Batch 3b it was 661 occurrences: 368 closed and 293 remaining.
+After Batch 3c it is **661 occurrences: 379 closed and 282 remaining**.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
 
@@ -166,6 +167,34 @@ No logging call was suppressed or removed, and no control flow changed.
 - Server-side baking tests: **115 passed, 3 skipped**. The first run failed four
   tests inside Skia native-library initialization; they pass with the cached
   Linux Skia asset on `LD_LIBRARY_PATH`, as recorded for Batch 2a.
+
+## Batch 3c implementation and verification
+
+JPEG terrain loading inherited virtual implementations from
+`GenericSystemDrawing`, but declared methods with the same signatures instead of
+overriding them. Calls through a `GenericSystemDrawing` reference therefore used
+the base PNG/grayscale behavior rather than JPEG's behavior. The seven virtual
+members now override the base members: both load methods, stream loading, file
+and stream saving, tiled saving and `SupportsTileSave`. `FileExtension` remains
+an intentional interface-level hide and is marked `new`; changing the base
+property to virtual would widen this cleanup into a public base-class API change.
+
+Phlox's `GenVisitor` had a private state-block helper whose name collided with a
+generated virtual visitor method. It is now named `EmitStateBlock`, preserving
+its private-helper behavior rather than changing visitor dispatch. The SLua
+compiler's obsolete `ExprStmt` node and its four unreachable switch arms were
+removed; current call statements use `CallStmt`. An unused cross-engine test
+delegate was also removed.
+
+### Verification
+
+- Full non-incremental Release rebuild: **282 warnings, 0 errors**; exactly
+  **8 CS0114, 1 CS0108 and 2 CS0649 occurrences removed**, with no added
+  diagnostic messages. All three codes are zero.
+- New JPEG regression coverage verifies that base and interface references use
+  JPEG's tile-save, extension and unsupported-load contracts.
+- Selected JPEG and cross-engine tests: **36 passed**. Selected Phlox compiler
+  tests: **46 passed**.
 
 ## Batch 2b implementation and verification
 
