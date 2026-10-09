@@ -37,6 +37,15 @@ namespace Phlox.ScriptEngine
 
         public const ThreadPriority SUBTASK_PRIORITY = ThreadPriority.Lowest;
 
+        /// <summary>The scheduler thread's priority when [InWorldz.Phlox] SchedulerThreadPriority is not set.</summary>
+        public const ThreadPriority DefaultSchedulerThreadPriority = SUBTASK_PRIORITY;
+
+        /// <summary>
+        /// The priority of the thread that runs every script in the region (<see cref="PhloxMasterScheduler"/>).
+        /// [InWorldz.Phlox] SchedulerThreadPriority, one of the <see cref="ThreadPriority"/> names; default Lowest.
+        /// </summary>
+        public ThreadPriority SchedulerThreadPriority { get; private set; } = DefaultSchedulerThreadPriority;
+
         private Scene m_Scene;
         private IConfigSource m_ConfigSource;
         private IConfig m_Config;
@@ -220,6 +229,10 @@ namespace Phlox.ScriptEngine
             };
             m_log.LogInformation("[PhloxEngine]: ServiceCallDeferral = {0}", ServiceCallDeferral);
 
+            SchedulerThreadPriority = ReadSchedulerThreadPriority(m_Config, out string priorityWarning);
+            if (priorityWarning != null) m_log.LogWarning("[PhloxEngine]: {0}", priorityWarning);
+            m_log.LogInformation("[PhloxEngine]: SchedulerThreadPriority = {0}", SchedulerThreadPriority);
+
             // Deploy-hygiene guard: Phlox is compiled against the tree's Library/C5.dll
             // (1.1 identity). If the runtime resolves a different C5 (e.g. a NuGet 3.x
             // copy leaks into the bin dir), scripts die at first timer use with
@@ -241,6 +254,29 @@ namespace Phlox.ScriptEngine
                     "Run the SLua Tier-1 back-half proof (assemble non-LSL bytecode, run, serialize, resume).",
                     HandleSluaProofCommand);
             }
+        }
+
+        /// <summary>
+        /// [InWorldz.Phlox] SchedulerThreadPriority: a <see cref="ThreadPriority"/> name (Lowest, BelowNormal, Normal,
+        /// AboveNormal, Highest), case and surrounding spaces ignored. Unset (or no section) gives
+        /// <see cref="DefaultSchedulerThreadPriority"/> with no warning. Any other value, numbers included, gives the
+        /// default and a warning naming the value.
+        /// </summary>
+        public static ThreadPriority ReadSchedulerThreadPriority(IConfig phlox, out string warning)
+        {
+            warning = null;
+            string value = phlox?.GetString("SchedulerThreadPriority", null);
+            if (value == null) return DefaultSchedulerThreadPriority;
+            // Matched by name only: Enum.TryParse would also take numbers and comma-separated lists.
+            foreach (ThreadPriority p in Enum.GetValues<ThreadPriority>())
+            {
+                if (string.Equals(p.ToString(), value.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return p;
+            }
+            warning = string.Format(
+                "SchedulerThreadPriority = '{0}' is not one of Lowest, BelowNormal, Normal, AboveNormal, Highest; using {1}",
+                value, DefaultSchedulerThreadPriority);
+            return DefaultSchedulerThreadPriority;
         }
 
         private static bool s_sluaProofCmdRegistered = false;
@@ -275,7 +311,7 @@ namespace Phlox.ScriptEngine
             m_WorldComm = worldComm;
             m_ExeScheduler = new PhloxExecutionScheduler(WorkArrived, this, worldComm);
             m_ScriptLoader = new PhloxScriptLoader(scene.AssetService, m_ExeScheduler, WorkArrived, this);
-            m_MasterScheduler = new PhloxMasterScheduler(m_ExeScheduler, m_ScriptLoader);
+            m_MasterScheduler = new PhloxMasterScheduler(m_ExeScheduler, m_ScriptLoader, SchedulerThreadPriority);
             ListenManager = new PhloxListenManager(m_ExeScheduler, scene,
                 m_WhisperDistance, m_SayDistance, m_ShoutDistance, m_MaxListensPerScript, m_MaxListensPerRegion);
             AsyncCommands = new AsyncCommandManager(this);

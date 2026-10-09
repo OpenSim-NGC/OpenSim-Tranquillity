@@ -20,13 +20,17 @@ namespace Phlox.ScriptEngine
         private readonly PhloxExecutionScheduler m_ExeScheduler;
         private readonly PhloxScriptLoader m_ScriptLoader;
         private readonly ManualResetEvent m_ActionEvent = new ManualResetEvent(false);
+        private readonly ThreadPriority m_Priority;
         private Thread m_Thread;
         private volatile bool m_Stop = false;
 
         public bool IsRunning => !m_Stop;
 
-        public PhloxMasterScheduler(PhloxExecutionScheduler exeScheduler, PhloxScriptLoader scriptLoader)
+        /// <param name="priority">The thread's priority: [InWorldz.Phlox] SchedulerThreadPriority, see <see cref="PhloxEngine.SchedulerThreadPriority"/>.</param>
+        public PhloxMasterScheduler(PhloxExecutionScheduler exeScheduler, PhloxScriptLoader scriptLoader,
+            ThreadPriority priority = PhloxEngine.DefaultSchedulerThreadPriority)
         {
+            m_Priority = priority;
             m_ExeScheduler = exeScheduler;
             m_ScriptLoader = scriptLoader;
         }
@@ -36,7 +40,7 @@ namespace Phlox.ScriptEngine
             m_Thread = new Thread(WorkLoop)
             {
                 Name = "PhloxMasterScheduler",
-                Priority = PhloxEngine.SUBTASK_PRIORITY,
+                Priority = m_Priority,
                 IsBackground = true
             };
             m_Thread.Start();
