@@ -80,6 +80,15 @@ namespace Phlox.ScriptEngine
         /// them). Scheduler-thread only, transient: never saved, dropped on resume, on a new timer and on unload.
         /// </summary>
         private readonly System.Collections.Generic.Dictionary<UUID, ulong> m_ParcelTimerLeft = new();
+        /// <summary>
+        /// The same for a script held by its object's crossing (<see cref="HoldForCrossing"/>). Scheduler-thread only,
+        /// transient: dropped when the hold ends, when the script stops and on unload.
+        /// </summary>
+        private readonly System.Collections.Generic.Dictionary<UUID, ulong> m_CrossingTimerLeft = new();
+
+        // Crossings announced by the core (EventManager.OnGroupBeginInTransit, OnGroupEndInTransit): the object's
+        // scripts to hold, or to let go when the object stayed. Posted from region threads.
+        private readonly Queue<(UUID[] Items, bool Hold)> m_CrossingHolds = new();
 
         // Pending events (posted from outside thread)
         private readonly Queue<PendingEvent> m_PendingEvents = new();
@@ -1213,6 +1222,7 @@ namespace Phlox.ScriptEngine
                 }
                 stateManager.CaptureRequestedStates();
             }
+            ProcessCrossingHolds();   // Before any capture: a crossing object's scripts are held when their state is taken
             ProcessObjectStateRequests();
             ProcessArrivedAvatars();
             ProcessExperienceLandChecks();
@@ -1256,6 +1266,7 @@ namespace Phlox.ScriptEngine
             lock (m_ParcelChecks) if (m_ParcelChecks.Count > 0) return true;
             lock (m_PermsEnds) if (m_PermsEnds.Count > 0) return true;
             lock (m_ObjectStateRequests) if (m_ObjectStateRequests.Count > 0) return true;
+            lock (m_CrossingHolds) if (m_CrossingHolds.Count > 0) return true;
             lock (m_ArrivedAvatars) if (m_ArrivedAvatars.Count > 0) return true;
             lock (m_ExperienceLandChecks) if (m_ExperienceLandChecks.Count > 0) return true;
             lock (m_ExperienceStateAnswers) if (m_ExperienceStateAnswers.Count > 0) return true;
@@ -1558,6 +1569,9 @@ namespace Phlox.ScriptEngine
                 events = new List<PendingEvent>(m_PendingEvents);
                 m_PendingEvents.Clear();
             }
+            // A crossing's hold is asked for before any event raised during it is posted: taken after this batch was,
+            // it covers every such event in the batch.
+            ProcessCrossingHolds();
 
             foreach (var pe in events)
             {
@@ -1579,6 +1593,24 @@ namespace Phlox.ScriptEngine
                     && (pe.Evt.EventType == SupportedEventList.Events.STATE_ENTRY || pe.Evt.EventType == SupportedEventList.Events.STATE_EXIT))
                 {
                     pe.Evt.SignalCompleted();
+                    script.ScriptState.QueueEvent(pe.Evt);
+                    continue;
+                }
+
+                // A script held only by its object's crossing keeps what arrives, in order, on its own queue: it travels
+                // with the script's state, or runs where the object stayed when the crossing fails. Halcyon
+                // (ExecutionScheduler, pending events): "CrossingWait scripts should not drop events ... everything
+                // should be queued". Chat is not kept: Halcyon took a held script's listens away (AfterDisable ->
+                // DeleteListener) and gave them back when the hold ended, so nothing they would have heard reached it.
+                if (IsHeldOnlyForCrossing(script.ScriptState))
+                {
+                    pe.Evt.SignalCompleted();   // It runs after the crossing, or in the next region; nobody waits that long
+                    if (pe.Evt.EventType == SupportedEventList.Events.LISTEN) continue;
+                    if (script.ScriptState.EventQueue.Count >= MAX_EVENT_QUEUE_DEPTH && !OverflowsQueueLimit(pe.Evt.EventType))
+                    {
+                        CountQueueFullDrop(pe.ItemId, pe.Evt.EventType);
+                        continue;
+                    }
                     script.ScriptState.QueueEvent(pe.Evt);
                     continue;
                 }
@@ -2029,6 +2061,14 @@ namespace Phlox.ScriptEngine
                 if (m_ObjectStateRequests.Count == 0) return;
                 batch = new List<ObjectStateRequest>(m_ObjectStateRequests);
                 m_ObjectStateRequests.Clear();
+            }
+            // A crossing asks for its hold before its capture, so the hold is taken first, and events posted before the
+            // capture was asked for are put on their scripts' queues: a held script carries them (ProcessEventQueue
+            // keeps what reaches a held script).
+            if (batch.Exists(r => r.Items != null))
+            {
+                ProcessCrossingHolds();
+                ProcessEventQueue();
             }
             foreach (var req in batch)
             {
@@ -2502,7 +2542,13 @@ namespace Phlox.ScriptEngine
             m_ParcelStats.Resumed++;
             script.SetScriptEventFlags();
             bool hadLeft = m_ParcelTimerLeft.Remove(script.ItemId, out ulong left);
-            if (!st.Enabled) return;
+            if (!st.Enabled)
+            {
+                // Still held by a crossing: the time left waits for the hold's end (EndCrossingHold)
+                if (hadLeft && (st.LocalDisable & RuntimeState.LocalDisableFlag.CrossingWait) != 0)
+                    m_CrossingTimerLeft.TryAdd(script.ItemId, left);
+                return;
+            }
 
             if (st.TimerInterval > 0 && !m_TimerHandles.ContainsKey(script.ItemId))
             {
@@ -2530,6 +2576,123 @@ namespace Phlox.ScriptEngine
             m_log.LogDebug("[PhloxExe]: {0} resumed: the parcel allows it", script.ItemId);
         }
 
+        // ── Crossing hold ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// The core announced that <paramref name="group"/> starts to cross into another region (<paramref name="hold"/>
+        /// true), or that a crossing ended with the object still here (false). The object's scripts are listed now, on
+        /// the region thread; the hold is taken on this scheduler's thread before its next capture.
+        /// </summary>
+        internal void RequestCrossingHold(SceneObjectGroup group, bool hold)
+        {
+            var items = new List<UUID>();
+            foreach (SceneObjectPart part in group.Parts)
+                foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
+                    items.Add(item.ItemID);
+            if (items.Count == 0) return;
+            lock (m_CrossingHolds) m_CrossingHolds.Enqueue((items.ToArray(), hold));
+            m_WorkArrived?.Invoke();
+        }
+
+        private void ProcessCrossingHolds()
+        {
+            List<(UUID[] Items, bool Hold)> batch;
+            lock (m_CrossingHolds)
+            {
+                if (m_CrossingHolds.Count == 0) return;
+                batch = new List<(UUID[] Items, bool Hold)>(m_CrossingHolds);
+                m_CrossingHolds.Clear();
+            }
+            foreach (var (items, hold) in batch)
+                foreach (UUID itemId in items)
+                {
+                    if (!m_AllScripts.TryGetValue(itemId, out Interpreter script)) continue;
+                    if (!m_Apis.TryGetValue(itemId, out LSLSystemAPI api)) continue;
+                    if (hold) HoldForCrossing(script, api);
+                    else EndCrossingHold(script, api);
+                }
+        }
+
+        private static bool IsHeldOnlyForCrossing(RuntimeState st)
+            => st.GeneralEnable && st.LocalDisable == RuntimeState.LocalDisableFlag.CrossingWait;
+
+        /// <summary>
+        /// Hold a crossing object's script until the crossing ends: Halcyon's crossing wait (EngineInterface
+        /// OnGroupBeginInTransit -> CrossingWaitDisable -> AfterDisable). Nothing runs: the script comes off the run
+        /// queue with its RunState, frame and globals as they are, and its wakes (sleep, timer, touch repeat, event-delay
+        /// floor) come off the heap, the timer keeping the time it had left. Events that arrive wait on its queue
+        /// (ProcessEventQueue). Its sensor repeat stops, and the replies it is still owed (dataserver, HTTP, XML-RPC) are
+        /// dropped, as Halcyon's OnScriptUnloaded removed its async handlers. Taken controls stay: Halcyon kept them
+        /// for a crossing wait, so the script's state still holds them when it is captured. A script that is stopped or
+        /// paused by the parcel has nothing armed; it only gets the mark.
+        /// </summary>
+        private void HoldForCrossing(Interpreter script, LSLSystemAPI api)
+        {
+            var st = script.ScriptState;
+            if ((st.LocalDisable & RuntimeState.LocalDisableFlag.CrossingWait) != 0) return;
+            bool wasEnabled = st.Enabled;
+            st.LocalDisable |= RuntimeState.LocalDisableFlag.CrossingWait;
+            if (!wasEnabled) return;
+
+            RemoveFromRunQueue(script.ItemId);
+            RemoveWake(m_StdSleepHandles, script.ItemId);
+            ulong? timerLeft = TimerTimeLeft(script);
+            if (timerLeft.HasValue) m_CrossingTimerLeft[script.ItemId] = timerLeft.Value;
+            RemoveWake(m_TimerHandles, script.ItemId);
+            RemoveWake(m_TouchHandles, script.ItemId);
+            RemoveWake(m_MinDelayHandles, script.ItemId);
+            api.OnCrossingHold();
+            script.SetScriptEventFlags();
+        }
+
+        /// <summary>
+        /// The crossing failed and the object stayed here: the script carries on where it was, as Halcyon's
+        /// CrossingWaitEnable -> InjectScript did. A running script goes back on the run queue, a sleeping one waits
+        /// out the rest of its sleep, an idle one runs what was queued for it in order, the timer comes back with the
+        /// time it had left, and the sensor repeat starts again. A script that is stopped or paused by the parcel
+        /// stays so, and the timer's time left goes with that pause.
+        /// </summary>
+        private void EndCrossingHold(Interpreter script, LSLSystemAPI api)
+        {
+            var st = script.ScriptState;
+            if ((st.LocalDisable & RuntimeState.LocalDisableFlag.CrossingWait) == 0) return;
+            st.LocalDisable &= ~RuntimeState.LocalDisableFlag.CrossingWait;
+            script.SetScriptEventFlags();
+            bool hadLeft = m_CrossingTimerLeft.Remove(script.ItemId, out ulong left);
+            if (!st.Enabled)
+            {
+                if (hadLeft && (st.LocalDisable & RuntimeState.LocalDisableFlag.Parcel) != 0)
+                    m_ParcelTimerLeft.TryAdd(script.ItemId, left);
+                else if (hadLeft && !st.GeneralEnable)
+                    m_StoppedTimerLeft.TryAdd(script.ItemId, left);
+                return;
+            }
+
+            if (st.TimerInterval > 0 && !m_TimerHandles.ContainsKey(script.ItemId))
+            {
+                if (hadLeft) ResumeTimerWithTimeLeft(script, left);
+                else TrackTimer(script, InWorldz.Phlox.Util.Clock.Now + (ulong)st.TimerInterval, false);
+            }
+            api.RestoreSensorAfterParcel();
+
+            switch (st.RunState)
+            {
+                case RuntimeState.Status.Running:
+                    AddToRunQueue(script);
+                    break;
+                case RuntimeState.Status.Sleeping:
+                    if (!m_StdSleepHandles.ContainsKey(script.ItemId))
+                        TrackSleep(script, st.NextWakeup);
+                    break;
+                case RuntimeState.Status.Waiting:
+                    bool queued;
+                    lock (st.EventQueueLock) queued = st.EventQueue != null && st.EventQueue.Count > 0;
+                    if (queued) DeliverNextQueuedEvent(script);
+                    break;
+                // Syscall: the return arrives as usual and queues it.
+            }
+        }
+
         private void RemoveWake(System.Collections.Generic.Dictionary<UUID, C5.IPriorityQueueHandle<SleepEntry>> handles, UUID itemId)
         {
             if (handles.TryGetValue(itemId, out var h))
@@ -2549,6 +2712,7 @@ namespace Phlox.ScriptEngine
         private void KeepTimerLeftForParcel(Interpreter script)
         {
             if (script.ScriptState.TimerInterval <= 0) return;
+            if (m_CrossingTimerLeft.ContainsKey(script.ItemId)) return;   // a crossing hold keeps it; its end passes it on
             ulong left = 0;
             if (m_TimerHandles.TryGetValue(script.ItemId, out var h))
             {
@@ -2751,10 +2915,11 @@ namespace Phlox.ScriptEngine
 
         private void AddToRunQueue(Interpreter script)
         {
-            // A script paused by the parcel is never queued. RunState is left as it is (a syscall return has
-            // already set Running), and ResumeForParcel queues it by that RunState. This one gate covers a syscall
-            // return, a reset, the owner's Running checkbox and a queued-event delivery.
-            if ((script.ScriptState.LocalDisable & RuntimeState.LocalDisableFlag.Parcel) != 0)
+            // A script paused by the parcel, or held by its object's crossing, is never queued. RunState is left as it
+            // is (a syscall return has already set Running), and ResumeForParcel or EndCrossingHold queues it by that
+            // RunState. This one gate covers a syscall return, a reset, the owner's Running checkbox and a queued-event
+            // delivery.
+            if ((script.ScriptState.LocalDisable & (RuntimeState.LocalDisableFlag.Parcel | RuntimeState.LocalDisableFlag.CrossingWait)) != 0)
                 return;
 
             // Suspended scripts never enter the run queue (removal at suspend + this gate
@@ -2799,6 +2964,7 @@ namespace Phlox.ScriptEngine
         private void UnregisterFromNotifications(Interpreter script)
         {
             m_ParcelTimerLeft.Remove(script.ItemId);
+            m_CrossingTimerLeft.Remove(script.ItemId);
             m_StoppedTimerLeft.Remove(script.ItemId);
             C5.IPriorityQueueHandle<SleepEntry> h;
             if (m_StdSleepHandles.TryGetValue(script.ItemId, out h))

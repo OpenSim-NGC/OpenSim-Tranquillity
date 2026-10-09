@@ -338,8 +338,9 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - State another engine wrote (YEngine, XEngine), state in a newer envelope version, and
     state that cannot be read are refused: the script starts fresh and the object always
     rezzes. YEngine refuses Phlox's state the same way.
-  - Events that arrive while an object is between regions are not held for it (no crossing
-    wait).
+  - An event that reaches a crossing object's script after its state was captured, and
+    before the object has left, reaches the copy left behind and is lost when the crossing
+    succeeds. Halcyon's crossing wait has the same gap.
   - A script that arrives on a parcel where scripts may not run is paused, and the arrival's
     `changed` event is dropped with whatever else reaches a paused script. SL queues it and
     posts it once the object is somewhere scripts run.
@@ -356,6 +357,29 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     same 10 seconds.
   - A script held stopped because its row could not be read carries no state.
   - Objects saved by an earlier Phlox build carry no Phlox state and start fresh as before.
+- **A crossing holds the object's scripts.** When an object starts to cross into another
+  region (a region crossing, or an object teleport to another region), the simulator
+  announces it (`EventManager.OnGroupBeginInTransit`) before the transfer starts, and Phlox
+  holds every script of the object until the crossing ends
+  (`EventManager.OnGroupEndInTransit`), as Halcyon's crossing wait did. While held:
+  - nothing runs: an event in progress stops where it is, and a sleep, the timer and the
+    touch repeat stop;
+  - every event that reaches the script waits on its queue, in order, up to the usual 64,
+    except chat on its listens, which is dropped (Halcyon took a held script's listens away);
+  - the sensor repeat stops, and replies still owed to it (dataserver, HTTP, XML-RPC) are
+    dropped, as Halcyon's crossing wait did; taken controls stay.
+
+  The state the crossing captures includes the held events: they run in the new region, in
+  the order they came, and not in the region the object left. When the crossing fails
+  (no region beyond, or the transfer is refused) the object is put back inside the region
+  and its scripts carry on there: the held events run in order, each once, the timer comes
+  back with the time it had left, and the sensor repeat starts again. Scripts of other
+  objects are not held. The SL wiki says nothing about events during a crossing; it says
+  events are "queued FIFO" and that when a script is paused "pending events are preserved"
+  ([LSL Events](https://wiki.secondlife.com/wiki/Category:LSL_Events)).
+
+  Before this hold, an event that reached the object during a crossing ran in the region it
+  was leaving, and could run a second time in the new one.
 - **Carried state is checked as input from outside.** It can come from anywhere: inventory
   from another grid, a Hypergrid visitor's attachments, an object another resident made.
   - It must fit the compiled script it is loaded for: its state index, its number of

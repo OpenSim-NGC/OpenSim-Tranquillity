@@ -316,6 +316,8 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptAtRotTargetEvent    += OnScriptAtRotTargetEvent;
             m_Scene.EventManager.OnScriptNotAtRotTargetEvent += OnScriptNotAtRotTargetEvent;
             m_Scene.EventManager.OnObjectBeingRemovedFromScene += OnObjectBeingRemovedFromScene;
+            m_Scene.EventManager.OnGroupBeginInTransit += OnGroupBeginInTransit;
+            m_Scene.EventManager.OnGroupEndInTransit += OnGroupEndInTransit;
             // The triggers for the No Scripts parcel check (the scene's parcel-crossing events and the land events)
             m_Scene.EventManager.OnGroupCrossedToNewParcel   += OnGroupCrossedToNewParcel;
             m_Scene.EventManager.OnObjectOwnerOrGroupChanged += OnObjectOwnerOrGroupChanged;
@@ -584,6 +586,8 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptColliding         -= OnScriptColliding;
             m_Scene.EventManager.OnScriptColliderStart     -= OnScriptColliderStart;
             m_Scene.EventManager.OnObjectBeingRemovedFromScene -= OnObjectBeingRemovedFromScene;
+            m_Scene.EventManager.OnGroupBeginInTransit -= OnGroupBeginInTransit;
+            m_Scene.EventManager.OnGroupEndInTransit -= OnGroupEndInTransit;
             m_Scene.EventManager.OnGroupCrossedToNewParcel   -= OnGroupCrossedToNewParcel;
             m_Scene.EventManager.OnObjectOwnerOrGroupChanged -= OnObjectOwnerOrGroupChanged;
             m_Scene.EventManager.OnLandObjectAdded           -= OnLandObjectChanged;
@@ -1052,6 +1056,28 @@ namespace Phlox.ScriptEngine
 
         private void OnGroupCrossedToNewParcel(SceneObjectGroup group, ILandObject oldParcel, ILandObject newParcel)
             => m_ExeScheduler?.RequestParcelCheck(group);
+
+        // ── Crossing hold ────────────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// An object starts to cross into another region: its scripts are held until the crossing ends, keeping the
+        /// events that reach them (Halcyon EngineInterface.EventManager_OnGroupBeginInTransit).
+        /// </summary>
+        private void OnGroupBeginInTransit(SceneObjectGroup group)
+        {
+            if (!group.IsAttachment) m_ExeScheduler?.RequestCrossingHold(group, hold: true);
+        }
+
+        /// <summary>
+        /// A crossing ended. When the object stayed here its scripts carry on, with what they kept while held. When it
+        /// left, its scripts here are removed with it and their state, held queue included, carries on in the next
+        /// region (Halcyon EngineInterface.EventManager_OnGroupEndInTransit acts only on a failure). A group the
+        /// crossing deleted (die or return at the region's edge) has its scripts removed too.
+        /// </summary>
+        private void OnGroupEndInTransit(SceneObjectGroup group, bool crossed)
+        {
+            if (!crossed && !group.IsDeleted && !group.IsAttachment) m_ExeScheduler?.RequestCrossingHold(group, hold: false);
+        }
 
         private void OnObjectOwnerOrGroupChanged(SceneObjectGroup group, UUID oldOwner, UUID newOwner, UUID oldGroup, UUID newGroup)
         {
