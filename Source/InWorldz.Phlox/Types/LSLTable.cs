@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 namespace InWorldz.Phlox.Types
 {
@@ -12,7 +13,9 @@ namespace InWorldz.Phlox.Types
     /// an insertion-ordered key list. The ordering makes iteration stable and, crucially, makes
     /// serialization deterministic so a table survives serialize -> deserialize -> resume mid-pairs.
     /// Keys are normalized: an integral number -> boxed int, strings -> string (so t[1] and t[1.0]
-    /// address the same slot, matching Lua). Length = the contiguous integer-key sequence from 1.
+    /// address the same slot, matching Lua). LSLList keys use reference identity, as Lua reference
+    /// values do, even though LSLList has content equality for .NET callers. Length = the contiguous
+    /// integer-key sequence from 1.
     ///
     /// Metatable seam (deferred): all key access funnels through Get/Set, so __index/__newindex can
     /// later hook here (on miss, consult a _metatable field) without touching the VM opcodes or the
@@ -22,6 +25,7 @@ namespace InWorldz.Phlox.Types
     {
         public const int MEM_OVERHEAD = 32;
 
+        private static readonly IEqualityComparer<object> s_keyComparer = new LuaKeyComparer();
         private readonly Dictionary<object, object> _map;
         private readonly List<object> _keys;   // insertion order (stable iteration + serialization)
         private int _memorySize;
@@ -43,7 +47,7 @@ namespace InWorldz.Phlox.Types
 
         public LSLTable()
         {
-            _map = new Dictionary<object, object>();
+            _map = new Dictionary<object, object>(s_keyComparer);
             _keys = new List<object>();
             _memorySize = 0;
         }
@@ -51,7 +55,7 @@ namespace InWorldz.Phlox.Types
         /// <summary>Rebuild from ordered (key,value) pairs — used by deserialization.</summary>
         public LSLTable(IList<object> keys, IList<object> values)
         {
-            _map = new Dictionary<object, object>(keys.Count);
+            _map = new Dictionary<object, object>(keys.Count, s_keyComparer);
             _keys = new List<object>(keys.Count);
             for (int i = 0; i < keys.Count; i++)
             {
@@ -97,7 +101,11 @@ namespace InWorldz.Phlox.Types
 
             if (value == null)
             {
-                if (_map.Remove(k)) _keys.Remove(k);
+                if (_map.Remove(k))
+                {
+                    int index = IndexOfKey(k);
+                    if (index >= 0) _keys.RemoveAt(index);
+                }
             }
             else
             {
@@ -136,7 +144,7 @@ namespace InWorldz.Phlox.Types
             else
             {
                 object k = NormalizeKey(key);
-                idx = _keys.IndexOf(k);
+                idx = IndexOfKey(k);
             }
 
             int ni = idx + 1;
@@ -145,6 +153,17 @@ namespace InWorldz.Phlox.Types
             nextKey = _keys[ni];
             nextValue = _map[_keys[ni]];
             return true;
+        }
+
+        private int IndexOfKey(object key)
+        {
+            for (int i = 0; i < _keys.Count; i++)
+            {
+                if (s_keyComparer.Equals(_keys[i], key))
+                    return i;
+            }
+
+            return -1;
         }
 
         private void CalcMemSize()
@@ -172,6 +191,25 @@ namespace InWorldz.Phlox.Types
             const int MAX_MEMORY = 0x20000;
             if (_memorySize > MAX_MEMORY)
                 throw new CheckException("Out of memory");
+        }
+
+        private sealed class LuaKeyComparer : IEqualityComparer<object>
+        {
+            public new bool Equals(object x, object y)
+            {
+                if (x is LSLList || y is LSLList)
+                    return ReferenceEquals(x, y);
+
+                return EqualityComparer<object>.Default.Equals(x, y);
+            }
+
+            public int GetHashCode(object obj)
+            {
+                if (obj is LSLList)
+                    return RuntimeHelpers.GetHashCode(obj);
+
+                return EqualityComparer<object>.Default.GetHashCode(obj);
+            }
         }
     }
 }

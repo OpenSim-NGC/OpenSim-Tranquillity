@@ -136,14 +136,14 @@ functions, updated constants, and a number of stability fixes.
 - Fixed ten stream reads that assumed a single read returns every requested byte.
   A short read previously left the remainder of the buffer zero-filled, which
   could truncate a cloned HTTP request body, an estate terrain download, a web
-  stats log tail or a map tile signature check.
+  stats log tail or a map tile signature check. Web stats log tails also tolerate
+  concurrent truncation and close their shared-read file stream on every path.
 - Phlox's `LSLList` now overrides `GetHashCode` to agree with its `Equals`, so
-  equal lists hash alike and can be found in a dictionary or set.
+  equal lists hash alike and can be found in a dictionary or set. SLua tables
+  retain Lua reference identity for separately constructed list keys.
 - Corrected 26 logging templates whose placeholders did not match their
   arguments, preserving previously supplied diagnostic values across framework,
   region, service, physics, voice and optional-module logging.
-- JPEG terrain loader methods now override the image-loader base methods, so
-  calls through a base reference no longer fall back to PNG/grayscale behavior.
 - Updated vector and quaternion helper calls to honor their readonly-reference
   contracts explicitly, avoiding hidden temporary values in scene, physics,
   caps and Phlox paths.

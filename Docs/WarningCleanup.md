@@ -101,16 +101,19 @@ worked on truncated data:
   `ReadAsByteArrayAsync`, which does not depend on a seekable content stream or
   on one read returning `Length` bytes. The outbound URL filter, redirect limit
   and failure handling are unchanged.
-- Estate terrain download, the data snapshot notification drain and the web stats
-  log tail now read exactly, or explicitly tolerate a short read where the bytes
-  are discarded.
+- Estate terrain download reads exactly, and the data snapshot notification drain
+  explicitly tolerates a short read where the bytes are discarded. The web stats
+  log tail tolerates concurrent truncation, decodes only available bytes and
+  disposes its shared-read file stream on every path.
 - A Phlox test's loopback HTTP server keeps its deliberate single read; the
   discarded result is now explicit.
 
 `LSLList` overrode `Object.Equals` without `GetHashCode`, so equal lists hashed
 differently and a list could not be found in a dictionary or set. It now hashes
 its length and members, with null members contributing a stable value.
-Equality itself is unchanged.
+Equality itself is unchanged. SLua tables use a dedicated comparer for list keys:
+separately constructed lists remain distinct keys by reference, matching Lua,
+while ordinary .NET dictionaries retain the `Equals`/`GetHashCode` contract.
 
 The Meshmerizer's unbalanced `[Mesh}` log prefix is now `[MESH]`, matching the
 other messages in that file and leaving the template without stray braces.
@@ -121,8 +124,9 @@ other messages in that file and leaving the template without stray braces.
   **12 occurrences removed**, with no added diagnostic messages.
   CA2022, CA2023 and CS0659 are all zero.
 - New regression coverage: `LSLListHashTests` (equal lists hash alike, dictionary
-  and set lookup, empty lists, differing lengths) and a `HttpRequestTests` clone
-  test whose body stream returns one byte per read.
+  and set lookup, empty lists, differing lengths), `LSLTableKeyTests` (equal list
+  instances remain separate keys through lookup, removal, iteration and rebuild)
+  and a `HttpRequestTests` clone test whose body stream returns one byte per read.
 - Selected Phlox list/outbound/mesh tests: **61 passed**. Selected CoreModules
   render, estate, terrain and archiver tests: **58 passed**.
 - Two failures are pre-existing on `develop` and unrelated to this batch:
@@ -157,7 +161,10 @@ already pass:
   placeholders were renumbered to `{0}`-`{3}`, which labels all four coordinates
   correctly and still prints the header once.
 
-No logging call was suppressed or removed, and no control flow changed.
+No logging call was suppressed or removed. Correcting the authentication and
+terrain templates also restores their intended failure paths: authentication
+can return its failure response, and terrain recovery can log and continue
+instead of throwing while formatting the diagnostic.
 
 ### Verification
 
@@ -173,12 +180,14 @@ No logging call was suppressed or removed, and no control flow changed.
 
 JPEG terrain loading inherited virtual implementations from
 `GenericSystemDrawing`, but declared methods with the same signatures instead of
-overriding them. Calls through a `GenericSystemDrawing` reference therefore used
-the base PNG/grayscale behavior rather than JPEG's behavior. The seven virtual
-members now override the base members: both load methods, stream loading, file
-and stream saving, tiled saving and `SupportsTileSave`. `FileExtension` remains
-an intentional interface-level hide and is marked `new`; changing the base
-property to virtual would widen this cleanup into a public base-class API change.
+overriding them. A future call through a `GenericSystemDrawing` reference would
+therefore use the base PNG/grayscale behavior rather than JPEG's behavior,
+although current production wiring calls it through `ITerrainLoader`. The seven
+virtual members now override the base members: both load methods, stream loading,
+file and stream saving, tiled saving and `SupportsTileSave`. `FileExtension`
+remains an intentional interface-level hide and is marked `new`; changing the
+base property to virtual would widen this cleanup into a public base-class API
+change.
 
 Phlox's `GenVisitor` had a private state-block helper whose name collided with a
 generated virtual visitor method. It is now named `EmitStateBlock`, preserving
