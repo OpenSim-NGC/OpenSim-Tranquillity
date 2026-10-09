@@ -33,14 +33,14 @@ do not close warnings by blanket suppression.
     - SYSLIB0014: OptionalModules (5), GloebitMoneyModule (2).
     - Exercise payment callbacks and failures against local fixtures; do not
       contact live payment services for validation.
-- [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 49 closed, 19 remaining**
+- [x] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 68 closed, 0 remaining**
   - [x] **3a: partial reads, malformed templates and the hash contract - 12 closed**
     - CA2022 (10), CA2023 (1), CS0659 (1).
   - [x] **3b: logging message templates - 26 closed**
     - CA2017 (26).
   - [x] **3c: inheritance and initialization - 11 closed**
     - CS0114 (8), CS0108 (1), CS0649 (2).
-  - [ ] **3d: ref/in call contracts - 19 remaining**
+  - [x] **3d: ref/in call contracts - 19 closed**
     - CS9192 (9), CS9193 (10).
   - Counts include test occurrences; review production occurrences first.
 - [ ] **Batch 4 / Tier 3: production nullability - 13**
@@ -78,7 +78,8 @@ After Batch 1 the reconciled inventory was 661 occurrences: 264 closed and
 397 remaining. After Batch 2 it was 661 occurrences: 330 closed and 331 remaining.
 After Batch 3a it was 661 occurrences: 342 closed and 319 remaining.
 After Batch 3b it was 661 occurrences: 368 closed and 293 remaining.
-After Batch 3c it is **661 occurrences: 379 closed and 282 remaining**.
+After Batch 3c it was 661 occurrences: 379 closed and 282 remaining.
+After Batch 3d it is **661 occurrences: 398 closed and 263 remaining**.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
 
@@ -195,6 +196,29 @@ delegate was also removed.
   JPEG's tile-save, extension and unsupported-load contracts.
 - Selected JPEG and cross-engine tests: **36 passed**. Selected Phlox compiler
   tests: **46 passed**.
+
+## Batch 3d implementation and verification
+
+OpenMetaverse vector and quaternion helpers now expose readonly-reference
+parameters. Nine calls already passed stable variables and now mark that contract
+explicitly with `in`. Ten calls passed values from properties, indexers, nullable
+casts or constructed expressions; those values are materialized once into local
+variables before the readonly-reference call.
+
+The affected paths are scene keyframe rotation, object inertia, inventory object
+rotation, caps linkset upload, ubODE orientation, and Phlox vector normalization,
+rotation math, impulse limiting and look-at behavior. Matching Phlox test
+expectations use the same explicit readonly-reference contract. The values and
+calculation order are unchanged.
+
+### Verification
+
+- Full non-incremental Release rebuild: **263 warnings, 0 errors**; exactly
+  **9 CS9192 and 10 CS9193 occurrences removed**. Both codes are zero.
+- No diagnostic message was added. The existing `tempi` CS0168 appears at a new
+  line number because the Phlox method formatting added lines.
+- Selected Phlox rotation, position, force, terrain, keyframe and rez tests:
+  **42 passed**. Selected scene and inventory tests: **8 passed**.
 
 ## Batch 2b implementation and verification
 

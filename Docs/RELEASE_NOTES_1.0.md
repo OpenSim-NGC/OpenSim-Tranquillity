@@ -144,6 +144,9 @@ functions, updated constants, and a number of stability fixes.
   region, service, physics, voice and optional-module logging.
 - JPEG terrain loader methods now override the image-loader base methods, so
   calls through a base reference no longer fall back to PNG/grayscale behavior.
+- Updated vector and quaternion helper calls to honor their readonly-reference
+  contracts explicitly, avoiding hidden temporary values in scene, physics,
+  caps and Phlox paths.
 
 ---
 

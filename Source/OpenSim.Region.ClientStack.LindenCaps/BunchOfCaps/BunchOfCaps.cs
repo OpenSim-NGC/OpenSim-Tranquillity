@@ -1003,7 +1003,8 @@ public partial class BunchOfCaps
                     // Fix first link number
                     grp.RootPart.LinkNum++;
 
-                    Quaternion rootRotConj = Quaternion.Conjugate(rotations[0]);
+                    Quaternion rootRotation = rotations[0];
+                    Quaternion rootRotConj = Quaternion.Conjugate(in rootRotation);
                     Quaternion tmprot;
                     Vector3 offset;
 
