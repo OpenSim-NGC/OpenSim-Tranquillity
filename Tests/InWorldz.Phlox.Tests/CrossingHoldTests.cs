@@ -29,7 +29,7 @@ namespace InWorldz.Phlox.Tests;
 /// handler that waits holds the crossing there.
 /// </para>
 /// </summary>
-// Runs in parallel: regions (7400, 7400), (7400, 7399) up to (7440, 7440), (7440, 7439) are used by no other test; the
+// Runs in parallel: regions (7400, 7400), (7400, 7399) up to (7450, 7450), (7450, 7449) are used by no other test; the
 // scenes, engines and items are its own.
 public class CrossingHoldTests
 {
@@ -210,6 +210,32 @@ public class CrossingHoldTests
         Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("lm marker")), a.Text());
         a.Scene.SimChat("after", OpenSim.Framework.ChatTypeEnum.Region, 5, sog.AbsolutePosition, "tester", UUID.Random(), false);
         Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("heard after")), a.Text());
+        Assert.False(a.Heard("heard during"), a.Text());
+    }
+
+    [Fact]
+    public void ChatHeardBetweenAHoldAndAnEndTakenInOnePassIsNotKept()
+    {
+        var (a, b) = VehicleCrossingStateTests.TwoRegions(7450);
+        using var ra = a;
+        using var rb = b;
+        var (sog, item) = Rez(a, "Example Object", new Vector3(128, 128, 30));
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("entry")), a.Text());
+        var exe = (global::Phlox.ScriptEngine.PhloxExecutionScheduler)SavedStateRig.Field(a.Engine, "m_ExeScheduler");
+
+        // A failed crossing can end before the scheduler has taken its hold. While this lock is held the scheduler takes
+        // no posted event, so the hold, the events raised during it and its end all reach it in one pass.
+        lock (SavedStateRig.Field(exe, "m_PendingEvents"))
+        {
+            exe.RequestCrossingHold(sog, true);
+            LinkMessage(a, item, "marker");
+            a.Engine.PostScriptEvent(item, "listen", new object[] { 5, "tester", UUID.Random().ToString(), "during" });
+            exe.RequestCrossingHold(sog, false);
+        }
+
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("lm marker")), a.Text());
+        LinkMessage(a, item, "after");
+        Assert.True(VehicleCrossingStateTests.WaitFor(() => a.Heard("lm after")), a.Text());
         Assert.False(a.Heard("heard during"), a.Text());
     }
 }

@@ -86,13 +86,14 @@ namespace Phlox.ScriptEngine
         /// </summary>
         private readonly System.Collections.Generic.Dictionary<UUID, ulong> m_CrossingTimerLeft = new();
 
-        // Crossings announced by the core (EventManager.OnGroupBeginInTransit, OnGroupEndInTransit): the object's
-        // scripts to hold, or to let go when the object stayed. Posted from region threads.
-        private readonly Queue<(UUID[] Items, bool Hold)> m_CrossingHolds = new();
+        // Crossings announced by the core (EventManager.OnGroupBeginInTransit): the object's scripts to hold. Posted from
+        // region threads. The end of a crossing that left the object here goes on m_PendingEvents instead (CrossingEnd).
+        private readonly Queue<UUID[]> m_CrossingHolds = new();
 
-        // Pending events (posted from outside thread)
+        // Pending events (posted from outside thread). An entry with CrossingEnd set carries no event: it lets those
+        // scripts go after every event posted before it, which the hold has then already taken.
         private readonly Queue<PendingEvent> m_PendingEvents = new();
-        private struct PendingEvent { public UUID ItemId; public PostedEvent Evt; public bool GrabUpdate; }
+        private struct PendingEvent { public UUID ItemId; public PostedEvent Evt; public bool GrabUpdate; public UUID[] CrossingEnd; }
 
         // Enable/disable requests
         private readonly Queue<EnableDisableReq> m_EnableDisableQueue = new();
@@ -1575,6 +1576,12 @@ namespace Phlox.ScriptEngine
 
             foreach (var pe in events)
             {
+                if (pe.CrossingEnd != null)
+                {
+                    EndCrossingHolds(pe.CrossingEnd);
+                    continue;
+                }
+
                 Interpreter script;
                 if (!m_AllScripts.TryGetValue(pe.ItemId, out script))
                 {
@@ -2581,7 +2588,9 @@ namespace Phlox.ScriptEngine
         /// <summary>
         /// The core announced that <paramref name="group"/> starts to cross into another region (<paramref name="hold"/>
         /// true), or that a crossing ended with the object still here (false). The object's scripts are listed now, on
-        /// the region thread; the hold is taken on this scheduler's thread before its next capture.
+        /// the region thread; the hold is taken on this scheduler's thread before its next capture. The end is posted
+        /// behind the events already posted, so a crossing that ends before the scheduler has taken its hold still holds
+        /// every event raised during it.
         /// </summary>
         internal void RequestCrossingHold(SceneObjectGroup group, bool hold)
         {
@@ -2590,27 +2599,39 @@ namespace Phlox.ScriptEngine
                 foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems(InventoryType.LSL))
                     items.Add(item.ItemID);
             if (items.Count == 0) return;
-            lock (m_CrossingHolds) m_CrossingHolds.Enqueue((items.ToArray(), hold));
+            if (hold)
+                lock (m_CrossingHolds) m_CrossingHolds.Enqueue(items.ToArray());
+            else
+                lock (m_PendingEvents) m_PendingEvents.Enqueue(new PendingEvent { CrossingEnd = items.ToArray() });
             m_WorkArrived?.Invoke();
         }
 
         private void ProcessCrossingHolds()
         {
-            List<(UUID[] Items, bool Hold)> batch;
+            List<UUID[]> batch;
             lock (m_CrossingHolds)
             {
                 if (m_CrossingHolds.Count == 0) return;
-                batch = new List<(UUID[] Items, bool Hold)>(m_CrossingHolds);
+                batch = new List<UUID[]>(m_CrossingHolds);
                 m_CrossingHolds.Clear();
             }
-            foreach (var (items, hold) in batch)
+            foreach (UUID[] items in batch)
                 foreach (UUID itemId in items)
                 {
                     if (!m_AllScripts.TryGetValue(itemId, out Interpreter script)) continue;
                     if (!m_Apis.TryGetValue(itemId, out LSLSystemAPI api)) continue;
-                    if (hold) HoldForCrossing(script, api);
-                    else EndCrossingHold(script, api);
+                    HoldForCrossing(script, api);
                 }
+        }
+
+        private void EndCrossingHolds(UUID[] items)
+        {
+            foreach (UUID itemId in items)
+            {
+                if (!m_AllScripts.TryGetValue(itemId, out Interpreter script)) continue;
+                if (!m_Apis.TryGetValue(itemId, out LSLSystemAPI api)) continue;
+                EndCrossingHold(script, api);
+            }
         }
 
         private static bool IsHeldOnlyForCrossing(RuntimeState st)
