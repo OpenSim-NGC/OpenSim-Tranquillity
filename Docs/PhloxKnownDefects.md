@@ -847,9 +847,13 @@ such list.
   call from any attachment replaces it and `ZERO_VECTOR` ends it. As in Halcyon, detaching the object or resetting or
   removing the script does not end it, so a script that should stop pushing when taken off sets `ZERO_VECTOR` in its
   `attach` event; that works when the object is detached to inventory, but not when it is dropped, because by then
-  it is no longer an attachment. The force ends when the avatar leaves the region; it is not carried to the next one.
-  **No physics engine applies it yet**: ubODE, BulletSim and Jolt ignore it, so a region shows no effect until its
-  engine supports it.
+  it is no longer an attachment. When the avatar crosses or teleports to another region the force goes with it in the
+  agent data (optional fields `constant_force` and `constant_force_local`); arriving from a simulator that does not
+  send them, the avatar has no force.
+  **No physics engine in this repository applies the force yet** (ubODE, BulletSim, POS and BasicPhysics keep the
+  default `SetConstantForce`, which does nothing), so the avatar does not move. ubODE's avatar has no constant force
+  at all: its `Force` property reports the avatar's walking target velocity and setting it does nothing. An engine
+  outside this repository, such as a Jolt module, shows no effect either until it implements `SetConstantForce`.
 - `llSetForce` in an unattached physical object: a local force (`local` TRUE) is turned once by the object's rotation
   when it is set, not kept in the object's frame as it turns.
 - `botGetProfileParams` returns `""` for `BOT_EMAIL` and `BOT_PROFILE_URL`, and the about text and image only for a

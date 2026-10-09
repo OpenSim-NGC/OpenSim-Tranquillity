@@ -5036,6 +5036,12 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         cAgent.MotionState = (byte)Animator.currentControlState;
 
+        lock (m_constantForceLock)
+        {
+            cAgent.ConstantForce = ConstantForce;
+            cAgent.ConstantForceIsLocal = ConstantForceIsLocal;
+        }
+
         Scene.AttachmentsModule?.CopyAttachments(this, cAgent);
 
         if(isCrossUpdate)
@@ -5194,6 +5200,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
         if (cAgent.MotionState != 0)
             Animator.currentControlState = (ScenePresenceAnimator.motionControlStates) cAgent.MotionState;
+
+        // The force came with the avatar; agent data without it means none. The actor made when the avatar
+        // becomes a root agent here is handed it.
+        SetConstantForce(cAgent.ConstantForce, cAgent.ConstantForceIsLocal);
 
         m_crossingFlags = cAgent.CrossingFlags;
         m_gotCrossUpdate = (m_crossingFlags != 0);
@@ -5925,8 +5935,8 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
 
     /// <summary>
     /// Set the avatar's constant force; a zero force ends it, and a force that is not finite is ignored. The
-    /// presence keeps it, so a new physics actor (after sitting and standing, for example) gets it too. It ends
-    /// when the avatar leaves the region: it is not carried to the next region.
+    /// presence keeps it, so a new physics actor (after sitting and standing, for example) gets it too. When the
+    /// avatar leaves the region it ends here and goes with the avatar in its agent data (CopyTo, CopyFrom).
     /// </summary>
     public void SetConstantForce(Vector3 force, bool local)
     {

@@ -38,7 +38,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// The constant force an attachment's llSetForce puts on its wearer ("Used on an attachment, it will apply the
     /// force to the avatar", SL wiki llSetForce). The presence holds it and hands it to its physics actor: on each
     /// change, and again to a new actor (sitting and standing, or a teleport in the region, replaces the actor).
-    /// A zero force ends it, and so does the avatar leaving the region (becoming a child agent here).
+    /// A zero force ends it. When the avatar leaves the region (becoming a child agent here) it ends here and goes
+    /// with the avatar in its agent data, as Halcyon's ScenePresence.CopyTo and CopyFrom carry it.
     /// </summary>
     public class ScenePresenceConstantForceTests : OpenSimTestCase
     {
@@ -168,6 +169,64 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             Assert.Equal(Vector3.Zero, sp.ConstantForce);
             Assert.False(sp.ConstantForceIsLocal);
+        }
+
+        [Fact]
+        public void TheForceGoesIntoTheAgentDataSentOnward()
+        {
+            TestHelpers.InMethod();
+            ScenePresence sp = NewPresence();
+            sp.SetConstantForce(new Vector3(3, 0, 4), true);
+
+            AgentData data = new AgentData();
+            sp.CopyTo(data, false);
+
+            Assert.Equal(new Vector3(3, 0, 4), data.ConstantForce);
+            Assert.True(data.ConstantForceIsLocal);
+        }
+
+        [Fact]
+        public void AnArrivingAvatarTakesTheForceFromItsAgentData()
+        {
+            TestHelpers.InMethod();
+            TestScene scene = new SceneHelpers().SetupScene();
+            ScenePresence source = SceneHelpers.AddScenePresence(scene, TestHelpers.ParseTail(0x1));
+            ScenePresence arriving = SceneHelpers.AddChildScenePresence(scene, TestHelpers.ParseTail(0x2));
+            source.SetConstantForce(new Vector3(0, 6, 0), true);
+            AgentData data = new AgentData();
+            source.CopyTo(data, false);
+
+            arriving.UpdateChildAgent(data);
+
+            Assert.Equal(new Vector3(0, 6, 0), arriving.ConstantForce);
+            Assert.True(arriving.ConstantForceIsLocal);
+            // The actor it gets on becoming a root agent is given the force.
+            var actor = new Recorder();
+            SetActor(arriving, actor);
+            Assert.Equal(new[] { (new Vector3(0, 6, 0), true) }, actor.Given);
+        }
+
+        [Fact]
+        public void AnAvatarArrivingWithNoForceInItsAgentDataHasNone()
+        {
+            TestHelpers.InMethod();
+            TestScene scene = new SceneHelpers().SetupScene();
+            ScenePresence source = SceneHelpers.AddScenePresence(scene, TestHelpers.ParseTail(0x1));
+            ScenePresence arriving = SceneHelpers.AddChildScenePresence(scene, TestHelpers.ParseTail(0x2));
+            source.SetConstantForce(new Vector3(0, 6, 0), true);
+            AgentData withForce = new AgentData();
+            source.CopyTo(withForce, false);
+            arriving.UpdateChildAgent(withForce);
+
+            // Agent data from a simulator that does not send the field unpacks to no force.
+            AgentData without = new AgentData();
+            source.CopyTo(without, false);
+            without.ConstantForce = Vector3.Zero;
+            without.ConstantForceIsLocal = false;
+            arriving.UpdateChildAgent(without);
+
+            Assert.Equal(Vector3.Zero, arriving.ConstantForce);
+            Assert.False(arriving.ConstantForceIsLocal);
         }
 
         [Fact]
