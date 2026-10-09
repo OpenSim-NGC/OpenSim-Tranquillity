@@ -429,10 +429,12 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     `llGetPermissions` and `llGetPermissionsKey` answer them as in SL
     ([llRequestExperiencePermissions](https://wiki.secondlife.com/wiki/LlRequestExperiencePermissions)),
     and the grant is saved as that Experience's. From the region's own state database it
-    comes back whole, as any grant, unless the region no longer lets the Experience run (the
-    estate blocks it, or neither allows nor trusts it): then it ends as the script starts, and
-    the script gets `experience_permissions_denied` with `XP_ERROR_NOT_PERMITTED_LAND` (17)
-    once, as below for a parcel. From carried state it comes back only when
+    comes back whole, as any grant, unless the region no longer lets it run (the estate blocks
+    it, or neither allows nor trusts it): then it ends as the script starts, with the controls
+    it took, and the script gets `experience_permissions_denied` once with
+    `XP_ERROR_NOT_PERMITTED_LAND` (17), as below for a parcel. The start does not ask the
+    Experience service anything: an Experience that is now disabled or suspended is found by the
+    read of its state shortly after the start (below). From carried state it comes back only when
     `llRequestExperiencePermissions` would grant it at that moment with no dialog: the script
     is still in that Experience, the Experience is allowed in the region and not blocked, and
     the granter is in the region, has not blocked it, and has allowed it (or it is trusted
@@ -616,9 +618,56 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   experience_id is NULL_KEY, then information about the script's experience is returned. In
   this situation, if the script isn't associated with an experience, an empty list is returned"
   ([LlGetExperienceDetails](https://wiki.secondlife.com/wiki/LlGetExperienceDetails)).
+- An Experience its owner has disabled, or one that is suspended, cannot be joined:
+  `llRequestExperiencePermissions` answers `experience_permissions_denied` with
+  `XP_ERROR_EXPERIENCE_DISABLED` (8) or `XP_ERROR_EXPERIENCE_SUSPENDED` (9), and 8 when both
+  apply, before the land or the avatar is looked at. `llGetExperienceDetails` gives the same code
+  and its message as the state. The SL wiki gives the codes ("The experience owner has temporarily
+  disabled the experience.", "The experience has been suspended by Linden Lab customer support.",
+  [llGetExperienceErrorMessage](https://wiki.secondlife.com/wiki/LlGetExperienceErrorMessage)) but
+  not when they are raised; YEngine raises them in the same places and order. The state is read
+  from the Experience service at each call. When the service cannot answer, the request is refused
+  with `XP_ERROR_NOT_FOUND` (6), "The sim was unable to verify the validity of the experience."
+  An Experience the service answers it does not know is refused with
+  `XP_ERROR_INVALID_EXPERIENCE` (7), "The script is associated with an experience that no longer
+  exists."
+  - A grant a script already holds ends when its Experience is disabled or suspended, whether or
+    not the script makes another call. Nothing tells a region of the change (the owner's edit is
+    stored by the Experience service, a suspension is set there alone), so the region reads the
+    state of every Experience a script in it holds a grant from: a minute after its last read,
+    and about two seconds after grants are given back at a region start or come in with an
+    object. The read runs on its own thread, one lookup at a time, and neither the scripts nor
+    the region's start wait for it. When it finds the Experience disabled or suspended, every
+    grant held from it in the region ends with the controls it took, and each script gets
+    `experience_permissions_denied` once, with 8 or 9 (8 when both apply). A call of
+    `llRequestExperiencePermissions` or `llGetExperienceDetails` that finds the same ends them
+    at once; a script refused with 8 or 9 when asking one avatar is then also told that the
+    grant it held from another has ended. The calls that use a grant do not look at the state.
+    While the Experience service answers, a grant outlives its Experience's suspension by at most
+    about a minute. A read the service does not answer changes nothing and is made again a
+    minute later; the region's log warns of it at most once every ten minutes. SL documents
+    nothing for this case; YEngine ends such a grant, with no event, at the script's next
+    permission call.
+  - `llAgentInExperience` and the key-value functions do not look at the state, as in YEngine.
 - Start-up events come in SL's order: `state_entry` (a new script), then `on_rez`, then
   `attach` (an attachment worn from inventory), then `changed(CHANGED_REGION_START)`, which every
   script started by the region's start gets, new or restored. YEngine posts them in the same order.
+- A state change, as the SL wiki's [State](https://wiki.secondlife.com/wiki/State) page lists it: "The event queue is
+  cleared.", "All listens are released." and "Repeating sensors are released." After the `state` statement the only
+  handler of the old state that runs is `state_exit`, then the new state's `state_entry`. An event posted to the
+  script before the statement, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the
+  old state while the state changes, is dropped: it runs neither in the old state's handler nor in the new state.
+  Phlox used to run such an event after the statement, now and then, when a sensor sweep or a listen delivery was
+  under way at that moment. The timer carries on into the new state, as the SL wiki says of `llSetTimerEvent`: "The
+  timer persists across state changes".
+- A reset, as the SL wiki's [llResetScript](https://wiki.secondlife.com/wiki/LlResetScript) page lists it: "Timers
+  (including repeating sensors) are cleared.", "Listeners are removed.", "The event queue is cleared." and "If it has
+  a state_entry event, then it is queued." This holds for every reset: `llResetScript`, `llResetOtherScript`,
+  `osResetAllScripts`, the viewer's Reset, a reset asked for while the script is still compiling, and starting a
+  crashed script again. The fresh script's first event is its `state_entry`. An event posted to the script before
+  the reset, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the old script while
+  it resets, is dropped. Phlox used to run such an event in the fresh script before its `state_entry` when a sensor
+  sweep or a listen delivery was under way at that moment.
 
 ---
 

@@ -337,6 +337,40 @@ public class EventQueueDropLogTests : IDisposable
         }, FullLines(l));
     }
 
+    /// <summary>
+    /// The scheduler asks to be woken when a lasting run's line is due. The clock is moved only to the times the
+    /// scheduler asks to be woken at, as its thread waits (PhloxMasterScheduler): with the only script asleep for 200 s,
+    /// a line not among those times would be written at whatever wakes the scheduler next, up to a minute late. The run's
+    /// first line is written at once; the drops after it are on the line a minute later.
+    /// </summary>
+    [Fact]
+    public void TheSchedulerWakesWhenALastingRunsLineIsDue()
+    {
+        UUID l = Start(LongSleeper, "L");
+        Say("nap");
+        Assert.True(RunUntil(() => H.Said.Contains("L asleep")), Said);
+
+        ulong t0 = m_now;
+        Touches(l, 70);                                                // 64 wait, 6 dropped: the run starts
+        ulong droppedBy = m_now;
+        Assert.Equal(0.0f, H.Engine.GetEventQueueFreeSpacePercentage(l));
+        Assert.Equal(new[] { Line(l, "6 TOUCH_START events") }, FullLines(l));
+        Touches(l, 5);                                                 // 5 more, for the minute's line
+
+        var wall = DateTime.UtcNow.AddSeconds(60);
+        while (FullLines(l).Length == 1 && DateTime.UtcNow < wall)
+        {
+            if (H.PumpOnceBusy()) continue;
+            ulong wake = H.ExeWakeUpTime();                            // a DoWork at m_now, which may write the line
+            if (FullLines(l).Length > 1) break;
+            Assert.NotEqual(ulong.MaxValue, wake);
+            if (wake > m_now) m_now = wake;
+        }
+        _out.WriteLine("drops from " + t0 + " to " + droppedBy + "; line at " + m_now);
+        Assert.Equal(new[] { Line(l, "6 TOUCH_START events"), Line(l, "5 TOUCH_START events") }, FullLines(l));
+        Assert.InRange(m_now, t0 + 60_000, droppedBy + 60_000);
+    }
+
     /// <summary>Counts its touches and takes 0.25 s over each, so it frees 4 queue slots a second.</summary>
     private const string Pacer = @"
         integer got;

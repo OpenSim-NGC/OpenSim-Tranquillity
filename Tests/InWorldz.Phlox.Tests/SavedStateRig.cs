@@ -84,6 +84,9 @@ internal static class SavedStateRig
     /// <summary>Write a row directly, as an earlier build or a damaged file left it.</summary>
     public static void PutRow(UUID itemId, UUID assetId, byte[] blob, long savedAt)
     {
+        // A test may write its row before any engine has started in this test run, and only the engine's state manager
+        // makes the database's folder (StateManager.EnsureDatabase); SQLite does not make folders.
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(System.IO.Path.GetFullPath(DbFile))!);
         using var conn = new SQLiteConnection("Data Source=" + DbFile + ";BusyTimeout=5000");
         conn.Open();
         using var cmd = conn.CreateCommand();

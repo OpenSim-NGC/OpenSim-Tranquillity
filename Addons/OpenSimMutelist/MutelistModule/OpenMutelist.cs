@@ -176,9 +176,10 @@ public class MuteListModule : ISharedRegionModule
         try
         {
             XmlRpcRequest Req = new XmlRpcRequest(method, SendParams);
-            Resp = Req.Send(server, 30000);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(30000);
+            Resp = Req.Send(server, client);
         }
-        catch (WebException ex)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or WebException)
         {
             m_log.LogError("[OS MUTELIST]: Unable to connect to mutelist " +
                     "server {0}.  Exception {1}", m_MuteListURL, ex);

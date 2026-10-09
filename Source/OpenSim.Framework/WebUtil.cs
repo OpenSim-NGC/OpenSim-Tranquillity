@@ -60,6 +60,38 @@ public static class WebUtil
     public static SocketsHttpHandler SharedSocketsHttpHandlerNoRedir = null;
     public static SocketsHttpHandler SharedSocketsHttpHandler = null;
 
+    private static int s_connectionLimit = 32;
+    private static TimeSpan s_idleTimeout = TimeSpan.FromSeconds(30);
+    private static TimeSpan s_connectionLifetime = TimeSpan.FromMinutes(3);
+    private static bool s_expectContinue;
+    private static System.Collections.Concurrent.ConcurrentDictionary<int, SocketsHttpHandler> s_connectionHandlers = new();
+    private static System.Collections.Concurrent.ConcurrentDictionary<(int Limit, bool VerifyCertificate), Lazy<SocketsHttpHandler>> s_legacyHandlers = new();
+
+    static WebUtil()
+    {
+        SetupHTTPClients(false, false, HttpClient.DefaultProxy, s_connectionLimit);
+    }
+
+    public static void ConfigureHTTPDefaults(int? connectionLimit, int? idleTimeout,
+        int? dnsTimeout, bool? expectContinue)
+    {
+        if (connectionLimit.HasValue && connectionLimit.Value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(connectionLimit));
+        if (idleTimeout.HasValue && idleTimeout.Value < -1)
+            throw new ArgumentOutOfRangeException(nameof(idleTimeout));
+        if (dnsTimeout.HasValue && dnsTimeout.Value < -1)
+            throw new ArgumentOutOfRangeException(nameof(dnsTimeout));
+
+        if (connectionLimit.HasValue)
+            s_connectionLimit = connectionLimit.Value;
+        if (idleTimeout.HasValue)
+            s_idleTimeout = idleTimeout.Value == -1 ? Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(idleTimeout.Value);
+        if (dnsTimeout.HasValue)
+            s_connectionLifetime = dnsTimeout.Value == -1 ? Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(dnsTimeout.Value);
+        if (expectContinue.HasValue)
+            s_expectContinue = expectContinue.Value;
+    }
+
     public static ExpiringKey<string> GlobalExpiringBadURLs = new(30000);
     /// <summary>
     /// Control the printing of certain debug messages.
@@ -117,9 +149,9 @@ public static class WebUtil
             ConnectTimeout = TimeSpan.FromSeconds(120),
             PreAuthenticate = false,
             UseCookies = false,
-            MaxConnectionsPerServer = MaxConnectionsPerServer,
-            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(31),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(3)
+            MaxConnectionsPerServer = MaxConnectionsPerServer > 0 ? MaxConnectionsPerServer : s_connectionLimit,
+            PooledConnectionIdleTimeout = s_idleTimeout,
+            PooledConnectionLifetime = s_connectionLifetime
         };
         
         //shh.SslOptions.ClientCertificates = null,
@@ -184,9 +216,9 @@ public static class WebUtil
             ConnectTimeout = TimeSpan.FromSeconds(120),
             PreAuthenticate = false,
             UseCookies = false,
-            MaxConnectionsPerServer = MaxConnectionsPerServer,
-            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(31),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(3)
+            MaxConnectionsPerServer = MaxConnectionsPerServer > 0 ? MaxConnectionsPerServer : s_connectionLimit,
+            PooledConnectionIdleTimeout = s_idleTimeout,
+            PooledConnectionLifetime = s_connectionLifetime
         };
         
         //shh.SslOptions.ClientCertificates = null,
@@ -239,17 +271,121 @@ public static class WebUtil
             shh.UseProxy = true;
         }
         SharedSocketsHttpHandler = shh;
+        s_connectionHandlers = new();
+        s_legacyHandlers = new();
     }
 
     public static HttpClient GetNewGlobalHttpClient(int timeout)
     {
-        var client = new HttpClient(SharedSocketsHttpHandler, false)
+        return GetNewGlobalHttpClient(timeout, 0);
+    }
+
+    public static HttpClient GetNewGlobalHttpClient(int timeout, int maxConnections)
+    {
+        SocketsHttpHandler handler = SharedSocketsHttpHandler;
+        if (maxConnections > handler.MaxConnectionsPerServer)
+        {
+            handler = s_connectionHandlers.GetOrAdd(maxConnections, limit =>
+            {
+                SocketsHttpHandler dedicated = CreateHttpHandler();
+                dedicated.MaxConnectionsPerServer = limit;
+                return dedicated;
+            });
+        }
+        var client = new HttpClient(handler, false)
         {
             Timeout = TimeSpan.FromMilliseconds(timeout > 0 ? timeout : 30000),
             MaxResponseContentBufferSize = 250 * 1024 * 1024,
         };
-        client.DefaultRequestHeaders.ExpectContinue = false;
+        client.DefaultRequestHeaders.ExpectContinue = s_expectContinue;
         return client;
+    }
+
+    public static SocketsHttpHandler CreateHttpHandler()
+    {
+        SocketsHttpHandler shared = SharedSocketsHttpHandler;
+        return new SocketsHttpHandler
+        {
+            AllowAutoRedirect = shared.AllowAutoRedirect,
+            MaxAutomaticRedirections = shared.MaxAutomaticRedirections,
+            AutomaticDecompression = shared.AutomaticDecompression,
+            ConnectTimeout = shared.ConnectTimeout,
+            PreAuthenticate = shared.PreAuthenticate,
+            UseCookies = shared.UseCookies,
+            MaxConnectionsPerServer = shared.MaxConnectionsPerServer,
+            PooledConnectionIdleTimeout = shared.PooledConnectionIdleTimeout,
+            PooledConnectionLifetime = shared.PooledConnectionLifetime,
+            SslOptions = new System.Net.Security.SslClientAuthenticationOptions
+            {
+                EnabledSslProtocols = shared.SslOptions.EnabledSslProtocols,
+                CertificateRevocationCheckMode = shared.SslOptions.CertificateRevocationCheckMode,
+                RemoteCertificateValidationCallback = shared.SslOptions.RemoteCertificateValidationCallback
+            },
+            UseProxy = shared.UseProxy,
+            Proxy = shared.Proxy
+        };
+    }
+
+    /// <summary>
+    /// Retains system-proxy behavior for callers migrated from WebRequest/WebClient,
+    /// without changing the direct transport used by existing grid-service clients.
+    /// </summary>
+    public static HttpClient GetLegacyHttpClient(int timeout, int maxConnections = 0, bool verifyCertificate = false)
+    {
+        int limit = Math.Max(maxConnections, SharedSocketsHttpHandler.MaxConnectionsPerServer);
+        SocketsHttpHandler handler = s_legacyHandlers.GetOrAdd((limit, verifyCertificate), key => new(() =>
+        {
+            SocketsHttpHandler dedicated = CreateLegacyHttpHandler(key.VerifyCertificate);
+            dedicated.MaxConnectionsPerServer = key.Limit;
+            return dedicated;
+        })).Value;
+        HttpClient client = new(handler, false)
+        {
+            Timeout = TimeSpan.FromMilliseconds(timeout > 0 ? timeout : 30000),
+            MaxResponseContentBufferSize = 250 * 1024 * 1024
+        };
+        client.DefaultRequestHeaders.ExpectContinue = s_expectContinue;
+        return client;
+    }
+
+    public static SocketsHttpHandler CreateLegacyHttpHandler(bool verifyCertificate = false)
+    {
+        SocketsHttpHandler handler = CreateHttpHandler();
+        handler.UseProxy = true;
+        handler.Proxy = SharedSocketsHttpHandler.Proxy ?? HttpClient.DefaultProxy;
+        if (verifyCertificate)
+            handler.SslOptions.RemoteCertificateValidationCallback = null;
+        return handler;
+    }
+
+    public static HttpRequestMessage CreateXmlRequest<TRequest>(string verb, string requestUrl, TRequest obj)
+    {
+        using MemoryStream buffer = new();
+        using (XmlWriter writer = XmlWriter.Create(buffer, new XmlWriterSettings { Encoding = Encoding.UTF8 }))
+            new XmlSerializer(typeof(TRequest)).Serialize(writer, obj);
+
+        HttpRequestMessage request = new(new HttpMethod(verb), requestUrl);
+        request.Content = new ByteArrayContent(buffer.ToArray());
+        request.Content.Headers.TryAddWithoutValidation("Content-Type", "text/xml");
+        return request;
+    }
+
+    public static async Task<TResponse> SendXmlRequestAsync<TRequest, TResponse>(
+        string verb, string requestUrl, TRequest obj, int timeout, IServiceAuth auth = null,
+        int maxConnections = 0, bool sendBody = true)
+    {
+        using HttpClient client = GetLegacyHttpClient(timeout, maxConnections);
+        using CancellationTokenSource cts = new(client.Timeout);
+        using HttpRequestMessage request = sendBody
+            ? CreateXmlRequest(verb, requestUrl, obj)
+            : new HttpRequestMessage(new HttpMethod(verb), requestUrl);
+        auth?.AddAuthorization(request.Headers);
+        using HttpResponseMessage response = await client.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        byte[] data = await response.Content.ReadAsByteArrayAsync(cts.Token).ConfigureAwait(false);
+        using MemoryStream stream = new(data);
+        return XMLResponseHelper.LogAndDeserialize<TResponse>(RequestNumber++, stream, data.Length);
     }
 
     public static HttpClient GetGlobalNoRedirHttpClient(int timeout)
@@ -259,8 +395,100 @@ public static class WebUtil
             Timeout = TimeSpan.FromMilliseconds(timeout > 0 ? timeout : 30000),
             MaxResponseContentBufferSize = 250 * 1024 * 1024,
         };
-        client.DefaultRequestHeaders.ExpectContinue = false;
+        client.DefaultRequestHeaders.ExpectContinue = s_expectContinue;
         return client;
+    }
+
+    public static Stream OpenHttpStream(Uri uri)
+    {
+        HttpClient client = GetLegacyHttpClient(100000);
+        HttpResponseMessage response = null;
+        try
+        {
+            using HttpRequestMessage request = new(HttpMethod.Get, uri);
+            request.Headers.ConnectionClose = true;
+            response = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
+            response.EnsureSuccessStatusCode();
+            if (response.Content.Headers.ContentLength == 0)
+                throw new IOException($"{uri} returned an empty file");
+            return new BufferedStream(new HttpResponseStream(response.Content.ReadAsStream(), response, client), 1000000);
+        }
+        catch
+        {
+            response?.Dispose();
+            client.Dispose();
+            throw;
+        }
+    }
+
+    public static void DownloadFile(string url, string filename)
+    {
+        using Stream source = OpenHttpStream(new Uri(url));
+        string temporaryFile = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(filename)), Path.GetRandomFileName());
+        try
+        {
+            using (FileStream destination = new(temporaryFile, FileMode.CreateNew, FileAccess.Write))
+                source.CopyTo(destination);
+            File.Move(temporaryFile, filename, true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryFile))
+                File.Delete(temporaryFile);
+        }
+    }
+
+    private sealed class HttpResponseStream : Stream
+    {
+        private readonly Stream m_stream;
+        private readonly HttpResponseMessage m_response;
+        private readonly HttpClient m_client;
+
+        public HttpResponseStream(Stream stream, HttpResponseMessage response, HttpClient client)
+        {
+            m_stream = stream;
+            m_response = response;
+            m_client = client;
+        }
+
+        public override bool CanRead => m_stream.CanRead;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+        public override void Flush() => m_stream.Flush();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            using CancellationTokenSource cts = new(300000);
+            return m_stream.ReadAsync(buffer.AsMemory(offset, count), cts.Token).AsTask().GetAwaiter().GetResult();
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            using CancellationTokenSource cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(300000);
+            return await m_stream.ReadAsync(buffer, cts.Token).ConfigureAwait(false);
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            return ReadAsync(buffer.AsMemory(offset, count), cancellationToken).AsTask();
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                m_stream.Dispose();
+                m_response.Dispose();
+                m_client.Dispose();
+            }
+            base.Dispose(disposing);
+        }
     }
 
     /// <summary>
@@ -911,9 +1139,10 @@ public static class AsynchronousRestObjectRequester
     /// <param name="action"></param>
     /// <returns></returns>
     ///
-    /// <exception cref="System.Net.WebException">Thrown if we encounter a
-    /// network issue while posting the request.  You'll want to make
-    /// sure you deal with this as they're not uncommon</exception>
+    /// <remarks>
+    /// Request and callback failures are logged. The callback receives the default
+    /// response when the request fails.
+    /// </remarks>
     //
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void MakeRequest<TRequest, TResponse>(string verb,
@@ -931,193 +1160,52 @@ public static class AsynchronousRestObjectRequester
     }
 
     /// <summary>
-    /// Perform a synchronous REST request.
+    /// Perform an asynchronous REST request.
     /// </summary>
     /// <param name="verb"></param>
     /// <param name="requestUrl"></param>
     /// <param name="obj"></param>
-    /// <param name="pTimeout">
-    /// Request timeout in seconds.  Timeout.Infinite indicates no timeout.  If 0 is passed then the default timeout is used (100 seconds)
-    /// </param>
+    /// <param name="action">Completion callback, invoked once even when the request fails.</param>
     /// <param name="maxConnections"></param>
-    /// <returns>
-    /// The response.  If there was an internal exception or the request timed out,
-    /// then the default(TResponse) is returned.
-    /// </returns>
+    /// <param name="auth"></param>
     public static void MakeRequest<TRequest, TResponse>(string verb,
             string requestUrl, TRequest obj, Action<TResponse> action,
             int maxConnections, IServiceAuth auth)
     {
-        int reqnum = WebUtil.RequestNumber++;
+        _ = MakeRequestAsync(verb, requestUrl, obj, action, maxConnections, auth);
+    }
 
-        if (WebUtil.DebugLevel >= 3)
-            m_log.LogDebug($"[LOGHTTP]: HTTP OUT {reqnum} AsynchronousRequestObject {verb} to {requestUrl}");
-
-        int tickstart = Util.EnvironmentTickCount();
-        int tickdata = 0;
-        int tickdiff = 0;
-
-        Type type = typeof(TRequest);
-
-        HttpWebRequest request = (HttpWebRequest)WebRequest.Create(requestUrl);
-
-        auth?.AddAuthorization(request.Headers);
-
-        request.AllowWriteStreamBuffering = false;
-
-        if (maxConnections > 0 && request.ServicePoint.ConnectionLimit < maxConnections)
-            request.ServicePoint.ConnectionLimit = maxConnections;
-
-        TResponse deserial = default;
-
-        request.Method = verb;
-
-        byte[] data = null;
+    public static async Task MakeRequestAsync<TRequest, TResponse>(string verb,
+        string requestUrl, TRequest obj, Action<TResponse> action,
+        int maxConnections = 0, IServiceAuth auth = null)
+    {
+        int ticks = Util.EnvironmentTickCount();
+        TResponse result = default;
         try
         {
-            if (verb == "POST")
-            {
-                request.ContentType = "text/xml";
-
-                XmlWriterSettings settings = new()
-                {
-                    Encoding = Encoding.UTF8
-                };
-                using (MemoryStream buffer = new())
-                using (XmlWriter writer = XmlWriter.Create(buffer, settings))
-                {
-                    XmlSerializer serializer = new(type);
-                    serializer.Serialize(writer, obj);
-                    writer.Flush();
-                    data = buffer.ToArray();
-                }
-
-                int length = data.Length;
-                request.ContentLength = length;
-
-                if (WebUtil.DebugLevel >= 5)
-                    WebUtil.LogOutgoingDetail("SEND", reqnum, System.Text.Encoding.UTF8.GetString(data));
-
-                request.BeginGetRequestStream(delegate(IAsyncResult res)
-                {
-                    using (Stream requestStream = request.EndGetRequestStream(res))
-                        requestStream.Write(data, 0, length);
-
-                    // capture how much time was spent writing
-                    tickdata = Util.EnvironmentTickCountSubtract(tickstart);
-
-                    request.BeginGetResponse(delegate(IAsyncResult ar)
-                    {
-                        using (WebResponse response = request.EndGetResponse(ar))
-                        {
-                            try
-                            {
-                                using Stream respStream = response.GetResponseStream();
-                                deserial = XMLResponseHelper.LogAndDeserialize<TResponse>(
-                                    reqnum, respStream, response.ContentLength);
-                            }
-                            catch (System.InvalidOperationException)
-                            {
-                            }
-                        }
-
-                        action(deserial);
-
-                    }, null);
-                }, null);
-            }
-            else
-            {
-                request.BeginGetResponse(delegate(IAsyncResult res2)
-                {
-                    try
-                    {
-                        // If the server returns a 404, this appears to trigger a System.Net.WebException even though that isn't
-                        // documented in MSDN
-                        using WebResponse response = request.EndGetResponse(res2);
-                        try
-                        {
-                            using Stream respStream = response.GetResponseStream();
-                            deserial = XMLResponseHelper.LogAndDeserialize<TResponse>(
-                                reqnum, respStream, response.ContentLength);
-                        }
-                        catch (System.InvalidOperationException)
-                        {
-                            try
-                            {
-                                using Stream respStream = response.GetResponseStream();
-                                deserial = XMLResponseHelper.LogAndDeserialize<TResponse>(
-                                    reqnum, respStream, response.ContentLength);
-                            }
-                            catch (System.InvalidOperationException)
-                            {
-                            }
-                        }
-                    }
-                    catch (WebException e)
-                    {
-                        if (e.Status == WebExceptionStatus.ProtocolError)
-                        {
-                            if (e.Response is HttpWebResponse httpResponse)
-                            {
-                                if (httpResponse.StatusCode != HttpStatusCode.NotFound)
-                                {
-                                    // We don't appear to be handling any other status codes, so log these feailures to that
-                                    // people don't spend unnecessary hours hunting phantom bugs.
-                                    m_log.LogDebug(
-                                        $"[ASYNC REQUEST]: Request {verb} {requestUrl} failed with unexpected status code {httpResponse.StatusCode}");
-                                }
-                                httpResponse.Dispose();
-                            }
-                        }
-                        else
-                        {
-                            m_log.LogError(
-                                $"[ASYNC REQUEST]: Request {verb} {requestUrl} failed with status {e.Status} and message {e.Message}");
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        m_log.LogError($"[ASYNC REQUEST]: Request {verb} {requestUrl} failed with exception {e.Message}");
-                    }
-
-                    //m_log.LogDebug("[ASYNC REQUEST]: Received {0}", deserial.ToString());
-
-                    try
-                    {
-                        action(deserial);
-                    }
-                    catch (Exception e)
-                    {
-                        m_log.LogError($"[ASYNC REQUEST]: Request {verb} {requestUrl} callback failed with exception {e.Message}");
-                    }
-
-                }, null);
-            }
-
-            tickdiff = Util.EnvironmentTickCountSubtract(tickstart);
-            if (tickdiff > WebUtil.LongCallTime)
-            {
-                string originalRequest = null;
-
-                if (data != null)
-                {
-                    originalRequest = Encoding.UTF8.GetString(data);
-
-                    if (originalRequest.Length > WebUtil.MaxRequestDiagLength)
-                        originalRequest = originalRequest.Remove(WebUtil.MaxRequestDiagLength);
-                }
-                 m_log.LogInformation(
-                    "[LOGHTTP]: Slow AsynchronousRequestObject request {0} {1} to {2} took {3}ms, {4}ms writing, {5}",
-                    reqnum, verb, requestUrl, tickdiff, tickdata,
-                    originalRequest);
-            }
-            else if (WebUtil.DebugLevel >= 4)
-            {
-                m_log.LogDebug($"[LOGHTTP]: HTTP OUT {reqnum} took {tickdiff}ms, {tickdata}ms writing");
-            }
+            result = await WebUtil.SendXmlRequestAsync<TRequest, TResponse>(
+                verb, requestUrl, obj, 100000, auth, maxConnections,
+                sendBody: verb == "POST").ConfigureAwait(false);
         }
-        catch { }
+        catch (Exception e)
+        {
+            m_log.LogError(e, "[ASYNC REQUEST]: Request {Verb} {Url} failed", verb, requestUrl);
+        }
+
+        try
+        {
+            action(result);
+        }
+        catch (Exception e)
+        {
+            m_log.LogError(e, "[ASYNC REQUEST]: Request {Verb} {Url} callback failed", verb, requestUrl);
+        }
+
+        ticks = Util.EnvironmentTickCountSubtract(ticks);
+        if (ticks > WebUtil.LongCallTime)
+            m_log.LogInformation("[LOGHTTP]: Slow asynchronous request {Verb} to {Url} took {Elapsed}ms", verb, requestUrl, ticks);
+        else if (WebUtil.DebugLevel >= 4)
+            m_log.LogDebug("[LOGHTTP]: HTTP OUT {Verb} to {Url} took {Elapsed}ms", verb, requestUrl, ticks);
     }
 }
 
@@ -1602,7 +1690,7 @@ public static class XMLResponseHelper
                 int remaining = (int)contentLength;
                 while (remaining > 0)
                 {
-                    curcount = respStream.Read(dataBuffer, 0, remaining);
+                    curcount = respStream.Read(dataBuffer, 0, Math.Min(remaining, blockLength));
                     if (curcount <= 0)
                         throw new EndOfStreamException($"End of stream reached with {remaining} bytes left to read");
                     ms.Write(dataBuffer, 0, curcount);

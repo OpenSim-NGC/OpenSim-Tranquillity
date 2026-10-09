@@ -120,12 +120,7 @@ public class OpenSimConsoleClient
         string user,
         string pass)
     {
-        string logPath = Environment.GetEnvironmentVariable("LOGDIR");
-        if (string.IsNullOrWhiteSpace(logPath))
-            logPath = ".";
-
-        // Console client logging uses the shared ILogger provider; the legacy log4net
-        // bootstrap file no longer participates in startup configuration.
+        // Request failures go to stderr even when no logging host is configured.
         IConfigSource config = LoadConfig(iniMaster, iniFiles);
         IConfig startupConfig = config.Configs["Startup"];
 

@@ -622,12 +622,12 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
             using (var canvas = new SKCanvas(joint))
             {
                 // Draw background
-                canvas.DrawBitmap(back, 0, 0);
+                canvas.DrawBitmap(back, 0, 0, SKSamplingOptions.Default);
 
                 // Draw foreground with alpha blending
                 if (alpha >= 255)
                 {
-                    canvas.DrawBitmap(front, 0, 0);
+                    canvas.DrawBitmap(front, 0, 0, SKSamplingOptions.Default);
                 }
                 else if (alpha > 0)
                 {
@@ -635,7 +635,7 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
                     {
                         paint.Color = new SKColor(255, 255, 255, alpha);
                         paint.BlendMode = SKBlendMode.SrcOver;
-                        canvas.DrawBitmap(front, 0, 0, paint);
+                        canvas.DrawBitmap(front, 0, 0, SKSamplingOptions.Default, paint);
                     }
                 }
             }
@@ -657,7 +657,7 @@ public class DynamicTextureModule : ISharedRegionModule, IDynamicTextureManager
                     {
                         paint.Color = new SKColor(255, 255, 255, alpha);
                         paint.BlendMode = SKBlendMode.SrcOver;
-                        canvas.DrawBitmap(b, 0, 0, paint);
+                        canvas.DrawBitmap(b, 0, 0, SKSamplingOptions.Default, paint);
                     }
                 }
             }

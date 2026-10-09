@@ -1,4 +1,5 @@
 using System;
+using Antlr4.Runtime;
 using Antlr4.Runtime.Misc;
 using Antlr4.Runtime.Tree;
 
@@ -75,12 +76,12 @@ namespace InWorldz.Phlox.Compiler
         }
 
         /// <summary>
-        /// Builds a minimal LSLAst shim from a terminal node for use as sym.Def,
+        /// Keeps the identifier token as sym.Def,
         /// so that SymbolTable.TestForDefineErrors() can report accurate line/col.
         /// </summary>
-        private static LSLAst MakeDef(ITerminalNode node)
+        private static IToken MakeDef(ITerminalNode node)
         {
-            return new LSLAst(node.Symbol);
+            return node.Symbol;
         }
 
         private void PushScope(IScope scope) => _currentScope = scope;
@@ -243,7 +244,7 @@ namespace InWorldz.Phlox.Compiler
             // StateSymbol constructor appends "(*)" internally, so pass plain "default".
             // SymbolTable.Define(StateSymbol) then checks for "default(*)" correctly.
             var stateSym = new StateSymbol("default", _currentScope);
-            stateSym.Def = new LSLAst();   // no ID token; synthetic def at line 0
+            stateSym.Def = new CommonToken(0) { Line = 0, Column = 0 };
 
             _symtab.Define(stateSym, _currentScope);
 

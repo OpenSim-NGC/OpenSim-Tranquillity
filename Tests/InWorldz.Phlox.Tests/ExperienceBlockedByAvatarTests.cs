@@ -57,7 +57,10 @@ public class ExperienceBlockedByAvatarTests
             experience_permissions_denied(key a, integer r) { llSay(0, ""NAME xpdenied="" + (string)a + "" "" + (string)r); }
         }";
 
-    /// <summary>IExperienceService stand-in: every permission change is stored, no avatar has one at login.</summary>
+    /// <summary>
+    /// IExperienceService stand-in: every permission change is stored, no avatar has one at login, and every Experience
+    /// asked about is known and enabled.
+    /// </summary>
     public class StubExperienceService : DispatchProxy
     {
         public static IExperienceService Create() => DispatchProxy.Create<IExperienceService, StubExperienceService>();
@@ -66,6 +69,8 @@ public class ExperienceBlockedByAvatarTests
         {
             if (m.Name == nameof(IExperienceService.FetchExperiencePermissions)) return new Dictionary<UUID, bool>();
             if (m.Name == nameof(IExperienceService.UpdateExperiencePermissions)) return true;
+            if (m.Name == nameof(IExperienceService.GetExperienceInfos))
+                return ((UUID[])a[0]).Select(id => new ExperienceInfo { public_id = id, name = "Example Experience" }).ToArray();
             Type rt = m.ReturnType;
             if (rt.IsArray) return Array.CreateInstance(rt.GetElementType()!, 0);
             return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);

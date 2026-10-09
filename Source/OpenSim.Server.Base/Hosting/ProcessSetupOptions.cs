@@ -11,6 +11,7 @@ namespace OpenSim.Server.Base.Hosting;
 
 /// <summary>
 /// Process-level startup settings that can be applied by hosted startup services.
+/// HTTP settings apply when shared handlers are created during server startup.
 /// </summary>
 public sealed class ProcessSetupOptions
 {
@@ -19,7 +20,8 @@ public sealed class ProcessSetupOptions
 
     public int? DefaultConnectionLimit { get; init; } = 32;
     public int? MaxServicePointIdleTime { get; init; } = 30000;
-    public int? DnsRefreshTimeout { get; init; } = 5000;
+    /// <summary>Maximum pooled-connection lifetime in milliseconds; -1 disables expiration.</summary>
+    public int? DnsRefreshTimeout { get; init; } = 180000;
     public bool? Expect100Continue { get; init; } = false;
     public bool? UseNagleAlgorithm { get; init; } = false;
 

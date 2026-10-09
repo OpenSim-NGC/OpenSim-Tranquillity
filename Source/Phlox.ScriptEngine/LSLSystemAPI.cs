@@ -591,7 +591,7 @@ namespace Phlox.ScriptEngine
             {
                 // Halcyon ScriptLoader: AsyncCommandManager.RemoveScript(engine, localId, itemId) - sensor, HTTP, XML-RPC
                 if (m_ScriptEngine != null && async != null)
-                    OpenSim.Region.ScriptEngine.Shared.Api.AsyncCommandManager.RemoveScript(m_ScriptEngine, m_localID, m_itemID);
+                    Phlox.ScriptEngine.AsyncCommand.AsyncCommandManager.RemoveScript(m_ScriptEngine, m_localID, m_itemID);
             }
             else
             {
@@ -769,8 +769,10 @@ namespace Phlox.ScriptEngine
         /// </para>
         /// <para>
         /// A grant from an Experience (llRequestExperiencePermissions) is noted with that Experience. From a row it comes
-        /// back whole, as any grant. From carried state it comes back only when llRequestExperiencePermissions would grant
-        /// it now with no dialog, by the same decision (<see cref="DecideExperienceRequest"/>): the script is still in
+        /// back whole, as any grant, unless the land no longer lets it run: then it ends as the script starts, told once with
+        /// experience_permissions_denied and XP_ERROR_NOT_PERMITTED_LAND. Whether its Experience is now disabled or suspended
+        /// is read shortly after, off the scheduler thread (<see cref="ExperienceCannotRun"/>). From carried state it comes
+        /// back only when llRequestExperiencePermissions would grant it now with no dialog, by the same decision (<see cref="DecideExperienceRequest"/>): the script is still in
         /// that Experience, the Experience is allowed here, and the granter, here, still allows it. Its granter need not
         /// wear or sit on the object, so a claim for it is decided when that avatar arrives anywhere in the region.
         /// Wherever it is restored from, it is honoured only while the script item names that same Experience; otherwise
@@ -803,6 +805,9 @@ namespace Phlox.ScriptEngine
             if (item == null || !noted || granter.IsZero() || mask == 0 || owner.IsZero() || owner != m_host.OwnerID) return;
             if (!carried && !unverified)
             {
+                // The Experience's state is not looked up here: the start never waits on the Experience service. The
+                // region reads it shortly after (SetRestoredGrant), and a disabled or suspended Experience's grant ends
+                // then (ExperienceCannotRun).
                 if (!experience.IsZero() && ExperienceCannotRunOnThisLand(experience))
                 {
                     // The land no longer lets the grant's Experience run (the estate blocks it, or neither allows nor
@@ -875,7 +880,13 @@ namespace Phlox.ScriptEngine
                 item.PermsMask = mask;
             }
             if (experience.IsZero()) ForgetExperienceGrant();
-            else NoteExperienceGrant(experience, granter);
+            else
+            {
+                NoteExperienceGrant(experience, granter);
+                // The Experience may have been disabled or suspended since the grant was given: the region reads its state
+                // shortly, off the scheduler thread, and the grant ends then if it cannot run (ExperienceCannotRun).
+                m_ScriptEngine?.ExperienceGrantRestored();
+            }
             NoteGrant(m_thisScript.ScriptState, granter, mask, m_host.OwnerID, experience);
             GrantChanged();
         }
@@ -892,6 +903,42 @@ namespace Phlox.ScriptEngine
         internal bool HoldsExperienceGrantFrom(UUID agentId)
             => m_thisScript?.ScriptState is RuntimeState st && !string.IsNullOrEmpty(st.ExperienceGrant)
                && UUID.TryParse(st.ExperienceGranter, out UUID granter) && granter == agentId;
+
+        /// <summary>The Experience this script's grant is from, or zero when it holds none from an Experience. Scheduler thread.</summary>
+        internal UUID HeldExperienceGrant()
+            => m_thisScript?.ScriptState is RuntimeState st && !string.IsNullOrEmpty(st.ExperienceGrant)
+               && UUID.TryParse(st.ExperienceGrant, out UUID experience) ? experience : UUID.Zero;
+
+        /// <summary>
+        /// <paramref name="experience"/>, which this script's grant is from, cannot run at all now: its owner disabled it
+        /// (<paramref name="code"/> XP_ERROR_EXPERIENCE_DISABLED, 8) or it is suspended (XP_ERROR_EXPERIENCE_SUSPENDED, 9),
+        /// as a read of its state or a script call's lookup found. The grant ends with the controls it took, as when the land
+        /// ends it, and the script is told once with experience_permissions_denied and that code, the code
+        /// llRequestExperiencePermissions is refused with (<see cref="ExperienceStateDenial"/>). SL wiki
+        /// experience_permissions_denied lists XP_ERROR_EXPERIENCE_DISABLED and XP_ERROR_EXPERIENCE_SUSPENDED among its
+        /// reasons. The grant is not looked at again: a later read finds none from that Experience. Scheduler thread.
+        /// </summary>
+        internal void ExperienceCannotRun(UUID experience, int code)
+        {
+            if (HeldExperienceGrant() != experience || m_thisScript?.ScriptState is not RuntimeState st
+                || !UUID.TryParse(st.ExperienceGranter, out UUID granter)) return;
+            TaskInventoryItem item = GetInventorySelf();
+            if (item == null || item.PermsGranter != granter) return;
+            EndExperienceGrant();
+            m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
+                "experience_permissions_denied", new object[] { granter.ToString(), code }, new DetectParams[0]));
+        }
+
+        /// <summary>
+        /// A lookup this script made found <paramref name="experience"/> with <paramref name="properties"/>: when it cannot
+        /// run, every grant held from it in the region ends (<see cref="ExperienceCannotRun"/>), on the scheduler thread.
+        /// Any thread.
+        /// </summary>
+        private void NoteExperienceState(UUID experience, int properties)
+        {
+            int code = ExperienceStateError(properties);
+            if (code != XP_ERROR_NONE) m_ScriptEngine?.ExperienceCannotRun(experience, code);
+        }
 
         /// <summary>
         /// <paramref name="agentId"/>, who gave this script its grant from an Experience, entered a parcel. SL wiki
@@ -19559,6 +19606,20 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         // Viewer experience-property bit PROPERTY_DISABLED (indra VP_DISABLED = 1<<6);
         // used to report the llGetExperienceDetails state field.
         private const int VP_DISABLED = 1 << 6;
+        // Viewer experience-property bit PROPERTY_SUSPENDED (indra VP_SUSPENDED = 1<<7; the core's ExperienceFlags.Suspended).
+        private const int VP_SUSPENDED = 1 << 7;
+
+        /// <summary>
+        /// The XP_ERROR an Experience's own state gives, from its viewer property bits. SL wiki llGetExperienceErrorMessage:
+        /// XP_ERROR_EXPERIENCE_DISABLED (8) "The experience owner has temporarily disabled the experience.";
+        /// XP_ERROR_EXPERIENCE_SUSPENDED (9) "The experience has been suspended by Linden Lab customer support." With both
+        /// bits set, disabled is the answer, as YEngine checks it first (LSL_Api llRequestExperiencePermissions and
+        /// llGetExperienceDetails).
+        /// </summary>
+        internal static int ExperienceStateError(int properties)
+            => (properties & VP_DISABLED) != 0 ? XP_ERROR_EXPERIENCE_DISABLED
+             : (properties & VP_SUSPENDED) != 0 ? XP_ERROR_EXPERIENCE_SUSPENDED
+             : XP_ERROR_NONE;
         // SL per-experience KV quota: 128 MiB (was NGC's 16 MiB).
         private const long MAX_DATA_QUOTA = 128L * 1024 * 1024;
 
@@ -21023,7 +21084,10 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
             var expService = GetExperienceAdapter();
             UUID experienceId = GetScriptExperienceId();
-            ExperienceAnswer answer = DecideExperienceRequest(expService, experienceId, agentId, out int denial);
+            int denial = expService == null || experienceId.IsZero() ? XP_ERROR_NONE : ExperienceStateDenial(expService, experienceId);
+            ExperienceAnswer answer = denial != XP_ERROR_NONE
+                ? ExperienceAnswer.Denied
+                : DecideExperienceRequest(expService, experienceId, agentId, out denial);
             if (answer == ExperienceAnswer.Denied)
             {
                 m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
@@ -21065,6 +21129,34 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             sp.ControllingClient.SendScriptQuestion(
                 m_host.UUID, m_host.ParentGroup.RootPart.Name, ownerName, m_itemID,
                 PERMISSION_EXPERIENCE, experienceId);
+        }
+
+        /// <summary>
+        /// llRequestExperiencePermissions is refused for an Experience that cannot run at all: disabled by its owner (8) or
+        /// suspended (9), <see cref="ExperienceStateError"/>. Checked before the land and the agent, as YEngine does. The
+        /// state is the Experience service's at this request (the adapter asks the service each time); the request runs on
+        /// the service lane, so a slow service delays only this script. A lookup that fails is XP_ERROR_NOT_FOUND (6), SL
+        /// wiki llGetExperienceErrorMessage: "The sim was unable to verify the validity of the experience. Retrying after a
+        /// short wait is advised." An Experience the service answers it does not know is XP_ERROR_INVALID_EXPERIENCE (7),
+        /// SL wiki llGetExperienceErrorMessage: "The script is associated with an experience that no longer exists."
+        /// A disabled or suspended answer also ends every grant held from that Experience in the region
+        /// (<see cref="NoteExperienceState"/>), this script's own among them.
+        /// </summary>
+        private int ExperienceStateDenial(PhloxExperienceAdapter expService, UUID experienceId)
+        {
+            PhloxExperienceAdapter.PhloxExperienceInfo info;
+            try
+            {
+                info = expService.GetExperience(experienceId);
+            }
+            catch (Exception ex)
+            {
+                m_log.LogWarning("[PhloxAPI]: llRequestExperiencePermissions could not look up experience {0}: {1}", experienceId, ex.Message);
+                return XP_ERROR_NOT_FOUND;
+            }
+            if (info == null) return XP_ERROR_INVALID_EXPERIENCE;
+            NoteExperienceState(experienceId, info.Properties);
+            return ExperienceStateError(info.Properties);
         }
 
         /// <summary>
@@ -21164,6 +21256,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                 "experience_permissions", new object[] { agent }, new DetectParams[0]));
             var expInfo = expService.GetExperience(experienceId);
+            if (expInfo != null) NoteExperienceState(experienceId, expInfo.Properties);
             m_log.LogInformation("[PhloxAPI]: Experience permission granted: agent={0} experience={1}",
                 agentId, expInfo?.Name ?? experienceId.ToString());
         }
@@ -21379,11 +21472,12 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // group key ] — NOT the old [name, owner, description, group, maturity, ""], which
             // silently returned wrong data at every index for SL-written scripts (High severity).
             // State uses the XP_ERROR vocabulary: NONE(0) for a valid enabled experience,
-            // EXPERIENCE_DISABLED(8) when the viewer PROPERTY_DISABLED bit is set. The message comes
-            // from llGetExperienceErrorMessage so the state and its text can never drift apart.
-            int state = (exp.Properties & VP_DISABLED) != 0
-                ? XP_ERROR_EXPERIENCE_DISABLED
-                : XP_ERROR_NONE;
+            // EXPERIENCE_DISABLED(8) when the viewer PROPERTY_DISABLED bit is set, EXPERIENCE_SUSPENDED(9)
+            // when PROPERTY_SUSPENDED is (ExperienceStateError; YEngine's llGetExperienceDetails reports the
+            // same two). The message comes from llGetExperienceErrorMessage so the state and its text can
+            // never drift apart.
+            int state = ExperienceStateError(exp.Properties);
+            NoteExperienceState(expId, exp.Properties);
             return new LSLList(new object[]
             {
                 exp.Name ?? string.Empty,

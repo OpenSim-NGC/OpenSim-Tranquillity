@@ -238,7 +238,7 @@ namespace InWorldz.Phlox.Glue
                         if (_listener != null)
                         {
                             _listener.Error("line: " + b.Node.Line + ":" +
-                                b.Node.CharPositionInLine + " " + b.Node.Text +
+                                b.Node.Column + " " + b.Node.Text +
                                 "(): Not all control paths return a value");
                         }
                     }

@@ -16,7 +16,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
-using OpenSim.Region.ScriptEngine.Shared.Api;
+using Phlox.ScriptEngine.AsyncCommand;
 using OpenSim.Services.Interfaces;
 
 using Microsoft.Extensions.Logging;
@@ -593,6 +593,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnAvatarEnteringNewParcel   -= OnAvatarEnteringNewParcelForExperiences;
             m_Scene.EventManager.OnExperiencePermissionsRevoked -= OnExperiencePermissionsRevoked;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
+            m_ExeScheduler?.StopExperienceStateReads();   // Before the final save: no read may end a grant after it
             bool stopped = m_MasterScheduler == null || m_MasterScheduler.Stop();
             AsyncCommands?.Shutdown();
             m_Scene = null;
@@ -673,7 +674,9 @@ namespace Phlox.ScriptEngine
         {
             m_log.LogInformation("[PhloxEngine]: Shutdown event, flushing script state");
             // The scheduler stops first, so the final save is of scripts that are no longer running (Halcyon
-            // MasterScheduler.Stop joins the execution thread before the state manager's backup).
+            // MasterScheduler.Stop joins the execution thread before the state manager's backup). No read of an
+            // Experience's state starts or ends a grant from here on, so none can after the final save.
+            m_ExeScheduler?.StopExperienceStateReads();
             SaveStateAtStop(m_MasterScheduler == null || m_MasterScheduler.StopThread());
             StateManager = null;
         }
@@ -1122,6 +1125,15 @@ namespace Phlox.ScriptEngine
         {
             if (sp != null && !sp.IsChildAgent) m_ExeScheduler?.RequestExperienceLandCheck(sp.UUID);
         }
+
+        /// <summary>A script here was given back a grant from an Experience (a restore): its state is read shortly.</summary>
+        internal void ExperienceGrantRestored() => m_ExeScheduler?.ExperienceGrantRestored();
+
+        /// <summary>
+        /// A lookup for a script call found <paramref name="experience"/> disabled or suspended: every grant held from it
+        /// here ends, told with <paramref name="code"/>. Any thread.
+        /// </summary>
+        internal void ExperienceCannotRun(UUID experience, int code) => m_ExeScheduler?.ExperienceCannotRun(experience, code);
 
         // The core ended a script's grant because its avatar may no longer be reached through the script's Experience
         // (ExperienceModule: the avatar blocked it, or YEngine's grant on entering a parcel). The core cleared the item and

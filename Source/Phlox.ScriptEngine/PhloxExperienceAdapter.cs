@@ -198,9 +198,13 @@ namespace Phlox.ScriptEngine
 
         // ────────────────────────── Experience metadata ──────────────────────────
 
-        public PhloxExperienceInfo GetExperience(UUID experienceId)
+        /// <summary>
+        /// The Experience as the service has it. <paramref name="fresh"/> false takes the core module's cached copy when
+        /// it has one (ExperienceModule keeps each lookup for 60 s); a miss still asks the service, and fills the cache.
+        /// </summary>
+        public PhloxExperienceInfo GetExperience(UUID experienceId, bool fresh = true)
         {
-            ExperienceInfo info = m_module?.GetExperienceInfo(experienceId, true);
+            ExperienceInfo info = m_module?.GetExperienceInfo(experienceId, fresh);
             if (info == null && m_service != null)
             {
                 ExperienceInfo[] infos = m_service.GetExperienceInfos(new[] { experienceId });
