@@ -48,6 +48,8 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         public List<TravelMode> NavModes;
         public int NavIndex;
         public Dictionary<int, object> NavOptions;
+        public bool NavFollowIndefinitely;      // BOT_MOVEMENT_TYPE BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY: start again after the last point
+        public long NavTeleportAfterMs = BotManager.DEFAULT_TELEPORT_AFTER_MS;  // BOT_MOVEMENT_TELEPORT_AFTER
         public bool IsFollowing;
         public UUID FollowTarget;
         public Dictionary<int, object> FollowOptions;
@@ -67,12 +69,18 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         // is currently walking to and poll its position to detect arrival.
         public Vector3 CurrentNavTarget;
         public bool NavInFlight;
-        public int NavInFlightTicks;
+        public bool NavNoFly, NavRunning;   // how the bot was sent to CurrentNavTarget, to send it again on resume
+        // Time spent moving toward CurrentNavTarget while not paused, added up at each nav poll since NavLastPoll
+        // (Environment.TickCount64). It reaching NavTeleportAfterMs teleports the bot to the point.
+        public long NavElapsedMs;
+        public long NavLastPoll;
 
-        // A BOT_TRAVELMODE_WAIT point: the bot stands still until NavWaitUntil (Environment.TickCount64),
-        // then the nav poll moves it on.
+        // The bot stands still until NavWaitUntil (Environment.TickCount64), then the nav poll moves it on: at a
+        // BOT_TRAVELMODE_WAIT point (NavUpdateAfterWait, reported as a move on to the next node), or for one poll
+        // before a path starts again.
         public bool NavWaiting;
         public long NavWaitUntil;
+        public bool NavUpdateAfterWait;
 
         // Collision-event bridge: the bot's physics actor we subscribed to, and the handler we
         // attached, so we can detach exactly that subscription on deregister/removal.
@@ -115,7 +123,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         private System.Timers.Timer m_navPollTimer;
         private const double NAV_POLL_INTERVAL_MS = 500.0;
         private const float NAV_ARRIVAL_TOLERANCE = 1.5f;    // metres (horizontal)
-        private const int NAV_INFLIGHT_TIMEOUT_TICKS = 120;  // ~60s safety so a stuck bot still reports
+        // A bot that has not reached a point after this long is teleported to it: Halcyon MovementDescription's
+        // TimeBeforeTeleportToNextPositionOccurs, 60 s unless BOT_MOVEMENT_TELEPORT_AFTER sets it.
+        internal const long DEFAULT_TELEPORT_AFTER_MS = 60_000;
 
         // Collision/land_collision script-event mask — only bridge a bot's collisions to a host whose
         // scripts actually subscribed to one of these, so we don't do work or emit sounds for nobody.
@@ -298,6 +308,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.NavIndex = 0;
             data.NavInFlight = false;
             data.NavWaiting = false;
+            data.NavFollowIndefinitely = false;
             StopWanderTimer(data);
             Scene scene = GetBotScene(data);
             if (scene != null)
@@ -592,8 +603,40 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.NavOptions = options;
             data.NavIndex = 0;
 
+            // Halcyon NavigationPathDescription: BOT_MOVEMENT_TYPE (0), an integer, BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY (1)
+            // repeats the path; BOT_MOVEMENT_TELEPORT_AFTER (1), an integer or float, is the seconds before the bot is
+            // teleported to a point it has not reached.
+            data.NavTeleportAfterMs = DEFAULT_TELEPORT_AFTER_MS;
+            if (options != null)
+            {
+                if (options.TryGetValue(0 /*BOT_MOVEMENT_TYPE*/, out object type) && type is int t)
+                    data.NavFollowIndefinitely = t == 1 /*BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY*/;
+                if (options.TryGetValue(1 /*BOT_MOVEMENT_TELEPORT_AFTER*/, out object after) && (after is int || after is float))
+                    data.NavTeleportAfterMs = (long)(Convert.ToSingle(after) * 1000f);
+            }
+
             if (positions.Count > 0)
                 MoveToNextNavPoint(data, false);
+        }
+
+        // Puts the bot at pos at once, as a BOT_TRAVELMODE_TELEPORT point does.
+        private void TeleportBot(BotData data, Scene scene, Vector3 pos)
+        {
+            m_npcModule.StopMoveToTarget(data.BotID, scene);
+            ScenePresence sp = GetBotSP(data);
+            if (sp != null)
+            {
+                sp.Velocity = Vector3.Zero;
+                sp.AbsolutePosition = pos;
+            }
+        }
+
+        // Holds the bot for ms, then the nav poll moves it on; updateAfter reports that as a move on to the next node.
+        private static void HoldBot(BotData data, long ms, bool updateAfter)
+        {
+            data.NavWaitUntil = Environment.TickCount64 + ms;
+            data.NavUpdateAfterWait = updateAfter;
+            data.NavWaiting = true;
         }
 
         // Starts the bot toward node NavIndex, or reports the path done. changingNodes: the bot has just
@@ -601,10 +644,20 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         // NavIndex, as Halcyon's MovementAction.GetNextDestination did when NodeGraph reported changingNodes.
         private void MoveToNextNavPoint(BotData data, bool changingNodes)
         {
-            if (data.NavPoints == null || data.NavIndex >= data.NavPoints.Count)
+            if (data.NavPoints == null) return;
+            if (data.NavIndex >= data.NavPoints.Count)
             {
-                if (data.NavPoints != null)
-                    FireMoveComplete(data);
+                if (data.NavFollowIndefinitely && data.NavPoints.Count > 0)
+                {
+                    // Halcyon NodeGraph went back to the first point and reported it as a move on to node
+                    // NumberOfNodes. The first point starts at the next poll, so a path of teleports goes one
+                    // point at a time instead of looping here.
+                    data.NavIndex = 0;
+                    FireMoveUpdate(data, data.NavPoints.Count);
+                    HoldBot(data, 0, false);
+                    return;
+                }
+                FireMoveComplete(data);
                 return;
             }
 
@@ -624,13 +677,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
             if (mode == TravelMode.Teleport)
             {
-                // Teleport directly
-                ScenePresence sp = GetBotSP(data);
-                if (sp != null)
-                {
-                    sp.Velocity = Vector3.Zero;
-                    sp.AbsolutePosition = target;
-                }
+                TeleportBot(data, scene, target);
                 data.NavIndex++;
                 // Halcyon reported every teleport as a move on to the next node, the last node included.
                 FireMoveUpdate(data, data.NavIndex);
@@ -642,16 +689,18 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 // <seconds, 0, 0>), then go on; NavPollTick ends the wait. Halcyon NodeGraph.GetNextPosition
                 // waits position.X seconds on a Wait node.
                 m_npcModule.StopMoveToTarget(data.BotID, scene);
-                data.NavWaitUntil = Environment.TickCount64 + (long)(Math.Max(0f, target.X) * 1000f);
-                data.NavWaiting = true;
+                HoldBot(data, (long)(Math.Max(0f, target.X) * 1000f), true);
                 data.NavIndex++;
             }
             else
             {
                 m_npcModule.MoveToTarget(data.BotID, scene, target, noFly, true, running);
                 data.CurrentNavTarget = target;
+                data.NavNoFly = noFly;
+                data.NavRunning = running;
                 data.NavInFlight = true;
-                data.NavInFlightTicks = 0;
+                data.NavElapsedMs = 0;
+                data.NavLastPoll = Environment.TickCount64;
                 data.NavIndex++;
             }
         }
@@ -659,8 +708,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         // Polls bots that are walking to a waypoint. INPCModule gives no arrival callback,
         // so when a bot gets within NAV_ARRIVAL_TOLERANCE (horizontal) of its current target
         // we advance to the next waypoint via MoveToNextNavPoint — which fires bot_update
-        // (BOT_MOVE_COMPLETE) once the list is exhausted. A timeout reports BOT_MOVE_FAILED
-        // so a stuck bot still notifies the script rather than hanging silently.
+        // (BOT_MOVE_COMPLETE) once the list is exhausted. A bot that has not arrived after
+        // NavTeleportAfterMs is teleported to the waypoint and goes on, as Halcyon's
+        // MovementAction.GetNextDestination did: BOT_MOVE_FAILED, then BOT_MOVE_UPDATE, for the next node.
         private void NavPollTick(object sender, System.Timers.ElapsedEventArgs e)
         {
             List<BotData> inFlight;
@@ -679,7 +729,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 {
                     if (Environment.TickCount64 < data.NavWaitUntil) continue;
                     data.NavWaiting = false;
-                    try { MoveToNextNavPoint(data, true); }
+                    try { MoveToNextNavPoint(data, data.NavUpdateAfterWait); }
                     catch (Exception ex)
                     {
                         m_log.LogWarning("[BotManager]: nav advance for bot {0} failed: {1}", data.BotID, ex.Message);
@@ -693,7 +743,10 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 float dx = sp.AbsolutePosition.X - data.CurrentNavTarget.X;
                 float dy = sp.AbsolutePosition.Y - data.CurrentNavTarget.Y;
                 bool arrived = (dx * dx + dy * dy) <= NAV_ARRIVAL_TOLERANCE * NAV_ARRIVAL_TOLERANCE;
-                bool timedOut = ++data.NavInFlightTicks >= NAV_INFLIGHT_TIMEOUT_TICKS;
+                long now = Environment.TickCount64;
+                data.NavElapsedMs += now - data.NavLastPoll;
+                data.NavLastPoll = now;
+                bool timedOut = data.NavElapsedMs >= data.NavTeleportAfterMs;
 
                 try
                 {
@@ -704,9 +757,13 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                     }
                     else if (timedOut)
                     {
+                        // NavIndex is already the node after the one not reached.
                         data.NavInFlight = false;
-                        data.NavPoints = null;
-                        FireMoveFailed(data, data.NavIndex);   // NavIndex is already the node after the one not reached
+                        Scene scene = GetBotScene(data);
+                        if (scene != null) TeleportBot(data, scene, data.CurrentNavTarget);
+                        FireMoveFailed(data, data.NavIndex);
+                        FireMoveUpdate(data, data.NavIndex);
+                        MoveToNextNavPoint(data, false);
                     }
                 }
                 catch (Exception ex)
@@ -1087,8 +1144,17 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             if (data == null) return;
             data.MovementPaused = false;
 
-            // Resume navigation if we had waypoints. A wait in progress is left to NavPollTick to finish.
-            if (!data.NavWaiting && data.NavPoints != null && data.NavIndex < data.NavPoints.Count)
+            // Resume navigation if we had waypoints. A wait in progress is left to NavPollTick to finish. A move in
+            // progress goes on toward its point, and the time paused does not count toward the teleport, as
+            // Halcyon's MovementAction.ResumeMovement restarted its step clock.
+            if (data.NavInFlight)
+            {
+                data.NavLastPoll = Environment.TickCount64;
+                Scene scene = GetBotScene(data);
+                if (scene != null)
+                    m_npcModule.MoveToTarget(botID, scene, data.CurrentNavTarget, data.NavNoFly, true, data.NavRunning);
+            }
+            else if (!data.NavWaiting && data.NavPoints != null && data.NavIndex < data.NavPoints.Count)
                 MoveToNextNavPoint(data, false);
         }
 
