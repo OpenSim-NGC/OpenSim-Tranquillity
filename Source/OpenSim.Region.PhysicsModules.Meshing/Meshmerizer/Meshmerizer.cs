@@ -110,7 +110,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                 }
                 catch (Exception e)
                 {
-                    m_log.LogWarning("[SCULPT]: Unable to create {0} directory: ", decodedSculptMapPath, e.Message);
+                    m_log.LogWarning("[SCULPT]: Unable to create {0} directory: {1}", decodedSculptMapPath, e.Message);
                 }
 
             }

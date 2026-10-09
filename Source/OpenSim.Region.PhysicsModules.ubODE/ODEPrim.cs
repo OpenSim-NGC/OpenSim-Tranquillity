@@ -1763,7 +1763,7 @@ public class OdePrim : PhysicsActor
                 }
                 catch (Exception e)
                 {
-                    m_log.LogWarning(e, "[PHYSICS]: Create box failed: {0}");
+                    m_log.LogWarning(e, "[PHYSICS]: Create box failed.");
                     return;
                 }
             }

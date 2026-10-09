@@ -377,7 +377,7 @@ public class TerrainChannel : ITerrainChannel
                     }
                     catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                     {
-                        m_log.LogDebug(LogHeader + "{0} MergeWithBounding - Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", sx, sy, x, y);
+                        m_log.LogDebug(LogHeader + "MergeWithBounding - Rotate: Out of Bounds sx={0} sy={1} dx={2} dy={3}", sx, sy, x, y);
                     }
                 }
             }
@@ -426,7 +426,7 @@ public class TerrainChannel : ITerrainChannel
                     }
                     catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                     {
-                        m_log.LogDebug(LogHeader + "{0} MergeWithBounding - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", x, y, dx, dy);
+                        m_log.LogDebug(LogHeader + "MergeWithBounding - Bound & Displace: Out of Bounds sx={0} sy={1} dx={2} dy={3}", x, y, dx, dy);
                     }
                 }
             }

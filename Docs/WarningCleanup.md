@@ -33,10 +33,10 @@ do not close warnings by blanket suppression.
     - SYSLIB0014: OptionalModules (5), GloebitMoneyModule (2).
     - Exercise payment callbacks and failures against local fixtures; do not
       contact live payment services for validation.
-- [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 12 closed, 56 remaining**
+- [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 38 closed, 30 remaining**
   - [x] **3a: partial reads, malformed templates and the hash contract - 12 closed**
     - CA2022 (10), CA2023 (1), CS0659 (1).
-  - [ ] **3b: logging message templates - 26 remaining**
+  - [x] **3b: logging message templates - 26 closed**
     - CA2017 (26).
   - [ ] **3c: inheritance and initialization - 11 remaining**
     - CS0114 (8), CS0108 (1), CS0649 (2).
@@ -76,7 +76,8 @@ from the original log, all in unchanged files:
 
 After Batch 1 the reconciled inventory was 661 occurrences: 264 closed and
 397 remaining. After Batch 2 it was 661 occurrences: 330 closed and 331 remaining.
-After Batch 3a it is **661 occurrences: 342 closed and 319 remaining**.
+After Batch 3a it was 661 occurrences: 342 closed and 319 remaining.
+After Batch 3b it is **661 occurrences: 368 closed and 293 remaining**.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
 
@@ -125,6 +126,46 @@ other messages in that file and leaving the template without stray braces.
 - Two failures are pre-existing on `develop` and unrelated to this batch:
   `VersionInfoTests.TestVersionLength`, which depends on the branch name in the
   informational version, and `AssetServerPostHandlerTests.TestGoodAssetStoreRequest`.
+
+## Batch 3b implementation and verification
+
+Every CA2017 occurrence was a real mismatch between a logging message template
+and its arguments, so each one either dropped a value the caller meant to log or
+left a placeholder with nothing to fill it. The fixes keep the values callers
+already pass:
+
+- Missing placeholders were added where an argument had no slot, so the Gloebit
+  transaction type, the archiver's rejected user name, the Bullet water-height
+  result, the overlapping region count, the `ServiceBase` plugin exception, the
+  sculpt-map error text and the user-agent reply text are now printed instead of
+  silently dropped.
+- Extra or duplicated placeholders were removed where no argument backed them,
+  including the authentication handler's account message, the Groups member
+  lookup, and the Gloebit subscription counts that repeated `{0}`.
+- Interpolated-style named placeholders in non-interpolated strings, which these
+  logging calls print literally, became the positional form already used nearby:
+  the HG lure failure, grid connector empty replies, the Janus provisioning error
+  and the WebRTC non-spatial load failure.
+- Where the exception is already passed through the logging overload's first
+  parameter, the leftover `{0}` was removed rather than re-logging the exception:
+  `RestClient`, both JSON store modules and the ubODE box-creation failure.
+- `TerrainChannel`'s two out-of-bounds messages concatenate `LogHeader` and then
+  started at `{0}` without passing a matching argument, so every coordinate
+  landed in the previous slot's label and the last one had no value. Their
+  placeholders were renumbered to `{0}`-`{3}`, which labels all four coordinates
+  correctly and still prints the header once.
+
+No logging call was suppressed or removed, and no control flow changed.
+
+### Verification
+
+- Full non-incremental Release rebuild: **293 warnings, 0 errors**; exactly
+  **26 CA2017 occurrences removed**, with no added diagnostic messages.
+  CA2017 is zero, and the Batch 3a codes remain zero.
+- Selected CoreModules terrain and optional transport tests: **27 passed**.
+- Server-side baking tests: **115 passed, 3 skipped**. The first run failed four
+  tests inside Skia native-library initialization; they pass with the cached
+  Linux Skia asset on `LD_LIBRARY_PATH`, as recorded for Batch 2a.
 
 ## Batch 2b implementation and verification
 

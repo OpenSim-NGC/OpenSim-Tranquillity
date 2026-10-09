@@ -139,6 +139,9 @@ functions, updated constants, and a number of stability fixes.
   stats log tail or a map tile signature check.
 - Phlox's `LSLList` now overrides `GetHashCode` to agree with its `Equals`, so
   equal lists hash alike and can be found in a dictionary or set.
+- Corrected 26 logging templates whose placeholders did not match their
+  arguments, preserving previously supplied diagnostic values across framework,
+  region, service, physics, voice and optional-module logging.
 
 ---
 

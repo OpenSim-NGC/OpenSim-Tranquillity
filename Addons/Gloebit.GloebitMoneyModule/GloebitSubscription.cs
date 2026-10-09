@@ -113,9 +113,9 @@ public class GloebitSubscription {
                 }
                  */
         bool cacheDuplicate = false;
-        m_log.LogDebug("[GLOEBITMONEYMODULE] Found {0} subscriptions for {0} saved in the DB", subscriptions.Length, objectIDStr);
+        m_log.LogDebug("[GLOEBITMONEYMODULE] Found {0} subscriptions for {1} saved in the DB", subscriptions.Length, objectIDStr);
         if (subscription != null) {
-            m_log.LogDebug("[GLOEBITMONEYMODULE] Found 1 cached subscriptions for {0}", subscriptions.Length, objectIDStr);
+            m_log.LogDebug("[GLOEBITMONEYMODULE] Found 1 cached subscriptions for {0}", objectIDStr);
             if (subscriptions.Length == 0) {
                 subscriptions = new GloebitSubscription[1];
                 subscriptions[0] = subscription;
@@ -144,7 +144,7 @@ public class GloebitSubscription {
             }
 
         } else {
-            m_log.LogDebug("[GLOEBITMONEYMODULE] Found no cached subscriptions for {0}", subscriptions.Length, objectIDStr);
+            m_log.LogDebug("[GLOEBITMONEYMODULE] Found no cached subscriptions for {0}", objectIDStr);
         }
 
         m_log.LogDebug("[GLOEBITMONEYMODULE] Returning {0} subscriptions for {0}", subscriptions.Length, objectIDStr);
@@ -293,5 +293,4 @@ public class GloebitSubscription {
     }
 }
 #pragma warning restore 0659
-
 

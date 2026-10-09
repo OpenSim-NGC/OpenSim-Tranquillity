@@ -607,7 +607,7 @@ public class UserAgentServiceConnector : SimulationServiceConnector, IUserAgentS
         {
             m_log.LogError("[USER AGENT CONNECTOR]: Got exception on GetBoolResponse response.");
             if (hash.ContainsKey("result") && hash["result"] != null)
-                m_log.LogError("Reply was ", (string)hash["result"]);
+                m_log.LogError("Reply was {0}", (string)hash["result"]);
             reason = "Exception: " + e.Message;
             return false;
         }

@@ -245,7 +245,7 @@ public class AuthenticationServerPostHandler : BaseStreamHandler
         if (!m_AuthenticationService.SetAuthInfo(existingInfo))
         {
             m_log.LogError(
-                "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0} {1} {2}",
+                "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0}",
                 existingInfo.PrincipalID);
 
             return FailureResult();
