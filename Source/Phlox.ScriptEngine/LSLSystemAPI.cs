@@ -1864,9 +1864,25 @@ namespace Phlox.ScriptEngine
             return (float)Math.Round(1f / minFactor, 5);
         }
         public Vector3 llGetVel() => m_host?.Velocity ?? Vector3.Zero;
-        public Vector3 llGetAccel() => Vector3.Zero;
-        public Vector3 llGetOmega() => Vector3.Zero;
-        public Vector3 llGetTorque() => Vector3.Zero;
+        /// <summary>
+        /// The object's acceleration in region axes; ZERO_VECTOR in an attachment or a child prim (SL wiki llGetAccel:
+        /// "Returns ZERO_VECTOR in attachments", "Returns ZERO_VECTOR in child prims").
+        /// </summary>
+        public Vector3 llGetAccel()
+        {
+            SceneObjectGroup group = m_host?.ParentGroup;
+            if (group == null || group.IsAttachment || group.RootPart != m_host) return Vector3.Zero;
+            return m_host.Acceleration;
+        }
+
+        /// <summary>
+        /// The root's angular velocity: a physical object's spin, or what llTargetOmega set (SL wiki llGetOmega:
+        /// "Returns the omega of the root if called in a child prim").
+        /// </summary>
+        public Vector3 llGetOmega() => m_host?.ParentGroup?.RootPart.AngularVelocity ?? Vector3.Zero;
+
+        /// <summary>The torque llSetTorque stored on the object's root, as YEngine (SceneObjectGroup.GetTorque).</summary>
+        public Vector3 llGetTorque() => m_host?.ParentGroup?.RootPart.Torque ?? Vector3.Zero;
         public Vector3 iwGetAngularVelocity() => Vector3.Zero;
         public Vector3 llGetCenterOfMass()
         {
@@ -2026,7 +2042,7 @@ namespace Phlox.ScriptEngine
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;
                 if (local != 0) torque *= m_host.GetWorldRotation();
-                pa.Torque = torque;
+                m_host.ParentGroup.RootPart.Torque = torque;   // stores it for llGetTorque and passes it to the actor
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }

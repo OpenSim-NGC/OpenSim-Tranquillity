@@ -49,6 +49,9 @@ namespace InWorldz.Phlox.Tests;
 ///   NaN and turns an infinity into a NaN, which would otherwise reach the body or the wearer.
 /// - llGetForce returns the force llSetForce stored on the object's root (SceneObjectPart.Force), in region axes, as
 ///   YEngine does, so it does not depend on the physics engine keeping the force it was given.
+/// - llGetAccel is the object's acceleration, ZERO_VECTOR in a child prim or an attachment (SL wiki llGetAccel);
+///   llGetOmega is the root's angular velocity, a physical spin or a llTargetOmega (SL: "Returns the omega of the
+///   root if called in a child prim"); llGetTorque returns the torque llSetTorque stored on the root.
 /// </summary>
 // Calls the API directly on the harness prims; no clock and no process-wide state, so the class runs in parallel.
 public class PhysicsStatusAndReadoutTests
@@ -253,5 +256,86 @@ public class PhysicsStatusAndReadoutTests
         api.llSetForce(new Vector3(4, 5, 6), 0);
         api.llSetForce(Vector3.Zero, 0);
         Assert.Equal(Vector3.Zero, api.llGetForce());
+    }
+
+    // ---- llGetAccel, llGetOmega, llGetTorque ----
+
+    [Fact]
+    public void GetAccelReturnsThePhysicalObjectsAcceleration()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body { Accel = new Vector3(1, 2, -3) };
+        h.Prim.AddFlag(PrimFlags.Physics);
+        Near(new Vector3(1, 2, -3), Api(h, h.Prim).llGetAccel());
+    }
+
+    [Fact]
+    public void GetAccelInAChildIsZero()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body { Accel = new Vector3(1, 2, -3) };
+        h.Prim.AddFlag(PrimFlags.Physics);
+        var child = AddChild(h, new Vector3(1, 0, 0));
+        Assert.Equal(Vector3.Zero, Api(h, child).llGetAccel());   // SL: "Returns ZERO_VECTOR in child prims"
+    }
+
+    [Fact]
+    public void GetAccelInAnAttachmentIsZero()
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30));
+        SetAvatarActor(sp, new Body { Accel = new Vector3(0, 0, 5) });
+        h.Prim.PhysActor = new Body { Accel = new Vector3(0, 0, 5) };
+        Assert.Equal(Vector3.Zero, Api(h, h.Prim).llGetAccel());   // SL: "Returns ZERO_VECTOR in attachments"
+    }
+
+    [Fact]
+    public void GetOmegaReturnsThePhysicalObjectsSpin()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body { Spin = new Vector3(0, 0, 2) };
+        h.Prim.AddFlag(PrimFlags.Physics);
+        Near(new Vector3(0, 0, 2), Api(h, h.Prim).llGetOmega());
+    }
+
+    [Fact]
+    public void GetOmegaInAChildReturnsTheRootsSpin()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body { Spin = new Vector3(0, 0, 2) };
+        h.Prim.AddFlag(PrimFlags.Physics);
+        var child = AddChild(h, new Vector3(1, 0, 0));
+        Near(new Vector3(0, 0, 2), Api(h, child).llGetOmega());   // SL: "Returns the omega of the root"
+    }
+
+    [Fact]
+    public void GetOmegaOfANonPhysicalObjectReturnsItsTargetOmega()
+    {
+        using var h = new SchedulerHarness();
+        var api = Api(h, h.Prim);
+        api.llTargetOmega(new Vector3(0, 0, 1), 1.5f, 1f);
+        Near(new Vector3(0, 0, 1.5f), api.llGetOmega());
+    }
+
+    [Fact]
+    public void GetTorqueReturnsTheTorqueSetWhenTheEngineDoesNotKeepIt()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body();
+        h.Prim.AddFlag(PrimFlags.Physics);
+        var api = Api(h, h.Prim);
+        api.llSetTorque(new Vector3(0, 7, 0), 0);
+        Near(new Vector3(0, 7, 0), api.llGetTorque());
+    }
+
+    [Fact]
+    public void GetTorqueInAChildReturnsTheObjectsTorque()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body();
+        h.Prim.AddFlag(PrimFlags.Physics);
+        var child = AddChild(h, new Vector3(1, 0, 0));
+        Api(h, h.Prim).llSetForceAndTorque(Vector3.Zero, new Vector3(1, 0, 0), 0);
+        Near(new Vector3(1, 0, 0), Api(h, child).llGetTorque());
     }
 }
