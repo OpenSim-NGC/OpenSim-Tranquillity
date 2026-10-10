@@ -3116,8 +3116,9 @@ public class SceneObjectPart : EntityBase, IDisposable
             "[SCENE OBJECT PART]: Physical object {0}, localID {1} went out of bounds at {2} in {3}.  Stopping at {4} and making non-physical.",
             Name, LocalId, pos, ParentGroup.Scene.Name, AbsolutePosition);
 
-        RemFlag(PrimFlags.Physics);
-        DoPhysicsPropertyUpdate(false, true);
+        // The whole object, as llSetStatus(STATUS_PHYSICS, FALSE) does: every part's flag, the region's
+        // physical-prim count, and the parts' actor events
+        ParentGroup.ScriptSetPhysicsStatus(false);
     }
 
     public void PhysicsRequestingTerseUpdate()
