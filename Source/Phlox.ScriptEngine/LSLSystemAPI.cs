@@ -2002,16 +2002,19 @@ namespace Phlox.ScriptEngine
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;
                 if (local != 0) force *= m_host.GetWorldRotation();
-                pa.Force = force;
+                m_host.ParentGroup.RootPart.Force = force;   // stores it and passes it to the actor
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }
 
+        /// <summary>
+        /// The force llSetForce stored on the object's root, in region axes, as YEngine (SceneObjectPart.GetForce),
+        /// rather than the physics actor's, which an engine need not keep.
+        /// </summary>
         public Vector3 llGetForce()
         {
             if (m_host?.ParentGroup == null) return Vector3.Zero;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            return pa?.Force ?? Vector3.Zero;
+            return m_host.ParentGroup.RootPart.Force;
         }
 
         public void llSetTorque(Vector3 torque, int local)

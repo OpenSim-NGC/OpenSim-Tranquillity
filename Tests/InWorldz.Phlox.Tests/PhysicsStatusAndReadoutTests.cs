@@ -47,6 +47,8 @@ namespace InWorldz.Phlox.Tests;
 ///   any prim of the object, and llGetStatus reads them back.
 /// - llApplyImpulse drops an impulse with a NaN or infinite component: the 20000 cap's length test is false for a
 ///   NaN and turns an infinity into a NaN, which would otherwise reach the body or the wearer.
+/// - llGetForce returns the force llSetForce stored on the object's root (SceneObjectPart.Force), in region axes, as
+///   YEngine does, so it does not depend on the physics engine keeping the force it was given.
 /// </summary>
 // Calls the API directly on the harness prims; no clock and no process-wide state, so the class runs in parallel.
 public class PhysicsStatusAndReadoutTests
@@ -202,5 +204,54 @@ public class PhysicsStatusAndReadoutTests
         Api(h, h.Prim).llApplyImpulse(new Vector3(30000, 0, 0), 0);
         Assert.Single(body.Forces);
         Near(new Vector3(20000, 0, 0), body.Forces[0], 0.5f);
+    }
+
+    // ---- llGetForce ----
+
+    [Fact]
+    public void GetForceReturnsTheForceSetWhenTheEngineDoesNotKeepIt()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body();
+        h.Prim.AddFlag(PrimFlags.Physics);
+        var api = Api(h, h.Prim);
+        api.llSetForce(new Vector3(4, 5, 6), 0);
+        Near(new Vector3(4, 5, 6), api.llGetForce());
+    }
+
+    [Fact]
+    public void GetForceInAChildReturnsTheObjectsForce()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body();
+        h.Prim.AddFlag(PrimFlags.Physics);
+        var child = AddChild(h, new Vector3(1, 0, 0));
+        Api(h, h.Prim).llSetForce(new Vector3(0, 0, 9), 0);
+        Near(new Vector3(0, 0, 9), Api(h, child).llGetForce());
+    }
+
+    [Fact]
+    public void GetForceAfterALocalForceReturnsItInRegionAxes()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body();
+        h.Prim.AddFlag(PrimFlags.Physics);
+        var quarter = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, (float)(Math.PI / 2));
+        h.Prim.ParentGroup.UpdateGroupRotationR(quarter);
+        var api = Api(h, h.Prim);
+        api.llSetForce(new Vector3(3, 0, 0), 1);
+        Near(new Vector3(3, 0, 0) * quarter, api.llGetForce());
+    }
+
+    [Fact]
+    public void GetForceAfterAZeroForceIsZero()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body();
+        h.Prim.AddFlag(PrimFlags.Physics);
+        var api = Api(h, h.Prim);
+        api.llSetForce(new Vector3(4, 5, 6), 0);
+        api.llSetForce(Vector3.Zero, 0);
+        Assert.Equal(Vector3.Zero, api.llGetForce());
     }
 }
