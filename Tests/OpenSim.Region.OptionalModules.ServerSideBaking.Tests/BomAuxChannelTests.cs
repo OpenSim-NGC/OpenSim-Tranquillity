@@ -37,7 +37,7 @@ public class BomAuxChannelTests
     };
 
     /// <summary>A small solid-colour JPEG 2000, so the compositor has something real to draw.</summary>
-    private static byte[] Texture(byte r, byte g, byte b)
+    internal static byte[] Texture(byte r, byte g, byte b)
     {
         var img = new RgbaPlanes(32, 32, hasAlpha: true);
         for (var i = 0; i < img.R.Length; i++) { img.R[i] = r; img.G[i] = g; img.B[i] = b; img.A[i] = 255; }
@@ -45,7 +45,7 @@ public class BomAuxChannelTests
     }
 
     /// <summary>An LLWearable body of the given type carrying the given texture slots.</summary>
-    private static string WearableText(WearableKind kind, string name, IReadOnlyDictionary<TextureSlot, UUID> textures)
+    internal static string WearableText(WearableKind kind, string name, IReadOnlyDictionary<TextureSlot, UUID> textures)
     {
         var sb = new StringBuilder();
         sb.Append("LLWearable version 22\n").Append(name).Append("\n\n");
