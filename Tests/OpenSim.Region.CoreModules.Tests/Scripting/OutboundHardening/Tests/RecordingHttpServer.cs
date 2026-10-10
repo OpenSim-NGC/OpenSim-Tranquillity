@@ -61,7 +61,7 @@ public sealed class RecordingHttpServer : IDisposable
         public string Reason = "OK";
         public string ContentType = "text/plain";
         public byte[] Body = Array.Empty<byte>();
-        public string Location;
+        public string? Location;
         public int BodyDelayMilliseconds;
         public int? ContentLength;
         public bool OmitContentLength;
@@ -131,7 +131,7 @@ public sealed class RecordingHttpServer : IDisposable
             {
                 client.ReceiveTimeout = 10000;
                 NetworkStream stream = client.GetStream();
-                byte[] head = ReadHead(stream);
+                byte[]? head = ReadHead(stream);
                 if (head is null)
                     return;
 
@@ -192,7 +192,7 @@ public sealed class RecordingHttpServer : IDisposable
         }
     }
 
-    private static byte[] ReadHead(NetworkStream stream)
+    private static byte[]? ReadHead(NetworkStream stream)
     {
         List<byte> buf = new();
         int b;

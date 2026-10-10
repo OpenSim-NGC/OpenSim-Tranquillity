@@ -48,7 +48,7 @@ public class FriendsInServiceTests : OpenSimTestCase
         {
             if (Throw)
                 throw new InvalidOperationException("service down");
-            return Lists.TryGetValue(principalID, out FriendInfo[] l) ? l : Array.Empty<FriendInfo>();
+            return Lists.TryGetValue(principalID, out FriendInfo[]? l) ? l ?? Array.Empty<FriendInfo>() : Array.Empty<FriendInfo>();
         }
 
         public FriendInfo[] GetFriends(string principalID) => GetFriends(UUID.Parse(principalID));

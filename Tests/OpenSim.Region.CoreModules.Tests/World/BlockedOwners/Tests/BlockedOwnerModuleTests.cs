@@ -51,9 +51,9 @@ public class BlockedOwnerModuleTests : OpenSimTestCase
     private static readonly UUID OtherId = new("5e9c7a21-8b34-4f06-a2d8-c1e7f3b95046");
     private static readonly Vector3 RezPos = new(10, 10, 25);
 
-    private TestScene m_scene;
-    private BlockedOwnerModule m_module;
-    private BasicInventoryAccessModule m_iam;
+    private TestScene m_scene = null!;
+    private BlockedOwnerModule m_module = null!;
+    private BasicInventoryAccessModule m_iam = null!;
 
     private void Setup(bool blockEstateBanned = false)
     {
@@ -128,8 +128,8 @@ public class BlockedOwnerModuleTests : OpenSimTestCase
 
     private int HandlerCount(string eventName)
     {
-        FieldInfo f = typeof(ScenePermissions).GetField(eventName, BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(f);
+        FieldInfo f = typeof(ScenePermissions).GetField(eventName, BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(typeof(ScenePermissions).FullName, eventName);
         return (f.GetValue(m_scene.Permissions) as Delegate)?.GetInvocationList().Length ?? 0;
     }
 

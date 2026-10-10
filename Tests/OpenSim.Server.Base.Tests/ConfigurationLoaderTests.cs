@@ -28,7 +28,7 @@ public sealed class ConfigurationLoaderTests : IDisposable
     private const string TestSubdirectory = "test";
     private readonly string _basePath;
     private readonly string _workingDirectory;
-    private IConfigSource _config;
+    private IConfigSource _config = new IniConfigSource();
 
     public ConfigurationLoaderTests()
     {
@@ -141,7 +141,7 @@ public sealed class ConfigurationLoaderTests : IDisposable
 
     private void CreateIni(string filepath, IniConfigSource source)
     {
-        string path = Path.GetDirectoryName(filepath);
+        string? path = Path.GetDirectoryName(filepath);
         if (!string.IsNullOrEmpty(path))
             Directory.CreateDirectory(path);
 

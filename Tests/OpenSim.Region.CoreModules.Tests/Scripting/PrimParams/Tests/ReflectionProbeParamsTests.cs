@@ -55,19 +55,20 @@ public class ReflectionProbeParamsTests : OpenSimTestCase
     /// <summary>A stand-in engine: the API reads only its scene and configuration.</summary>
     public class StandInEngine : DispatchProxy
     {
-        public Scene Scene;
-        public IConfigSource Source;
+        public Scene Scene = null!;
+        public IConfigSource Source = null!;
 
-        protected override object Invoke(MethodInfo method, object[] args)
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
-            switch (method.Name)
+            MethodInfo targetMethod = method ?? throw new InvalidOperationException("The script-engine proxy received no target method.");
+            switch (targetMethod.Name)
             {
                 case "get_World": return Scene;
                 case "get_ConfigSource": return Source;
                 case "get_Config": return Source.Configs["YEngine"];
                 case "get_ScriptEngineName": return "YEngine";
             }
-            Type rt = method.ReturnType;
+            Type rt = targetMethod.ReturnType;
             return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);
         }
     }
