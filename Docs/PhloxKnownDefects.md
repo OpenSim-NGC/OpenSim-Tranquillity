@@ -255,14 +255,19 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   other engine is not carried over.
 - **What survives.** A Phlox script resumes where it was after a region or simulator restart,
   including in the middle of an event (asleep, in a loop or in a blocking call): its globals,
-  state, queued events, listens (with their handles) and timer, which keeps its phase (the next
-  `timer()` comes after the time it had left). A script that was stopped stays stopped. It
-  starts fresh when its source changes, and when it is reset.
+  state, queued events, listens and timer, which keeps its phase (the next `timer()` comes after
+  the time it had left). Listens come back with their handles, on or off as `llListenControl`
+  left them, with their `osListenRegex` filters, and a `botListen` listen still hears from its
+  bot, as YEngine saves each listen's on/off state and regex bitfield. A row saved by an earlier
+  build has none of these, and loads as before: its `llListen` listens on, and no
+  `osListenRegex` or `botListen` listen. A restored `botListen` listen is registered whether or
+  not its bot is in the region yet, as a live one stays registered when its bot leaves; it hears
+  said chat from the bot's position once the bot is there. A script that was stopped stays
+  stopped. It starts fresh when its source changes, and when it is reset.
 - **What does not.** `llGetStartParameter` is 0 after a restart or a crossing, as SL documents
   ([LlGetStartParameter](https://wiki.secondlife.com/wiki/LlGetStartParameter): "The start
   parameter does not survive region restarts ... or region change"); a rez gives it the rez's
-  parameter. A listen switched off with `llListenControl` comes back on, as Halcyon's did.
-  `osListenRegex` and `botListen` listens are not saved and are gone after a restart.
+  parameter.
 - **Rows that cannot be read.** A saved row that cannot be decoded is moved to the
   `script_state_rejected` table of the state database and the script starts fresh, as
   YEngine resets a script whose state file is bad. When the database itself fails (busy or
@@ -614,6 +619,11 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   owner's profile, as Halcyon refused it: the call returns `FALSE`, nothing changes, and neither
   an IM nor an error is sent, as for the estate owner. When the estate owner's profile cannot be
   read, the ban goes ahead and the region's log says so. SL documents no partner rule.
+- A change `llManageEstateAccess` makes to the estate's lists is stored and then sent to the
+  estate's other regions, as a change from the viewer's estate tools is: the estate module's
+  change event reloads the estate on this simulator's regions of the estate and sends
+  `update_estate` to the others. A call that changes nothing (a no-op, a refusal or a query)
+  stores and sends nothing.
 - `llGetExperienceDetails(NULL_KEY)` gives the details of the script's own Experience, the one
   its script item names, and an empty list for a script in no Experience, as SL documents: "If
   experience_id is NULL_KEY, then information about the script's experience is returned. In

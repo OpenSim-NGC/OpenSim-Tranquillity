@@ -848,6 +848,16 @@ namespace Phlox.ScriptEngine
             lock (m_AllScriptsLock) return m_AllScripts.ContainsKey(itemId);
         }
 
+        /// <summary>
+        /// Marks a script for saving from any thread, for a change to its saved state made outside its own run (a listen
+        /// switched off by the listen manager). The state manager's ScriptChanged takes its own lock.
+        /// </summary>
+        internal void ScriptChangedOutsideARun(UUID itemId)
+        {
+            Interpreter interp = FindScript(itemId);
+            if (interp != null) m_Engine?.StateManager?.ScriptChanged(interp);
+        }
+
         /// <summary>Safe from any thread: takes the lock this thread's adds and removes take.</summary>
         public Interpreter FindScript(UUID itemId)
         {
@@ -2967,8 +2977,15 @@ namespace Phlox.ScriptEngine
                 if (l == null) { saved.Remove(kvp.Key); continue; }
                 UUID filterKey = UUID.Zero;
                 if (!string.IsNullOrEmpty(l.Key)) UUID.TryParse(l.Key, out filterKey);
-                int got = listens?.Restore(req.Prim.LocalId, req.ItemID, req.Prim.UUID, l.Handle, l.Channel,
-                    l.Name ?? string.Empty, filterKey, l.Message ?? string.Empty) ?? -1;
+                // A botListen listen hears from its bot, as it did when the bot left the region while the script ran:
+                // it is registered whether or not the bot is here yet, and hears ranged chat once the bot is.
+                UUID hostID = req.Prim.UUID;
+                if (!string.IsNullOrEmpty(l.HostKey) && (!UUID.TryParse(l.HostKey, out hostID) || hostID.IsZero()))
+                {
+                    saved.Remove(kvp.Key);
+                    continue;
+                }
+                int got = listens?.Restore(req.Prim.LocalId, req.ItemID, hostID, filterKey, l) ?? -1;
                 if (got != l.Handle) saved.Remove(kvp.Key);
             }
         }
