@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- Tests/OpenSim.Region.OptionalModules.Tests has no project file and is not in the solution, so the
-       ServerSideBaking seam tests live in their own project. No SceneHelpers: the seams take fakes. -->
+       ServerSideBaking seam tests live in their own project. The seams take fakes; SceneHelpers is used only
+       where a test needs a real ScenePresence and its close path. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>disable</Nullable>
@@ -35,6 +36,8 @@
     <ProjectReference Include="..\..\Source\OpenSim.Region.ClientStack.LindenCaps\OpenSim.Region.ClientStack.LindenCaps.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
     <ProjectReference Include="..\..\Source\OpenSimNGC.Appearance.Baking\OpenSimNGC.Appearance.Baking.csproj" />
+    <!-- A real ScenePresence and Scene.RemoveClient, for the bake that outlives its presence. -->
+    <ProjectReference Include="..\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
   </ItemGroup>
 
 </Project>

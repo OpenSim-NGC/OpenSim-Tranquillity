@@ -185,6 +185,18 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     {
         ArgumentNullException.ThrowIfNull(sp);
         if (sp.IsChildAgent) throw new InvalidOperationException($"{sp.Name} is a child agent here");
+
+        // A queued bake can outlive its presence. Logging out with an appearance save pending flushes that save
+        // (AvatarFactoryModule.FlushAppearanceSaveOnClose), which raises the change trigger; Scene.RemoveClient
+        // then disposes the presence, and ScenePresence.Dispose sets Appearance to null. So the appearance is read
+        // once, here, and the bake uses that object throughout.
+        var appearance = sp.Appearance;
+        if (appearance is null)
+        {
+            m_log.LogDebug("[SSB]: bake for {Name} ({Agent}) reason={Reason} not run: the presence has closed", sp.Name, sp.UUID, reason);
+            return new BakeOutcome(sp.UUID, reason, Array.Empty<ChannelOutcome>(), 0);
+        }
+
         var scene = sp.Scene;
         var backend = Backend;
 
@@ -195,7 +207,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         // set with no skin produces a valid-looking bake of nothing, and storing it supersedes - deletes - the
         // good bakes it replaces, so the damage is not recoverable by baking again. Observed 2026-09-05: four
         // unresolvable item ids emptied slots 1-4 and the CofChanged bake that followed stored 4 and superseded 4.
-        var refusal = region?.RefusalForBodyPartLoss(sp.UUID, sp.Appearance.Wearables);
+        var refusal = region?.RefusalForBodyPartLoss(sp.UUID, appearance.Wearables);
         if (refusal is not null)
         {
             m_log.LogWarning("[SSB]: bake for {Name} ({Agent}) reason={Reason} REFUSED: {Reason2}",
@@ -205,18 +217,28 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
 
         // steps 2, 4-6, scene-free; the ADR-004 index in the avatar service is read for the reuse decision and
         // written back at the end of the run
-        var outcome = await Task.Run(() => BakeOrchestrator.Run(sp.UUID, reason, sp.Appearance.Wearables, sp.Appearance.VisualParams, sp.Appearance,
+        var outcome = await Task.Run(() => BakeOrchestrator.Run(sp.UUID, reason, appearance.Wearables, appearance.VisualParams, appearance,
             scene.AssetService, scene.AvatarService, backend, m_compositor, BakeSize, cofVersion, ct), ct).ConfigureAwait(false);
+
+        // The presence can also close while the bake runs. The bake itself is kept: it is stored and its index
+        // written, which is where the next login's bake finds it. Nothing is written back, though: the region
+        // forgot the agent on close (ServerSideBakingRegion.Forget), and recording now would put back what that
+        // removed, for an agent that is no longer here. There is nobody to send to either.
+        var closed = sp.IsDeleted;
+        var live = outcome.Count(ChannelStatus.Baked) + outcome.Count(ChannelStatus.Reused) > 0;
+        if (closed)
+            m_log.LogDebug("[SSB]: bake for {Name} ({Agent}) reason={Reason}: the presence closed during the bake; stored, not recorded or sent",
+                sp.Name, sp.UUID, reason);
 
         // Record the bake before sending: SendAppearanceToAgentNF asks IServerSideBakingRegion for the version,
         // and an appearance sent before the record would go out without its AppearanceData block. RecordBake
         // ignores the call on a flag-off region, which is what keeps a console bake there off the wire.
-        if (outcome.Count(ChannelStatus.Baked) + outcome.Count(ChannelStatus.Reused) > 0)
+        if (live && !closed)
         {
             region?.RecordBake(sp.UUID, cofVersion);
             // The baseline for the next body-part check is what a bake actually succeeded from, never what one
             // was refused for: recording a refused set would let the second attempt through unchallenged.
-            region?.RecordGoodBodyParts(sp.UUID, sp.Appearance.Wearables);
+            region?.RecordGoodBodyParts(sp.UUID, appearance.Wearables);
         }
 
         // step 7: send to everyone in view and to self. A reused channel is sent exactly like a fresh one — the
@@ -228,7 +250,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         // save would do is destroy this bake's index, because AvatarService.SetAvatar deletes every row for the
         // agent before rewriting those keys (AvatarService.cs:93). The bake index written above IS the
         // persistence of the baked faces.
-        if (outcome.Count(ChannelStatus.Baked) + outcome.Count(ChannelStatus.Reused) > 0)
+        if (live && !closed)
         {
             sp.SendAppearanceToAllOtherAgents();
             sp.SendAppearanceToAgent(sp);
