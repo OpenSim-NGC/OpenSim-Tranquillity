@@ -2985,14 +2985,52 @@ public class SQLiteSimulationData : ISimulationDataStore
 
     public void SaveExtra(UUID regionID, string name, string value)
     {
+        lock (ds)
+        {
+            using (SQLiteCommand cmd = new SQLiteCommand(
+                "insert or replace into regionextra (RegionID, Name, value) values (:RegionID, :Name, :value)", m_conn))
+            {
+                cmd.Parameters.Add(new SQLiteParameter(":RegionID", regionID.ToString()));
+                cmd.Parameters.Add(new SQLiteParameter(":Name", name));
+                cmd.Parameters.Add(new SQLiteParameter(":value", value));
+                cmd.ExecuteNonQuery();
+            }
+        }
     }
 
     public void RemoveExtra(UUID regionID, string name)
     {
+        lock (ds)
+        {
+            using (SQLiteCommand cmd = new SQLiteCommand(
+                "delete from regionextra where RegionID = :RegionID and Name = :Name", m_conn))
+            {
+                cmd.Parameters.Add(new SQLiteParameter(":RegionID", regionID.ToString()));
+                cmd.Parameters.Add(new SQLiteParameter(":Name", name));
+                cmd.ExecuteNonQuery();
+            }
+        }
     }
 
+    // Scene treats null as a store that keeps no extra settings, so a region with none gets an empty dictionary.
     public Dictionary<string, string> GetExtra(UUID regionID)
     {
-        return null;
+        Dictionary<string, string> ret = new Dictionary<string, string>();
+
+        lock (ds)
+        {
+            using (SQLiteCommand cmd = new SQLiteCommand(
+                "select Name, value from regionextra where RegionID = :RegionID", m_conn))
+            {
+                cmd.Parameters.Add(new SQLiteParameter(":RegionID", regionID.ToString()));
+                using (IDataReader r = cmd.ExecuteReader())
+                {
+                    while (r.Read())
+                        ret[r["Name"].ToString()] = r["value"].ToString();
+                }
+            }
+        }
+
+        return ret;
     }
 }

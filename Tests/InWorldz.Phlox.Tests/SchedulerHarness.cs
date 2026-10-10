@@ -47,7 +47,12 @@ public sealed class SchedulerHarness : IDisposable
     /// The engine's bytecode cache folder. Null (the default) is the calling test class's own folder, see
     /// <see cref="BytecodeDirForCaller"/>; <see cref="ProductionBytecodeDir"/> is the loader's own shared folder.
     /// </param>
-    public SchedulerHarness(Action<IConfigSource> configure = null, bool withYEngine = false, string bytecodeDir = null)
+    /// <param name="keepMasterThread">
+    /// Leave the region's own scheduler thread running, as in a region, instead of pumping from the test. The pump
+    /// methods must not be used then: the thread and the test would both drive the schedulers.
+    /// </param>
+    public SchedulerHarness(Action<IConfigSource> configure = null, bool withYEngine = false, string bytecodeDir = null,
+        bool keepMasterThread = false)
     {
         var config = new IniConfigSource();
         var phlox = config.AddConfig("InWorldz.Phlox");
@@ -120,7 +125,7 @@ public sealed class SchedulerHarness : IDisposable
         Assert.NotNull(m_exe);
 
         // The master scheduler owns a thread; this harness drives DoWork itself instead, so stop it.
-        StopMasterThread();
+        if (!keepMasterThread) StopMasterThread();
     }
 
     /// <summary>The loader's own folder (PhloxScriptLoader.CACHE_DIR), relative to the working directory.</summary>
@@ -525,8 +530,9 @@ public sealed class SchedulerHarness : IDisposable
     }
 
     /// <summary>
-    /// Pump until neither scheduler reports work pending, and no object event is still with the thread pool
-    /// (PhloxEngine.ObjectPostsInFlight), for <paramref name="quietRounds"/> rounds in a row, or
+    /// Pump until neither scheduler reports work pending, no object event is still with the thread pool
+    /// (PhloxEngine.ObjectPostsInFlight) and no script is still on the loader's compile thread (CompilesOutstanding:
+    /// the loader's WorkIsPending does not count one), for <paramref name="quietRounds"/> rounds in a row, or
     /// <paramref name="limit"/> passes; false on the limit. Used AFTER a test's own settle window, never instead of it,
     /// so a "nothing arrived" window is never shorter - only a delivery that is still queued under load is waited for.
     /// </summary>
@@ -541,7 +547,7 @@ public sealed class SchedulerHarness : IDisposable
             var l = loaderDoWork!.Invoke(m_loader, null);
             var e = exeDoWork!.Invoke(m_exe, null);
             bool busy = Pending(l) || Pending(e);
-            quiet = busy || Engine.ObjectPostsInFlight > 0 ? 0 : quiet + 1;
+            quiet = busy || Engine.ObjectPostsInFlight > 0 || CompilesOutstanding > 0 ? 0 : quiet + 1;
             if (quiet >= quietRounds) return true;
             if (!busy) System.Threading.Thread.Sleep(1);   // Quiet rounds still sleep, so a late delivery has time to land
         }
@@ -570,6 +576,10 @@ public sealed class SchedulerHarness : IDisposable
         }
         return true;
     }
+
+    /// <summary>Scripts handed to the loader's compile thread and not yet taken back by its DoWork.</summary>
+    private int CompilesOutstanding => (int)typeof(global::Phlox.ScriptEngine.PhloxScriptLoader)
+        .GetField("m_CompilesOutstanding", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(m_loader)!;
 
     private static bool Pending(object workStatus)
         => (bool)(workStatus.GetType().GetField("WorkIsPending")?.GetValue(workStatus)

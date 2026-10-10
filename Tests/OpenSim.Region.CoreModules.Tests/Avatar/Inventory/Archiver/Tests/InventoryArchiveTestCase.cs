@@ -41,12 +41,12 @@ public class InventoryArchiveTestCase : OpenSimTestCase
     /// <summary>
     /// A raw array of bytes that we'll use to create an IAR memory stream suitable for isolated use in each test.
     /// </summary>
-    protected byte[] m_iarStreamBytes;
+    protected byte[] m_iarStreamBytes = null!;
 
     /// <summary>
     /// Stream of data representing a common IAR for load tests.
     /// </summary>
-    protected MemoryStream m_iarStream;
+    protected MemoryStream m_iarStream = null!;
 
     protected UserAccount m_uaMT
         = new UserAccount {

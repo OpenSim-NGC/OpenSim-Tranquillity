@@ -71,10 +71,12 @@ SL behaviour is cited from the SL wiki (`https://wiki.secondlife.com/wiki/<Page>
 - An `llListen` identical to one the script already holds active returns the existing handle.
 - Handles are each script's own, numbered from 1 with the lowest free one first, as SL, YEngine
   and the core WorldComm number them; two scripts can hold the same handle number.
-- A script receives at most 20 listen events per second; the rest of that second's are dropped,
-  with one line in the region log per script per second. SL documents no such limit, and YEngine
-  and Halcyon have none. `[InWorldz.Phlox] MaxListenEventsPerSecond` sets the number; 0 turns the
-  limit off.
+- A script receives at most 20 listen events per second; the rest of that second's are dropped.
+  SL documents no such limit, and YEngine and Halcyon have none. `[InWorldz.Phlox]
+  MaxListenEventsPerSecond` sets the number; 0 turns the limit off. The region log gets one line
+  when a script starts being capped, then at most one a minute with how many deliveries were
+  refused since the line before, for as long as the script goes on being capped; a minute with
+  no refusal ends that run, and the next refusal starts a new one with its own first line.
 - A prim never hears its own chat.
 - `llRegionSayTo` refuses `DEBUG_CHANNEL` with the error "Cannot use llRegionSayTo() on
   DEBUG_CHANNEL.". Only its target hears it: the target prim's listens, or, for an avatar,
@@ -253,14 +255,19 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   other engine is not carried over.
 - **What survives.** A Phlox script resumes where it was after a region or simulator restart,
   including in the middle of an event (asleep, in a loop or in a blocking call): its globals,
-  state, queued events, listens (with their handles) and timer, which keeps its phase (the next
-  `timer()` comes after the time it had left). A script that was stopped stays stopped. It
-  starts fresh when its source changes, and when it is reset.
+  state, queued events, listens and timer, which keeps its phase (the next `timer()` comes after
+  the time it had left). Listens come back with their handles, on or off as `llListenControl`
+  left them, with their `osListenRegex` filters, and a `botListen` listen still hears from its
+  bot, as YEngine saves each listen's on/off state and regex bitfield. A row saved by an earlier
+  build has none of these, and loads as before: its `llListen` listens on, and no
+  `osListenRegex` or `botListen` listen. A restored `botListen` listen is registered whether or
+  not its bot is in the region yet, as a live one stays registered when its bot leaves; it hears
+  said chat from the bot's position once the bot is there. A script that was stopped stays
+  stopped. It starts fresh when its source changes, and when it is reset.
 - **What does not.** `llGetStartParameter` is 0 after a restart or a crossing, as SL documents
   ([LlGetStartParameter](https://wiki.secondlife.com/wiki/LlGetStartParameter): "The start
   parameter does not survive region restarts ... or region change"); a rez gives it the rez's
-  parameter. A listen switched off with `llListenControl` comes back on, as Halcyon's did.
-  `osListenRegex` and `botListen` listens are not saved and are gone after a restart.
+  parameter.
 - **Rows that cannot be read.** A saved row that cannot be decoded is moved to the
   `script_state_rejected` table of the state database and the script starts fresh, as
   YEngine resets a script whose state file is bad. When the database itself fails (busy or
@@ -338,8 +345,12 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - State another engine wrote (YEngine, XEngine), state in a newer envelope version, and
     state that cannot be read are refused: the script starts fresh and the object always
     rezzes. YEngine refuses Phlox's state the same way.
-  - Events that arrive while an object is between regions are not held for it (no crossing
-    wait).
+  - An event that reaches a crossing object's script after its state was captured, and
+    before the object has left, reaches the copy left behind and is lost when the crossing
+    succeeds. Halcyon's crossing wait has the same gap.
+  - After a crossing that fails, a dataserver, HTTP or XML-RPC reply the script was waiting
+    for when the crossing started does not arrive: the hold drops the replies a script is
+    still owed, as Halcyon's crossing wait did.
   - A script that arrives on a parcel where scripts may not run is paused, and the arrival's
     `changed` event is dropped with whatever else reaches a paused script. SL queues it and
     posts it once the object is somewhere scripts run.
@@ -356,6 +367,32 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     same 10 seconds.
   - A script held stopped because its row could not be read carries no state.
   - Objects saved by an earlier Phlox build carry no Phlox state and start fresh as before.
+- **A crossing holds the object's scripts.** When an object starts to cross into another
+  region (a region crossing, or an object teleport to another region), the simulator
+  announces it (`EventManager.OnGroupBeginInTransit`) before the transfer starts, and Phlox
+  holds every script of the object until the crossing ends
+  (`EventManager.OnGroupEndInTransit`), as Halcyon's crossing wait did. While held:
+  - nothing runs: an event in progress stops where it is, and a sleep, the timer and the
+    touch repeat stop;
+  - every event that reaches the script waits on its queue, in order, up to the usual 64,
+    except chat on its listens, which is dropped (Halcyon took a held script's listens away);
+  - the sensor repeat stops, and replies still owed to it (dataserver, HTTP, XML-RPC) are
+    dropped, as Halcyon's crossing wait did; taken controls stay;
+  - the script's URLs stay. A crossing that succeeds releases them in the region the object
+    left, when its scripts are removed there; a crossing that fails leaves the object where
+    it was, so its URLs keep working. Halcyon released them when the hold started.
+
+  The state the crossing captures includes the held events: they run in the new region, in
+  the order they came, and not in the region the object left. When the crossing fails
+  (no region beyond, or the transfer is refused) the object is put back inside the region
+  and its scripts carry on there: the held events run in order, each once, the timer comes
+  back with the time it had left, and the sensor repeat starts again. Scripts of other
+  objects are not held. The SL wiki says nothing about events during a crossing; it says
+  events are "queued FIFO" and that when a script is paused "pending events are preserved"
+  ([LSL Events](https://wiki.secondlife.com/wiki/Category:LSL_Events)).
+
+  Before this hold, an event that reached the object during a crossing ran in the region it
+  was leaving, and could run a second time in the new one.
 - **Carried state is checked as input from outside.** It can come from anywhere: inventory
   from another grid, a Hypergrid visitor's attachments, an object another resident made.
   - It must fit the compiled script it is loaded for: its state index, its number of
@@ -540,6 +577,12 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   object's owner may edit both objects (the same check as editing them by hand). If not,
   nothing is linked, no error is shown and the call returns without its delay. YEngine
   does not make this check.
+- **Events dropped by a full queue.** When a script's event queue holds 64 events, new ones
+  are dropped, as SL drops them. The region log gets one line when a run of drops starts, with
+  how many of each kind were dropped, then one a minute with the drops since the line before,
+  and the rest when the script is unloaded. A run lasts until a whole minute passes with no drop
+  for that script, so events that keep arriving in bursts, with room in the queue between them,
+  are one run and write about one line a minute, not one a burst.
 - **`llInstantMessage` length.** A message longer than 1023 bytes of UTF-8 is cut to 1023
   bytes, as SL documents ([LlInstantMessage](https://wiki.secondlife.com/wiki/LlInstantMessage)).
   A character the cut would split is dropped whole. YEngine cuts at 1024 characters.
@@ -600,11 +643,17 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   deliver to an avatar elsewhere or offline.
 - `llGetUsername` returns "First Last" where YEngine returns "first.last". Both answer only for
   an avatar the region holds (root or child agent), else `""`; `llRequestUsername` answers for
-  anyone.
+  any avatar with an account, here or not. For a key no account has, `llRequestUsername` and
+  `llRequestDisplayName` raise no dataserver event, as the SL wiki says of both.
 - `llManageEstateAccess` never bans the estate owner's partner, the partner named on the estate
   owner's profile, as Halcyon refused it: the call returns `FALSE`, nothing changes, and neither
   an IM nor an error is sent, as for the estate owner. When the estate owner's profile cannot be
   read, the ban goes ahead and the region's log says so. SL documents no partner rule.
+- A change `llManageEstateAccess` makes to the estate's lists is stored and then sent to the
+  estate's other regions, as a change from the viewer's estate tools is: the estate module's
+  change event reloads the estate on this simulator's regions of the estate and sends
+  `update_estate` to the others. A call that changes nothing (a no-op, a refusal or a query)
+  stores and sends nothing.
 - `llGetExperienceDetails(NULL_KEY)` gives the details of the script's own Experience, the one
   its script item names, and an empty list for a script in no Experience, as SL documents: "If
   experience_id is NULL_KEY, then information about the script's experience is returned. In
@@ -660,6 +709,17 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   the reset, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the old script while
   it resets, is dropped. Phlox used to run such an event in the fresh script before its `state_entry` when a sensor
   sweep or a listen delivery was under way at that moment.
+- Notecard text, as every notecard reader reads it: `llGetNotecardLine`, `llGetNumberOfNotecardLines`,
+  `llGetNotecardLineSync`, `llFindNotecardTextSync`, `iwGetNotecardSegment`, the `iwGetLink*` notecard functions,
+  `osGetNotecard`, `osGetNotecardLine` and `osGetNumberOfNotecardLines`. A notecard's stored "Text length" counts bytes
+  of UTF-8, and Phlox reads exactly that many bytes, as YEngine does. A newline ends the line before it and does not
+  start another: text that ends with a newline has no empty line after it, and an empty notecard has no lines. The SL
+  wiki pages for `llGetNotecardLine` and `llGetNumberOfNotecardLines` do not say; this is how YEngine reads them. So a
+  notecard made by `osMakeNotecard`, which writes a newline after the string and after each list item, reads back as
+  the string's lines or the list's items. Phlox used to take the stored length as a count of characters, so text with
+  characters of more than one byte could end in a stray `}` (and, when a `}` and a newline closed the text, an extra
+  empty line after it); it answered one empty line more
+  than YEngine for text that ends with a newline, and `""` instead of EOF for line 0 of an empty notecard.
 
 ---
 
@@ -673,7 +733,14 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 
 ### Events
 `bot_update(string, integer, list)` is the only event beyond SL's set. The bot manager
-raises it for the `bot*` functions.
+raises it for the `bot*` functions, as Halcyon did: `BOT_MOVE_COMPLETE` with `[bot position]` when
+a navigation path is done; `BOT_MOVE_UPDATE` with `[next node, bot position]` each time the bot
+moves on to another point (after a teleport point too, the last one included); `BOT_MOVE_FAILED`
+with `[next node, bot position]` when a move times out; `BOT_MOVE_AVATAR_LOST` with
+`[avatar position, 0.0, bot position]`, once, when a followed avatar leaves the region (the
+position is then `ZERO_VECTOR`) or is farther than `BOT_LOST_AVATAR_DISTANCE` (default 1000 m).
+It goes to every script registered with `botRegisterForNavigationEvents`, and to the script that
+created the bot with `botCreateBot`.
 
 ### `iw*` functions (82)
 | Area | Functions |
@@ -856,10 +923,13 @@ such list.
   outside this repository, such as a Jolt module, shows no effect either until it implements `SetConstantForce`.
 - `llSetForce` in an unattached physical object: a local force (`local` TRUE) is turned once by the object's rotation
   when it is set, not kept in the object's frame as it turns.
-- `botGetProfileParams` returns `""` for `BOT_EMAIL` and `BOT_PROFILE_URL`, and the about text and image only for a
-  bot in the same region; the bot manager keeps the values `botSetProfileParams` stores but does not hand them out.
-- `botSetNavigationPoints` with `BOT_TRAVELMODE_WAIT`: the bot manager moves on to the next point at once instead of
-  waiting.
+- `botSetNavigationPoints`: a move that times out (about 60 s) raises `BOT_MOVE_FAILED` and ends the path. Halcyon
+  teleported the bot to the point and went on, after `BOT_MOVEMENT_TELEPORT_AFTER` seconds (60 by default); that
+  option and `BOT_MOVEMENT_TYPE` (`BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY` repeats the path) are not read.
+- `botWanderWithin` raises no `bot_update`. Halcyon raised `BOT_MOVE_UPDATE` as the bot reached each wander point (when
+  there was a wait between points) and `BOT_MOVE_FAILED` when it did not reach one.
+- `botFollowAvatar` walks once toward the avatar and does not keep following it; `BOT_REQUIRES_LINE_OF_SIGHT`, the
+  start and stop following distances and the allow-running, flying and jumping options are not read.
 
 ### Prim-params rules
 - `PRIM_HEALTH` and the damage type in `PRIM_DAMAGE` are accepted and dropped. Reading them

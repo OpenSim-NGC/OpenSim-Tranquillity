@@ -6,7 +6,7 @@
  * an entry is refreshed by every read of it, IsCached does not look at age, and CacheCheck - run on every read that
  * missed the cache - drops the entries not read for more than NOTECARD_CACHE_TIMEOUT (60 s). Unlike Halcyon's (one
  * static cache per process), there is one per region's engine. It holds the lines Phlox already parsed a notecard into
- * without a cache (LSLSystemAPI.StripNotecardHeader, split on '\n'), so a cached read answers exactly what a fetch does.
+ * without a cache (LSLSystemAPI.StripNotecardHeader, then Card.SplitLines), so a cached read answers exactly what a fetch does.
  * Asset ids are content addresses: a notecard saved with new text gets a new asset id, so an entry never goes stale.
  *
  * MovingIntegerAverage is Halcyon's (OpenSim/Framework MovingIntegerAverage): the last n values, averaged with integer
@@ -26,17 +26,28 @@ namespace Phlox.ScriptEngine
         internal sealed class Card
         {
             private readonly string[] m_lines;
-            private readonly bool m_empty;
 
             /// <param name="body">the notecard's text, header already stripped</param>
             public Card(string body)
             {
-                m_empty = body.Length == 0;
-                m_lines = body.Split('\n');
+                m_lines = SplitLines(body);
             }
 
-            /// <summary>What llGetNumberOfNotecardLines answers: 0 for an empty notecard, else the '\n'-separated lines.</summary>
-            public int LineCount => m_empty ? 0 : m_lines.Length;
+            /// <summary>
+            /// The notecard's lines, as every notecard reader answers them: the text split at '\n', where a '\n' ends
+            /// the line before it and does not start another, so a text that ends with '\n' has no empty line after
+            /// it, and an empty text has no lines. The SL wiki does not say; this is YEngine's reader
+            /// (SLUtil.ParseNotecardToArray), whose loop ends at the end of the text.
+            /// </summary>
+            public static string[] SplitLines(string body)
+            {
+                if (body.Length == 0) return System.Array.Empty<string>();
+                string[] lines = body.Split('\n');
+                return body[body.Length - 1] == '\n' ? lines[..^1] : lines;
+            }
+
+            /// <summary>What llGetNumberOfNotecardLines answers.</summary>
+            public int LineCount => m_lines.Length;
 
             /// <summary>Line <paramref name="n"/> without its '\r', or null past either end.</summary>
             public string Line(int n) => n < 0 || n >= m_lines.Length ? null : m_lines[n].TrimEnd('\r');

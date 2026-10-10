@@ -415,36 +415,36 @@ public class WebStatsModule : ISharedRegionModule
         int sizeOfChar = encoding.GetByteCount("\n");
         byte[] buffer = encoding.GetBytes("\n");
         string logfile = Util.logFile();
-        FileStream fs = new FileStream(logfile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using FileStream fs = new FileStream(logfile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         Int64 tokenCount = 0;
         Int64 endPosition = fs.Length / sizeOfChar;
 
         for (Int64 position = sizeOfChar; position < endPosition; position += sizeOfChar)
         {
+            if (position > fs.Length)
+                break;
+
             fs.Seek(-position, SeekOrigin.End);
-            fs.Read(buffer, 0, buffer.Length);
+            if (fs.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false) < buffer.Length)
+                break;
 
             if (encoding.GetString(buffer) == "\n")
             {
                 tokenCount++;
                 if (tokenCount == amount)
                 {
-                    byte[] returnBuffer = new byte[fs.Length - fs.Position];
-                    fs.Read(returnBuffer, 0, returnBuffer.Length);
-                    fs.Close();
-                    fs.Dispose();
-                    return encoding.GetString(returnBuffer);
+                    using MemoryStream tail = new MemoryStream();
+                    fs.CopyTo(tail);
+                    return encoding.GetString(tail.GetBuffer(), 0, (int)tail.Length);
                 }
             }
         }
 
         // handle case where number of tokens in file is less than numberOfTokens
         fs.Seek(0, SeekOrigin.Begin);
-        buffer = new byte[fs.Length];
-        fs.Read(buffer, 0, buffer.Length);
-        fs.Close();
-        fs.Dispose();
-        return encoding.GetString(buffer);
+        using MemoryStream contents = new MemoryStream();
+        fs.CopyTo(contents);
+        return encoding.GetString(contents.GetBuffer(), 0, (int)contents.Length);
     }
 
     /// <summary>

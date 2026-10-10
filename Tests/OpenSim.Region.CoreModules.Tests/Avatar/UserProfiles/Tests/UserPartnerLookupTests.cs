@@ -64,7 +64,7 @@ public class UserPartnerLookupTests : OpenSimTestCase
     private int m_requests;
 
     /// <summary>What the stand-in service answers: a partner, an error, or nothing usable.</summary>
-    private Func<OSDMap, string> m_answer = _ => null;
+    private Func<OSDMap, string?> m_answer = _ => null;
 
     public UserPartnerLookupTests()
     {
@@ -114,8 +114,9 @@ public class UserPartnerLookupTests : OpenSimTestCase
             string body;
             using (StreamReader reader = new(ctx.Request.InputStream, Encoding.UTF8))
                 body = await reader.ReadToEndAsync();
-            OSDMap request = (OSDMap)OSDParser.DeserializeJson(body);
-            string reply = request["method"].AsString() == "avatar_properties_request" ? m_answer(request) : null;
+            OSDMap request = OSDParser.DeserializeJson(body) as OSDMap
+                ?? throw new InvalidDataException("Profile service sent invalid JSON.");
+            string? reply = request["method"].AsString() == "avatar_properties_request" ? m_answer(request) : null;
             reply ??= "{\"jsonrpc\":\"2.0\",\"id\":\"" + request["id"].AsString() + "\",\"error\":{\"code\":-32601,\"message\":\"no\"}}";
 
             byte[] bytes = Encoding.UTF8.GetBytes(reply);
@@ -144,10 +145,11 @@ public class UserPartnerLookupTests : OpenSimTestCase
     {
         public bool Local = true;
 
-        protected override object Invoke(MethodInfo method, object[] args)
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
-            if (method.Name == "IsLocalGridUser")
+            if (method!.Name == "IsLocalGridUser")
                 return Local;
+            args ??= Array.Empty<object?>();
             if (method.Name == "GetUserServerURL" && args.Length == 3)
             {
                 args[2] = true;   // the out "failed": a foreign user's home grid is not known here

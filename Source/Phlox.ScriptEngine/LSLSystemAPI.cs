@@ -329,7 +329,7 @@ namespace Phlox.ScriptEngine
                         ShoutError("Notecard '" + cardName + "' could not be found.");
                         return;
                     }
-                    var card = new PhloxNotecardCache.Card(StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data)));
+                    var card = new PhloxNotecardCache.Card(StripNotecardHeader(asset.Data));
                     cache?.Cache(assetId, card);
                     PostDataserverEvent(queryID, answer(card));
                 }
@@ -418,13 +418,28 @@ namespace Phlox.ScriptEngine
             // half way and left every derezzed script loaded.
             var inventory = m_host?.TaskInventory;
             if (inventory == null) return null;
-            lock (inventory)
+            // The read lock the core's inventory writers take (SceneObjectPartInventory.AddInventoryItem,
+            // RemoveInventoryItem: LockItemsForWrite), not a monitor on the dictionary, which no writer takes: a script
+            // added or removed on another thread during the read broke it with "Collection was modified".
+            // The core calls into this engine while it holds that lock (HasScript, OnRemoveScript, changed() posts);
+            // none of those paths reaches here, and the only lock held when this is called is m_permRequestLock,
+            // which nothing takes under the inventory lock.
+            try
             {
-                foreach (var kvp in inventory)
-                    if (kvp.Value.Type == 10 && kvp.Value.ItemID == m_itemID)
-                        return kvp.Value;
+                inventory.LockItemsForRead(true);
+                try
+                {
+                    return inventory.TryGetValue(m_itemID, out TaskInventoryItem item) && item.Type == 10 ? item : null;
+                }
+                finally
+                {
+                    inventory.LockItemsForRead(false);
+                }
             }
-            return null;
+            catch (Exception e) when (e is ObjectDisposedException || e is NullReferenceException)
+            {
+                return null;   // The part's inventory was disposed (the object was derezzed) after it was read above
+            }
         }
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -534,6 +549,24 @@ namespace Phlox.ScriptEngine
             PauseSensorForParcel();
             m_PendingDataserver.Clear();
             ReleaseControlsOnUnload();
+        }
+
+        /// <summary>
+        /// The script is held while its object crosses into another region. As Halcyon's OnScriptUnloaded for a crossing
+        /// wait: the sensor repeat stops, the replies the script is still owed (dataserver, HTTP, XML-RPC) are dropped,
+        /// and taken controls stay ("silently release controls IF this is not the result of a crossing wait disable"),
+        /// so the state the crossing captures still holds them. The SensorRepeat record stays: the sensor starts again
+        /// in the next region, or here when the crossing fails (RestoreSensorAfterParcel). URLs stay, unlike Halcyon's: a
+        /// failed crossing leaves the object here, so they keep working; a crossing that succeeds removes the script here,
+        /// and that unload releases them (ReleaseScriptResources).
+        /// </summary>
+        internal void OnCrossingHold()
+        {
+            PauseSensorForParcel();
+            m_PendingDataserver.Clear();
+            var async = m_ScriptEngine?.AsyncCommands;
+            async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID);
+            async?.XmlRequestPlugin.RemoveEvents(m_localID, m_itemID);
         }
 
         /// <summary>
@@ -1141,7 +1174,7 @@ namespace Phlox.ScriptEngine
         public float llLog(float f) => (float)Math.Log(f);
 
         public float llVecMag(Vector3 v) => v.Length();
-        public Vector3 llVecNorm(Vector3 v) => Vector3.Normalize(v);
+        public Vector3 llVecNorm(Vector3 v) => Vector3.Normalize(in v);
         public float llVecDist(Vector3 a, Vector3 b) => Vector3.Distance(a, b);
 
         public Vector3 llRot2Euler(Quaternion r)
@@ -1163,9 +1196,10 @@ namespace Phlox.ScriptEngine
         {
             double c1 = Math.Cos(v.X/2), c2 = Math.Cos(v.Y/2), c3 = Math.Cos(v.Z/2);
             double s1 = Math.Sin(v.X/2), s2 = Math.Sin(v.Y/2), s3 = Math.Sin(v.Z/2);
-            return Quaternion.Normalize(new Quaternion(
+            Quaternion rotation = new Quaternion(
                 (float)(s1*c2*c3 + c1*s2*s3), (float)(c1*s2*c3 - s1*c2*s3),
-                (float)(s1*s2*c3 + c1*c2*s3), (float)(c1*c2*c3 - s1*s2*s3)));
+                (float)(s1*s2*c3 + c1*c2*s3), (float)(c1*c2*c3 - s1*s2*s3));
+            return Quaternion.Normalize(in rotation);
         }
 
         public Quaternion llAxes2Rot(Vector3 fwd, Vector3 left, Vector3 up)
@@ -1198,9 +1232,23 @@ namespace Phlox.ScriptEngine
             }
         }
 
-        public Vector3 llRot2Fwd(Quaternion r) => Vector3.Normalize(new Vector3(1f,0f,0f)*r);
-        public Vector3 llRot2Left(Quaternion r) => Vector3.Normalize(new Vector3(0f,1f,0f)*r);
-        public Vector3 llRot2Up(Quaternion r) => Vector3.Normalize(new Vector3(0f,0f,1f)*r);
+        public Vector3 llRot2Fwd(Quaternion r)
+        {
+            Vector3 direction = new Vector3(1f,0f,0f) * r;
+            return Vector3.Normalize(in direction);
+        }
+
+        public Vector3 llRot2Left(Quaternion r)
+        {
+            Vector3 direction = new Vector3(0f,1f,0f) * r;
+            return Vector3.Normalize(in direction);
+        }
+
+        public Vector3 llRot2Up(Quaternion r)
+        {
+            Vector3 direction = new Vector3(0f,0f,1f) * r;
+            return Vector3.Normalize(in direction);
+        }
 
         public Quaternion llRotBetween(Vector3 a, Vector3 b)
         {
@@ -1209,13 +1257,16 @@ namespace Phlox.ScriptEngine
             double magProduct = a.Length() * b.Length();
             if (magProduct == 0) return Quaternion.Identity;
             double angle = Math.Acos(Math.Max(-1.0, Math.Min(1.0, dotProduct / magProduct)));
-            Vector3 axis = Vector3.Normalize(crossProduct);
+            Vector3 axis = Vector3.Normalize(in crossProduct);
             if (float.IsNaN(axis.X)) return Quaternion.Identity;
             return Quaternion.CreateFromAxisAngle(axis, (float)angle);
         }
 
         public Quaternion llAxisAngle2Rot(Vector3 axis, float angle)
-            => Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), angle);
+        {
+            Vector3 normalizedAxis = Vector3.Normalize(in axis);
+            return Quaternion.CreateFromAxisAngle(normalizedAxis, angle);
+        }
 
         // llRot2Axis, llRot2Angle and llAngleBetween are YEngine's (LSL_Api.cs llRot2Axis / llRot2Angle /
         // llAngleBetween): the input's scale does not matter and there is no small-angle cut-off. OpenMetaverse's GetAxisAngle,
@@ -1995,7 +2046,7 @@ namespace Phlox.ScriptEngine
                 if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
                 if (!m_host.ParentGroup.IsAttachment && (m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
                 if (force.LengthSquared() > 20000f * 20000f)
-                    force = Vector3.Normalize(force) * 20000f;
+                    force = Vector3.Normalize(in force) * 20000f;
                 m_host.ApplyImpulse(force, local != 0);
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
@@ -3115,6 +3166,15 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
+        /// The core took permissions from this script's item with no event run (EventManager.OnScriptPermissionsRemoved):
+        /// a stand-up or a detach ends CONTROL_CAMERA (SL llSetCameraParams, "automatically revoked when the avatar stands
+        /// up from or detaches the object") even from a script that took no controls. The state notes the item's grant as
+        /// it is now and the script is saved again, so its row does not keep the ended bits for a restart to give back.
+        /// Scheduler thread.
+        /// </summary>
+        internal void PermissionsRemovedByCore() => GrantChanged();
+
+        /// <summary>
         /// The object has a new owner. Halcyon clears every item's grant (ApplyNextOwnerPermissions, Rationalize) and so
         /// does the core (ChangeInventoryOwner), but neither lets go of controls the old grant took. A request the script
         /// was still waiting on under the old owner ends too. Scheduler thread.
@@ -3383,7 +3443,17 @@ namespace Phlox.ScriptEngine
             return partner.IsNotZero() && partner == key;
         }
 
-        private void StoreEstate(EstateSettings es) => World.EstateDataServiceSafe?.StoreEstateSettings(es);
+        /// <summary>
+        /// Stores the estate, then tells the estate's other regions, as NGC's own estate tools do
+        /// (EstateManagementModule.TriggerEstateInfoChange; EstateModule turns it into EstateConnector.SendUpdateEstate,
+        /// which reloads the estate on this simulator's regions and sends update_estate to the others) and as Halcyon does
+        /// after a ban (SaveEstateDataAndUpdateRegions). Called only for a real change.
+        /// </summary>
+        private void StoreEstate(EstateSettings es)
+        {
+            World.EstateDataServiceSafe?.StoreEstateSettings(es);
+            World.RequestModuleInterface<IEstateModule>()?.TriggerEstateInfoChange();
+        }
 
         /// <summary>
         /// Halcyon EstateBanUser "Banned, now shoo them away" (EstateManagementModule.cs:311-328): an avatar here whose
@@ -4456,7 +4526,15 @@ namespace Phlox.ScriptEngine
             else
             {
                 UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
-                if (acct != null) name = acct.FirstName + " " + acct.LastName;
+                if (acct == null)
+                {
+                    // SL wiki llRequestUsername: "If id is not the UUID of an avatar, the dataserver event is not raised."
+                    // llRequestDisplayName: "If the request fails for any reason, there will be no error notice or
+                    // dataserver event." The query is owed nothing any more.
+                    m_PendingDataserver.TryRemove(requestID, out _);
+                    return;
+                }
+                name = acct.FirstName + " " + acct.LastName;
             }
 
             PostDataserverEvent(requestID, name);
@@ -4856,13 +4934,31 @@ namespace Phlox.ScriptEngine
             if (m_ScriptEngine.ListenManager == null) { Stub("llListen (no ListenManager)"); return -1; }
             UUID filterKey = UUID.Zero;
             UUID.TryParse(id, out filterKey);
-            int handle = m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channel, name, filterKey, msg);
-            // Kept in the script's state, so a restore registers the listen again with this handle (Halcyon llListen:
-            // ScriptState.AddActiveListen).
+            return AddSavedListen(m_host.UUID, channel, name, id, filterKey, msg, 0, null);
+        }
+
+        /// <summary>
+        /// Registers a listen and keeps it in the script's state, so a restore registers it again with this handle
+        /// (Halcyon llListen: ScriptState.AddActiveListen), with its osListenRegex bitfield and, for botListen, its bot.
+        /// The listen manager keeps the record's on/off state in step with llListenControl.
+        /// </summary>
+        private int AddSavedListen(UUID hostID, int channel, string name, string id, UUID filterKey, string msg,
+                                   int regexBitfield, string botKey)
+        {
+            var saved = new ActiveListen
+            {
+                Channel = channel, Name = name, Key = id, Message = msg, RegexBitfield = regexBitfield, HostKey = botKey
+            };
+            int handle = m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, hostID, channel, name, filterKey, msg,
+                regexBitfield, saved);
             if (handle > 0)
-                m_thisScript?.ScriptState?.AddActiveListen(new ActiveListen { Handle = handle, Channel = channel, Name = name, Key = id, Message = msg });
+            {
+                saved.Handle = handle;
+                m_thisScript?.ScriptState?.AddActiveListen(saved);
+            }
             return handle;
         }
+
         public void llListenControl(int number, int active) { m_ScriptEngine.ListenManager?.SetActive(m_itemID, number, active != 0); }
         public void llListenRemove(int number)
         {
@@ -5355,8 +5451,7 @@ namespace Phlox.ScriptEngine
             {
                 AssetBase asset = World.AssetService.Get(item.AssetID.ToString());
                 if (asset == null || asset.Data == null) return "\n\n\n";
-                string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                string[] lines = body.Split('\n');
+                string[] lines = PhloxNotecardCache.Card.SplitLines(StripNotecardHeader(asset.Data));
                 if (line < 0 || line >= lines.Length) return "\n\n\n";
                 return lines[line].TrimEnd('\r');
             }
@@ -5372,8 +5467,7 @@ namespace Phlox.ScriptEngine
             {
                 AssetBase asset = World.AssetService.Get(item.AssetID.ToString());
                 if (asset == null || asset.Data == null) return -1;
-                string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-                string[] lines = body.Split('\n');
+                string[] lines = PhloxNotecardCache.Card.SplitLines(StripNotecardHeader(asset.Data));
                 StringComparison comp = caseSensitive != 0
                     ? StringComparison.Ordinal
                     : StringComparison.OrdinalIgnoreCase;
@@ -5659,8 +5753,7 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// Give task items to a prim, or into a new folder named <paramref name="category"/> in an avatar's inventory.
-        /// Scene.MoveTaskInventoryItems gives up (UUID.Zero) for an avatar who is not in this region, so for one who is
-        /// elsewhere or offline the folder is made here and each item goes in by the no-client overload.
+        /// An avatar, here, elsewhere or offline, gets the list from Scene.MoveTaskInventoryItemsAllOrNone.
         /// </summary>
         private int GiveTaskItems(SceneObjectPart source, UUID destId, string category, List<UUID> itemIDs, out string failure)
         {
@@ -5670,9 +5763,10 @@ namespace Phlox.ScriptEngine
                 World.MoveTaskInventoryItems(destId, category, source, itemIDs);
                 return IW_DELIVER_OK;
             }
-            // Halcyon gives an avatar all of the list or none of it: an item that cannot be moved aborts the give with
-            // its reason (LSLSystemAPI.cs:8478-8501). Core's MoveTaskInventoryItems alerts per item and gives the rest, so
-            // the items are checked first, by its own rules (CreateAgentInventoryItemFromTask).
+            // An item that cannot be moved aborts the give with its reason, as in Halcyon (LSLSystemAPI.cs:8478-8501;
+            // its Scene.MoveTaskInventoryItems stopped at that item). Scene.MoveTaskInventoryItemsAllOrNone also gives
+            // nothing before it, and holds when the prim's inventory changes during the give. This check only keeps an
+            // item's reason ahead of the avatar's.
             foreach (UUID itemId in itemIDs)
             {
                 TaskInventoryItem item = source.Inventory.GetInventoryItem(itemId);
@@ -5687,40 +5781,19 @@ namespace Phlox.ScriptEngine
                     return IW_DELIVER_PERM;
                 }
             }
-            if (World.GetScenePresence(destId) != null)
-            {
-                UUID given = World.MoveTaskInventoryItems(destId, category, source, itemIDs);
-                if (given == UUID.Zero)
-                {
-                    failure = "the recipient's inventory could not be reached";
-                    return IW_DELIVER_USER;
-                }
-                // Halcyon offers the folder to a present avatar too, so the viewer shows the offer.
-                SendGiveNotice(source, destId, "'" + category + "'", given, (byte)AssetType.Folder);
-                return IW_DELIVER_OK;
-            }
-            if (!AvatarKnown(destId))
+            if (World.GetScenePresence(destId) == null && !AvatarKnown(destId))
             {
                 failure = "Can't find destination '" + destId + "'";
                 return IW_DELIVER_USER;
             }
-            InventoryFolderBase root = World.InventoryService.GetRootFolder(destId);
-            if (root == null)
+            UUID given = World.MoveTaskInventoryItemsAllOrNone(destId, category, source, itemIDs, out string reason);
+            if (given == UUID.Zero)
             {
-                failure = "the recipient's inventory could not be reached";
-                return IW_DELIVER_USER;
+                failure = reason;
+                return DeliverReasonToResult(reason);
             }
-            var folder = new InventoryFolderBase(UUID.Random(), category, destId, -1, root.ID, root.Version);
-            World.InventoryService.AddFolder(folder);
-            foreach (UUID itemId in itemIDs)
-            {
-                if (World.MoveTaskInventoryItem(destId, folder.ID, source, itemId, out string reason) == null)
-                {
-                    failure = reason;
-                    return DeliverReasonToResult(failure);
-                }
-            }
-            SendGiveNotice(source, destId, "'" + category + "'", folder.ID, (byte)AssetType.Folder);
+            // Halcyon offers the folder to a present avatar too, so the viewer shows the offer.
+            SendGiveNotice(source, destId, "'" + category + "'", given, (byte)AssetType.Folder);
             return IW_DELIVER_OK;
         }
 
@@ -10517,7 +10590,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (toTarget.LengthSquared() < 0.0001f)
                 return; // target is at same position, nothing to do
 
-            Vector3 up = Vector3.Normalize(toTarget);
+            Vector3 up = Vector3.Normalize(in toTarget);
             Quaternion current = m_host.ParentGroup.GroupRotation;
             Vector3 left = Vector3.Cross(Vector3.UnitZ, up);
             if (left.LengthSquared() < 1e-8f)
@@ -10528,7 +10601,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 if (left.LengthSquared() < 1e-8f) left = Vector3.UnitY;
                 if (up.Z < 0f) left = -left;
             }
-            left = Vector3.Normalize(left);
+            left = Vector3.Normalize(in left);
             Vector3 fwd = Vector3.Cross(left, up);
             Quaternion newRot = Quaternion.CreateFromRotationMatrix(new Matrix4(
                 fwd.X, fwd.Y, fwd.Z, 0f,
@@ -13176,9 +13249,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (item == null) return null;
             AssetBase asset = World?.AssetService?.Get(item.AssetID.ToString());
             if (asset?.Data == null) return null;
-            string body = StripNotecardHeader(OpenMetaverse.Utils.BytesToString(asset.Data));
-            if (body.Length == 0) return Array.Empty<string>();
-            string[] lines = body.Split('\n');
+            string[] lines = PhloxNotecardCache.Card.SplitLines(StripNotecardHeader(asset.Data));
             for (int i = 0; i < lines.Length; i++) lines[i] = lines[i].TrimEnd('\r');
             return lines;
         }
@@ -13276,7 +13347,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (!UUID.TryParse(ID, out UUID keyID)) return -1;
             if ((regexBitfield & 1) != 0) { try { ScriptRegex.Create(name).IsMatch(""); } catch { ShoutError("Name regex is invalid."); return -1; } }
             if ((regexBitfield & 2) != 0) { try { ScriptRegex.Create(msg).IsMatch(""); } catch { ShoutError("Message regex is invalid."); return -1; } }
-            return m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, m_host.UUID, channelID, name, keyID, msg, regexBitfield);
+            return AddSavedListen(m_host.UUID, channelID, name, ID, keyID, msg, regexBitfield, null);
         }
 
         private string OsslCountryOf(UUID key)
@@ -17862,13 +17933,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             UUID id = ParseBotID(botID);
             if (id == UUID.Zero) return new LSLList();
 
-            // Get profile from BotManager's stored data via INPC
-            INPCModule npcMod = World.RequestModuleInterface<INPCModule>();
-            INPC npc = npcMod?.GetNPC(id, World);
-
+            // The profile the bot manager stored for the bot, wherever the bot stands (Halcyon read the bot's
+            // stored user profile). Not a bot's profile: an empty list, as Halcyon's missing profile.
             IBotManager manager = GetBotManager();
-            // We need to read from the bot's stored profile data
-            // Since BotData is internal, we read from INPC + fallback
+            if (manager == null || !manager.GetBotProfile(id, out string about, out string email, out UUID image, out string url))
+                return new LSLList();
 
             List<object> list = new List<object>();
             for (int i = 0; i < profileInformation.Length; i++)
@@ -17877,16 +17946,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 switch (param)
                 {
                     case 1: // BOT_ABOUT_TEXT
-                        list.Add(npc?.profileAbout ?? string.Empty);
+                        list.Add(about);
                         break;
                     case 2: // BOT_EMAIL
-                        list.Add(string.Empty); // email not exposed via INPC
+                        list.Add(email);
                         break;
                     case 3: // BOT_IMAGE_UUID
-                        list.Add((npc?.profileImage ?? UUID.Zero).ToString());
+                        list.Add(image.ToString());
                         break;
                     case 4: // BOT_PROFILE_URL
-                        list.Add(string.Empty); // profileURL not exposed via INPC
+                        list.Add(url);
                         break;
                 }
             }
@@ -18515,7 +18584,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (botSP == null) return -1;
 
             if (m_ScriptEngine.ListenManager == null) return -1;
-            return m_ScriptEngine.ListenManager.Add(m_localID, m_itemID, botSP.UUID, channel, name, keyID, msg);
+            return AddSavedListen(botSP.UUID, channel, name, id, keyID, msg, 0, botSP.UUID.ToString());
         }
 
         public void botMessageLinked(string botID, int num, string msg, string id)
@@ -18697,21 +18766,31 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             m_ScriptEngine?.PostDataserverToPrim(m_host, owed ? UUID.Zero : m_itemID, queryID.ToString(), data);
         }
 
-        private static string StripNotecardHeader(string raw)
+        private static readonly byte[] NotecardTextLengthMarker = Encoding.ASCII.GetBytes("\nText length ");
+
+        /// <summary>
+        /// The text of a notecard asset, without the header before it and the "}" after it. "Text length N" counts
+        /// bytes of UTF-8, not characters: OSSL's SaveNotecard and libomv's AssetNotecard.Encode both write the byte
+        /// count, and YEngine's reader takes that many bytes (SLUtil.ParseNotecardToArray). So the header is found and
+        /// the text is cut in the asset's bytes, and only then decoded.
+        /// </summary>
+        private static string StripNotecardHeader(byte[] data)
         {
-            if (string.IsNullOrEmpty(raw)) return string.Empty;
+            if (data == null || data.Length == 0) return string.Empty;
+            string raw = OpenMetaverse.Utils.BytesToString(data);
             if (!raw.StartsWith("Linden text", StringComparison.Ordinal)) return raw;
-            int marker = raw.IndexOf("\nText length ", StringComparison.Ordinal);
+            int marker = data.AsSpan().IndexOf(NotecardTextLengthMarker);
             if (marker < 0) return raw;
-            int bodyStart = raw.IndexOf('\n', marker + 1);
-            if (bodyStart < 0) return string.Empty;
-            string body = raw.Substring(bodyStart + 1);
-            // The body is followed by "}\n" (AssetNotecard.Encode and the viewer both write it so), which the
-            // EndsWith checks below never matched - the last line came back as "text}" with an empty line after it.
-            // "Text length N" says how long the body is; take exactly that when it fits.
-            string lenText = raw.Substring(marker + 13, bodyStart - (marker + 13)).Trim();
-            if (int.TryParse(lenText, out int declared) && declared >= 0 && declared <= body.Length)
-                return body.Substring(0, declared);
+            int lenStart = marker + NotecardTextLengthMarker.Length;
+            int lenEnd = data.AsSpan(lenStart).IndexOf((byte)'\n');
+            if (lenEnd < 0) return string.Empty;
+            int bodyStart = lenStart + lenEnd + 1;
+            // The text is followed by "}\n" (libomv AssetNotecard.Encode) or "}" (OSSL SaveNotecard). "Text length N"
+            // says how long the text is; take exactly that when it fits.
+            string lenText = Encoding.ASCII.GetString(data, lenStart, lenEnd).Trim();
+            if (int.TryParse(lenText, out int declared) && declared >= 0 && declared <= data.Length - bodyStart)
+                return Encoding.UTF8.GetString(data, bodyStart, declared);
+            string body = OpenMetaverse.Utils.BytesToString(data[bodyStart..]);
             if (body.EndsWith("}\n", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 2);
             else if (body.EndsWith("\n}", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 2);
             else if (body.EndsWith("}", StringComparison.Ordinal)) body = body.Substring(0, body.Length - 1);

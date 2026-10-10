@@ -51,12 +51,12 @@ public class BlockedOwnerConsoleTests : OpenSimTestCase
     private static readonly UUID SecondId = new("b84f0a27-c519-4d6e-8f3a-17d9e2b6c405");
     private static readonly Vector3 RezPos = new(10, 10, 25);
 
-    private ICommandConsole m_savedConsole;
-    private RecordingConsole m_console;
-    private TestScene m_sceneA;
-    private TestScene m_sceneB;
-    private BlockedOwnerModule m_moduleA;
-    private BlockedOwnerModule m_moduleB;
+    private ICommandConsole m_savedConsole = null!;
+    private RecordingConsole m_console = null!;
+    private TestScene m_sceneA = null!;
+    private TestScene m_sceneB = null!;
+    private BlockedOwnerModule m_moduleA = null!;
+    private BlockedOwnerModule m_moduleB = null!;
 
     public override void SetUp()
     {
@@ -259,16 +259,16 @@ public class BlockedOwnerConsoleTests : OpenSimTestCase
     private sealed class RecordingConsole : ICommandConsole
     {
 #pragma warning disable 0067
-        public event OnOutputDelegate OnOutput;
+        public event OnOutputDelegate OnOutput = delegate { };
 #pragma warning restore 0067
 
         public List<string> Lines { get; } = new();
 
         public ICommands Commands { get; } = new Commands();
 
-        public string DefaultPrompt { get; set; }
+        public string DefaultPrompt { get; set; } = string.Empty;
 
-        public IScene ConsoleScene { get; set; }
+        public IScene ConsoleScene { get; set; } = null!;
 
         public void Run(string commandLine)
         {

@@ -132,10 +132,10 @@ public sealed class RegionServiceHostLifecycleTests
     {
         private readonly System.Threading.ManualResetEventSlim _gate = new(false);
 
-        public event OnOutputDelegate OnOutput;
+        public event OnOutputDelegate OnOutput = delegate { };
         public ICommands Commands { get; } = new MockCommands();
         public string DefaultPrompt { get; set; } = string.Empty;
-        public IScene ConsoleScene { get; set; }
+        public IScene ConsoleScene { get; set; } = null!;
         public void RunCommand(string cmd) { }
         public string ReadLine(string p, bool isCommand, bool e) => string.Empty;
         public void WriteLine(string s) { }
@@ -158,7 +158,7 @@ public sealed class RegionServiceHostLifecycleTests
         public int InitializeCalls { get; private set; }
         public int StopCalls { get; private set; }
 
-        public Exception InitializeException { get; set; }
+        public Exception? InitializeException { get; set; }
 
         public void Initialize()
         {
@@ -180,4 +180,3 @@ public sealed class RegionServiceHostLifecycleTests
 public sealed class MainConsoleCollection
 {
 }
-

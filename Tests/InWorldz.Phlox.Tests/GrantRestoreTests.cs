@@ -34,7 +34,7 @@ namespace InWorldz.Phlox.Tests;
 // state database every harness shares (as the other saved-state classes do); nothing process-wide is changed.
 public class GrantRestoreTests
 {
-    private const int Debit = 0x2, TakeControls = 0x4, TriggerAnimation = 0x10, SilentEstate = 0x4000;
+    private const int Debit = 0x2, TakeControls = 0x4, TriggerAnimation = 0x10, ControlCamera = 0x800, SilentEstate = 0x4000;
     private const int RegionStart = 0, NewRez = 1;
     private const string Phlox = "InWorldz.Phlox";
 
@@ -305,6 +305,36 @@ public class GrantRestoreTests
         h.StopRegionAsTheSimulatorDoes();
         SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
         Assert.Equal(0, row.GrantedPermsMask & TakeControls);
+    }
+
+    /// <summary>
+    /// A stand-up after the script was last saved, from a script that holds CONTROL_CAMERA and took no controls: the
+    /// core ends the camera grant (SL llSetCameraParams: "automatically revoked when the avatar stands up from or
+    /// detaches the object") with no controls released and no event run, and the shutdown save still writes the row
+    /// again, so a restart does not give the camera grant back.
+    /// </summary>
+    [Fact]
+    public void ACameraGrantTheCoreEndsOnAStandIsSavedAtShutdown()
+    {
+        using var h = new SchedulerHarness();
+        UUID item = UUID.Random(), driver = UUID.Random();
+        var inv = TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, item, UUID.Random(), "seat", Seat);
+        Assert.True(h.Prim.Inventory.CreateScriptInstance(item, 0, false, Phlox, RegionStart));
+        h.Prim.ParentGroup.ResumeScripts();
+        Assert.True(h.PumpUntil(() => h.Said.Contains("entry")), SavedStateRig.SaidText(h));
+        var sp = SitOn(h.Scene, driver, h.Prim.ParentGroup);
+        inv.PermsGranter = driver;
+        inv.PermsMask = ControlCamera | TriggerAnimation;
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+        SavedStateRig.States(h).SaveNow(new[] { (Interpreter)h.InterpreterFor(item) });
+        Assert.Equal(ControlCamera | TriggerAnimation, StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob).GrantedPermsMask);
+
+        sp.StandUp();
+        Assert.Equal(TriggerAnimation, inv.PermsMask);
+        h.PumpUntilIdle(TimeSpan.FromSeconds(2));
+        h.StopRegionAsTheSimulatorDoes();
+        SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
+        Assert.Equal(TriggerAnimation, row.GrantedPermsMask);
     }
 
     // ── old rows and old carried states ──────────────────────────────────────

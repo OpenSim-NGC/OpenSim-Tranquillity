@@ -234,7 +234,7 @@ public class ArchiverModule : INonSharedRegionModule, IRegionArchiverModule
             }
             catch
             {
-                m_log.LogError("[ARCHIVER MODULE] default user must be in format \"First Last\"", defaultUser);
+                m_log.LogError("[ARCHIVER MODULE] default user \"{0}\" must be in format \"First Last\"", defaultUser);
             }
             if (defaultUserUUID.IsZero())
             {

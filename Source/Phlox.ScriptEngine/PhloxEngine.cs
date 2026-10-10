@@ -37,6 +37,15 @@ namespace Phlox.ScriptEngine
 
         public const ThreadPriority SUBTASK_PRIORITY = ThreadPriority.Lowest;
 
+        /// <summary>The scheduler thread's priority when [InWorldz.Phlox] SchedulerThreadPriority is not set.</summary>
+        public const ThreadPriority DefaultSchedulerThreadPriority = SUBTASK_PRIORITY;
+
+        /// <summary>
+        /// The priority of the thread that runs every script in the region (<see cref="PhloxMasterScheduler"/>).
+        /// [InWorldz.Phlox] SchedulerThreadPriority, one of the <see cref="ThreadPriority"/> names; default Lowest.
+        /// </summary>
+        public ThreadPriority SchedulerThreadPriority { get; private set; } = DefaultSchedulerThreadPriority;
+
         private Scene m_Scene;
         private IConfigSource m_ConfigSource;
         private IConfig m_Config;
@@ -220,6 +229,10 @@ namespace Phlox.ScriptEngine
             };
             m_log.LogInformation("[PhloxEngine]: ServiceCallDeferral = {0}", ServiceCallDeferral);
 
+            SchedulerThreadPriority = ReadSchedulerThreadPriority(m_Config, out string priorityWarning);
+            if (priorityWarning != null) m_log.LogWarning("[PhloxEngine]: {0}", priorityWarning);
+            m_log.LogInformation("[PhloxEngine]: SchedulerThreadPriority = {0}", SchedulerThreadPriority);
+
             // Deploy-hygiene guard: Phlox is compiled against the tree's Library/C5.dll
             // (1.1 identity). If the runtime resolves a different C5 (e.g. a NuGet 3.x
             // copy leaks into the bin dir), scripts die at first timer use with
@@ -241,6 +254,29 @@ namespace Phlox.ScriptEngine
                     "Run the SLua Tier-1 back-half proof (assemble non-LSL bytecode, run, serialize, resume).",
                     HandleSluaProofCommand);
             }
+        }
+
+        /// <summary>
+        /// [InWorldz.Phlox] SchedulerThreadPriority: a <see cref="ThreadPriority"/> name (Lowest, BelowNormal, Normal,
+        /// AboveNormal, Highest), case and surrounding spaces ignored. Unset (or no section) gives
+        /// <see cref="DefaultSchedulerThreadPriority"/> with no warning. Any other value, numbers included, gives the
+        /// default and a warning naming the value.
+        /// </summary>
+        public static ThreadPriority ReadSchedulerThreadPriority(IConfig phlox, out string warning)
+        {
+            warning = null;
+            string value = phlox?.GetString("SchedulerThreadPriority", null);
+            if (value == null) return DefaultSchedulerThreadPriority;
+            // Matched by name only: Enum.TryParse would also take numbers and comma-separated lists.
+            foreach (ThreadPriority p in Enum.GetValues<ThreadPriority>())
+            {
+                if (string.Equals(p.ToString(), value.Trim(), StringComparison.OrdinalIgnoreCase))
+                    return p;
+            }
+            warning = string.Format(
+                "SchedulerThreadPriority = '{0}' is not one of Lowest, BelowNormal, Normal, AboveNormal, Highest; using {1}",
+                value, DefaultSchedulerThreadPriority);
+            return DefaultSchedulerThreadPriority;
         }
 
         private static bool s_sluaProofCmdRegistered = false;
@@ -275,7 +311,7 @@ namespace Phlox.ScriptEngine
             m_WorldComm = worldComm;
             m_ExeScheduler = new PhloxExecutionScheduler(WorkArrived, this, worldComm);
             m_ScriptLoader = new PhloxScriptLoader(scene.AssetService, m_ExeScheduler, WorkArrived, this);
-            m_MasterScheduler = new PhloxMasterScheduler(m_ExeScheduler, m_ScriptLoader);
+            m_MasterScheduler = new PhloxMasterScheduler(m_ExeScheduler, m_ScriptLoader, SchedulerThreadPriority);
             ListenManager = new PhloxListenManager(m_ExeScheduler, scene,
                 m_WhisperDistance, m_SayDistance, m_ShoutDistance, m_MaxListensPerScript, m_MaxListensPerRegion);
             AsyncCommands = new AsyncCommandManager(this);
@@ -316,6 +352,8 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptAtRotTargetEvent    += OnScriptAtRotTargetEvent;
             m_Scene.EventManager.OnScriptNotAtRotTargetEvent += OnScriptNotAtRotTargetEvent;
             m_Scene.EventManager.OnObjectBeingRemovedFromScene += OnObjectBeingRemovedFromScene;
+            m_Scene.EventManager.OnGroupBeginInTransit += OnGroupBeginInTransit;
+            m_Scene.EventManager.OnGroupEndInTransit += OnGroupEndInTransit;
             // The triggers for the No Scripts parcel check (the scene's parcel-crossing events and the land events)
             m_Scene.EventManager.OnGroupCrossedToNewParcel   += OnGroupCrossedToNewParcel;
             m_Scene.EventManager.OnObjectOwnerOrGroupChanged += OnObjectOwnerOrGroupChanged;
@@ -325,6 +363,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnMakeRootAgent             += OnMakeRootAgentForControls;
             m_Scene.EventManager.OnAvatarEnteringNewParcel   += OnAvatarEnteringNewParcelForExperiences;
             m_Scene.EventManager.OnExperiencePermissionsRevoked += OnExperiencePermissionsRevoked;
+            m_Scene.EventManager.OnScriptPermissionsRemoved += OnScriptPermissionsRemoved;
             if (PhysicsThrottle) m_Scene.EventManager.OnFrame += OnFrameForPhysicsTime;
             IMoneyModule moneyModule = m_Scene.RequestModuleInterface<IMoneyModule>();
             if (moneyModule != null)
@@ -584,6 +623,8 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnScriptColliding         -= OnScriptColliding;
             m_Scene.EventManager.OnScriptColliderStart     -= OnScriptColliderStart;
             m_Scene.EventManager.OnObjectBeingRemovedFromScene -= OnObjectBeingRemovedFromScene;
+            m_Scene.EventManager.OnGroupBeginInTransit -= OnGroupBeginInTransit;
+            m_Scene.EventManager.OnGroupEndInTransit -= OnGroupEndInTransit;
             m_Scene.EventManager.OnGroupCrossedToNewParcel   -= OnGroupCrossedToNewParcel;
             m_Scene.EventManager.OnObjectOwnerOrGroupChanged -= OnObjectOwnerOrGroupChanged;
             m_Scene.EventManager.OnLandObjectAdded           -= OnLandObjectChanged;
@@ -592,6 +633,7 @@ namespace Phlox.ScriptEngine
             m_Scene.EventManager.OnMakeRootAgent             -= OnMakeRootAgentForControls;
             m_Scene.EventManager.OnAvatarEnteringNewParcel   -= OnAvatarEnteringNewParcelForExperiences;
             m_Scene.EventManager.OnExperiencePermissionsRevoked -= OnExperiencePermissionsRevoked;
+            m_Scene.EventManager.OnScriptPermissionsRemoved -= OnScriptPermissionsRemoved;
             LSLSystemAPI.ClearRegionCharacters(scene.RegionInfo.RegionID);
             m_ExeScheduler?.StopExperienceStateReads();   // Before the final save: no read may end a grant after it
             bool stopped = m_MasterScheduler == null || m_MasterScheduler.Stop();
@@ -1053,6 +1095,28 @@ namespace Phlox.ScriptEngine
         private void OnGroupCrossedToNewParcel(SceneObjectGroup group, ILandObject oldParcel, ILandObject newParcel)
             => m_ExeScheduler?.RequestParcelCheck(group);
 
+        // ── Crossing hold ────────────────────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// An object starts to cross into another region: its scripts are held until the crossing ends, keeping the
+        /// events that reach them (Halcyon EngineInterface.EventManager_OnGroupBeginInTransit).
+        /// </summary>
+        private void OnGroupBeginInTransit(SceneObjectGroup group)
+        {
+            if (!group.IsAttachment) m_ExeScheduler?.RequestCrossingHold(group, hold: true);
+        }
+
+        /// <summary>
+        /// A crossing ended. When the object stayed here its scripts carry on, with what they kept while held. When it
+        /// left, its scripts here are removed with it and their state, held queue included, carries on in the next
+        /// region (Halcyon EngineInterface.EventManager_OnGroupEndInTransit acts only on a failure). A group the
+        /// crossing deleted (die or return at the region's edge) has its scripts removed too.
+        /// </summary>
+        private void OnGroupEndInTransit(SceneObjectGroup group, bool crossed)
+        {
+            if (!crossed && !group.IsDeleted && !group.IsAttachment) m_ExeScheduler?.RequestCrossingHold(group, hold: false);
+        }
+
         private void OnObjectOwnerOrGroupChanged(SceneObjectGroup group, UUID oldOwner, UUID newOwner, UUID oldGroup, UUID newGroup)
         {
             // A new owner ends every grant in the object, and the controls the old grants took
@@ -1143,6 +1207,18 @@ namespace Phlox.ScriptEngine
         {
             if (StateManager == null) return;
             m_ExeScheduler?.RequestExperienceGrantEnded(itemId, granterId, experienceId);
+        }
+
+        // The core took permissions from a script's item without the script asking (a stand-up, a detach, Release Keys,
+        // the viewer's revoke:
+        // SceneObjectPartInventory.RemoveScriptsPermissions). Nothing is posted to the script, and CONTROL_CAMERA can go
+        // with no controls released, so OnScriptControlsReleased does not cover it; the script's state notes the item's
+        // grant again on the scheduler thread. Ignored once the region's stop has begun and for items this engine does
+        // not run.
+        private void OnScriptPermissionsRemoved(UUID partId, UUID itemId, UUID granterId, int removedMask)
+        {
+            if (StateManager == null) return;
+            m_ExeScheduler?.RequestPermissionsRemovedByCore(itemId);
         }
 
         /// <summary>

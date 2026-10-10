@@ -21,7 +21,10 @@ public class RotationMathsTests
     private static LSLSystemAPI Api() => new LSLSystemAPI(null, null, 0, UUID.Random());
 
     private static Quaternion AxisAngle(Vector3 axis, float angle)
-        => Quaternion.CreateFromAxisAngle(Vector3.Normalize(axis), angle);
+    {
+        Vector3 normalizedAxis = Vector3.Normalize(in axis);
+        return Quaternion.CreateFromAxisAngle(normalizedAxis, angle);
+    }
 
     [Fact]
     public void ASmallRotationKeepsItsAngle()

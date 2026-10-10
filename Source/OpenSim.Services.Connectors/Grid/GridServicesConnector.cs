@@ -315,7 +315,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                 //    m_log.LogDebug("$[GRID CONNECTOR]: GetRegionByName {scopeID}, {regionName} received empty result");
             }
             else
-                 m_log.LogDebug("$[GRID CONNECTOR]: GetRegionByName {scopeID}, {regionName} received empty reply");
+                 m_log.LogDebug("$[GRID CONNECTOR]: GetRegionByName {0}, {1} received empty reply", scopeID, regionName);
         }
         catch (Exception e)
         {
@@ -350,7 +350,7 @@ public class GridServicesConnector : BaseServiceConnector, IGridService
                 //    m_log.LogDebug("$[GRID CONNECTOR]: GetLocalRegionByName {scopeID}, {regionName} received empty result");
             }
             else
-                 m_log.LogDebug("$[GRID CONNECTOR]: GetLocalRegionByName {scopeID}, {regionName} received empty reply");
+                 m_log.LogDebug("$[GRID CONNECTOR]: GetLocalRegionByName {0}, {1} received empty reply", scopeID, regionName);
         }
         catch (Exception e)
         {

@@ -39,18 +39,18 @@ public class PrimCountModuleTests : OpenSimTestCase
     protected UUID m_userId = new UUID("00000000-0000-0000-0000-100000000000");
     protected UUID m_groupId = new UUID("00000000-0000-0000-8888-000000000000");
     protected UUID m_otherUserId = new UUID("99999999-9999-9999-9999-999999999999");
-    protected TestScene m_scene;
-    protected PrimCountModule m_pcm;
+    protected TestScene m_scene = null!;
+    protected PrimCountModule m_pcm = null!;
 
     /// <summary>
     /// A parcel that covers the entire sim except for a 1 unit wide strip on the eastern side.
     /// </summary>
-    protected ILandObject m_lo;
+    protected ILandObject m_lo = null!;
 
     /// <summary>
     /// A parcel that covers just the eastern strip of the sim.
     /// </summary>
-    protected ILandObject m_lo2;
+    protected ILandObject m_lo2 = null!;
 
     public override void SetUp()
     {

@@ -383,9 +383,9 @@ public class OutboundConnectAddressTests
     /// <summary>A proxy that carries every URL except those of the bypassed host.</summary>
     private sealed class FakeProxy : IWebProxy
     {
-        private readonly string m_bypassedHost;
-        public FakeProxy(string bypassedHost = null) => m_bypassedHost = bypassedHost;
-        public ICredentials Credentials { get; set; }
+        private readonly string? m_bypassedHost;
+        public FakeProxy(string? bypassedHost = null) => m_bypassedHost = bypassedHost;
+        public ICredentials? Credentials { get; set; }
         public Uri GetProxy(Uri destination) => new("http://proxy.example.org:3128/");
         public bool IsBypassed(Uri host) => host.Host == m_bypassedHost;
     }

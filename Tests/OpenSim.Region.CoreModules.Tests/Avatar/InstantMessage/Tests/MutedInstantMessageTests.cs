@@ -107,7 +107,7 @@ public class MutedInstantMessageTests : OpenSimTestCase
     /// <summary>The file transfer the mute list module needs to be enabled; nothing is sent in these tests.</summary>
     public class StandInXfer : DispatchProxy
     {
-        protected override object Invoke(MethodInfo method, object[] args) => true;
+        protected override object? Invoke(MethodInfo? method, object?[]? args) => true;
     }
 
     /// <summary>Records warnings, so a test can count the ones the mute check logs.</summary>
@@ -117,9 +117,9 @@ public class MutedInstantMessageTests : OpenSimTestCase
         public void AddProvider(ILoggerProvider provider) { }
         public ILogger CreateLogger(string categoryName) => this;
         public void Dispose() { }
-        public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
         public bool IsEnabled(LogLevel logLevel) => true;
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
         {
             if (logLevel == LogLevel.Warning)
                 lock (Warnings)
@@ -151,14 +151,14 @@ public class MutedInstantMessageTests : OpenSimTestCase
             return m_log.Warnings.Count(w => w.Contains("could not be read"));
     }
 
-    private TestScene m_scene;
-    private TestClient m_recipientClient;
-    private IMessageTransferModule m_transfer;
+    private TestScene m_scene = null!;
+    private TestClient m_recipientClient = null!;
+    private IMessageTransferModule m_transfer = null!;
     private readonly List<GridInstantMessage> m_received = new();
     private readonly List<bool> m_results = new();
     private int m_undelivered;
 
-    private void SetUpRegion(string module, StandInMuteService mutes, bool withMuteListModule = false)
+    private void SetUpRegion(string module, StandInMuteService? mutes, bool withMuteListModule = false)
     {
         m_scene = new SceneHelpers().SetupScene();
         if (mutes is not null)
@@ -280,10 +280,11 @@ public class MutedInstantMessageTests : OpenSimTestCase
         SetUpRegion(module, mutes);
         SceneObjectGroup so = SceneHelpers.CreateSceneObject(2, SenderId);
         m_scene.AddNewSceneObject(so, false);
-        SceneObjectPart child = Array.Find(so.Parts, p => !p.UUID.Equals(so.UUID));
+        SceneObjectPart? child = Array.Find(so.Parts, p => !p.UUID.Equals(so.UUID));
+        Assert.NotNull(child);
         mutes.Text = Row(2, so.UUID, 0);
 
-        Send(FromObject(SenderId, child.UUID));
+        Send(FromObject(SenderId, child!.UUID));
 
         Assert.Empty(m_received);
     }
@@ -344,15 +345,19 @@ public class MutedInstantMessageTests : OpenSimTestCase
     /// <summary>The recipient changes their mute list from their viewer, as the mute list module receives it.</summary>
     private void RecipientMutes(UUID id)
     {
-        MuteListEntryUpdate handler = (MuteListEntryUpdate)typeof(TestClient)
-            .GetField("OnUpdateMuteListEntry", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_recipientClient);
+        FieldInfo field = typeof(TestClient).GetField("OnUpdateMuteListEntry", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new MissingFieldException(typeof(TestClient).FullName, "OnUpdateMuteListEntry");
+        MuteListEntryUpdate handler = field.GetValue(m_recipientClient) as MuteListEntryUpdate
+            ?? throw new InvalidOperationException("TestClient.OnUpdateMuteListEntry handler is missing.");
         handler(m_recipientClient, id, "Test User", 1, 0);
     }
 
     private void RecipientUnmutes(UUID id)
     {
-        MuteListEntryRemove handler = (MuteListEntryRemove)typeof(TestClient)
-            .GetField("OnRemoveMuteListEntry", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_recipientClient);
+        FieldInfo field = typeof(TestClient).GetField("OnRemoveMuteListEntry", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new MissingFieldException(typeof(TestClient).FullName, "OnRemoveMuteListEntry");
+        MuteListEntryRemove handler = field.GetValue(m_recipientClient) as MuteListEntryRemove
+            ?? throw new InvalidOperationException("TestClient.OnRemoveMuteListEntry handler is missing.");
         handler(m_recipientClient, id, "Test User");
     }
 
@@ -391,15 +396,24 @@ public class MutedInstantMessageTests : OpenSimTestCase
     /// <summary>Move a cached list's read time back, as if that much time had passed.</summary>
     private static void AgeCachedList(UUID agent, long ms)
     {
-        FieldInfo cacheField = typeof(InstantMessageMuteCheck).GetField("m_cache", BindingFlags.NonPublic | BindingFlags.Static);
-        object cache = cacheField.GetValue(null);
+        FieldInfo cacheField = typeof(InstantMessageMuteCheck).GetField("m_cache", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new MissingFieldException(typeof(InstantMessageMuteCheck).FullName, "m_cache");
+        object cache = cacheField.GetValue(null)
+            ?? throw new InvalidOperationException("InstantMessageMuteCheck cache is missing.");
         lock (cache)
         {
-            object[] args = { agent, null };
-            Assert.True((bool)cache.GetType().GetMethod("TryGetValue").Invoke(cache, args));
-            object entry = args[1];
-            PropertyInfo readAt = entry.GetType().GetProperty("ReadAt");
-            readAt.SetValue(entry, (long)readAt.GetValue(entry) - ms);
+            object?[] args = { agent, null };
+            MethodInfo tryGetValue = cache.GetType().GetMethod("TryGetValue")
+                ?? throw new MissingMethodException(cache.GetType().FullName, "TryGetValue");
+            if (tryGetValue.Invoke(cache, args) is not true)
+                throw new InvalidOperationException("No cached mute list exists for the test recipient.");
+            object entry = args[1]
+                ?? throw new InvalidOperationException("The cached mute list entry is missing.");
+            PropertyInfo readAt = entry.GetType().GetProperty("ReadAt")
+                ?? throw new MissingMemberException(entry.GetType().FullName, "ReadAt");
+            if (readAt.GetValue(entry) is not long cachedAt)
+                throw new InvalidOperationException("The cached mute list has no read timestamp.");
+            readAt.SetValue(entry, cachedAt - ms);
         }
     }
 
@@ -518,7 +532,7 @@ public class MutedInstantMessageTests : OpenSimTestCase
         }
     }
 
-    private SlowMuteServer m_slowServer;
+    private SlowMuteServer m_slowServer = null!;
 
     [Fact]
     public void ADeadMuteServiceHoldsAnImNoLongerThanTheReadTimeoutAndOnlyOncePerRecipient()
@@ -577,8 +591,10 @@ public class MutedInstantMessageTests : OpenSimTestCase
     /// <summary>The recipient's viewer asks this simulator for its mute list, as at login.</summary>
     private void RecipientViewerAsksForItsList(uint crc)
     {
-        MuteListRequest handler = (MuteListRequest)typeof(TestClient)
-            .GetField("OnMuteListRequest", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_recipientClient);
+        FieldInfo field = typeof(TestClient).GetField("OnMuteListRequest", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new MissingFieldException(typeof(TestClient).FullName, "OnMuteListRequest");
+        MuteListRequest handler = field.GetValue(m_recipientClient) as MuteListRequest
+            ?? throw new InvalidOperationException("TestClient.OnMuteListRequest handler is missing.");
         handler(m_recipientClient, crc);
     }
 

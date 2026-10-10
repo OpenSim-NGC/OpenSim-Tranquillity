@@ -218,7 +218,7 @@ public sealed class ExperienceConsoleCommandsTests : IDisposable
     }
 
     [Fact]
-    public void CreateNamedExperienceIsRefusedWhenNoUserAccountServiceIsSet()
+    public void ExperienceCreationIsRefusedWhenNoUserAccountServiceIsSet()
     {
         ScriptedConsole console = new ScriptedConsole();
         MainConsole.Instance = console;
@@ -229,6 +229,7 @@ public sealed class ExperienceConsoleCommandsTests : IDisposable
         new ExperienceService(config);
 
         console.RunCommand("create named experience \"Garden Tour\" Test User");
+        console.RunCommand($"create experience Test User {UUID.Random()}");
 
         Assert.Contains("No user account service is set ([ExperienceService] UserAccountService).", console.Lines);
         Assert.Empty(Store.All());
@@ -581,7 +582,7 @@ public sealed class InMemoryExperienceData : IExperienceData
     public bool SetExperiencePermissions(UUID agent_id, UUID experience_id, bool allow) => false;
     public UUID[] GetGroupExperiences(UUID agent_id) => new UUID[0];
     public UUID[] GetExperiencesForGroups(UUID[] groups) => new UUID[0];
-    public string GetKeyValue(UUID experience, string key) => null;
+    public string? GetKeyValue(UUID experience, string key) => null;
     public bool SetKeyValue(UUID experience, string key, string val) => false;
     public bool DeleteKey(UUID experience, string key) => false;
     public int GetKeyCount(UUID experience) => 0;
@@ -596,14 +597,14 @@ public sealed class TestUserAccountService : IUserAccountService
 
     public TestUserAccountService(IConfigSource config) { }
 
-    public UserAccount GetUserAccount(UUID scopeID, UUID userID) =>
+    public UserAccount? GetUserAccount(UUID scopeID, UUID userID) =>
         Accounts.FirstOrDefault(a => a.PrincipalID == userID);
 
-    public UserAccount GetUserAccount(UUID scopeID, string FirstName, string LastName) =>
+    public UserAccount? GetUserAccount(UUID scopeID, string FirstName, string LastName) =>
         Accounts.FirstOrDefault(a => string.Equals(a.FirstName, FirstName, StringComparison.OrdinalIgnoreCase)
             && string.Equals(a.LastName, LastName, StringComparison.OrdinalIgnoreCase));
 
-    public UserAccount GetUserAccount(UUID scopeID, string Email) => null;
+    public UserAccount? GetUserAccount(UUID scopeID, string Email) => null;
     public bool SetDisplayName(UUID agentID, string displayName) => false;
     public List<UserAccount> GetUserAccounts(UUID scopeID, string query) => new List<UserAccount>();
     public List<UserAccount> GetUserAccountsWhere(UUID scopeID, string where) => new List<UserAccount>();

@@ -161,6 +161,13 @@ namespace OpenSim.Region.Framework.Interfaces
         void SetBotProfile(UUID botID, string aboutText, string email,
             UUID? imageID, string profileURL, UUID ownerID);
 
+        /// <summary>
+        /// Read a bot's profile fields, wherever the bot is. Returns false if <paramref name="botID"/>
+        /// is not a bot. Unset fields read as "" and UUID.Zero.
+        /// </summary>
+        bool GetBotProfile(UUID botID, out string aboutText, out string email,
+            out UUID imageID, out string profileURL);
+
         // ── Outfits ──────────────────────────────────────────────────────
 
         /// <summary>Save current avatar appearance as a named outfit.</summary>

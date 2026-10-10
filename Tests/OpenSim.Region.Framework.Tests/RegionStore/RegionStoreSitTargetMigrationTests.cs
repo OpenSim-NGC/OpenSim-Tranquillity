@@ -107,8 +107,11 @@ public class RegionStoreSitTargetMigrationTests
         var all = Steps(ReadRegionStoreMigrations(store));
         var step = all.Single(s => Regex.IsMatch(s.Text, AddsTheColumn, RegexOptions.IgnoreCase));
 
-        // The newest step, so every database reaches it after all the steps it already has.
-        Assert.Equal(all.Max(s => s.Version), step.Version);
+        // Added as each store's newest step, so every database reaches it after all the steps it already had. Steps
+        // added since come after it, so its version is pinned rather than compared with the newest.
+        int added = store switch { "MySQL" => 70, "PGSQL" => 61, _ => 45 };
+        Assert.Equal(added, step.Version);
+        Assert.Equal(added, all.Where(s => s.Version <= added).Max(s => s.Version));
 
         string[] statements = Statements(step.Text);
         string sql = Assert.Single(statements);

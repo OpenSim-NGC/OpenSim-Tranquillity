@@ -434,3 +434,13 @@ COMMIT;
 BEGIN;
 ALTER TABLE prims ADD COLUMN SitTargetActive integer default NULL;
 COMMIT;
+
+:VERSION 46         #----- add the region extra settings table, as the MySQL and PostgreSQL region stores have
+BEGIN;
+CREATE TABLE IF NOT EXISTS regionextra (
+  RegionID char(36) NOT NULL,
+  Name varchar(32) NOT NULL,
+  value text,
+  PRIMARY KEY (RegionID, Name)
+);
+COMMIT;

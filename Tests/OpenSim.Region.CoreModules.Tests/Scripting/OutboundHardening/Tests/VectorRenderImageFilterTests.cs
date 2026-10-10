@@ -52,7 +52,7 @@ public class VectorRenderImageFilterTests : OpenSimTestCase
 
     private readonly RecordingHttpServer m_proxy = new();
     private readonly IWebProxy m_savedDefaultProxy;
-    private VectorRenderModule m_module;
+    private VectorRenderModule m_module = null!;
     private static readonly byte[] s_png = MakePng();
 
     public VectorRenderImageFilterTests()
@@ -87,7 +87,7 @@ public class VectorRenderImageFilterTests : OpenSimTestCase
         return data.ToArray();
     }
 
-    private void StartModule(string except = null)
+    private void StartModule(string? except = null)
     {
         IConfigSource config = new IniConfigSource();
         IConfig network = config.AddConfig("Network");

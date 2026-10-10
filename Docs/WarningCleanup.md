@@ -33,24 +33,27 @@ do not close warnings by blanket suppression.
     - SYSLIB0014: OptionalModules (5), GloebitMoneyModule (2).
     - Exercise payment callbacks and failures against local fixtures; do not
       contact live payment services for validation.
-- [ ] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 68**
-  - CA2017 (26), CA2022 (10), CA2023 (1), CS0114 (8), CS0108 (1),
-    CS0659 (1), CS0649 (2), CS9192 (9), CS9193 (10).
-  - Prioritize partial reads, logging templates and equality/hash contracts,
-    then review inheritance, initialization and ref/in calls.
+- [x] **Batch 3 / Tier 2: correctness and call-contract diagnostics - 68 closed, 0 remaining**
+  - [x] **3a: partial reads, malformed templates and the hash contract - 12 closed**
+    - CA2022 (10), CA2023 (1), CS0659 (1).
+  - [x] **3b: logging message templates - 26 closed**
+    - CA2017 (26).
+  - [x] **3c: inheritance and initialization - 11 closed**
+    - CS0114 (8), CS0108 (1), CS0649 (2).
+  - [x] **3d: ref/in call contracts - 19 closed**
+    - CS9192 (9), CS9193 (10).
   - Counts include test occurrences; review production occurrences first.
-- [ ] **Batch 4 / Tier 3: production nullability - 13**
+- [x] **Batch 4 / Tier 3: production nullability - 13 closed, 0 remaining**
   - ExperienceService's CS8600, CS8603, CS8602 and CS8625 occurrences.
-  - Promote possible runtime failures to correctness priority.
-- [ ] **Batch 5 / Tier 3: test nullability - 181**
+- [x] **Batch 5 / Tier 3: test nullability - 181 closed, 0 remaining**
   - CS8600/01/02/03/05, CS8610/18/19, CS8620/25, CS8765/67.
   - Fix fixture initialization and nullable contracts in project-sized batches.
 - [ ] **Batch 6 / Tier 3b: xUnit analyzers - 32**
   - xUnit2013 (22), xUnit1031 (6), xUnit2017 (2), xUnit2029 (1),
     xUnit2009 (1).
   - Preserve assertion meaning and remove blocking async test operations.
-- [ ] **Batch 7 / Tier 4: cosmetic, documentation and dead code - 37**
-  - CS3021 (12), CS8981 (12), CS0067 (5), CS0414 (3), CS0168 (2),
+- [ ] **Batch 7 / Tier 4: cosmetic, documentation and dead code - 33**
+  - CS3021 (12), CS8981 (12), CS0067 (1), CS0414 (3), CS0168 (2),
     CS1573 (3).
   - Check generated-source ownership before editing or removing declarations.
 
@@ -71,9 +74,196 @@ from the original log, all in unchanged files:
 | OpenSimNGC.Appearance.Baking | CS1573 | 3 | 7 |
 
 After Batch 1 the reconciled inventory was 661 occurrences: 264 closed and
-397 remaining. After Batch 2 it is **661 occurrences: 330 closed and 331 remaining**.
+397 remaining. After Batch 2 it was 661 occurrences: 330 closed and 331 remaining.
+After Batch 3a it was 661 occurrences: 342 closed and 319 remaining.
+After Batch 3b it was 661 occurrences: 368 closed and 293 remaining.
+After Batch 3c it was 661 occurrences: 379 closed and 282 remaining.
+After Batch 3d it was 661 occurrences: 398 closed and 263 remaining.
+After Batch 4 it was 661 occurrences: 411 closed and 250 remaining.
+After Batch 5 it is **661 occurrences: 596 closed and 65 remaining**.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
+
+## Batch 3a implementation and verification
+
+Ten `Stream.Read` calls assumed one read returns every requested byte. A short
+read left the rest of the buffer zero-filled, so the affected code silently
+worked on truncated data:
+
+- `HttpRequest.Clone` copied the request body with a single read. It now rewinds
+  the body, copies it in full and restores the original position, so a clone of a
+  partially buffered request carries the whole body instead of trailing zeros.
+- The authentication POST handler's `crypt` branch reads its capped body exactly.
+  That branch's decryption is still an unimplemented stub, so this is hardening.
+- Map tile detection reads the JPEG signature with `ReadAtLeast` and reports
+  "not a JPEG" for a file shorter than three bytes, instead of inspecting
+  uninitialized buffer bytes.
+- Vector render's image fetch reads the response body through
+  `ReadAsByteArrayAsync`, which does not depend on a seekable content stream or
+  on one read returning `Length` bytes. The outbound URL filter, redirect limit
+  and failure handling are unchanged.
+- Estate terrain download reads exactly, and the data snapshot notification drain
+  explicitly tolerates a short read where the bytes are discarded. The web stats
+  log tail tolerates concurrent truncation, decodes only available bytes and
+  disposes its shared-read file stream on every path.
+- A Phlox test's loopback HTTP server keeps its deliberate single read; the
+  discarded result is now explicit.
+
+`LSLList` overrode `Object.Equals` without `GetHashCode`, so equal lists hashed
+differently and a list could not be found in a dictionary or set. It now hashes
+its length and members, with null members contributing a stable value.
+Equality itself is unchanged. SLua tables use a dedicated comparer for list keys:
+separately constructed lists remain distinct keys by reference, matching Lua,
+while ordinary .NET dictionaries retain the `Equals`/`GetHashCode` contract.
+
+The Meshmerizer's unbalanced `[Mesh}` log prefix is now `[MESH]`, matching the
+other messages in that file and leaving the template without stray braces.
+
+### Verification
+
+- Full non-incremental Release rebuild: **319 warnings, 0 errors**; exactly
+  **12 occurrences removed**, with no added diagnostic messages.
+  CA2022, CA2023 and CS0659 are all zero.
+- New regression coverage: `LSLListHashTests` (equal lists hash alike, dictionary
+  and set lookup, empty lists, differing lengths), `LSLTableKeyTests` (equal list
+  instances remain separate keys through lookup, removal, iteration and rebuild)
+  and a `HttpRequestTests` clone test whose body stream returns one byte per read.
+- Selected Phlox list/outbound/mesh tests: **61 passed**. Selected CoreModules
+  render, estate, terrain and archiver tests: **58 passed**.
+- Two failures are pre-existing on `develop` and unrelated to this batch:
+  `VersionInfoTests.TestVersionLength`, which depends on the branch name in the
+  informational version, and `AssetServerPostHandlerTests.TestGoodAssetStoreRequest`.
+
+## Batch 3b implementation and verification
+
+Every CA2017 occurrence was a real mismatch between a logging message template
+and its arguments, so each one either dropped a value the caller meant to log or
+left a placeholder with nothing to fill it. The fixes keep the values callers
+already pass:
+
+- Missing placeholders were added where an argument had no slot, so the Gloebit
+  transaction type, the archiver's rejected user name, the Bullet water-height
+  result, the overlapping region count, the `ServiceBase` plugin exception, the
+  sculpt-map error text and the user-agent reply text are now printed instead of
+  silently dropped.
+- Extra or duplicated placeholders were removed where no argument backed them,
+  including the authentication handler's account message, the Groups member
+  lookup, and the Gloebit subscription counts that repeated `{0}`.
+- Interpolated-style named placeholders in non-interpolated strings, which these
+  logging calls print literally, became the positional form already used nearby:
+  the HG lure failure, grid connector empty replies, the Janus provisioning error
+  and the WebRTC non-spatial load failure.
+- Where the exception is already passed through the logging overload's first
+  parameter, the leftover `{0}` was removed rather than re-logging the exception:
+  `RestClient`, both JSON store modules and the ubODE box-creation failure.
+- `TerrainChannel`'s two out-of-bounds messages concatenate `LogHeader` and then
+  started at `{0}` without passing a matching argument, so every coordinate
+  landed in the previous slot's label and the last one had no value. Their
+  placeholders were renumbered to `{0}`-`{3}`, which labels all four coordinates
+  correctly and still prints the header once.
+
+No logging call was suppressed or removed. Correcting the authentication and
+terrain templates also restores their intended failure paths: authentication
+can return its failure response, and terrain recovery can log and continue
+instead of throwing while formatting the diagnostic.
+
+### Verification
+
+- Full non-incremental Release rebuild: **293 warnings, 0 errors**; exactly
+  **26 CA2017 occurrences removed**, with no added diagnostic messages.
+  CA2017 is zero, and the Batch 3a codes remain zero.
+- Selected CoreModules terrain and optional transport tests: **27 passed**.
+- Server-side baking tests: **115 passed, 3 skipped**. The first run failed four
+  tests inside Skia native-library initialization; they pass with the cached
+  Linux Skia asset on `LD_LIBRARY_PATH`, as recorded for Batch 2a.
+
+## Batch 3c implementation and verification
+
+JPEG terrain loading inherited virtual implementations from
+`GenericSystemDrawing`, but declared methods with the same signatures instead of
+overriding them. A future call through a `GenericSystemDrawing` reference would
+therefore use the base PNG/grayscale behavior rather than JPEG's behavior,
+although current production wiring calls it through `ITerrainLoader`. The seven
+virtual members now override the base members: both load methods, stream loading,
+file and stream saving, tiled saving and `SupportsTileSave`. `FileExtension`
+remains an intentional interface-level hide and is marked `new`; changing the
+base property to virtual would widen this cleanup into a public base-class API
+change.
+
+Phlox's `GenVisitor` had a private state-block helper whose name collided with a
+generated virtual visitor method. It is now named `EmitStateBlock`, preserving
+its private-helper behavior rather than changing visitor dispatch. The SLua
+compiler's obsolete `ExprStmt` node and its four unreachable switch arms were
+removed; current call statements use `CallStmt`. An unused cross-engine test
+delegate was also removed.
+
+### Verification
+
+- Full non-incremental Release rebuild: **282 warnings, 0 errors**; exactly
+  **8 CS0114, 1 CS0108 and 2 CS0649 occurrences removed**, with no added
+  diagnostic messages. All three codes are zero.
+- New JPEG regression coverage verifies that base and interface references use
+  JPEG's tile-save, extension and unsupported-load contracts.
+- Selected JPEG and cross-engine tests: **36 passed**. Selected Phlox compiler
+  tests: **46 passed**.
+
+## Batch 3d implementation and verification
+
+OpenMetaverse vector and quaternion helpers now expose readonly-reference
+parameters. Nine calls already passed stable variables and now mark that contract
+explicitly with `in`. Ten calls passed values from properties, indexers, nullable
+casts or constructed expressions; those values are materialized once into local
+variables before the readonly-reference call.
+
+The affected paths are scene keyframe rotation, object inertia, inventory object
+rotation, caps linkset upload, ubODE orientation, and Phlox vector normalization,
+rotation math, impulse limiting and look-at behavior. Matching Phlox test
+expectations use the same explicit readonly-reference contract. The values and
+calculation order are unchanged.
+
+### Verification
+
+- Full non-incremental Release rebuild: **263 warnings, 0 errors**; exactly
+  **9 CS9192 and 10 CS9193 occurrences removed**. Both codes are zero.
+- No diagnostic message was added. The existing `tempi` CS0168 appears at a new
+  line number because the Phlox method formatting added lines.
+- Selected Phlox rotation, position, force, terrain, keyframe and rez tests:
+  **42 passed**. Selected scene and inventory tests: **8 passed**.
+
+## Batch 4 implementation and verification
+
+Nullable annotations now reflect the ExperienceService's real failure paths:
+owner and experience lookups and `UpdateExperienceInfo` may return null, and
+the service interface marks that return with `MaybeNull`. The user-account and
+database fields no longer use null initializers. Both experience-creation
+commands now report a missing user-account service rather than dereferencing
+one, and a null owner prompt is treated as an empty answer.
+
+### Verification
+
+- Full non-incremental Release rebuild: **250 warnings, 0 errors**; all 13
+  Batch 4 production nullability warnings are gone.
+- `ExperienceConsoleCommandsTests`: **42 passed**, including the missing
+  user-account-service guard for both creation commands.
+
+## Batch 5 implementation and verification
+
+The 181 test nullability warnings were confined to `OpenSim.Region.CoreModules.Tests`
+(151 occurrences) and `OpenSim.Server.Base.Tests` (30). Fixtures initialized by
+the test setup lifecycle are explicitly marked as such; optional results and
+callbacks now use nullable types with assertions or guards before dereference.
+Reflection-backed test doubles report missing members explicitly, and proxy,
+logger, and web-proxy implementations now match their nullable framework
+contracts. Four `CS0067` warnings also disappeared when the affected test event
+stubs were initialized to satisfy their non-null event contracts.
+
+### Verification
+
+- Full non-incremental Release rebuild: **65 warnings, 0 errors**; all 181
+  Batch 5 test nullability warnings are gone.
+- `OpenSim.Region.CoreModules.Tests`: **451 passed** with the cached Linux Skia
+  asset on `LD_LIBRARY_PATH`.
+- `OpenSim.Server.Base.Tests`: **152 passed**.
 
 ## Batch 2b implementation and verification
 

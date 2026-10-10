@@ -458,7 +458,7 @@ public sealed class BSTerrainManager : IDisposable
         }
         else
         {
-            m_physicsScene.Logger.LogError("{0} GetWaterHeightAtXY: terrain not found: pos={1}, terrainBase={2}, height={3}",
+            m_physicsScene.Logger.LogError("{0} GetWaterHeightAtXY: terrain not found: pos={1}, terrainBase={2}, height={3}, result={4}",
                     LogHeader, m_physicsScene.RegionName, pos, terrainBaseXYZ, ret);
         }
         return ret;

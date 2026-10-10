@@ -283,7 +283,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
         else
         {
             errorMsg = "viewersession not JanusViewerSession";
-            _log.LogError("{LogHeader} ProvisionVoiceAccountRequest: viewersession not JanusViewerSession");
+            _log.LogError("{0} ProvisionVoiceAccountRequest: viewersession not JanusViewerSession", LogHeader);
         }
 
         if (!string.IsNullOrEmpty(errorMsg) && ret is null)
@@ -473,4 +473,3 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
 
 
 }
-

@@ -45,6 +45,11 @@ namespace Phlox.ScriptEngine
         public int RegexBitfield;   // as osListenRegex was given it; 0 for llListen
         public bool Active;
         public bool Removed;        // set under the manager's lock when the listen is removed
+        /// <summary>
+        /// The script's saved record of this listen (its state's ActiveListens), kept in step with <see cref="Active"/>
+        /// under the manager's lock so a restore brings the listen back on or off as it was. Null when not recorded.
+        /// </summary>
+        public ActiveListen Saved;
     }
 
     internal class PhloxListenManager
@@ -64,8 +69,26 @@ namespace Phlox.ScriptEngine
         /// </summary>
         public int MaxListenEventsPerSecond { get; set; } = DefaultMaxListenEventsPerSecond;
 
-        // Per-script listen delivery count in the current one-second window, and whether that window's drops were logged.
-        private readonly Dictionary<UUID, (int Count, long WindowStart, bool Logged)> m_RateTracker = new();
+        // Per-script listen delivery count in the current one-second window.
+        private readonly Dictionary<UUID, (int Count, long WindowStart)> m_RateTracker = new();
+
+        // A script's run of deliveries the rate cap refused, logged as a run of queue-full drops is
+        // (PhloxExecutionScheduler.QueueFullLineIntervalMs): it starts with the first refusal and ends only when a whole
+        // interval of the engine's clock passes with none. It writes a line when it starts, then at most one each interval
+        // with the refusals since the line before: on the refusal that finds a line due, or on the scheduler's pass
+        // (LogCapRuns) when no refusal comes. Kept under m_Lock; every line is written after the lock is released, so a
+        // slow log sink never holds up listen delivery.
+        private sealed class CapRun
+        {
+            public ulong LineDueOn;
+            public ulong LastRefusedOn;
+            public int Refused;      // since the run's last line
+        }
+        private readonly Dictionary<UUID, CapRun> m_CapRuns = new();
+        private static ulong CapLineIntervalMs => PhloxExecutionScheduler.QueueFullLineIntervalMs;
+
+        /// <summary>The wall-clock second the rate cap counts in (a test sets its own).</summary>
+        internal Func<long> CurrentSecond = () => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         /// <summary>Listen events dropped by the rate cap, and the log lines that reported them (tests).</summary>
         internal long DroppedListenEvents;
@@ -192,6 +215,14 @@ namespace Phlox.ScriptEngine
         /// <summary>osListenRegex - bit 1 (OS_LISTEN_REGEX_NAME) makes the name a regex, bit 2 (OS_LISTEN_REGEX_MESSAGE) the message; the caller has validated them.</summary>
         public int Add(uint localID, UUID itemID, UUID hostID,
                        int channel, string name, UUID key, string msg, int regexBitfield)
+            => Add(localID, itemID, hostID, channel, name, key, msg, regexBitfield, null);
+
+        /// <summary>
+        /// As above, and <paramref name="saved"/> is the record the caller keeps in the script's state for this listen,
+        /// which the manager keeps in step with the listen's on/off state (llListenControl, a regex timeout).
+        /// </summary>
+        public int Add(uint localID, UUID itemID, UUID hostID,
+                       int channel, string name, UUID key, string msg, int regexBitfield, ActiveListen saved)
         {
             name ??= string.Empty;
             msg ??= string.Empty;
@@ -208,7 +239,11 @@ namespace Phlox.ScriptEngine
                             && held.RegexBitfield == regexBitfield
                             && string.Equals(held.FilterName, name, StringComparison.Ordinal)
                             && string.Equals(held.FilterMsg, msg, StringComparison.Ordinal))
+                        {
+                            // The caller's record replaces the one it kept for this handle.
+                            if (saved != null) held.Saved = saved;
                             return held.Handle;
+                        }
 
                     // Halcyon returns -1 with no script error when a script has no handle left.
                     if (existing.Count >= MaxListensPerScript)
@@ -246,7 +281,8 @@ namespace Phlox.ScriptEngine
                     NameRegex   = (regexBitfield & 1) != 0 && !string.IsNullOrEmpty(name) ? ScriptRegex.Create(name) : null,
                     MsgRegex    = (regexBitfield & 2) != 0 && !string.IsNullOrEmpty(msg) ? ScriptRegex.Create(msg) : null,
                     RegexBitfield = regexBitfield,
-                    Active      = true
+                    Active      = true,
+                    Saved       = saved
                 };
 
                 if (existing == null)
@@ -265,15 +301,29 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// A restored script's saved listen, registered again with the handle the script holds (Halcyon Relisten).
-        /// Returns that handle, or -1 when the handle is taken or a cap is full.
+        /// A restored script's saved listen, registered again with the handle the script holds (Halcyon Relisten),
+        /// on or off as it was saved and with its osListenRegex bitfield (YEngine's WorldCommModule saves both).
+        /// <paramref name="hostID"/> is the prim, or for botListen the bot. Returns the handle, or -1 when the handle is
+        /// taken, a cap is full or a saved pattern is no longer a valid regex.
         /// </summary>
-        public int Restore(uint localID, UUID itemID, UUID hostID, int handle,
-                           int channel, string name, UUID key, string msg)
+        public int Restore(uint localID, UUID itemID, UUID hostID, UUID key, ActiveListen saved)
         {
-            name ??= string.Empty;
-            msg ??= string.Empty;
+            string name = saved.Name ?? string.Empty;
+            string msg = saved.Message ?? string.Empty;
+            int handle = saved.Handle;
             if (handle <= 0) return -1;
+            System.Text.RegularExpressions.Regex nameRegex = null, msgRegex = null;
+            try
+            {
+                if ((saved.RegexBitfield & 1) != 0 && name.Length > 0) nameRegex = ScriptRegex.Create(name);
+                if ((saved.RegexBitfield & 2) != 0 && msg.Length > 0) msgRegex = ScriptRegex.Create(msg);
+            }
+            catch (ArgumentException e)
+            {
+                m_log.LogWarning("[PhloxListen]: saved listen handle {0} of item {1} has a pattern that is not a valid regex; not restored: {2}",
+                    handle, itemID, e.Message);
+                return -1;
+            }
             lock (m_Lock)
             {
                 m_ByItem.TryGetValue(itemID, out var existing);
@@ -281,8 +331,10 @@ namespace Phlox.ScriptEngine
                 if (m_ListenCount >= MaxListensPerRegion) return -1;
                 var entry = new ListenEntry
                 {
-                    Handle = handle, LocalID = localID, ItemID = itemID, HostID = hostID, Channel = channel,
-                    FilterName = name, FilterKey = key, FilterMsg = msg, Active = true
+                    Handle = handle, LocalID = localID, ItemID = itemID, HostID = hostID, Channel = saved.Channel,
+                    FilterName = name, FilterKey = key, FilterMsg = msg,
+                    NameRegex = nameRegex, MsgRegex = msgRegex, RegexBitfield = saved.RegexBitfield,
+                    Active = !saved.Inactive, Saved = saved
                 };
                 if (existing == null) m_ByItem[itemID] = existing = new Dictionary<int, ListenEntry>();
                 existing[handle] = entry;
@@ -324,6 +376,7 @@ namespace Phlox.ScriptEngine
                     byHandle.TryGetValue(handle, out var entry))
                 {
                     entry.Active = active;
+                    if (entry.Saved != null) entry.Saved.Inactive = !active;
                 }
             }
         }
@@ -362,14 +415,20 @@ namespace Phlox.ScriptEngine
             }
         }
 
-        /// <summary>The script is unloaded - its listens and its listen-rate record go (the record was never freed).</summary>
+        /// <summary>
+        /// The script is unloaded - its listens, its listen-rate record (the record was never freed) and its run of refused
+        /// deliveries go; the run's refusals since its last line, if any, are logged.
+        /// </summary>
         public void Forget(UUID itemID)
         {
+            int rest = 0;
             lock (m_Lock)
             {
                 RemoveAllOf(itemID);
                 m_RateTracker.Remove(itemID);
+                if (m_CapRuns.Remove(itemID, out var run) && run.Refused > 0) { rest = run.Refused; RateLimitLogLines++; }
             }
+            if (rest > 0) WriteCapLine(itemID, rest);
         }
 
         /// <summary>How many listens this script holds on a channel (tests).</summary>
@@ -559,11 +618,14 @@ namespace Phlox.ScriptEngine
                 {
                     disabledNow = entry.Active;
                     entry.Active = false;
+                    if (entry.Saved != null) entry.Saved.Inactive = true;
                 }
                 if (disabledNow)
                 {
                     m_log.LogWarning("[PhloxListen]: {0} for listen handle {1} of item {2}; listener disabled",
                         ScriptRegex.TimedOutMessage, entry.Handle, entry.ItemID);
+                    // The switch-off happens outside any event of the script, so the script is marked for saving here.
+                    m_Scheduler.ScriptChangedOutsideARun(entry.ItemID);
                     try { m_Scheduler.FindScript(entry.ItemID)?.ShoutError(ListenRegexTimedOutNotice); }
                     catch (Exception e) { m_log.LogWarning("[PhloxListen]: could not tell the owner: {0}", e.Message); }
                 }
@@ -577,34 +639,96 @@ namespace Phlox.ScriptEngine
         {
             int cap = MaxListenEventsPerSecond;
             if (cap <= 0) return false;
-            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long now = CurrentSecond();
+            int rest = 0, refused = 0;
+            bool started = false;
             lock (m_Lock)
             {
-                if (m_RateTracker.TryGetValue(itemID, out var entry) && entry.WindowStart == now)
-                {
-                    if (entry.Count >= cap)
-                    {
-                        DroppedListenEvents++;
-                        if (!entry.Logged)
-                        {
-                            // One line per script per one-second window, not one per dropped event.
-                            RateLimitLogLines++;
-                            m_RateTracker[itemID] = (entry.Count, now, true);
-                            m_log.LogWarning("[PhloxListen]: script {0} heard more than {1} listen events this second; the rest of this second's are dropped ([InWorldz.Phlox] MaxListenEventsPerSecond)",
-                                itemID, cap);
-                        }
-                        return true;
-                    }
-                    m_RateTracker[itemID] = (entry.Count + 1, now, entry.Logged);
-                }
-                else
+                if (!m_RateTracker.TryGetValue(itemID, out var entry) || entry.WindowStart != now)
                 {
                     // A new second: the count starts again
-                    m_RateTracker[itemID] = (1, now, false);
+                    m_RateTracker[itemID] = (1, now);
+                    return false;
+                }
+                if (entry.Count < cap)
+                {
+                    m_RateTracker[itemID] = (entry.Count + 1, now);
+                    return false;
+                }
+                DroppedListenEvents++;
+
+                ulong clock = InWorldz.Phlox.Util.Clock.Now;
+                if (m_CapRuns.TryGetValue(itemID, out var run) && clock >= run.LastRefusedOn + CapLineIntervalMs)
+                {
+                    // The run ended since the scheduler's last pass: its rest goes on its own line, and this starts a new one.
+                    if (run.Refused > 0) { rest = run.Refused; RateLimitLogLines++; }
+                    run = null;
+                }
+                if (run == null)
+                {
+                    m_CapRuns[itemID] = run = new CapRun();
+                    started = true;
+                }
+                run.Refused++;
+                run.LastRefusedOn = clock;
+                if (clock >= run.LineDueOn)
+                {
+                    refused = run.Refused;
+                    run.Refused = 0;
+                    run.LineDueOn = clock + CapLineIntervalMs;
+                    RateLimitLogLines++;
                 }
             }
-            return false;
+            if (rest > 0) WriteCapLine(itemID, rest);
+            if (refused > 0) WriteCapLine(itemID, refused);
+            if (started) m_Scheduler?.Wake();       // so the scheduler's next wake takes in the run's next line
+            return true;
         }
+
+        /// <summary>
+        /// The scheduler's pass: a run whose line is due writes the refusals since the line before, and a run with no
+        /// refusal for a whole interval ends, writing its rest.
+        /// </summary>
+        internal void LogCapRuns()
+        {
+            List<(UUID Item, int Refused)> lines = null;
+            lock (m_Lock)
+            {
+                if (m_CapRuns.Count == 0) return;
+                ulong clock = InWorldz.Phlox.Util.Clock.Now;
+                List<UUID> ended = null;
+                foreach (var (item, run) in m_CapRuns)
+                {
+                    bool over = clock >= run.LastRefusedOn + CapLineIntervalMs;
+                    bool due = clock >= run.LineDueOn;
+                    if ((over || due) && run.Refused > 0)
+                    {
+                        (lines ??= new()).Add((item, run.Refused));
+                        run.Refused = 0;
+                        RateLimitLogLines++;
+                    }
+                    if (over) (ended ??= new List<UUID>()).Add(item);
+                    else if (due) run.LineDueOn = clock + CapLineIntervalMs;
+                }
+                if (ended != null) foreach (UUID item in ended) m_CapRuns.Remove(item);
+            }
+            if (lines != null) foreach (var (item, refused) in lines) WriteCapLine(item, refused);
+        }
+
+        /// <summary>When the next cap line is due, so the scheduler wakes for it (ulong.MaxValue: none).</summary>
+        internal ulong EarliestCapLine()
+        {
+            ulong earliest = ulong.MaxValue;
+            lock (m_Lock)
+                foreach (var run in m_CapRuns.Values)
+                    if (run.LineDueOn < earliest) earliest = run.LineDueOn;
+            return earliest;
+        }
+
+        /// <summary>Never called under m_Lock.</summary>
+        private void WriteCapLine(UUID itemID, int refused)
+            => m_log.LogWarning("[PhloxListen]: script {0} heard more than {1} listen events in a second; {2} refused since the last line ([InWorldz.Phlox] MaxListenEventsPerSecond)",
+                itemID, MaxListenEventsPerSecond, refused);
 
         /// <summary>
         /// A listen botListen registered (its host is the bot's avatar, not a prim) carries the bot's key for

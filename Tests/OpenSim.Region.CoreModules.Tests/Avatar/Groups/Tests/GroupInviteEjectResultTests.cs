@@ -80,21 +80,22 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
     /// </summary>
     public class Stand<T> : DispatchProxy where T : class
     {
-        private Func<string, object[], object> m_handler;
+        private Func<string, object?[], object?> m_handler = null!;
 
-        public static T Create(Func<string, object[], object> handler)
+        public static T Create(Func<string, object?[], object?> handler)
         {
             T proxy = Create<T, Stand<T>>();
             ((Stand<T>)(object)proxy).m_handler = handler;
             return proxy;
         }
 
-        protected override object Invoke(MethodInfo method, object[] args)
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
-            object result = m_handler(method.Name, args ?? Array.Empty<object>());
+            MethodInfo targetMethod = method ?? throw new InvalidOperationException("The groups proxy received no target method.");
+            object? result = m_handler(targetMethod.Name, args ?? Array.Empty<object?>());
             if (result is not null)
                 return result;
-            Type rt = method.ReturnType;
+            Type rt = targetMethod.ReturnType;
             return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);
         }
     }
@@ -122,12 +123,12 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
             Stand<XmlRpcGroups.IGroupsServicesConnector>.Create((name, a) => name switch
             {
                 "GetGroupRecord" => new GroupRecord { GroupID = GroupId, GroupName = "Example Group" },
-                "AddAgentToGroupInvite" => Discard(svc.Invite((UUID)a[1], (UUID)a[4])),
-                "GetAgentToGroupInvite" => svc.Invites.TryGetValue((UUID)a[1], out UUID who)
-                    ? new XmlRpcGroups.GroupInviteInfo { InviteID = (UUID)a[1], GroupID = GroupId, AgentID = who }
+                "AddAgentToGroupInvite" => Discard(svc.Invite(Argument<UUID>(a, 1), Argument<UUID>(a, 4))),
+                "GetAgentToGroupInvite" => svc.Invites.TryGetValue(Argument<UUID>(a, 1), out UUID who)
+                    ? new XmlRpcGroups.GroupInviteInfo { InviteID = Argument<UUID>(a, 1), GroupID = GroupId, AgentID = who }
                     : null,
-                "RemoveAgentFromGroup" => Discard(Do(() => svc.Remove((UUID)a[0], (UUID)a[1]))),
-                "GetAgentGroupMembership" => svc.Members.Contains((UUID)a[1])
+                "RemoveAgentFromGroup" => Discard(Do(() => svc.Remove(Argument<UUID>(a, 0), Argument<UUID>(a, 1)))),
+                "GetAgentGroupMembership" => svc.Members.Contains(Argument<UUID>(a, 1))
                     ? new GroupMembershipData { GroupID = GroupId }
                     : null,
                 _ => null
@@ -146,9 +147,10 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
             Stand<V2Groups.IGroupsServicesConnector>.Create((name, a) => name switch
             {
                 "GetGroupRecord" => new V2Groups.ExtendedGroupRecord { GroupID = GroupId, GroupName = "Example Group" },
-                "AddAgentToGroupInvite" => svc.Invite((UUID)a[1], UUID.Parse((string)a[4])),
-                "RemoveAgentFromGroup" => Discard(Do(() => svc.Remove(UUID.Parse((string)a[0]), UUID.Parse((string)a[1])))),
-                "GetAgentGroupMembership" => svc.Members.Contains(UUID.Parse((string)a[1]))
+                "AddAgentToGroupInvite" => svc.Invite(Argument<UUID>(a, 1), UUID.Parse(Argument<string>(a, 4))),
+                "RemoveAgentFromGroup" => Discard(Do(() =>
+                    svc.Remove(ParseUuid(a, 0), ParseUuid(a, 1)))),
+                "GetAgentGroupMembership" => svc.Members.Contains(ParseUuid(a, 1))
                     ? new V2Groups.ExtendedGroupMembershipData { GroupID = GroupId }
                     : null,
                 _ => null
@@ -159,8 +161,17 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
         return gm;
     }
 
-    private static object Discard(object _) => null;
-    private static object Do(Action a) { a(); return null; }
+    private static T Argument<T>(object?[]? args, int index)
+    {
+        if (args is null || args.Length <= index || args[index] is not T value)
+            throw new InvalidOperationException($"Groups proxy argument {index} is not a {typeof(T).Name}.");
+        return value;
+    }
+
+    private static UUID ParseUuid(object?[] args, int index) => UUID.Parse(Argument<string>(args, index));
+
+    private static object? Discard(object? _) => null;
+    private static object? Do(Action a) { a(); return null; }
 
     public static IEnumerable<object[]> Modules() => new[] { new object[] { "XmlRpc" }, new object[] { "V2" } };
 
@@ -174,7 +185,7 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
         FakeGroupsService svc = new() { ActorHasPowers = true };
         IGroupsModule gm = Module(which, svc);
 
-        Assert.True(gm.InviteGroup(null, ActorId, GroupId, TargetId, UUID.Zero));
+        Assert.True(gm.InviteGroup(null!, ActorId, GroupId, TargetId, UUID.Zero));
         Assert.Single(svc.Invites);
     }
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using OSHttpServer;
 using Xunit;
 
@@ -16,6 +17,30 @@ public class HttpRequestTests
         request.AddHeader("X-Forwarded-For", "203.0.113.99");
 
         Xunit.Assert.Equal(realPeer, request.RemoteIPEndPoint);
+    }
+
+    [Fact]
+    public void CloneCopiesABodyThatReadsInSmallPieces()
+    {
+        HttpRequest request = new(new TestHttpClientContext(new IPEndPoint(IPAddress.Loopback, 9000)));
+        byte[] body = Encoding.ASCII.GetBytes("POST body that no single read returns in full.");
+        request.Body = new OneBytePerReadStream(body);
+
+        HttpRequest clone = (HttpRequest)request.Clone();
+
+        using MemoryStream copied = new();
+        clone.Body.CopyTo(copied);
+        Xunit.Assert.Equal(body, copied.ToArray());
+    }
+
+    private sealed class OneBytePerReadStream : MemoryStream
+    {
+        public OneBytePerReadStream(byte[] contents) : base(contents, writable: false)
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+            => base.Read(buffer, offset, Math.Min(count, 1));
     }
 
     private sealed class TestHttpClientContext : IHttpClientContext

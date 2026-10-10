@@ -130,6 +130,71 @@ namespace OpenSim.Region.Framework.Tests
         }
 
         /// <summary>
+        /// MoveTaskInventoryItemsAllOrNone gives every listed item or none. Each item is checked and copied before
+        /// any is added, so an item that loses Transfer while the first one is being added is still given.
+        /// </summary>
+        [Fact]
+        public void TestMoveTaskInventoryItemsAllOrNoneGivesTheWholeListWhenAnItemChangesDuringTheGive()
+        {
+            TestHelpers.InMethod();
+
+            Scene scene = new SceneHelpers().SetupScene();
+            UserAccount owner = UserAccountHelpers.CreateUserWithInventory(scene, "Owner", "Test", 0x10, "pw");
+            UserAccount receiver = UserAccountHelpers.CreateUserWithInventory(scene, "Receiver", "Test", 0x20, "pw");
+            SceneObjectPart sop1 = SceneHelpers.CreateSceneObject(1, owner.PrincipalID).RootPart;
+            TaskInventoryItem item1 = TaskInventoryHelpers.AddNotecard(
+                scene.AssetService, sop1, "nc1", TestHelpers.ParseTail(0x801), TestHelpers.ParseTail(0x901), "one");
+            TaskInventoryItem item2 = TaskInventoryHelpers.AddNotecard(
+                scene.AssetService, sop1, "nc2", TestHelpers.ParseTail(0x802), TestHelpers.ParseTail(0x902), "two");
+
+            // The first item's arrival takes Transfer away from the second, as an edit made during the give would.
+            bool changed = false;
+            scene.EventManager.OnNewInventoryItemUploadComplete += (item, _) =>
+            {
+                if (changed || item.Owner != receiver.PrincipalID) return;
+                changed = true;
+                item2.CurrentPermissions &= ~(uint)OpenSim.Framework.PermissionMask.Transfer;
+            };
+
+            UUID folderID = scene.MoveTaskInventoryItemsAllOrNone(
+                receiver.PrincipalID, "box", sop1, new List<UUID> { item1.ItemID, item2.ItemID }, out string message);
+
+            Assert.True(changed);
+            Assert.NotEqual(UUID.Zero, folderID);
+            Assert.Null(message);
+            List<InventoryItemBase> given = scene.InventoryService.GetFolderItems(receiver.PrincipalID, folderID);
+            Assert.Equal(new[] { "nc1", "nc2" }, given.Select(i => i.Name).OrderBy(n => n));
+        }
+
+        /// <summary>
+        /// An item that cannot be given stops the whole list: nothing is given, no folder is made, and the reason
+        /// is returned. The receiver is not in the region.
+        /// </summary>
+        [Fact]
+        public void TestMoveTaskInventoryItemsAllOrNoneGivesNothingWhenAnItemCannotBeGiven()
+        {
+            TestHelpers.InMethod();
+
+            Scene scene = new SceneHelpers().SetupScene();
+            UserAccount owner = UserAccountHelpers.CreateUserWithInventory(scene, "Owner", "Test", 0x10, "pw");
+            UserAccount receiver = UserAccountHelpers.CreateUserWithInventory(scene, "Receiver", "Test", 0x20, "pw");
+            SceneObjectPart sop1 = SceneHelpers.CreateSceneObject(1, owner.PrincipalID).RootPart;
+            TaskInventoryItem item1 = TaskInventoryHelpers.AddNotecard(
+                scene.AssetService, sop1, "nc1", TestHelpers.ParseTail(0x801), TestHelpers.ParseTail(0x901), "one");
+            TaskInventoryItem item2 = TaskInventoryHelpers.AddNotecard(
+                scene.AssetService, sop1, "nc2", TestHelpers.ParseTail(0x802), TestHelpers.ParseTail(0x902), "two");
+            item2.CurrentPermissions &= ~(uint)OpenSim.Framework.PermissionMask.Transfer;
+
+            UUID folderID = scene.MoveTaskInventoryItemsAllOrNone(
+                receiver.PrincipalID, "box", sop1, new List<UUID> { item1.ItemID, item2.ItemID }, out string message);
+
+            Assert.Equal(UUID.Zero, folderID);
+            Assert.Equal("Item doesn't have the Transfer permission.", message);
+            Assert.DoesNotContain(scene.InventoryService.GetInventorySkeleton(receiver.PrincipalID), f => f.Name == "box");
+            Assert.Null(InventoryArchiveUtils.FindItemByPath(scene.InventoryService, receiver.PrincipalID, "Notecards/nc1"));
+        }
+
+        /// <summary>
         /// Test MoveTaskInventoryItem from a part inventory to a user inventory where the item has no parent folder assigned.
         /// </summary>
         /// <remarks>

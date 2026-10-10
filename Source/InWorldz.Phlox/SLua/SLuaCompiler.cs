@@ -282,7 +282,6 @@ namespace InWorldz.Phlox.SLua
     internal abstract class Stmt : Node { }
     internal sealed class LocalDecl : Stmt { public string Name; public Expr Init; }
     internal sealed class Assign : Stmt { public string Name; public Expr Value; }
-    internal sealed class ExprStmt : Stmt { public LlCall Call; }
     internal sealed class IfStmt : Stmt { public Expr Cond; public List<Stmt> Then; public List<Stmt> Else; }
     internal sealed class WhileStmt : Stmt { public Expr Cond; public List<Stmt> Body; }
     internal sealed class ReturnStmt : Stmt { public List<Expr> Values; }
@@ -1109,7 +1108,6 @@ namespace InWorldz.Phlox.SLua
                 case AssignMulti am: foreach (var v in am.Values) ScanExprForNested(v, names); break;
                 case IndexAssign ia: ScanExprForNested(ia.Target, names); ScanExprForNested(ia.Key, names); ScanExprForNested(ia.Value, names); break;
                 case TableInsert ti: ScanExprForNested(ti.Table, names); ScanExprForNested(ti.Value, names); break;
-                case ExprStmt es: ScanExprForNested(es.Call, names); break;
                 case CallStmt cs: ScanExprForNested(cs.Call, names); break;
                 case IfStmt ifs: ScanExprForNested(ifs.Cond, names); foreach (var st in ifs.Then) ScanStmtForNested(st, names); if (ifs.Else != null) foreach (var st in ifs.Else) ScanStmtForNested(st, names); break;
                 case WhileStmt w: ScanExprForNested(w.Cond, names); foreach (var st in w.Body) ScanStmtForNested(st, names); break;
@@ -1153,7 +1151,6 @@ namespace InWorldz.Phlox.SLua
                 case AssignMulti am: foreach (var n in am.Names) names.Add(n); foreach (var v in am.Values) AllNamesExpr(v, names); break;
                 case IndexAssign ia: AllNamesExpr(ia.Target, names); AllNamesExpr(ia.Key, names); AllNamesExpr(ia.Value, names); break;
                 case TableInsert ti: AllNamesExpr(ti.Table, names); AllNamesExpr(ti.Value, names); break;
-                case ExprStmt es: AllNamesExpr(es.Call, names); break;
                 case CallStmt cs: AllNamesExpr(cs.Call, names); break;
                 case IfStmt ifs: AllNamesExpr(ifs.Cond, names); AllNamesList(ifs.Then, names); if (ifs.Else != null) AllNamesList(ifs.Else, names); break;
                 case WhileStmt w: AllNamesExpr(w.Cond, names); AllNamesList(w.Body, names); break;
@@ -1200,7 +1197,6 @@ namespace InWorldz.Phlox.SLua
                 case AssignMulti am: foreach (var v in am.Values) LLEExpr(v, evs); break;
                 case IndexAssign ia: LLEExpr(ia.Target, evs); LLEExpr(ia.Key, evs); LLEExpr(ia.Value, evs); break;
                 case TableInsert ti: LLEExpr(ti.Table, evs); LLEExpr(ti.Value, evs); break;
-                case ExprStmt es: LLEExpr(es.Call, evs); break;
                 case CallStmt cs: LLEExpr(cs.Call, evs); break;
                 case IfStmt ifs: LLEExpr(ifs.Cond, evs); CollectLLEvents(ifs.Then, evs); if (ifs.Else != null) CollectLLEvents(ifs.Else, evs); break;
                 case WhileStmt w: LLEExpr(w.Cond, evs); CollectLLEvents(w.Body, evs); break;
@@ -1525,9 +1521,6 @@ namespace InWorldz.Phlox.SLua
                 }
                 case TableInsert ti:
                     EmitTableInsert(ti);
-                    break;
-                case ExprStmt es:
-                    EmitLlCall(es.Call, statementLevel: true);
                     break;
                 case CallStmt cs:
                     EmitCallStmt(cs);

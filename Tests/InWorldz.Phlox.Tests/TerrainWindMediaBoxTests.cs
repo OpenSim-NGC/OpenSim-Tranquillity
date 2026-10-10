@@ -103,7 +103,8 @@ public class TerrainWindMediaBoxTests
         Near(new Vector3(-1, 0, -1), api.llGroundSlope(Vector3.Zero));
         Near(new Vector3(-1, 0, 1), api.llGroundNormal(Vector3.Zero));
         Near(new Vector3(0, -1, 0), api.llGroundContour(Vector3.Zero));
-        Near(Vector3.Normalize(new Vector3(-1, 0, 1)), api.iwGroundSurfaceNormal(Vector3.Zero));
+        Vector3 normal = new Vector3(-1, 0, 1);
+        Near(Vector3.Normalize(in normal), api.iwGroundSurfaceNormal(Vector3.Zero));
     }
 
     [Fact]

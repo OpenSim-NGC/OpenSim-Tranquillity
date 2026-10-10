@@ -22,7 +22,7 @@ public sealed class PidFileHostedServiceTests
         try
         {
             IConfiguration config = new ConfigurationBuilder()
-                .AddInMemoryCollection(new Dictionary<string, string>
+                .AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["Startup:PIDFile"] = pidPath,
                 })

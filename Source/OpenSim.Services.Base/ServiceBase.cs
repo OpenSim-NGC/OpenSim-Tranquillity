@@ -100,7 +100,7 @@ public class ServiceBase
                 strArgs.Add(arg.ToString());
 
             m_log.LogError(
-                    "[SERVICE BASE]: Failed to load plugin {0} from {1} with args {2}",
+                    "[SERVICE BASE]: Failed to load plugin {0} from {1} with args {2}: {3}",
                     interfaceName, dllName, string.Join(", ", strArgs.ToArray()), e);
             if (e.InnerException != null)
                 m_log.LogError($"[SERVICE BASE]: inner exception {e.InnerException.Message}");

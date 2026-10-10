@@ -277,7 +277,7 @@ public class MapImageService : IMapImageService
             using var fs = File.OpenRead(fileName);
             byte[] sig = new byte[3];
 
-            fs.Read(sig, 0, 3);
+            if (fs.ReadAtLeast(sig, sig.Length, throwOnEndOfStream: false) < sig.Length) return false;
             if (SkiaImageUtils.IsNotJpeg(sig)) return false;
 
             // Rewind the stream for DecodeBounds

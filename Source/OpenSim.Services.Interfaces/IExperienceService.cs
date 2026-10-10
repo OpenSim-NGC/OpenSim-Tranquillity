@@ -1,4 +1,5 @@
 using OpenMetaverse;
+using System.Diagnostics.CodeAnalysis;
 
 namespace OpenSim.Services.Interfaces;
 
@@ -95,6 +96,7 @@ public interface IExperienceService
     bool UpdateExperiencePermissions(UUID agent_id, UUID experience, ExperiencePermission perm);
     ExperienceInfo[] GetExperienceInfos(UUID[] experiences);
     UUID[] GetAgentExperiences(UUID agent_id);
+    [return: MaybeNull]
     ExperienceInfo UpdateExperienceInfo(ExperienceInfo info);
     ExperienceInfo[] FindExperiencesByName(string search);
     UUID[] GetGroupExperiences(UUID group_id);

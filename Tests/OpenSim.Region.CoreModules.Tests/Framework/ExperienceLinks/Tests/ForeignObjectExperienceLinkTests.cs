@@ -58,21 +58,22 @@ public class ForeignObjectExperienceLinkTests : OpenSimTestCase
     /// <summary>A stand-in for an interface; each call goes to the handler, others return the default.</summary>
     public class Stand<T> : DispatchProxy where T : class
     {
-        private Func<string, object[], object> m_handler;
+        private Func<string, object?[], object?> m_handler = null!;
 
-        public static T Create(Func<string, object[], object> handler)
+        public static T Create(Func<string, object?[], object?> handler)
         {
             T proxy = Create<T, Stand<T>>();
             ((Stand<T>)(object)proxy).m_handler = handler;
             return proxy;
         }
 
-        protected override object Invoke(MethodInfo method, object[] args)
+        protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
-            object result = m_handler(method.Name, args ?? Array.Empty<object>());
+            MethodInfo targetMethod = method ?? throw new InvalidOperationException("The service proxy received no target method.");
+            object? result = m_handler(targetMethod.Name, args ?? Array.Empty<object?>());
             if (result is not null)
                 return result;
-            Type rt = method.ReturnType;
+            Type rt = targetMethod.ReturnType;
             return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);
         }
     }
@@ -126,18 +127,20 @@ public class ForeignObjectExperienceLinkTests : OpenSimTestCase
     {
         IAssetService local = Stand<IAssetService>.Create((name, a) => name switch
         {
-            "Get" when a.Length == 1 => assets.Local.TryGetValue((string)a[0], out AssetBase l) ? l : null,
-            "Store" => Store(assets, (AssetBase)a[0]),
+            "Get" when a.Length == 1 => assets.Local.TryGetValue(Argument<string>(a, 0), out AssetBase? l) && l is not null ? l : null,
+            "Store" => Store(assets, Argument<AssetBase>(a, 0)),
             _ => null
         });
         IAssetService foreign = Stand<IAssetService>.Create((name, a) => name switch
         {
-            "Get" when a.Length == 3 => assets.Foreign.TryGetValue((string)a[0], out AssetBase f) ? Copy(f) : null,
+            "Get" when a.Length == 3 => assets.Foreign.TryGetValue(Argument<string>(a, 0), out AssetBase? f) && f is not null ? Copy(f) : null,
             _ => null
         });
         RegionAssetConnector module = new RegionAssetConnector();
-        FieldInfo localField = typeof(RegionAssetConnector).GetField("m_localConnector", BindingFlags.NonPublic | BindingFlags.Instance);
-        FieldInfo hgField = typeof(RegionAssetConnector).GetField("m_HGConnector", BindingFlags.NonPublic | BindingFlags.Instance);
+        FieldInfo localField = typeof(RegionAssetConnector).GetField("m_localConnector", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new MissingFieldException(typeof(RegionAssetConnector).FullName, "m_localConnector");
+        FieldInfo hgField = typeof(RegionAssetConnector).GetField("m_HGConnector", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new MissingFieldException(typeof(RegionAssetConnector).FullName, "m_HGConnector");
         localField.SetValue(module, local);
         hgField.SetValue(module, foreign);
         return module;
@@ -148,6 +151,13 @@ public class ForeignObjectExperienceLinkTests : OpenSimTestCase
         assets.Stored.Add(asset);
         assets.Local[asset.ID] = asset;
         return asset.ID;
+    }
+
+    private static T Argument<T>(object?[] args, int index)
+    {
+        if (args.Length <= index || args[index] is not T value)
+            throw new InvalidOperationException($"Service proxy argument {index} is not a {typeof(T).Name}.");
+        return value;
     }
 
     private static AssetBase Copy(AssetBase a)
@@ -225,9 +235,9 @@ public class ForeignObjectExperienceLinkTests : OpenSimTestCase
 
     private sealed class Arrival
     {
-        public Scene Scene;
-        public AttachmentsModule Attachments;
-        public ScenePresence Presence;
+        public Scene Scene = null!;
+        public AttachmentsModule Attachments = null!;
+        public ScenePresence Presence = null!;
         public readonly List<string> StatesGiven = new();
     }
 
@@ -240,7 +250,7 @@ public class ForeignObjectExperienceLinkTests : OpenSimTestCase
         scene.RegisterModuleInterface<IScriptModule>(Stand<IScriptModule>.Create((name, a) => name switch
         {
             "get_ScriptEngineName" => "YEngine",
-            "SetXMLState" => Record(arrival, (string)a[1]),
+            "SetXMLState" => Record(arrival, Argument<string>(a, 1)),
             _ => null
         }));
         // The transfer module accepts the attachments and does nothing else.

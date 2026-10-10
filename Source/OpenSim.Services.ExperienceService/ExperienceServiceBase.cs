@@ -6,7 +6,7 @@ namespace OpenSim.Services.ExperienceService;
 
 public class ExperienceServiceBase : ServiceBase
 {
-    protected IExperienceData m_Database = null;
+    protected IExperienceData m_Database;
 
     public ExperienceServiceBase(IConfigSource config)
         : base(config)

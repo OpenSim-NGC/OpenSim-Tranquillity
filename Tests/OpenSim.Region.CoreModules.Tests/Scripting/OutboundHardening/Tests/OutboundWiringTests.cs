@@ -64,21 +64,22 @@ public class OutboundWiringTests : OpenSimTestCase
     private static readonly TimeSpan Limit = TimeSpan.FromSeconds(15);
 
     private static readonly FieldInfo s_httpModuleFilter =
-        typeof(HttpRequestModule).GetField("m_outboundUrlFilter", BindingFlags.NonPublic | BindingFlags.Static);
+        typeof(HttpRequestModule).GetField("m_outboundUrlFilter", BindingFlags.NonPublic | BindingFlags.Static)
+        ?? throw new MissingFieldException(typeof(HttpRequestModule).FullName, "m_outboundUrlFilter");
 
     private readonly RecordingHttpServer m_server = new();
     private readonly RecordingHttpServer m_proxyServer = new();
-    private readonly OutboundUrlFilter m_savedHttpModuleFilter;
+    private readonly OutboundUrlFilter? m_savedHttpModuleFilter;
     private readonly IWebProxy m_savedDefaultProxy;
     private readonly ICommandConsole m_savedConsole;
     private readonly SocketsHttpHandler m_savedRedir;
     private readonly SocketsHttpHandler m_savedNoRedir;
-    private HttpRequestModule m_httpModule;
-    private Scene m_scene;
+    private HttpRequestModule m_httpModule = null!;
+    private Scene m_scene = null!;
 
     public OutboundWiringTests()
     {
-        m_savedHttpModuleFilter = (OutboundUrlFilter)s_httpModuleFilter.GetValue(null);
+        m_savedHttpModuleFilter = s_httpModuleFilter.GetValue(null) as OutboundUrlFilter;
         m_savedDefaultProxy = HttpClient.DefaultProxy;
         HttpClient.DefaultProxy = new WebProxy();   // no proxy: every URL is bypassed
 
@@ -136,7 +137,7 @@ public class OutboundWiringTests : OpenSimTestCase
         }
     }
 
-    private static OutboundUrlFilter Filter(Lookup lookup, string except = null)
+    private static OutboundUrlFilter Filter(Lookup lookup, string? except = null)
     {
         IConfigSource config = new IniConfigSource();
         IConfig network = config.AddConfig("Network");
@@ -192,11 +193,14 @@ public class OutboundWiringTests : OpenSimTestCase
         HttpRequestModule.m_jobEngine = null;
         foreach (string name in new[] { "VeriFyCertClient", "VeriFyNoCertClient" })
         {
-            FieldInfo field = typeof(HttpRequestModule).GetField(name, BindingFlags.NonPublic | BindingFlags.Static);
+            FieldInfo field = typeof(HttpRequestModule).GetField(name, BindingFlags.NonPublic | BindingFlags.Static)
+                ?? throw new MissingFieldException(typeof(HttpRequestModule).FullName, name);
             (field.GetValue(null) as HttpClient)?.Dispose();
             field.SetValue(null, null);
         }
-        typeof(HttpRequestModule).GetField("m_numberScenes", BindingFlags.NonPublic | BindingFlags.Static).SetValue(null, 0);
+        FieldInfo numberScenes = typeof(HttpRequestModule).GetField("m_numberScenes", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new MissingFieldException(typeof(HttpRequestModule).FullName, "m_numberScenes");
+        numberScenes.SetValue(null, 0);
     }
 
     /// <param name="viaProxy">Configure the listener in <c>m_proxyServer</c> as the proxy, bypassing "localhost".</param>
@@ -398,7 +402,7 @@ public class OutboundWiringTests : OpenSimTestCase
     {
         VectorRenderModule module = new();
         module.Initialise(ModuleConfig());
-        typeof(VectorRenderModule).GetField("m_outboundUrlFilter", BindingFlags.NonPublic | BindingFlags.Instance)
+        GetRequiredField(typeof(VectorRenderModule), "m_outboundUrlFilter", BindingFlags.NonPublic | BindingFlags.Instance)
             .SetValue(module, filter);
         return module;
     }
@@ -494,22 +498,25 @@ public class OutboundWiringTests : OpenSimTestCase
     }
 
     /// <summary>Starts a load and waits for the module to hand back its result, however the fetch ended. A null filter keeps the module's own.</summary>
-    private static void LoadImage(OutboundUrlFilter filter, string url)
+    private static void LoadImage(OutboundUrlFilter? filter, string url)
     {
         LoadImageURLModule module = new();
         module.Initialise(ModuleConfig());
         ReturnedTextures textures = new();
         if (filter is not null)
         {
-            typeof(LoadImageURLModule).GetField("m_outboundUrlFilter", BindingFlags.NonPublic | BindingFlags.Instance)
+            GetRequiredField(typeof(LoadImageURLModule), "m_outboundUrlFilter", BindingFlags.NonPublic | BindingFlags.Instance)
                 .SetValue(module, filter);
         }
-        typeof(LoadImageURLModule).GetField("m_textureManager", BindingFlags.NonPublic | BindingFlags.Instance)
+        GetRequiredField(typeof(LoadImageURLModule), "m_textureManager", BindingFlags.NonPublic | BindingFlags.Instance)
             .SetValue(module, textures);
 
         Assert.True(module.AsyncConvertUrl(UUID.Random(), url, ""), "the early check should have let the load start");
         Assert.True(textures.Returned.Task.Wait(Limit), "the loader never returned a result");
     }
+
+    private static FieldInfo GetRequiredField(Type type, string name, BindingFlags flags) =>
+        type.GetField(name, flags) ?? throw new MissingFieldException(type.FullName, name);
 
     [Fact]
     public void ImageUrlLoaderRefusesAHostThatTurnsBlockedAtTheConnect()

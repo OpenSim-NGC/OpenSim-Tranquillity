@@ -3855,7 +3855,7 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
                         instruction = tryAgainContactOwner;
                         break;
                     default:
-                        m_log.LogError("[GLOEBITMONEYMODULE] alertUsersTransactionPreparationFailure: Unimplemented failure TransactionPrecheckFailure [{0}] TransactionType.", failure, typeID);
+                        m_log.LogError("[GLOEBITMONEYMODULE] alertUsersTransactionPreparationFailure: Unimplemented failure TransactionPrecheckFailure [{0}] TransactionType {1}.", failure, typeID);
                         break;
                 }
                 break;
@@ -3882,7 +3882,7 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
                         instruction = String.Format("If you would like Gloebit to prioritize this functionality, please contact {0}.", m_contactGloebit);
                         break;
                     default:
-                        m_log.LogError("[GLOEBITMONEYMODULE] alertUsersTransactionPreparationFailure: Unimplemented failure TransactionPrecheckFailure [{0}] TransactionType.", failure, typeID);
+                        m_log.LogError("[GLOEBITMONEYMODULE] alertUsersTransactionPreparationFailure: Unimplemented failure TransactionPrecheckFailure [{0}] TransactionType {1}.", failure, typeID);
                         break;
                 }
                 break;
