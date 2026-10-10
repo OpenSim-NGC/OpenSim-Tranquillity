@@ -369,35 +369,35 @@ public class NotecardFloodTests
 
     // 2d again, on the engine's own clock: a script asleep for its read delay is lapped by the others, which read from the
     // cache without sleeping (the virtual clock above stands still while any script can run, so it never shows this).
+    // Three rounds, as which readers are lapped changes from run to run. Every reader reaches EOF.
     [Fact]
     public void EightReadersOfTheSameNotecardInOnePrimOnTheRealClock()
     {
-        var r = new Rig(realClock: true);
-        using (r)
+        for (int round = 1; round <= 3; round++)
         {
-            AddNotecard(r.H, r.H.Prim, "card", Card(200));
-            string[] tags = Enumerable.Range(1, 8).Select(i => "r" + i).ToArray();
-            foreach (string t in tags) r.Rez(r.H.Prim, t, Reader(t, report: true));
-            Assert.True(r.Started(tags), string.Join(" | ", r.H.Said));
-            r.Say("go");
-            r.RunUntil(() => tags.All(t => r.Last(t).Eofs >= 1), 30_000);
-            r.RunUntil(() => false, 2_000);
-            var c = tags.ToDictionary(t => t, t => r.Last(t));
-            Report("2d eight readers, same card, real clock", c);
-            foreach (string t in tags)
-                foreach (string l in r.FullLines(r.Tags.First(k => k.Value == t).Key).Take(2)) _out.WriteLine("  " + t + ": " + l);
-            // What the timing may change, run to run, is which readers lose an answer; what it may not change is that a
-            // reader that stopped short lost one to a full queue, that no queue went past its limit by more than the
-            // events queued without limit, and that no script got more answers than were sent.
-            foreach (string t in tags)
+            var r = new Rig(realClock: true);
+            using (r)
             {
-                Assert.True(c[t].Evs <= 8 * 201, t + " got more answers than were sent: " + c[t]);
-                Assert.True(c[t].MaxDepth <= 64 + 8, t + " queue went past its limit: " + c[t]);
-                if (c[t].Own < 201) Assert.True(c[t].Dropped >= 1, t + " stopped short without a drop: " + c[t]);
+                AddNotecard(r.H, r.H.Prim, "card", Card(200));
+                string[] tags = Enumerable.Range(1, 8).Select(i => "r" + i).ToArray();
+                foreach (string t in tags) r.Rez(r.H.Prim, t, Reader(t, report: true));
+                Assert.True(r.Started(tags), string.Join(" | ", r.H.Said));
+                r.Say("go");
+                r.RunUntil(() => tags.All(t => r.Last(t).Eofs >= 1), 30_000);
+                r.RunUntil(() => false, 2_000);
+                var c = tags.ToDictionary(t => t, t => r.Last(t));
+                Report("2d eight readers, same card, real clock, round " + round, c);
+                foreach (string t in tags)
+                    foreach (string l in r.FullLines(r.Tags.First(k => k.Value == t).Key).Take(2)) _out.WriteLine("  " + t + ": " + l);
+                foreach (string t in tags)
+                {
+                    Assert.True(c[t].Evs <= 8 * 201, t + " got more answers than were sent: " + c[t]);
+                    Assert.True(c[t].MaxDepth <= 64 + 8, t + " queue went past its limit: " + c[t]);
+                    Assert.True(c[t].Eofs >= 1 && c[t].Own >= 201, "round " + round + ": " + t + " did not reach EOF: " + c[t]);
+                }
             }
         }
     }
-
     // 2e
     [Fact]
     public void FourPrimsEachWithTwoReadersTakeOnlyTheirOwnPrimsAnswers()
@@ -505,11 +505,11 @@ public class NotecardFloodTests
         }
     }
 
-    // 2j: a fast reader that never stops beside a reader that spends 50 ms per line. SL's queue rule (64 waiting: new
-    // events discarded) applies to the slow reader's own answer too, so its chain of requests ends at the first one dropped.
-    // Pins what happens now; it is not a statement that it is wanted.
+    // 2j: a fast reader that never stops beside a reader that spends 50 ms per line. The slow reader's queue fills with the
+    // fast reader's answers to requests that are not its own; those are dropped at half the limit, so its own answers still
+    // fit and it reaches EOF.
     [Fact]
-    public void ASlowReaderBesideAFastRestartingReaderLosesItsOwnAnswerAndStops()
+    public void ASlowReaderBesideAFastRestartingReaderStillReachesEof()
     {
         var r = new Rig();
         using (r)
@@ -522,17 +522,15 @@ public class NotecardFloodTests
             r.RunUntil(() => false, 60_000, 180);
             var c = new Dictionary<string, Counts> { ["F"] = r.Last("F"), ["S"] = r.Last("S") };
             Report("2j fast restarting reader F beside slow reader S (50 ms a line), 60 s", c);
-            foreach (string t in new[] { "F", "S" })
-                foreach (string l in r.FullLines(r.Tags.First(k => k.Value == t).Key).Take(3)) _out.WriteLine("  " + l);
-            Assert.True(c["S"].MaxDepth >= 64, "the slow reader's queue never filled: " + c["S"]);
-            Assert.True(c["S"].Dropped >= 1, "nothing dropped for the slow reader: " + c["S"]);
-            Assert.Equal(0, c["S"].Eofs);
-            Assert.True(c["S"].Reqs < 201, "the slow reader went on asking: " + c["S"]);
+            UUID s = r.Tags.First(k => k.Value == "S").Key;
+            _out.WriteLine("  S: other scripts' answers dropped " + SavedStateRig.Exe(r.H).OtherAnswersDropped(s));
+            Assert.True(c["S"].Eofs >= 1, "the slow reader never reached EOF: " + c["S"]);
+            Assert.True(c["S"].Own >= 201, "the slow reader lost an answer of its own: " + c["S"]);
+            Assert.True(c["S"].MaxDepth <= 64, "the slow reader's queue went past its limit: " + c["S"]);
             Assert.True(c["F"].Eofs > 1, "the fast reader did not keep reading: " + c["F"]);
             Assert.Equal(0, c["F"].Dropped);
         }
     }
-
     // 2i
     [Fact]
     public void EofAndOtherEdgesOfALineRead()
@@ -575,6 +573,196 @@ public class NotecardFloodTests
             Assert.Contains("R embedded 1 EOF", r.H.Said);
             Assert.Contains("R embedded 5 EOF", r.H.Said);
         }
+    }
+
+    private const string LinkCounter = @"
+        integer ticks;
+        default {
+            state_entry() { llListen(7, """", NULL_KEY, """"); llSetTimerEvent(1.0); llSay(0, ""L entry""); }
+            timer() { ++ticks; llMessageLinked(LINK_THIS, 0, ""tick"", NULL_KEY); }
+            listen(integer c, string n, key k, string m) { if (m == ""tstop"") { llSetTimerEvent(0.0); llSay(0, ""L ticks "" + (string)ticks); } }
+        }";
+
+    // Eight readers restarting at EOF, one of them slow, and one link message a second to every script: every one arrives.
+    [Fact]
+    public void EveryLinkMessageArrivesBesideEightReaders()
+    {
+        var r = new Rig();
+        using (r)
+        {
+            AddNotecard(r.H, r.H.Prim, "card", Card(200));
+            string[] tags = { "F1", "F2", "F3", "F4", "F5", "F6", "F7", "S" };
+            foreach (string t in tags)
+                r.Rez(r.H.Prim, t, Reader(t, restart: true, linkCount: true, sleepPerLine: t == "S" ? 0.5 : 0));
+            r.Rez(r.H.Prim, "L", LinkCounter);
+            Assert.True(r.Started(tags.Append("L")), string.Join(" | ", r.H.Said));
+            r.Say("go");
+            r.RunUntil(() => false, 20_000, 180);
+            Assert.True(r.RunUntil(() => { if (r.Now % 100 == 0) r.Say("tstop"); return r.H.Said.Any(s => s.StartsWith("L ticks ")); }, 5_000));
+            int ticks = int.Parse(r.H.Said.First(s => s.StartsWith("L ticks ")).Split(' ')[2]);
+            var c = r.Finish(tags);
+            Report($"eight readers, one slow, {ticks} link messages sent to each", c);
+            foreach (var kv in c) Assert.True(kv.Value.Links == ticks, kv.Key + " got " + kv.Value.Links + " of " + ticks + " link messages: " + kv.Value);
+        }
+    }
+
+    // A script that asks for 200 lines in one handler, without waiting for an answer: its own answers keep the whole limit.
+    [Fact]
+    public void AScriptsOwnAnswersToTwoHundredRequestsAreStillLimitedAt64()
+    {
+        var r = new Rig();
+        using (r)
+        {
+            AddNotecard(r.H, r.H.Prim, "card", Card(200));
+            r.Rez(r.H.Prim, "A", @"
+                integer got;
+                default {
+                    state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""A entry""); }
+                    listen(integer c, string n, key k, string m) {
+                        if (m == ""flood"") { integer i; for (i = 0; i < 200; i++) llGetNotecardLine(""card"", i); }
+                        else if (m == ""count"") llSay(0, ""A evs "" + (string)got);
+                    }
+                    dataserver(key id, string d) { got++; }
+                }");
+            Assert.True(r.Started(new[] { "A" }));
+            r.Say("flood");
+            r.RunUntil(() => false, 5_000);
+            r.RunUntil(() => false, 61_000);   // the drop run ends and writes its rest
+            r.Say("count");
+            Assert.True(r.RunUntil(() => r.H.Said.Any(s => s.StartsWith("A evs ")), 10_000));
+            UUID a = r.Tags.First(k => k.Value == "A").Key;
+            int got = int.Parse(r.H.Said.Last(s => s.StartsWith("A evs ")).Split(' ')[2]);
+            long others = SavedStateRig.Exe(r.H).OtherAnswersDropped(a);
+            _out.WriteLine($"  A: received {got}, highest depth {r.MaxDepthOf("A")}, dropped {r.Dropped(a)}, other scripts' answers dropped {others}");
+            Assert.InRange(got, 64, 70);
+            Assert.True(r.MaxDepthOf("A") <= 66, "the queue went past its limit");
+            Assert.True(r.Dropped(a) >= 120, "its own answers were not limited at 64: dropped " + r.Dropped(a));
+            Assert.Equal(0, others);
+        }
+    }
+
+    private const string SleeperScript = @"
+        default {
+            state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""S entry""); }
+            listen(integer c, string n, key k, string m) { if (m == ""sleep"") llSleep(100000.0); }
+            dataserver(key id, string d) { }
+        }";
+
+    /// <summary>A script put to sleep (the clock stands still), so what is posted to it stays queued.</summary>
+    private static UUID AsleepScript(Rig r)
+    {
+        UUID s = r.Rez(r.H.Prim, "S", SleeperScript);
+        Assert.True(r.Started(new[] { "S" }));
+        r.Say("sleep");
+        Assert.True(r.H.PumpUntil(() => r.H.RunStateOf(s) == "Sleeping"), "the script did not go to sleep: " + r.H.RunStateOf(s));
+        r.H.PumpUntilIdle(TimeSpan.FromSeconds(5));   // whatever was on its way to the queue has landed
+        return s;
+    }
+
+    private static int Depth(Rig r, UUID s) => SavedStateRig.Exe(r.H).GetStatus(s).QueuedEvents;
+
+    // Another script's answer is queued while the queue holds under 32 events and dropped from 32 on.
+    [Fact]
+    public void AnotherScriptsAnswersAreQueuedOnlyWhileTheQueueIsUnderHalfItsLimit()
+    {
+        var r = new Rig();
+        using (r)
+        {
+            UUID s = AsleepScript(r);
+            UUID other = UUID.Random();
+            int baseline = Depth(r, s);
+            for (int i = 0; i < 40; i++) r.H.Engine.PostDataserverToPrim(r.H.Prim, UUID.Zero, other, "q" + i, "x");
+            var exe = SavedStateRig.Exe(r.H);
+            Assert.True(r.H.PumpUntil(() => Depth(r, s) >= 32 || Depth(r, s) == baseline + 40), "depth " + Depth(r, s));
+            r.H.PumpUntilIdle(TimeSpan.FromSeconds(5));
+            _out.WriteLine($"  depth {Depth(r, s)}, other scripts' answers dropped {exe.OtherAnswersDropped(s)}, queue-full lines {r.FullLines(s).Length}");
+            Assert.Equal(32, Depth(r, s));
+            Assert.Equal(40 - (32 - baseline), exe.OtherAnswersDropped(s));
+            Assert.Equal(40 - (32 - baseline), exe.GetStatus(s).OtherAnswersDropped);
+            Assert.Empty(r.FullLines(s));
+        }
+    }
+
+    // The asker's own answer is never marked, so it is queued past 32, up to 64.
+    [Fact]
+    public void TheAskersOwnAnswerIsQueuedPastHalfTheLimit()
+    {
+        var r = new Rig();
+        using (r)
+        {
+            UUID s = AsleepScript(r);
+            int baseline = Depth(r, s);
+            for (int i = 0; i < 40; i++) r.H.Engine.PostDataserverToPrim(r.H.Prim, UUID.Zero, s, "q" + i, "x");
+            Assert.True(r.H.PumpUntil(() => Depth(r, s) >= baseline + 40));
+            r.H.PumpUntilIdle(TimeSpan.FromSeconds(5));
+            Assert.Equal(baseline + 40, Depth(r, s));
+            Assert.Equal(0, SavedStateRig.Exe(r.H).OtherAnswersDropped(s));
+        }
+    }
+
+    // A dataserver event that answers no script's request (an object message, for one) is not another script's answer.
+    [Fact]
+    public void ADataserverEventThatAnswersNoRequestIsNotTreatedAsAnotherScriptsAnswer()
+    {
+        var r = new Rig();
+        using (r)
+        {
+            UUID s = AsleepScript(r);
+            int baseline = Depth(r, s);
+            for (int i = 0; i < 40; i++)
+                r.H.Engine.PostObjectEvent(r.H.Prim.LocalId,
+                    new OpenSim.Region.ScriptEngine.Shared.EventParams("dataserver", new object[] { "m" + i, "x" },
+                        new OpenSim.Region.ScriptEngine.Shared.DetectParams[0]));
+            Assert.True(r.H.PumpUntil(() => Depth(r, s) >= baseline + 40));
+            r.H.PumpUntilIdle(TimeSpan.FromSeconds(5));
+            Assert.Equal(baseline + 40, Depth(r, s));
+            Assert.Equal(0, SavedStateRig.Exe(r.H).OtherAnswersDropped(s));
+        }
+    }
+
+    // At 64 the drops are reported as before; another script's answer at that depth is counted, not warned about.
+    [Fact]
+    public void DropsAt64AreReportedAsBeforeAndOtherScriptsAnswersAreOnlyCounted()
+    {
+        var r = new Rig();
+        using (r)
+        {
+            UUID s = AsleepScript(r);
+            int baseline = Depth(r, s);
+            for (int i = 0; i < 64 - baseline; i++) r.H.Engine.PostDataserverToPrim(r.H.Prim, UUID.Zero, s, "q" + i, "x");
+            Assert.True(r.H.PumpUntil(() => Depth(r, s) >= 64));
+            for (int i = 0; i < 5; i++) r.H.Engine.PostDataserverToPrim(r.H.Prim, UUID.Zero, UUID.Random(), "o" + i, "x");
+            for (int i = 0; i < 3; i++) r.H.Engine.PostDataserverToPrim(r.H.Prim, UUID.Zero, s, "p" + i, "x");
+            Assert.True(r.H.PumpUntil(() => SavedStateRig.Exe(r.H).OtherAnswersDropped(s) >= 5 && r.Dropped(s) >= 3));
+            Assert.Equal(64, Depth(r, s));
+            Assert.Equal(5, SavedStateRig.Exe(r.H).OtherAnswersDropped(s));
+            Assert.Equal(3, r.Dropped(s));
+            Assert.Single(r.FullLines(s));
+            Assert.Contains("dropped 3 DATASERVER events", r.FullLines(s)[0]);
+        }
+    }
+
+    // The mark is not saved with a queued event.
+    [Fact]
+    public void TheMarkIsNotSavedWithAQueuedEvent()
+    {
+        var marked = new global::InWorldz.Phlox.VM.PostedEvent
+        {
+            EventType = global::InWorldz.Phlox.Types.SupportedEventList.Events.DATASERVER,
+            Args = new object[] { "query", "data" },
+            AnswersOtherScript = true,
+        };
+        var plain = new global::InWorldz.Phlox.VM.PostedEvent { EventType = marked.EventType, Args = new object[] { "query", "data" } };
+        byte[] Bytes(global::InWorldz.Phlox.VM.PostedEvent e)
+        {
+            using var ms = new System.IO.MemoryStream();
+            ProtoBuf.Serializer.Serialize(ms, global::InWorldz.Phlox.Serialization.SerializedPostedEvent.FromPostedEvent(e));
+            return ms.ToArray();
+        }
+        Assert.Equal(Bytes(plain), Bytes(marked));
+        // A restored event is built from the saved fields alone, so it comes back unmarked.
+        Assert.Equal(typeof(global::InWorldz.Phlox.Serialization.SerializedPostedEvent).GetFields().Length,
+            typeof(global::InWorldz.Phlox.Serialization.SerializedPostedEvent).GetFields().Count(f => f.Name != "AnswersOtherScript"));
     }
 
     /// <summary>A notecard asset in the form the viewer saves it, with one embedded item.</summary>

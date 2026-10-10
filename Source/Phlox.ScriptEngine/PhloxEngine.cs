@@ -476,6 +476,7 @@ namespace Phlox.ScriptEngine
             if (st.TerminatedReason is not null)
                 o.Output(TerminatedLine(st.TerminatedReason));
             o.Output($"  queued events : {st.QueuedEvents}");
+            o.Output($"  other scripts' dataserver answers dropped (queue at half its limit): {st.OtherAnswersDropped}");
             o.Output($"  LSL state     : {st.LslState}");
             o.Output($"  timer         : {(st.TimerIntervalMs > 0 ? st.TimerIntervalMs + " ms" : "not set")}");
             o.Output($"  region mask   : part.ScriptEvents={part?.ScriptEvents.ToString() ?? "(no part)"}");
@@ -1532,6 +1533,10 @@ namespace Phlox.ScriptEngine
 
         /// <summary>The same, with a completion callback the scheduler fires when the event is done with.</summary>
         public bool PostScriptEvent(UUID itemID, EventParams parms, Action completed)
+            => PostScriptEvent(itemID, parms, completed, answersOtherScript: false);
+
+        /// <param name="answersOtherScript">A dataserver answer to a request another script of the prim made (see PostedEvent).</param>
+        internal bool PostScriptEvent(UUID itemID, EventParams parms, Action completed, bool answersOtherScript)
         {
             if (m_ExeScheduler == null) return false;
 
@@ -1545,7 +1550,8 @@ namespace Phlox.ScriptEngine
                 EventType = (InWorldz.Phlox.Types.SupportedEventList.Events)eventInfo.TableIndex,
                 Args = ToPhloxArgs(parms.Params),
                 DetectVars = detectVars,
-                Completed = completed
+                Completed = completed,
+                AnswersOtherScript = answersOtherScript
             };
             evt.Normalize();
             if (parms is GrabUpdateParams) m_ExeScheduler.PostGrabUpdate(itemID, evt);
@@ -1881,7 +1887,7 @@ namespace Phlox.ScriptEngine
         /// dataserver posts (LSLString key, LSLString data); each posts only to its own scripts in that prim (the
         /// shape of AsyncCommand/Plugins/HttpRequest.cs). Returns how many Phlox scripts it was posted to.
         /// </summary>
-        internal int PostDataserverToPrim(SceneObjectPart part, UUID skip, string queryId, string data)
+        internal int PostDataserverToPrim(SceneObjectPart part, UUID skip, UUID asker, string queryId, string data)
         {
             if (part?.ParentGroup == null || part.ParentGroup.IsDeleted) return 0;
 
@@ -1902,7 +1908,9 @@ namespace Phlox.ScriptEngine
             foreach (TaskInventoryItem item in scripts)
             {
                 if (item.ItemID == skip || !HasOrIsLoading(item.ItemID)) continue;
-                if (PostScriptEvent(item.ItemID, new EventParams("dataserver", new object[] { queryId, data }, new DetectParams[0])))
+                // Another script's answer is marked here, once, as it is posted: the asker's own never is.
+                if (PostScriptEvent(item.ItemID, new EventParams("dataserver", new object[] { queryId, data }, new DetectParams[0]),
+                        null, answersOtherScript: item.ItemID != asker))
                     posted++;
             }
 

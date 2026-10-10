@@ -23,6 +23,13 @@ namespace InWorldz.Phlox.VM
         /// </summary>
         public Action Completed;
 
+        /// <summary>
+        /// A dataserver answer to a request that another script of the prim made, decided when it is posted. The
+        /// scheduler queues such an answer only while the script's queue is under half its limit. Never serialized: a
+        /// restored event is not marked.
+        /// </summary>
+        public bool AnswersOtherScript;
+
         public void SignalCompleted()
         {
             Action c = Completed;

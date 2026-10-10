@@ -18762,7 +18762,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             // Every other script in the prim gets it all the same (SL: "all scripts within the same prim
             // where the request was made"; the wiki says nothing of a reset, state change or removal in between).
             bool owed = m_PendingDataserver.TryRemove(queryID, out _);
-            m_ScriptEngine?.PostDataserverToPrim(m_host, owed ? UUID.Zero : m_itemID, queryID.ToString(), data);
+            m_ScriptEngine?.PostDataserverToPrim(m_host, owed ? UUID.Zero : m_itemID, m_itemID, queryID.ToString(), data);
         }
 
         private static readonly byte[] NotecardTextLengthMarker = Encoding.ASCII.GetBytes("\nText length ");
