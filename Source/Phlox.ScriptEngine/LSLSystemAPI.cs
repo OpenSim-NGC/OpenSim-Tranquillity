@@ -2205,19 +2205,13 @@ namespace Phlox.ScriptEngine
             if ((status & STATUS_SANDBOX) != 0)
                 m_host.SetStatusSandbox(on);   // As YEngine
 
-            // Rotation axis locks — byte bitmask: bit0=X, bit1=Y, bit2=Z
-            if ((status & (STATUS_ROTATE_X | STATUS_ROTATE_Y | STATUS_ROTATE_Z)) != 0)
-            {
-                byte locks = m_host.RotationAxisLocks;
-                if ((status & STATUS_ROTATE_X) != 0)
-                    locks = on ? (byte)(locks & ~0x01) : (byte)(locks | 0x01);
-                if ((status & STATUS_ROTATE_Y) != 0)
-                    locks = on ? (byte)(locks & ~0x02) : (byte)(locks | 0x02);
-                if ((status & STATUS_ROTATE_Z) != 0)
-                    locks = on ? (byte)(locks & ~0x04) : (byte)(locks | 0x04);
-                m_host.RotationAxisLocks = locks;
-                m_host.PhysActor?.LockAngularMotion(locks);
-            }
+            // Rotation axis locks, as YEngine (LSL_Api.cs:1583-1585): the root's RotationAxisLocks hold the
+            // STATUS_ROTATE_X/Y/Z bits themselves (0x02, 0x04, 0x08; SceneObjectGroup.axisSelect), which core and
+            // the physics engines read, and status is an object attribute (SL: "all prims in an object share the
+            // same status"), so a child prim's call locks the object.
+            int axes = status & (STATUS_ROTATE_X | STATUS_ROTATE_Y | STATUS_ROTATE_Z);
+            if (axes != 0)
+                group.SetAxisRotation(axes, on ? 1 : 0);
         }
 
         /// <summary>
@@ -2261,11 +2255,9 @@ namespace Phlox.ScriptEngine
                 case STATUS_RETURN_AT_EDGE:
                     return m_host.GetReturnAtEdge() ? 1 : 0;   // YEngine LSL_Api.cs:1649
                 case STATUS_ROTATE_X:
-                    return (m_host.RotationAxisLocks & 0x01) == 0 ? 1 : 0;
                 case STATUS_ROTATE_Y:
-                    return (m_host.RotationAxisLocks & 0x02) == 0 ? 1 : 0;
                 case STATUS_ROTATE_Z:
-                    return (m_host.RotationAxisLocks & 0x04) == 0 ? 1 : 0;
+                    return m_host.GetAxisRotation(status);   // the root's locks, as YEngine LSL_Api.cs:1650-1652
                 default:
                     return 0;
             }
