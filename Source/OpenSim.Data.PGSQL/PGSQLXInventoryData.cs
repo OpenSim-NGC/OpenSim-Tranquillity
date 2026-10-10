@@ -144,7 +144,7 @@ public class PGSQLItemHandler : PGSQLInventoryHandler<XInventoryItem>
         {
             using (NpgsqlCommand cmd = new NpgsqlCommand())
             {
-                cmd.CommandText = $"update {m_Realm} set parentFolderID = :ParentFolderID where inventoryID = :InventoryID";
+                cmd.CommandText = $"update {m_Realm} set \"parentFolderID\" = :ParentFolderID where \"inventoryID\" = :InventoryID";
                 cmd.Parameters.Add(m_database.CreateParameter("ParentFolderID", newParent));
                 cmd.Parameters.Add(m_database.CreateParameter("InventoryID", id ));
                 cmd.Connection = conn;
