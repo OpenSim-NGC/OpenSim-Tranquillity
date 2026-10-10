@@ -329,7 +329,7 @@ namespace Phlox.ScriptEngine
                         ShoutError("Notecard '" + cardName + "' could not be found.");
                         return;
                     }
-                    var card = new PhloxNotecardCache.Card(StripNotecardHeader(asset.Data));
+                    var card = new PhloxNotecardCache.Card(HasEmbeddedItems(asset.Data) ? string.Empty : StripNotecardHeader(asset.Data));
                     cache?.Cache(assetId, card);
                     PostDataserverEvent(queryID, answer(card));
                 }
@@ -18766,6 +18766,24 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         private static readonly byte[] NotecardTextLengthMarker = Encoding.ASCII.GetBytes("\nText length ");
+
+        private static readonly byte[] NotecardEmbeddedItemsMarker = Encoding.ASCII.GetBytes("Linden text version 2\n{\nLLEmbeddedItems version 1\n{\ncount ");
+
+        /// <summary>
+        /// Does the notecard asset carry embedded inventory items? SL llGetNotecardLine: "If notecard contains embedded
+        /// inventory items (such as textures and landmarks), EOF will be returned". The core's reader for YEngine
+        /// (SLUtil.ParseNotecardToArray) also gives such a notecard no lines.
+        /// </summary>
+        private static bool HasEmbeddedItems(byte[] data)
+        {
+            if (data == null || data.Length <= NotecardEmbeddedItemsMarker.Length) return false;
+            if (!data.AsSpan().StartsWith(NotecardEmbeddedItemsMarker)) return false;
+            int i = NotecardEmbeddedItemsMarker.Length;
+            int count = 0;
+            for (; i < data.Length && data[i] >= (byte)'0' && data[i] <= (byte)'9' && count < 100000; i++)
+                count = count * 10 + (data[i] - (byte)'0');
+            return count != 0;
+        }
 
         /// <summary>
         /// The text of a notecard asset, without the header before it and the "}" after it. "Text length N" counts
