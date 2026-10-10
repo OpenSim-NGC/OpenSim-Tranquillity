@@ -418,13 +418,28 @@ namespace Phlox.ScriptEngine
             // half way and left every derezzed script loaded.
             var inventory = m_host?.TaskInventory;
             if (inventory == null) return null;
-            lock (inventory)
+            // The read lock the core's inventory writers take (SceneObjectPartInventory.AddInventoryItem,
+            // RemoveInventoryItem: LockItemsForWrite), not a monitor on the dictionary, which no writer takes: a script
+            // added or removed on another thread during the read broke it with "Collection was modified".
+            // The core calls into this engine while it holds that lock (HasScript, OnRemoveScript, changed() posts);
+            // none of those paths reaches here, and the only lock held when this is called is m_permRequestLock,
+            // which nothing takes under the inventory lock.
+            try
             {
-                foreach (var kvp in inventory)
-                    if (kvp.Value.Type == 10 && kvp.Value.ItemID == m_itemID)
-                        return kvp.Value;
+                inventory.LockItemsForRead(true);
+                try
+                {
+                    return inventory.TryGetValue(m_itemID, out TaskInventoryItem item) && item.Type == 10 ? item : null;
+                }
+                finally
+                {
+                    inventory.LockItemsForRead(false);
+                }
             }
-            return null;
+            catch (Exception e) when (e is ObjectDisposedException || e is NullReferenceException)
+            {
+                return null;   // The part's inventory was disposed (the object was derezzed) after it was read above
+            }
         }
 
         // ── Lifecycle ──────────────────────────────────────────────────────────
@@ -4462,7 +4477,15 @@ namespace Phlox.ScriptEngine
             else
             {
                 UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
-                if (acct != null) name = acct.FirstName + " " + acct.LastName;
+                if (acct == null)
+                {
+                    // SL wiki llRequestUsername: "If id is not the UUID of an avatar, the dataserver event is not raised."
+                    // llRequestDisplayName: "If the request fails for any reason, there will be no error notice or
+                    // dataserver event." The query is owed nothing any more.
+                    m_PendingDataserver.TryRemove(requestID, out _);
+                    return;
+                }
+                name = acct.FirstName + " " + acct.LastName;
             }
 
             PostDataserverEvent(requestID, name);

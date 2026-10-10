@@ -608,7 +608,8 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   deliver to an avatar elsewhere or offline.
 - `llGetUsername` returns "First Last" where YEngine returns "first.last". Both answer only for
   an avatar the region holds (root or child agent), else `""`; `llRequestUsername` answers for
-  anyone.
+  any avatar with an account, here or not. For a key no account has, `llRequestUsername` and
+  `llRequestDisplayName` raise no dataserver event, as the SL wiki says of both.
 - `llManageEstateAccess` never bans the estate owner's partner, the partner named on the estate
   owner's profile, as Halcyon refused it: the call returns `FALSE`, nothing changes, and neither
   an IM nor an error is sent, as for the estate owner. When the estate owner's profile cannot be

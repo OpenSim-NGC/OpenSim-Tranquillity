@@ -2669,6 +2669,11 @@ namespace Phlox.ScriptEngine
             // with them, so a restore cannot bring back a listen of the state the script left.
             script.ScriptState.ActiveListens?.Clear();
 
+            // SL wiki State: on a state change the event queue is cleared. An arrival event still waiting for riders
+            // (m_HeldArrivals) has not reached the queue yet, but it is an event of the state the script left, and goes
+            // with the rest. Both run on this thread.
+            m_HeldArrivals.RemoveAll(held => held.ItemId == script.ItemId);
+
             // The queue is cleared, and with it what was posted to the script and not yet taken into the queue, which
             // would otherwise run in the old state's handler after the state statement. The API has already released
             // the listens and the sensor repeat (Interpreter.Op_StateChg runs it first), so what they posted is here.

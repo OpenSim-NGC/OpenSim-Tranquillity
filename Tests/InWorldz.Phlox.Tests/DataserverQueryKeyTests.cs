@@ -56,6 +56,38 @@ public class DataserverQueryKeyTests
     [Fact]
     public void RequestUsernameReturnsTheEventsKey() => Run(c => $"llRequestUsername(\"{c.AgentId}\")");
 
+    /// <summary>
+    /// SL wiki llRequestUsername: "If id is not the UUID of an avatar, the dataserver event is not raised."
+    /// llRequestDisplayName: "If the request fails for any reason, there will be no error notice or dataserver
+    /// event." The script asks about a key no account has, and only once that call has returned asks about an
+    /// avatar in the region. Events are queued in the order they are posted, so once the second answer has
+    /// arrived, an answer to the first can no longer come.
+    /// </summary>
+    private void NoEventForAKeyWithNoAccount(string fn)
+    {
+        using var h = new SchedulerHarness();
+        var client = h.AddClient();
+        string nobody = OpenMetaverse.UUID.Random().ToString();
+        h.RezScript("key q1; key q2; default { state_entry() { q1 = " + fn + "(\"" + nobody + "\"); llSay(0, \"asked \" + (string)q1); " +
+                    "q2 = " + fn + "(\"" + client.AgentId + "\"); } " +
+                    "dataserver(key id, string d) { if (id == q1) llSay(0, \"answer nobody data=\" + d); " +
+                    "else if (id == q2) llSay(0, \"answer avatar\"); } }");
+        var until = DateTime.UtcNow.AddSeconds(30);
+        while (!h.Said.Contains("answer avatar") && DateTime.UtcNow < until)
+            h.PumpFor(TimeSpan.FromMilliseconds(50));
+        var said = string.Join(" | ", h.Said);
+        _out.WriteLine(said);
+        Assert.True(h.Said.Any(s => s.StartsWith("asked ") && s != "asked " + OpenMetaverse.UUID.Zero), "no query key came back: " + said);
+        Assert.True(h.Said.Contains("answer avatar"), "the avatar's request was not answered: " + said);
+        Assert.DoesNotContain(h.Said, s => s.StartsWith("answer nobody"));
+    }
+
+    [Fact]
+    public void RequestUsernameRaisesNoEventForAKeyWithNoAccount() => NoEventForAKeyWithNoAccount("llRequestUsername");
+
+    [Fact]
+    public void RequestDisplayNameRaisesNoEventForAKeyWithNoAccount() => NoEventForAKeyWithNoAccount("llRequestDisplayName");
+
     // iwAvatarName2Key is not a dataserver request: as in Halcyon it returns the avatar's key
     // directly (AvatarName2KeyTests).
 }
