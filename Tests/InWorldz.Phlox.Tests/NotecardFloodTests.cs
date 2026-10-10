@@ -575,6 +575,27 @@ public class NotecardFloodTests
         }
     }
 
+    // SL gives no value for the number of lines of a notecard with embedded items; Phlox says 0, as YEngine does.
+    [Fact]
+    public void ANotecardWithEmbeddedItemsHasZeroLines()
+    {
+        var r = new Rig();
+        using (r)
+        {
+            AddEmbedded(r, "embedded", "one\ntwo");
+            r.Rez(r.H.Prim, "A", @"
+                key q;
+                default {
+                    state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""A entry""); }
+                    listen(integer c, string n, key k, string m) { q = llGetNumberOfNotecardLines(""embedded""); }
+                    dataserver(key id, string d) { if (id == q) llSay(0, ""lines "" + d); }
+                }");
+            Assert.True(r.Started(new[] { "A" }));
+            r.Say("go");
+            Assert.True(r.RunUntil(() => r.H.Said.Contains("lines 0"), 10_000), string.Join(" | ", r.H.Said));
+        }
+    }
+
     private const string LinkCounter = @"
         integer ticks;
         default {

@@ -20,8 +20,8 @@ namespace InWorldz.Phlox.Tests;
 /// part of its read: every reader finishes, with none of its own lines lost. SL (dataserver): "Dataserver requests
 /// will trigger dataserver events in all scripts within the same prim where the request was made", so every reader also
 /// gets every other reader's answers; SL (Category:LSL_Events): "If more that 64 events are waiting, new events are
-/// discarded until free slots become available." While the sleeper sleeps, the others' answers fill its queue and the
-/// rest of them are dropped; its own answer arrives straight after its own request and is kept.
+/// discarded until free slots become available." While the sleeper sleeps, the others' answers queue up to half its
+/// limit (32) and the rest of them are dropped; its own answer arrives straight after its own request and is kept.
 /// This guards the notecard read delays: with a 0.1 s pause after each read the others are still reading when the
 /// sleeper wakes, its own answer arrives while its queue is full of theirs, and its read stops.
 /// Time is the engine's clock, moved by the test when nothing can run (and, in the second model, after every busy pump

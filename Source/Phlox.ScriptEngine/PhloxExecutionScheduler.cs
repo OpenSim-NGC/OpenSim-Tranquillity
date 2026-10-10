@@ -1757,8 +1757,8 @@ namespace Phlox.ScriptEngine
                 d.Total++;
                 d.SinceLine++;
                 if (d.LastLineOn != 0 && now < d.LastLineOn + 60_000) return;
-                m_log.LogDebug("[PhloxExe]: Script {0} dropped {1} dataserver answer{2} to other scripts' requests: its queue held {3} or more events ({4} so far)",
-                    itemId, d.SinceLine, d.SinceLine == 1 ? "" : "s", OTHER_ANSWER_LIMIT, d.Total);
+                m_log.LogDebug("[PhloxExe]: Script {0}: {1} dataserver answers to other scripts' requests dropped since the last line, its queue held {2} or more events ({3} in all)",
+                    itemId, d.SinceLine, OTHER_ANSWER_LIMIT, d.Total);
                 d.SinceLine = 0;
                 d.LastLineOn = now;
             }

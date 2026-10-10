@@ -115,6 +115,11 @@ public class EventQueueDropLogTests : IDisposable
             state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""C entry""); }
             listen(integer c, string n, key k, string m) {
                 if (m == ""nap"") { llSay(0, ""C asleep""); llSleep(3.0); llSay(0, ""C woke""); }
+                else if (m == ""floodnap"") {
+                    integer i;
+                    for (i = 1; i <= 200; i++) llGetNotecardLine(""card"", i);
+                    llSay(0, ""C asleep""); llSleep(3.0); llSay(0, ""C woke"");
+                }
                 else if (m == ""count"") llSay(0, ""C got "" + (string)got);
             }
             dataserver(key id, string d) { got++; }
@@ -196,11 +201,11 @@ public class EventQueueDropLogTests : IDisposable
         Start(Asker, "A");
         UUID c = Start(Sleeper, "C");
         Warm();
-        Say("nap");
-        Assert.True(RunUntil(() => H.Said.Contains("C asleep")), Said);
+        // C asks for the 200 lines itself and then sleeps: its own answers fill its queue (the answers of another script's
+        // requests are queued only up to half the limit, so A's flood no longer does).
         ulong t0 = m_now;
-        Say("flood");
-        Assert.True(RunUntil(() => H.Said.Contains("A asked") && H.Engine.GetEventQueueFreeSpacePercentage(c) == 0.0f), Said);
+        Say("floodnap");
+        Assert.True(RunUntil(() => H.Said.Contains("C asleep") && H.Engine.GetEventQueueFreeSpacePercentage(c) == 0.0f), Said);
         RunUntil(() => false, 50);                                     // every answer posted has reached C
         Assert.Single(FullLines(c));                                   // the run's first line, at its start
         Assert.DoesNotContain("TOUCH_START", FullLines(c)[0]);
@@ -210,12 +215,11 @@ public class EventQueueDropLogTests : IDisposable
         RunTo(t0 + 61_000);
         _out.WriteLine(string.Join("\n", FullLines(c)));
         Assert.Equal(0, H.Said.Count(s => s == "C touched"));          // the touch was dropped, as before
-        // C's count includes the warm-up answer (every script in the prim gets it); of the 200 it kept 63, its "flood"
-        // chat line holding the 64th slot.
-        Assert.Equal(1 + 63, got);
+        // C's count includes the warm-up answer (every script in the prim gets it); of its own 200 it kept 64, the limit.
+        Assert.Equal(1 + 64, got);
         Assert.Equal(2, FullLines(c).Length);
         Assert.Contains("DATASERVER, 1 TOUCH_START events", FullLines(c)[1]);   // both kinds, on the minute's line
-        Assert.Equal(new Dictionary<string, int> { ["DATASERVER"] = 137, ["TOUCH_START"] = 1 }, Kinds(FullLines(c)));
+        Assert.Equal(new Dictionary<string, int> { ["DATASERVER"] = 136, ["TOUCH_START"] = 1 }, Kinds(FullLines(c)));
     }
 
     /// <summary>Two floods with a minute and more with no drop between them are two runs, each with its own lines.</summary>
@@ -250,17 +254,15 @@ public class EventQueueDropLogTests : IDisposable
         Start(Asker, "A");
         UUID c = Start(Sleeper, "C");
         Warm();
-        Say("nap");
-        Assert.True(RunUntil(() => H.Said.Contains("C asleep")), Said);
-        Say("flood");
-        Assert.True(RunUntil(() => H.Said.Contains("A asked") && H.Engine.GetEventQueueFreeSpacePercentage(c) == 0.0f), Said);
+        Say("floodnap");                                               // C's own answers fill its queue, as in the test above
+        Assert.True(RunUntil(() => H.Said.Contains("C asleep") && H.Engine.GetEventQueueFreeSpacePercentage(c) == 0.0f), Said);
         RunUntil(() => false, 50);
         Assert.Single(FullLines(c));                                   // the run's first line; its minute is not up
         H.Prim.Inventory.RemoveInventoryItem(c);
         Assert.True(RunUntil(() => FullLines(c).Length > 1, 1_000), "no line at unload");
         _out.WriteLine(string.Join("\n", FullLines(c)));
         Assert.Equal(2, FullLines(c).Length);
-        Assert.Equal(new Dictionary<string, int> { ["DATASERVER"] = 137 }, Kinds(FullLines(c)));
+        Assert.Equal(new Dictionary<string, int> { ["DATASERVER"] = 136 }, Kinds(FullLines(c)));
     }
 
     /// <summary>Asleep for 200 s from "nap"; a touch it would run when awake.</summary>
