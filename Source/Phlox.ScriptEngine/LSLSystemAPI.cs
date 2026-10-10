@@ -3136,6 +3136,15 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
+        /// The core took permissions from this script's item with no event run (EventManager.OnScriptPermissionsRemoved):
+        /// a stand-up or a detach ends CONTROL_CAMERA (SL llSetCameraParams, "automatically revoked when the avatar stands
+        /// up from or detaches the object") even from a script that took no controls. The state notes the item's grant as
+        /// it is now and the script is saved again, so its row does not keep the ended bits for a restart to give back.
+        /// Scheduler thread.
+        /// </summary>
+        internal void PermissionsRemovedByCore() => GrantChanged();
+
+        /// <summary>
         /// The object has a new owner. Halcyon clears every item's grant (ApplyNextOwnerPermissions, Rationalize) and so
         /// does the core (ChangeInventoryOwner), but neither lets go of controls the old grant took. A request the script
         /// was still waiting on under the old owner ends too. Scheduler thread.
@@ -5714,8 +5723,7 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// Give task items to a prim, or into a new folder named <paramref name="category"/> in an avatar's inventory.
-        /// Scene.MoveTaskInventoryItems gives up (UUID.Zero) for an avatar who is not in this region, so for one who is
-        /// elsewhere or offline the folder is made here and each item goes in by the no-client overload.
+        /// An avatar, here, elsewhere or offline, gets the list from Scene.MoveTaskInventoryItemsAllOrNone.
         /// </summary>
         private int GiveTaskItems(SceneObjectPart source, UUID destId, string category, List<UUID> itemIDs, out string failure)
         {
@@ -5725,9 +5733,10 @@ namespace Phlox.ScriptEngine
                 World.MoveTaskInventoryItems(destId, category, source, itemIDs);
                 return IW_DELIVER_OK;
             }
-            // Halcyon gives an avatar all of the list or none of it: an item that cannot be moved aborts the give with
-            // its reason (LSLSystemAPI.cs:8478-8501). Core's MoveTaskInventoryItems alerts per item and gives the rest, so
-            // the items are checked first, by its own rules (CreateAgentInventoryItemFromTask).
+            // An item that cannot be moved aborts the give with its reason, as in Halcyon (LSLSystemAPI.cs:8478-8501;
+            // its Scene.MoveTaskInventoryItems stopped at that item). Scene.MoveTaskInventoryItemsAllOrNone also gives
+            // nothing before it, and holds when the prim's inventory changes during the give. This check only keeps an
+            // item's reason ahead of the avatar's.
             foreach (UUID itemId in itemIDs)
             {
                 TaskInventoryItem item = source.Inventory.GetInventoryItem(itemId);
@@ -5742,40 +5751,19 @@ namespace Phlox.ScriptEngine
                     return IW_DELIVER_PERM;
                 }
             }
-            if (World.GetScenePresence(destId) != null)
-            {
-                UUID given = World.MoveTaskInventoryItems(destId, category, source, itemIDs);
-                if (given == UUID.Zero)
-                {
-                    failure = "the recipient's inventory could not be reached";
-                    return IW_DELIVER_USER;
-                }
-                // Halcyon offers the folder to a present avatar too, so the viewer shows the offer.
-                SendGiveNotice(source, destId, "'" + category + "'", given, (byte)AssetType.Folder);
-                return IW_DELIVER_OK;
-            }
-            if (!AvatarKnown(destId))
+            if (World.GetScenePresence(destId) == null && !AvatarKnown(destId))
             {
                 failure = "Can't find destination '" + destId + "'";
                 return IW_DELIVER_USER;
             }
-            InventoryFolderBase root = World.InventoryService.GetRootFolder(destId);
-            if (root == null)
+            UUID given = World.MoveTaskInventoryItemsAllOrNone(destId, category, source, itemIDs, out string reason);
+            if (given == UUID.Zero)
             {
-                failure = "the recipient's inventory could not be reached";
-                return IW_DELIVER_USER;
+                failure = reason;
+                return DeliverReasonToResult(reason);
             }
-            var folder = new InventoryFolderBase(UUID.Random(), category, destId, -1, root.ID, root.Version);
-            World.InventoryService.AddFolder(folder);
-            foreach (UUID itemId in itemIDs)
-            {
-                if (World.MoveTaskInventoryItem(destId, folder.ID, source, itemId, out string reason) == null)
-                {
-                    failure = reason;
-                    return DeliverReasonToResult(failure);
-                }
-            }
-            SendGiveNotice(source, destId, "'" + category + "'", folder.ID, (byte)AssetType.Folder);
+            // Halcyon offers the folder to a present avatar too, so the viewer shows the offer.
+            SendGiveNotice(source, destId, "'" + category + "'", given, (byte)AssetType.Folder);
             return IW_DELIVER_OK;
         }
 

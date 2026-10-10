@@ -552,6 +552,23 @@ public class EventManager
     public event ExperiencePermissionsRevoked OnExperiencePermissionsRevoked;
 
     /// <summary>
+    /// Triggered when the core takes permissions away from a script item without the script asking: the avatar
+    /// stood up from the object, detached it, used Release Keys, or revoked animation permissions from the viewer
+    /// (SceneObjectPartInventory.RemoveScriptsPermissions).
+    /// SL llSetCameraParams: "The PERMISSION_CONTROL_CAMERA permission is automatically revoked when the avatar stands
+    /// up from or detaches the object".
+    /// </summary>
+    /// <remarks>
+    /// Raised once per script item whose grant changed, after the item's PermsMask (and PermsGranter, when nothing is
+    /// left) have been updated and any taken controls released. removedMask holds the bits the item lost; granterId
+    /// is the avatar who had granted them. No script event is posted, so an engine that keeps the grant in its own
+    /// saved state can subscribe and note the change; an engine ignores items it does not run. Triggered by
+    /// <see cref="TriggerScriptPermissionsRemoved"/>.
+    /// </remarks>
+    public delegate void ScriptPermissionsRemoved(UUID partId, UUID itemId, UUID granterId, int removedMask);
+    public event ScriptPermissionsRemoved OnScriptPermissionsRemoved;
+
+    /// <summary>
     /// TODO: Should be triggered when a physics object starts moving.
     /// </summary>
     public delegate void ScriptMovingStartEvent(uint localID);
@@ -2626,6 +2643,27 @@ public class EventManager
                 {
                     m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerExperiencePermissionsRevoked failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerScriptPermissionsRemoved(UUID partId, UUID itemId, UUID granterId, int removedMask)
+    {
+        ScriptPermissionsRemoved handlerScriptPermissionsRemoved = OnScriptPermissionsRemoved;
+        if (handlerScriptPermissionsRemoved != null)
+        {
+            foreach (ScriptPermissionsRemoved d in handlerScriptPermissionsRemoved.GetInvocationList())
+            {
+                try
+                {
+                    d(partId, itemId, granterId, removedMask);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerScriptPermissionsRemoved failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
             }

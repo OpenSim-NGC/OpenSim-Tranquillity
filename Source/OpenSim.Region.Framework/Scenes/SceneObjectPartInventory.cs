@@ -877,6 +877,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         bool removeControl = ((permissions & 4) != 0); //takecontrol
         List<UUID> grants = new List<UUID>();
         List<UUID> items = new List<UUID>();
+        List<(UUID item, UUID granter, int removed)> removedGrants = new();
 
         permissions = ~permissions;
         foreach (TaskInventoryItem item in m_scripts.Values)
@@ -888,10 +889,13 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                 grants.Add(curGrant);
                 items.Add(item.ItemID);
             }
+            int oldmask = curmask;
             curmask &= permissions;
             item.PermsMask = curmask;
             if(curmask == 0)
                 item.PermsGranter = UUID.Zero;
+            if (curmask != oldmask)
+                removedGrants.Add((item.ItemID, curGrant, oldmask & ~curmask));
         }
         m_items.LockItemsForWrite(false);
 
@@ -904,6 +908,8 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                     presence.UnRegisterControlEventsToScript(m_part.LocalId, items[i]);
             }
         }
+
+        TriggerScriptPermissionsRemoved(removedGrants);
     }
 
     public void RemoveScriptsPermissions(ScenePresence sp, int permissions)
@@ -920,6 +926,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         List<UUID> items = new List<UUID>();
 
         permissions = ~permissions;
+        List<(UUID item, UUID granter, int removed)> removedGrants = new();
         foreach (TaskInventoryItem item in m_scripts.Values)
         {
                 if(grant != item.PermsGranter)
@@ -927,10 +934,13 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                 int curmask = item.PermsMask;
                 if (removeControl && ((curmask & 4) != 0))
                     items.Add(item.ItemID);
+                int oldmask = curmask;
                 curmask &= permissions;
                 item.PermsMask = curmask;
                 if(curmask == 0)
                     item.PermsGranter = UUID.Zero;
+                if (curmask != oldmask)
+                    removedGrants.Add((item.ItemID, grant, oldmask & ~curmask));
         }
         m_items.LockItemsForWrite(false);
 
@@ -942,6 +952,23 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                     sp.UnRegisterControlEventsToScript(m_part.LocalId, items[i]);
             }
         }
+
+        TriggerScriptPermissionsRemoved(removedGrants);
+    }
+
+    /// <summary>
+    /// Tell script engines which items lost which permissions (EventManager.OnScriptPermissionsRemoved). Called with
+    /// the inventory lock released.
+    /// </summary>
+    private void TriggerScriptPermissionsRemoved(List<(UUID item, UUID granter, int removed)> removedGrants)
+    {
+        if (removedGrants.Count == 0)
+            return;
+        EventManager events = m_part.ParentGroup?.Scene?.EventManager;
+        if (events is null)
+            return;
+        foreach ((UUID item, UUID granter, int removed) in removedGrants)
+            events.TriggerScriptPermissionsRemoved(m_part.UUID, item, granter, removed);
     }
 
     /// <summary>

@@ -116,7 +116,7 @@ namespace Phlox.ScriptEngine
 
         // Permission ends the scene reports (the core's release of controls on an avatar still here, a new
         // owner). Queued from region threads; EndPermissions runs here, on the scheduler thread, like every script call.
-        private struct PermsEndReq { public UUID ItemId; public UUID AgentId; public SceneObjectGroup Group; public bool ExperienceEnded; public UUID Experience; }
+        private struct PermsEndReq { public UUID ItemId; public UUID AgentId; public SceneObjectGroup Group; public bool ExperienceEnded; public UUID Experience; public bool PermsRemoved; }
         private readonly Queue<PermsEndReq> m_PermsEnds = new();
 
         /// <summary>What the parcel checks have done, for tests and the cost report.</summary>
@@ -2364,6 +2364,9 @@ namespace Phlox.ScriptEngine
         internal void RequestExperienceGrantEnded(UUID itemId, UUID agentId, UUID experience)
             => EnqueuePermsEnd(new PermsEndReq { ItemId = itemId, AgentId = agentId, ExperienceEnded = true, Experience = experience });
 
+        /// <summary>The core took permissions from a script's item with no event run (a stand-up, a detach, Release Keys).</summary>
+        internal void RequestPermissionsRemovedByCore(UUID itemId) => EnqueuePermsEnd(new PermsEndReq { ItemId = itemId, PermsRemoved = true });
+
         /// <summary>The object has a new owner.</summary>
         internal void RequestOwnerChanged(SceneObjectGroup group)
         {
@@ -2391,6 +2394,7 @@ namespace Phlox.ScriptEngine
                 {
                     if (!m_Apis.TryGetValue(req.ItemId, out LSLSystemAPI api)) continue;
                     if (req.ExperienceEnded) api.ExperienceGrantEndedByCore(req.AgentId, req.Experience);
+                    else if (req.PermsRemoved) api.PermissionsRemovedByCore();
                     else api.ControlsReleasedByCore(req.AgentId);
                     continue;
                 }
