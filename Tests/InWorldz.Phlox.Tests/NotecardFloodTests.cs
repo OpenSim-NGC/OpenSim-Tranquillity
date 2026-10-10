@@ -115,11 +115,15 @@ public class NotecardFloodTests
         public readonly Dictionary<UUID, string> Tags = new();
         private readonly Dictionary<UUID, int> m_maxDepth = new();
 
-        public Rig(Action<Nini.Config.IConfigSource> configure = null)
+        /// <summary>The engine's own clock (real time), as on a region; <see cref="RunUntil"/> then measures wall time.</summary>
+        public readonly bool RealClock;
+
+        public Rig(Action<Nini.Config.IConfigSource> configure = null, bool realClock = false)
         {
+            RealClock = realClock;
             m_previous = LoggerProvider.LoggerFactory;
             LoggerProvider.LoggerFactory = m_log;
-            Clock.SetSourceForTesting(() => Now);
+            if (!realClock) Clock.SetSourceForTesting(() => Now);
             H = new SchedulerHarness(configure);
         }
 
@@ -161,6 +165,17 @@ public class NotecardFloodTests
         /// </summary>
         public bool RunUntil(Func<bool> done, ulong maxClockMs, int wallSeconds = 120)
         {
+            if (RealClock)
+            {
+                var end = DateTime.UtcNow.AddMilliseconds(maxClockMs);
+                while (!done())
+                {
+                    if (DateTime.UtcNow >= end) return false;
+                    H.PumpOnceBusy();
+                    SampleDepth();
+                }
+                return true;
+            }
             ulong until = Now + maxClockMs;
             var wall = DateTime.UtcNow.AddSeconds(wallSeconds);
             while (!done())
@@ -214,8 +229,10 @@ public class NotecardFloodTests
         /// <summary>The counters a script's timer last said, with its depth and drops so far.</summary>
         public Counts Last(string tag)
         {
-            string[] w = H.Said.Last(s => s.StartsWith(tag + " evs ")).Split(' ');
+            string line = H.Said.LastOrDefault(s => s.StartsWith(tag + " evs "));
             UUID id = Tags.First(k => k.Value == tag).Key;
+            if (line == null) return new Counts { MaxDepth = MaxDepthOf(tag), Dropped = Dropped(id) };
+            string[] w = line.Split(' ');
             return new Counts { Evs = int.Parse(w[2]), Own = int.Parse(w[4]), Reqs = int.Parse(w[6]), Eofs = int.Parse(w[8]), Links = int.Parse(w[10]),
                 MaxDepth = MaxDepthOf(tag), Dropped = Dropped(id) };
         }
@@ -347,6 +364,37 @@ public class NotecardFloodTests
             Report("2d eight readers, same card", c);
             AllReachedEof(c, 200);
             foreach (var kv in c) Assert.Equal(0, kv.Value.Dropped);
+        }
+    }
+
+    // 2d again, on the engine's own clock: a script asleep for its read delay is lapped by the others, which read from the
+    // cache without sleeping (the virtual clock above stands still while any script can run, so it never shows this).
+    [Fact]
+    public void EightReadersOfTheSameNotecardInOnePrimOnTheRealClock()
+    {
+        var r = new Rig(realClock: true);
+        using (r)
+        {
+            AddNotecard(r.H, r.H.Prim, "card", Card(200));
+            string[] tags = Enumerable.Range(1, 8).Select(i => "r" + i).ToArray();
+            foreach (string t in tags) r.Rez(r.H.Prim, t, Reader(t, report: true));
+            Assert.True(r.Started(tags), string.Join(" | ", r.H.Said));
+            r.Say("go");
+            r.RunUntil(() => tags.All(t => r.Last(t).Eofs >= 1), 30_000);
+            r.RunUntil(() => false, 2_000);
+            var c = tags.ToDictionary(t => t, t => r.Last(t));
+            Report("2d eight readers, same card, real clock", c);
+            foreach (string t in tags)
+                foreach (string l in r.FullLines(r.Tags.First(k => k.Value == t).Key).Take(2)) _out.WriteLine("  " + t + ": " + l);
+            // What the timing may change, run to run, is which readers lose an answer; what it may not change is that a
+            // reader that stopped short lost one to a full queue, that no queue went past its limit by more than the
+            // events queued without limit, and that no script got more answers than were sent.
+            foreach (string t in tags)
+            {
+                Assert.True(c[t].Evs <= 8 * 201, t + " got more answers than were sent: " + c[t]);
+                Assert.True(c[t].MaxDepth <= 64 + 8, t + " queue went past its limit: " + c[t]);
+                if (c[t].Own < 201) Assert.True(c[t].Dropped >= 1, t + " stopped short without a drop: " + c[t]);
+            }
         }
     }
 
