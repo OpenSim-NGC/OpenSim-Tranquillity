@@ -50,9 +50,9 @@ public class BlockedOwnerEntryTests : OpenSimTestCase
     private static readonly UUID OtherId = new("e1c58b3a-4f97-42d0-b6e8-7a3c0d915f26");
     private static readonly Vector3 StartPos = new(128, 10, 20);
 
-    private TestScene m_sceneA;
-    private TestScene m_sceneB;
-    private BlockedOwnerModule m_moduleB;
+    private TestScene m_sceneA = null!;
+    private TestScene m_sceneB = null!;
+    private BlockedOwnerModule m_moduleB = null!;
 
     public override void SetUp()
     {
@@ -80,7 +80,7 @@ public class BlockedOwnerEntryTests : OpenSimTestCase
 
     // Starts a crossing from A to B and waits until A has finished with the object: it has left A, or the
     // crossing failed and A has ended the object's transit.
-    private (SceneObjectGroup inA, SceneObjectGroup inB) Cross(UUID owner, int tail)
+    private (SceneObjectGroup? inA, SceneObjectGroup? inB) Cross(UUID owner, int tail)
     {
         SceneObjectGroup so = SceneHelpers.AddSceneObject(m_sceneA, 1, owner, "crosser", tail);
         UUID id = so.UUID;
@@ -91,7 +91,7 @@ public class BlockedOwnerEntryTests : OpenSimTestCase
         Stopwatch sw = Stopwatch.StartNew();
         while (sw.Elapsed < TimeSpan.FromSeconds(20))
         {
-            SceneObjectGroup inA = m_sceneA.GetSceneObjectGroup(id);
+            SceneObjectGroup? inA = m_sceneA.GetSceneObjectGroup(id);
             if (inA is null || !inA.inTransit)
                 return (inA, m_sceneB.GetSceneObjectGroup(id));
             Thread.Sleep(50);
@@ -101,8 +101,8 @@ public class BlockedOwnerEntryTests : OpenSimTestCase
 
     private int EntryHandlerCount()
     {
-        FieldInfo f = typeof(ScenePermissions).GetField("OnObjectEntry", BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(f);
+        FieldInfo f = typeof(ScenePermissions).GetField("OnObjectEntry", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new MissingFieldException(typeof(ScenePermissions).FullName, "OnObjectEntry");
         return (f.GetValue(m_sceneB.Permissions) as Delegate)?.GetInvocationList().Length ?? 0;
     }
 
@@ -111,7 +111,7 @@ public class BlockedOwnerEntryTests : OpenSimTestCase
     {
         m_moduleB.Block(BlockedId);
 
-        (SceneObjectGroup inA, SceneObjectGroup inB) = Cross(BlockedId, 0x10);
+        (SceneObjectGroup? inA, SceneObjectGroup? inB) = Cross(BlockedId, 0x10);
 
         Assert.Null(inB);
         Assert.NotNull(inA);
@@ -125,7 +125,7 @@ public class BlockedOwnerEntryTests : OpenSimTestCase
     {
         m_moduleB.Block(BlockedId);
 
-        (SceneObjectGroup inA, SceneObjectGroup inB) = Cross(OtherId, 0x20);
+        (SceneObjectGroup? inA, SceneObjectGroup? inB) = Cross(OtherId, 0x20);
 
         Assert.Null(inA);
         Assert.NotNull(inB);
@@ -136,7 +136,7 @@ public class BlockedOwnerEntryTests : OpenSimTestCase
     {
         Assert.Equal(0, EntryHandlerCount());
 
-        (SceneObjectGroup inA, SceneObjectGroup inB) = Cross(BlockedId, 0x30);
+        (SceneObjectGroup? inA, SceneObjectGroup? inB) = Cross(BlockedId, 0x30);
 
         Assert.Null(inA);
         Assert.NotNull(inB);

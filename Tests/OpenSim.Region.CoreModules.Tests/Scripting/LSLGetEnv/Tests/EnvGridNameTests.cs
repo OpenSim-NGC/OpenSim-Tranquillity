@@ -40,7 +40,7 @@ namespace OpenSim.Region.CoreModules.Scripting.LSLGetEnv.Tests;
 /// </summary>
 public class EnvGridNameTests : OpenSimTestCase
 {
-    private static GridInfo Info(string gridName)
+    private static GridInfo Info(string? gridName)
     {
         IniConfigSource config = new IniConfigSource();
         if (gridName is not null)
@@ -74,6 +74,6 @@ public class EnvGridNameTests : OpenSimTestCase
         scene.SceneGridInfo = null;
 
         Assert.Equal(string.Empty, LSL_Api.EnvGridName(scene));
-        Assert.Equal(string.Empty, LSL_Api.EnvGridName(null));
+        Assert.Equal(string.Empty, LSL_Api.EnvGridName(null!));
     }
 }

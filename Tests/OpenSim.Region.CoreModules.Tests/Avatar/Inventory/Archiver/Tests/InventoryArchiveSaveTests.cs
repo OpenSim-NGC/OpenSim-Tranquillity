@@ -38,8 +38,8 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver.Tests;
 
 public class InventoryArchiveSaveTests : InventoryArchiveTestCase
 {
-    protected TestScene m_scene;
-    protected InventoryArchiverModule m_archiverModule;
+    protected TestScene m_scene = null!;
+    protected InventoryArchiverModule m_archiverModule = null!;
 
     public override void SetUp()
     {
@@ -73,7 +73,7 @@ public class InventoryArchiveSaveTests : InventoryArchiveTestCase
         // TODO: Assert.Equal(,); - incomplete assertion
 
         InventoryArchiveReadRequest iarr
-            = new InventoryArchiveReadRequest(UUID.Random(), null, null, null, null, null, null, (Stream)null, false);
+            = new InventoryArchiveReadRequest(UUID.Random(), null, null, null, null, null, null, (Stream)null!, false);
         iarr.LoadControlFile(filePath, data);
 
         Assert.True(iarr.ControlFileLoaded);

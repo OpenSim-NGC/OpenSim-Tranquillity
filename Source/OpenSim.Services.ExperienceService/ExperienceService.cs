@@ -1,4 +1,4 @@
-using System.Reflection;
+using System.Diagnostics.CodeAnalysis;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
@@ -11,9 +11,9 @@ namespace OpenSim.Services.ExperienceService;
 public class ExperienceService : ExperienceServiceBase, IExperienceService
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(
-            MethodBase.GetCurrentMethod().DeclaringType);
+            typeof(ExperienceService));
 
-    private IUserAccountService m_UserService = null;
+    private IUserAccountService? m_UserService;
 
     // SL per-experience KV quota: 128 MiB (was 16 MiB). Raised to the SL value so this
     // internal check (a redundant backstop) aligns with the authoritative Phlox-layer quota gate
@@ -100,12 +100,12 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
             return;
 
         // The owner is one word (a key) or two (first and last name); the optional experience key follows it.
-        UserAccount owner;
+        UserAccount? owner;
         int keyIndex;
         if (cmdparams.Length < 5)
         {
-            string answer = MainConsole.Instance.Prompt("Owner (first and last name, or key)");
-            string[] words = answer.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+            string? answer = MainConsole.Instance.Prompt("Owner (first and last name, or key)");
+            string[] words = (answer ?? string.Empty).Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
             if (words.Length == 2)
                 owner = FindOwner(words[0], words[1]);
             else if (words.Length == 1 && UUID.TryParse(words[0], out UUID answerKey))
@@ -182,7 +182,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
             which = MainConsole.Instance.Prompt("Experience (name or key)");
         else which = cmdparams[2];
 
-        ExperienceInfo info = FindExperienceForCommand(which);
+        ExperienceInfo? info = FindExperienceForCommand(which);
         if (info == null)
             return;
 
@@ -202,7 +202,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
             which = MainConsole.Instance.Prompt("Experience (name or key)");
         else which = cmdparams[3];
 
-        ExperienceInfo info = FindExperienceForCommand(which);
+        ExperienceInfo? info = FindExperienceForCommand(which);
         if (info == null)
             return;
 
@@ -228,7 +228,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
             which = MainConsole.Instance.Prompt("Experience (name or key)");
         else which = cmdparams[3];
 
-        ExperienceInfo info = FindExperienceForCommand(which);
+        ExperienceInfo? info = FindExperienceForCommand(which);
         if (info == null)
             return;
 
@@ -258,7 +258,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
             which = MainConsole.Instance.Prompt("Experience (name or key)");
         else which = cmdparams[3];
 
-        ExperienceInfo info = FindExperienceForCommand(which);
+        ExperienceInfo? info = FindExperienceForCommand(which);
         if (info == null)
             return;
 
@@ -293,7 +293,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
 
     // A key, or the whole name (case ignored). Several experiences may share a name, as the viewer does not
     // stop a rename to a name in use; then they are listed and the key is asked for.
-    private ExperienceInfo FindExperienceForCommand(string which)
+    private ExperienceInfo? FindExperienceForCommand(string which)
     {
         which = which.Trim();
         if (UUID.TryParse(which, out UUID key))
@@ -335,7 +335,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
             return false;
         }
 
-        ExperienceInfo taken = FindExperiencesByName(name).FirstOrDefault(
+        ExperienceInfo? taken = FindExperiencesByName(name).FirstOrDefault(
             i => i.public_id != self && string.Equals(i.name, name, StringComparison.OrdinalIgnoreCase));
         if (taken != null)
         {
@@ -345,26 +345,27 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
         return true;
     }
 
-    private UserAccount FindOwner(string firstName, string lastName)
+    private UserAccount? FindOwner(string firstName, string lastName)
     {
         if (!HaveUserService())
             return null;
-        UserAccount account = m_UserService.GetUserAccount(UUID.Zero, firstName, lastName);
+        UserAccount? account = m_UserService.GetUserAccount(UUID.Zero, firstName, lastName);
         if (account == null)
             MainConsole.Instance.Output("No such user as {0} {1}", firstName, lastName);
         return account;
     }
 
-    private UserAccount FindOwner(UUID key)
+    private UserAccount? FindOwner(UUID key)
     {
         if (!HaveUserService())
             return null;
-        UserAccount account = m_UserService.GetUserAccount(UUID.Zero, key);
+        UserAccount? account = m_UserService.GetUserAccount(UUID.Zero, key);
         if (account == null)
             MainConsole.Instance.Output("No user with key {0}", key);
         return account;
     }
 
+    [MemberNotNullWhen(true, nameof(m_UserService))]
     private bool HaveUserService()
     {
         if (m_UserService != null)
@@ -375,7 +376,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
 
     private string OwnerName(UUID owner)
     {
-        UserAccount account = m_UserService?.GetUserAccount(UUID.Zero, owner);
+        UserAccount? account = m_UserService?.GetUserAccount(UUID.Zero, owner);
         return account == null ? owner.ToString() : AccountName(account);
     }
 
@@ -400,6 +401,9 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
 
     private void HandleCreateNewExperience(string module, string[] cmdparams)
     {
+        if (!HaveUserService())
+            return;
+
         string firstName;
         string lastName;
         string experienceKey;
@@ -426,7 +430,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
             return;
         }
 
-        UserAccount account = m_UserService.GetUserAccount(UUID.Zero, firstName, lastName);
+        UserAccount? account = m_UserService.GetUserAccount(UUID.Zero, firstName, lastName);
         if (account == null)
         {
             MainConsole.Instance.Output("No such user as {0} {1}", firstName, lastName);
@@ -577,7 +581,7 @@ public class ExperienceService : ExperienceServiceBase, IExperienceService
         return m_Database.GetGroupExperiences(group_id);
     }
 
-    public ExperienceInfo UpdateExperienceInfo(ExperienceInfo info)
+    public ExperienceInfo? UpdateExperienceInfo(ExperienceInfo info)
     {
         ExperienceInfoData data = new ExperienceInfoData();
 

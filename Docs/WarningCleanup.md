@@ -43,18 +43,17 @@ do not close warnings by blanket suppression.
   - [x] **3d: ref/in call contracts - 19 closed**
     - CS9192 (9), CS9193 (10).
   - Counts include test occurrences; review production occurrences first.
-- [ ] **Batch 4 / Tier 3: production nullability - 13**
+- [x] **Batch 4 / Tier 3: production nullability - 13 closed, 0 remaining**
   - ExperienceService's CS8600, CS8603, CS8602 and CS8625 occurrences.
-  - Promote possible runtime failures to correctness priority.
-- [ ] **Batch 5 / Tier 3: test nullability - 181**
+- [x] **Batch 5 / Tier 3: test nullability - 181 closed, 0 remaining**
   - CS8600/01/02/03/05, CS8610/18/19, CS8620/25, CS8765/67.
   - Fix fixture initialization and nullable contracts in project-sized batches.
 - [ ] **Batch 6 / Tier 3b: xUnit analyzers - 32**
   - xUnit2013 (22), xUnit1031 (6), xUnit2017 (2), xUnit2029 (1),
     xUnit2009 (1).
   - Preserve assertion meaning and remove blocking async test operations.
-- [ ] **Batch 7 / Tier 4: cosmetic, documentation and dead code - 37**
-  - CS3021 (12), CS8981 (12), CS0067 (5), CS0414 (3), CS0168 (2),
+- [ ] **Batch 7 / Tier 4: cosmetic, documentation and dead code - 33**
+  - CS3021 (12), CS8981 (12), CS0067 (1), CS0414 (3), CS0168 (2),
     CS1573 (3).
   - Check generated-source ownership before editing or removing declarations.
 
@@ -79,7 +78,9 @@ After Batch 1 the reconciled inventory was 661 occurrences: 264 closed and
 After Batch 3a it was 661 occurrences: 342 closed and 319 remaining.
 After Batch 3b it was 661 occurrences: 368 closed and 293 remaining.
 After Batch 3c it was 661 occurrences: 379 closed and 282 remaining.
-After Batch 3d it is **661 occurrences: 398 closed and 263 remaining**.
+After Batch 3d it was 661 occurrences: 398 closed and 263 remaining.
+After Batch 4 it was 661 occurrences: 411 closed and 250 remaining.
+After Batch 5 it is **661 occurrences: 596 closed and 65 remaining**.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
 
@@ -228,6 +229,41 @@ calculation order are unchanged.
   line number because the Phlox method formatting added lines.
 - Selected Phlox rotation, position, force, terrain, keyframe and rez tests:
   **42 passed**. Selected scene and inventory tests: **8 passed**.
+
+## Batch 4 implementation and verification
+
+Nullable annotations now reflect the ExperienceService's real failure paths:
+owner and experience lookups and `UpdateExperienceInfo` may return null, and
+the service interface marks that return with `MaybeNull`. The user-account and
+database fields no longer use null initializers. Both experience-creation
+commands now report a missing user-account service rather than dereferencing
+one, and a null owner prompt is treated as an empty answer.
+
+### Verification
+
+- Full non-incremental Release rebuild: **250 warnings, 0 errors**; all 13
+  Batch 4 production nullability warnings are gone.
+- `ExperienceConsoleCommandsTests`: **42 passed**, including the missing
+  user-account-service guard for both creation commands.
+
+## Batch 5 implementation and verification
+
+The 181 test nullability warnings were confined to `OpenSim.Region.CoreModules.Tests`
+(151 occurrences) and `OpenSim.Server.Base.Tests` (30). Fixtures initialized by
+the test setup lifecycle are explicitly marked as such; optional results and
+callbacks now use nullable types with assertions or guards before dereference.
+Reflection-backed test doubles report missing members explicitly, and proxy,
+logger, and web-proxy implementations now match their nullable framework
+contracts. Four `CS0067` warnings also disappeared when the affected test event
+stubs were initialized to satisfy their non-null event contracts.
+
+### Verification
+
+- Full non-incremental Release rebuild: **65 warnings, 0 errors**; all 181
+  Batch 5 test nullability warnings are gone.
+- `OpenSim.Region.CoreModules.Tests`: **451 passed** with the cached Linux Skia
+  asset on `LD_LIBRARY_PATH`.
+- `OpenSim.Server.Base.Tests`: **152 passed**.
 
 ## Batch 2b implementation and verification
 

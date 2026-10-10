@@ -216,7 +216,7 @@ public class InventoryArchiveLoadPathTests : InventoryArchiveTestCase
 
         {
             // Test replication of path1
-            new InventoryArchiveReadRequest(UUID.Random(), null, scene.InventoryService, scene.AssetService, scene.UserAccountService, ua1, null, (Stream)null, false)
+            new InventoryArchiveReadRequest(UUID.Random(), null, scene.InventoryService, scene.AssetService, scene.UserAccountService, ua1, null, (Stream)null!, false)
                 .ReplicateArchivePathToUserInventory(
                     iarPath1, scene.InventoryService.GetRootFolder(ua1.PrincipalID),
                     foldersCreated, nodesLoaded);
@@ -233,7 +233,7 @@ public class InventoryArchiveLoadPathTests : InventoryArchiveTestCase
 
         {
             // Test replication of path2
-            new InventoryArchiveReadRequest(UUID.Random(), null, scene.InventoryService, scene.AssetService, scene.UserAccountService, ua1, null, (Stream)null, false)
+            new InventoryArchiveReadRequest(UUID.Random(), null, scene.InventoryService, scene.AssetService, scene.UserAccountService, ua1, null, (Stream)null!, false)
                 .ReplicateArchivePathToUserInventory(
                     iarPath2, scene.InventoryService.GetRootFolder(ua1.PrincipalID),
                     foldersCreated, nodesLoaded);
@@ -279,7 +279,7 @@ public class InventoryArchiveLoadPathTests : InventoryArchiveTestCase
 
         string itemArchivePath = string.Join("", new string[] { folder1ArchiveName, folder2ArchiveName });
 
-        new InventoryArchiveReadRequest(UUID.Random(), null, scene.InventoryService, scene.AssetService, scene.UserAccountService, ua1, null, (Stream)null, false)
+        new InventoryArchiveReadRequest(UUID.Random(), null, scene.InventoryService, scene.AssetService, scene.UserAccountService, ua1, null, (Stream)null!, false)
             .ReplicateArchivePathToUserInventory(
                 itemArchivePath, scene.InventoryService.GetRootFolder(ua1.PrincipalID),
                 new Dictionary<string, InventoryFolderBase>(), new Dictionary<UUID, InventoryNodeBase>());
@@ -289,7 +289,7 @@ public class InventoryArchiveLoadPathTests : InventoryArchiveTestCase
         Assert.True(folder1PostCandidates.Count >= 1);
 
         // FIXME: Temporarily, we're going to do something messy to make sure we pick up the created folder.
-        InventoryFolderBase folder1Post = null;
+        InventoryFolderBase? folder1Post = null;
         foreach (InventoryFolderBase folder in folder1PostCandidates)
         {
             if (folder.ID != folder1.ID)
@@ -300,6 +300,7 @@ public class InventoryArchiveLoadPathTests : InventoryArchiveTestCase
         }
 //            Assert.Equal(,);
 
+        Assert.NotNull(folder1Post);
         List<InventoryFolderBase> folder2PostCandidates
             = InventoryArchiveUtils.FindFoldersByPath(scene.InventoryService, folder1Post, "b");
         Assert.Single(folder2PostCandidates);
@@ -330,7 +331,7 @@ public class InventoryArchiveLoadPathTests : InventoryArchiveTestCase
 
         string itemArchivePath = string.Join("", new string[] { folder1ArchiveName, folder2ArchiveName });
 
-        new InventoryArchiveReadRequest(UUID.Random(), null, scene.InventoryService, scene.AssetService, scene.UserAccountService, ua1, folder1ExistingName, (Stream)null, true)
+        new InventoryArchiveReadRequest(UUID.Random(), null, scene.InventoryService, scene.AssetService, scene.UserAccountService, ua1, folder1ExistingName, (Stream)null!, true)
             .ReplicateArchivePathToUserInventory(
                 itemArchivePath, scene.InventoryService.GetRootFolder(ua1.PrincipalID),
                 new Dictionary<string, InventoryFolderBase>(), new Dictionary<UUID, InventoryNodeBase>());
@@ -345,4 +346,3 @@ public class InventoryArchiveLoadPathTests : InventoryArchiveTestCase
         Assert.Single(folder2PostCandidates);
     }
 }
-

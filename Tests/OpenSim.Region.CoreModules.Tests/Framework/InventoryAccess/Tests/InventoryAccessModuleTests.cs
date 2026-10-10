@@ -38,10 +38,10 @@ namespace OpenSim.Region.CoreModules.Framework.InventoryAccess.Tests;
 
 public class InventoryAccessModuleTests : OpenSimTestCase
 {
-    protected TestScene m_scene;
-    protected BasicInventoryAccessModule m_iam;
+    protected TestScene m_scene = null!;
+    protected BasicInventoryAccessModule m_iam = null!;
     protected UUID m_userId = UUID.Parse("00000000-0000-0000-0000-000000000020");
-    protected TestClient m_tc;
+    protected TestClient m_tc = null!;
 
     public override void SetUp()
     {

@@ -79,7 +79,7 @@ public class HttpMimeTypeTests : OpenSimTestCase
         base.Dispose();
     }
 
-    private UUID Start(string mimeType, string body = "hello")
+    private UUID Start(string? mimeType, string body = "hello")
     {
         List<string> parameters = new()
         {
@@ -97,8 +97,9 @@ public class HttpMimeTypeTests : OpenSimTestCase
     private string ContentTypeLineSent()
     {
         Assert.True(m_server.WaitForRequests(1), "the request never reached the test listener");
-        m_server.Requests.TryPeek(out RecordingHttpServer.Received rec);
-        return rec!.HeaderLines.Single(l => l.StartsWith("Content-Type:", StringComparison.OrdinalIgnoreCase));
+        m_server.Requests.TryPeek(out RecordingHttpServer.Received? rec);
+        Assert.NotNull(rec);
+        return rec.HeaderLines.Single(l => l.StartsWith("Content-Type:", StringComparison.OrdinalIgnoreCase));
     }
 
     private void AssertRefusedAndNothingSent(UUID id)
@@ -175,7 +176,7 @@ public class HttpMimeTypeTests : OpenSimTestCase
         UUID id = Start("text/plain;charset=utf-8");
         Assert.NotEqual(UUID.Zero, id);
 
-        IHttpServiceRequest done = null;
+        IHttpServiceRequest? done = null;
         DateTime end = DateTime.UtcNow.AddSeconds(10);
         while (done is null && DateTime.UtcNow < end)
         {
