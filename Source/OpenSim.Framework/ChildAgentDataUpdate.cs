@@ -379,6 +379,13 @@ public class AgentData : IAgentData
     public Animation AnimState = null;
     public Byte MotionState = 0;
 
+    /// <summary>
+    /// The avatar's constant force from an attachment's llSetForce, in region axes or, when
+    /// <see cref="ConstantForceIsLocal"/>, the avatar's own axes. Zero when there is none.
+    /// </summary>
+    public Vector3 ConstantForce;
+    public bool ConstantForceIsLocal;
+
     public UUID ParentPart;
     public Vector3 SitOffset;
 
@@ -522,6 +529,13 @@ public class AgentData : IAgentData
         if (MotionState != 0)
         {
             args["motion_state"] = OSD.FromInteger(MotionState);
+        }
+
+        // Optional: written only when there is a force, so a simulator that does not know the field sees nothing.
+        if (!ConstantForce.IsZero())
+        {
+            args["constant_force"] = OSD.FromVector3(ConstantForce);
+            args["constant_force_local"] = OSD.FromBoolean(ConstantForceIsLocal);
         }
 
         if (Appearance != null)
@@ -756,6 +770,18 @@ public class AgentData : IAgentData
 
         if (args.TryGetValue("motion_state", out tmp) && tmp != null)
             MotionState = (byte)tmp.AsInteger();
+
+        // Absent (agent data from a simulator that does not send it) means no constant force.
+        if (args.TryGetValue("constant_force", out tmp) && tmp is OSDArray)
+        {
+            Vector3 force = tmp.AsVector3();
+            if (force.IsFinite())
+            {
+                ConstantForce = force;
+                if (args.TryGetValue("constant_force_local", out tmp) && tmp != null)
+                    ConstantForceIsLocal = tmp.AsBoolean();
+            }
+        }
 
         //if ((args["agent_textures"] != null) && (args["agent_textures"]).Type == OSDType.Array)
         //{

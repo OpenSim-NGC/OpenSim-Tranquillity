@@ -907,10 +907,22 @@ such list.
   `"INVALID CODEC"`.
 - `iwStandTarget` and `iwLinkStandTarget` set the stand offset, which is saved with the object;
   the rotation is ignored.
-- `llSetForce` and `llSetForceAndTorque` in an attachment do nothing. SL applies the force to the wearer
+- `llSetForce` and `llSetForceAndTorque` in an attachment, physical or not, set a constant force on the wearer
   ([LlSetForce](https://wiki.secondlife.com/wiki/LlSetForce): "Used on an attachment, it will apply the force to the
-  avatar"); the region has no way to hold a constant force on an avatar. A local force (`local` TRUE) is turned once
-  by the object's rotation when it is set, not kept in the object's frame as it turns.
+  avatar"). The avatar holds it and hands it to the physics engine (`PhysicsActor.SetConstantForce`), which is to
+  apply it on every step; a local force (`local` TRUE) is in the avatar's own axes and turns with the avatar. A new
+  call from any attachment replaces it and `ZERO_VECTOR` ends it. As in Halcyon, detaching the object or resetting or
+  removing the script does not end it, so a script that should stop pushing when taken off sets `ZERO_VECTOR` in its
+  `attach` event; that works when the object is detached to inventory, but not when it is dropped, because by then
+  it is no longer an attachment. When the avatar crosses or teleports to another region the force goes with it in the
+  agent data (optional fields `constant_force` and `constant_force_local`); arriving from a simulator that does not
+  send them, the avatar has no force.
+  **No physics engine in this repository applies the force yet** (ubODE, BulletSim, POS and BasicPhysics keep the
+  default `SetConstantForce`, which does nothing), so the avatar does not move. ubODE's avatar has no constant force
+  at all: its `Force` property reports the avatar's walking target velocity and setting it does nothing. An engine
+  outside this repository, such as a Jolt module, shows no effect either until it implements `SetConstantForce`.
+- `llSetForce` in an unattached physical object: a local force (`local` TRUE) is turned once by the object's rotation
+  when it is set, not kept in the object's frame as it turns.
 - `botSetNavigationPoints`: a move that times out (about 60 s) raises `BOT_MOVE_FAILED` and ends the path. Halcyon
   teleported the bot to the point and went on, after `BOT_MOVEMENT_TELEPORT_AFTER` seconds (60 by default); that
   option and `BOT_MOVEMENT_TYPE` (`BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY` repeats the path) are not read.
