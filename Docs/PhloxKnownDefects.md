@@ -515,7 +515,9 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
 - YEngine's XMR extensions are not available: `switch`, `break`, `continue`, `constant`,
   `try`/`catch`/`finally`/`throw`, arrays, `foreach`, classes and the `xmr*` functions.
 - YEngine accepts several user functions with the same name and different parameters.
-  Phlox rejects them, as SL does.
+  Phlox rejects them, as SL does. This is deliberate: a script that defines two user functions
+  with one name does not compile on Phlox. Rename one, or make `//YEngine:` the script's first
+  line so that YEngine runs it (see "Which engine runs a script").
 - Phlox compiles SLua scripts; YEngine does not. Where YEngine is the default, an SLua script
   needs `//InWorldz.Phlox:slua` as its first line to run on Phlox.
 
@@ -606,6 +608,28 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   The SL wiki says of `llGroundNormal`: "This function does not return a unit vector."
 - `llApplyImpulse` in an attachment pushes the wearer, as in YEngine and Halcyon. `llApplyRotationalImpulse` in an
   attachment does nothing, as the SL wiki says ("It does not work on attachments"); Halcyon turned the wearer.
+- `llApplyImpulse` pauses for the physics throttle (`PhysicsThrottle`) after every call, also a call that does
+  nothing, as Halcyon did; YEngine does not pause. This is deliberate. An impulse with a NaN or infinite component is
+  dropped; it used to reach the object or the wearer.
+- `llMoveToTarget` with a target outside the region where there is no neighbouring region brings the target back
+  inside the region's edge, as Halcyon did, so a physical object is not driven off the edge; a target in a
+  neighbouring region is kept. YEngine passes the target on unchanged. This is deliberate.
+- `llSetStatus` with `STATUS_ROTATE_X`, `_Y` or `_Z` locks or frees the axis it names, for the whole object from any
+  of its prims, and `llGetStatus` reads it back, as YEngine does. The SL wiki gives the values 0x002, 0x004 and 0x008
+  and says "all prims in an object share the same status"
+  ([LlSetStatus](https://wiki.secondlife.com/wiki/LlSetStatus)). Phlox used to write other bits, so locking X did
+  nothing, Y locked X and Z locked Y, and a call from a child prim locked nothing.
+- `llGetForce` and `llGetTorque` return the force and torque `llSetForce` and `llSetTorque` last stored on the
+  object, in region axes, as YEngine does. They used to read the physics engine, which gave `ZERO_VECTOR` on an
+  engine that does not keep them (`llGetTorque` always gave `ZERO_VECTOR`).
+- `llGetAccel` gives the object's acceleration, and `ZERO_VECTOR` in an attachment or a child prim, as the SL wiki
+  says ([LlGetAccel](https://wiki.secondlife.com/wiki/LlGetAccel)); YEngine gives the prim's own value there.
+  `llGetOmega` gives the root's angular velocity, the physical spin or what `llTargetOmega` set, also in a child prim
+  ("Returns the omega of the root if called in a child prim",
+  [LlGetOmega](https://wiki.secondlife.com/wiki/LlGetOmega)); YEngine gives the calling prim's. Both used to give
+  `ZERO_VECTOR`.
+- `llGetVel` in an attachment gives the wearer's velocity (the seat object's when the wearer sits), as YEngine and
+  Halcyon do; the SL wiki page says nothing about attachments. It used to give the attachment prim's own velocity.
 - `llCastRay` that the physics engine refuses (for example a cast over the engine's time or hit budget) returns
   `[RCERR_CAST_TIME_EXCEEDED]`. The region log gets at most one warning per script per minute for it: the first
   refused cast writes one at once, and the next, written by the first cast refused after the minute is up, gives the
@@ -839,7 +863,7 @@ name) promises.
 ### Functions that return a fixed value
 | Function | Returns |
 |---|---|
-| `llGetAccel`, `llGetOmega`, `llGetTorque`, `iwGetAngularVelocity` | `ZERO_VECTOR` |
+| `iwGetAngularVelocity` | `ZERO_VECTOR` |
 | `llGetEnergy` | 1.0 |
 | `llCloud` | 0 |
 | `llGetCameraAspect`, `llGetCameraFOV` | 1.7778 and 1.0472 (the viewer does not send them) |
