@@ -17915,13 +17915,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             UUID id = ParseBotID(botID);
             if (id == UUID.Zero) return new LSLList();
 
-            // Get profile from BotManager's stored data via INPC
-            INPCModule npcMod = World.RequestModuleInterface<INPCModule>();
-            INPC npc = npcMod?.GetNPC(id, World);
-
+            // The profile the bot manager stored for the bot, wherever the bot stands (Halcyon read the bot's
+            // stored user profile). Not a bot's profile: an empty list, as Halcyon's missing profile.
             IBotManager manager = GetBotManager();
-            // We need to read from the bot's stored profile data
-            // Since BotData is internal, we read from INPC + fallback
+            if (manager == null || !manager.GetBotProfile(id, out string about, out string email, out UUID image, out string url))
+                return new LSLList();
 
             List<object> list = new List<object>();
             for (int i = 0; i < profileInformation.Length; i++)
@@ -17930,16 +17928,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 switch (param)
                 {
                     case 1: // BOT_ABOUT_TEXT
-                        list.Add(npc?.profileAbout ?? string.Empty);
+                        list.Add(about);
                         break;
                     case 2: // BOT_EMAIL
-                        list.Add(string.Empty); // email not exposed via INPC
+                        list.Add(email);
                         break;
                     case 3: // BOT_IMAGE_UUID
-                        list.Add((npc?.profileImage ?? UUID.Zero).ToString());
+                        list.Add(image.ToString());
                         break;
                     case 4: // BOT_PROFILE_URL
-                        list.Add(string.Empty); // profileURL not exposed via INPC
+                        list.Add(url);
                         break;
                 }
             }

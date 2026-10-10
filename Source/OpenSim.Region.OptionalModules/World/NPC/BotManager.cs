@@ -51,14 +51,15 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         public bool IsFollowing;
         public UUID FollowTarget;
         public Dictionary<int, object> FollowOptions;
+        public bool FollowLost;     // BOT_MOVE_AVATAR_LOST was raised and the avatar has not come back since
         public bool IsWandering;
         public Vector3 WanderOrigin;
         public Vector3 WanderDistances;
         public Dictionary<int, object> WanderOptions;
         public Timer WanderTimer;
 
-        // Event registration
-        public UUID PathEventScriptID = UUID.Zero;
+        // Event registration: every script item registered for bot_update (lock the list to use it)
+        public List<UUID> PathEventScripts = new List<UUID>();
         public SceneObjectGroup CollisionEventHost;
 
         // Navigation arrival tracking (poll-driven). INPCModule.MoveToTarget is
@@ -67,6 +68,11 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         public Vector3 CurrentNavTarget;
         public bool NavInFlight;
         public int NavInFlightTicks;
+
+        // A BOT_TRAVELMODE_WAIT point: the bot stands still until NavWaitUntil (Environment.TickCount64),
+        // then the nav poll moves it on.
+        public bool NavWaiting;
+        public long NavWaitUntil;
 
         // Collision-event bridge: the bot's physics actor we subscribed to, and the handler we
         // attached, so we can detach exactly that subscription on deregister/removal.
@@ -287,27 +293,52 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         {
             data.IsFollowing = false;
             data.FollowTarget = UUID.Zero;
+            data.FollowLost = false;
             data.NavPoints = null;
             data.NavIndex = 0;
             data.NavInFlight = false;
+            data.NavWaiting = false;
             StopWanderTimer(data);
             Scene scene = GetBotScene(data);
             if (scene != null)
                 m_npcModule.StopMoveToTarget(data.BotID, scene);
         }
 
-        private void FirePathEvent(BotData data, int eventType, Vector3 pos)
+        // bot_update flags (InWorldz BOT_MOVE_* constants)
+        private const int BOT_MOVE_COMPLETE = 1, BOT_MOVE_UPDATE = 2, BOT_MOVE_FAILED = 3, BOT_MOVE_AVATAR_LOST = 4;
+
+        private Vector3 BotPosition(BotData data) => GetBotSP(data)?.AbsolutePosition ?? Vector3.Zero;
+
+        // BOT_MOVE_COMPLETE [bot position]: the last node is done.
+        private void FireMoveComplete(BotData data)
+            => FirePathEvent(data, BOT_MOVE_COMPLETE, new object[] { BotPosition(data) });
+
+        // BOT_MOVE_UPDATE [next node, bot position]: the bot moves on to node nextNode.
+        private void FireMoveUpdate(BotData data, int nextNode)
+            => FirePathEvent(data, BOT_MOVE_UPDATE, new object[] { nextNode, BotPosition(data) });
+
+        // BOT_MOVE_FAILED [next node, bot position]: the bot did not reach the node before nextNode.
+        private void FireMoveFailed(BotData data, int nextNode)
+            => FirePathEvent(data, BOT_MOVE_FAILED, new object[] { nextNode, BotPosition(data) });
+
+        // BOT_MOVE_AVATAR_LOST [followed avatar's position, distance, bot position].
+        private void FireAvatarLost(BotData data, Vector3 avatarPos, float distance)
+            => FirePathEvent(data, BOT_MOVE_AVATAR_LOST, new object[] { avatarPos, distance, BotPosition(data) });
+
+        private void FirePathEvent(BotData data, int eventType, object[] parameters)
         {
-            if (data.PathEventScriptID == UUID.Zero) return;
+            UUID[] scripts;
+            lock (data.PathEventScripts)
+                scripts = data.PathEventScripts.ToArray();
+            if (scripts.Length == 0) return;
 
             Scene scene = GetBotScene(data);
             if (scene == null) return;
 
-            // Deliver the bot_update script event, mirroring the original InWorldz/Halcyon
-            // signature: bot_update(string botID, integer flag, list params). The empty
-            // object[] is coerced to an LSLList by the Phlox VM (PostedEvent.Normalize), so
-            // this needs no dependency on the Phlox assemblies. eventType carries the flag
-            // (1 = BOT_MOVE_COMPLETE, 3 = BOT_MOVE_FAILED), matching what InWorldz scripts expect.
+            // Deliver the bot_update script event, with the original InWorldz/Halcyon signature
+            // bot_update(string botID, integer flag, list params), to every registered script, as Halcyon's
+            // MovementAction.TriggerBotUpdate did. The object[] params is turned into a list by the Phlox VM
+            // (PostedEvent.Normalize), so this needs no dependency on the Phlox assemblies.
             //
             // The grid may run several script engines (YEngine + Phlox), each registered as
             // IScriptModule; RequestModuleInterface<IScriptModule>() returns only the first
@@ -316,7 +347,6 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             IScriptModule[] engines = scene.RequestModuleInterfaces<IScriptModule>();
             if (engines == null) return;
 
-            object[] args = new object[] { data.BotID.ToString(), eventType, new object[0] };
             // The same outcome as SL's path_update(integer type, list reserved), for a
             // script that speaks SL pathfinding (llCreateCharacter / llNavigateTo) rather than the
             // InWorldz bot API. Posted beside bot_update rather than instead of it - a script
@@ -324,13 +354,27 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             // handler for. BotData carries no marker for how the bot was created, so both go.
             // Mapping per wiki.secondlife.com/wiki/Path_update: BOT_MOVE_COMPLETE (1) ->
             // PU_GOAL_REACHED (1); BOT_MOVE_FAILED (3, a navigation timeout) -> PU_FAILURE_UNREACHABLE
-            // (4, "goal is no longer reachable for some reason").
-            int puType = eventType == 1 ? 1 : eventType == 3 ? 4 : 1000000 /* PU_FAILURE_OTHER */;
-            object[] pathArgs = new object[] { puType, new object[0] };
-            foreach (IScriptModule engine in engines)
+            // (4, "goal is no longer reachable for some reason"); BOT_MOVE_AVATAR_LOST (4) ->
+            // PU_FAILURE_TARGET_GONE (5, the target "can no longer be tracked"). BOT_MOVE_UPDATE (2), a
+            // node passed on the way, has no path_update counterpart and posts none.
+            int puType = eventType switch
             {
-                engine?.PostScriptEvent(data.PathEventScriptID, "bot_update", args);
-                engine?.PostScriptEvent(data.PathEventScriptID, "path_update", pathArgs);
+                BOT_MOVE_COMPLETE => 1,
+                BOT_MOVE_FAILED => 4,
+                BOT_MOVE_AVATAR_LOST => 5,
+                _ => -1,
+            };
+            foreach (UUID script in scripts)
+            {
+                // Each script gets its own arrays: the Phlox VM keeps a posted params array as its list's storage.
+                object[] args = new object[] { data.BotID.ToString(), eventType, (object[])parameters.Clone() };
+                object[] pathArgs = puType < 0 ? null : new object[] { puType, new object[0] };
+                foreach (IScriptModule engine in engines)
+                {
+                    engine?.PostScriptEvent(script, "bot_update", args);
+                    if (pathArgs != null)
+                        engine?.PostScriptEvent(script, "path_update", pathArgs);
+                }
             }
         }
 
@@ -340,7 +384,13 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
         public UUID CreateBot(string firstName, string lastName, Vector3 startPos,
             string outfitName, UUID scriptItemID, UUID ownerID, out string reason)
-            => CreateBot(firstName, lastName, startPos, outfitName, scriptItemID, ownerID, true, true, out reason);
+        {
+            UUID botID = CreateBot(firstName, lastName, startPos, outfitName, scriptItemID, ownerID, true, true, out reason);
+            // The bot* door registers the creating script for bot_update, as Halcyon's BotManager.CreateBot did.
+            if (botID != UUID.Zero && scriptItemID != UUID.Zero)
+                BotRegisterForPathUpdateEvents(botID, scriptItemID, ownerID);
+            return botID;
+        }
 
         /// <summary>The osNpcCreate door. Same bot, same BotData; ownership and sensing per the OS_NPC_* flags.</summary>
         public UUID CreateBot(string firstName, string lastName, Vector3 startPos,
@@ -496,16 +546,23 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.NavIndex = 0;
 
             if (positions.Count > 0)
-                MoveToNextNavPoint(data);
+                MoveToNextNavPoint(data, false);
         }
 
-        private void MoveToNextNavPoint(BotData data)
+        // Starts the bot toward node NavIndex, or reports the path done. changingNodes: the bot has just
+        // finished the node before NavIndex (arrived, or waited), so BOT_MOVE_UPDATE reports the move on to
+        // NavIndex, as Halcyon's MovementAction.GetNextDestination did when NodeGraph reported changingNodes.
+        private void MoveToNextNavPoint(BotData data, bool changingNodes)
         {
             if (data.NavPoints == null || data.NavIndex >= data.NavPoints.Count)
             {
-                FirePathEvent(data, 1 /*BOT_MOVE_COMPLETE*/, Vector3.Zero);
+                if (data.NavPoints != null)
+                    FireMoveComplete(data);
                 return;
             }
+
+            if (changingNodes)
+                FireMoveUpdate(data, data.NavIndex);
 
             Scene scene = GetBotScene(data);
             if (scene == null) return;
@@ -528,13 +585,19 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                     sp.AbsolutePosition = target;
                 }
                 data.NavIndex++;
-                MoveToNextNavPoint(data);
+                // Halcyon reported every teleport as a move on to the next node, the last node included.
+                FireMoveUpdate(data, data.NavIndex);
+                MoveToNextNavPoint(data, false);
             }
             else if (mode == TravelMode.Wait)
             {
-                // Wait mode -- just advance to next point
+                // Stand still for the point's X seconds (botSetNavigationPoints passes the duration as
+                // <seconds, 0, 0>), then go on; NavPollTick ends the wait. Halcyon NodeGraph.GetNextPosition
+                // waits position.X seconds on a Wait node.
+                m_npcModule.StopMoveToTarget(data.BotID, scene);
+                data.NavWaitUntil = Environment.TickCount64 + (long)(Math.Max(0f, target.X) * 1000f);
+                data.NavWaiting = true;
                 data.NavIndex++;
-                MoveToNextNavPoint(data);
             }
             else
             {
@@ -558,12 +621,24 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             {
                 inFlight = new List<BotData>();
                 foreach (BotData d in m_bots.Values)
-                    if (d.NavInFlight) inFlight.Add(d);
+                    if (d.NavInFlight || d.NavWaiting) inFlight.Add(d);
             }
 
             foreach (BotData data in inFlight)
             {
                 if (data.MovementPaused) continue;
+
+                if (data.NavWaiting)
+                {
+                    if (Environment.TickCount64 < data.NavWaitUntil) continue;
+                    data.NavWaiting = false;
+                    try { MoveToNextNavPoint(data, true); }
+                    catch (Exception ex)
+                    {
+                        m_log.LogWarning("[BotManager]: nav advance for bot {0} failed: {1}", data.BotID, ex.Message);
+                    }
+                    continue;
+                }
 
                 ScenePresence sp = GetBotSP(data);
                 if (sp == null) { data.NavInFlight = false; continue; }
@@ -578,19 +653,31 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                     if (arrived)
                     {
                         data.NavInFlight = false;
-                        MoveToNextNavPoint(data);
+                        MoveToNextNavPoint(data, true);
                     }
                     else if (timedOut)
                     {
                         data.NavInFlight = false;
                         data.NavPoints = null;
-                        FirePathEvent(data, 3 /*BOT_MOVE_FAILED*/, data.CurrentNavTarget);
+                        FireMoveFailed(data, data.NavIndex);   // NavIndex is already the node after the one not reached
                     }
                 }
                 catch (Exception ex)
                 {
                     data.NavInFlight = false;
                     m_log.LogWarning("[BotManager]: nav advance for bot {0} failed: {1}", data.BotID, ex.Message);
+                }
+            }
+
+            List<BotData> following;
+            lock (m_bots)
+                following = m_bots.Values.Where(d => d.IsFollowing && !d.MovementPaused).ToList();
+            foreach (BotData data in following)
+            {
+                try { CheckFollowedAvatar(data); }
+                catch (Exception ex)
+                {
+                    m_log.LogWarning("[BotManager]: follow check for bot {0} failed: {1}", data.BotID, ex.Message);
                 }
             }
 
@@ -883,6 +970,53 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             return BotMovementResult.Success;
         }
 
+        private const float DEFAULT_LOST_AVATAR_DISTANCE = 1000f;   // Halcyon AvatarFollowerDescription
+
+        // BOT_MOVE_AVATAR_LOST, once each time the followed avatar is lost, as Halcyon's AvatarFollower raised it:
+        // the avatar has left the region (UpdateInformation: [ZERO_VECTOR, 0.0, bot position]), or the bot is
+        // farther than BOT_LOST_AVATAR_DISTANCE (8) from the avatar plus BOT_FOLLOW_OFFSET (4)
+        // (CheckInformationBeforeMove: [avatar position, 0.0, bot position]). Halcyon passed 0.0 as the distance
+        // in both. The avatar coming back within the distance re-arms the report.
+        private void CheckFollowedAvatar(BotData data)
+        {
+            Scene scene = GetBotScene(data);
+            ScenePresence bot = GetBotSP(data);
+            if (scene == null || bot == null) return;
+
+            ScenePresence target = scene.GetScenePresence(data.FollowTarget);
+            if (target == null || target.IsChildAgent)      // a child agent stands in another region
+            {
+                if (!data.FollowLost)
+                {
+                    data.FollowLost = true;
+                    FireAvatarLost(data, Vector3.Zero, 0.0f);
+                }
+                return;
+            }
+
+            Dictionary<int, object> options = data.FollowOptions;
+            Vector3 offset = Vector3.Zero;
+            float lostDistance = DEFAULT_LOST_AVATAR_DISTANCE;
+            if (options != null)
+            {
+                if (options.TryGetValue(4 /*BOT_FOLLOW_OFFSET*/, out object o) && o is Vector3 v) offset = v;
+                if (options.TryGetValue(8 /*BOT_LOST_AVATAR_DISTANCE*/, out object d) && (d is float || d is int))
+                    lostDistance = Convert.ToSingle(d);
+            }
+
+            float distance = Vector3.Distance(target.AbsolutePosition + offset, bot.AbsolutePosition);
+            if (distance > lostDistance)
+            {
+                if (!data.FollowLost)
+                {
+                    data.FollowLost = true;
+                    FireAvatarLost(data, target.AbsolutePosition, 0.0f);
+                }
+            }
+            else
+                data.FollowLost = false;
+        }
+
         public void StopMovement(UUID botID, UUID ownerID)
         {
             BotData data = GetBotWithPermission(botID, ownerID);
@@ -906,9 +1040,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             if (data == null) return;
             data.MovementPaused = false;
 
-            // Resume navigation if we had waypoints
-            if (data.NavPoints != null && data.NavIndex < data.NavPoints.Count)
-                MoveToNextNavPoint(data);
+            // Resume navigation if we had waypoints. A wait in progress is left to NavPollTick to finish.
+            if (!data.NavWaiting && data.NavPoints != null && data.NavIndex < data.NavPoints.Count)
+                MoveToNextNavPoint(data, false);
         }
 
         public void SetBotSpeed(UUID botID, float speed, UUID ownerID)
@@ -1172,6 +1306,31 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             }
         }
 
+        public bool GetBotProfile(UUID botID, out string aboutText, out string email,
+            out UUID imageID, out string profileURL)
+        {
+            aboutText = email = profileURL = string.Empty;
+            imageID = UUID.Zero;
+            BotData data = GetBot(botID);
+            if (data == null) return false;
+
+            email = data.Email;
+            profileURL = data.ProfileURL;
+            aboutText = data.AboutText;
+            imageID = data.ImageID;
+
+            // About text and image also live on the NPC (osNpcSetProfileAbout and osNpcSetProfileImage
+            // write only there, and the NPC caps the about text), so the NPC's values win while it exists.
+            Scene scene = GetBotScene(data);
+            INPC npc = scene != null ? m_npcModule?.GetNPC(botID, scene) : null;
+            if (npc != null)
+            {
+                aboutText = npc.profileAbout ?? string.Empty;
+                imageID = npc.profileImage;
+            }
+            return true;
+        }
+
         #endregion
 
         #region Outfits
@@ -1368,14 +1527,19 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         {
             BotData data = GetBotWithPermission(botID, ownerID);
             if (data == null) return;
-            data.PathEventScriptID = scriptItemID;
+            lock (data.PathEventScripts)
+            {
+                if (!data.PathEventScripts.Contains(scriptItemID))
+                    data.PathEventScripts.Add(scriptItemID);
+            }
         }
 
         public void BotDeregisterFromPathUpdateEvents(UUID botID, UUID scriptItemID, UUID ownerID)
         {
             BotData data = GetBotWithPermission(botID, ownerID);
             if (data == null) return;
-            data.PathEventScriptID = UUID.Zero;
+            lock (data.PathEventScripts)
+                data.PathEventScripts.Remove(scriptItemID);
         }
 
         public void BotRegisterForCollisionEvents(UUID botID, SceneObjectGroup hostGroup, UUID ownerID)
