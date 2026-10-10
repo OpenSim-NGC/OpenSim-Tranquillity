@@ -2045,6 +2045,9 @@ namespace Phlox.ScriptEngine
             {
                 if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
                 if (!m_host.ParentGroup.IsAttachment && (m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
+                // The cap below lets a NaN through (the comparison is false) and turns an infinity into a NaN,
+                // so an impulse that is not finite is dropped before it reaches the body or the wearer.
+                if (!float.IsFinite(force.X) || !float.IsFinite(force.Y) || !float.IsFinite(force.Z)) return;
                 if (force.LengthSquared() > 20000f * 20000f)
                     force = Vector3.Normalize(in force) * 20000f;
                 m_host.ApplyImpulse(force, local != 0);

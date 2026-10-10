@@ -45,6 +45,8 @@ namespace InWorldz.Phlox.Tests;
 ///   and every physics engine read from SceneObjectPart.RotationAxisLocks (SceneObjectGroup.axisSelect). Status is
 ///   an object attribute (SL: "all prims in an object share the same status"), so the locks are the root's, from
 ///   any prim of the object, and llGetStatus reads them back.
+/// - llApplyImpulse drops an impulse with a NaN or infinite component: the 20000 cap's length test is false for a
+///   NaN and turns an infinity into a NaN, which would otherwise reach the body or the wearer.
 /// </summary>
 // Calls the API directly on the harness prims; no clock and no process-wide state, so the class runs in parallel.
 public class PhysicsStatusAndReadoutTests
@@ -81,6 +83,22 @@ public class PhysicsStatusAndReadoutTests
         var child = h.Prim.ParentGroup.Parts.Single(p => p != h.Prim);
         child.OffsetPosition = offset;
         return child;
+    }
+
+    private static void SetAvatarActor(ScenePresence sp, PhysicsActor pa)
+        => typeof(ScenePresence).GetProperty("PhysicsActor")!.GetSetMethod(true)!.Invoke(sp, new object[] { pa });
+
+    /// <summary>Wear the harness object on a new avatar at <paramref name="pos"/>.</summary>
+    private static ScenePresence Wear(SchedulerHarness h, Vector3 pos)
+    {
+        var client = h.AddClient();
+        var sp = h.Scene.GetScenePresence(client.AgentId);
+        sp.AbsolutePosition = pos;
+        var sog = h.Prim.ParentGroup;
+        sog.AttachedAvatar = sp.UUID;
+        sog.IsAttachment = true;
+        sp.AddAttachment(sog);
+        return sp;
     }
 
     // ---- llSetStatus / llGetStatus rotation axes ----
@@ -139,5 +157,50 @@ public class PhysicsStatusAndReadoutTests
             Assert.Equal(1, api.llGetStatus(STATUS_ROTATE_Y));
             Assert.Equal(1, api.llGetStatus(STATUS_ROTATE_Z));
         }
+    }
+
+    // ---- llApplyImpulse with a value that is not a number ----
+
+    public static IEnumerable<object[]> NotFiniteImpulses => new[]
+    {
+        new object[] { new Vector3(float.NaN, 0, 0) },
+        new object[] { new Vector3(0, 0, float.PositiveInfinity) },
+        new object[] { new Vector3(1, float.NegativeInfinity, float.NaN) },
+    };
+
+    [Theory]
+    [MemberData(nameof(NotFiniteImpulses))]
+    public void ApplyImpulseThatIsNotFiniteDoesNotReachThePhysicalObject(Vector3 impulse)
+    {
+        using var h = new SchedulerHarness();
+        var body = new Body();
+        h.Prim.PhysActor = body;
+        h.Prim.AddFlag(PrimFlags.Physics);
+        Api(h, h.Prim).llApplyImpulse(impulse, 0);
+        Assert.Empty(body.Forces);
+    }
+
+    [Theory]
+    [MemberData(nameof(NotFiniteImpulses))]
+    public void ApplyImpulseThatIsNotFiniteDoesNotPushTheWearer(Vector3 impulse)
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30));
+        var avatar = new Body();
+        SetAvatarActor(sp, avatar);
+        Api(h, h.Prim).llApplyImpulse(impulse, 0);
+        Assert.Empty(avatar.Forces);
+    }
+
+    [Fact]
+    public void ApplyImpulseStillCapsAFiniteImpulseAt20000()
+    {
+        using var h = new SchedulerHarness();
+        var body = new Body();
+        h.Prim.PhysActor = body;
+        h.Prim.AddFlag(PrimFlags.Physics);
+        Api(h, h.Prim).llApplyImpulse(new Vector3(30000, 0, 0), 0);
+        Assert.Single(body.Forces);
+        Near(new Vector3(20000, 0, 0), body.Forces[0], 0.5f);
     }
 }
