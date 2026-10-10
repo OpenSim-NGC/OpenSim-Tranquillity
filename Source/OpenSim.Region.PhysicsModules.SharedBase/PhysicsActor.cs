@@ -141,8 +141,8 @@ public class CollisionEventUpdate : EventArgs
         {
             if (curcp.PenetrationDepth < contact.PenetrationDepth)
             {
-                if (Math.Abs(curcp.PenetrationDepth) > Math.Abs(contact.RelativeSpeed))
-                    contact.RelativeSpeed = curcp.PenetrationDepth;
+                if (Math.Abs(curcp.RelativeSpeed) > Math.Abs(contact.RelativeSpeed))
+                    contact.RelativeSpeed = curcp.RelativeSpeed;
                 curcp = contact;
             }
             else if (MathF.Abs(curcp.RelativeSpeed) < MathF.Abs(contact.RelativeSpeed))
