@@ -47,7 +47,12 @@ public sealed class SchedulerHarness : IDisposable
     /// The engine's bytecode cache folder. Null (the default) is the calling test class's own folder, see
     /// <see cref="BytecodeDirForCaller"/>; <see cref="ProductionBytecodeDir"/> is the loader's own shared folder.
     /// </param>
-    public SchedulerHarness(Action<IConfigSource> configure = null, bool withYEngine = false, string bytecodeDir = null)
+    /// <param name="keepMasterThread">
+    /// Leave the region's own scheduler thread running, as in a region, instead of pumping from the test. The pump
+    /// methods must not be used then: the thread and the test would both drive the schedulers.
+    /// </param>
+    public SchedulerHarness(Action<IConfigSource> configure = null, bool withYEngine = false, string bytecodeDir = null,
+        bool keepMasterThread = false)
     {
         var config = new IniConfigSource();
         var phlox = config.AddConfig("InWorldz.Phlox");
@@ -120,7 +125,7 @@ public sealed class SchedulerHarness : IDisposable
         Assert.NotNull(m_exe);
 
         // The master scheduler owns a thread; this harness drives DoWork itself instead, so stop it.
-        StopMasterThread();
+        if (!keepMasterThread) StopMasterThread();
     }
 
     /// <summary>The loader's own folder (PhloxScriptLoader.CACHE_DIR), relative to the working directory.</summary>

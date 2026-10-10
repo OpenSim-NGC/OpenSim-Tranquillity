@@ -114,6 +114,7 @@ This is every key the engine reads from the section. All of them are optional.
 | `ServiceCallDeferral` | `auto` | How script calls that may wait on a grid service run. `auto`: on the scheduler when the answer is local or cached, otherwise on worker threads. `always`: every such call on worker threads. `never`: every call on the scheduler. Any other value means `auto`. |
 | `ServiceCallTimeoutMs` | `35000` | Deadline in milliseconds for a call running on a worker thread (minimum 1). |
 | `ServiceCallThreads` | `4` | Worker threads per region for those calls (minimum 1). |
+| `SchedulerThreadPriority` | `Lowest` | Priority of the one thread that runs every script in the region: `Lowest`, `BelowNormal`, `Normal`, `AboveNormal` or `Highest` (case does not matter). Any other value logs a warning at start and means `Lowest`. A higher priority keeps scripts responsive when the machine is busy, at the cost of the rest of the simulator (and of other programs on the host), which gets the processor less often. No value is right for every host: it depends on how busy the machine is and what else runs on it. The start-up log line `SchedulerThreadPriority = ...` shows the value in use. |
 | `SensorMaxRange` | `96.0` | Largest range in metres a sensor may use. |
 | `SensorMaxResults` | `16` | Most objects or avatars one sensor reports. |
 | `StateRowMaxAgeDays` | `0` | Deletes saved-state rows not saved or loaded for this many days whose scripts are not loaded in the simulator; checked every 6 hours, first 1 hour after start. `0`: never (the default). |
