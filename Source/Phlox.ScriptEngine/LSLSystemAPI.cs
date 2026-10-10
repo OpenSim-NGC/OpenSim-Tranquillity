@@ -552,6 +552,24 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
+        /// The script is held while its object crosses into another region. As Halcyon's OnScriptUnloaded for a crossing
+        /// wait: the sensor repeat stops, the replies the script is still owed (dataserver, HTTP, XML-RPC) are dropped,
+        /// and taken controls stay ("silently release controls IF this is not the result of a crossing wait disable"),
+        /// so the state the crossing captures still holds them. The SensorRepeat record stays: the sensor starts again
+        /// in the next region, or here when the crossing fails (RestoreSensorAfterParcel). URLs stay, unlike Halcyon's: a
+        /// failed crossing leaves the object here, so they keep working; a crossing that succeeds removes the script here,
+        /// and that unload releases them (ReleaseScriptResources).
+        /// </summary>
+        internal void OnCrossingHold()
+        {
+            PauseSensorForParcel();
+            m_PendingDataserver.Clear();
+            var async = m_ScriptEngine?.AsyncCommands;
+            async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID);
+            async?.XmlRequestPlugin.RemoveEvents(m_localID, m_itemID);
+        }
+
+        /// <summary>
         /// The unload's release of taken controls, from what the script and the region hold, never from the part's
         /// inventory: a derez queues the unload (Scene.DeleteSceneObject -> RemoveScriptInstances) and then disposes the
         /// object, which takes the part's inventory away (SceneObjectPart.Dispose), so the unload can run after the item

@@ -789,13 +789,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                 if (!inTransit)
                 {
                     inTransit = true;
-                    SceneObjectGroup sog = this;
-
-                    Util.FireAndForget(delegate
-                    {
-                        sog = CrossAsync(sog, val, null);
-                        CrossAsyncCompleted(sog);
-                    }, null, "ObjCross-"+sog.UUID.ToString(), false);
+                    StartCrossing(val, null, "ObjCross-" + UUID.ToString());
                 }
                 return;
             }
@@ -847,6 +841,34 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
 
             CheckParcelCrossing();
         }
+    }
+
+    /// <summary>
+    /// Run a crossing (or an object teleport to another region) whose caller has just set <see cref="inTransit"/>,
+    /// on its own thread. It is announced with EventManager.OnGroupBeginInTransit before that thread starts, and its
+    /// end with OnGroupEndInTransit once it is over: crossed when the object left (CrossAsync returns null), not
+    /// crossed when it stays here, after CrossAsyncCompleted has put it back in the region.
+    /// </summary>
+    private void StartCrossing(Vector3 val, TeleportObjectData tpdata, string threadName)
+    {
+        SceneObjectGroup sog = this;
+        Scene scene = m_scene;
+        scene.EventManager.TriggerGroupBeginInTransit(sog);
+
+        Util.FireAndForget(delegate
+        {
+            bool crossed = false;
+            try
+            {
+                SceneObjectGroup stayed = CrossAsync(sog, val, tpdata);
+                crossed = stayed is null;
+                CrossAsyncCompleted(stayed);
+            }
+            finally
+            {
+                scene.EventManager.TriggerGroupEndInTransit(sog, crossed);
+            }
+        }, null, threadName, false);
     }
 
     private SceneObjectGroup CrossAsync(SceneObjectGroup sog, Vector3 val, TeleportObjectData tpdata)
@@ -1309,12 +1331,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             sourceID = sourceID
         };
 
-        SceneObjectGroup sog = this;
-        Util.FireAndForget(delegate
-        {
-            sog = CrossAsync(sog, targetPosition, tdata);
-            CrossAsyncCompleted(sog);
-        }, null, "ObjTeleport-" + sog.UUID.ToString(), false);
+        StartCrossing(targetPosition, tdata, "ObjTeleport-" + UUID.ToString());
         return 0;
     }
 
