@@ -90,7 +90,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             SceneHelpers.AddScenePresence(m_scene, TestHelpers.ParseTail(0x1));
 
             // TODO: Add more assertions for the other aspects of event queues
-            Assert.Equal(1, m_server.GetPollServiceHandlerKeys().Count);
+            Assert.Single(m_server.GetPollServiceHandlerKeys());
         }
 
         [Fact]
@@ -105,7 +105,7 @@ namespace OpenSim.Region.ClientStack.Linden.Tests
             m_scene.CloseAgent(spId, false);
 
             // TODO: Add more assertions for the other aspects of event queues
-            Assert.Equal(0, m_server.GetPollServiceHandlerKeys().Count);
+            Assert.Empty(m_server.GetPollServiceHandlerKeys());
         }
 
         [Fact]

@@ -208,7 +208,7 @@ public class ResaveWhileLoadingTests
     /// loader runs the old queued load in between: that load is superseded already and never starts.
     /// </summary>
     [Fact]
-    public void AnOldLoadRunBeforeTheSavesRezIsPostedDoesNotStart()
+    public async Task AnOldLoadRunBeforeTheSavesRezIsPostedDoesNotStart()
     {
         using var h = new SchedulerHarness();
         UUID item = RezQueued(h, Good("m0"));
@@ -219,7 +219,7 @@ public class ResaveWhileLoadingTests
         var save = Task.Run(() => h.Prim.Inventory.CreateScriptInstanceEr(item, 0, false, Phlox, 1));
         Assert.True(h.PumpUntil(() => save.IsCompleted, Cap), "the Save did not return");
         h.Prim.ParentGroup.ResumeScripts();
-        Assert.Empty(save.Result);
+        Assert.Empty(await save);
         Assert.True(h.PumpUntil(() => Count(h, "m1 start") >= 1, Cap), $"the save did not start: [{string.Join(" | ", h.Said)}]");
         AssertRuns(h, item, "m1");
         Assert.Equal(0, Count(h, "m0 start"));
@@ -232,7 +232,7 @@ public class ResaveWhileLoadingTests
     /// which never starts, and the save's load runs the new asset.
     /// </summary>
     [Fact]
-    public void AnOldLoadPostedBeforeTheSavesUnloadIsCancelledByIt()
+    public async Task AnOldLoadPostedBeforeTheSavesUnloadIsCancelledByIt()
     {
         using var h = new SchedulerHarness();
         UUID item = RezQueued(h, Good("k0"));
@@ -248,7 +248,7 @@ public class ResaveWhileLoadingTests
         var save = Task.Run(() => h.Prim.Inventory.CreateScriptInstanceEr(item, 0, false, Phlox, 1));
         Assert.True(h.PumpUntil(() => save.IsCompleted, Cap), "the Save did not return");
         h.Prim.ParentGroup.ResumeScripts();
-        Assert.Empty(save.Result);
+        Assert.Empty(await save);
         Assert.True(h.PumpUntil(() => Count(h, "k1 start") >= 1, Cap), $"the save did not start: [{string.Join(" | ", h.Said)}]");
         AssertRuns(h, item, "k1");
         Assert.Equal(0, Count(h, "k0 touched"));

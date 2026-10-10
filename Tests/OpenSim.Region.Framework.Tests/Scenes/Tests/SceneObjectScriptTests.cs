@@ -60,11 +60,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.NotNull(partWhereScriptAdded);
 
             IEntityInventory primInventory = partWhereScriptAdded.Inventory;
-            Assert.Equal(1, primInventory.GetInventoryList().Count);
+            Assert.Single(primInventory.GetInventoryList());
             Assert.True(primInventory.ContainsScripts());
 
             IList<TaskInventoryItem> primItems = primInventory.GetInventoryItems(itemName);
-            Assert.Equal(1, primItems.Count);
+            Assert.Single(primItems);
         }
     }
 }

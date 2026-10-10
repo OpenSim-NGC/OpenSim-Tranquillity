@@ -10,6 +10,12 @@ vulnerabilities. Review each occurrence before changing behavior. Close a batch
 only after its diagnostics disappear from a full rebuild and relevant tests pass;
 do not close warnings by blanket suppression.
 
+Closeout: full non-incremental Release and Debug rebuilds of `Tranquillity.sln`
+are **warning-free (0 warnings, 0 errors)** on .NET SDK 10.0.112. All seven
+batches are closed. This inventory covers projects built by the solution,
+not every standalone project in the repository; see the excluded-project
+backlog below.
+
 ## Ranked task list
 
 - [x] **Batch 1 / Tier 1: duplicate type identities - 264 closed, 0 remaining**
@@ -48,11 +54,11 @@ do not close warnings by blanket suppression.
 - [x] **Batch 5 / Tier 3: test nullability - 181 closed, 0 remaining**
   - CS8600/01/02/03/05, CS8610/18/19, CS8620/25, CS8765/67.
   - Fix fixture initialization and nullable contracts in project-sized batches.
-- [ ] **Batch 6 / Tier 3b: xUnit analyzers - 32**
+- [x] **Batch 6 / Tier 3b: xUnit analyzers - 32 closed, 0 remaining**
   - xUnit2013 (22), xUnit1031 (6), xUnit2017 (2), xUnit2029 (1),
     xUnit2009 (1).
   - Preserve assertion meaning and remove blocking async test operations.
-- [ ] **Batch 7 / Tier 4: cosmetic, documentation and dead code - 33**
+- [x] **Batch 7 / Tier 4: cosmetic, documentation and dead code - 33 closed, 0 remaining**
   - CS3021 (12), CS8981 (12), CS0067 (1), CS0414 (3), CS0168 (2),
     CS1573 (3).
   - Check generated-source ownership before editing or removing declarations.
@@ -80,9 +86,91 @@ After Batch 3b it was 661 occurrences: 368 closed and 293 remaining.
 After Batch 3c it was 661 occurrences: 379 closed and 282 remaining.
 After Batch 3d it was 661 occurrences: 398 closed and 263 remaining.
 After Batch 4 it was 661 occurrences: 411 closed and 250 remaining.
-After Batch 5 it is **661 occurrences: 596 closed and 65 remaining**.
+After Batch 5 it was 661 occurrences: 596 closed and 65 remaining.
+After Batch 6 it was 661 occurrences: 628 closed and 33 remaining.
+After Batch 7 it is **661 occurrences: 661 closed and 0 remaining**:
+658 corrected and three accepted, declaration-specific compatibility exceptions.
 Use the current counts above for future batches, rather than subtracting 264
 from the incomplete original 648-warning baseline.
+
+## Batches 6 and 7 implementation and closeout
+
+Reassessment of `develop` at `588be916a0` (merged Batches 4/5 and intervening
+bug fixes) found exactly the expected **65 warnings, 0 errors** in a full
+non-incremental Release rebuild. There were no added solution diagnostic
+occurrences or warning codes.
+
+Batch 6 replaces collection-size, membership and substring boolean assertions
+with xUnit's `Empty`, `Single`, `Contains` and `DoesNotContain` assertions,
+preserving the expected contents and counts. Four Phlox tests now return
+`async Task` and await results rather than reading `Task.Result`. They still
+drive the scheduler with bounded synchronous pumping until each task completes
+before awaiting it, preserving the scheduler-driving thread and timeout checks.
+All 32 xUnit diagnostic occurrences are gone.
+
+Batch 7:
+
+- Declares the Phlox compiler assembly non-CLS-compliant, matching its generated
+  ANTLR types. All 12 CS3021 occurrences disappear without editing generated
+  parsers or changing the grammar regeneration workflow.
+- Replaces ten lowercase internal type aliases with the existing `LSL_Key`,
+  `LSL_Rotation` convention and `LSL_Vector`. The underlying CLR types, public
+  signatures, parameter names and script-facing names are unchanged.
+- Retains the public `LSL_Types.list` and `LSL_Types.key` names for compiled
+  scripts and serialized-state compatibility. With user approval, CS8981 is
+  disabled only around each declaration, then immediately restored.
+- Retains Phlox's required `IScriptModule.OnObjectRemoved` event and existing
+  subscription behavior. As in YEngine, the unused-event diagnostic is handled
+  locally: CS0067 is disabled only around that declaration, then restored.
+  No speculative object-removal notification behavior is introduced.
+- Removes three unused certificate-path/password fields in the DTL money module,
+  one unused particle-system local and an unused exception variable, retaining
+  the narrow exception catch and existing failure result.
+- Documents all parameters of the compositor's `Bake` overload.
+
+The three scoped exceptions above are intentional compatibility decisions, not
+project-wide suppression or missing implementations claimed as runtime fixes.
+No project-level `NoWarn` entries were added.
+
+### Verification
+
+- Full non-incremental Release rebuild: **0 warnings, 0 errors**.
+- Full non-incremental Debug rebuild: **0 warnings, 0 errors**.
+  The first Debug attempt aborted with an internal CLR error (`0x80131506`);
+  retrying with MSBuild server reuse disabled and one worker succeeded.
+- Selected Release tests: **207 passed, 0 failed**:
+  Phlox state/save/parcel/compiler/cleanup/cross-engine tests (123),
+  scene and inventory tests (43), event queue tests (5), muted messages (36).
+- `git diff --check` and editor diagnostics: clean.
+
+Repeat the solution verification with:
+
+```sh
+dotnet build Tranquillity.sln -c Release --no-restore --no-incremental
+DOTNET_CLI_USE_MSBUILD_SERVER=0 dotnet build Tranquillity.sln \
+  -c Debug --no-restore --no-incremental -m:1 -nr:false
+```
+
+### Excluded-project backlog
+
+An additional compatibility check built
+`Tests/OpenSim.Region.ScriptEngine.Tests/OpenSim.Region.ScriptEngine.Tests.csproj`,
+which is not included in `Tranquillity.sln`. Its separate build reported
+**74 warnings**: CS8600 (11), CS8604 (5), CS8618 (29), SYSLIB0014 (2),
+xUnit1013 (10), xUnit2013 (17). These are outside the tracked 661-occurrence
+solution inventory; the user chose to document this separate backlog rather
+than expand the closeout scope.
+
+Selected LSL type/list and OSSL API tests in that project produced **51 passed,
+2 failed**. Both failures are in unchanged float-conversion tests:
+`LSL_TypesTestLSLFloat.TestExplicitCastStringToLSLFloat` and
+`TestExplicitCastLSLStringToLSLFloat` expect `-100000` but receive `0`.
+Neither the float converter nor those tests was changed by this cleanup.
+These failures are not counted as successful verification and remain outside
+this batch.
+
+Linux tests used the already cached Skia native asset via `LD_LIBRARY_PATH`,
+as in the earlier batches. No dependency manifests were changed.
 
 ## Batch 3a implementation and verification
 

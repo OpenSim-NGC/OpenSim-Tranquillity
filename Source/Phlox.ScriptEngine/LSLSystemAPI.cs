@@ -9661,7 +9661,6 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 Primitive.ParticleSystem prules = GetNewParticleSystemWithSLDefaultValues();
                 Vector3 tempv;
                 float tempf;
-                int tempi;
 
                 for (int i = 0; i + 1 < rules.Data.Length; i += 2)
                 {

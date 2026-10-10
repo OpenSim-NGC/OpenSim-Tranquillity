@@ -372,7 +372,7 @@ public class MutedInstantMessageTests : OpenSimTestCase
         Send(FromAgent(SenderId));
         Send(FromAgent(OtherId));
 
-        Assert.Empty(m_received.Where(im => new UUID(im.fromAgentID).Equals(SenderId)));
+        Assert.DoesNotContain(m_received, im => new UUID(im.fromAgentID).Equals(SenderId));
         Assert.Single(m_received);
         Assert.Equal(1, mutes.Reads);
     }

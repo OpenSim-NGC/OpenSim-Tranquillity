@@ -64,7 +64,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_uuidGatherer.GatherAll();
 
             // We count the uuid as gathered even if the asset itself is corrupt.
-            Assert.Equal(1, m_uuidGatherer.GatheredUuids.Count);
+            Assert.Single(m_uuidGatherer.GatheredUuids);
         }
 
         /// <summary>
@@ -80,7 +80,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             m_uuidGatherer.AddForInspection(missingAssetUuid);
             m_uuidGatherer.GatherAll();
 
-            Assert.Equal(0, m_uuidGatherer.GatheredUuids.Count);
+            Assert.Empty(m_uuidGatherer.GatheredUuids);
         }
 
         [Fact]

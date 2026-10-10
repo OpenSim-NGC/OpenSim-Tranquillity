@@ -388,6 +388,9 @@ public sealed class TexLayerCompositor
 
     public CompositeResult Bake(BakeChannel bt, IReadOnlyList<WornWearable> worn, int size) => Bake(bt, worn, size, null);
 
+    /// <param name="bt">Bake channel to composite.</param>
+    /// <param name="worn">Wearables supplying textures and visual parameters.</param>
+    /// <param name="size">Width and height of the square output image in pixels.</param>
     /// <param name="overlayParams">Values for parameters no worn wearable stores (a caller's merged view); never override a wearable's own value.</param>
     public CompositeResult Bake(BakeChannel bt, IReadOnlyList<WornWearable> worn, int size, IReadOnlyDictionary<int, float>? overlayParams)
     {
