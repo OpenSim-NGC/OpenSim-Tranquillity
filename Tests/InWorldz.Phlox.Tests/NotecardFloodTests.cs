@@ -666,6 +666,7 @@ public class NotecardFloodTests
         default {
             state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""S entry""); }
             listen(integer c, string n, key k, string m) { if (m == ""sleep"") llSleep(100000.0); }
+            link_message(integer a, integer b, string c, key d) { }
             dataserver(key id, string d) { }
         }";
 
@@ -701,6 +702,46 @@ public class NotecardFloodTests
             Assert.Equal(40 - (32 - baseline), exe.OtherAnswersDropped(s));
             Assert.Equal(40 - (32 - baseline), exe.GetStatus(s).OtherAnswersDropped);
             Assert.Empty(r.FullLines(s));
+            // Every other event keeps the whole limit: with the queue at 32 of another script's answers, a link message
+            // and a chat event are both queued.
+            r.H.Engine.PostScriptEvent(s, "link_message", new object[] { 0, 0, "x", UUID.Zero.ToString() });
+            r.Say("chat");
+            Assert.True(r.H.PumpUntil(() => Depth(r, s) >= 34), "depth " + Depth(r, s));
+            r.H.PumpUntilIdle(TimeSpan.FromSeconds(5));
+            Assert.Equal(34, Depth(r, s));
+            Assert.Equal(40 - (32 - baseline), exe.OtherAnswersDropped(s));
+        }
+    }
+
+    // While a script is held for a crossing, the same rule holds at the second site: another script's answers stop at
+    // 32, and the script's own answers and its other events keep 64.
+    [Fact]
+    public void WhileAScriptIsHeldForACrossingAnotherScriptsAnswersStopAt32AndTheRestKeep64()
+    {
+        var r = new Rig();
+        using (r)
+        {
+            UUID s = r.Rez(r.H.Prim, "S", SleeperScript);
+            Assert.True(r.Started(new[] { "S" }));
+            var exe = SavedStateRig.Exe(r.H);
+            exe.RequestCrossingHold(r.H.Prim.ParentGroup, true);
+            Assert.True(r.H.PumpUntil(() => (exe.GetStatus(s).LocalDisable ?? "").Contains("CrossingWait")), "not held: " + exe.GetStatus(s).LocalDisable);
+            r.H.PumpUntilIdle(TimeSpan.FromSeconds(5));
+            int baseline = Depth(r, s);
+            UUID other = UUID.Random();
+            for (int i = 0; i < 40; i++) r.H.Engine.PostDataserverToPrim(r.H.Prim, UUID.Zero, other, "q" + i, "x");
+            Assert.True(r.H.PumpUntil(() => exe.OtherAnswersDropped(s) >= 40 - (32 - baseline)), "depth " + Depth(r, s));
+            r.H.PumpUntilIdle(TimeSpan.FromSeconds(5));
+            Assert.Equal(32, Depth(r, s));
+            Assert.Equal(40 - (32 - baseline), exe.OtherAnswersDropped(s));
+            r.H.Engine.PostScriptEvent(s, "link_message", new object[] { 0, 0, "x", UUID.Zero.ToString() });
+            Assert.True(r.H.PumpUntil(() => Depth(r, s) >= 33), "depth " + Depth(r, s));
+            for (int i = 0; i < 40; i++) r.H.Engine.PostDataserverToPrim(r.H.Prim, UUID.Zero, s, "p" + i, "x");
+            Assert.True(r.H.PumpUntil(() => r.Dropped(s) >= 9), "depth " + Depth(r, s) + " dropped " + r.Dropped(s));
+            r.H.PumpUntilIdle(TimeSpan.FromSeconds(5));
+            Assert.Equal(64, Depth(r, s));
+            Assert.Equal(9, r.Dropped(s));   // its own answers: 31 fit up to 64, the other 9 are dropped as at 64 before
+            Assert.Equal(40 - (32 - baseline), exe.OtherAnswersDropped(s));
         }
     }
 
