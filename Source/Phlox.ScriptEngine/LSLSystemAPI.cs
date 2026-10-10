@@ -1863,7 +1863,19 @@ namespace Phlox.ScriptEngine
             if (minFactor == float.MaxValue || minFactor <= 0f) return 1f;
             return (float)Math.Round(1f / minFactor, 5);
         }
-        public Vector3 llGetVel() => m_host?.Velocity ?? Vector3.Zero;
+        /// <summary>
+        /// In an attachment, the wearer's velocity (a seated wearer's is the seat object's), as YEngine
+        /// (ScenePresence.GetWorldVelocity) and Halcyon (SceneObjectPart.GetWearerVelocity); the SL wiki page says
+        /// nothing about attachments. Otherwise the prim's velocity, as before.
+        /// </summary>
+        public Vector3 llGetVel()
+        {
+            if (m_host == null) return Vector3.Zero;
+            SceneObjectGroup group = m_host.ParentGroup;
+            if (group != null && group.IsAttachment)
+                return World.GetScenePresence(group.AttachedAvatar)?.GetWorldVelocity() ?? Vector3.Zero;
+            return m_host.Velocity;
+        }
         /// <summary>
         /// The object's acceleration in region axes; ZERO_VECTOR in an attachment or a child prim (SL wiki llGetAccel:
         /// "Returns ZERO_VECTOR in attachments", "Returns ZERO_VECTOR in child prims").

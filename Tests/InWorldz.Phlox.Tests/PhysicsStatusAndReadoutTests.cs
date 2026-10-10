@@ -52,6 +52,8 @@ namespace InWorldz.Phlox.Tests;
 /// - llGetAccel is the object's acceleration, ZERO_VECTOR in a child prim or an attachment (SL wiki llGetAccel);
 ///   llGetOmega is the root's angular velocity, a physical spin or a llTargetOmega (SL: "Returns the omega of the
 ///   root if called in a child prim"); llGetTorque returns the torque llSetTorque stored on the root.
+/// - llGetVel in an attachment returns the wearer's velocity, as YEngine (ScenePresence.GetWorldVelocity) and
+///   Halcyon (SceneObjectPart.GetWearerVelocity) do; the SL wiki page says nothing about attachments.
 /// </summary>
 // Calls the API directly on the harness prims; no clock and no process-wide state, so the class runs in parallel.
 public class PhysicsStatusAndReadoutTests
@@ -337,5 +339,36 @@ public class PhysicsStatusAndReadoutTests
         var child = AddChild(h, new Vector3(1, 0, 0));
         Api(h, h.Prim).llSetForceAndTorque(Vector3.Zero, new Vector3(1, 0, 0), 0);
         Near(new Vector3(1, 0, 0), Api(h, child).llGetTorque());
+    }
+
+    // ---- llGetVel ----
+
+    [Fact]
+    public void GetVelInAnAttachmentReturnsTheWearersVelocity()
+    {
+        using var h = new SchedulerHarness();
+        var sp = Wear(h, new Vector3(100, 100, 30));
+        SetAvatarActor(sp, new Body { Vel = new Vector3(3, -1, 0) });
+        h.Prim.PhysActor = new Body { Vel = new Vector3(0, 0, 9) };
+        Near(new Vector3(3, -1, 0), Api(h, h.Prim).llGetVel());
+    }
+
+    [Fact]
+    public void GetVelInAnAttachmentsChildReturnsTheWearersVelocity()
+    {
+        using var h = new SchedulerHarness();
+        var child = AddChild(h, new Vector3(0.2f, 0, 0));
+        var sp = Wear(h, new Vector3(100, 100, 30));
+        SetAvatarActor(sp, new Body { Vel = new Vector3(0, 4, 0) });
+        Near(new Vector3(0, 4, 0), Api(h, child).llGetVel());
+    }
+
+    [Fact]
+    public void GetVelOfAnUnattachedPhysicalObjectIsItsOwnAsBefore()
+    {
+        using var h = new SchedulerHarness();
+        h.Prim.PhysActor = new Body { Vel = new Vector3(0, 0, 9) };
+        h.Prim.AddFlag(PrimFlags.Physics);
+        Near(new Vector3(0, 0, 9), Api(h, h.Prim).llGetVel());
     }
 }
