@@ -97,14 +97,14 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneHelpers.AddScenePresence(scene, spUuid);
 
             Assert.NotNull(scene.AuthenticateHandler.GetAgentCircuitData(spUuid));
-            Assert.Equal(1, scene.AuthenticateHandler.GetAgentCircuits().Count);
+            Assert.Single(scene.AuthenticateHandler.GetAgentCircuits());
 
             ScenePresence sp = scene.GetScenePresence(spUuid);
             Assert.NotNull(sp);
             Assert.False(sp.IsChildAgent);
             Assert.Equal(spUuid, sp.UUID);
 
-            Assert.Equal(1, scene.GetScenePresences().Count);
+            Assert.Single(scene.GetScenePresences());
         }
 
         /// <summary>
@@ -138,12 +138,12 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Check rest of exepcted parameters.
             Assert.NotNull(scene.AuthenticateHandler.GetAgentCircuitData(spUuid));
-            Assert.Equal(1, scene.AuthenticateHandler.GetAgentCircuits().Count);
+            Assert.Single(scene.AuthenticateHandler.GetAgentCircuits());
 
             Assert.False(sp.IsChildAgent);
             Assert.Equal(spUuid, sp.UUID);
 
-            Assert.Equal(1, scene.GetScenePresences().Count);
+            Assert.Single(scene.GetScenePresences());
         }
 
         [Fact]
@@ -172,7 +172,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneHelpers.AddScenePresence(scene, spUuid);
 
             Assert.NotNull(scene.AuthenticateHandler.GetAgentCircuitData(spUuid));
-            Assert.Equal(1, scene.AuthenticateHandler.GetAgentCircuits().Count);
+            Assert.Single(scene.AuthenticateHandler.GetAgentCircuits());
 
             ScenePresence sp = scene.GetScenePresence(spUuid);
             Assert.NotNull(sp);
@@ -193,7 +193,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             Assert.Null(scene.GetScenePresence(sp.UUID));
             Assert.Null(scene.AuthenticateHandler.GetAgentCircuitData(sp.UUID));
-            Assert.Equal(0, scene.AuthenticateHandler.GetAgentCircuits().Count);
+            Assert.Empty(scene.AuthenticateHandler.GetAgentCircuits());
 
 //            TestHelpers.DisableLogging();
         }
@@ -228,7 +228,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             scene.SimulationService.CreateAgent(null, region, acd, (uint)TeleportFlags.ViaLogin, ctx, out reason);
 
             Assert.NotNull(scene.AuthenticateHandler.GetAgentCircuitData(agentId));
-            Assert.Equal(1, scene.AuthenticateHandler.GetAgentCircuits().Count);
+            Assert.Single(scene.AuthenticateHandler.GetAgentCircuits());
 
             // There's no scene presence yet since only an agent circuit has been established.
             Assert.Null(scene.GetScenePresence(agentId));
@@ -239,7 +239,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             scene.AddNewAgent(client, PresenceType.User);
 
             Assert.NotNull(scene.AuthenticateHandler.GetAgentCircuitData(agentId));
-            Assert.Equal(1, scene.AuthenticateHandler.GetAgentCircuits().Count);
+            Assert.Single(scene.AuthenticateHandler.GetAgentCircuits());
 
             ScenePresence sp = scene.GetScenePresence(agentId);
             Assert.NotNull(sp);

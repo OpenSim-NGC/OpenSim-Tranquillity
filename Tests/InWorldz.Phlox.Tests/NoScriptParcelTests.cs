@@ -261,7 +261,7 @@ public class NoScriptParcelTests
         l2.Pump(600);
         l2.PumpUntil(() => !l2.Paused(itemId) && l2.LastTick("rs") > before, 30000);
         Log(l2, "west allows");
-        Assert.False(l2.H.Said.Contains("rs entry"));                        // restored, not restarted
+        Assert.DoesNotContain("rs entry", l2.H.Said);                        // restored, not restarted
         Assert.True(l2.LastTick("rs") > before);                              // n carried on from where it was
         Assert.Equal(before + 1, l2.H.Said.Where(s => s.StartsWith("rs tick ")).Select(s => int.Parse(s.Substring(8))).Min());
     }

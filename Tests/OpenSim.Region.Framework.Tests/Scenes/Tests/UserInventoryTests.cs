@@ -55,7 +55,7 @@ namespace OpenSim.Region.Framework.Tests
             List<InventoryFolderBase> oneFolder
                 = UserInventoryHelpers.GetInventoryFolders(scene.InventoryService, user1.PrincipalID, foldersName);
 
-            Assert.Equal(1, oneFolder.Count);
+            Assert.Single(oneFolder);
             InventoryFolderBase firstRetrievedFolder = oneFolder[0];
             Assert.Equal(foldersName, firstRetrievedFolder.Name);
 

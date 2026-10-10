@@ -135,7 +135,7 @@ public static class SkiaImageUtils
         {
             decoded = SKBitmapJ2kExtensions.FromJ2KBytes(inData);
         }
-        catch (InvalidOperationException e)
+        catch (InvalidOperationException)
         {
             // The given array of bytes is not a valid JPEG2000 image. Report failure.
             return false;

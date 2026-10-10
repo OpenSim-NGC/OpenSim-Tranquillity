@@ -126,7 +126,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             SceneObjectGroup so2 = SceneObjectSerializer.FromXml2Format(xml);
             Assert.NotNull(so2);
             Assert.NotEqual(so.RootPart.CreatorIdentification, so2.RootPart.CreatorIdentification);
-            Assert.True(so2.RootPart.CreatorIdentification.Contains("http://"));
+            Assert.Contains("http://", so2.RootPart.CreatorIdentification);
         }
     }
 }

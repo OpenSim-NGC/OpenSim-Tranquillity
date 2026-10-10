@@ -91,8 +91,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.Equal(UUID.Zero, part.SitTargetAvatar);
             Assert.Equal(1, part.GetSittingAvatarsCount());
             HashSet<ScenePresence> sittingAvatars = part.GetSittingAvatars();
-            Assert.Equal(1, sittingAvatars.Count);
-            Assert.True(sittingAvatars.Contains(m_sp));
+            Assert.Single(sittingAvatars);
+            Assert.Contains(m_sp, sittingAvatars);
             Assert.Equal(part.LocalId, m_sp.ParentID);
         }
 

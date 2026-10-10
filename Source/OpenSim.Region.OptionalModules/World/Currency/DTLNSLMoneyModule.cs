@@ -204,10 +204,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     private bool m_entryalert = true;
     public BaseHttpServer HttpServer;
 
-    private string m_certFilename = "";
-    private string m_certPassword = "";
     private bool m_checkServerCert = false;
-    private string m_cacertFilename = "";
     private X509Certificate2 m_cert = null;
 
     private bool m_use_web_settle = false;

@@ -1381,7 +1381,10 @@ namespace Phlox.ScriptEngine
         public string ScriptEngineName => Name;
 
         public event ScriptRemoved OnScriptRemoved;
+        // Required by IScriptModule; Phlox currently emits only script-removal notifications.
+#pragma warning disable CS0067
         public event ObjectRemoved OnObjectRemoved;
+#pragma warning restore CS0067
 
         // ── State that travels with objects ──────────────────────────────────────
         //

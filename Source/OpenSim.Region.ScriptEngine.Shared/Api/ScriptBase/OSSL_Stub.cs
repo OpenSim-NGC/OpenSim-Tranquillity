@@ -29,9 +29,8 @@ using System.Runtime.CompilerServices;
 
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
-using vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
-using rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
-using key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
+using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
+using LSL_Rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
 using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
@@ -123,31 +122,31 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Integer osGetParcelDwell(vector pos)
+    public LSL_Integer osGetParcelDwell(LSL_Vector pos)
     {
         return m_OSSL_Functions.osGetParcelDwell(pos);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osParcelJoin(vector pos1, vector pos2)
+    public void osParcelJoin(LSL_Vector pos1, LSL_Vector pos2)
     {
         m_OSSL_Functions.osParcelJoin(pos1,pos2);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osParcelSubdivide(vector pos1, vector pos2)
+    public void osParcelSubdivide(LSL_Vector pos1, LSL_Vector pos2)
     {
         m_OSSL_Functions.osParcelSubdivide(pos1, pos2);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetParcelDetails(vector pos, LSL_List rules)
+    public void osSetParcelDetails(LSL_Vector pos, LSL_List rules)
     {
         m_OSSL_Functions.osSetParcelDetails(pos, rules);
     }
     // Deprecated
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osParcelSetDetails(vector pos, LSL_List rules)
+    public void osParcelSetDetails(LSL_Vector pos, LSL_List rules)
     {
         m_OSSL_Functions.osParcelSetDetails(pos,rules);
     }
@@ -290,43 +289,43 @@ public partial class ScriptBaseClass
     // Teleport Functions
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osLocalTeleportAgent(LSL_Key agent, vector position, vector velocity, vector lookat, LSL_Integer flags)
+    public void osLocalTeleportAgent(LSL_Key agent, LSL_Vector position, LSL_Vector velocity, LSL_Vector lookat, LSL_Integer flags)
     {
         m_OSSL_Functions.osLocalTeleportAgent(agent, position, velocity, lookat, flags);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osTeleportAgent(string agent, string regionName, vector position, vector lookat)
+    public void osTeleportAgent(string agent, string regionName, LSL_Vector position, LSL_Vector lookat)
     {
         m_OSSL_Functions.osTeleportAgent(agent, regionName, position, lookat);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osTeleportAgent(string agent, int regionX, int regionY, vector position, vector lookat)
+    public void osTeleportAgent(string agent, int regionX, int regionY, LSL_Vector position, LSL_Vector lookat)
     {
         m_OSSL_Functions.osTeleportAgent(agent, regionX, regionY, position, lookat);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osTeleportAgent(string agent, vector position, vector lookat)
+    public void osTeleportAgent(string agent, LSL_Vector position, LSL_Vector lookat)
     {
         m_OSSL_Functions.osTeleportAgent(agent, position, lookat);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osTeleportOwner(string regionName, vector position, vector lookat)
+    public void osTeleportOwner(string regionName, LSL_Vector position, LSL_Vector lookat)
     {
         m_OSSL_Functions.osTeleportOwner(regionName, position, lookat);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osTeleportOwner(int regionX, int regionY, vector position, vector lookat)
+    public void osTeleportOwner(int regionX, int regionY, LSL_Vector position, LSL_Vector lookat)
     {
         m_OSSL_Functions.osTeleportOwner(regionX, regionY, position, lookat);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osTeleportOwner(vector position, vector lookat)
+    public void osTeleportOwner(LSL_Vector position, LSL_Vector lookat)
     {
         m_OSSL_Functions.osTeleportOwner(position, lookat);
     }
@@ -514,13 +513,13 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string osSetPenColor(string drawList, vector color)
+    public string osSetPenColor(string drawList, LSL_Vector color)
     {
         return m_OSSL_Functions.osSetPenColor(drawList, color);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public string osSetPenColor(string drawList, vector color, float alpha)
+    public string osSetPenColor(string drawList, LSL_Vector color, float alpha)
     {
         return m_OSSL_Functions.osSetPenColor(drawList, color, alpha);
     }
@@ -539,7 +538,7 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osGetDrawStringSize(string contentType, string text, string fontName, int fontSize)
+    public LSL_Vector osGetDrawStringSize(string contentType, string text, string fontName, int fontSize)
     {
         return m_OSSL_Functions.osGetDrawStringSize(contentType, text, fontName, fontSize);
     }
@@ -575,7 +574,7 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osMessageObject(key objectUUID,string message)
+    public void osMessageObject(LSL_Key objectUUID,string message)
     {
         m_OSSL_Functions.osMessageObject(objectUUID,message);
     }
@@ -744,31 +743,31 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public key osNpcCreate(string user, string name, vector position, key cloneFrom)
+    public LSL_Key osNpcCreate(string user, string name, LSL_Vector position, LSL_Key cloneFrom)
     {
         return m_OSSL_Functions.osNpcCreate(user, name, position, cloneFrom);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public key osNpcCreate(string user, string name, vector position, key cloneFrom, int options)
+    public LSL_Key osNpcCreate(string user, string name, LSL_Vector position, LSL_Key cloneFrom, int options)
     {
         return m_OSSL_Functions.osNpcCreate(user, name, position, cloneFrom, options);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public key osNpcSaveAppearance(key npc, LSL_String notecard)
+    public LSL_Key osNpcSaveAppearance(LSL_Key npc, LSL_String notecard)
     {
         return m_OSSL_Functions.osNpcSaveAppearance(npc, notecard);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public key osNpcSaveAppearance(key npc, LSL_String notecard, LSL_Integer includeHuds)
+    public LSL_Key osNpcSaveAppearance(LSL_Key npc, LSL_String notecard, LSL_Integer includeHuds)
     {
         return m_OSSL_Functions.osNpcSaveAppearance(npc, notecard, includeHuds);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcLoadAppearance(key npc, string notecard)
+    public void osNpcLoadAppearance(LSL_Key npc, string notecard)
     {
         m_OSSL_Functions.osNpcLoadAppearance(npc, notecard);
     }
@@ -780,31 +779,31 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osNpcGetPos(LSL_Key npc)
+    public LSL_Vector osNpcGetPos(LSL_Key npc)
     {
         return m_OSSL_Functions.osNpcGetPos(npc);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcMoveTo(key npc, vector position)
+    public void osNpcMoveTo(LSL_Key npc, LSL_Vector position)
     {
         m_OSSL_Functions.osNpcMoveTo(npc, position);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcMoveToTarget(key npc, vector target, int options)
+    public void osNpcMoveToTarget(LSL_Key npc, LSL_Vector target, int options)
     {
         m_OSSL_Functions.osNpcMoveToTarget(npc, target, options);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public rotation osNpcGetRot(key npc)
+    public LSL_Rotation osNpcGetRot(LSL_Key npc)
     {
         return m_OSSL_Functions.osNpcGetRot(npc);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcSetRot(key npc, rotation rot)
+    public void osNpcSetRot(LSL_Key npc, LSL_Rotation rot)
     {
         m_OSSL_Functions.osNpcSetRot(npc, rot);
     }
@@ -828,13 +827,13 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcSay(key npc, string message)
+    public void osNpcSay(LSL_Key npc, string message)
     {
         m_OSSL_Functions.osNpcSay(npc, message);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcSay(key npc, int channel, string message)
+    public void osNpcSay(LSL_Key npc, int channel, string message)
     {
         m_OSSL_Functions.osNpcSay(npc, channel, message);
     }
@@ -846,7 +845,7 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcShout(key npc, int channel, string message)
+    public void osNpcShout(LSL_Key npc, int channel, string message)
     {
         m_OSSL_Functions.osNpcShout(npc, channel, message);
     }
@@ -864,7 +863,7 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcRemove(key npc)
+    public void osNpcRemove(LSL_Key npc)
     {
         m_OSSL_Functions.osNpcRemove(npc);
     }
@@ -882,7 +881,7 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osNpcWhisper(key npc, int channel, string message)
+    public void osNpcWhisper(LSL_Key npc, int channel, string message)
     {
         m_OSSL_Functions.osNpcWhisper(npc, channel, message);
     }
@@ -924,13 +923,13 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public key osGetMapTexture()
+    public LSL_Key osGetMapTexture()
     {
         return m_OSSL_Functions.osGetMapTexture();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public key osGetRegionMapTexture(string regionNameOrID)
+    public LSL_Key osGetRegionMapTexture(string regionNameOrID)
     {
         return m_OSSL_Functions.osGetRegionMapTexture(regionNameOrID);
     }
@@ -942,7 +941,7 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osGetRegionSize()
+    public LSL_Vector osGetRegionSize()
     {
         return m_OSSL_Functions.osGetRegionSize();
     }
@@ -989,37 +988,37 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Float osGetHealth(key avatar)
+    public LSL_Float osGetHealth(LSL_Key avatar)
     {
         return m_OSSL_Functions.osGetHealth(avatar);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osCauseDamage(key avatar, LSL_Float damage)
+    public void osCauseDamage(LSL_Key avatar, LSL_Float damage)
     {
         m_OSSL_Functions.osCauseDamage(avatar, damage);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osCauseHealing(key avatar, LSL_Float healing)
+    public void osCauseHealing(LSL_Key avatar, LSL_Float healing)
     {
         m_OSSL_Functions.osCauseHealing(avatar, healing);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetHealth(key avatar, LSL_Float health)
+    public void osSetHealth(LSL_Key avatar, LSL_Float health)
     {
         m_OSSL_Functions.osSetHealth(avatar, health);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetHealRate(key avatar, LSL_Float health)
+    public void osSetHealRate(LSL_Key avatar, LSL_Float health)
     {
         m_OSSL_Functions.osSetHealRate(avatar, health);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Float osGetHealRate(key avatar)
+    public LSL_Float osGetHealRate(LSL_Key avatar)
     {
         return m_OSSL_Functions.osGetHealRate(avatar);
     }
@@ -1157,13 +1156,13 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osDropAttachmentAt(vector pos, rotation rot)
+    public void osDropAttachmentAt(LSL_Vector pos, LSL_Rotation rot)
     {
         m_OSSL_Functions.osDropAttachmentAt(pos, rot);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osForceDropAttachmentAt(vector pos, rotation rot)
+    public void osForceDropAttachmentAt(LSL_Vector pos, LSL_Rotation rot)
     {
         m_OSSL_Functions.osForceDropAttachmentAt(pos, rot);
     }
@@ -1211,25 +1210,25 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetInertia(LSL_Float mass, vector centerOfMass, vector principalInertiaScaled,  rotation rot)
+    public void osSetInertia(LSL_Float mass, LSL_Vector centerOfMass, LSL_Vector principalInertiaScaled,  LSL_Rotation rot)
     {
         m_OSSL_Functions.osSetInertia(mass, centerOfMass, principalInertiaScaled, rot);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetInertiaAsBox(LSL_Float mass, vector boxSize, vector centerOfMass, rotation rot)
+    public void osSetInertiaAsBox(LSL_Float mass, LSL_Vector boxSize, LSL_Vector centerOfMass, LSL_Rotation rot)
     {
         m_OSSL_Functions.osSetInertiaAsBox(mass, boxSize, centerOfMass, rot);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetInertiaAsSphere(LSL_Float mass,  LSL_Float radius, vector centerOfMass)
+    public void osSetInertiaAsSphere(LSL_Float mass,  LSL_Float radius, LSL_Vector centerOfMass)
     {
         m_OSSL_Functions.osSetInertiaAsSphere(mass, radius, centerOfMass);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetInertiaAsCylinder(LSL_Float mass,  LSL_Float radius, LSL_Float length, vector centerOfMass,rotation lslrot)
+    public void osSetInertiaAsCylinder(LSL_Float mass,  LSL_Float radius, LSL_Float length, LSL_Vector centerOfMass,LSL_Rotation lslrot)
     {
         m_OSSL_Functions.osSetInertiaAsCylinder( mass, radius, length, centerOfMass, lslrot);
     }
@@ -1241,7 +1240,7 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Integer osTeleportObject(LSL_Key objectUUID, vector targetPos, rotation targetrotation, LSL_Integer flags)
+    public LSL_Integer osTeleportObject(LSL_Key objectUUID, LSL_Vector targetPos, LSL_Rotation targetrotation, LSL_Integer flags)
     {
         return m_OSSL_Functions.osTeleportObject(objectUUID, targetPos, targetrotation, flags);
     }
@@ -1259,19 +1258,19 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Float osVecMagSquare(vector a)
+    public LSL_Float osVecMagSquare(LSL_Vector a)
     {
         return m_OSSL_Functions.osVecMagSquare(a);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Float osVecDistSquare(vector a, vector b)
+    public LSL_Float osVecDistSquare(LSL_Vector a, LSL_Vector b)
     {
         return m_OSSL_Functions.osVecDistSquare(a, b);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Float osAngleBetween(vector a, vector b)
+    public LSL_Float osAngleBetween(LSL_Vector a, LSL_Vector b)
     {
         return m_OSSL_Functions.osAngleBetween(a, b);
     }
@@ -1326,14 +1325,14 @@ public partial class ScriptBaseClass
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void osTriggerSoundLimited(LSL_Integer linknum, LSL_String sound, LSL_Float volume,
-             vector top_north_east, vector bottom_south_west)
+             LSL_Vector top_north_east, LSL_Vector bottom_south_west)
     {
         m_OSSL_Functions.osTriggerSoundLimited(linknum, sound, volume,
                                         top_north_east, bottom_south_west);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osTriggerSoundAtPos(LSL_String sound, vector position, LSL_Float gain)
+    public void osTriggerSoundAtPos(LSL_String sound, LSL_Vector position, LSL_Float gain)
     {
         m_OSSL_Functions.osTriggerSoundAtPos(sound, position, gain);
     }
@@ -1435,25 +1434,25 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Integer osApproxEquals(vector va, vector vb)
+    public LSL_Integer osApproxEquals(LSL_Vector va, LSL_Vector vb)
     {
         return m_OSSL_Functions.osApproxEquals(va, vb);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Integer osApproxEquals(vector va, vector vb, LSL_Float margin)
+    public LSL_Integer osApproxEquals(LSL_Vector va, LSL_Vector vb, LSL_Float margin)
     {
         return m_OSSL_Functions.osApproxEquals(va, vb, margin);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Integer osApproxEquals(rotation ra, rotation rb)
+    public LSL_Integer osApproxEquals(LSL_Rotation ra, LSL_Rotation rb)
     {
         return m_OSSL_Functions.osApproxEquals(ra, rb);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Integer osApproxEquals(rotation ra, rotation rb, LSL_Float margin)
+    public LSL_Integer osApproxEquals(LSL_Rotation ra, LSL_Rotation rb, LSL_Float margin)
     {
         return m_OSSL_Functions.osApproxEquals(ra, rb, margin);
     }
@@ -1566,13 +1565,13 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public rotation osSlerp(rotation a, rotation b, LSL_Float amount)
+    public LSL_Rotation osSlerp(LSL_Rotation a, LSL_Rotation b, LSL_Float amount)
     {
         return m_OSSL_Functions.osSlerp(a, b, amount);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osSlerp(vector a, vector b, LSL_Float amount)
+    public LSL_Vector osSlerp(LSL_Vector a, LSL_Vector b, LSL_Float amount)
     {
         return m_OSSL_Functions.osSlerp(a, b, amount);
     }
@@ -1614,37 +1613,37 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetStandTarget(vector v)
+    public void osSetStandTarget(LSL_Vector v)
     {
         m_OSSL_Functions.osSetStandTarget(v);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public void osSetLinkStandTarget(LSL_Integer linkNumber, vector v)
+    public void osSetLinkStandTarget(LSL_Integer linkNumber, LSL_Vector v)
     {
         m_OSSL_Functions.osSetLinkStandTarget(linkNumber, v);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osGetSitTargetPos()
+    public LSL_Vector osGetSitTargetPos()
     {
         return m_OSSL_Functions.osGetSitTargetPos();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public rotation osGetSitTargetRot()
+    public LSL_Rotation osGetSitTargetRot()
     {
         return m_OSSL_Functions.osGetSitTargetRot();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osGetStandTarget()
+    public LSL_Vector osGetStandTarget()
     {
         return m_OSSL_Functions.osGetStandTarget();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osGetLinkStandTarget(LSL_Integer linkNumber)
+    public LSL_Vector osGetLinkStandTarget(LSL_Integer linkNumber)
     {
         return m_OSSL_Functions.osGetLinkStandTarget(linkNumber);
     }
@@ -1718,7 +1717,7 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public LSL_Integer osNpcLookAt(LSL_Key npckey, LSL_Integer type, LSL_Key objkey, vector offset)
+    public LSL_Integer osNpcLookAt(LSL_Key npckey, LSL_Integer type, LSL_Key objkey, LSL_Vector offset)
     {
         return m_OSSL_Functions.osNpcLookAt(npckey, type, objkey, offset);
     }
@@ -1820,13 +1819,13 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osGetLinkColor(LSL_Integer link, LSL_Integer face)
+    public LSL_Vector osGetLinkColor(LSL_Integer link, LSL_Integer face)
     {
         return m_OSSL_Functions.osGetLinkColor(link, face);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osTemperature2sRBG(LSL_Float dtemp)
+    public LSL_Vector osTemperature2sRBG(LSL_Float dtemp)
     {
         return m_OSSL_Functions.osTemperature2sRGB(dtemp);
     }
@@ -1856,13 +1855,13 @@ public partial class ScriptBaseClass
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public vector osListAsVector(LSL_List src, int index)
+    public LSL_Vector osListAsVector(LSL_List src, int index)
     {
         return m_OSSL_Functions.osListAsVector(src, index);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public rotation osListAsRotation(LSL_List src, int index)
+    public LSL_Rotation osListAsRotation(LSL_List src, int index)
     {
         return m_OSSL_Functions.osListAsRotation(src, index);
     }

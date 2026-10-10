@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
+using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
@@ -35,6 +35,6 @@ public interface ILS_Api
     // Windlight Functions
     LSL_List lsGetWindlightScene(LSL_List rules);
     int lsSetWindlightScene(LSL_List rules);
-    int lsSetWindlightSceneTargeted(LSL_List rules, key targetId);
+    int lsSetWindlightSceneTargeted(LSL_List rules, LSL_Key targetId);
     void lsClearWindlightScene();
 }

@@ -99,7 +99,7 @@ public class CompileErrorsToEditorTests : IDisposable
     /// The class is already in "phlox-state", which the process-wide clock needs.
     /// </summary>
     [Fact]
-    public void ATimeoutAnswersTheRegionsTimeoutAndDoesNotBlockTheScheduler()
+    public async Task ATimeoutAnswersTheRegionsTimeoutAndDoesNotBlockTheScheduler()
     {
         bool frozen = false;
         ulong now = 0;
@@ -136,8 +136,9 @@ public class CompileErrorsToEditorTests : IDisposable
             Assert.False(save.IsCompleted, "the Save returned while its compile was still held");
             held.Set();
             Assert.True(h.PumpUntil(() => save.IsCompleted, TimeSpan.FromSeconds(30)), "the Save did not return");
-            _out.WriteLine($"while waiting: {Ticks() - before} ticks; answer [{string.Join(" | ", save.Result.Cast<object>())}]");
-            Assert.Empty(save.Result);
+            var answer = await save;
+            _out.WriteLine($"while waiting: {Ticks() - before} ticks; answer [{string.Join(" | ", answer.Cast<object>())}]");
+            Assert.Empty(answer);
 
             // 2. A compile that does not come in time: the wait ends at ErrorWaitTimeout with the region's timeout answer.
             //    Real time only lengthens the wait, so 900 ms is a sound floor; far below the 15 s default is the ceiling.

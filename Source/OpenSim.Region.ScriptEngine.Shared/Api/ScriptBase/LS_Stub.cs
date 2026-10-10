@@ -27,7 +27,7 @@
 
 using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
-using key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
+using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 
 namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase;
@@ -52,7 +52,7 @@ public partial class ScriptBaseClass
         return m_LS_Functions.lsSetWindlightScene(rules);
     }
 
-    public int lsSetWindlightSceneTargeted(LSL_List rules, key target)
+    public int lsSetWindlightSceneTargeted(LSL_List rules, LSL_Key target)
     {
         return m_LS_Functions.lsSetWindlightSceneTargeted(rules, target);
     }
@@ -72,7 +72,7 @@ public partial class ScriptBaseClass
         return m_LS_Functions.lsSetWindlightScene(rules);
     }
 
-    public int cmSetWindlightSceneTargeted(LSL_List rules, key target)
+    public int cmSetWindlightSceneTargeted(LSL_List rules, LSL_Key target)
     {
         return m_LS_Functions.lsSetWindlightSceneTargeted(rules, target);
     }

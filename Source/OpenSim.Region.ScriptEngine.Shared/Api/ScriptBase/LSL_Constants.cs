@@ -25,8 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
-using rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
+using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
+using LSL_Rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
 using LSLInteger = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 
 namespace OpenSim.Region.ScriptEngine.Shared.ScriptBase;
@@ -737,8 +737,8 @@ public partial class ScriptBaseClass
     public const int AGENT_LIST_EXCLUDENPC = 0x4000000;
 
     // Can not be public const?
-    public static readonly vector ZERO_VECTOR = new vector(0.0, 0.0, 0.0);
-    public static readonly rotation ZERO_ROTATION = new rotation(0.0, 0.0, 0.0, 1.0);
+    public static readonly LSL_Vector ZERO_VECTOR = new LSL_Vector(0.0, 0.0, 0.0);
+    public static readonly LSL_Rotation ZERO_ROTATION = new LSL_Rotation(0.0, 0.0, 0.0, 1.0);
 
     // constants for llSetCameraParams
     public const int CAMERA_PITCH = 0;
@@ -806,8 +806,8 @@ public partial class ScriptBaseClass
 
     // constants for the llDetectedTouch* functions
     public const int TOUCH_INVALID_FACE = -1;
-    public static readonly vector TOUCH_INVALID_TEXCOORD = new vector(-1.0, -1.0, 0.0);
-    public static readonly vector TOUCH_INVALID_VECTOR = ZERO_VECTOR;
+    public static readonly LSL_Vector TOUCH_INVALID_TEXCOORD = new LSL_Vector(-1.0, -1.0, 0.0);
+    public static readonly LSL_Vector TOUCH_INVALID_VECTOR = ZERO_VECTOR;
 
     // constants for llGetPrimMediaParams/llSetPrimMediaParams
     public const int PRIM_MEDIA_ALT_IMAGE_ENABLE = 0;

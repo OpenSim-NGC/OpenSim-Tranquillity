@@ -253,7 +253,7 @@ public class CarriedStateTests
     /// for it (Halcyon EngineInterface.GetXMLState: RequestStateData, WaitForData).
     /// </summary>
     [Fact]
-    public void ARegionThreadGetsTheStateCapturedOnTheSchedulerThread()
+    public async Task ARegionThreadGetsTheStateCapturedOnTheSchedulerThread()
     {
         using var h = new SchedulerHarness();
         var item = Running(h, Counter, UUID.Random(), UUID.Random());
@@ -263,10 +263,11 @@ public class CarriedStateTests
         {
             Task<string> asked = Task.Run(() => h.Engine.GetXMLState(item));
             Assert.True(h.PumpUntil(() => asked.IsCompleted, TimeSpan.FromSeconds(20)), "the capture was never answered");
-            Assert.Contains("InWorldz.Phlox", asked.Result);
+            string captured = await asked;
+            Assert.Contains("InWorldz.Phlox", captured);
 
             var other = UUID.Random();
-            Assert.True(h.Engine.SetXMLState(other, asked.Result.Replace(item.ToString(), other.ToString())));
+            Assert.True(h.Engine.SetXMLState(other, captured.Replace(item.ToString(), other.ToString())));
         }
         finally { SetMasterRunning(h, false); }
     }
