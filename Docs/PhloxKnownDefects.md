@@ -71,10 +71,12 @@ SL behaviour is cited from the SL wiki (`https://wiki.secondlife.com/wiki/<Page>
 - An `llListen` identical to one the script already holds active returns the existing handle.
 - Handles are each script's own, numbered from 1 with the lowest free one first, as SL, YEngine
   and the core WorldComm number them; two scripts can hold the same handle number.
-- A script receives at most 20 listen events per second; the rest of that second's are dropped,
-  with one line in the region log per script per second. SL documents no such limit, and YEngine
-  and Halcyon have none. `[InWorldz.Phlox] MaxListenEventsPerSecond` sets the number; 0 turns the
-  limit off.
+- A script receives at most 20 listen events per second; the rest of that second's are dropped.
+  SL documents no such limit, and YEngine and Halcyon have none. `[InWorldz.Phlox]
+  MaxListenEventsPerSecond` sets the number; 0 turns the limit off. The region log gets one line
+  when a script starts being capped, then at most one a minute with how many deliveries were
+  refused since the line before, for as long as the script goes on being capped; a minute with
+  no refusal ends that run, and the next refusal starts a new one with its own first line.
 - A prim never hears its own chat.
 - `llRegionSayTo` refuses `DEBUG_CHANNEL` with the error "Cannot use llRegionSayTo() on
   DEBUG_CHANNEL.". Only its target hears it: the target prim's listens, or, for an avatar,
@@ -540,6 +542,12 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   object's owner may edit both objects (the same check as editing them by hand). If not,
   nothing is linked, no error is shown and the call returns without its delay. YEngine
   does not make this check.
+- **Events dropped by a full queue.** When a script's event queue holds 64 events, new ones
+  are dropped, as SL drops them. The region log gets one line when a run of drops starts, with
+  how many of each kind were dropped, then one a minute with the drops since the line before,
+  and the rest when the script is unloaded. A run lasts until a whole minute passes with no drop
+  for that script, so events that keep arriving in bursts, with room in the queue between them,
+  are one run and write about one line a minute, not one a burst.
 - **`llInstantMessage` length.** A message longer than 1023 bytes of UTF-8 is cut to 1023
   bytes, as SL documents ([LlInstantMessage](https://wiki.secondlife.com/wiki/LlInstantMessage)).
   A character the cut would split is dropped whole. YEngine cuts at 1024 characters.

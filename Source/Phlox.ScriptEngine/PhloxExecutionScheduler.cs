@@ -170,15 +170,19 @@ namespace Phlox.ScriptEngine
         private ulong m_NextDeferredExpiry;
 
         // Events a full queue dropped, per script and kind, in the order each kind was first dropped, since the run's last
-        // log line. A run writes a line when it ends (LogEndedQueueFullRuns, DoUnload), and while it lasts one each
-        // QueueFullLineIntervalMs of the engine's clock with the drops since the line before: a burst of hundreds of
-        // drops is one line, not hundreds, and a queue that never has room again still shows, once a minute.
-        // Scheduler thread only.
+        // log line. A run starts with a script's first drop and ends only when QueueFullLineIntervalMs of the engine's
+        // clock pass with no drop for it, so events that arrive in bursts with room between them are one run, not one
+        // run a burst. A run writes a line when it starts (at the end of the pass of its first drop), then one each
+        // QueueFullLineIntervalMs with the drops since the line before, and the rest when the script unloads
+        // (LogQueueFullRuns, DoUnload): a burst of hundreds of drops is one line, not hundreds. Scheduler thread only.
         internal const ulong QueueFullLineIntervalMs = 60_000;
         private sealed class QueueFullRun
         {
+            public bool Started;      // its first line is written
             public ulong LineDueOn;
+            public ulong LastDropOn;
             public readonly List<KeyValuePair<SupportedEventList.Events, int>> Counts = new();
+            public bool EndedBy(ulong now) => now >= LastDropOn + QueueFullLineIntervalMs;
         }
         private readonly System.Collections.Generic.Dictionary<UUID, QueueFullRun> m_QueueFullDrops = new();
 
@@ -684,6 +688,9 @@ namespace Phlox.ScriptEngine
         }
 
         // ── Event posting ──────────────────────────────────────────────────────
+
+        /// <summary>A pass with nothing posted, so the next wake takes in a log line that became due from another thread.</summary>
+        internal void Wake() => m_WorkArrived?.Invoke();
 
         public void PostEvent(UUID itemId, PostedEvent evt)
         {
@@ -1220,7 +1227,8 @@ namespace Phlox.ScriptEngine
             ProcessHeldArrivals();   // After the arrivals, whose waiting grants it waits for
             CheckSleepingScripts();
             ProcessEventQueue();
-            LogEndedQueueFullRuns();
+            LogQueueFullRuns();
+            m_Engine?.ListenManager?.LogCapRuns();
             ExpireDeferredEvents();
             ProcessPermsEnds();      // Before the parcel checks it may call for
             ProcessParcelChecks();
@@ -1238,7 +1246,8 @@ namespace Phlox.ScriptEngine
             {
                 WorkWasDone = hadRunnable,
                 WorkIsPending = HasWork(),
-                NextWakeUpTime = Math.Min(Math.Min(Math.Min(Math.Min(nextWake, EarliestServiceDeadline()), EarliestHeldArrival()), NextExperienceStateRead()), EarliestQueueFullLine())
+                NextWakeUpTime = Math.Min(Math.Min(Math.Min(Math.Min(Math.Min(nextWake, EarliestServiceDeadline()), EarliestHeldArrival()), NextExperienceStateRead()), EarliestQueueFullLine()),
+                                          m_Engine?.ListenManager?.EarliestCapLine() ?? ulong.MaxValue)
             };
         }
 
@@ -1649,8 +1658,16 @@ namespace Phlox.ScriptEngine
 
         private void CountQueueFullDrop(UUID itemId, SupportedEventList.Events type)
         {
-            if (!m_QueueFullDrops.TryGetValue(itemId, out var run))
-                m_QueueFullDrops[itemId] = run = new QueueFullRun { LineDueOn = InWorldz.Phlox.Util.Clock.Now + QueueFullLineIntervalMs };
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            if (m_QueueFullDrops.TryGetValue(itemId, out var run) && run.EndedBy(now))
+            {
+                // The run ended since the last pass: its rest goes on its own line, and this drop starts a new run.
+                LogQueueFullRun(itemId);
+                run = null;
+            }
+            if (run == null)
+                m_QueueFullDrops[itemId] = run = new QueueFullRun();
+            run.LastDropOn = now;
             var counts = run.Counts;
             int i = counts.FindIndex(c => c.Key == type);
             if (i < 0) counts.Add(new KeyValuePair<SupportedEventList.Events, int>(type, 1));
@@ -1658,43 +1675,49 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// A run of drops ends when the script's queue has room after a pass of posted events, or when the script is gone:
-        /// its last line is written then. A run still full when its line is due writes the drops so far and goes on.
+        /// After each pass of posted events: a run that started in it writes its first line; a run whose line is due writes
+        /// the drops since the line before; a run with no drop for a whole QueueFullLineIntervalMs has ended, and writes
+        /// its rest, if any; and the run of a script that is gone writes its rest and ends.
         /// </summary>
-        private void LogEndedQueueFullRuns()
+        private void LogQueueFullRuns()
         {
             if (m_QueueFullDrops.Count == 0) return;
             ulong now = InWorldz.Phlox.Util.Clock.Now;
             List<UUID> ended = null;
             foreach (var run in m_QueueFullDrops)
             {
-                if (m_AllScripts.TryGetValue(run.Key, out Interpreter script) && script.ScriptState.EventQueue.Count >= MAX_EVENT_QUEUE_DEPTH)
+                QueueFullRun r = run.Value;
+                if (r.EndedBy(now) || !m_AllScripts.ContainsKey(run.Key))
                 {
-                    if (now >= run.Value.LineDueOn)
-                    {
-                        WriteQueueFullLine(run.Key, run.Value.Counts);
-                        run.Value.LineDueOn = now + QueueFullLineIntervalMs;
-                    }
+                    (ended ??= new List<UUID>()).Add(run.Key);
                     continue;
                 }
-                (ended ??= new List<UUID>()).Add(run.Key);
+                if (!r.Started || now >= r.LineDueOn)
+                {
+                    WriteQueueFullLine(run.Key, r.Counts);
+                    r.Started = true;
+                    r.LineDueOn = now + QueueFullLineIntervalMs;
+                }
             }
             if (ended == null) return;
             foreach (UUID itemId in ended) LogQueueFullRun(itemId);
         }
 
-        /// <summary>The run's last line, if it dropped anything since the line before.</summary>
+        /// <summary>The run's last line, if it dropped anything since the line before; the run ends.</summary>
         private void LogQueueFullRun(UUID itemId)
         {
             if (m_QueueFullDrops.Remove(itemId, out var run)) WriteQueueFullLine(itemId, run.Counts);
         }
 
-        /// <summary>When the next line of a lasting run is due, so the scheduler wakes for it (ulong.MaxValue: none).</summary>
+        /// <summary>
+        /// When the next line of a lasting run is due, so the scheduler wakes for it (ulong.MaxValue: none). A run whose
+        /// first line is not written yet is written in the same pass, so it adds no wake.
+        /// </summary>
         private ulong EarliestQueueFullLine()
         {
             ulong earliest = ulong.MaxValue;
             foreach (var run in m_QueueFullDrops.Values)
-                if (run.LineDueOn < earliest) earliest = run.LineDueOn;
+                if (run.Started && run.LineDueOn < earliest) earliest = run.LineDueOn;
             return earliest;
         }
 

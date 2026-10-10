@@ -64,8 +64,26 @@ namespace Phlox.ScriptEngine
         /// </summary>
         public int MaxListenEventsPerSecond { get; set; } = DefaultMaxListenEventsPerSecond;
 
-        // Per-script listen delivery count in the current one-second window, and whether that window's drops were logged.
-        private readonly Dictionary<UUID, (int Count, long WindowStart, bool Logged)> m_RateTracker = new();
+        // Per-script listen delivery count in the current one-second window.
+        private readonly Dictionary<UUID, (int Count, long WindowStart)> m_RateTracker = new();
+
+        // A script's run of deliveries the rate cap refused, logged as a run of queue-full drops is
+        // (PhloxExecutionScheduler.QueueFullLineIntervalMs): it starts with the first refusal and ends only when a whole
+        // interval of the engine's clock passes with none. It writes a line when it starts, then at most one each interval
+        // with the refusals since the line before: on the refusal that finds a line due, or on the scheduler's pass
+        // (LogCapRuns) when no refusal comes. Kept under m_Lock; every line is written after the lock is released, so a
+        // slow log sink never holds up listen delivery.
+        private sealed class CapRun
+        {
+            public ulong LineDueOn;
+            public ulong LastRefusedOn;
+            public int Refused;      // since the run's last line
+        }
+        private readonly Dictionary<UUID, CapRun> m_CapRuns = new();
+        private static ulong CapLineIntervalMs => PhloxExecutionScheduler.QueueFullLineIntervalMs;
+
+        /// <summary>The wall-clock second the rate cap counts in (a test sets its own).</summary>
+        internal Func<long> CurrentSecond = () => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
         /// <summary>Listen events dropped by the rate cap, and the log lines that reported them (tests).</summary>
         internal long DroppedListenEvents;
@@ -362,14 +380,20 @@ namespace Phlox.ScriptEngine
             }
         }
 
-        /// <summary>The script is unloaded - its listens and its listen-rate record go (the record was never freed).</summary>
+        /// <summary>
+        /// The script is unloaded - its listens, its listen-rate record (the record was never freed) and its run of refused
+        /// deliveries go; the run's refusals since its last line, if any, are logged.
+        /// </summary>
         public void Forget(UUID itemID)
         {
+            int rest = 0;
             lock (m_Lock)
             {
                 RemoveAllOf(itemID);
                 m_RateTracker.Remove(itemID);
+                if (m_CapRuns.Remove(itemID, out var run) && run.Refused > 0) { rest = run.Refused; RateLimitLogLines++; }
             }
+            if (rest > 0) WriteCapLine(itemID, rest);
         }
 
         /// <summary>How many listens this script holds on a channel (tests).</summary>
@@ -577,34 +601,96 @@ namespace Phlox.ScriptEngine
         {
             int cap = MaxListenEventsPerSecond;
             if (cap <= 0) return false;
-            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long now = CurrentSecond();
+            int rest = 0, refused = 0;
+            bool started = false;
             lock (m_Lock)
             {
-                if (m_RateTracker.TryGetValue(itemID, out var entry) && entry.WindowStart == now)
-                {
-                    if (entry.Count >= cap)
-                    {
-                        DroppedListenEvents++;
-                        if (!entry.Logged)
-                        {
-                            // One line per script per one-second window, not one per dropped event.
-                            RateLimitLogLines++;
-                            m_RateTracker[itemID] = (entry.Count, now, true);
-                            m_log.LogWarning("[PhloxListen]: script {0} heard more than {1} listen events this second; the rest of this second's are dropped ([InWorldz.Phlox] MaxListenEventsPerSecond)",
-                                itemID, cap);
-                        }
-                        return true;
-                    }
-                    m_RateTracker[itemID] = (entry.Count + 1, now, entry.Logged);
-                }
-                else
+                if (!m_RateTracker.TryGetValue(itemID, out var entry) || entry.WindowStart != now)
                 {
                     // A new second: the count starts again
-                    m_RateTracker[itemID] = (1, now, false);
+                    m_RateTracker[itemID] = (1, now);
+                    return false;
+                }
+                if (entry.Count < cap)
+                {
+                    m_RateTracker[itemID] = (entry.Count + 1, now);
+                    return false;
+                }
+                DroppedListenEvents++;
+
+                ulong clock = InWorldz.Phlox.Util.Clock.Now;
+                if (m_CapRuns.TryGetValue(itemID, out var run) && clock >= run.LastRefusedOn + CapLineIntervalMs)
+                {
+                    // The run ended since the scheduler's last pass: its rest goes on its own line, and this starts a new one.
+                    if (run.Refused > 0) { rest = run.Refused; RateLimitLogLines++; }
+                    run = null;
+                }
+                if (run == null)
+                {
+                    m_CapRuns[itemID] = run = new CapRun();
+                    started = true;
+                }
+                run.Refused++;
+                run.LastRefusedOn = clock;
+                if (clock >= run.LineDueOn)
+                {
+                    refused = run.Refused;
+                    run.Refused = 0;
+                    run.LineDueOn = clock + CapLineIntervalMs;
+                    RateLimitLogLines++;
                 }
             }
-            return false;
+            if (rest > 0) WriteCapLine(itemID, rest);
+            if (refused > 0) WriteCapLine(itemID, refused);
+            if (started) m_Scheduler?.Wake();       // so the scheduler's next wake takes in the run's next line
+            return true;
         }
+
+        /// <summary>
+        /// The scheduler's pass: a run whose line is due writes the refusals since the line before, and a run with no
+        /// refusal for a whole interval ends, writing its rest.
+        /// </summary>
+        internal void LogCapRuns()
+        {
+            List<(UUID Item, int Refused)> lines = null;
+            lock (m_Lock)
+            {
+                if (m_CapRuns.Count == 0) return;
+                ulong clock = InWorldz.Phlox.Util.Clock.Now;
+                List<UUID> ended = null;
+                foreach (var (item, run) in m_CapRuns)
+                {
+                    bool over = clock >= run.LastRefusedOn + CapLineIntervalMs;
+                    bool due = clock >= run.LineDueOn;
+                    if ((over || due) && run.Refused > 0)
+                    {
+                        (lines ??= new()).Add((item, run.Refused));
+                        run.Refused = 0;
+                        RateLimitLogLines++;
+                    }
+                    if (over) (ended ??= new List<UUID>()).Add(item);
+                    else if (due) run.LineDueOn = clock + CapLineIntervalMs;
+                }
+                if (ended != null) foreach (UUID item in ended) m_CapRuns.Remove(item);
+            }
+            if (lines != null) foreach (var (item, refused) in lines) WriteCapLine(item, refused);
+        }
+
+        /// <summary>When the next cap line is due, so the scheduler wakes for it (ulong.MaxValue: none).</summary>
+        internal ulong EarliestCapLine()
+        {
+            ulong earliest = ulong.MaxValue;
+            lock (m_Lock)
+                foreach (var run in m_CapRuns.Values)
+                    if (run.LineDueOn < earliest) earliest = run.LineDueOn;
+            return earliest;
+        }
+
+        /// <summary>Never called under m_Lock.</summary>
+        private void WriteCapLine(UUID itemID, int refused)
+            => m_log.LogWarning("[PhloxListen]: script {0} heard more than {1} listen events in a second; {2} refused since the last line ([InWorldz.Phlox] MaxListenEventsPerSecond)",
+                itemID, MaxListenEventsPerSecond, refused);
 
         /// <summary>
         /// A listen botListen registered (its host is the bot's avatar, not a prim) carries the bot's key for
