@@ -923,6 +923,8 @@ namespace Phlox.ScriptEngine
             public bool GeneralEnable;
             public bool Suspended;
             public int QueuedEvents;
+            /// <summary>Other scripts' dataserver answers dropped for this script because its queue held half its limit.</summary>
+            public long OtherAnswersDropped;
             public int LslState;
             public int TimerIntervalMs;
             public ulong EventMask;
@@ -960,6 +962,7 @@ namespace Phlox.ScriptEngine
                     GeneralEnable = st.GeneralEnable,
                     Suspended = m_Suspended.Contains(itemId),
                     QueuedEvents = queued,
+                    OtherAnswersDropped = OtherAnswersDropped(itemId),
                     LslState = st.LSLState,
                     TimerIntervalMs = st.TimerInterval,
                     EventMask = 0,
@@ -1175,6 +1178,7 @@ namespace Phlox.ScriptEngine
                 m_HeldFresh.Remove(itemId);
             }
             m_Apis.Remove(itemId);
+            lock (m_OtherAnswerDrops) m_OtherAnswerDrops.Remove(itemId);
             m_ControlsExempt.Remove(itemId);
             LogQueueFullRun(itemId);
         }
@@ -1632,6 +1636,11 @@ namespace Phlox.ScriptEngine
                 {
                     pe.Evt.SignalCompleted();   // It runs after the crossing, or in the next region; nobody waits that long
                     if (pe.Evt.EventType == SupportedEventList.Events.LISTEN) continue;
+                    if (pe.Evt.AnswersOtherScript && script.ScriptState.EventQueue.Count >= OTHER_ANSWER_LIMIT)
+                    {
+                        CountOtherAnswerDrop(pe.ItemId);
+                        continue;
+                    }
                     if (script.ScriptState.EventQueue.Count >= MAX_EVENT_QUEUE_DEPTH && !OverflowsQueueLimit(pe.Evt.EventType))
                     {
                         CountQueueFullDrop(pe.ItemId, pe.Evt.EventType);
@@ -1660,6 +1669,14 @@ namespace Phlox.ScriptEngine
                 // state event leaves a state change half done, and a lost timer event stops the timer for good: it is
                 // re-armed only when its event runs (CheckAndResetTimer).
                 int queueDepth = script.ScriptState.EventQueue.Count;
+                // Another script's dataserver answer: only while the queue is under half its limit, so the script's own
+                // answers and its other events keep the room (counted, not warned about).
+                if (pe.Evt.AnswersOtherScript && queueDepth >= OTHER_ANSWER_LIMIT)
+                {
+                    CountOtherAnswerDrop(pe.ItemId);
+                    pe.Evt.SignalCompleted();
+                    continue;
+                }
                 if (queueDepth >= MAX_EVENT_QUEUE_DEPTH && !OverflowsQueueLimit(pe.Evt.EventType))
                 {
                     CountQueueFullDrop(pe.ItemId, pe.Evt.EventType);
@@ -1702,6 +1719,48 @@ namespace Phlox.ScriptEngine
                 {
                     script.ScriptState.QueueEvent(pe.Evt);
                 }
+            }
+        }
+
+        /// <summary>
+        /// Another script's dataserver answer is queued only while the script's queue is under this many events, half
+        /// the limit; the script's own answers and every other event keep the whole limit.
+        /// </summary>
+        private const int OTHER_ANSWER_LIMIT = MAX_EVENT_QUEUE_DEPTH / 2;
+
+        private sealed class OtherAnswerDrops
+        {
+            public long Total;
+            public int SinceLine;
+            public ulong LastLineOn;
+        }
+
+        private readonly System.Collections.Generic.Dictionary<UUID, OtherAnswerDrops> m_OtherAnswerDrops = new();
+
+        /// <summary>Another script's answers dropped for this script, from the half limit (read from any thread).</summary>
+        internal long OtherAnswersDropped(UUID itemId)
+        {
+            lock (m_OtherAnswerDrops) return m_OtherAnswerDrops.TryGetValue(itemId, out var d) ? d.Total : 0;
+        }
+
+        /// <summary>
+        /// Counts one such drop. No queue-full warning: at most one debug line a minute per script, with the drops since
+        /// the line before.
+        /// </summary>
+        private void CountOtherAnswerDrop(UUID itemId)
+        {
+            ulong now = InWorldz.Phlox.Util.Clock.Now;
+            lock (m_OtherAnswerDrops)
+            {
+                if (!m_OtherAnswerDrops.TryGetValue(itemId, out var d))
+                    m_OtherAnswerDrops[itemId] = d = new OtherAnswerDrops();
+                d.Total++;
+                d.SinceLine++;
+                if (d.LastLineOn != 0 && now < d.LastLineOn + 60_000) return;
+                m_log.LogDebug("[PhloxExe]: Script {0}: {1} dataserver answers to other scripts' requests dropped since the last line, its queue held {2} or more events ({3} in all)",
+                    itemId, d.SinceLine, OTHER_ANSWER_LIMIT, d.Total);
+                d.SinceLine = 0;
+                d.LastLineOn = now;
             }
         }
 
