@@ -677,7 +677,7 @@ public static class Util
         if (float.IsNaN(v.X) || float.IsNaN(v.Y) || float.IsNaN(v.Z))
             return true;
 
-        if (float.IsInfinity(v.X) || float.IsInfinity(v.Y) || float.IsNaN(v.Z))
+        if (float.IsInfinity(v.X) || float.IsInfinity(v.Y) || float.IsInfinity(v.Z))
             return true;
 
         return false;
