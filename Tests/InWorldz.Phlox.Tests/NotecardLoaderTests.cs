@@ -134,7 +134,6 @@ public partial class NotecardLoaderTests
         public int LinksLost;
         public int WarnLines;
         public string[] OtherWarnings;
-        public bool DefaultOnLinkSleepOnly;
     }
 
     private static readonly int[] KnownSleeps = { 100, 50, 25, 20, 15, 1 };
