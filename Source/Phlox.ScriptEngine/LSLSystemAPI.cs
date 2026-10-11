@@ -1863,10 +1863,38 @@ namespace Phlox.ScriptEngine
             if (minFactor == float.MaxValue || minFactor <= 0f) return 1f;
             return (float)Math.Round(1f / minFactor, 5);
         }
-        public Vector3 llGetVel() => m_host?.Velocity ?? Vector3.Zero;
-        public Vector3 llGetAccel() => Vector3.Zero;
-        public Vector3 llGetOmega() => Vector3.Zero;
-        public Vector3 llGetTorque() => Vector3.Zero;
+        /// <summary>
+        /// In an attachment, the wearer's velocity (a seated wearer's is the seat object's), as YEngine
+        /// (ScenePresence.GetWorldVelocity) and Halcyon (SceneObjectPart.GetWearerVelocity); the SL wiki page says
+        /// nothing about attachments. Otherwise the prim's velocity, as before.
+        /// </summary>
+        public Vector3 llGetVel()
+        {
+            if (m_host == null) return Vector3.Zero;
+            SceneObjectGroup group = m_host.ParentGroup;
+            if (group != null && group.IsAttachment)
+                return World.GetScenePresence(group.AttachedAvatar)?.GetWorldVelocity() ?? Vector3.Zero;
+            return m_host.Velocity;
+        }
+        /// <summary>
+        /// The object's acceleration in region axes; ZERO_VECTOR in an attachment or a child prim (SL wiki llGetAccel:
+        /// "Returns ZERO_VECTOR in attachments", "Returns ZERO_VECTOR in child prims").
+        /// </summary>
+        public Vector3 llGetAccel()
+        {
+            SceneObjectGroup group = m_host?.ParentGroup;
+            if (group == null || group.IsAttachment || group.RootPart != m_host) return Vector3.Zero;
+            return m_host.Acceleration;
+        }
+
+        /// <summary>
+        /// The root's angular velocity: a physical object's spin, or what llTargetOmega set (SL wiki llGetOmega:
+        /// "Returns the omega of the root if called in a child prim").
+        /// </summary>
+        public Vector3 llGetOmega() => m_host?.ParentGroup?.RootPart.AngularVelocity ?? Vector3.Zero;
+
+        /// <summary>The torque llSetTorque stored on the object's root, as YEngine (SceneObjectGroup.GetTorque).</summary>
+        public Vector3 llGetTorque() => m_host?.ParentGroup?.RootPart.Torque ?? Vector3.Zero;
         public Vector3 iwGetAngularVelocity() => Vector3.Zero;
         public Vector3 llGetCenterOfMass()
         {
@@ -2002,16 +2030,19 @@ namespace Phlox.ScriptEngine
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;
                 if (local != 0) force *= m_host.GetWorldRotation();
-                pa.Force = force;
+                m_host.ParentGroup.RootPart.Force = force;   // stores it and passes it to the actor
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }
 
+        /// <summary>
+        /// The force llSetForce stored on the object's root, in region axes, as YEngine (SceneObjectPart.GetForce),
+        /// rather than the physics actor's, which an engine need not keep.
+        /// </summary>
         public Vector3 llGetForce()
         {
             if (m_host?.ParentGroup == null) return Vector3.Zero;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            return pa?.Force ?? Vector3.Zero;
+            return m_host.ParentGroup.RootPart.Force;
         }
 
         public void llSetTorque(Vector3 torque, int local)
@@ -2023,7 +2054,7 @@ namespace Phlox.ScriptEngine
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;
                 if (local != 0) torque *= m_host.GetWorldRotation();
-                pa.Torque = torque;
+                m_host.ParentGroup.RootPart.Torque = torque;   // stores it for llGetTorque and passes it to the actor
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }
@@ -2045,6 +2076,9 @@ namespace Phlox.ScriptEngine
             {
                 if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return;
                 if (!m_host.ParentGroup.IsAttachment && (m_host.ParentGroup.RootPart.Flags & PrimFlags.Physics) == 0) return;
+                // The cap below lets a NaN through (the comparison is false) and turns an infinity into a NaN,
+                // so an impulse that is not finite is dropped before it reaches the body or the wearer.
+                if (!float.IsFinite(force.X) || !float.IsFinite(force.Y) || !float.IsFinite(force.Z)) return;
                 if (force.LengthSquared() > 20000f * 20000f)
                     force = Vector3.Normalize(in force) * 20000f;
                 m_host.ApplyImpulse(force, local != 0);
@@ -2205,19 +2239,13 @@ namespace Phlox.ScriptEngine
             if ((status & STATUS_SANDBOX) != 0)
                 m_host.SetStatusSandbox(on);   // As YEngine
 
-            // Rotation axis locks — byte bitmask: bit0=X, bit1=Y, bit2=Z
-            if ((status & (STATUS_ROTATE_X | STATUS_ROTATE_Y | STATUS_ROTATE_Z)) != 0)
-            {
-                byte locks = m_host.RotationAxisLocks;
-                if ((status & STATUS_ROTATE_X) != 0)
-                    locks = on ? (byte)(locks & ~0x01) : (byte)(locks | 0x01);
-                if ((status & STATUS_ROTATE_Y) != 0)
-                    locks = on ? (byte)(locks & ~0x02) : (byte)(locks | 0x02);
-                if ((status & STATUS_ROTATE_Z) != 0)
-                    locks = on ? (byte)(locks & ~0x04) : (byte)(locks | 0x04);
-                m_host.RotationAxisLocks = locks;
-                m_host.PhysActor?.LockAngularMotion(locks);
-            }
+            // Rotation axis locks, as YEngine (LSL_Api.cs:1583-1585): the root's RotationAxisLocks hold the
+            // STATUS_ROTATE_X/Y/Z bits themselves (0x02, 0x04, 0x08; SceneObjectGroup.axisSelect), which core and
+            // the physics engines read, and status is an object attribute (SL: "all prims in an object share the
+            // same status"), so a child prim's call locks the object.
+            int axes = status & (STATUS_ROTATE_X | STATUS_ROTATE_Y | STATUS_ROTATE_Z);
+            if (axes != 0)
+                group.SetAxisRotation(axes, on ? 1 : 0);
         }
 
         /// <summary>
@@ -2261,11 +2289,9 @@ namespace Phlox.ScriptEngine
                 case STATUS_RETURN_AT_EDGE:
                     return m_host.GetReturnAtEdge() ? 1 : 0;   // YEngine LSL_Api.cs:1649
                 case STATUS_ROTATE_X:
-                    return (m_host.RotationAxisLocks & 0x01) == 0 ? 1 : 0;
                 case STATUS_ROTATE_Y:
-                    return (m_host.RotationAxisLocks & 0x02) == 0 ? 1 : 0;
                 case STATUS_ROTATE_Z:
-                    return (m_host.RotationAxisLocks & 0x04) == 0 ? 1 : 0;
+                    return m_host.GetAxisRotation(status);   // the root's locks, as YEngine LSL_Api.cs:1650-1652
                 default:
                     return 0;
             }
