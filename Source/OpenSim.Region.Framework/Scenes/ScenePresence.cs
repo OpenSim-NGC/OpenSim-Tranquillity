@@ -561,6 +561,13 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// </summary>
     
     PhysicsActor m_physActor;
+
+    /// <summary>
+    /// The mass the physics actor had when it was last read or taken away, returned by GetMass()
+    /// while the avatar has no actor (a teleport inside the region, standing up from a seat).
+    /// </summary>
+    private volatile float m_lastKnownMass;
+
     public PhysicsActor PhysicsActor
     {
         get
@@ -1753,6 +1760,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         PhysicsActor pa = Interlocked.Exchange(ref m_physActor, null);
         if (pa != null)
         {
+            float mass = pa.Mass;
+            if (mass > 0)
+                m_lastKnownMass = mass;
+
             //PhysicsActor.OnRequestTerseUpdate -= SendTerseUpdateToAllClients;
             pa.OnOutOfBounds -= OutOfBoundsCall;
             pa.OnCollisionUpdate -= PhysicsCollisionUpdate;
@@ -5903,15 +5914,19 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     /// Gets the mass.
     /// </summary>
     /// <returns>
-    /// The mass.
+    /// The mass of the physics actor; while the avatar has no actor, the last mass it had
+    /// (0 if it never had one).
     /// </returns>
     public float GetMass()
     {
         PhysicsActor pa = PhysicsActor;
-        if (pa != null)
-            return pa.Mass;
-        else
-            return 0;
+        if (pa is null)
+            return m_lastKnownMass;
+
+        float mass = pa.Mass;
+        if (mass > 0)
+            m_lastKnownMass = mass;
+        return mass;
     }
 
     internal void Jump(float impulseZ)
