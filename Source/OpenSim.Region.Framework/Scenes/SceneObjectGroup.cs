@@ -2950,15 +2950,15 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// <param name="tau">Number of seconds over which to reach target</param>
     public void SetHoverHeight(float height, PIDHoverType hoverType, float tau)
     {
-        PhysicsActor pa = null;
-        if(IsAttachment)
-            {
-                ScenePresence avatar = m_scene.GetScenePresence(AttachedAvatar);
-                if (avatar is not null)
-                    pa = avatar.PhysicsActor;
-            }
-        else
-            pa = RootPart.PhysActor;
+        if (IsAttachment)
+        {
+            // While worn the prims have no actor; the wearer's presence holds the hover and gives it to the
+            // avatar's actor, now and after any later actor is made.
+            m_scene?.GetScenePresence(AttachedAvatar)?.SetAttachmentHover(this, height, hoverType, tau);
+            return;
+        }
+
+        PhysicsActor pa = RootPart.PhysActor;
 
         if (pa is not null)
         {
@@ -5509,14 +5509,15 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     public void SetBuoyancy(float fvalue)
     {
         if(IsAttachment)
-        {
-            ScenePresence avatar = m_scene.GetScenePresence(AttachedAvatar);
-            PhysicsActor pa = avatar?.PhysicsActor;
-            if( pa is not null )
-                pa.Buoyancy = fvalue;
-        }
+            SetWearerBuoyancy(fvalue);
         else
             RootPart.Buoyancy = fvalue;
+    }
+
+    /// <summary>Set the buoyancy of the avatar wearing this attachment, on behalf of this attachment.</summary>
+    internal void SetWearerBuoyancy(float fvalue)
+    {
+        m_scene?.GetScenePresence(AttachedAvatar)?.SetAttachmentBuoyancy(this, fvalue);
     }
 
     public override string ToString()

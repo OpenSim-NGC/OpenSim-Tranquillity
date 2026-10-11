@@ -571,7 +571,10 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         {
             m_physActor = value;
             if (value != null)
+            {
                 HandConstantForceTo(value);
+                HandAttachmentPhysicsTo(value);
+            }
         }
     }
 
@@ -1721,6 +1724,7 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         m_scene.SwapRootAgentCount(true, IsNPC);
         RemoveFromPhysicalScene();
         ClearConstantForce();
+        EndAttachmentPhysics(UUID.Zero, true);
         ParentID = 0; // Child agents can't be sitting
 
 // we dont have land information for child
@@ -5624,6 +5628,8 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     {
         lock (m_attachments)
             m_attachments.Remove(gobj);
+
+        EndAttachmentPhysics(gobj.UUID, false);
     }
 
     /// <summary>
@@ -5633,6 +5639,8 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
     {
         lock (m_attachments)
             m_attachments.Clear();
+
+        EndAttachmentPhysics(UUID.Zero, true);
     }
 
     /// <summary>
@@ -5960,6 +5968,99 @@ public class ScenePresence : EntityBase, IScenePresence, IDisposable
         {
             if (!ConstantForce.IsZero())
                 pa.SetConstantForce(ConstantForce, ConstantForceIsLocal);
+        }
+    }
+
+    // Buoyancy and hover that a script in a worn attachment set on the avatar (llSetBuoyancy, llSetHoverHeight).
+    // While worn the attachment has no physics actor, so the presence keeps the values and the id of the
+    // attachment that set each, hands them to every actor it gets, and ends them when that attachment is removed.
+    private readonly object m_attachmentPhysicsLock = new();
+    private float m_attachmentBuoyancy;
+    private UUID m_attachmentBuoyancySetter;
+    private bool m_attachmentHoverActive;
+    private float m_attachmentHoverHeight;
+    private PIDHoverType m_attachmentHoverType;
+    private float m_attachmentHoverTau;
+    private UUID m_attachmentHoverSetter;
+
+    /// <summary>Set the avatar's buoyancy on behalf of a worn attachment; zero ends it. A value that is not finite is ignored.</summary>
+    internal void SetAttachmentBuoyancy(SceneObjectGroup setter, float buoyancy)
+    {
+        if (!float.IsFinite(buoyancy))
+            return;
+
+        lock (m_attachmentPhysicsLock)
+        {
+            m_attachmentBuoyancy = buoyancy;
+            m_attachmentBuoyancySetter = buoyancy == 0f ? UUID.Zero : setter.UUID;
+            if (m_physActor is not null)
+                m_physActor.Buoyancy = buoyancy;
+        }
+    }
+
+    /// <summary>Set the avatar's hover on behalf of a worn attachment; a height of zero ends it (llStopHover).</summary>
+    internal void SetAttachmentHover(SceneObjectGroup setter, float height, PIDHoverType hoverType, float tau)
+    {
+        lock (m_attachmentPhysicsLock)
+        {
+            m_attachmentHoverActive = height != 0f;
+            m_attachmentHoverHeight = height;
+            m_attachmentHoverType = hoverType;
+            m_attachmentHoverTau = tau;
+            m_attachmentHoverSetter = m_attachmentHoverActive ? setter.UUID : UUID.Zero;
+            if (m_physActor is not null)
+                ApplyAttachmentHover(m_physActor);
+        }
+    }
+
+    private void ApplyAttachmentHover(PhysicsActor pa)
+    {
+        if (m_attachmentHoverActive)
+        {
+            pa.PIDHoverHeight = m_attachmentHoverHeight;
+            pa.PIDHoverType = m_attachmentHoverType;
+            pa.PIDHoverTau = m_attachmentHoverTau;
+            pa.PIDHoverActive = true;
+        }
+        else
+            pa.PIDHoverActive = false;
+    }
+
+    /// <summary>Hand the held buoyancy and hover to a new physics actor.</summary>
+    private void HandAttachmentPhysicsTo(PhysicsActor pa)
+    {
+        lock (m_attachmentPhysicsLock)
+        {
+            if (m_attachmentBuoyancy != 0f)
+                pa.Buoyancy = m_attachmentBuoyancy;
+            if (m_attachmentHoverActive)
+                ApplyAttachmentHover(pa);
+        }
+    }
+
+    /// <summary>
+    /// An attachment was removed from the avatar (detached, dropped or deleted): the buoyancy and hover it set end
+    /// and the avatar's go back to normal. Those set by another attachment stay.
+    /// </summary>
+    private void EndAttachmentPhysics(UUID setter, bool all)
+    {
+        lock (m_attachmentPhysicsLock)
+        {
+            if (m_attachmentBuoyancy != 0f && (all || m_attachmentBuoyancySetter.Equals(setter)))
+            {
+                m_attachmentBuoyancy = 0f;
+                m_attachmentBuoyancySetter = UUID.Zero;
+                if (m_physActor is not null)
+                    m_physActor.Buoyancy = 0f;
+            }
+
+            if (m_attachmentHoverActive && (all || m_attachmentHoverSetter.Equals(setter)))
+            {
+                m_attachmentHoverActive = false;
+                m_attachmentHoverSetter = UUID.Zero;
+                if (m_physActor is not null)
+                    m_physActor.PIDHoverActive = false;
+            }
         }
     }
 
