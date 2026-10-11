@@ -2416,6 +2416,10 @@ public class SceneObjectPart : EntityBase, IDisposable
 
         dupe.m_sittingAvatars = new HashSet<ScenePresence>();
         dupe.SitTargetAvatar = UUID.Zero;
+
+        // MemberwiseClone shares the vehicle record; the copy gets its own (VehicleData holds only values)
+        if (m_vehicleParams != null)
+            dupe.m_vehicleParams = new SOPVehicle { vd = m_vehicleParams.vd };
         // safeguard  actual copy is done in sog.copy
         dupe.KeyframeMotion = null;
         dupe.PayPrice = (int[])PayPrice.Clone();

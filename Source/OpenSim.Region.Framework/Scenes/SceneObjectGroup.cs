@@ -2851,6 +2851,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
      // This is used by both Double-Click Auto-Pilot and llMoveToTarget() in an attached object
     public void MoveToTarget(Vector3 target, float tau)
     {
+        // A tau of 0 or less does nothing, and leaves an earlier target as it is: "Calling llMoveToTarget with a
+        // tau of 0.0 or less will silently fail, and do nothing" (SL wiki llMoveToTarget). StopMoveToTarget stops.
         if(tau > 0)
         {
             if (IsAttachment)
@@ -2870,8 +2872,6 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
                 }
             }
         }
-        else
-            StopMoveToTarget();
     }
 
     public void StopMoveToTarget()
