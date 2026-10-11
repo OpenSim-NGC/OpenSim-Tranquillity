@@ -326,6 +326,10 @@ namespace Phlox.ScriptEngine
                     AssetBase asset = World.AssetService.Get(assetId.ToString());
                     if (asset == null || asset.Data == null || asset.Type != (sbyte)AssetType.Notecard)
                     {
+                        LogNotecardFetchFailed(cardName, assetId,
+                            asset == null ? "the asset service returned no asset"
+                            : asset.Data == null ? "the asset has no data"
+                            : "the asset is of type " + asset.Type + ", not a notecard");
                         ShoutError("Notecard '" + cardName + "' could not be found.");
                         return;
                     }
@@ -336,11 +340,26 @@ namespace Phlox.ScriptEngine
                 catch (Exception ex)
                 {
                     if (logAs != null) m_log.LogError("[PhloxAPI]: {0} ex: {1}", logAs, ex.Message);
+                    LogNotecardFetchFailed(cardName, assetId, ex.Message);
                     ShoutError("Notecard '" + cardName + "' could not be found.");
                 }
             });
             cache?.CacheCheck();
             return false;
+        }
+
+        /// <summary>
+        /// A notecard fetch that gave no notecard: the script is sent no dataserver event (SL: "it is possible for any
+        /// dataserver request to fail"), and the region log says which notecard, which asset and which script, so the
+        /// loss is not silent. Runs on the thread pool.
+        /// </summary>
+        private void LogNotecardFetchFailed(string cardName, UUID assetId, string reason)
+        {
+            string script;
+            try { script = llGetScriptName(); }
+            catch (Exception) { script = string.Empty; }
+            m_log.LogWarning("[PhloxAPI]: Notecard '{0}' (asset {1}) could not be read for script '{2}' ({3}) in object '{4}': {5}; no dataserver event is sent",
+                cardName, assetId, script, m_itemID, m_host?.Name, reason);
         }
 
         /// <summary>SL's notecard line limit: "If the requested line is longer than 1024 bytes (not characters), dataserver will only return the first 1024 bytes".</summary>

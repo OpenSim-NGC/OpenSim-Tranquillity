@@ -1584,7 +1584,26 @@ namespace Phlox.ScriptEngine
             return true;
         }
 
-        private void ProcessEventQueue()
+        /// <summary>
+        /// For the final save, after the scheduler's thread has stopped: every event still in the incoming queue is put on
+        /// its script's own queue (which the saved state carries and the restored script is given from), where a script
+        /// that is waiting would otherwise have been started on it. An answer already produced is then not lost with the
+        /// process. The scripts that received one are marked changed, so the save takes them.
+        /// </summary>
+        internal void QueueIncomingForFinalSave()
+        {
+            var items = new HashSet<UUID>();
+            lock (m_PendingEvents)
+                foreach (PendingEvent pe in m_PendingEvents) items.Add(pe.ItemId);
+            if (items.Count == 0) return;
+            ProcessEventQueue(queueOnly: true);
+            StateManager states = m_Engine?.StateManager;
+            if (states == null) return;
+            foreach (UUID item in items)
+                if (m_AllScripts.TryGetValue(item, out Interpreter script)) states.ScriptChanged(script);
+        }
+
+        private void ProcessEventQueue(bool queueOnly = false)
         {
             List<PendingEvent> events;
             lock (m_PendingEvents)
@@ -1696,7 +1715,7 @@ namespace Phlox.ScriptEngine
                     continue;
                 }
 
-                if (script.ScriptState.RunState == RuntimeState.Status.Waiting)
+                if (script.ScriptState.RunState == RuntimeState.Status.Waiting && !queueOnly)
                 {
                     // llMinEventDelay - a floor between handler STARTS. wiki: events
                     // inside the window are queued and processed after it, not dropped (YEngine

@@ -741,6 +741,16 @@ namespace Phlox.ScriptEngine
                     m_log.LogWarning("[PhloxEngine]: The script scheduler did not stop within 5 s; it is still running {0}, whose last saved state is kept; every other script is saved",
                         running);
             }
+            else
+            {
+                // The scheduler thread is gone, so nothing else touches its queues: events it had not yet taken up go to
+                // their scripts' own queues, which the saved state carries.
+                try { m_ExeScheduler?.QueueIncomingForFinalSave(); }
+                catch (Exception e)
+                {
+                    m_log.LogWarning("[PhloxEngine]: Events waiting for the script scheduler could not be queued before the final save: {0}", e.Message);
+                }
+            }
             StateManager?.StopExcept(running);
         }
 
