@@ -168,17 +168,17 @@ public class BotUpdateEventTests
         try
         {
             UUID bot = CreateBot(h, "");
-            Vector3 start = h.Scene.GetScenePresence(bot).AbsolutePosition;
-            bots.SetBotNavigationPoints(bot, new() { new Vector3(20, 20, 30), B },
+            Vector3 first = new Vector3(20, 20, 30);
+            bots.SetBotNavigationPoints(bot, new() { first, B },
                 new() { OpenSim.Region.Framework.Interfaces.TravelMode.Walk, OpenSim.Region.Framework.Interfaces.TravelMode.Walk },
                 new(), h.Prim.OwnerID);
-            // The walk would time out after about a minute; bring its tick count to the last one before the limit.
-            SetNavTicks(bots, bot, 119);
+            // The walk times out after 60 s by default; bring the time spent on it to just under the limit.
+            SetNavElapsed(bots, bot, 59_900);
 
-            Assert.True(h.PumpUntil(() => Updates(h, "c").Any(), TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
-            string got = Updates(h, "c").Single();
-            Assert.StartsWith("c 3 1|<", got);
-            Assert.EndsWith(" 1,5", got);
+            // The bot is teleported to the point it did not reach (Halcyon MovementAction.GetNextDestination), so both
+            // reports carry that point as the bot's position, then it walks on to B.
+            Assert.True(h.PumpUntil(() => Updates(h, "c").Length >= 2, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.Equal(new[] { "c 3 1|" + V(first) + " 1,5", "c 2 1|" + V(first) + " 1,5" }, Updates(h, "c").Take(2));
         }
         finally { bots.Close(); }
     }
@@ -233,11 +233,11 @@ public class BotUpdateEventTests
         finally { bots.Close(); }
     }
 
-    private static void SetNavTicks(BotManager bots, UUID bot, int ticks)
+    private static void SetNavElapsed(BotManager bots, UUID bot, long ms)
     {
         var map = (IDictionary)typeof(BotManager).GetField("m_bots", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(bots)!;
         object data;
         lock (map) data = map[bot]!;
-        data.GetType().GetField("NavInFlightTicks")!.SetValue(data, ticks);
+        data.GetType().GetField("NavElapsedMs")!.SetValue(data, ms);
     }
 }

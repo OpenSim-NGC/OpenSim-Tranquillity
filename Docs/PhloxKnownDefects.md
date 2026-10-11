@@ -735,10 +735,15 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 `bot_update(string, integer, list)` is the only event beyond SL's set. The bot manager
 raises it for the `bot*` functions, as Halcyon did: `BOT_MOVE_COMPLETE` with `[bot position]` when
 a navigation path is done; `BOT_MOVE_UPDATE` with `[next node, bot position]` each time the bot
-moves on to another point (after a teleport point too, the last one included); `BOT_MOVE_FAILED`
-with `[next node, bot position]` when a move times out; `BOT_MOVE_AVATAR_LOST` with
+moves on to another point (after a teleport point too, the last one included, and after a
+`botWanderWithin` point that has a wait after it); `BOT_MOVE_FAILED` with `[next node, bot position]`
+when the bot has not reached a point after `BOT_MOVEMENT_TELEPORT_AFTER` seconds (60 by default) and is
+teleported to it, followed by `BOT_MOVE_UPDATE` as the path goes on; `BOT_MOVE_AVATAR_LOST` with
 `[avatar position, 0.0, bot position]`, once, when a followed avatar leaves the region (the
-position is then `ZERO_VECTOR`) or is farther than `BOT_LOST_AVATAR_DISTANCE` (default 1000 m).
+position is then `ZERO_VECTOR`) or is farther than `BOT_LOST_AVATAR_DISTANCE` (default 1000 m), and with
+`[avatar position, distance, bot position]` when `BOT_REQUIRES_LINE_OF_SIGHT` is set and an object is
+in between. With `BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY` a path starts again after its last point,
+reported as a move on to node (number of points), and never completes.
 It goes to every script registered with `botRegisterForNavigationEvents`, and to the script that
 created the bot with `botCreateBot`.
 
@@ -791,7 +796,8 @@ the `listen` events of `botListen`, `NULL_KEY` in other events with detect data,
 does not sense itself. The option lists of `botFollowAvatar`, `botSetNavigationPoints` and `botWanderWithin` take an
 integer key and an integer or float value (`botFollowAvatar` also a vector); any other pair makes `botFollowAvatar`
 return `BOT_ERROR` and the other two do nothing. In `botSetNavigationPoints` a number among the points is the wait
-for `BOT_TRAVELMODE_WAIT`, in seconds.
+for `BOT_TRAVELMODE_WAIT`, in seconds. A persistent bot comes back after a region restart under the key it had, or
+under a new key if an avatar or another bot in the simulator already holds that one.
 
 ### Constants
 - `IW_PRIM_ALPHA` and `IW_PRIM_PROJECTOR*` are extra prim-params rules.
@@ -923,13 +929,8 @@ such list.
   outside this repository, such as a Jolt module, shows no effect either until it implements `SetConstantForce`.
 - `llSetForce` in an unattached physical object: a local force (`local` TRUE) is turned once by the object's rotation
   when it is set, not kept in the object's frame as it turns.
-- `botSetNavigationPoints`: a move that times out (about 60 s) raises `BOT_MOVE_FAILED` and ends the path. Halcyon
-  teleported the bot to the point and went on, after `BOT_MOVEMENT_TELEPORT_AFTER` seconds (60 by default); that
-  option and `BOT_MOVEMENT_TYPE` (`BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY` repeats the path) are not read.
-- `botWanderWithin` raises no `bot_update`. Halcyon raised `BOT_MOVE_UPDATE` as the bot reached each wander point (when
-  there was a wait between points) and `BOT_MOVE_FAILED` when it did not reach one.
-- `botFollowAvatar` walks once toward the avatar and does not keep following it; `BOT_REQUIRES_LINE_OF_SIGHT`, the
-  start and stop following distances and the allow-running, flying and jumping options are not read.
+- `botFollowAvatar` goes straight for the avatar. Halcyon also steered around objects along the avatar's recent
+  positions.
 
 ### Prim-params rules
 - `PRIM_HEALTH` and the damage type in `PRIM_DAMAGE` are accepted and dropped. Reading them

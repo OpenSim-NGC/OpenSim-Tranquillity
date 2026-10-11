@@ -9,10 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Timers;
-// Tranquillity has ImplicitUsings=enable (auto-imports System.Threading), so alias
-// Timer to System.Timers.Timer to resolve the System.Threading.Timer ambiguity.
-using Timer = System.Timers.Timer;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -48,15 +44,26 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         public List<TravelMode> NavModes;
         public int NavIndex;
         public Dictionary<int, object> NavOptions;
+        public bool NavFollowIndefinitely;      // BOT_MOVEMENT_TYPE BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY: start again after the last point
+        public long NavTeleportAfterMs = BotManager.DEFAULT_TELEPORT_AFTER_MS;  // BOT_MOVEMENT_TELEPORT_AFTER
         public bool IsFollowing;
         public UUID FollowTarget;
         public Dictionary<int, object> FollowOptions;
         public bool FollowLost;     // BOT_MOVE_AVATAR_LOST was raised and the avatar has not come back since
+        // botFollowAvatar's options, as Halcyon's AvatarFollowerDescription read them, and the follower's state.
+        public bool FollowAllowRunning, FollowAllowFlying, FollowAllowJumping, FollowNeedsSight;
+        public Vector3 FollowOffset;
+        public float FollowStartDistance, FollowStopDistance, FollowLostDistance;
+        public bool FollowAtAvatar;         // the bot stopped beside the avatar (Halcyon m_toAvatar)
+        public int FollowJumpAttempts;      // Halcyon NumberOfTimesJumpAttempted
+        // Wandering runs as a navigation path of one point and, when WanderWait is not 0, a wait after it; at the
+        // path's end a new point is picked (Halcyon WanderingAction).
         public bool IsWandering;
         public Vector3 WanderOrigin;
         public Vector3 WanderDistances;
         public Dictionary<int, object> WanderOptions;
-        public Timer WanderTimer;
+        public TravelMode WanderMode = TravelMode.Walk;
+        public float WanderWait;
 
         // Event registration: every script item registered for bot_update (lock the list to use it)
         public List<UUID> PathEventScripts = new List<UUID>();
@@ -67,12 +74,18 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         // is currently walking to and poll its position to detect arrival.
         public Vector3 CurrentNavTarget;
         public bool NavInFlight;
-        public int NavInFlightTicks;
+        public bool NavNoFly, NavRunning;   // how the bot was sent to CurrentNavTarget, to send it again on resume
+        // Time spent moving toward CurrentNavTarget while not paused, added up at each nav poll since NavLastPoll
+        // (Environment.TickCount64). It reaching NavTeleportAfterMs teleports the bot to the point.
+        public long NavElapsedMs;
+        public long NavLastPoll;
 
-        // A BOT_TRAVELMODE_WAIT point: the bot stands still until NavWaitUntil (Environment.TickCount64),
-        // then the nav poll moves it on.
+        // The bot stands still until NavWaitUntil (Environment.TickCount64), then the nav poll moves it on: at a
+        // BOT_TRAVELMODE_WAIT point (NavUpdateAfterWait, reported as a move on to the next node), or for one poll
+        // before a path starts again.
         public bool NavWaiting;
         public long NavWaitUntil;
+        public bool NavUpdateAfterWait;
 
         // Collision-event bridge: the bot's physics actor we subscribed to, and the handler we
         // attached, so we can detach exactly that subscription on deregister/removal.
@@ -115,7 +128,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         private System.Timers.Timer m_navPollTimer;
         private const double NAV_POLL_INTERVAL_MS = 500.0;
         private const float NAV_ARRIVAL_TOLERANCE = 1.5f;    // metres (horizontal)
-        private const int NAV_INFLIGHT_TIMEOUT_TICKS = 120;  // ~60s safety so a stuck bot still reports
+        // A bot that has not reached a point after this long is teleported to it: Halcyon MovementDescription's
+        // TimeBeforeTeleportToNextPositionOccurs, 60 s unless BOT_MOVEMENT_TELEPORT_AFTER sets it.
+        internal const long DEFAULT_TELEPORT_AFTER_MS = 60_000;
 
         // Collision/land_collision script-event mask — only bridge a bot's collisions to a host whose
         // scripts actually subscribed to one of these, so we don't do work or emit sounds for nobody.
@@ -190,7 +205,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 {
                     if (kvp.Value.BotScene == scene)
                     {
-                        StopWanderTimer(kvp.Value);
+                        kvp.Value.IsWandering = false;
                         UnsubscribeBotCollision(kvp.Value);
                         m_npcModule?.DeleteNPC(kvp.Key, scene);
                         m_bots.Remove(kvp.Key);
@@ -278,17 +293,6 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             return UUID.Parse(Utils.MD5String(ownerID.ToString() + ":" + outfitName.ToLowerInvariant()));
         }
 
-        private void StopWanderTimer(BotData data)
-        {
-            if (data.WanderTimer != null)
-            {
-                data.WanderTimer.Stop();
-                data.WanderTimer.Dispose();
-                data.WanderTimer = null;
-            }
-            data.IsWandering = false;
-        }
-
         private void StopAllMovement(BotData data)
         {
             data.IsFollowing = false;
@@ -298,7 +302,8 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.NavIndex = 0;
             data.NavInFlight = false;
             data.NavWaiting = false;
-            StopWanderTimer(data);
+            data.NavFollowIndefinitely = false;
+            data.IsWandering = false;
             Scene scene = GetBotScene(data);
             if (scene != null)
                 m_npcModule.StopMoveToTarget(data.BotID, scene);
@@ -403,6 +408,53 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             Scene ownerScene = FindSceneForRootAgent(ownerID);
             if (ownerScene == null) { reason = "Owner not found in any region"; return UUID.Zero; }
 
+            return CreateBotIn(ownerScene, UUID.Zero, firstName, lastName, startPos, outfitName, scriptItemID, ownerID,
+                owned, senseAsAgent, out reason);
+        }
+
+        /// <summary>
+        /// Brings a saved bot back into the region it was saved in, under the key it had, so a script that stored the
+        /// key still reaches it. The bot comes back as botCreateBot made it, with the creating script registered for
+        /// bot_update. If anything in the simulator already holds the key (an avatar, or another bot), the bot comes
+        /// back under a new random key instead, and the caller moves the saved record to it.
+        /// </summary>
+        public UUID RespawnBot(Scene scene, UUID botID, string firstName, string lastName, Vector3 startPos,
+            UUID scriptItemID, UUID ownerID, out string reason)
+        {
+            reason = null;
+            if (m_npcModule == null) { reason = "NPC module not available"; return UUID.Zero; }
+
+            UUID key = botID;
+            if (botID != UUID.Zero && KeyInUse(botID))
+            {
+                m_log.LogWarning("[BotManager] Key {0} is already in use; the saved bot comes back under a new key", botID);
+                key = UUID.Zero;
+            }
+
+            UUID id = CreateBotIn(scene, key, firstName, lastName, startPos, null, scriptItemID, ownerID, true, true, out reason);
+            if (id != UUID.Zero && scriptItemID != UUID.Zero)
+                BotRegisterForPathUpdateEvents(id, scriptItemID, ownerID);
+            return id;
+        }
+
+        // A bot's key is in use when this manager has a bot under it or any region here has a presence under it.
+        private bool KeyInUse(UUID key)
+        {
+            if (IsBot(key)) return true;
+            lock (m_scenes)
+            {
+                foreach (Scene s in m_scenes)
+                    if (s.GetScenePresence(key) != null) return true;
+            }
+            return false;
+        }
+
+        // Makes the bot in the given scene; agentID is the key to give it, or UUID.Zero for a new random key.
+        private UUID CreateBotIn(Scene ownerScene, UUID agentID, string firstName, string lastName, Vector3 startPos,
+            string outfitName, UUID scriptItemID, UUID ownerID, bool owned, bool senseAsAgent, out string reason)
+        {
+            reason = null;
+
             // Get appearance -- try saved outfit first, fall back to owner's appearance
             AvatarAppearance appearance = null;
 
@@ -444,8 +496,8 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
             // The bot* door always senses as agent and is always owned; osNpcCreate chooses.
             UUID npcOwner = owned ? ownerID : UUID.Zero;
-            UUID botID = m_npcModule.CreateNPC(firstName, lastName, startPos,
-                npcOwner, senseAsAgent, ownerScene, appearance);
+            UUID botID = m_npcModule.CreateNPC(firstName, lastName, startPos, agentID,
+                npcOwner, "", UUID.Zero, senseAsAgent, ownerScene, appearance);
 
             if (botID == UUID.Zero)
             {
@@ -545,8 +597,40 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.NavOptions = options;
             data.NavIndex = 0;
 
+            // Halcyon NavigationPathDescription: BOT_MOVEMENT_TYPE (0), an integer, BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY (1)
+            // repeats the path; BOT_MOVEMENT_TELEPORT_AFTER (1), an integer or float, is the seconds before the bot is
+            // teleported to a point it has not reached.
+            data.NavTeleportAfterMs = DEFAULT_TELEPORT_AFTER_MS;
+            if (options != null)
+            {
+                if (options.TryGetValue(0 /*BOT_MOVEMENT_TYPE*/, out object type) && type is int t)
+                    data.NavFollowIndefinitely = t == 1 /*BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY*/;
+                if (options.TryGetValue(1 /*BOT_MOVEMENT_TELEPORT_AFTER*/, out object after) && (after is int || after is float))
+                    data.NavTeleportAfterMs = (long)(Convert.ToSingle(after) * 1000f);
+            }
+
             if (positions.Count > 0)
                 MoveToNextNavPoint(data, false);
+        }
+
+        // Puts the bot at pos at once, as a BOT_TRAVELMODE_TELEPORT point does.
+        private void TeleportBot(BotData data, Scene scene, Vector3 pos)
+        {
+            m_npcModule.StopMoveToTarget(data.BotID, scene);
+            ScenePresence sp = GetBotSP(data);
+            if (sp != null)
+            {
+                sp.Velocity = Vector3.Zero;
+                sp.AbsolutePosition = pos;
+            }
+        }
+
+        // Holds the bot for ms, then the nav poll moves it on; updateAfter reports that as a move on to the next node.
+        private static void HoldBot(BotData data, long ms, bool updateAfter)
+        {
+            data.NavWaitUntil = Environment.TickCount64 + ms;
+            data.NavUpdateAfterWait = updateAfter;
+            data.NavWaiting = true;
         }
 
         // Starts the bot toward node NavIndex, or reports the path done. changingNodes: the bot has just
@@ -554,10 +638,28 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         // NavIndex, as Halcyon's MovementAction.GetNextDestination did when NodeGraph reported changingNodes.
         private void MoveToNextNavPoint(BotData data, bool changingNodes)
         {
-            if (data.NavPoints == null || data.NavIndex >= data.NavPoints.Count)
+            if (data.NavPoints == null) return;
+            if (data.NavIndex >= data.NavPoints.Count)
             {
-                if (data.NavPoints != null)
-                    FireMoveComplete(data);
+                if (data.IsWandering)
+                {
+                    // Halcyon WanderingAction.TriggerFinishedMovement picked the next point instead of reporting the
+                    // move complete. It starts at the next poll, so a wander by teleport goes one point at a time.
+                    NewWanderPath(data);
+                    HoldBot(data, 0, false);
+                    return;
+                }
+                if (data.NavFollowIndefinitely && data.NavPoints.Count > 0)
+                {
+                    // Halcyon NodeGraph went back to the first point and reported it as a move on to node
+                    // NumberOfNodes. The first point starts at the next poll, so a path of teleports goes one
+                    // point at a time instead of looping here.
+                    data.NavIndex = 0;
+                    FireMoveUpdate(data, data.NavPoints.Count);
+                    HoldBot(data, 0, false);
+                    return;
+                }
+                FireMoveComplete(data);
                 return;
             }
 
@@ -577,13 +679,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
 
             if (mode == TravelMode.Teleport)
             {
-                // Teleport directly
-                ScenePresence sp = GetBotSP(data);
-                if (sp != null)
-                {
-                    sp.Velocity = Vector3.Zero;
-                    sp.AbsolutePosition = target;
-                }
+                TeleportBot(data, scene, target);
                 data.NavIndex++;
                 // Halcyon reported every teleport as a move on to the next node, the last node included.
                 FireMoveUpdate(data, data.NavIndex);
@@ -595,16 +691,18 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 // <seconds, 0, 0>), then go on; NavPollTick ends the wait. Halcyon NodeGraph.GetNextPosition
                 // waits position.X seconds on a Wait node.
                 m_npcModule.StopMoveToTarget(data.BotID, scene);
-                data.NavWaitUntil = Environment.TickCount64 + (long)(Math.Max(0f, target.X) * 1000f);
-                data.NavWaiting = true;
+                HoldBot(data, (long)(Math.Max(0f, target.X) * 1000f), true);
                 data.NavIndex++;
             }
             else
             {
                 m_npcModule.MoveToTarget(data.BotID, scene, target, noFly, true, running);
                 data.CurrentNavTarget = target;
+                data.NavNoFly = noFly;
+                data.NavRunning = running;
                 data.NavInFlight = true;
-                data.NavInFlightTicks = 0;
+                data.NavElapsedMs = 0;
+                data.NavLastPoll = Environment.TickCount64;
                 data.NavIndex++;
             }
         }
@@ -612,8 +710,9 @@ namespace OpenSim.Region.OptionalModules.World.NPC
         // Polls bots that are walking to a waypoint. INPCModule gives no arrival callback,
         // so when a bot gets within NAV_ARRIVAL_TOLERANCE (horizontal) of its current target
         // we advance to the next waypoint via MoveToNextNavPoint — which fires bot_update
-        // (BOT_MOVE_COMPLETE) once the list is exhausted. A timeout reports BOT_MOVE_FAILED
-        // so a stuck bot still notifies the script rather than hanging silently.
+        // (BOT_MOVE_COMPLETE) once the list is exhausted. A bot that has not arrived after
+        // NavTeleportAfterMs is teleported to the waypoint and goes on, as Halcyon's
+        // MovementAction.GetNextDestination did: BOT_MOVE_FAILED, then BOT_MOVE_UPDATE, for the next node.
         private void NavPollTick(object sender, System.Timers.ElapsedEventArgs e)
         {
             List<BotData> inFlight;
@@ -632,7 +731,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 {
                     if (Environment.TickCount64 < data.NavWaitUntil) continue;
                     data.NavWaiting = false;
-                    try { MoveToNextNavPoint(data, true); }
+                    try { MoveToNextNavPoint(data, data.NavUpdateAfterWait); }
                     catch (Exception ex)
                     {
                         m_log.LogWarning("[BotManager]: nav advance for bot {0} failed: {1}", data.BotID, ex.Message);
@@ -646,7 +745,10 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 float dx = sp.AbsolutePosition.X - data.CurrentNavTarget.X;
                 float dy = sp.AbsolutePosition.Y - data.CurrentNavTarget.Y;
                 bool arrived = (dx * dx + dy * dy) <= NAV_ARRIVAL_TOLERANCE * NAV_ARRIVAL_TOLERANCE;
-                bool timedOut = ++data.NavInFlightTicks >= NAV_INFLIGHT_TIMEOUT_TICKS;
+                long now = Environment.TickCount64;
+                data.NavElapsedMs += now - data.NavLastPoll;
+                data.NavLastPoll = now;
+                bool timedOut = data.NavElapsedMs >= data.NavTeleportAfterMs;
 
                 try
                 {
@@ -657,9 +759,13 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                     }
                     else if (timedOut)
                     {
+                        // NavIndex is already the node after the one not reached.
                         data.NavInFlight = false;
-                        data.NavPoints = null;
-                        FireMoveFailed(data, data.NavIndex);   // NavIndex is already the node after the one not reached
+                        Scene scene = GetBotScene(data);
+                        if (scene != null) TeleportBot(data, scene, data.CurrentNavTarget);
+                        FireMoveFailed(data, data.NavIndex);
+                        FireMoveUpdate(data, data.NavIndex);
+                        MoveToNextNavPoint(data, false);
                     }
                 }
                 catch (Exception ex)
@@ -674,7 +780,7 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 following = m_bots.Values.Where(d => d.IsFollowing && !d.MovementPaused).ToList();
             foreach (BotData data in following)
             {
-                try { CheckFollowedAvatar(data); }
+                try { FollowStep(data); }
                 catch (Exception ex)
                 {
                     m_log.LogWarning("[BotManager]: follow check for bot {0} failed: {1}", data.BotID, ex.Message);
@@ -957,27 +1063,64 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.IsFollowing = true;
             data.FollowTarget = targetID;
             data.FollowOptions = options;
+            ReadFollowOptions(data, options);
+            data.FollowAtAvatar = false;
+            data.FollowJumpAttempts = 0;
 
-            // Start following by moving to target's position
-            Vector3 targetPos = targetSP.AbsolutePosition;
-
-            // Apply follow offset if specified
-            if (options.TryGetValue(4 /*BOT_FOLLOW_OFFSET*/, out object offsetObj) && offsetObj is Vector3 offset)
-                targetPos += offset;
-
-            m_npcModule.MoveToTarget(botID, scene, targetPos, false, true, false);
-
+            FollowStep(data);
             return BotMovementResult.Success;
         }
 
-        private const float DEFAULT_LOST_AVATAR_DISTANCE = 1000f;   // Halcyon AvatarFollowerDescription
+        private const float DEFAULT_STOP_FOLLOW_DISTANCE = 2f;      // Halcyon AvatarFollowerDescription
+        private const float DEFAULT_START_FOLLOW_DISTANCE = 3f;
+        private const float DEFAULT_LOST_AVATAR_DISTANCE = 1000f;
+        private const float FOLLOW_JUMP_IMPULSE = 9.4f;             // what ScenePresenceAnimator gives an avatar's jump
 
-        // BOT_MOVE_AVATAR_LOST, once each time the followed avatar is lost, as Halcyon's AvatarFollower raised it:
-        // the avatar has left the region (UpdateInformation: [ZERO_VECTOR, 0.0, bot position]), or the bot is
-        // farther than BOT_LOST_AVATAR_DISTANCE (8) from the avatar plus BOT_FOLLOW_OFFSET (4)
-        // (CheckInformationBeforeMove: [avatar position, 0.0, bot position]). Halcyon passed 0.0 as the distance
-        // in both. The avatar coming back within the distance re-arms the report.
-        private void CheckFollowedAvatar(BotData data)
+        // Halcyon AvatarFollowerDescription: BOT_ALLOW_RUNNING (1), BOT_ALLOW_FLYING (2), BOT_ALLOW_JUMPING (3) and
+        // BOT_REQUIRES_LINE_OF_SIGHT (5) are integers, 1 for yes (the first three default to yes, the last to no);
+        // BOT_FOLLOW_OFFSET (4) is a vector added to the avatar's position; BOT_START_FOLLOWING_DISTANCE (6),
+        // BOT_STOP_FOLLOWING_DISTANCE (7) and BOT_LOST_AVATAR_DISTANCE (8) are metres, an integer or a float.
+        private static void ReadFollowOptions(BotData data, Dictionary<int, object> options)
+        {
+            data.FollowAllowRunning = data.FollowAllowFlying = data.FollowAllowJumping = true;
+            data.FollowNeedsSight = false;
+            data.FollowOffset = Vector3.Zero;
+            data.FollowStartDistance = DEFAULT_START_FOLLOW_DISTANCE;
+            data.FollowStopDistance = DEFAULT_STOP_FOLLOW_DISTANCE;
+            data.FollowLostDistance = DEFAULT_LOST_AVATAR_DISTANCE;
+            if (options == null) return;
+
+            foreach (KeyValuePair<int, object> kvp in options)
+            {
+                object v = kvp.Value;
+                bool number = v is int || v is float;
+                switch (kvp.Key)
+                {
+                    case 1 /*BOT_ALLOW_RUNNING*/: if (v is int run) data.FollowAllowRunning = run == 1; break;
+                    case 2 /*BOT_ALLOW_FLYING*/: if (v is int fly) data.FollowAllowFlying = fly == 1; break;
+                    case 3 /*BOT_ALLOW_JUMPING*/: if (v is int jump) data.FollowAllowJumping = jump == 1; break;
+                    case 4 /*BOT_FOLLOW_OFFSET*/: if (v is Vector3 offset) data.FollowOffset = offset; break;
+                    case 5 /*BOT_REQUIRES_LINE_OF_SIGHT*/: if (v is int sight) data.FollowNeedsSight = sight == 1; break;
+                    case 6 /*BOT_START_FOLLOWING_DISTANCE*/: if (number) data.FollowStartDistance = Convert.ToSingle(v); break;
+                    case 7 /*BOT_STOP_FOLLOWING_DISTANCE*/: if (number) data.FollowStopDistance = Convert.ToSingle(v); break;
+                    case 8 /*BOT_LOST_AVATAR_DISTANCE*/: if (number) data.FollowLostDistance = Convert.ToSingle(v); break;
+                }
+            }
+        }
+
+        // One step of following, at each nav poll, after Halcyon's AvatarFollower (CheckInformationBeforeMove,
+        // UpdateInformation and DirectFollowing):
+        // - closer than the stop distance (the start distance once the bot has stopped) the bot stops beside the avatar;
+        // - BOT_MOVE_AVATAR_LOST is raised once each time the avatar is lost: it left the region ([ZERO_VECTOR, 0.0, bot
+        //   position]), it is farther than the lost distance ([avatar position, 0.0, bot position]; the bot keeps
+        //   following, as Halcyon's did), or line of sight is required and an object is in between ([avatar position,
+        //   distance, bot position]; the bot goes no further toward it). The avatar found again re-arms it;
+        // - otherwise the bot is sent toward the avatar plus BOT_FOLLOW_OFFSET: flying when the avatar flies, or when the
+        //   avatar is more than 3 m above or below, if flying is allowed; running when the avatar runs, if running is
+        //   allowed; for an avatar a little above it, at its own height unless jumping is allowed and something taller
+        //   than the bot is in the way, when the bot jumps if it is near the foot of it.
+        // Halcyon also steered around objects along the avatar's recent positions; this goes straight for the avatar.
+        private void FollowStep(BotData data)
         {
             Scene scene = GetBotScene(data);
             ScenePresence bot = GetBotSP(data);
@@ -994,27 +1137,94 @@ namespace OpenSim.Region.OptionalModules.World.NPC
                 return;
             }
 
-            Dictionary<int, object> options = data.FollowOptions;
-            Vector3 offset = Vector3.Zero;
-            float lostDistance = DEFAULT_LOST_AVATAR_DISTANCE;
-            if (options != null)
-            {
-                if (options.TryGetValue(4 /*BOT_FOLLOW_OFFSET*/, out object o) && o is Vector3 v) offset = v;
-                if (options.TryGetValue(8 /*BOT_LOST_AVATAR_DISTANCE*/, out object d) && (d is float || d is int))
-                    lostDistance = Convert.ToSingle(d);
-            }
+            Vector3 botPos = bot.AbsolutePosition;
+            Vector3 targetPos = target.AbsolutePosition + data.FollowOffset;
+            targetPos.X = Math.Clamp(targetPos.X, 0f, scene.RegionInfo.RegionSizeX);
+            targetPos.Y = Math.Clamp(targetPos.Y, 0f, scene.RegionInfo.RegionSizeY);
+            float distance = Vector3.Distance(targetPos, botPos);
 
-            float distance = Vector3.Distance(target.AbsolutePosition + offset, bot.AbsolutePosition);
-            if (distance > lostDistance)
+            float closeEnough = data.FollowAtAvatar ? data.FollowStartDistance : data.FollowStopDistance;
+            if (distance < closeEnough)
+            {
+                if (!data.FollowAtAvatar)
+                {
+                    m_npcModule.StopMoveToTarget(data.BotID, scene);
+                    // A bot that had to fly up to here lands (Halcyon AvatarFollower.UpdateInformation).
+                    if (data.FollowJumpAttempts > 0 && !(data.FollowAllowFlying && target.Flying))
+                        bot.Flying = false;
+                    data.FollowJumpAttempts = 0;
+                }
+                data.FollowAtAvatar = true;
+                return;
+            }
+            data.FollowAtAvatar = false;
+
+            bool outOfSight = data.FollowNeedsSight && SomethingBetween(scene, botPos, targetPos, 0f);
+            bool tooFar = distance > data.FollowLostDistance;
+            if (outOfSight || tooFar)
             {
                 if (!data.FollowLost)
                 {
                     data.FollowLost = true;
-                    FireAvatarLost(data, target.AbsolutePosition, 0.0f);
+                    FireAvatarLost(data, target.AbsolutePosition, outOfSight ? distance : 0.0f);
                 }
+                if (outOfSight) return;
             }
             else
                 data.FollowLost = false;
+
+            bool fly = data.FollowAllowFlying && target.Flying;
+            bool jump = false;
+            float dz = targetPos.Z - botPos.Z;
+            if (!fly && (dz > 0.25f || data.FollowJumpAttempts > 5))
+            {
+                if (data.FollowJumpAttempts > 5 || dz > 3f)
+                {
+                    if (data.FollowJumpAttempts <= 5) data.FollowJumpAttempts = 6;
+                    if (data.FollowAllowFlying) fly = true;
+                }
+                else if (!data.FollowAllowJumping || !SomethingBetween(scene, botPos, targetPos, bot.Appearance.AvatarHeight))
+                {
+                    data.FollowJumpAttempts--;
+                    targetPos.Z = botPos.Z + 0.15f;
+                }
+                else
+                {
+                    if (data.FollowJumpAttempts < 0) data.FollowJumpAttempts = 0;
+                    data.FollowJumpAttempts++;
+                    // Halcyon's walkTo jumped when the point was within 2 m across and more than 1.5 m up.
+                    jump = Math.Abs(targetPos.X - botPos.X) < 2f && Math.Abs(targetPos.Y - botPos.Y) < 2f && dz > 1.5f;
+                }
+            }
+            else if (!fly)
+            {
+                if (dz < -3f && data.FollowAllowFlying) fly = true;
+                data.FollowJumpAttempts--;
+            }
+
+            bool run = data.FollowAllowRunning && target.SetAlwaysRun;
+            m_npcModule.MoveToTarget(data.BotID, scene, targetPos, !fly, !fly, run);
+            if (jump && bot.IsColliding)
+                bot.PhysicsActor?.AvatarJump(FOLLOW_JUMP_IMPULSE);
+        }
+
+        // Whether an object stands on the line from 'from' to 'to': a prim, not an attachment or phantom, that the line
+        // crosses, and that is taller than minHeight. Halcyon's AvatarFollower cast a physics ray (llCastRay); this
+        // tests the objects' boxes, which needs no physics engine.
+        private static bool SomethingBetween(Scene scene, Vector3 from, Vector3 to, float minHeight)
+        {
+            Vector3 dir = to - from;
+            float length = dir.Length();
+            if (length < 0.001f) return false;
+            Ray ray = new Ray(from, dir / length);
+            foreach (SceneObjectGroup sog in scene.GetSceneObjectGroups())
+            {
+                if (sog.IsDeleted || sog.IsAttachment || sog.IsPhantom) continue;
+                EntityIntersection hit = sog.TestIntersection(ray, false, false);
+                if (hit.HitTF && hit.distance <= length && hit.obj != null && hit.obj.Scale.Z > minHeight)
+                    return true;
+            }
+            return false;
         }
 
         public void StopMovement(UUID botID, UUID ownerID)
@@ -1040,8 +1250,17 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             if (data == null) return;
             data.MovementPaused = false;
 
-            // Resume navigation if we had waypoints. A wait in progress is left to NavPollTick to finish.
-            if (!data.NavWaiting && data.NavPoints != null && data.NavIndex < data.NavPoints.Count)
+            // Resume navigation if we had waypoints. A wait in progress is left to NavPollTick to finish. A move in
+            // progress goes on toward its point, and the time paused does not count toward the teleport, as
+            // Halcyon's MovementAction.ResumeMovement restarted its step clock.
+            if (data.NavInFlight)
+            {
+                data.NavLastPoll = Environment.TickCount64;
+                Scene scene = GetBotScene(data);
+                if (scene != null)
+                    m_npcModule.MoveToTarget(botID, scene, data.CurrentNavTarget, data.NavNoFly, true, data.NavRunning);
+            }
+            else if (!data.NavWaiting && data.NavPoints != null && data.NavIndex < data.NavPoints.Count)
                 MoveToNextNavPoint(data, false);
         }
 
@@ -1069,36 +1288,26 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             data.WanderDistances = distances;
             data.WanderOptions = options;
 
-            // Determine travel mode
-            bool running = false;
-            bool noFly = true;
-            if (options.TryGetValue(1 /*BOT_WANDER_MOVEMENT_TYPE*/, out object modeObj))
-            {
-                int mode = Convert.ToInt32(modeObj);
-                if (mode == 2 /*BOT_TRAVELMODE_RUN*/) running = true;
-                if (mode == 3 /*BOT_TRAVELMODE_FLY*/) noFly = false;
-            }
+            // Halcyon WanderingDescription: BOT_WANDER_MOVEMENT_TYPE (1), an integer, is the travel mode to each point
+            // (walk by default); BOT_WANDER_TIME_BETWEEN_NODES (2), an integer or float, is the seconds to wait at each
+            // point (0 by default: on to the next point at once).
+            data.WanderMode = TravelMode.Walk;
+            data.WanderWait = 0f;
+            if (options.TryGetValue(1 /*BOT_WANDER_MOVEMENT_TYPE*/, out object modeObj) && modeObj is int mode
+                && mode >= (int)TravelMode.Walk && mode <= (int)TravelMode.Teleport)
+                data.WanderMode = (TravelMode)mode;
+            if (options.TryGetValue(2 /*BOT_WANDER_TIME_BETWEEN_NODES*/, out object timeObj) && (timeObj is int || timeObj is float))
+                data.WanderWait = Convert.ToSingle(timeObj);
 
-            // Determine time between wander nodes
-            double interval = 5.0; // default 5 seconds
-            if (options.TryGetValue(2 /*BOT_WANDER_TIME_BETWEEN_NODES*/, out object timeObj))
-                interval = Convert.ToDouble(timeObj);
-
-            // Move to first random point
-            WanderToRandomPoint(data, noFly, running);
-
-            // Set up timer for subsequent wander points
-            data.WanderTimer = new Timer(interval * 1000.0);
-            data.WanderTimer.Elapsed += (s, e) => WanderToRandomPoint(data, noFly, running);
-            data.WanderTimer.AutoReset = true;
-            data.WanderTimer.Start();
+            NewWanderPath(data);
+            MoveToNextNavPoint(data, false);
         }
 
-        private void WanderToRandomPoint(BotData data, bool noFly, bool running)
+        // The next wander path: a random point within the distances of the origin, and a wait after it when there is one.
+        // Reaching the point then moves on to node 1, which raises BOT_MOVE_UPDATE only when the wait is there.
+        private void NewWanderPath(BotData data)
         {
-            if (!data.IsWandering) return;
             Scene scene = GetBotScene(data);
-            if (scene == null) return;
 
             float rx = (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * data.WanderDistances.X;
             float ry = (float)(Random.Shared.NextDouble() * 2.0 - 1.0) * data.WanderDistances.Y;
@@ -1109,11 +1318,25 @@ namespace OpenSim.Region.OptionalModules.World.NPC
             target.Y = Math.Clamp(target.Y, 0.5f, 255.5f);
 
             // Ensure above terrain
-            float terrainHeight = (float)scene.Heightmap[(int)target.X, (int)target.Y];
-            if (target.Z < terrainHeight)
-                target.Z = terrainHeight;
+            if (scene != null)
+            {
+                float terrainHeight = (float)scene.Heightmap[(int)target.X, (int)target.Y];
+                if (target.Z < terrainHeight)
+                    target.Z = terrainHeight;
+            }
 
-            m_npcModule.MoveToTarget(data.BotID, scene, target, noFly, true, running);
+            var points = new List<Vector3> { target };
+            var modes = new List<TravelMode> { data.WanderMode };
+            if (data.WanderWait != 0f)
+            {
+                points.Add(new Vector3(data.WanderWait, 0, 0));
+                modes.Add(TravelMode.Wait);
+            }
+            data.NavPoints = points;
+            data.NavModes = modes;
+            data.NavIndex = 0;
+            data.NavFollowIndefinitely = false;
+            data.NavTeleportAfterMs = DEFAULT_TELEPORT_AFTER_MS;
         }
 
         public Vector3 GetBotPosition(UUID botID, UUID ownerID)

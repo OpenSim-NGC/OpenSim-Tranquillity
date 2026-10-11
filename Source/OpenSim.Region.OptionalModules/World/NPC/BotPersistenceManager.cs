@@ -1,7 +1,7 @@
 /*
- * Copyright (c) Legion Grid Contributors
+ * Copyright (c) Legion Builds
  * BotPersistenceManager.cs — Persistent bot storage and respawn system
- * Phase 34: Saves bot data to SQLite and auto-respawns on region load.
+ * Saves bot data to SQLite and auto-respawns on region load.
  */
 
 using System;
@@ -225,14 +225,14 @@ CREATE INDEX IF NOT EXISTS idx_pb_parcel ON persistent_bots(parcel_id, active);
 
         /// <summary>
         /// Returns true if bot persistence is available for this region.
-        /// Checks both grid-level config and region-level setting.
+        /// Checks the grid-level config only, and that the database opened.
         /// </summary>
         public bool IsEnabled()
         {
             if (!m_gridEnabled || !m_initialized) return false;
 
-            // Region-level toggle (AllowBotPersistence) will be added to
-            // RegionSettings in Phase 34b. For now, grid-level config controls it.
+            // A region-level toggle (AllowBotPersistence) in RegionSettings
+            // does not exist yet. For now, grid-level config controls it.
             return true;
         }
 
@@ -1086,11 +1086,11 @@ ORDER BY created_at ASC";
 
                 appearance ??= new AvatarAppearance();
 
-                // Create the bot via BotManager
+                // Bring the bot back in this region under the key it had (a new key only if that one is in use),
+                // so a script that stored the key still reaches it. No outfit name: the saved appearance goes on below.
                 string reason;
-                UUID newBotID = m_botManager.CreateBot(
-                    rec.BotFirstName, rec.BotLastName,
-                    rec.Position, null, // no outfit name — using serialized appearance
+                UUID newBotID = m_botManager.RespawnBot(m_scene, rec.BotID,
+                    rec.BotFirstName, rec.BotLastName, rec.Position,
                     rec.CreatorScript, rec.OwnerID,
                     out reason);
 
@@ -1127,9 +1127,9 @@ ORDER BY created_at ASC";
                     catch { }
                 }
 
-                // Update the database record with the new bot ID
-                // (bot UUID changes on respawn since it's a new ScenePresence)
-                UpdateBotIDInDb(rec.BotID, newBotID);
+                // The record moves to the new key only when the bot could not have its old one.
+                if (newBotID != rec.BotID)
+                    UpdateBotIDInDb(rec.BotID, newBotID);
 
                 lock (m_lock)
                 {
