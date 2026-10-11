@@ -118,13 +118,21 @@ public class NotecardFloodTests
         /// <summary>The engine's own clock (real time), as on a region; <see cref="RunUntil"/> then measures wall time.</summary>
         public readonly bool RealClock;
 
-        public Rig(Action<Nini.Config.IConfigSource> configure = null, bool realClock = false)
+        /// <param name="halcyon">
+        /// Halcyon's notecard timing (NotecardPause = halcyon). The default pause is SL's 0.1 s a call, which is too slow
+        /// for these tests to flood a queue, so they ask for the fast timing; the tests of the default pass false.
+        /// </param>
+        public Rig(Action<Nini.Config.IConfigSource> configure = null, bool realClock = false, bool halcyon = true)
         {
             RealClock = realClock;
             m_previous = LoggerProvider.LoggerFactory;
             LoggerProvider.LoggerFactory = m_log;
             if (!realClock) Clock.SetSourceForTesting(() => Now);
-            H = new SchedulerHarness(configure);
+            H = new SchedulerHarness(cfg =>
+            {
+                if (halcyon) cfg.Configs["InWorldz.Phlox"].Set("NotecardPause", "halcyon");
+                configure?.Invoke(cfg);
+            });
         }
 
         public UUID Rez(SceneObjectPart part, string tag, string source)
@@ -255,9 +263,9 @@ public class NotecardFloodTests
     }
 
     private (Rig, string[]) PrimOf(int readers, int lines, bool restart = false, bool checkId = true, bool computeTakesTime = true,
-        Func<int, string> source = null)
+        Func<int, string> source = null, bool halcyon = true)
     {
-        var r = new Rig { ComputeTakesTime = computeTakesTime };
+        var r = new Rig(halcyon: halcyon) { ComputeTakesTime = computeTakesTime };
         AddNotecard(r.H, r.H.Prim, "card", Card(lines));
         string[] tags = Enumerable.Range(0, readers).Select(i => ((char)('A' + i)).ToString()).ToArray();
         for (int i = 0; i < readers; i++)
@@ -362,6 +370,67 @@ public class NotecardFloodTests
             r.RunUntil(() => false, 120_000);
             var c = r.Finish(tags);
             Report("2d eight readers, same card", c);
+            AllReachedEof(c, 200);
+            foreach (var kv in c) Assert.Equal(0, kv.Value.Dropped);
+        }
+    }
+
+    /// <summary>Reads lines 0 to 19 of "card" one after the other and says "R done N" at EOF (N = lines read).</summary>
+    private const string TwentyLineReader = @"
+        integer line; key q;
+        default {
+            state_entry() { llListen(7, """", NULL_KEY, """"); llSay(0, ""R entry""); }
+            listen(integer c, string n, key k, string m) { if (m == ""go"") { line = 0; q = llGetNotecardLine(""card"", 0); } }
+            dataserver(key id, string d) {
+                if (id != q) return;
+                if (d == EOF) { llSay(0, ""R done "" + (string)line); return; }
+                line++; q = llGetNotecardLine(""card"", line);
+            }
+        }";
+
+    /// <summary>The engine time a script takes to read a notecard of <paramref name="lines"/> lines to its EOF.</summary>
+    private static ulong TimeToReadWholeCard(bool halcyon, int lines)
+    {
+        using var r = new Rig(halcyon: halcyon);
+        AddNotecard(r.H, r.H.Prim, "card", Card(lines));
+        r.Rez(r.H.Prim, "R", TwentyLineReader);
+        Assert.True(r.Started(new[] { "R" }), string.Join(" | ", r.H.Said));
+        ulong start = r.Now;
+        r.Say("go");
+        Assert.True(r.RunUntil(() => r.H.Said.Contains("R done " + lines), 120_000), "no EOF: " + string.Join(" | ", r.H.Said));
+        return r.Now - start;
+    }
+
+    // SL (llGetNotecardLine): "causes the script to sleep for 0.1 seconds". 20 lines and the EOF answer are 21 calls.
+    [Fact]
+    public void ATwentyLineReadTakesAtLeastTwoSecondsOfEngineTimeByDefault()
+    {
+        ulong took = TimeToReadWholeCard(halcyon: false, lines: 20);
+        _out.WriteLine("20 lines and EOF, default pause: " + took + " ms of engine time");
+        Assert.True(took >= 2_000, "the read took only " + took + " ms");
+        Assert.True(took < 10_000, "the read took " + took + " ms");
+    }
+
+    [Fact]
+    public void ATwentyLineReadWithHalcyonsTimingTakesUnderTwoSeconds()
+    {
+        ulong took = TimeToReadWholeCard(halcyon: true, lines: 20);
+        _out.WriteLine("20 lines and EOF, Halcyon timing: " + took + " ms of engine time");
+        Assert.True(took < 1_000, "the read took " + took + " ms");
+    }
+
+    // 2d on the default pause: 200 lines and the EOF answer are 201 calls of 0.1 s each, with seven other readers' answers
+    // arriving at each reader's queue at the same pace. Every reader reaches EOF and none of its own answers is lost.
+    [Fact]
+    public void EightReadersOfOneNotecardOnTheDefaultTimingAllReachEof()
+    {
+        var (r, tags) = PrimOf(8, 200, halcyon: false);
+        using (r)
+        {
+            r.Say("go");
+            r.RunUntil(() => false, 40_000);
+            var c = r.Finish(tags);
+            Report("2d eight readers, same card, default timing", c);
             AllReachedEof(c, 200);
             foreach (var kv in c) Assert.Equal(0, kv.Value.Dropped);
         }
