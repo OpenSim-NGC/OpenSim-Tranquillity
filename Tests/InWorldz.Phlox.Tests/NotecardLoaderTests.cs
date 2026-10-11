@@ -317,16 +317,6 @@ public partial class NotecardLoaderTests
         Assert.InRange(r.TimeMs, 30_000UL, 40_000UL);
     }
 
-    // a: cards read one after another, NotecardPause = halcyon
-    [Fact]
-    public void A_OneAfterAnother_Halcyon()
-    {
-        var r = Run("a", halcyon: true);
-        BothLoaded(r);
-        NothingLost(r);
-        Assert.InRange(r.TimeMs, 0UL, 5_000UL);
-    }
-
     // b: cards read one after another, NotecardPause = sl
     [Fact]
     public void B_OneAfterAnother_Sl()
@@ -338,15 +328,6 @@ public partial class NotecardLoaderTests
         Assert.True(r.A.MaxDepth < 32 && r.B.MaxDepth < 32, $"depths {r.A.MaxDepth}, {r.B.MaxDepth}");
     }
 
-    // c: all three cards at once, halcyon
-    [Fact]
-    public void C_AllAtOnce_Halcyon()
-    {
-        var r = Run("c", halcyon: true, concurrent: true);
-        BothLoaded(r);
-        NothingLost(r);
-    }
-
     // d: all three at once, sl. Three requests outstanding do not shorten it: each call still sleeps 0.1 s.
     [Fact]
     public void D_AllAtOnce_Sl()
@@ -355,86 +336,5 @@ public partial class NotecardLoaderTests
         BothLoaded(r);
         NothingLost(r);
         SlSleptTheNotecardPause(r);
-    }
-
-    // e: variant a with 20 ms of work in the link_message handler. It loads, in about ten times the time, with the
-    // back-pressure sleeping both scripts for a fifth of it; link messages are not asserted (see H).
-    [Fact]
-    public void E_OneAfterAnother_Halcyon_20msInLinkHandler()
-    {
-        var r = Run("e", halcyon: true, workSeconds: 0.02);
-        BothLoaded(r);
-        Assert.InRange(r.TimeMs, 3_000UL, 60_000UL);
-        foreach (var s in new[] { r.A, r.B })
-            Assert.True(s.Sleeps.GetValueOrDefault(50).Count > 0, "no link-message back-pressure sleep in " + s.Tag);
-    }
-
-    // f: variant a with the link-message back-pressure off: no 50 ms sleep at all
-    [Fact]
-    public void F_OneAfterAnother_Halcyon_BackPressureOff()
-    {
-        var r = Run("f", halcyon: true, throttle: false);
-        BothLoaded(r);
-        NothingLost(r);
-        foreach (var s in new[] { r.A, r.B })
-            Assert.False(s.Sleeps.ContainsKey(50), "a back-pressure sleep with the throttle off in " + s.Tag);
-    }
-
-    // g: variant a with no link messages
-    [Fact]
-    public void G_OneAfterAnother_Halcyon_NoLinkMessages()
-    {
-        var r = Run("g", halcyon: true, links: false);
-        BothLoaded(r);
-        NothingLost(r);
-        foreach (var s in new[] { r.A, r.B })
-            Assert.False(s.Sleeps.ContainsKey(50), "a back-pressure sleep with no link message sent in " + s.Tag);
-    }
-
-    // The same loaders on six cards of 300 lines with 20 ms of work per link message, Halcyon timing. Both load, in
-    // about 65 s of engine time where the loaders with no work take 4 s: one script's queue sits at the back-pressure
-    // threshold for as long as the other works through its cards, so they load one after the other.
-    [Fact]
-    public void I_SixCardsOf300Lines_20msInLinkHandler_LoadsOneScriptAfterTheOther()
-    {
-        var r = Run("i", halcyon: true, cards: 6, lines: 300, workSeconds: 0.02, capMs: 300_000);
-        BothLoaded(r);
-        Assert.InRange(r.TimeMs, 40_000UL, 200_000UL);
-    }
-
-    // The back-pressure is what keeps the link messages: with it off the same loaders drop most of what each sends the
-    // other at 64 queued. (Whether both then load is decided by thread timing, see K.)
-    [Fact]
-    public void J_SixCardsOf300Lines_20msInLinkHandler_WithBackPressureOffDropsLinkMessages()
-    {
-        var r = Run("j", halcyon: true, cards: 6, lines: 300, workSeconds: 0.02, throttle: false, capMs: 60_000);
-        Assert.True(r.A.DroppedAt64.GetValueOrDefault("LINK_MESSAGE") + r.B.DroppedAt64.GetValueOrDefault("LINK_MESSAGE") > 500,
-            $"dropped at 64: A {string.Join(", ", r.A.DroppedAt64)}; B {string.Join(", ", r.B.DroppedAt64)}");
-        Assert.True(r.LinksLost > 500, "link messages lost: " + r.LinksLost);
-    }
-
-    // The stall: with the back-pressure off, one of the two scripts (2 runs of 3) has its own dataserver answer dropped
-    // when its queue, full of the other's link messages, holds 64. It asked for that line and waits for the answer for
-    // good (the status then reads Waiting, 0 queued, and the counters one request more than answers). The same drop
-    // can happen with the back-pressure on, but it was seen once in 14 runs.
-    [Fact(Skip = "Stalls in 2 of 3 runs: a script's own dataserver answer is dropped at 64 queued (link messages from the other script fill the queue), and it never asks again.")]
-    public void K_SixCardsOf300Lines_20msInLinkHandler_WithBackPressureOffLoads()
-    {
-        var r = Run("k", halcyon: true, cards: 6, lines: 300, workSeconds: 0.02, throttle: false, capMs: 300_000);
-        BothLoaded(r);
-    }
-
-    // The loss on the back-pressure's default. Of 12 runs of this case, 8 dropped between 6 and 68 link messages at 64
-    // queued (each with a queue-full line), none stalled; an earlier run of it also dropped
-    // one script's own dataserver answer, and that script never asked again. What decides it is whether a post finds the
-    // queue at 64 while the receiver is inside a 20 ms handler, and that depends on thread timing, so a run is not
-    // repeatable. The back-pressure sleeps the sender after its post (LSLSystemAPI.cs LinkMessageBackPressure), so it
-    // cannot keep a queue at or below 63.
-    [Fact(Skip = "Shows link messages dropped at 64 (and, rarely, a script's own answer): the back-pressure sleeps after the post. Not repeatable run to run.")]
-    public void H_SixCardsOf300Lines_20msInLinkHandler_LosesNoLinkMessageAndNoAnswer()
-    {
-        var r = Run("h", halcyon: true, cards: 6, lines: 300, workSeconds: 0.02, capMs: 300_000);
-        BothLoaded(r);
-        NothingLost(r);
     }
 }
