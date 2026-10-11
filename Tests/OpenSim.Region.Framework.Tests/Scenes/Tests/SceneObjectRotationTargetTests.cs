@@ -564,6 +564,45 @@ public class SceneObjectRotationTargetTests : OpenSimTestCase
         Assert.Equal(new[] { Off, "RotationalVelocity=" + V(new Vector3(0, 0, 1)) }, f.Actor.Calls);
     }
 
+    [Theory]
+    [InlineData(0.00001f)]
+    [InlineData(1f)]
+    [InlineData(40f)]
+    public void AScriptsTargetOmegaSetBeforeTheDragIsAppliedAgainOnReleaseWhateverThePartsCopyHolds(float rate)
+    {
+        // The part's own copy of the spin equals the omega the script set, and nothing has read it since, while the
+        // engine's target (switched off at the release, no zero written) stopped the real spin. The omega must still reach the actor.
+        var f = Make(true);
+        var omega = new Vector3(0, 0, rate);
+        f.Root.UpdateAngularVelocity(omega);
+        f.Start();
+        f.Spin(Turn(90));
+        f.Step();
+        f.Actor.RotationalVelocity = Vector3.Zero;
+        f.Actor.Clear();
+        f.Stop();
+        Assert.Equal(new[] { Off, "RotationalVelocity=" + V(omega) }, f.Actor.Calls);
+        Assert.Equal(omega, f.Actor.RotationalVelocity);
+    }
+
+    [Fact]
+    public void AScriptsTargetOmegaIsAppliedAgainAfterEveryDragOfSeveral()
+    {
+        var f = Make(true);
+        var omega = new Vector3(0, 0, 1);
+        f.Root.UpdateAngularVelocity(omega);
+        for (int i = 0; i < 3; i++)
+        {
+            f.Start();
+            f.Spin(Turn(30 + 30 * i));
+            f.Step();
+            f.Actor.RotationalVelocity = Vector3.Zero;
+            f.Actor.Clear();
+            f.Stop();
+            Assert.Equal(new[] { Off, "RotationalVelocity=" + V(omega) }, f.Actor.Calls);
+        }
+    }
+
     [Fact]
     public void ALookAtOnAVehicleIsGivenAsItIsSteeredToday()
     {
