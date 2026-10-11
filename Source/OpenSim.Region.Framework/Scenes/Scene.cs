@@ -1532,12 +1532,18 @@ public partial class Scene : SceneBase
         // Kick all ROOT agents with the message, 'The simulator is going down'
         ForEachScenePresence(delegate(ScenePresence avatar)
         {
+            // Kick waits for the message to go out. The viewer can log out meanwhile, and removing the
+            // presence clears its ControllingClient, so read it once and skip a presence that is gone.
+            IClientAPI client = avatar.ControllingClient;
+            if (client is null)
+                return;
+
             avatar.RemoveNeighbourRegion(RegionInfo.RegionHandle);
 
             if (!avatar.IsChildAgent)
-                avatar.ControllingClient.Kick("The simulator is going down.");
+                client.Kick("The simulator is going down.");
 
-            avatar.ControllingClient.SendShutdownConnectionNotice();
+            client.SendShutdownConnectionNotice();
         });
 
         // Stop updating the scene objects and agents.
