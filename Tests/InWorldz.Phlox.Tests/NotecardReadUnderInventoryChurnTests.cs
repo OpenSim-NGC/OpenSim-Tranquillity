@@ -143,9 +143,6 @@ public class NotecardReadUnderInventoryChurnTests
                         prim.Inventory.RemoveInventoryItem(live.Dequeue());
                         changes++;
                     }
-                    // Without this the writer takes the lock again before a waiting reader is woken (the reader-writer
-                    // lock is not fair), which no region's rate of inventory changes comes near.
-                    Thread.Yield();
                 }
             }) { IsBackground = true, Name = "inventory churn" };
             churn.Start();
