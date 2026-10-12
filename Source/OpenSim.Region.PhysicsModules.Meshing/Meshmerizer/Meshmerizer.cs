@@ -1015,12 +1015,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
                 if (whole != null)
                 {
-                    mesh = MakeBoundingBox(primName, whole);
-                    lock (cache)
-                    {
-                        cache[key] = mesh;
-                    }
-                    return mesh;
+                    return AddToCache(cache, key, MakeBoundingBox(primName, whole));
                 }
             }
             else if (primShape.SculptEntry && (primShape.SculptData == null || primShape.SculptData.Length == 0))
@@ -1055,10 +1050,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
             if (shouldCache)
             {
-                lock (cache)
-                {
-                    cache.Add(key, mesh);
-                }
+                mesh = AddToCache(cache, key, mesh);
 
                 // Keep the asset only while the bounding box is the one answer there is for it.
                 lock (m_uniqueBoundingBoxMeshes)
@@ -1073,6 +1065,20 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
         return mesh;
     }
+    // Caches a mesh and returns the one that is cached. Two threads can build the same mesh at once; the first to
+    // finish wins and the other is handed the winner, so both callers get the same answer.
+    private static Mesh AddToCache(Dictionary<ulong, Mesh> cache, ulong key, Mesh mesh)
+    {
+        lock (cache)
+        {
+            if (cache.TryGetValue(key, out Mesh cached))
+                return cached;
+
+            cache.Add(key, mesh);
+            return mesh;
+        }
+    }
+
     // The bounding box answer for a mesh, carrying the hulls of the asset the mesh came from.
     private Mesh MakeBoundingBox(string primName, Mesh mesh)
     {

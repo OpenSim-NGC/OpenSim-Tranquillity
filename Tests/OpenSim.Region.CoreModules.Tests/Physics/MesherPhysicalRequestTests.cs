@@ -200,6 +200,63 @@ public class MesherPhysicalRequestTests
         Assert.True(KeptSourceCount(large.GetMeshKey(Large, Lod)) == 0);
     }
 
+    [Fact]
+    public void Two_threads_asking_for_the_same_small_mesh_get_the_same_box_and_the_cache_holds_it_once()
+    {
+        AssertSimultaneousRequestsShareOneEntry(Small, false, "m_uniqueBoundingBoxMeshes");
+    }
+
+    [Fact]
+    public void Two_threads_asking_for_the_same_mesh_get_the_same_mesh_and_the_cache_holds_it_once()
+    {
+        AssertSimultaneousRequestsShareOneEntry(Large, false, "m_uniqueMeshes");
+        AssertSimultaneousRequestsShareOneEntry(Small, true, "m_uniqueMeshes");
+    }
+
+    // Each round is a fresh mesh asked for by two threads that start together, each with a shape of its own that
+    // carries the asset (as two callers that loaded it would).
+    private static void AssertSimultaneousRequestsShareOneEntry(Vector3 size, bool physical, string cacheField)
+    {
+        const int Rounds = 100;
+        var mesher = new Meshmerizer();
+        var cache = (Dictionary<ulong, Mesh>)typeof(Meshmerizer).GetField(cacheField, BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+
+        for (int round = 0; round < Rounds; round++)
+        {
+            var asset = new MeshAsset(ThreeHulls);
+            PrimitiveBaseShape[] shapes = { asset.Shape(), asset.Shape() };
+            var start = new Barrier(2);
+            IMesh?[] answers = new IMesh?[2];
+            Exception?[] errors = new Exception?[2];
+
+            Thread[] threads = new Thread[2];
+            for (int t = 0; t < 2; t++)
+            {
+                int me = t;
+                threads[t] = new Thread(() =>
+                {
+                    start.SignalAndWait();
+                    try { answers[me] = mesher.CreateMesh("race", shapes[me], size, Lod, physical, true); }
+                    catch (Exception e) { errors[me] = e; }
+                });
+                threads[t].Start();
+            }
+            foreach (Thread thread in threads)
+                Assert.True(thread.Join(TimeSpan.FromSeconds(30)));
+
+            Assert.Null(errors[0]);
+            Assert.Null(errors[1]);
+            Assert.NotNull(answers[0]);
+            Assert.Same(answers[0], answers[1]);
+
+            lock (cache)
+            {
+                Assert.Single(cache.Where(kv => ReferenceEquals(kv.Value, answers[0])));
+                Assert.Same(answers[0], cache[asset.ShapeWithoutData().GetMeshKey(size, Lod)]);
+            }
+        }
+    }
+
     private static int KeptSourceCount(ulong key)
     {
         var field = typeof(Meshmerizer).GetField("m_boundingBoxSources", BindingFlags.NonPublic | BindingFlags.Static);
