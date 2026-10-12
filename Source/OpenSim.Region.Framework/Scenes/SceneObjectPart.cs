@@ -1714,10 +1714,8 @@ public class SceneObjectPart : EntityBase, IDisposable
                 }
                 if (ParentGroup.IsAttachment)
                 {
-                    ScenePresence avatar = m_scene.GetScenePresence(ParentGroup.AttachedAvatar);
-                    PhysicsActor pa = avatar?.PhysicsActor;
-                    if (pa != null)
-                        pa.Buoyancy = value;
+                    // A part's own m_scene is never set; the group's is. The wearer's presence takes the value.
+                    ParentGroup.SetWearerBuoyancy(value);
                 }
                 else if (PhysActor != null)
                     PhysActor.Buoyancy = value;
