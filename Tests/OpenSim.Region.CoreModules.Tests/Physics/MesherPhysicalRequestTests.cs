@@ -5,6 +5,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+using System.Reflection;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.Meshing;
@@ -141,6 +142,71 @@ public class MesherPhysicalRequestTests
         Assert.Equal(meshCount, Vertices(mesher.CreateMesh("2", asset.Shape(), Small, Lod, true, true)));
         Assert.NotEqual(meshCount, Vertices(mesher.CreateMesh("3", asset.Shape(), Small, Lod, false, true)));
         Assert.Equal(meshCount, Vertices(mesher.CreateMesh("4", asset.Shape(), Small, Lod, true, true)));
+    }
+
+    [Fact]
+    public void A_small_mesh_asked_for_non_physical_then_physical_gets_the_mesh_not_null()
+    {
+        var mesher = new Meshmerizer();
+        int meshCount = MeshVertexCount(mesher);
+        PrimitiveBaseShape shape = new MeshAsset(ThreeHulls).Shape();
+
+        Assert.NotEqual(meshCount, Vertices(mesher.CreateMesh("1", shape, Small, Lod, false, true)));
+        Assert.Empty(shape.SculptData);
+
+        // Same shape, whose asset bytes the mesher dropped after the first decode.
+        IMesh? physical = mesher.CreateMesh("2", shape, Small, Lod, true, true);
+        Assert.Equal(meshCount, Vertices(physical));
+        Assert.Equal(3, mesher.GetConvexHulls(physical, Small)!.Count);
+        Assert.Empty(shape.SculptData);
+
+        // Both answers now come from the cache.
+        Assert.NotNull(mesher.CreateMesh("3", shape, Small, Lod, false, true));
+        Assert.Equal(meshCount, Vertices(mesher.CreateMesh("4", shape, Small, Lod, true, true)));
+    }
+
+    [Fact]
+    public void A_small_mesh_asked_for_physical_then_non_physical_gets_the_box_not_null()
+    {
+        var mesher = new Meshmerizer();
+        int meshCount = MeshVertexCount(mesher);
+        PrimitiveBaseShape shape = new MeshAsset(ThreeHulls).Shape();
+
+        Assert.Equal(meshCount, Vertices(mesher.CreateMesh("1", shape, Small, Lod, true, true)));
+        Assert.Empty(shape.SculptData);
+
+        // Same shape, asset bytes dropped: the box is made from the mesh the first request cached.
+        IMesh? box = mesher.CreateMesh("2", shape, Small, Lod, false, true);
+        Assert.NotEqual(meshCount, Vertices(box));
+        Assert.Equal(3, mesher.GetConvexHulls(box, Small)!.Count);
+    }
+
+    [Fact]
+    public void The_asset_bytes_kept_for_a_box_are_dropped_once_the_mesh_is_built()
+    {
+        var mesher = new Meshmerizer();
+        PrimitiveBaseShape shape = new MeshAsset(ThreeHulls).Shape();
+        ulong key = shape.GetMeshKey(Small, Lod);
+
+        Assert.NotNull(mesher.CreateMesh("1", shape, Small, Lod, false, true));
+        Assert.True(KeptSourceCount(key) == 1);
+
+        Assert.NotNull(mesher.CreateMesh("2", shape, Small, Lod, true, true));
+        Assert.True(KeptSourceCount(key) == 0);
+
+        // A request that is never replaced by a box keeps nothing.
+        PrimitiveBaseShape large = new MeshAsset(ThreeHulls).Shape();
+        Assert.NotNull(mesher.CreateMesh("3", large, Large, Lod, false, true));
+        Assert.True(KeptSourceCount(large.GetMeshKey(Large, Lod)) == 0);
+    }
+
+    private static int KeptSourceCount(ulong key)
+    {
+        var field = typeof(Meshmerizer).GetField("m_boundingBoxSources", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(field);
+        var kept = (Dictionary<ulong, byte[]>)field!.GetValue(null)!;
+        lock (kept)
+            return kept.ContainsKey(key) ? 1 : 0;
     }
 
     [Fact]
