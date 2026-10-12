@@ -176,7 +176,7 @@ public class MesherHullListTests
     // ---------------------------------------------------------------- the asset encoder
     // Writes the viewer's mesh asset format: an LLSD header of block offsets and sizes, then zlib-compressed blocks.
 
-    private static Vector3[][] Boxes(params (float x0, float y0, float z0, float x1, float y1, float z1)[] boxes)
+    internal static Vector3[][] Boxes(params (float x0, float y0, float z0, float x1, float y1, float z1)[] boxes)
     {
         return boxes.Select(b =>
         {
@@ -277,7 +277,7 @@ public class MesherHullListTests
     }
 
     /// <summary>A mesh asset: the display mesh as medium LOD, and a "physics_convex" block when hulls are given.</summary>
-    private static byte[] Asset(Vector3[][]? hulls)
+    internal static byte[] Asset(Vector3[][]? hulls)
     {
         var blocks = new List<(string name, byte[] data)> { ("medium_lod", MeshBlock()) };
         if (hulls != null)
@@ -298,7 +298,7 @@ public class MesherHullListTests
         return ms.ToArray();
     }
 
-    private static PrimitiveBaseShape MeshPbs(byte[] asset)
+    internal static PrimitiveBaseShape MeshPbs(byte[] asset)
     {
         PrimitiveBaseShape pbs = PrimitiveBaseShape.CreateBox();
         pbs.PathCurve = (byte)Extrusion.Curve1;

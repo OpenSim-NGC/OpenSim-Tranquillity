@@ -69,6 +69,15 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
     // Mesh cache. Static so it can be shared across instances of this class
     private static Dictionary<ulong, Mesh> m_uniqueMeshes = new Dictionary<ulong, Mesh>();
 
+    // Answers that were replaced by a bounding box (a non-physical request for a small mesh). The cache key does not
+    // carry the physical flag, so these are kept apart from the meshes above, which a physical request may be given.
+    private static Dictionary<ulong, Mesh> m_uniqueBoundingBoxMeshes = new Dictionary<ulong, Mesh>();
+
+    // The asset bytes a bounding-box answer was made from, by cache key. Decoding empties the shape's asset bytes, so
+    // without these a later physical request for the same mesh could not be answered. An entry is dropped when the
+    // mesh itself is cached. Guarded by m_uniqueBoundingBoxMeshes.
+    private static Dictionary<ulong, byte[]> m_boundingBoxSources = new Dictionary<ulong, byte[]>();
+
     private readonly J2KDecoderConfiguration decoderConfig = new J2KDecoderConfiguration()
         .WithHighestResolution();
 
@@ -954,7 +963,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
     public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool shouldCache, bool convex, bool forOde)
     {
-        return CreateMesh(primName, primShape, size, lod, false);
+        return CreateMesh(primName, primShape, size, lod, isPhysical);
     }
 
     public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical)
@@ -979,15 +988,47 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
         Mesh mesh = null;
         ulong key = 0;
 
+        // A non-physical request for a small mesh is answered with a bounding box (below); the others get the mesh.
+        bool boundingBoxOnly = !isPhysical && size.X < minSizeForComplexMesh && size.Y < minSizeForComplexMesh && size.Z < minSizeForComplexMesh;
+        Dictionary<ulong, Mesh> cache = boundingBoxOnly ? m_uniqueBoundingBoxMeshes : m_uniqueMeshes;
+
         // If this mesh has been created already, return it instead of creating another copy
         // For large regions with 100k+ prims and hundreds of copies of each, this can save a GB or more of memory
         if (shouldCache)
         {
             key = primShape.GetMeshKey(size, lod);
-            lock (m_uniqueMeshes)
+            lock (cache)
             {
-                if (m_uniqueMeshes.TryGetValue(key, out mesh))
+                if (cache.TryGetValue(key, out mesh))
                     return mesh;
+            }
+
+            // The mesh was made for a request that was not replaced by a box: make the box from it rather than
+            // from an asset that has been dropped.
+            if (boundingBoxOnly)
+            {
+                Mesh whole;
+                lock (m_uniqueMeshes)
+                {
+                    m_uniqueMeshes.TryGetValue(key, out whole);
+                }
+
+                if (whole != null)
+                {
+                    return AddToCache(cache, key, MakeBoundingBox(primName, whole));
+                }
+            }
+            else if (primShape.SculptEntry && (primShape.SculptData == null || primShape.SculptData.Length == 0))
+            {
+                // The asset was dropped after a bounding box was made from it: give the shape its bytes back, the
+                // decode below drops them again.
+                byte[] source;
+                lock (m_uniqueBoundingBoxMeshes)
+                {
+                    m_boundingBoxSources.TryGetValue(key, out source);
+                }
+                if (source != null)
+                    primShape.SculptData = source;
             }
         }
 
@@ -995,33 +1036,59 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
         if (size.Y < 0.01f) size.Y = 0.01f;
         if (size.Z < 0.01f) size.Z = 0.01f;
 
+        byte[] assetBytes = primShape.SculptEntry ? primShape.SculptData : null;
+
         mesh = CreateMeshFromPrimMesher(primName, primShape, size, lod);
 
         if (mesh != null)
         {
-            if ((!isPhysical) && size.X < minSizeForComplexMesh && size.Y < minSizeForComplexMesh && size.Z < minSizeForComplexMesh)
-            {
-                Mesh box = CreateBoundingBoxMesh(mesh);
-                box.ConvexHulls = mesh.ConvexHulls;
-                box.BoundingHull = mesh.BoundingHull;
-                mesh = box;
-                mesh.DumpRaw(baseDir, primName, "Z extruded");
-            }
+            if (boundingBoxOnly)
+                mesh = MakeBoundingBox(primName, mesh);
 
             // trim the vertex and triangle lists to free up memory
             mesh.TrimExcess();
 
             if (shouldCache)
             {
-                lock (m_uniqueMeshes)
+                mesh = AddToCache(cache, key, mesh);
+
+                // Keep the asset only while the bounding box is the one answer there is for it.
+                lock (m_uniqueBoundingBoxMeshes)
                 {
-                    m_uniqueMeshes.Add(key, mesh);
+                    if (boundingBoxOnly && assetBytes != null && assetBytes.Length != 0)
+                        m_boundingBoxSources[key] = assetBytes;
+                    else if (!boundingBoxOnly)
+                        m_boundingBoxSources.Remove(key);
                 }
             }
         }
 
         return mesh;
     }
+    // Caches a mesh and returns the one that is cached. Two threads can build the same mesh at once; the first to
+    // finish wins and the other is handed the winner, so both callers get the same answer.
+    private static Mesh AddToCache(Dictionary<ulong, Mesh> cache, ulong key, Mesh mesh)
+    {
+        lock (cache)
+        {
+            if (cache.TryGetValue(key, out Mesh cached))
+                return cached;
+
+            cache.Add(key, mesh);
+            return mesh;
+        }
+    }
+
+    // The bounding box answer for a mesh, carrying the hulls of the asset the mesh came from.
+    private Mesh MakeBoundingBox(string primName, Mesh mesh)
+    {
+        Mesh box = CreateBoundingBoxMesh(mesh);
+        box.ConvexHulls = mesh.ConvexHulls;
+        box.BoundingHull = mesh.BoundingHull;
+        box.DumpRaw(baseDir, primName, "Z extruded");
+        return box;
+    }
+
     public IMesh GetMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool convex)
     {
         return null;
