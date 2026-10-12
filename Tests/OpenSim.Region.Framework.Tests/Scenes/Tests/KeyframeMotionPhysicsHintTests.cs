@@ -180,6 +180,52 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             }
         }
 
+        /// <summary>A physics scene that makes a <see cref="Recorder"/> for every prim.</summary>
+        private sealed class RecorderScene : OpenSim.Region.PhysicsModules.BasicPhysics.BasicScene
+        {
+            public override PhysicsActor AddPrimShape(string primName, OpenSim.Framework.PrimitiveBaseShape pbs,
+                Vector3 position, Vector3 size, Quaternion rotation, bool isPhysical, uint localid)
+                => new Recorder();
+
+            public override void RemovePrim(PhysicsActor prim) { }
+        }
+
+        [Fact]
+        public void AnActorMadeWhileTheMotionRunsIsToldWhenThePartIsAddedToPhysics()
+        {
+            TestHelpers.InMethod();
+            TestScene scene = new SceneHelpers().SetupScene();
+            scene.PhysicsScene = new RecorderScene();
+            SceneObjectGroup so = SceneHelpers.AddSceneObject(scene);
+
+            var motion = new KeyframeMotion(so, KeyframeMotion.PlayMode.Forward,
+                KeyframeMotion.DataFormat.Translation | KeyframeMotion.DataFormat.Rotation);
+            motion.SetKeyframes(new[]
+            {
+                new KeyframeMotion.Keyframe { Position = new Vector3(2, 0, 0), Rotation = Quaternion.Identity, TimeMS = 60000 },
+            });
+            so.RootPart.KeyframeMotion = motion;
+            motion.Start();
+            try
+            {
+                // Rebuild the root prim's physics, as a change of shape or flags does, while the motion runs.
+                PhysicsActor old = so.RootPart.PhysActor;
+                so.RootPart.RemoveFromPhysics();
+                Assert.Null(so.RootPart.PhysActor);
+
+                so.RootPart.ApplyPhysics(0, false, false);
+
+                PhysicsActor made = so.RootPart.PhysActor;
+                Assert.NotNull(made);
+                Assert.NotSame(old, made);
+                Assert.True(made.MovedByKeyframedMotion);
+            }
+            finally
+            {
+                motion.Stop();
+            }
+        }
+
         [Fact]
         public void AnEngineThatIgnoresTheHintIsUnaffected()
         {
