@@ -16930,6 +16930,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             Vector3 dir = end - start;
             float dist = dir.Length();
 
+            // A ray shorter than 0.001 m has no usable direction (a zero length gives NaN when it is normalized);
+            // answer [0] before asking the engine, as YEngine does.
+            if (dist * dist < 1e-6f)
+            {
+                results.Add(0);
+                return new LSLList(results);
+            }
+
             // RC_* are SL's values from SlConst. The local copies here once disagreed with them, so
             // options were mis-parsed and llCastRay dropped the normal (2b84e458b3).
 

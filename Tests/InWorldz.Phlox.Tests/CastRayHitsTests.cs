@@ -60,8 +60,10 @@ public class CastRayHitsTests
         public int AskedCount = -1;
         public RayFilterFlags? AskedFilter;
         public int FourArgumentCalls;
+        public int FiveArgumentCalls;
+        public bool Filters = true;
 
-        public override bool SupportsRaycastWorldFiltered() => true;
+        public override bool SupportsRaycastWorldFiltered() => Filters;
 
         public override List<ContactResult> RaycastWorld(Vector3 position, Vector3 direction, float length, int Count)
         {
@@ -71,6 +73,7 @@ public class CastRayHitsTests
 
         public override object RaycastWorld(Vector3 position, Vector3 direction, float length, int Count, RayFilterFlags filter)
         {
+            FiveArgumentCalls++;
             AskedCount = Count;
             AskedFilter = filter;
             return Hits
@@ -204,5 +207,26 @@ public class CastRayHitsTests
 
         Assert.Equal(1, Status(result));
         Assert.Equal(UUID.Zero.ToString(), result.GetLSLStringItem(0));
+    }
+
+    /// <summary>A ray with no length has no direction. YEngine answers [0] when the ray is shorter than 0.001 m, before it asks the engine.</summary>
+    [Theory]
+    [InlineData(true, 0f)]
+    [InlineData(true, 0.0005f)]
+    [InlineData(false, 0f)]
+    [InlineData(false, 0.0005f)]
+    public void ARayWithNoLengthAnswersZeroAndTheEngineIsNeverAsked(bool engineFilters, float length)
+    {
+        using var r = new Rig();
+        r.Physics.Filters = engineFilters;
+        r.Physics.Hits.Add((Kind.Land, 0f, 0));
+
+        Vector3 start = new Vector3(10, 10, 50);
+        LSLList result = r.Script().llCastRay(start, new Vector3(10, 10, 50 - length), Options());
+
+        Assert.Equal(1, result.Length);
+        Assert.Equal(0, result.GetLSLIntegerItem(0));
+        Assert.Equal(0, r.Physics.FourArgumentCalls);
+        Assert.Equal(0, r.Physics.FiveArgumentCalls);
     }
 }
