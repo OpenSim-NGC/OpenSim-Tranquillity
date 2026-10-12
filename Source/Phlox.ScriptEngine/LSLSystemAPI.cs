@@ -16921,6 +16921,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public string llGetObjectPermMask2(int mask) { /* Halcyon-2 variant — not standard LSL */ return "0"; }
         public int llGetParcelFlags2(Vector3 pos) { /* Halcyon-2 variant — not standard LSL */ return 0; }
+        private const int CastRayMaxHits = 256;
+
         public LSLList llCastRay(Vector3 start, Vector3 end, LSLList options)
         {
             // Faithful port from Halcyon
@@ -16934,16 +16936,19 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             int count = 1;
             int dataFlags = 0;
             int rejectTypes = 0;
+            bool detectPhantom = false;
 
             for (int i = 0; i < options.Length; i += 2)
             {
                 int opt = options.GetLSLIntegerItem(i);
                 if (opt == RC_MAX_HITS) count = options.GetLSLIntegerItem(i + 1);
+                else if (opt == RC_DETECT_PHANTOM) detectPhantom = options.GetLSLIntegerItem(i + 1) != 0;
                 else if (opt == RC_DATA_FLAGS) dataFlags = options.GetLSLIntegerItem(i + 1);
                 else if (opt == RC_REJECT_TYPES) rejectTypes = options.GetLSLIntegerItem(i + 1);
             }
 
-            if (count > 16) count = 16;
+            // The SL wiki gives RC_MAX_HITS a maximum of 256 (https://wiki.secondlife.com/wiki/LlCastRay).
+            if (count > CastRayMaxHits) count = CastRayMaxHits;
             else if (count <= 0)
             {
                 ScriptShoutError("You must request at least one result from llCastRay.");
@@ -16957,8 +16962,34 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
             try
             {
-                // OpenSim's PhysicsScene.RaycastWorld returns List<ContactResult>
-                List<ContactResult> contactResults = World.PhysicsScene.RaycastWorld(start, dir, dist, count);
+                // An engine that filters by type is asked for the types the cast does not reject, so a rejected type is
+                // never a hit and takes no place among the count. The script's own linkset is left out of the answer
+                // below, so the engine is asked for one more hit per prim of it. An engine that cannot filter returns the
+                // nearest hits of every type and the rejected types are dropped after the count, as before.
+                bool engineFilters = World.SupportsRayCastFiltered();
+                List<ContactResult> contactResults;
+                if (engineFilters)
+                {
+                    RayFilterFlags filter = RayFilterFlags.BackFaceCull;
+                    if (!rejectTerrain) filter |= RayFilterFlags.land;
+                    if (!rejectAgents) filter |= RayFilterFlags.agent;
+                    if (!rejectPhysical) filter |= RayFilterFlags.physical;
+                    if (!rejectNonPhysical) filter |= RayFilterFlags.nonphysical;
+                    // Phantom and volume-detect objects are found only when asked for, whatever the two reject flags say.
+                    if (detectPhantom) filter |= RayFilterFlags.LSLPhantom;
+
+                    if ((filter & ~RayFilterFlags.BackFaceCull) == 0)
+                    {
+                        results.Add(0);
+                        return new LSLList(results);
+                    }
+
+                    int ownPrims = m_host.ParentGroup != null ? m_host.ParentGroup.PrimCount : 1;
+                    contactResults = (List<ContactResult>)World.RayCastFiltered(start, dir * (1.0f / dist), dist,
+                        Math.Min(CastRayMaxHits, count + ownPrims), filter);
+                }
+                else
+                    contactResults = World.PhysicsScene.RaycastWorld(start, dir, dist, count);
 
                 if (contactResults == null)
                 {
@@ -16989,14 +17020,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
                             // Filter by physics type
                             PhysicsActor pa = part.PhysActor;
-                            if (pa != null)
+                            if (!engineFilters)
                             {
-                                if (rejectPhysical && pa.IsPhysical) continue;
-                                if (rejectNonPhysical && !pa.IsPhysical) continue;
-                            }
-                            else
-                            {
-                                if (rejectNonPhysical) continue;
+                                if (pa != null)
+                                {
+                                    if (rejectPhysical && pa.IsPhysical) continue;
+                                    if (rejectNonPhysical && !pa.IsPhysical) continue;
+                                }
+                                else if (rejectNonPhysical) continue;
                             }
 
                             if ((dataFlags & RC_GET_ROOT_KEY) != 0)
@@ -17011,7 +17042,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             ScenePresence sp = World.GetScenePresence(result.ConsumerID);
                             if (sp != null)
                             {
-                                if (rejectAgents) continue;
+                                if (!engineFilters && rejectAgents) continue;
                                 itemID = sp.UUID;
                             }
                         }
@@ -17019,7 +17050,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     else
                     {
                         // ConsumerID == 0 means terrain
-                        if (rejectTerrain) continue;
+                        if (!engineFilters && rejectTerrain) continue;
                     }
 
                     results.Add(itemID.ToString());
