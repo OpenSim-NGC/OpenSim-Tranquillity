@@ -1584,7 +1584,32 @@ namespace Phlox.ScriptEngine
             return true;
         }
 
-        private void ProcessEventQueue()
+        /// <summary>
+        /// For the final save, after the scheduler's thread has stopped: every event still in the incoming queue is put on
+        /// its script's own queue (which the saved state carries and the restored script is given from), where a script
+        /// that is waiting would otherwise have been started on it. An answer already produced is then not lost with the
+        /// process. The scripts the taken events were for are marked changed, so the save takes them; the events and the
+        /// scripts come from the same take, so an event posted while this runs is either in it, and its script marked, or
+        /// stays in the incoming queue; none is queued on a script that is not marked. The scheduler's thread writes the log lines for events a full queue
+        /// dropped after each pass; it has stopped, so what was counted is written here.
+        /// </summary>
+        internal void QueueIncomingForFinalSave()
+        {
+            var items = new HashSet<UUID>();
+            try { ProcessEventQueue(queueOnly: true, taken: items); }
+            finally
+            {
+                StateManager states = m_Engine?.StateManager;
+                if (states != null)
+                    foreach (UUID item in items)
+                        if (m_AllScripts.TryGetValue(item, out Interpreter script)) states.ScriptChanged(script);
+                foreach (UUID item in new List<UUID>(m_QueueFullDrops.Keys)) LogQueueFullRun(item);
+            }
+        }
+
+        /// <param name="queueOnly">Put every event on its script's queue; start none (the final save).</param>
+        /// <param name="taken">When given, receives the item of each event taken from the incoming queue.</param>
+        private void ProcessEventQueue(bool queueOnly = false, HashSet<UUID> taken = null)
         {
             List<PendingEvent> events;
             lock (m_PendingEvents)
@@ -1593,6 +1618,9 @@ namespace Phlox.ScriptEngine
                 events = new List<PendingEvent>(m_PendingEvents);
                 m_PendingEvents.Clear();
             }
+            if (taken != null)
+                foreach (PendingEvent pe in events)
+                    if (pe.CrossingEnd == null) taken.Add(pe.ItemId);
             // A crossing's hold is asked for before any event raised during it is posted: taken after this batch was,
             // it covers every such event in the batch.
             ProcessCrossingHolds();
@@ -1696,7 +1724,7 @@ namespace Phlox.ScriptEngine
                     continue;
                 }
 
-                if (script.ScriptState.RunState == RuntimeState.Status.Waiting)
+                if (script.ScriptState.RunState == RuntimeState.Status.Waiting && !queueOnly)
                 {
                     // llMinEventDelay - a floor between handler STARTS. wiki: events
                     // inside the window are queued and processed after it, not dropped (YEngine
