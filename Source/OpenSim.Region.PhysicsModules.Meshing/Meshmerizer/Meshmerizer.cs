@@ -63,8 +63,8 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
     private float minSizeForComplexMesh = 0.2f; // prims with all dimensions smaller than this will have a bounding box mesh
 
-    private List<List<Vector3>> mConvexHulls = null;
-    private List<Vector3> mBoundingHull = null;
+    // The mesh this thread was last handed by CreateMesh, which the size-only hull getters answer for.
+    [ThreadStatic] private static Mesh t_lastRequestedMesh;
 
     // Mesh cache. Static so it can be shared across instances of this class
     private static Dictionary<ulong, Mesh> m_uniqueMeshes = new Dictionary<ulong, Mesh>();
@@ -296,6 +296,8 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
         List<Coord> coords;
         List<Face> faces;
+        List<List<Vector3>> convexHulls = null;
+        List<Vector3> boundingHull = null;
 
         if (primShape.SculptEntry)
         {
@@ -304,7 +306,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                 if (!useMeshiesPhysicsMesh)
                     return null;
 
-                if (!GenerateCoordsAndFacesFromPrimMeshData(primName, primShape, size, out coords, out faces))
+                if (!GenerateCoordsAndFacesFromPrimMeshData(primName, primShape, size, out coords, out faces, out convexHulls, out boundingHull))
                     return null;
             }
             else
@@ -341,6 +343,9 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
             mesh.Add(new Triangle(vertices[f.v1], vertices[f.v2], vertices[f.v3]));
         }
 
+        mesh.ConvexHulls = convexHulls;
+        mesh.BoundingHull = boundingHull;
+
         return mesh;
     }
 
@@ -352,9 +357,12 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
     /// <param name="size"></param>
     /// <param name="coords">Coords are added to this list by the method.</param>
     /// <param name="faces">Faces are added to this list by the method.</param>
+    /// <param name="convexHulls">The asset's hull list, unscaled, or null if it has none.</param>
+    /// <param name="boundingHull">The asset's bounding hull, unscaled, or null if it has none.</param>
     /// <returns>true if coords and faces were successfully generated, false if not</returns>
     private bool GenerateCoordsAndFacesFromPrimMeshData(
-        string primName, PrimitiveBaseShape primShape, Vector3 size, out List<Coord> coords, out List<Face> faces)
+        string primName, PrimitiveBaseShape primShape, Vector3 size, out List<Coord> coords, out List<Face> faces,
+        out List<List<Vector3>> convexHulls, out List<Vector3> boundingHull)
     {
 //            m_log.LogDebug("[MESH]: experimental mesh proxy generation for {0}", primName);
 
@@ -362,8 +370,8 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
         faces = new List<Face>();
         OSD meshOsd = null;
 
-        mConvexHulls = null;
-        mBoundingHull = null;
+        convexHulls = null;
+        boundingHull = null;
 
         if (primShape.SculptData.Length <= 0)
         {
@@ -463,12 +471,10 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                         Vector3 max = new Vector3(0.5f, 0.5f, 0.5f);
                         if (convexBlock.ContainsKey("Max")) max = convexBlock["Max"].AsVector3();
 
-                        List<Vector3> boundingHull = null;
-
                         if (convexBlock.ContainsKey("BoundingVerts"))
                         {
                             byte[] boundingVertsBytes = convexBlock["BoundingVerts"].AsBinary();
-                            boundingHull = new List<Vector3>();
+                            List<Vector3> bounding = new List<Vector3>();
                             for (int i = 0; i < boundingVertsBytes.Length; )
                             {
                                 ushort uX = Utils.BytesToUInt16(boundingVertsBytes, i); i += 2;
@@ -481,11 +487,11 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                                     Utils.UInt16ToFloat(uZ, min.Z, max.Z)
                                 );
 
-                                boundingHull.Add(pos);
+                                bounding.Add(pos);
                             }
 
-                            mBoundingHull = boundingHull;
-                            if (debugDetail) m_log.LogDebug("{0} prim='{1}': parsed bounding hull. nVerts={2}", LogHeader, primName, mBoundingHull.Count);
+                            boundingHull = bounding;
+                            if (debugDetail) m_log.LogDebug("{0} prim='{1}': parsed bounding hull. nVerts={2}", LogHeader, primName, boundingHull.Count);
                         }
 
                         if (convexBlock.ContainsKey("HullList"))
@@ -520,8 +526,8 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                                 hulls.Add(hull);
                             }
 
-                            mConvexHulls = hulls;
-                            if (debugDetail) m_log.LogDebug("{0} prim='{1}': parsed hulls. nHulls={2}", LogHeader, primName, mConvexHulls.Count);
+                            convexHulls = hulls;
+                            if (debugDetail) m_log.LogDebug("{0} prim='{1}': parsed hulls. nHulls={2}", LogHeader, primName, convexHulls.Count);
                         }
                         else
                         {
@@ -880,42 +886,64 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
     }
 
     /// <summary>
-    /// temporary prototype code - please do not use until the interface has been finalized!
+    /// The bounding hull of the mesh asset that <paramref name="mesh"/> was made from.
     /// </summary>
+    /// <param name="mesh">A mesh returned by CreateMesh, whether freshly made or served from the cache.</param>
     /// <param name="size">value to scale the hull points by</param>
-    /// <returns>a list of vertices in the bounding hull if it exists and has been successfully decoded, otherwise null</returns>
-    public List<Vector3> GetBoundingHull(Vector3 size)
+    /// <returns>a list of vertices in the bounding hull if the asset has one and it was decoded, otherwise null</returns>
+    public List<Vector3> GetBoundingHull(IMesh mesh, Vector3 size)
     {
-        if (mBoundingHull == null)
+        List<Vector3> hull = (mesh as Mesh)?.BoundingHull;
+        if (hull == null)
             return null;
 
-        List<Vector3> verts = new List<Vector3>();
-        foreach (var vert in mBoundingHull)
+        List<Vector3> verts = new List<Vector3>(hull.Count);
+        foreach (var vert in hull)
             verts.Add(vert * size);
 
         return verts;
     }
 
     /// <summary>
-    /// temporary prototype code - please do not use until the interface has been finalized!
+    /// The hull list of the mesh asset that <paramref name="mesh"/> was made from.
     /// </summary>
+    /// <param name="mesh">A mesh returned by CreateMesh, whether freshly made or served from the cache.</param>
     /// <param name="size">value to scale the hull points by</param>
-    /// <returns>a list of hulls if they exist and have been successfully decoded, otherwise null</returns>
-    public List<List<Vector3>> GetConvexHulls(Vector3 size)
+    /// <returns>a list of hulls if the asset has them and they were decoded, otherwise null</returns>
+    public List<List<Vector3>> GetConvexHulls(IMesh mesh, Vector3 size)
     {
-        if (mConvexHulls == null)
+        List<List<Vector3>> hulls = (mesh as Mesh)?.ConvexHulls;
+        if (hulls == null)
             return null;
 
-        List<List<Vector3>> hulls = new List<List<Vector3>>();
-        foreach (var hull in mConvexHulls)
+        List<List<Vector3>> scaled = new List<List<Vector3>>(hulls.Count);
+        foreach (var hull in hulls)
         {
-            List<Vector3> verts = new List<Vector3>();
+            List<Vector3> verts = new List<Vector3>(hull.Count);
             foreach (var vert in hull)
                 verts.Add(vert * size);
-            hulls.Add(verts);
+            scaled.Add(verts);
         }
 
-        return hulls;
+        return scaled;
+    }
+
+    /// <summary>
+    /// The bounding hull of the mesh that the calling thread was last handed by CreateMesh (null if that call
+    /// returned no mesh). Prefer the overload that takes the mesh.
+    /// </summary>
+    public List<Vector3> GetBoundingHull(Vector3 size)
+    {
+        return GetBoundingHull(t_lastRequestedMesh, size);
+    }
+
+    /// <summary>
+    /// The hull list of the mesh that the calling thread was last handed by CreateMesh (null if that call
+    /// returned no mesh). Prefer the overload that takes the mesh.
+    /// </summary>
+    public List<List<Vector3>> GetConvexHulls(Vector3 size)
+    {
+        return GetConvexHulls(t_lastRequestedMesh, size);
     }
 
     public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod)
@@ -939,6 +967,13 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
     }
 
     public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool shouldCache)
+    {
+        Mesh mesh = MakeMesh(primName, primShape, size, lod, isPhysical, shouldCache);
+        t_lastRequestedMesh = mesh;
+        return mesh;
+    }
+
+    private Mesh MakeMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool shouldCache)
     {
         Mesh mesh = null;
         ulong key = 0;
@@ -965,7 +1000,10 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
         {
             if ((!isPhysical) && size.X < minSizeForComplexMesh && size.Y < minSizeForComplexMesh && size.Z < minSizeForComplexMesh)
             {
-                mesh = CreateBoundingBoxMesh(mesh);
+                Mesh box = CreateBoundingBoxMesh(mesh);
+                box.ConvexHulls = mesh.ConvexHulls;
+                box.BoundingHull = mesh.BoundingHull;
+                mesh = box;
                 mesh.DumpRaw(baseDir, primName, "Z extruded");
             }
 
