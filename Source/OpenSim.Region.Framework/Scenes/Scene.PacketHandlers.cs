@@ -321,6 +321,9 @@ public partial class Scene
 
         SceneObjectGroup obj = part.ParentGroup;
 
+        // a new grab by the agent that holds a drag means the release of the earlier one never arrived
+        obj.ReleaseGrab(remoteClient.AgentId);
+
         SurfaceTouchEventArgs surfaceArg = null;
         if (surfaceArgs != null && surfaceArgs.Count > 0)
             surfaceArg = surfaceArgs[0];
@@ -400,6 +403,8 @@ public partial class Scene
             return;
 
         SceneObjectGroup grp = part.ParentGroup;
+
+        grp.ReleaseGrab(remoteClient.AgentId);
 
         SurfaceTouchEventArgs surfaceArg = null;
         if (surfaceArgs != null && surfaceArgs.Count > 0)

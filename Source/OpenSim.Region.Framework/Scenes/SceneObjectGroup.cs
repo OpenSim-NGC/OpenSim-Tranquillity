@@ -2863,12 +2863,22 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             }
             else
             {
-                PhysicsActor pa = RootPart.PhysActor;
-                if (pa is not null)
+                lock (m_grabLock)
                 {
-                    pa.PIDTarget = target;
-                    pa.PIDTau = tau;
-                    pa.PIDActive = true;
+                    PhysicsActor pa = RootPart.PhysActor;
+                    if (pa is not null)
+                    {
+                        // remembered so a drag can put it back; while a drag holds the target it is only remembered
+                        m_scriptMoveActive = true;
+                        m_scriptMoveTarget = target;
+                        m_scriptMoveTau = tau;
+                        if (m_grabbed)
+                            return;
+
+                        pa.PIDTarget = target;
+                        pa.PIDTau = tau;
+                        pa.PIDActive = true;
+                    }
                 }
             }
         }
@@ -2883,9 +2893,16 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         }
         else
         {
-            PhysicsActor pa = RootPart.PhysActor;
-            if (pa is not null)
-                pa.PIDActive = false;
+            lock (m_grabLock)
+            {
+                m_scriptMoveActive = false;
+                if (m_grabbed)
+                    return; // the drag holds the target; nothing is put back when it ends
+
+                PhysicsActor pa = RootPart.PhysActor;
+                if (pa is not null)
+                    pa.PIDActive = false;
+            }
 
             RootPart.ScheduleTerseUpdate(); // send a stop information
         }
@@ -2962,16 +2979,33 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         if (pa is not null)
         {
-            if (height != 0f)
+            lock (m_grabLock)
             {
-                pa.PIDHoverHeight = height;
-                pa.PIDHoverType = hoverType;
-                pa.PIDHoverTau = tau;
-                pa.PIDHoverActive = true;
-            }
-            else
-            {
-                pa.PIDHoverActive = false;
+                if (!IsAttachment)
+                {
+                    // remembered so a drag can put it back; while a drag is held it is only remembered
+                    m_scriptHoverActive = height != 0f;
+                    if (m_scriptHoverActive)
+                    {
+                        m_scriptHoverHeight = height;
+                        m_scriptHoverType = hoverType;
+                        m_scriptHoverTau = tau;
+                    }
+                    if (m_grabbed)
+                        return;
+                }
+
+                if (height != 0f)
+                {
+                    pa.PIDHoverHeight = height;
+                    pa.PIDHoverType = hoverType;
+                    pa.PIDHoverTau = tau;
+                    pa.PIDHoverActive = true;
+                }
+                else
+                {
+                    pa.PIDHoverActive = false;
+                }
             }
         }
     }
@@ -3871,20 +3905,42 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
     double lastTouchTime = 0;
 
+    // Click-and-drag of a physical object. The viewer sends ObjectGrabUpdate only while the mouse moves, so a drag
+    // steers the root actor with its move-to-target (a velocity of distance / tau, gravity not applied) instead of
+    // pushing it: a push per update is a spring with no damper that does nothing while the mouse is still.
+    private const float GrabTau = 0.25f;
+    private readonly object m_grabLock = new();
+    private bool m_grabbed;
+    private UUID m_grabAgent;
+    private Vector3 m_grabAnchor;
+    private PhysicsActor m_grabActor;
+
+    // What scripts last set on the root actor (llMoveToTarget, llSetHoverHeight), put back when a drag ends.
+    private bool m_scriptMoveActive;
+    private Vector3 m_scriptMoveTarget;
+    private float m_scriptMoveTau;
+    private bool m_scriptHoverActive;
+    private float m_scriptHoverHeight;
+    private float m_scriptHoverTau;
+    private PIDHoverType m_scriptHoverType;
+
     /// <summary>
-    /// If object is physical, apply force to move it around
+    /// If object is physical, steer it to the cursor with the physics actor's move-to-target
     /// If object is not physical, just put it at the resulting location
     /// </summary>
     /// <param name="partID">Part ID to check for grab</param>
-    /// <param name="offset">Always seems to be 0,0,0, so ignoring</param>
-    /// <param name="pos">New position.  We do the math here to turn it into a force</param>
+    /// <param name="offset">Not used: the offset of the grabbed point from the root is taken from the first update of a drag</param>
+    /// <param name="pos">New position of the grabbed point</param>
     /// <param name="remoteClient"></param>
     public void GrabMovement(UUID partID, Vector3 offset, Vector3 pos, IClientAPI remoteClienth)
     {
         if (m_scene.EventManager.TriggerGroupMove(UUID, pos))
         {
             if (BlockGrabOverride)
+            {
+                EndGrab();
                 return;
+            }
 
             SceneObjectPart part = GetPart(partID);
 
@@ -3892,19 +3948,29 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
                 return;
 
             if (part.BlockGrab)
+            {
+                EndGrab();
                 return;
+            }
 
             PhysicsActor pa = m_rootPart.PhysActor;
 
             if (pa is not null && pa.IsPhysical)
             {
-                // empirically convert distance diference to a impulse
-                Vector3 grabforce = pos - AbsolutePosition;
-                grabforce *= pa.Mass * 0.1f;
-                pa.AddForce(grabforce, false);
+                // a drag moves the root's body, so the root's block applies whichever part was grabbed
+                if (m_rootPart.BlockGrab || IsSelected || IsAttachment
+                    || m_rootPart.VehicleType != (int)Vehicle.TYPE_NONE || GetSittingAvatarsCount() > 0)
+                {
+                    EndGrab();
+                    return;
+                }
+
+                SteerGrab(pa, pos, remoteClienth is null ? UUID.Zero : remoteClienth.AgentId);
             }
             else
             {
+                EndGrab();
+
                 if(IsAttachment)
                     return;
 
@@ -3927,6 +3993,119 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
                 UpdateGroupPosition(pos);
             }
         }
+    }
+
+    /// <summary>
+    /// Point the root actor's move-to-target at the dragged point. The first update of a drag also takes the target
+    /// from any script and sets the drag's tau.
+    /// </summary>
+    private void SteerGrab(PhysicsActor pa, Vector3 pos, UUID agent)
+    {
+        if (!pos.IsFinite())
+            return;
+
+        lock (m_grabLock)
+        {
+            bool wasHeld = m_grabbed;
+            if (!wasHeld || m_grabAgent != agent)
+                m_grabAnchor = AbsolutePosition - pos; // keeps the grabbed point under the cursor instead of the centre
+
+            Vector3 target = pos + m_grabAnchor;
+            if (wasHeld && ReferenceEquals(m_grabActor, pa))
+            {
+                m_grabAgent = agent;
+                pa.PIDTarget = target;
+                return;
+            }
+
+            // a new drag, or the root's actor was replaced and the new one is switched on
+            m_grabbed = true;
+            m_grabAgent = agent;
+            m_grabActor = pa;
+
+            // only what the actor still has active is put back: a record left from an actor that has since been replaced is dropped
+            m_scriptMoveActive &= pa.PIDActive;
+            m_scriptHoverActive &= pa.PIDHoverActive;
+            if (m_scriptHoverActive)
+                pa.PIDHoverActive = false; // a hover can override the target's height
+            if (m_scriptMoveActive)
+                pa.PIDActive = false; // so an engine that reads tau when the target is switched on takes the drag's
+
+            pa.PIDTau = GrabTau;
+            pa.PIDTarget = target;
+            pa.PIDActive = true;
+
+            if (!wasHeld)
+            {
+                m_scene.EventManager.OnRemovePresence += GrabHolderRemoved;
+                m_scene.EventManager.OnMakeChildAgent += GrabHolderMadeChild;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The viewer let go (ObjectDeGrab) or grabbed again (ObjectGrab, which means the earlier release was lost).
+    /// Only the agent that holds the drag can end it.
+    /// </summary>
+    public void ReleaseGrab(UUID agent)
+    {
+        lock (m_grabLock)
+        {
+            if (m_grabbed && m_grabAgent == agent)
+                EndGrab();
+        }
+    }
+
+    private void GrabHolderRemoved(UUID agentId) => ReleaseGrab(agentId);
+
+    private void GrabHolderMadeChild(ScenePresence presence)
+    {
+        if (presence is not null)
+            ReleaseGrab(presence.UUID);
+    }
+
+    /// <summary>
+    /// End a drag: the move-to-target is switched off, or put back to what a script had set, and so is a script's hover.
+    /// The velocity the object has is left alone and gravity acts again.
+    /// </summary>
+    private void EndGrab()
+    {
+        lock (m_grabLock)
+        {
+            if (!m_grabbed)
+                return;
+
+            PhysicsActor pa = m_grabActor;
+            DropGrabState();
+            if (pa is null)
+                return;
+
+            if (m_scriptMoveActive)
+            {
+                pa.PIDTarget = m_scriptMoveTarget;
+                pa.PIDTau = m_scriptMoveTau;
+                pa.PIDActive = true;
+            }
+            else
+                pa.PIDActive = false;
+
+            if (m_scriptHoverActive)
+            {
+                pa.PIDHoverHeight = m_scriptHoverHeight;
+                pa.PIDHoverType = m_scriptHoverType;
+                pa.PIDHoverTau = m_scriptHoverTau;
+                pa.PIDHoverActive = true;
+            }
+        }
+    }
+
+    private void DropGrabState()
+    {
+        m_grabbed = false;
+        m_grabAgent = UUID.Zero;
+        m_grabActor = null;
+        m_scene.EventManager.OnRemovePresence -= GrabHolderRemoved;
+        m_scene.EventManager.OnMakeChildAgent -= GrabHolderMadeChild;
     }
 
     /// <summary>
