@@ -134,12 +134,24 @@ public class MesherHullListTests
         PrimitiveBaseShape b = MeshPbs(Asset(OneHull));
 
         mesher.CreateMesh("a", a, Size, Lod);
-        var other = Task.Run(() =>
+
+        // A thread of its own, joined here: the hulls are kept per calling thread, so the test must
+        // keep running on the thread that made the first request.
+        List<List<Vector3>>? otherHulls = null;
+        Exception? error = null;
+        var other = new Thread(() =>
         {
-            mesher.CreateMesh("b", b, Size, Lod);
-            return mesher.GetConvexHulls(Size);
+            try
+            {
+                mesher.CreateMesh("b", b, Size, Lod);
+                otherHulls = mesher.GetConvexHulls(Size);
+            }
+            catch (Exception e) { error = e; }
         });
-        AssertHulls(OneHull, other.GetAwaiter().GetResult());
+        other.Start();
+        Assert.True(other.Join(TimeSpan.FromSeconds(30)));
+        Assert.Null(error);
+        AssertHulls(OneHull, otherHulls);
         AssertHulls(ThreeHulls, mesher.GetConvexHulls(Size));
     }
 
@@ -176,7 +188,7 @@ public class MesherHullListTests
     // ---------------------------------------------------------------- the asset encoder
     // Writes the viewer's mesh asset format: an LLSD header of block offsets and sizes, then zlib-compressed blocks.
 
-    private static Vector3[][] Boxes(params (float x0, float y0, float z0, float x1, float y1, float z1)[] boxes)
+    internal static Vector3[][] Boxes(params (float x0, float y0, float z0, float x1, float y1, float z1)[] boxes)
     {
         return boxes.Select(b =>
         {
@@ -277,7 +289,7 @@ public class MesherHullListTests
     }
 
     /// <summary>A mesh asset: the display mesh as medium LOD, and a "physics_convex" block when hulls are given.</summary>
-    private static byte[] Asset(Vector3[][]? hulls)
+    internal static byte[] Asset(Vector3[][]? hulls)
     {
         var blocks = new List<(string name, byte[] data)> { ("medium_lod", MeshBlock()) };
         if (hulls != null)
@@ -298,7 +310,7 @@ public class MesherHullListTests
         return ms.ToArray();
     }
 
-    private static PrimitiveBaseShape MeshPbs(byte[] asset)
+    internal static PrimitiveBaseShape MeshPbs(byte[] asset)
     {
         PrimitiveBaseShape pbs = PrimitiveBaseShape.CreateBox();
         pbs.PathCurve = (byte)Extrusion.Curve1;
