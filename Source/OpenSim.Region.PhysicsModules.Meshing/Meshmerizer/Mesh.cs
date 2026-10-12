@@ -45,6 +45,15 @@ public class Mesh : IMesh
     Vector3 _centroid;
     int _centroidDiv;
 
+    /// <summary>
+    /// The convex hulls of the mesh asset this mesh was made from (unscaled, in the asset's own units), or null
+    /// when the asset has none. Kept with the mesh so that a mesh served from the cache keeps its own hulls.
+    /// </summary>
+    public List<List<Vector3>> ConvexHulls { get; set; }
+
+    /// <summary>The asset's bounding hull (unscaled), or null when the asset has none.</summary>
+    public List<Vector3> BoundingHull { get; set; }
+
     private class VertexComp : IEqualityComparer<Vertex>
     {
         public bool Equals(Vertex v1, Vertex v2)
@@ -84,6 +93,8 @@ public class Mesh : IMesh
         }
         result._centroid = _centroid;
         result._centroidDiv = _centroidDiv;
+        result.ConvexHulls = ConvexHulls;
+        result.BoundingHull = BoundingHull;
         return result;
     }
 
