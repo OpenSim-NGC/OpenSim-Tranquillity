@@ -67,7 +67,7 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// The shipped floor for <c>llSetTimerEvent</c>, in seconds. Matches
-        /// <c>OpenSimDefaults.ini</c> <c>[YEngine] MinTimerInterval = 0.1</c>, which is what this grid
+        /// <c>RegionServerDefaults.ini</c> <c>[YEngine] MinTimerInterval = 0.1</c>, which is what this grid
         /// already applies to the other engine.
         /// </summary>
         public const float DefaultMinTimerInterval = 0.1f;
@@ -178,7 +178,7 @@ namespace Phlox.ScriptEngine
             // The floor for llSetTimerEvent. Same key name and same default as the
             // other engine on this grid, so an operator sets one number and both agree:
             // LSL_Api.llSetTimerEvent clamps at m_MinTimerInterval (LSL_Api.cs:4005-4011) and
-            // OpenSimDefaults.ini ships [YEngine] MinTimerInterval = 0.1. Neither SL nor
+            // RegionServerDefaults.ini ships [YEngine] MinTimerInterval = 0.1. Neither SL nor
             // InWorldz clamps at all - the SL wiki documents no minimum, and Halcyon assigns
             // TimerInterval = (int)(sec * 1000) with none - so 0.1 is this grid's number, not
             // an upstream-of-Phlox one, and it is written down here rather than inferred.

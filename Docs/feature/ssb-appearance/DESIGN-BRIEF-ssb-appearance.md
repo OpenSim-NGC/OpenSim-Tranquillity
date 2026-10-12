@@ -154,7 +154,7 @@ derived set, and the agent keeps what it already wears for that type.
 
 ### 4.9 Configuration
 
-In the simulator, `[Appearance]` (defaults in `OpenSimDefaults.ini`):
+In the simulator, `[Appearance]` (defaults in `RegionServerDefaults.ini`):
 
 | Key | Default | Meaning |
 |---|---|---|

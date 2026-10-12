@@ -51,7 +51,7 @@ public static class Program
         var inimasterOption = new Option<string>("--inimaster")
         {
             Description = "The path to the master ini file. The master ini file will be read first and then overridden by any .ini files specified by --inifile or --inidirectory options.",
-            DefaultValueFactory = ParseResult => "OpenSimDefaults.ini",
+            DefaultValueFactory = ParseResult => "RegionServerDefaults.ini",
         };
         var inidirectoryOption = new Option<string>("--inidirectory")
         {
