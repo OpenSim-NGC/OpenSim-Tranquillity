@@ -86,7 +86,7 @@ public class InventoryLockReentryTests
     }
 
     [Fact]
-    public void AReadScopeInsideAReadScopeTakesNothingAndLetsGoOnlyAtTheOuterEnd()
+    public async Task AReadScopeInsideAReadScopeTakesNothingAndLetsGoOnlyAtTheOuterEnd()
     {
         var log = new Capture();
         ILoggerFactory previous = LoggerProvider.LoggerFactory;
@@ -105,9 +105,11 @@ public class InventoryLockReentryTests
                     inventory.LockItemsForWrite(false);
                     return true;
                 });
-                Assert.False(writer.Wait(300), "the writer got in while the outer read scope was open");
+                Assert.NotSame(writer, await Task.WhenAny(writer, Task.Delay(300)));
             }
-            Assert.True(writer.Wait(TimeSpan.FromSeconds(10)), "the writer never got in after the outer read scope ended");            Assert.DoesNotContain(log.Lines, l => l.Contains("Recursive"));
+            Assert.NotSame(Task.Delay(0), await Task.WhenAny(writer, Task.Delay(TimeSpan.FromSeconds(10))));
+            await writer;
+            Assert.DoesNotContain(log.Lines, l => l.Contains("Recursive"));
         }
         finally { LoggerProvider.LoggerFactory = previous; }
     }
