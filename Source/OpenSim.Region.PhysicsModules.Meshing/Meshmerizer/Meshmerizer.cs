@@ -69,6 +69,10 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
     // Mesh cache. Static so it can be shared across instances of this class
     private static Dictionary<ulong, Mesh> m_uniqueMeshes = new Dictionary<ulong, Mesh>();
 
+    // Answers that were replaced by a bounding box (a non-physical request for a small mesh). The cache key does not
+    // carry the physical flag, so these are kept apart from the meshes above, which a physical request may be given.
+    private static Dictionary<ulong, Mesh> m_uniqueBoundingBoxMeshes = new Dictionary<ulong, Mesh>();
+
     private readonly J2KDecoderConfiguration decoderConfig = new J2KDecoderConfiguration()
         .WithHighestResolution();
 
@@ -954,7 +958,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
     public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical, bool shouldCache, bool convex, bool forOde)
     {
-        return CreateMesh(primName, primShape, size, lod, false);
+        return CreateMesh(primName, primShape, size, lod, isPhysical);
     }
 
     public IMesh CreateMesh(String primName, PrimitiveBaseShape primShape, Vector3 size, float lod, bool isPhysical)
@@ -979,14 +983,18 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
         Mesh mesh = null;
         ulong key = 0;
 
+        // A non-physical request for a small mesh is answered with a bounding box (below); the others get the mesh.
+        bool boundingBoxOnly = !isPhysical && size.X < minSizeForComplexMesh && size.Y < minSizeForComplexMesh && size.Z < minSizeForComplexMesh;
+        Dictionary<ulong, Mesh> cache = boundingBoxOnly ? m_uniqueBoundingBoxMeshes : m_uniqueMeshes;
+
         // If this mesh has been created already, return it instead of creating another copy
         // For large regions with 100k+ prims and hundreds of copies of each, this can save a GB or more of memory
         if (shouldCache)
         {
             key = primShape.GetMeshKey(size, lod);
-            lock (m_uniqueMeshes)
+            lock (cache)
             {
-                if (m_uniqueMeshes.TryGetValue(key, out mesh))
+                if (cache.TryGetValue(key, out mesh))
                     return mesh;
             }
         }
@@ -999,7 +1007,7 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
         if (mesh != null)
         {
-            if ((!isPhysical) && size.X < minSizeForComplexMesh && size.Y < minSizeForComplexMesh && size.Z < minSizeForComplexMesh)
+            if (boundingBoxOnly)
             {
                 Mesh box = CreateBoundingBoxMesh(mesh);
                 box.ConvexHulls = mesh.ConvexHulls;
@@ -1013,9 +1021,9 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
 
             if (shouldCache)
             {
-                lock (m_uniqueMeshes)
+                lock (cache)
                 {
-                    m_uniqueMeshes.Add(key, mesh);
+                    cache.Add(key, mesh);
                 }
             }
         }
