@@ -3661,6 +3661,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             linkPart.PhysActor = null;
         }
 
+        GiveDelinkedPartTheLinksetMotion(linkPart, worldPos);
+
         // We need to reset the child part's position
         // ready for life as a separate object after being a part of another object
 
@@ -3695,6 +3697,35 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             linkPart.TriggerScriptChangedEvent(Changed.LINK);
 
         return objectGroup;
+    }
+
+    /// <summary>
+    /// Sets the velocity and angular velocity a part leaves a physical linkset with. The part's new physics actor
+    /// is made from these when it is added to the scene as a group of its own.
+    /// </summary>
+    /// <remarks>
+    /// The part moves as it did in the linkset: at the root's velocity plus the root's spin crossed with the part's
+    /// offset from the root's centre of mass (from the root's position when the physics engine reports no centre
+    /// of mass), and it keeps the root's angular velocity. A linkset that is not physical, or a root with no physics
+    /// actor, leaves the part as it is.
+    /// </remarks>
+    /// <param name="linkPart">The part being delinked, already out of the physics scene.</param>
+    /// <param name="worldPos">The part's world position in the linkset.</param>
+    private void GiveDelinkedPartTheLinksetMotion(SceneObjectPart linkPart, Vector3 worldPos)
+    {
+        PhysicsActor rootPa = m_rootPart.PhysActor;
+        if (linkPart == m_rootPart || rootPa is null || !rootPa.IsPhysical)
+            return;
+
+        Vector3 velocity = m_rootPart.Velocity;
+        Vector3 angularVelocity = m_rootPart.AngularVelocity;
+
+        Vector3 pivot = rootPa.CenterOfMass;
+        if (pivot == Vector3.Zero || Util.IsNanOrInfinity(pivot))
+            pivot = m_rootPart.AbsolutePosition;
+
+        linkPart.Velocity = velocity + Vector3.Cross(angularVelocity, worldPos - pivot);
+        linkPart.AngularVelocity = angularVelocity;
     }
 
 /* working on it
