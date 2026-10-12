@@ -670,6 +670,14 @@ public class LandObject : ILandObject
             uint preserve = LandData.Flags & ~allowedDelta;
             newData.Flags = preserve | (args.ParcelFlags & allowedDelta);
 
+            // The viewer has no control that owns the ban list's on/off flag: the Access tab sets it and
+            // every other tab sends back the value it cached. A parcel that holds a ban keeps the flag
+            // on, otherwise a save from one of those tabs leaves a ban that is stored but not enforced.
+            // The access list's flag is not handled this way: a parcel with an access list may be
+            // public (flag off) with its list kept.
+            if (HasBanEntry(newData))
+                newData.Flags |= (uint)ParcelFlags.UseBanList;
+
             uint curdelta = LandData.Flags ^ newData.Flags;
             curdelta &= (uint)(ParcelFlags.SoundLocal);
 
@@ -678,6 +686,18 @@ public class LandObject : ILandObject
 
             m_scene.LandChannel.UpdateLandObject(LandData.LocalID, newData);
             return true;
+        }
+        return false;
+    }
+
+    // True if the parcel holds any ban entry, expired or not: the flag is set when a ban is added and
+    // cleared only when the ban list is cleared.
+    private static bool HasBanEntry(LandData data)
+    {
+        foreach (LandAccessEntry e in data.ParcelAccessList)
+        {
+            if ((e.Flags & AccessList.Ban) != 0)
+                return true;
         }
         return false;
     }
