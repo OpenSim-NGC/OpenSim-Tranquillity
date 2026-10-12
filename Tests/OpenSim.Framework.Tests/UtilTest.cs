@@ -339,5 +339,28 @@ namespace OpenSim.Framework.Tests
             uuid = new UUID("00dd0700-00d1-0700-3800-000032000000");
             Util.FakeParcelIDToGlobalPosition(uuid, out x2, out y2);
         }
+
+        [Theory]
+        [InlineData(float.NaN, 0f, 0f)]
+        [InlineData(0f, float.NaN, 0f)]
+        [InlineData(0f, 0f, float.NaN)]
+        [InlineData(float.PositiveInfinity, 0f, 0f)]
+        [InlineData(0f, float.PositiveInfinity, 0f)]
+        [InlineData(0f, 0f, float.PositiveInfinity)]
+        [InlineData(float.NegativeInfinity, 0f, 0f)]
+        [InlineData(0f, float.NegativeInfinity, 0f)]
+        [InlineData(0f, 0f, float.NegativeInfinity)]
+        public void IsNanOrInfinityFlagsAnyBadComponent(float x, float y, float z)
+        {
+            Assert.True(Util.IsNanOrInfinity(new Vector3(x, y, z)));
+        }
+
+        [Fact]
+        public void IsNanOrInfinityAcceptsFiniteVectors()
+        {
+            Assert.False(Util.IsNanOrInfinity(Vector3.Zero));
+            Assert.False(Util.IsNanOrInfinity(new Vector3(1f, -2f, 3f)));
+            Assert.False(Util.IsNanOrInfinity(new Vector3(float.MaxValue, float.MinValue, float.Epsilon)));
+        }
     }
 }

@@ -58,6 +58,8 @@ public static class SOPMaterialData
         }
     }
 
+    // Friction and restitution per material, as listed on the Second Life wiki,
+    // https://wiki.secondlife.com/wiki/LlSetPrimitiveParams#PRIM_MATERIAL
     private static readonly MaterialData[] m_materialdata = {
         new(0.8f,0.4f), // Stone
         new(0.3f,0.4f), // Metal
@@ -65,8 +67,8 @@ public static class SOPMaterialData
         new(0.6f,0.5f), // Wood
         new(0.9f,0.3f), // Flesh
         new(0.4f,0.7f), // Plastic
-        new(0.9f,0.95f), // Rubber
-        new(0.0f,0.0f) // light ??
+        new(0.9f,0.9f), // Rubber
+        new(0.6f,0.5f) // Light (deprecated; kept for old viewers)
     };
 
     public static Material MaxMaterial
