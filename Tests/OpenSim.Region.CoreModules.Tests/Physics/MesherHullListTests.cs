@@ -134,12 +134,24 @@ public class MesherHullListTests
         PrimitiveBaseShape b = MeshPbs(Asset(OneHull));
 
         mesher.CreateMesh("a", a, Size, Lod);
-        var other = Task.Run(() =>
+
+        // A thread of its own, joined here: the hulls are kept per calling thread, so the test must
+        // keep running on the thread that made the first request.
+        List<List<Vector3>>? otherHulls = null;
+        Exception? error = null;
+        var other = new Thread(() =>
         {
-            mesher.CreateMesh("b", b, Size, Lod);
-            return mesher.GetConvexHulls(Size);
+            try
+            {
+                mesher.CreateMesh("b", b, Size, Lod);
+                otherHulls = mesher.GetConvexHulls(Size);
+            }
+            catch (Exception e) { error = e; }
         });
-        AssertHulls(OneHull, other.GetAwaiter().GetResult());
+        other.Start();
+        Assert.True(other.Join(TimeSpan.FromSeconds(30)));
+        Assert.Null(error);
+        AssertHulls(OneHull, otherHulls);
         AssertHulls(ThreeHulls, mesher.GetConvexHulls(Size));
     }
 
