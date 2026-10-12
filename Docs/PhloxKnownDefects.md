@@ -143,7 +143,7 @@ this form. Each is on by default and can be switched off under `[InWorldz.Phlox]
 | `ResetThrottle` | more than 5 resets of one script in one second puts it to sleep for 5 s |
 | `LinkMessageThrottle` | `llMessageLinked` pauses 50 ms when a receiving script's event queue is nearly full |
 | `PhysicsThrottle` | physics setters pause for the average physics frame time when that is over 30 ms |
-| `NotecardThrottle` | short delays on notecard reads |
+| `NotecardThrottle` | pause after notecard reads: 0.1 s as SL, or Halcyon's shorter delays with `NotecardPause = halcyon` |
 | `BotThrottle` | 15 ms pause after bot chat, typing, sit, stand and touch calls |
 | `FormatStringThrottle` | 100 ms pause after `iwFormatString` |
 | `HttpInFlightThrottle` | at most 10 `llHTTPRequest` calls in flight per object and 200 per region; a request that returns `NULL_KEY` (throttled, refused or over these caps) costs 80 ms; a script whose event queue is 60% or more full pauses up to 50 ms before each request |

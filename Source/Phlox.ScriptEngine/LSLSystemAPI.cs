@@ -292,6 +292,39 @@ namespace Phlox.ScriptEngine
         private const int NOTECARD_LINE_FAST_DELAY = 1;
         private const int NOTECARD_LINES_PER_DELAY = 16;
 
+        /// <summary>
+        /// SL's pause for llGetNotecardLine and llGetNumberOfNotecardLines: "causes the script to sleep for 0.1 seconds"
+        /// (YEngine: LSL_Api.cs m_sleepMsOnGetNotecardLine and m_sleepMsOnGetNumberOfNotecardLines, 100).
+        /// </summary>
+        private const int NOTECARD_SL_DELAY = 100;
+
+        /// <summary>
+        /// The pause of llGetNumberOfNotecardLines and iwGetLinkNumberOfNotecardLines after an answer: SL's 100 ms, or
+        /// with [InWorldz.Phlox] NotecardPause = halcyon Halcyon's 25 ms cached and 50 ms fetched.
+        /// </summary>
+        private void NotecardCountSleep(bool cached)
+        {
+            if (m_ScriptEngine != null && m_ScriptEngine.NotecardHalcyonTiming)
+                NotecardSleep(cached ? NOTECARD_COUNT_FAST_DELAY : NOTECARD_COUNT_LONG_DELAY);
+            else
+                NotecardSleep(NOTECARD_SL_DELAY);
+        }
+
+        /// <summary>
+        /// The pause of llGetNotecardLine and iwGetLinkNotecardLine after an answer: SL's 100 ms, or with
+        /// [InWorldz.Phlox] NotecardPause = halcyon Halcyon's (<see cref="NotecardLineCachedSleep"/> cached, 25 ms fetched).
+        /// </summary>
+        private void NotecardLineSleep(bool cached, int line)
+        {
+            if (m_ScriptEngine != null && m_ScriptEngine.NotecardHalcyonTiming)
+            {
+                if (cached) NotecardLineCachedSleep(line, 0);
+                else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
+            }
+            else
+                NotecardSleep(NOTECARD_SL_DELAY);
+        }
+
         /// <summary>Halcyon GetNotecardSegment's cached-read delay: 1 ms on every 16th line read from offset 0.</summary>
         private void NotecardLineCachedSleep(int line, int startOffset)
         {
@@ -5417,8 +5450,9 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// Halcyon's GetNumberOfNotecardLines delays (LSLSystemAPI.cs:14521-14580) - 25 ms answered from the
-        /// notecard cache, 50 ms fetched, 100 ms when there is no such notecard - and its cache. The answer is unchanged.
+        /// Pauses the script 100 ms after the answer, as SL does; with NotecardPause = halcyon Halcyon's delays
+        /// (LSLSystemAPI.cs:14521-14580) - 25 ms answered from the notecard cache, 50 ms fetched - instead. A notecard
+        /// that is not there pauses 100 ms either way. The answer is unchanged.
         /// </summary>
         public string llGetNumberOfNotecardLines(string name)
         {
@@ -5433,13 +5467,14 @@ namespace Phlox.ScriptEngine
             }
             UUID queryID = NewDataserverQuery();
             bool cached = AnswerNotecardRead(notecard, queryID, c => c.LineCount.ToString(), name, "llGetNumberOfNotecardLines");
-            NotecardSleep(cached ? NOTECARD_COUNT_FAST_DELAY : NOTECARD_COUNT_LONG_DELAY);
+            NotecardCountSleep(cached);
             return queryID.ToString();
         }
 
         /// <summary>
-        /// Halcyon's GetNotecardSegment delays (LSLSystemAPI.cs:14602-14661) - 25 ms fetched; from the cache,
-        /// 1 ms on lines 0, 16, 32 ... read from offset 0 and none otherwise; none for a missing notecard - and its cache.
+        /// Pauses the script 100 ms after the answer, as SL does; with NotecardPause = halcyon Halcyon's
+        /// GetNotecardSegment delays (LSLSystemAPI.cs:14602-14661) - 25 ms fetched; from the cache, 1 ms on lines
+        /// 0, 16, 32 ... and none otherwise - instead. A missing notecard has no read pause either way.
         /// </summary>
         public string llGetNotecardLine(string name, int line)
         {
@@ -5454,8 +5489,7 @@ namespace Phlox.ScriptEngine
             UUID queryID = NewDataserverQuery();
             int lineNum = line;
             bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardLineAnswer(c, lineNum), name, "llGetNotecardLine");
-            if (cached) NotecardLineCachedSleep(line, 0);
-            else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
+            NotecardLineSleep(cached, line);
             return queryID.ToString();
         }
         public string iwGetNotecardSegment(string name, int line, int startOffset, int maxLength)
@@ -5961,7 +5995,7 @@ namespace Phlox.ScriptEngine
                 UUID queryID = NewDataserverQuery();
                 // Halcyon's GetNumberOfNotecardLines delays and cache, as llGetNumberOfNotecardLines
                 bool cached = AnswerNotecardRead(notecard, queryID, c => c.LineCount.ToString(), name, null);
-                NotecardSleep(cached ? NOTECARD_COUNT_FAST_DELAY : NOTECARD_COUNT_LONG_DELAY);
+                NotecardCountSleep(cached);
                 return queryID.ToString();
             }
             ScriptShoutError("iwGetLinkNumberOfNotecardLines: Link number " + linknumber + " does not contain notecard '" + name + "'.");
@@ -5980,8 +6014,7 @@ namespace Phlox.ScriptEngine
                 int lineNum = line;
                 // Halcyon's GetNotecardSegment delays and cache, as llGetNotecardLine
                 bool cached = AnswerNotecardRead(notecard, queryID, c => NotecardLineAnswer(c, lineNum), name, null);
-                if (cached) NotecardLineCachedSleep(line, 0);
-                else NotecardSleep(NOTECARD_LINE_LONG_DELAY);
+                NotecardLineSleep(cached, line);
                 return queryID.ToString();
             }
             ShoutError("iwGetLinkNotecardLine: Notecard '" + name + "' not found in link " + linknumber + ".");

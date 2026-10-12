@@ -42,11 +42,19 @@ public class AntiAbuseSlowdownTests
         private bool m_frozen;
         public ulong Now;
 
-        /// <param name="off">settings to turn off, e.g. "ChatThrottle"</param>
+        /// <param name="off">settings to turn off, e.g. "ChatThrottle"; "Key=value" sets a value instead, e.g. "NotecardPause=halcyon"</param>
         public Rig(params string[] off)
         {
             Clock.SetSourceForTesting(() => m_frozen ? Now : (ulong)Environment.TickCount64);
-            H = new SchedulerHarness(cfg => { foreach (var k in off) cfg.Configs["InWorldz.Phlox"].Set(k, "false"); });
+            H = new SchedulerHarness(cfg =>
+            {
+                foreach (var k in off)
+                {
+                    int eq = k.IndexOf('=');
+                    if (eq < 0) cfg.Configs["InWorldz.Phlox"].Set(k, "false");
+                    else cfg.Configs["InWorldz.Phlox"].Set(k.Substring(0, eq), k.Substring(eq + 1));
+                }
+            });
         }
 
         /// <summary>Stop the engine's clock where it is; from here only the test moves it.</summary>
@@ -460,6 +468,9 @@ public class AntiAbuseSlowdownTests
 
     private const string Card = "line zero\nline one\nline two";
 
+    /// <summary>Halcyon's notecard timing, which is an operator choice (the default pause is SL's 0.1 s).</summary>
+    private const string Halcyon = "NotecardPause=halcyon";
+
     private static TaskInventoryItem AddCard(Rig r, string name = "card", string text = Card)
         => TaskInventoryHelpers.AddNotecard(r.H.Scene.AssetService, r.H.Prim, name, UUID.Random(), UUID.Random(), text);
 
@@ -485,7 +496,7 @@ public class AntiAbuseSlowdownTests
     [Fact]
     public void LineCountsSleep50Uncached25CachedAnd100WhenTheCardIsMissing()
     {
-        using var r = new Rig();
+        using var r = new Rig(Halcyon);
         UUID item = r.Loaded();
         var card = AddCard(r);
         r.Freeze();
@@ -504,7 +515,7 @@ public class AntiAbuseSlowdownTests
     [Fact]
     public void LineReadsSleep25UncachedAnd1MsOnEverySixteenthCachedLine()
     {
-        using var r = new Rig();
+        using var r = new Rig(Halcyon);
         UUID item = r.Loaded();
         var card = AddCard(r, text: string.Join("\n", Enumerable.Range(0, 40).Select(i => "l" + i)));
         r.Freeze();
@@ -521,6 +532,119 @@ public class AntiAbuseSlowdownTests
         Assert.Equal(1, r.Sleep(item, api => api.iwGetLinkNotecardLine(SlConst.LINK_THIS, "card", 16)));
         Assert.Equal(0, r.Sleep(item, api => api.iwGetLinkNotecardSegment(SlConst.LINK_THIS, "card", 17, 0, 5)));
         Assert.Equal(15, r.Sleep(item, api => api.llGetNotecardLine("no such card", 0)));   // The error's pause
+    }
+
+    /// <summary>
+    /// By default llGetNotecardLine and llGetNumberOfNotecardLines and the link variants pause the script 100 ms, as SL
+    /// and YEngine do, whether the answer is fetched or cached, for any line. The segment readers keep their delays, a
+    /// missing card keeps its pauses, and llGetNotecardLineSync has none.
+    /// </summary>
+    [Fact]
+    public void ByDefaultEveryLineAndCountCallSleeps100MsCachedOrFetched()
+    {
+        using var r = new Rig();
+        UUID item = r.Loaded();
+        var card = AddCard(r, text: string.Join("\n", Enumerable.Range(0, 40).Select(i => "l" + i)));
+        var segCard = AddCard(r, "segcard", string.Join("\n", Enumerable.Range(0, 40).Select(i => "s" + i)));
+        r.Freeze();
+
+        // fetched
+        Assert.Equal(100, r.Sleep(item, api => api.llGetNumberOfNotecardLines("card")));
+        UntilCached(r, card.AssetID);
+        Assert.Equal(100, r.Sleep(item, api => api.llGetNotecardLine("card", 3)));   // cached from here on
+        // cached, whatever the line (Halcyon's 1 ms came on lines 0, 16, 32 only)
+        foreach (int line in new[] { 0, 1, 15, 16, 17, 32 })
+            Assert.Equal(100, r.Sleep(item, api => api.llGetNotecardLine("card", line)));
+        Assert.Equal(100, r.Sleep(item, api => api.llGetNumberOfNotecardLines("card")));
+        Assert.Equal(100, r.Sleep(item, api => api.iwGetLinkNumberOfNotecardLines(SlConst.LINK_THIS, "card")));
+        Assert.Equal(100, r.Sleep(item, api => api.iwGetLinkNotecardLine(SlConst.LINK_THIS, "card", 16)));
+        Assert.Equal(100, r.Sleep(item, api => api.iwGetLinkNotecardLine(SlConst.LINK_THIS, "card", 5)));
+
+        // a missing card: the count's 100 ms, the line read's error pause only
+        Assert.Equal(100, r.Sleep(item, api => api.llGetNumberOfNotecardLines("no such card")));
+        Assert.Equal(15, r.Sleep(item, api => api.llGetNotecardLine("no such card", 0)));
+
+        // as before: the segment readers (fetched 25 ms, then 1 ms on every 16th cached line from offset 0) ...
+        Assert.Equal(25, r.Sleep(item, api => api.iwGetNotecardSegment("segcard", 3, 0, 5)));
+        UntilCached(r, segCard.AssetID);
+        Assert.Equal(1, r.Sleep(item, api => api.iwGetNotecardSegment("segcard", 16, 0, 5)));
+        Assert.Equal(0, r.Sleep(item, api => api.iwGetNotecardSegment("segcard", 17, 0, 5)));
+        Assert.Equal(1, r.Sleep(item, api => api.iwGetLinkNotecardSegment(SlConst.LINK_THIS, "segcard", 32, 0, 5)));
+        Assert.Equal(0, r.Sleep(item, api => api.iwGetLinkNotecardSegment(SlConst.LINK_THIS, "segcard", 1, 0, 5)));
+        // ... and the synchronous read, which SL gives no pause
+        Assert.Equal(0, r.Sleep(item, api => api.llGetNotecardLineSync("card", 4)));
+    }
+
+    [Fact]
+    public void ByDefaultAFetchedLineAndCountAlsoSleep100MsWithTheCacheOff()
+    {
+        using var r = new Rig("NotecardCache");
+        UUID item = r.Loaded();
+        AddCard(r);
+        r.Freeze();
+        Assert.Equal(100, r.Sleep(item, api => api.llGetNotecardLine("card", 0)));
+        Assert.True(r.PumpUntil(() => r.H.Engine.ObjectPostsInFlight == 0));
+        Assert.Equal(100, r.Sleep(item, api => api.llGetNotecardLine("card", 0)));
+        Assert.Equal(100, r.Sleep(item, api => api.llGetNumberOfNotecardLines("card")));
+    }
+
+    [Fact]
+    public void WithNotecardPauseHalcyonTheLinkVariantsKeepHalcyonsDelaysToo()
+    {
+        using var r = new Rig(Halcyon);
+        UUID item = r.Loaded();
+        var card = AddCard(r, text: string.Join("\n", Enumerable.Range(0, 40).Select(i => "l" + i)));
+        AddCard(r, "countcard", "x\ny");
+        r.Freeze();
+        Assert.Equal(25, r.Sleep(item, api => api.iwGetLinkNotecardLine(SlConst.LINK_THIS, "card", 3)));
+        Assert.Equal(50, r.Sleep(item, api => api.iwGetLinkNumberOfNotecardLines(SlConst.LINK_THIS, "countcard")));
+        UntilCached(r, card.AssetID);
+        Assert.Equal(1, r.Sleep(item, api => api.iwGetLinkNotecardLine(SlConst.LINK_THIS, "card", 16)));
+        Assert.Equal(0, r.Sleep(item, api => api.iwGetLinkNotecardLine(SlConst.LINK_THIS, "card", 17)));
+        Assert.Equal(25, r.Sleep(item, api => api.iwGetLinkNumberOfNotecardLines(SlConst.LINK_THIS, "card")));
+    }
+
+    [Fact]
+    public void WithNotecardThrottleOffTheHalcyonChoiceStillSleepsNothing()
+    {
+        using var r = new Rig("NotecardThrottle", Halcyon);
+        UUID item = r.Loaded();
+        AddCard(r);
+        r.Freeze();
+        Assert.Equal(0, r.Sleep(item, api => api.llGetNumberOfNotecardLines("card")));
+        Assert.Equal(0, r.Sleep(item, api => api.llGetNotecardLine("card", 0)));
+    }
+
+    [Theory]
+    [InlineData(null, false)]
+    [InlineData("sl", false)]
+    [InlineData(" SL ", false)]
+    [InlineData("halcyon", true)]
+    [InlineData(" Halcyon ", true)]
+    [InlineData("fast", false)]
+    [InlineData("", false)]
+    public void NotecardPauseIsSlUnlessSetToHalcyon(string value, bool halcyon)
+    {
+        var capture = new Capture();
+        ILoggerFactory before = LoggerProvider.LoggerFactory;
+        LoggerProvider.LoggerFactory = capture;
+        PhloxEngine engine;
+        try
+        {
+            var config = new IniConfigSource();
+            var phlox = config.AddConfig("InWorldz.Phlox");
+            phlox.Set("Enabled", "true");
+            if (value != null) phlox.Set("NotecardPause", value);
+            engine = new PhloxEngine();
+            engine.Initialise(config);
+        }
+        finally { LoggerProvider.LoggerFactory = before; }
+        Assert.Equal(halcyon, engine.NotecardHalcyonTiming);
+        Assert.True(engine.NotecardThrottle);
+        string[] lines; lock (capture.Lines) lines = capture.Lines.ToArray();
+        Assert.Contains("[PhloxEngine]: NotecardPause = " + (halcyon ? "halcyon" : "sl"), lines);
+        bool warned = lines.Any(l => l.Contains("is not 'sl' or 'halcyon'"));
+        Assert.Equal(value == "fast" || value == "", warned);
     }
 
     [Fact]
@@ -634,7 +758,7 @@ public class AntiAbuseSlowdownTests
     [Fact]
     public void WithNotecardCacheOffEveryReadFetches()
     {
-        using var r = new Rig("NotecardCache");
+        using var r = new Rig("NotecardCache", Halcyon);
         UUID item = r.Loaded();
         var card = AddCard(r);
         r.Freeze();

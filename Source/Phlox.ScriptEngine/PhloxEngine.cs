@@ -108,6 +108,13 @@ namespace Phlox.ScriptEngine
         public bool LinkMessageThrottle { get; private set; } = true;
         /// <summary>Halcyon's notecard read delays. [InWorldz.Phlox] NotecardThrottle.</summary>
         public bool NotecardThrottle { get; private set; } = true;
+        /// <summary>
+        /// Which pause llGetNotecardLine, llGetNumberOfNotecardLines and the link variants of those two take while
+        /// <see cref="NotecardThrottle"/> is on. false (default): SL's 0.1 s for every call, cached or fetched. true:
+        /// Halcyon's timing (25 ms or 50 ms for a count, 25 ms for an uncached line, 1 ms on every 16th cached line).
+        /// [InWorldz.Phlox] NotecardPause = sl | halcyon.
+        /// </summary>
+        public bool NotecardHalcyonTiming { get; private set; }
         /// <summary>The parsed-notecard cache (Halcyon's NotecardCache). [InWorldz.Phlox] NotecardCache.</summary>
         public bool NotecardCacheEnabled { get; private set; } = true;
         /// <summary>iwFormatString's 100 ms. [InWorldz.Phlox] FormatStringThrottle.</summary>
@@ -216,6 +223,13 @@ namespace Phlox.ScriptEngine
                 "HttpInFlightThrottle = {8}",
                 ResetThrottle, ChatThrottle, BotThrottle, PhysicsThrottle, LinkMessageThrottle, NotecardThrottle,
                 NotecardCacheEnabled, FormatStringThrottle, HttpInFlightThrottle);
+
+            // Notecard read pause: sl (default) or halcyon; anything else is sl, with a warning.
+            string notecardPause = m_Config.GetString("NotecardPause", "sl").Trim().ToLowerInvariant();
+            NotecardHalcyonTiming = notecardPause == "halcyon";
+            if (notecardPause != "sl" && notecardPause != "halcyon")
+                m_log.LogWarning("[PhloxEngine]: NotecardPause = '{0}' is not 'sl' or 'halcyon'; using sl", notecardPause);
+            m_log.LogInformation("[PhloxEngine]: NotecardPause = {0}", NotecardHalcyonTiming ? "halcyon" : "sl");
 
             // Syscalls that can reach a service run off the scheduler thread.
             // auto (default) = inline when the answer is local or cached, deferred otherwise;

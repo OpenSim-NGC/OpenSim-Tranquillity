@@ -40,7 +40,9 @@ public class EventQueueDropLogTests : IDisposable
         m_previous = LoggerProvider.LoggerFactory;
         LoggerProvider.LoggerFactory = m_log;
         Clock.SetSourceForTesting(() => m_now);
-        H = new SchedulerHarness();
+        // These tests fill a queue with 200 requests from one handler, which the default 0.1 s pause per request would
+        // spread over 20 s; they ask for Halcyon's notecard timing.
+        H = new SchedulerHarness(cfg => cfg.Configs["InWorldz.Phlox"].Set("NotecardPause", "halcyon"));
     }
 
     public void Dispose()
