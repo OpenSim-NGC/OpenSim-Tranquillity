@@ -3957,9 +3957,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
             if (pa is not null && pa.IsPhysical)
             {
-                // a drag moves the root's body, so the root's block applies whichever part was grabbed
-                if (m_rootPart.BlockGrab || IsSelected || IsAttachment
-                    || m_rootPart.VehicleType != (int)Vehicle.TYPE_NONE || GetSittingAvatarsCount() > 0)
+                if (IsPhysicalDragRefused())
                 {
                     EndGrab();
                     return;
@@ -3994,6 +3992,14 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             }
         }
     }
+
+    /// <summary>
+    /// Whether a drag or a turn of the physical root body is refused, for the mouse drag and the rotate-drag alike.
+    /// A drag moves the root's body, so the root's block applies whichever part was grabbed.
+    /// </summary>
+    private bool IsPhysicalDragRefused()
+        => m_rootPart.BlockGrab || IsSelected || IsAttachment
+            || m_rootPart.VehicleType != (int)Vehicle.TYPE_NONE || GetSittingAvatarsCount() > 0;
 
     /// <summary>
     /// Point the root actor's move-to-target at the dragged point. The first update of a drag also takes the target
@@ -4108,64 +4114,164 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         m_scene.EventManager.OnMakeChildAgent -= GrabHolderMadeChild;
     }
 
+    // Ctrl-Shift drag (rotate-drag) of a physical object. The viewer sends the rotation it wants, absolute, each time the
+    // mouse moves, so the turn steers the root with the look-at controller (SceneObjectPart.UpdateLookAt, the one
+    // llRotLookAt uses) toward that rotation instead of pushing it with an angular force per update.
+    internal const float SpinStrength = 1.0f; // llRotLookAt strength: a time constant of 1/pi s, no overshoot at the heartbeat's rate
+    private readonly object m_spinLock = new();
+    private bool m_spinning;
+    private UUID m_spinAgent;
+    private Quaternion m_spinTarget = Quaternion.Identity;
+
+    // The last llTargetOmega on the root, put back when a turn ends. While a turn is held it is only remembered.
+    private bool m_scriptOmegaSet;
+    private Vector3 m_scriptOmega;
+
     /// <summary>
-    /// If object is physical, prepare for spinning torques (set flag to save old orientation)
+    /// A new start by the agent that holds a turn means the earlier stop never arrived, so that turn ends. The turn
+    /// itself begins with the first update, which carries the rotation to steer to.
     /// </summary>
-    /// <param name="rotation">Rotation.  We do the math here to turn it into a torque</param>
-    /// <param name="remoteClient"></param>
     public void SpinStart(IClientAPI remoteClient)
     {
         if (BlockGrabOverride || m_rootPart.BlockGrab)
-                return;
+            return;
+
         if (m_scene.EventManager.TriggerGroupSpinStart(UUID))
+            ReleaseSpin(remoteClient is null ? UUID.Zero : remoteClient.AgentId);
+    }
+
+    /// <summary>
+    /// Whether a rotate-drag holds the root, and the rotation it steers to. Read once a frame by the look-at controller.
+    /// </summary>
+    internal bool TryGetSpinTarget(out Quaternion target)
+    {
+        lock (m_spinLock)
         {
-            PhysicsActor pa = m_rootPart.PhysActor;
-            if (pa is not null)
-            {
-                if (pa.IsPhysical)
-                {
-                    m_rootPart.IsWaitingForFirstSpinUpdatePacket = true;
-                }
-            }
+            target = m_spinTarget;
+            return m_spinning;
+        }
+    }
+
+    internal bool IsSpinning
+    {
+        get { lock (m_spinLock) return m_spinning; }
+    }
+
+    /// <summary>
+    /// What a script last set with llTargetOmega on the root. While a turn is held it is remembered and not applied.
+    /// </summary>
+    /// <returns>true if it was only remembered</returns>
+    internal bool RecordScriptOmega(SceneObjectPart part, Vector3 omega)
+    {
+        if (part != m_rootPart)
+            return false;
+
+        lock (m_spinLock)
+        {
+            PhysicsActor pa = part.PhysActor;
+            m_scriptOmegaSet = pa is not null && pa.IsPhysical && omega != Vector3.Zero;
+            m_scriptOmega = omega;
+            return m_spinning;
         }
     }
 
     /// <summary>
-    /// If object is physical, apply torque to spin it around
+    /// The viewer let go (ObjectSpinStop), grabbed again or started a new turn. Only the agent that holds the turn can end it.
     /// </summary>
-    /// <param name="rotation">Rotation.  We do the math here to turn it into a torque</param>
+    public void ReleaseSpin(UUID agent)
+    {
+        lock (m_spinLock)
+        {
+            if (m_spinning && m_spinAgent == agent)
+                EndSpin();
+        }
+    }
+
+    private void SpinHolderRemoved(UUID agentId) => ReleaseSpin(agentId);
+
+    private void SpinHolderMadeChild(ScenePresence presence)
+    {
+        if (presence is not null)
+            ReleaseSpin(presence.UUID);
+    }
+
+    /// <summary>
+    /// End a turn: the controller stops and so does the spin it left. A script's look-at, which the turn took over, runs
+    /// again from the next frame and a script's llTargetOmega is applied again.
+    /// </summary>
+    internal void EndSpin()
+    {
+        lock (m_spinLock)
+        {
+            if (!m_spinning)
+                return;
+
+            m_spinning = false;
+            m_spinAgent = UUID.Zero;
+            m_scene.EventManager.OnRemovePresence -= SpinHolderRemoved;
+            m_scene.EventManager.OnMakeChildAgent -= SpinHolderMadeChild;
+
+            PhysicsActor pa = m_rootPart.PhysActor;
+            if (pa is null || !pa.IsPhysical)
+                return;
+
+            m_rootPart.AngularVelocity = Vector3.Zero;
+            if (m_scriptOmegaSet)
+                m_rootPart.ApplyAngularVelocity(m_scriptOmega); // not compared with the part's copy, which may be stale
+            else
+                m_rootPart.ScheduleTerseUpdate();
+
+            QueueForUpdateCheck(); // a script's look-at picks up again
+        }
+    }
+
+    /// <summary>
+    /// Take the rotation the viewer asks for as the controller's target. The first update of a turn starts it.
+    /// </summary>
+    private void SteerSpin(Quaternion rotation, UUID agent)
+    {
+        if (!float.IsFinite(rotation.X) || !float.IsFinite(rotation.Y) || !float.IsFinite(rotation.Z) || !float.IsFinite(rotation.W))
+            return;
+
+        float length = MathF.Sqrt(rotation.X * rotation.X + rotation.Y * rotation.Y + rotation.Z * rotation.Z + rotation.W * rotation.W);
+        if (length < 1e-6f)
+            return;
+
+        lock (m_spinLock)
+        {
+            if (!m_spinning)
+            {
+                m_spinning = true;
+                m_scene.EventManager.OnRemovePresence += SpinHolderRemoved;
+                m_scene.EventManager.OnMakeChildAgent += SpinHolderMadeChild;
+            }
+
+            m_spinAgent = agent;
+            m_spinTarget = new Quaternion(rotation.X / length, rotation.Y / length, rotation.Z / length, rotation.W / length);
+        }
+
+        QueueForUpdateCheck(); // the controller runs from the update list
+    }
+
+    /// <summary>
+    /// If object is physical, steer it to the rotation the viewer asks for
+    /// If object is not physical, just put it at that rotation
+    /// </summary>
+    /// <param name="newOrientation">The absolute rotation the viewer wants, sent each time the mouse moves</param>
     /// <param name="remoteClient"></param>
     public void SpinMovement(Quaternion newOrientation, IClientAPI remoteClient)
-    {
-        // The incoming newOrientation, sent by the client, "seems" to be the
-        // desired target orientation. This needs further verification; in particular,
-        // one would expect that the initial incoming newOrientation should be
-        // fairly close to the original prim's physical orientation,
-        // m_rootPart.PhysActor.Orientation. This however does not seem to be the
-        // case (might just be an issue with different quaternions representing the
-        // same rotation, or it might be a coordinate system issue).
-        //
-        // Since it's not clear what the relationship is between the PhysActor.Orientation
-        // and the incoming orientations sent by the client, we take an alternative approach
-        // of calculating the delta rotation between the orientations being sent by the
-        // client. (Since a spin is invoked by ctrl+shift+drag in the client, we expect
-        // a steady stream of several new orientations coming in from the client.)
-        // This ensures that the delta rotations are being calculated from self-consistent
-        // pairs of old/new rotations. Given the delta rotation, we apply a torque around
-        // the delta rotation axis, scaled by the object mass times an arbitrary scaling
-        // factor (to ensure the resulting torque is not "too strong" or "too weak").
-        //
-        // Ideally we need to calculate (probably iteratively) the exact torque or series
-        // of torques needed to arrive exactly at the destination orientation. However, since
-        // it is not yet clear how to map the destination orientation (provided by the viewer)
-        // into PhysActor orientations (needed by the physics engine), we omit this step.
-        // This means that the resulting torque will at least be in the correct direction,
-        // but it will result in over-shoot or under-shoot of the target orientation.
-        // For the end user, this means that ctrl+shift+drag can be used for relative,
-        // but not absolute, adjustments of orientation for physical prims.
+        => SpinMovement(m_rootPart.UUID, newOrientation, remoteClient);
 
+    /// <param name="partID">The part that was grabbed</param>
+    /// <param name="newOrientation">The absolute rotation the viewer wants, sent each time the mouse moves</param>
+    /// <param name="remoteClient"></param>
+    public void SpinMovement(UUID partID, Quaternion newOrientation, IClientAPI remoteClient)
+    {
         if (BlockGrabOverride || m_rootPart.BlockGrab)
-                return;
+        {
+            EndSpin();
+            return;
+        }
 
         if (m_scene.EventManager.TriggerGroupSpin(UUID, newOrientation))
         {
@@ -4173,39 +4279,21 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
             if (pa is not null && pa.IsPhysical)
             {
-                if (m_rootPart.IsWaitingForFirstSpinUpdatePacket)
+                SceneObjectPart part = GetPart(partID);
+                if (part is null)
+                    return;
+
+                if (part.BlockGrab || IsPhysicalDragRefused())
                 {
-                  // first time initialization of "old" orientation for calculation of delta rotations
-                    m_rootPart.SpinOldOrientation = newOrientation;
-                    m_rootPart.IsWaitingForFirstSpinUpdatePacket = false;
+                    EndSpin();
+                    return;
                 }
-                else
-                {
-                    // save and update old orientation
-                    Quaternion old = m_rootPart.SpinOldOrientation;
-                    m_rootPart.SpinOldOrientation = newOrientation;
-                    //m_log.LogError("[SCENE OBJECT GROUP]: Old orientation is " + old);
-                    //m_log.LogError("[SCENE OBJECT GROUP]: Incoming new orientation is " + newOrientation);
 
-                    // compute difference between previous old rotation and new incoming rotation
-                    Quaternion minimalRotationFromQ1ToQ2 = newOrientation * Quaternion.Inverse(old);
-
-                    minimalRotationFromQ1ToQ2.GetAxisAngle(out Vector3 spinforce, out float rotationAngle);
-                    if(Math.Abs(rotationAngle)< 0.001)
-                        return;
-
-                    spinforce.Normalize();
-
-                    //m_log.LogError("SCENE OBJECT GROUP]: rotation axis is " + rotationAxis);
-                    if(rotationAngle > 0)
-                        spinforce = spinforce * pa.Mass * 0.1f; // 0.1 is an arbitrary torque scaling factor
-                    else
-                       spinforce = spinforce * pa.Mass * -0.1f; // 0.1 is an arbitrary torque scaling
-                    pa.AddAngularForce(spinforce,true);
-                }
+                SteerSpin(newOrientation, remoteClient is null ? UUID.Zero : remoteClient.AgentId);
             }
             else
             {
+                EndSpin();
                 NonPhysicalSpinMovement(newOrientation);
             }
         }
