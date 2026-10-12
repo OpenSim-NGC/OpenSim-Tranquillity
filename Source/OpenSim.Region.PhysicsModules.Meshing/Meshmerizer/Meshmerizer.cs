@@ -697,8 +697,9 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
             }
         }
 
+        // The low three bits are the map type; 64 (invert) and 128 (mirror) are flags, read below.
         PrimMesher.SculptMesh.SculptType sculptType;
-        switch ((OpenMetaverse.SculptType)primShape.SculptType)
+        switch ((OpenMetaverse.SculptType)(primShape.SculptType & 0x07))
         {
             case OpenMetaverse.SculptType.Cylinder:
                 sculptType = PrimMesher.SculptMesh.SculptType.cylinder;
