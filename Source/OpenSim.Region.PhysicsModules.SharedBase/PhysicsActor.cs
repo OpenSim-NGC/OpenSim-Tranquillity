@@ -354,6 +354,14 @@ public abstract class PhysicsActor
         this.VehicleFloatParam((int)Vehicle.VERTICAL_ATTRACTION_EFFICIENCY, vdata.m_verticalAttractionEfficiency);
         this.VehicleFloatParam((int)Vehicle.VERTICAL_ATTRACTION_TIMESCALE, vdata.m_verticalAttractionTimescale);
 
+        // InWorldz properties
+        this.VehicleFloatParam((int)Vehicle.MOUSELOOK_AZIMUTH, vdata.m_mouselookAzimuth);
+        this.VehicleFloatParam((int)Vehicle.MOUSELOOK_ALTITUDE, vdata.m_mouselookAltitude);
+        this.VehicleFloatParam((int)Vehicle.BANKING_AZIMUTH, vdata.m_bankingAzimuth);
+        this.VehicleFloatParam((int)Vehicle.DISABLE_MOTORS_ABOVE, vdata.m_disableMotorsAbove);
+        this.VehicleFloatParam((int)Vehicle.DISABLE_MOTORS_AFTER, vdata.m_disableMotorsAfter);
+        this.VehicleFloatParam((int)Vehicle.INVERTED_BANKING_MODIFIER, vdata.m_invertedBankingModifier);
+
         this.VehicleRotationParam((int)Vehicle.REFERENCE_FRAME, vdata.m_referenceFrame);
     }
 
