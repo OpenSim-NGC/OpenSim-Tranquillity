@@ -251,7 +251,7 @@ public class MesherPhysicalRequestTests
 
             lock (cache)
             {
-                Assert.Single(cache.Where(kv => ReferenceEquals(kv.Value, answers[0])));
+                Assert.Single(cache, kv => ReferenceEquals(kv.Value, answers[0]));
                 Assert.Same(answers[0], cache[asset.ShapeWithoutData().GetMeshKey(size, Lod)]);
             }
         }
