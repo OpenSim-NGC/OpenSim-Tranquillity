@@ -123,7 +123,7 @@ public sealed class GridServerRuntime : IGridServerRuntime
 
             _serviceConnectors.AddRange(_connectorLoader.LoadConnectors(config));
 
-            PrintFileToConsole("robuststartuplogo.txt");
+            PrintFileToConsole("gridserver.startuplogo.txt");
 
             _loader = new PluginLoader(config, registryLocation);
 

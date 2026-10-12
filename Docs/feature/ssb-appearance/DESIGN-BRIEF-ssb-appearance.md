@@ -184,7 +184,7 @@ To enable both SSB and AIS for a whole simulator:
     ServerSideBaking = true
 ```
 
-In Robust (`Robust.ini.example`; for standalone, `StandaloneCommon.ini.example` carries the
+In Robust (`GridServer.ini.example`; for standalone, `StandaloneCommon.ini.example` carries the
 `AgentAppearanceServiceURL` line):
 
 ```ini
