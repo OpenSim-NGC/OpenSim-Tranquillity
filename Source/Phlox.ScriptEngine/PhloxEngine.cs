@@ -1706,8 +1706,8 @@ namespace Phlox.ScriptEngine
                 foreach (SceneObjectPart part in attachment.Parts)
                 {
                     TaskInventoryDictionary scripts;
-                    lock (part.TaskInventory)
-                        scripts = (TaskInventoryDictionary)part.TaskInventory.Clone();
+                    // Clone takes the inventory's read lock itself.
+                    scripts = (TaskInventoryDictionary)part.TaskInventory.Clone();
                     foreach (var kvp in scripts)
                         if (kvp.Value.Type == (int)AssetType.LSLText || kvp.Value.Type == 10)
                             items.Add(kvp.Value.ItemID);
@@ -1795,8 +1795,8 @@ namespace Phlox.ScriptEngine
                 try
                 {
                     TaskInventoryDictionary scripts;
-                    lock (part.TaskInventory)
-                        scripts = (TaskInventoryDictionary)part.TaskInventory.Clone();
+                    // Clone takes the inventory's read lock itself.
+                    scripts = (TaskInventoryDictionary)part.TaskInventory.Clone();
 
                     foreach (var kvp in scripts)
                     {
@@ -1892,8 +1892,8 @@ namespace Phlox.ScriptEngine
             if (part?.ParentGroup == null || part.ParentGroup.IsDeleted) return 0;
 
             TaskInventoryDictionary inventory;
-            lock (part.TaskInventory)
-                inventory = (TaskInventoryDictionary)part.TaskInventory.Clone();
+            // Clone takes the inventory's read lock itself.
+            inventory = (TaskInventoryDictionary)part.TaskInventory.Clone();
             var scripts = new List<TaskInventoryItem>();
             foreach (TaskInventoryItem item in inventory.Values)
                 if (item.Type == (int)AssetType.LSLText || item.Type == 10)

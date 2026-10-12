@@ -59,6 +59,7 @@
     <Compile Include="ScriptRegex.cs" />
     <Compile Include="PhloxListenManager.cs" />
     <Compile Include="PhloxNotecardCache.cs" />
+    <Compile Include="PhloxInventoryLock.cs" />
     <Compile Include="AsyncCommand\AsyncCommandManager.cs" />
     <Compile Include="AsyncCommand\Plugins\SensorRepeat.cs" />
     <Compile Include="AsyncCommand\Plugins\HttpRequest.cs" />
