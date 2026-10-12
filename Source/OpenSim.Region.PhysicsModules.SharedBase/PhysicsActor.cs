@@ -206,6 +206,15 @@ public abstract class PhysicsActor
 
     public virtual bool Building { get; set; }
 
+    /// <summary>
+    /// True while keyframed motion (llSetKeyframedMotion) is moving this prim's object: set when the motion starts and
+    /// cleared when it stops, is paused, ends, or the object is selected. The positions and rotations set on a
+    /// non-physical prim in that time are the steps of the motion (about every 50 ms), not a script's or builder's
+    /// jumps, so an engine may carry what stands on the object along with it. Engines that do not need to tell the
+    /// two apart ignore it.
+    /// </summary>
+    public virtual bool MovedByKeyframedMotion { get => false; set { } }
+
     public virtual void getContactData(ref ContactData cdata)
     {
         cdata.mu = 0;
