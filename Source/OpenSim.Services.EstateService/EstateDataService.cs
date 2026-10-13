@@ -36,10 +36,6 @@ namespace OpenSim.Services.EstateService;
 
 public class EstateDataService : ServiceBase, IEstateDataService
 {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
-
     protected IEstateDataStore m_database;
 
     public EstateDataService(IConfigSource config)

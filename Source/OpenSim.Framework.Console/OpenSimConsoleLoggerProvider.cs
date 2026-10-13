@@ -36,8 +36,7 @@ namespace OpenSim.Framework.Console;
 /// <remarks>
 /// The interactive console is created long after the logging pipeline is configured, and the
 /// "set log level" command changes the console threshold at runtime, so both are held here rather
-/// than captured at provider construction. This mirrors how the log4net OpenSimAppender singleton
-/// was mutated by ServerBase.RegisterCommonAppenders.
+/// than captured at provider construction.
 /// </remarks>
 public static class OpenSimConsoleLogSink
 {
@@ -64,7 +63,7 @@ public static class OpenSimConsoleLogSink
     }
 
     /// <summary>
-    /// Parses a log4net-style level name so existing "set log level" usage keeps working.
+    /// Parses a log level name so existing "set log level" usage keeps working.
     /// </summary>
     public static bool TryParseLevel(string rawLevel, out LogLevel level)
     {
@@ -105,9 +104,9 @@ public static class OpenSimConsoleLogSink
 }
 
 /// <summary>
-/// Routes <see cref="ILogger"/> output to the OpenSimulator interactive console, replacing the
-/// log4net OpenSimAppender. Writing through <see cref="ConsoleBase"/> keeps log lines from
-/// corrupting the readline prompt and preserves category colourization.
+/// Routes <see cref="ILogger"/> output to the OpenSimulator interactive console.
+/// Writing through <see cref="ConsoleBase"/> keeps log lines from corrupting the readline prompt
+/// and preserves category colourization.
 /// </summary>
 [ProviderAlias("OpenSimConsole")]
 public sealed class OpenSimConsoleLoggerProvider : ILoggerProvider
@@ -147,7 +146,7 @@ internal sealed class OpenSimConsoleLogger : ILogger
         if (exception is not null)
             message = string.IsNullOrEmpty(message) ? exception.ToString() : $"{message}{Environment.NewLine}{exception}";
 
-        // Matches the log4net PatternLayout "%date %-5level %message%newline" the appenders used.
+        // Formats as "%date %-5level %message%newline" matching the legacy pattern layout.
         string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss,fff} {LevelLabel(logLevel),-5} {message}";
 
         try
