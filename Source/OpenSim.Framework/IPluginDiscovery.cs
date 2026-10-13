@@ -82,7 +82,6 @@ public class DotNetCorePluginsDiscovery : IPluginDiscovery
         "CoreJ2K",
         "DotNetOpenId",
         "ICSharpCode",
-        "log4net",
         "LukeSkywalker",
         "MailKit",
         "McMaster.NETCore.Plugins",

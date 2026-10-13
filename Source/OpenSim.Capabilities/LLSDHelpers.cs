@@ -36,9 +36,6 @@ namespace OpenSim.Framework.Capabilities;
 
 public class LLSDHelpers
 {
-//        private static readonly log4net.ILog m_log
-//            = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-
     public static string SerialiseLLSDReply(object obj)
     {
         using(StringWriter sw = new StringWriter())

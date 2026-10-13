@@ -34,7 +34,6 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.2" />
     <PackageReference Include="MailKit" Version="4.17.0" />
     <PackageReference Include="MimeKit" Version="4.17.0" />
     <PackageReference Include="MySqlConnector" Version="2.6.1" />

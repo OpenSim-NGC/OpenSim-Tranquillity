@@ -28,8 +28,6 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.2" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Log4Net.AspNetCore" Version="10.0.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.10" />
     <PackageReference Include="Autofac" Version="9.3.2" />
     <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="11.0.2" />
@@ -44,10 +42,10 @@
     </Content>
 
     <!-- Include all JSON configuration files matching the pattern 'appsettings*.json' -->
-    <Content Include="appsettings*.json">
+    <!-- <Content Include="appsettings*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-    </Content>
+    </Content> -->
   </ItemGroup>
 
 </Project>

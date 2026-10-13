@@ -38,9 +38,6 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 using Microsoft.Extensions.Logging;
-// using log4net;
-// using System.Reflection;
-
 
 /*****************************************************
  *

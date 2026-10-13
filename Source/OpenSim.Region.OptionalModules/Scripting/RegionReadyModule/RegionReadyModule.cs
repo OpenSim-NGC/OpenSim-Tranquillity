@@ -98,10 +98,6 @@ public class RegionReadyModule : IRegionReadyModule, INonSharedRegionModule
         {
             m_scene.LoginLock = true;
             m_scene.EventManager.OnEmptyScriptCompileQueue += OnEmptyScriptCompileQueue;
-
-            // This should always show up to the user but should not trigger warn/errors as these messages are
-            // expected and are not simulator problems.  Ideally, there would be a status level in log4net but
-            // failing that, we will print out to console instead.
             MainConsole.Instance.Output("Region {0} - LOGINS DISABLED DURING INITIALIZATION.", m_scene.Name);
 
             if (m_uri != string.Empty)
@@ -205,14 +201,6 @@ public class RegionReadyModule : IRegionReadyModule, INonSharedRegionModule
         if (!m_scene.StartDisabled)
         {
             m_scene.LoginsEnabled = true;
-
-            // m_log.LogInformation("[RegionReady]: Logins enabled for {0}, Oar {1}",
-            //                 m_scene.RegionInfo.RegionName, m_oarFileLoading.ToString());
-
-            // Putting this out to console to make it eye-catching for people who are running OpenSimulator
-            // without info log messages enabled.  Making this a warning is arguably misleading since it isn't a
-            // warning, and monitor scripts looking for warn/error/fatal messages will received false positives.
-            // Arguably, log4net needs a status log level (like Apache).
             MainConsole.Instance.Output("INITIALIZATION COMPLETE FOR {0} - LOGINS ENABLED", m_scene.Name);
         }
 
