@@ -62,7 +62,7 @@ public static class OpenSimLoggingBuilderExtensions
         if (string.IsNullOrWhiteSpace(configuredStatsLogFile))
         {
             loggerConfiguration.WriteTo.File(
-                new OpenSimLog4NetStyleFormatter(),
+                new OpenSimLogFileFormatter(),
                 logFilePath,
                 restrictedToMinimumLevel: LogEventLevel.Debug,
                 rollingInterval: RollingInterval.Day,
@@ -75,7 +75,7 @@ public static class OpenSimLoggingBuilderExtensions
                     .MinimumLevel.Verbose()
                     .Filter.ByExcluding(IsStatsLogEvent)
                     .WriteTo.File(
-                        new OpenSimLog4NetStyleFormatter(),
+                        new OpenSimLogFileFormatter(),
                         logFilePath,
                         restrictedToMinimumLevel: LogEventLevel.Debug,
                         rollingInterval: RollingInterval.Day,
@@ -84,7 +84,7 @@ public static class OpenSimLoggingBuilderExtensions
                     .MinimumLevel.Verbose()
                     .Filter.ByIncludingOnly(IsStatsLogEvent)
                     .WriteTo.File(
-                        new OpenSimLog4NetStyleFormatter(),
+                        new OpenSimLogFileFormatter(),
                         statsLogFilePath,
                         restrictedToMinimumLevel: LogEventLevel.Debug,
                         rollingInterval: RollingInterval.Day,

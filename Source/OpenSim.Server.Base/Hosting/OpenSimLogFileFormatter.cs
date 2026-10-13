@@ -13,11 +13,10 @@ using Serilog.Formatting;
 namespace OpenSim.Server.Base.Hosting;
 
 /// <summary>
-/// Renders log lines as "%date %-5level %message%newline", matching the log4net PatternLayout the
-/// file appenders used, so log-scraping scripts keyed on the full level names (INFO/WARN/ERROR)
-/// keep working. Serilog's built-in "u3"/"u4" level formats abbreviate instead (INF/WRN/ERR).
+/// Renders log lines with full level names (INFO/WARN/ERROR) so existing log-scraping scripts keep
+/// working. Serilog's built-in "u3"/"u4" level formats abbreviate instead (INF/WRN/ERR).
 /// </summary>
-public sealed class OpenSimLog4NetStyleFormatter : ITextFormatter
+public sealed class OpenSimLogFileFormatter : ITextFormatter
 {
     public void Format(LogEvent logEvent, TextWriter output)
     {
