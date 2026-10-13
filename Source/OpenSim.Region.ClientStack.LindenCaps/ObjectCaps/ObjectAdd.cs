@@ -40,8 +40,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class ObjectAdd : INonSharedRegionModule
 {
-    // private static readonly ILog m_log =
-    //     LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private Scene m_scene;
 
     #region INonSharedRegionModule Members

@@ -42,9 +42,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class RegionConsoleModule : INonSharedRegionModule, IRegionConsole
 {
-//        private static readonly ILog m_log =
-//            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
     private Scene m_scene;
     private IEventQueue m_eventQueue;
     private Commands m_commands = new Commands();
@@ -159,9 +156,6 @@ public class RegionConsoleModule : INonSharedRegionModule, IRegionConsole
 
 public class ConsoleHandler : SimpleStreamHandler
 {
-//        private static readonly ILog m_log =
-//            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
     private RegionConsoleModule m_consoleModule;
     private UUID m_agentID;
     private bool m_isGod;

@@ -30,8 +30,6 @@ using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
 using Microsoft.Extensions.Logging;
-//using log4net;
-
 
 namespace OpenSim.Server.Handlers.Hypergrid;
 

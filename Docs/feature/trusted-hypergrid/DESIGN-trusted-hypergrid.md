@@ -257,5 +257,5 @@ Each of these is covered by tests in `Tests/OpenSim.TrustedHypergrid.Tests/`.
 | Registry service and console | `Source/OpenSim.Services.HypergridService/TrustedGridRegistryService.cs`, `TrustedGridServiceBase.cs` |
 | Data stores and migrations | `Source/OpenSim.Data/ITrustedGridData.cs`, `Source/OpenSim.Data.MySQL/MySQLTrustedGridData.cs`, `Source/OpenSim.Data.SQLite/SQLiteTrustedGridData.cs`, and `Resources/TrustedGrid.migrations` in each of the two store projects |
 | Call sites | `Source/OpenSim.Server.Handlers/Hypergrid/GatekeeperServerConnector.cs`, `HypergridHandlers.cs`; `Source/OpenSim.Services.Connectors/Hypergrid/GatekeeperServiceConnector.cs` |
-| Shipped config | `Source/OpenSim.Server.GridServer/AppData/Robust.HG.ini.example`, sections `[TrustedHypergrid]` and `[GatekeeperService]` |
+| Shipped config | `Source/OpenSim.Server.GridServer/AppData/GridServer.HG.ini.example`, sections `[TrustedHypergrid]` and `[GatekeeperService]` |
 | Tests | `Tests/OpenSim.TrustedHypergrid.Tests/` |

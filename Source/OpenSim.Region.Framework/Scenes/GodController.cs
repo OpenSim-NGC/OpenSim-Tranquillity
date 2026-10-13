@@ -27,7 +27,6 @@
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-//using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 

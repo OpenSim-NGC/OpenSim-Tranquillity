@@ -19,7 +19,6 @@ public class ServerStartupOptionsTests
     {
         var opts = new ServerStartupOptions();
 
-        Assert.Equal(string.Empty, opts.LogConfig);
         Assert.Empty(opts.IniFiles);
         Assert.Equal(string.Empty, opts.IniMaster);
         Assert.Equal("config", opts.IniDirectory);
@@ -31,14 +30,12 @@ public class ServerStartupOptionsTests
     {
         var opts = new ServerStartupOptions
         {
-            LogConfig    = "my.config",
             IniFiles     = ["a.ini", "b.ini"],
             IniMaster    = "master.ini",
             IniDirectory = "cfg",
             ConsoleType  = "rest",
         };
 
-        Assert.Equal("my.config",  opts.LogConfig);
         Assert.Equal(["a.ini", "b.ini"], opts.IniFiles);
         Assert.Equal("master.ini", opts.IniMaster);
         Assert.Equal("cfg",        opts.IniDirectory);

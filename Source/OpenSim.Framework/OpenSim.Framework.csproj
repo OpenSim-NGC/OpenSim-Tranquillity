@@ -19,7 +19,6 @@
     <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.11" />
     <PackageReference Include="SkiaSharp" Version="4.151.1" />
     <PackageReference Include="CoreJ2K.Skia" Version="2.3.3.91" />
-    <PackageReference Include="log4net" Version="3.3.2" />
     <PackageReference Include="McMaster.NETCore.Plugins" Version="2.0.0" />
     <PackageReference Include="zlib.net-mutliplatform" Version="1.1.0" />
   </ItemGroup>

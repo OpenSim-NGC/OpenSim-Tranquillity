@@ -39,8 +39,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
-using log4net;
-using log4net.Appender;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -2039,28 +2037,12 @@ public static class Util
 
     public static string logFile()
     {
-        foreach (IAppender appender in LogManager.GetRepository().GetAppenders())
-        {
-            if (appender is FileAppender appender1 && appender1.Name == "LogFileAppender")
-            {
-                return appender1.File;
-            }
-        }
-
-        return "./OpenSim.log";
+        return LoggingFilePaths.CurrentLogFilePath;
     }
 
     public static string StatsLogFile()
     {
-        foreach (IAppender appender in LogManager.GetRepository().GetAppenders())
-        {
-            if (appender is FileAppender appender1 && appender1.Name == "StatsLogFileAppender")
-            {
-                return appender1.File;
-            }
-        }
-
-        return "./OpenSimStats.log";
+        return LoggingFilePaths.CurrentStatsLogFilePath;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
