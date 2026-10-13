@@ -2951,7 +2951,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         SceneObjectPart rootpart = m_rootPart;
         if (rootpart is not null)
         {
-            if (rootpart.PhysActor is not null)
+            // a target core gave the actor is switched off by the part, unless a rotate-drag holds it
+            if (rootpart.PhysActor is not null && !rootpart.HasGivenRotationTarget)
             {
                 rootpart.PhysActor.APIDActive = false;
             }
@@ -4149,6 +4150,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     // mouse moves, so the turn steers the root with the look-at controller (SceneObjectPart.UpdateLookAt, the one
     // llRotLookAt uses) toward that rotation instead of pushing it with an angular force per update.
     internal const float SpinStrength = 1.0f; // llRotLookAt strength: a time constant of 1/pi s, no overshoot at the heartbeat's rate
+    internal const float SpinTargetSeconds = 0.1f; // strength and damping given to an engine with a rotation target: a short lag behind the mouse
     private readonly object m_spinLock = new();
     private bool m_spinning;
     private UUID m_spinAgent;
@@ -4242,11 +4244,16 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             m_scene.EventManager.OnRemovePresence -= SpinHolderRemoved;
             m_scene.EventManager.OnMakeChildAgent -= SpinHolderMadeChild;
 
+            // an engine with a rotation target stops the turn when the target is switched off
+            bool switchedOff = m_rootPart.ReleaseRotationTarget();
+
             PhysicsActor pa = m_rootPart.PhysActor;
             if (pa is null || !pa.IsPhysical)
                 return;
 
-            m_rootPart.AngularVelocity = Vector3.Zero;
+            if (!switchedOff)
+                m_rootPart.AngularVelocity = Vector3.Zero;
+
             if (m_scriptOmegaSet)
                 m_rootPart.ApplyAngularVelocity(m_scriptOmega); // not compared with the part's copy, which may be stale
             else
