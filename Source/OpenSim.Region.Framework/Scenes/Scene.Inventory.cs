@@ -2928,6 +2928,10 @@ public partial class Scene
             group.RezzerID = rezzerID;
             group.RezStringParameter = null;
 
+            // llSetStatus: an object rezzed by a script has STATUS_DIE_AT_EDGE set unless the script clears it
+            if (!humanRez && ScriptRezzedObjectsDieAtEdge)
+                group.RootPart.DIE_AT_EDGE = true;
+
             if (rezSelected)
             {
                 group.IsSelected = true;
@@ -3005,6 +3009,9 @@ public partial class Scene
         }
 
         sog.RezzerID = sourcePart.UUID;
+
+        if (ScriptRezzedObjectsDieAtEdge)
+            sog.RootPart.DIE_AT_EDGE = true;
 
         AddNewSceneObject(sog, true, pos, rot, vel);
 

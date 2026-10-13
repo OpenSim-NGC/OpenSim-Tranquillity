@@ -233,6 +233,13 @@ public partial class Scene : SceneBase
     /// </summary>
     public bool DisableObjectTransfer { get; set; }
 
+    /// <summary>
+    /// When true, an object rezzed by a script (llRezObject, llRezAtRoot) starts with STATUS_DIE_AT_EDGE set, as the
+    /// llSetStatus documentation describes. The script can clear it again with llSetStatus. Off by default, which
+    /// leaves a rezzed object with the flag stored in its inventory copy.
+    /// </summary>
+    public bool ScriptRezzedObjectsDieAtEdge { get; set; }
+
     public bool m_useFlySlow;
     public bool m_useTrashOnDelete = true;
 
@@ -1120,6 +1127,7 @@ public partial class Scene : SceneBase
         {
             AllowAvatarCrossing = entityTransferConfig.GetBoolean("AllowAvatarCrossing", AllowAvatarCrossing);
             DisableObjectTransfer = entityTransferConfig.GetBoolean("DisableObjectTransfer", false);
+            ScriptRezzedObjectsDieAtEdge = entityTransferConfig.GetBoolean("ScriptRezzedObjectsDieAtEdge", false);
         }
 
         #region Interest Management

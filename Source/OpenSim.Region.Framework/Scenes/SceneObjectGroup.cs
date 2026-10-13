@@ -871,6 +871,27 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         }, null, threadName, false);
     }
 
+    /// <summary>
+    /// Stand up every avatar seated on this object and keep it inside the region, for an object that is about to be
+    /// deleted or returned at the region's edge. A stand-up beside a seat near the edge can land past it, and the
+    /// avatar would be left outside the region with no region to take it.
+    /// </summary>
+    private void StandSittersUpInsideRegion()
+    {
+        float maxX = m_scene.RegionInfo.RegionSizeX - 0.5f;
+        float maxY = m_scene.RegionInfo.RegionSizeY - 0.5f;
+
+        foreach (ScenePresence av in GetSittingAvatars())
+        {
+            av.StandUp();
+
+            Vector3 pos = av.AbsolutePosition;
+            Vector3 inside = new(Utils.Clamp(pos.X, 0.5f, maxX), Utils.Clamp(pos.Y, 0.5f, maxY), pos.Z);
+            if (inside != pos)
+                av.AbsolutePosition = inside;
+        }
+    }
+
     private SceneObjectGroup CrossAsync(SceneObjectGroup sog, Vector3 val, TeleportObjectData tpdata)
     {
         Scene sogScene = sog.m_scene;
@@ -884,6 +905,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             {
                 try
                 {
+                    sog.StandSittersUpInsideRegion();
                     sogScene.DeleteSceneObject(sog, false);
                 }
                 catch (Exception)
@@ -899,6 +921,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                 try
                 {
                     List<uint> localIDs = new(){root.LocalId};
+                    sog.StandSittersUpInsideRegion();
                     sogScene.AddReturn(sog.OwnerID, sog.Name, sog.AbsolutePosition,
                         "Returned at region cross");
                     sogScene.DeRezObjects(null, localIDs, UUID.Zero, DeRezAction.Return, UUID.Zero, false);
