@@ -717,8 +717,13 @@ public class TestClient : IClientAPI, IClientCore
                 regionHandle, simAccess, regionExternalEndPoint, locationID, flags, capsURL);
     }
 
+    /// <summary>The reasons given to the client by SendTeleportFailed, oldest first.</summary>
+    public List<string> TeleportFailedReasons { get; } = new();
+
     public virtual void SendTeleportFailed(string reason)
     {
+        lock (TeleportFailedReasons)
+            TeleportFailedReasons.Add(reason);
     }
 
     public virtual void CrossRegion(ulong newRegionHandle, Vector3 pos, Vector3 lookAt,

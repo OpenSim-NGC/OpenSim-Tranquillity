@@ -56,6 +56,37 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         }
 
         [Fact]
+        public void TestRequestWhileCrossingIsAnsweredWithTeleportFailed()
+        {
+            TestHelpers.InMethod();
+
+            EntityTransferModule etm = new EntityTransferModule();
+
+            IConfigSource config = new IniConfigSource();
+            config.AddConfig("Modules");
+            config.Configs["Modules"].Set("EntityTransferModule", etm.Name);
+
+            TestScene scene = new SceneHelpers().SetupScene("sceneA", TestHelpers.ParseTail(0x100), 1000, 1000);
+            SceneHelpers.SetupSceneModules(scene, config, etm);
+
+            ScenePresence sp = SceneHelpers.AddScenePresence(scene, TestHelpers.ParseTail(0x1));
+            Vector3 start = new Vector3(30, 31, 32);
+            sp.AbsolutePosition = start;
+            sp.IsInTransit = true; // a border crossing is waiting for the neighbour
+
+            scene.RequestTeleportLocation(
+                sp.ControllingClient, scene.RegionInfo.RegionHandle, new Vector3(10, 11, 12), new Vector3(20, 21, 22),
+                (uint)TeleportFlags.ViaLocation);
+            scene.RequestTeleportLocation(
+                sp.ControllingClient, scene.RegionInfo.RegionName, new Vector3(10, 11, 12), new Vector3(20, 21, 22),
+                (uint)TeleportFlags.ViaLocation);
+
+            // the viewer waits for an answer to every request: without one its teleport never ends
+            Assert.Equal(start, sp.AbsolutePosition);
+            Assert.Equal(2, ((TestClient)sp.ControllingClient).TeleportFailedReasons.Count);
+        }
+
+        [Fact]
         public void TestSameRegion()
         {
             TestHelpers.InMethod();
