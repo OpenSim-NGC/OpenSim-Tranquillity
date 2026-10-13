@@ -171,10 +171,14 @@ public static class Program
             directoryPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "addon-modules");
             RegisterServices.Register(registry, directoryPath);
         })
-        .ConfigureLogging(loggingBuilder =>
+        .ConfigureLogging((context, loggingBuilder) =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddOpenSimLogging("OpenSim.Server.RegionServer", logPath);
+            loggingBuilder.AddOpenSimLogging(
+                "OpenSim.Server.RegionServer",
+                logPath,
+                context.Configuration["Startup:logfile"],
+                context.Configuration["Startup:StatsLogFile"]);
 
             LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })

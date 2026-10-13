@@ -146,10 +146,14 @@ class Program
             registryBuilder.RegisterType<MoneyXmlRpcController>().AsSelf().SingleInstance();
             registryBuilder.RegisterType<MoneyDBService>().As<IMoneyDBService>().AsSelf().SingleInstance();
         })
-        .ConfigureLogging(loggingBuilder =>
+        .ConfigureLogging((context, loggingBuilder) =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddOpenSimLogging("OpenSim.Server.MoneyServer", logPath);
+            loggingBuilder.AddOpenSimLogging(
+                "OpenSim.Server.MoneyServer",
+                logPath,
+                context.Configuration["Startup:logfile"],
+                context.Configuration["Startup:StatsLogFile"]);
 
             LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })
