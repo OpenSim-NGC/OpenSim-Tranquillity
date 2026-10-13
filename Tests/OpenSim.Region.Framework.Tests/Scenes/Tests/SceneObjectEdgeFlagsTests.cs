@@ -43,8 +43,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// An object that reaches the edge of a region with no neighbouring region: with neither STATUS_DIE_AT_EDGE nor
     /// STATUS_RETURN_AT_EDGE it is put back just inside the edge and stopped; with STATUS_DIE_AT_EDGE it is deleted
     /// and not returned; with STATUS_RETURN_AT_EDGE it is returned to its owner. Anyone seated on it is stood up
-    /// inside the region first. The [EntityTransfer] ScriptRezzedObjectsDieAtEdge setting gives objects rezzed by a
-    /// script STATUS_DIE_AT_EDGE. The crossing runs on its own thread, so each test waits for the end signal rather
+    /// inside the region first. The [EntityTransfer] ScriptRezzedObjectsDieAtEdge setting makes an object rezzed by a
+    /// script die at a region edge with no neighbour (it crosses into a neighbour as usual). The crossing runs on its own thread, so each test waits for the end signal rather
     /// than for a fixed time. The tests use no physics engine: a stand-in actor reports the position an engine would.
     /// </summary>
     public class SceneObjectEdgeFlagsTests : OpenSimTestCase
@@ -75,8 +75,9 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             public TestScene Scene;
             public UserAccount Owner;
             public AsyncSceneObjectGroupDeleter Deleter;
+            public TestScene Neighbour;   // the region south of Scene, when asked for
 
-            public Fixture(bool? scriptRezzedDieAtEdge = null)
+            public Fixture(bool? scriptRezzedDieAtEdge = null, bool withNeighbour = false)
             {
                 EntityTransferModule etm = new EntityTransferModule();
                 LocalSimulationConnectorModule lscm = new LocalSimulationConnectorModule();
@@ -89,8 +90,17 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 if (scriptRezzedDieAtEdge.HasValue)
                     config.AddConfig("EntityTransfer").Set("ScriptRezzedObjectsDieAtEdge", scriptRezzedDieAtEdge.Value);
 
-                Scene = new SceneHelpers().SetupScene("Example Region", UUID.Random(), 1000, 1000, config);
-                SceneHelpers.SetupSceneModules(Scene, config, lscm, etm, new BasicInventoryAccessModule());
+                SceneHelpers sh = new SceneHelpers();
+                Scene = sh.SetupScene("Example Region", UUID.Random(), 1000, 1000, config);
+                if (withNeighbour)
+                {
+                    Neighbour = sh.SetupScene("Example Neighbour", UUID.Random(), 1000, 999);
+                    SceneHelpers.SetupSceneModules(new Scene[] { Scene, Neighbour }, config, lscm);
+                    SceneHelpers.SetupSceneModules(Neighbour, config, new EntityTransferModule());
+                    SceneHelpers.SetupSceneModules(Scene, config, etm, new BasicInventoryAccessModule());
+                }
+                else
+                    SceneHelpers.SetupSceneModules(Scene, config, lscm, etm, new BasicInventoryAccessModule());
                 Owner = UserAccountHelpers.CreateUserWithInventory(Scene);
 
                 // The returned objects are taken into inventory by this deleter's timer; the tests drain it by hand.
@@ -409,10 +419,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.Single(rezzed);
             Assert.False(rezzed[0].RootPart.DIE_AT_EDGE);
             Assert.False(rezzed[0].RootPart.RETURN_AT_EDGE);
+            Assert.False(rezzed[0].DieAtVoidEdge);
         }
 
         [Fact]
-        public void AnObjectRezzedByAScriptHasDieAtEdgeWhenTheSettingIsOn()
+        public void AnObjectRezzedByAScriptDiesAtAVoidEdgeButKeepsItsStoredFlagClearWhenTheSettingIsOn()
         {
             TestHelpers.InMethod();
             var f = new Fixture(true);
@@ -422,7 +433,8 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 rezzer.RootPart, item, new Vector3(10, 10, 10), Quaternion.Identity, Vector3.Zero, 0, false);
 
             Assert.Single(rezzed);
-            Assert.True(rezzed[0].RootPart.DIE_AT_EDGE);
+            Assert.True(rezzed[0].DieAtVoidEdge);
+            Assert.False(rezzed[0].RootPart.DIE_AT_EDGE);   // the stored flag, which acts at every crossing, is not set
             Assert.False(rezzed[0].RootPart.RETURN_AT_EDGE);
         }
 
@@ -437,6 +449,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             rezzed[0].RootPart.SetDieAtEdge(false);
 
+            Assert.False(rezzed[0].DieAtVoidEdge);
             Assert.False(rezzed[0].RootPart.GetDieAtEdge());
         }
 
@@ -488,6 +501,42 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             Assert.Single(rezzed);
             Assert.False(rezzed[0].RootPart.DIE_AT_EDGE);
+            Assert.False(rezzed[0].DieAtVoidEdge);
+        }
+
+        [Fact]
+        public void AnObjectRezzedByAScriptWithTheSettingOnCrossesIntoANeighbourAndSurvives()
+        {
+            TestHelpers.InMethod();
+            var f = new Fixture(true, withNeighbour: true);
+            var (rezzer, item) = NewRezzer(f);
+            SceneObjectGroup so = f.Scene.RezObject(
+                rezzer.RootPart, item, new Vector3(128, 10, 20), Quaternion.Identity, Vector3.Zero, 0, false)[0];
+            Assert.True(so.DieAtVoidEdge);
+
+            so.AbsolutePosition = new Vector3(128, -10, 20);
+
+            Assert.True(f.WaitForEnd());
+            Assert.Null(f.Scene.GetSceneObjectGroup(so.UUID));
+            Assert.NotNull(f.Neighbour.GetSceneObjectGroup(so.UUID));
+            Assert.Empty(f.ReturnedItems());
+        }
+
+        [Fact]
+        public void AnObjectWhoseScriptSetDieAtEdgeStillDiesAtACrossingIntoANeighbour()
+        {
+            TestHelpers.InMethod();
+            var f = new Fixture(false, withNeighbour: true);
+            SceneObjectGroup so = f.NewObject(0x31);
+            so.AbsolutePosition = new Vector3(128, 10, 20);
+            so.RootPart.SetDieAtEdge(true);
+
+            so.AbsolutePosition = new Vector3(128, -10, 20);
+
+            Assert.True(f.WaitForEnd());
+            Assert.True(so.IsDeleted);
+            Assert.Null(f.Neighbour.GetSceneObjectGroup(so.UUID));
+            Assert.Empty(f.ReturnedItems());
         }
     }
 }

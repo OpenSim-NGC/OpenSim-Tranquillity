@@ -767,6 +767,15 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
     }
 
     public bool inTransit = false;
+
+    /// <summary>
+    /// The object is deleted, not returned, when it reaches a region edge with no neighbouring region. Set for an
+    /// object rezzed by a script when Scene.ScriptRezzedObjectsDieAtEdge is on; llSetStatus(STATUS_DIE_AT_EDGE, FALSE)
+    /// clears it. Unlike DIE_AT_EDGE it does not act when the object crosses into a neighbouring region, and it is
+    /// not stored.
+    /// </summary>
+    public bool DieAtVoidEdge;
+
     private delegate SceneObjectGroup SOGCrossDelegate(SceneObjectGroup sog,Vector3 pos, TeleportObjectData tpData);
 
     /// <summary>
@@ -951,7 +960,22 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
 
         destination = entityTransfer.GetObjectDestination(sog, val, out newpos);
         if (destination is null)
+        {
+            // No region beyond: the object has gone off world
+            if (sog.DieAtVoidEdge && !isTeleport)
+            {
+                try
+                {
+                    sog.StandSittersUpInsideRegion();
+                    sogScene.DeleteSceneObject(sog, false);
+                }
+                catch (Exception)
+                {
+                    m_log.LogWarning("[SCENE]: exception when trying to remove the prim that went off world.");
+                }
+            }
             return sog;
+        }
 
         if (sog.m_sittingAvatars.Count == 0)
         {

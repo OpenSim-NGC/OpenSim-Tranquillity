@@ -234,9 +234,10 @@ public partial class Scene : SceneBase
     public bool DisableObjectTransfer { get; set; }
 
     /// <summary>
-    /// When true, an object rezzed by a script (llRezObject, llRezAtRoot) starts with STATUS_DIE_AT_EDGE set, as the
-    /// llSetStatus documentation describes. The script can clear it again with llSetStatus. Off by default, which
-    /// leaves a rezzed object with the flag stored in its inventory copy.
+    /// When true, an object rezzed by a script (llRezObject, llRezAtRoot) is deleted, not returned, when it reaches a
+    /// region edge with no neighbouring region (SceneObjectGroup.DieAtVoidEdge), as the llSetStatus documentation
+    /// describes for STATUS_DIE_AT_EDGE. It crosses into a neighbouring region as usual. The script can clear it with
+    /// llSetStatus. Off by default.
     /// </summary>
     public bool ScriptRezzedObjectsDieAtEdge { get; set; }
 

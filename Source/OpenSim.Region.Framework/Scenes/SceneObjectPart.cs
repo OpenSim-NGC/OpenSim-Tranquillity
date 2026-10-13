@@ -3733,6 +3733,8 @@ public class SceneObjectPart : EntityBase, IDisposable
             return;
 
         ParentGroup.RootPart.DIE_AT_EDGE = p;
+        if (!p)
+            ParentGroup.DieAtVoidEdge = false;
     }
 
     public void SetFloatOnWater(int floatYN)
