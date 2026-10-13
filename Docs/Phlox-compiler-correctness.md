@@ -34,6 +34,20 @@ values (SL wiki `LSL_Operators`, `Integer`, `Typecast`, `For`):
 | A non-integer `for` condition was not converted to a boolean | the condition's type was read from the unannotated `exprStatement` | `for (; f; …)` with `f` = 0.5 never runs; a string or key condition throws | runs while non-zero / non-empty / a valid key |
 | Hex components in a vector or rotation literal | the literal was folded into `vconst` text that cannot hold `0x10` | `<0x10, 0, 0>` fails at run time | `<16, 0, 0>` |
 
+## Unicode string escapes
+
+Phlox LSL string literals accept `\uXXXX`, with exactly four hexadecimal digits
+(`0-9`, `a-f` or `A-F`). For example, `"\u00e9"` produces U+00E9 (e with acute
+accent). Each escape represents one UTF-16 code unit; a surrogate pair such as
+`"\uD83D\uDE00"` represents a supplementary Unicode character. `\u0000` is
+supported, and malformed or incomplete escapes are compile errors.
+
+Escapes are decoded once: `"\\u0041"` is the literal text `\u0041`, not `A`.
+Forward-slash sequences such as `"/u0041"` remain ordinary text. Existing newline,
+four-space tab, quote and backslash escapes retain their behavior.
+
+This affects newly compiled scripts; re-save a script to recompile it.
+
 ## Scripts already compiled
 
 Compiled bytecode is cached in `ScriptEngines/Phlox/bytecode/*.plx`. The cache schema version

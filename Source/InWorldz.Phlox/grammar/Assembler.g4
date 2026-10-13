@@ -149,7 +149,10 @@ STRING
 
 fragment STR_INTERNALS : ( ESC_SEQ | ~[\\"] )* ;
 
-fragment ESC_SEQ : '\\' [tn"\\] ;
+fragment ESC_SEQ
+    : '\\' [tn"\\]
+    | '\\u' [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]
+    ;
 
 FLOAT
     : INT '.' INT*

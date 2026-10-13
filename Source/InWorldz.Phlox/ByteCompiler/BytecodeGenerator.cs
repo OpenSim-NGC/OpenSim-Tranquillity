@@ -271,6 +271,17 @@ namespace InWorldz.Phlox.ByteCompiler
                     case 't': retval.Append("    "); break;
                     case '"': retval.Append('"'); break;
                     case '\\': retval.Append('\\'); break;
+                    case 'u':
+                        if (jx + 6 > txt.Length ||
+                            !ushort.TryParse(txt.AsSpan(jx + 2, 4),
+                                System.Globalization.NumberStyles.AllowHexSpecifier,
+                                System.Globalization.CultureInfo.InvariantCulture, out ushort codeUnit))
+                        {
+                            throw new GenerationException("Invalid Unicode escape: expected \\u followed by four hexadecimal digits");
+                        }
+                        retval.Append((char)codeUnit);
+                        ix = jx + 6;
+                        continue;
                     default:
                         retval.Append('\\').Append(txt[jx + 1]); break;
                 }

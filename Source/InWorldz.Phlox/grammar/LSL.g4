@@ -261,6 +261,7 @@ STRING_LITERAL
 fragment
 ESC_SEQ
     : '\\' [tn"\\]
+    | '\\u' [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F] [0-9a-fA-F]
     ;
 
 INTEGER_LITERAL
