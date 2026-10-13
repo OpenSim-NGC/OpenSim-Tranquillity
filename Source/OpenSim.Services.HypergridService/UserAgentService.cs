@@ -73,15 +73,16 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
     /// <summary>
     /// Resolves (and periodically re-resolves) the public address of the gatekeeper host.
-    /// See [UserAgentService] ExternalIPResolver / ExternalIPRefreshMinutes.
+    /// See [ViewerAddress] PublicDnsServer / PublicRefreshMinutes and their older names
+    /// [UserAgentService] ExternalIPResolver / ExternalIPRefreshMinutes.
     /// </summary>
-    protected static ExternalIPResolver m_ExternalIPResolver;
+    protected static GatekeeperExternalAddress m_ExternalAddress;
 
     /// <summary>
     /// The public address of this grid as seen from outside, used by <see cref="VerifyClient"/> as
     /// the NAT fallback. Empty until a lookup has succeeded.
     /// </summary>
-    protected static string m_MyExternalIP => m_ExternalIPResolver?.CurrentIP ?? string.Empty;
+    protected static string m_MyExternalIP => m_ExternalAddress?.CurrentIP ?? string.Empty;
 
     protected static int m_LevelOutsideContacts;
     protected static bool m_ShowDetails;
@@ -125,9 +126,8 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
             m_BypassClientVerification = serverConfig.GetBoolean("BypassClientVerification", false);
 
-            // Read these before the legacy ExternalName block below, which may reassign serverConfig.
-            string externalIPResolver = serverConfig.GetString("ExternalIPResolver", string.Empty);
-            int externalIPRefreshMinutes = serverConfig.GetInt("ExternalIPRefreshMinutes", 30);
+            // Taken before the legacy ExternalName block below, which may reassign serverConfig.
+            IConfig userAgentSection = serverConfig;
 
             if (gridService.Length == 0 || gridUserService.Length == 0 || gatekeeperService.Length == 0)
                 throw new Exception(String.Format("Incomplete specifications, UserAgent Service cannot function."));
@@ -169,17 +169,16 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
                     throw new Exception(String.Format("[UserAgentService] could not parse gatekeeper uri"));
                 string host = gateURI.DnsSafeHost;
 
-                // Resolve the gatekeeper's public address. With ExternalIPResolver unset this is
-                // Util.GetHostFromDNS through the OS resolver, as before; when set, the named DNS
-                // server is queried directly so a hosts-file or split-horizon override of our own
+                // Resolve the gatekeeper's public address. With no DNS server configured this is
+                // Util.GetHostFromDNS through the OS resolver, as before; when one is set
+                // ([ViewerAddress] PublicDnsServer, or the older [UserAgentService] ExternalIPResolver),
+                // that server is queried directly so a hosts-file or split-horizon override of our own
                 // hostname cannot feed a LAN address into VerifyClient's NAT fallback. The lookup is
-                // repeated every ExternalIPRefreshMinutes so a dynamic-DNS change heals without a
-                // restart. A failed lookup logs a warning and never throws here.
-                m_ExternalIPResolver = new ExternalIPResolver(host, externalIPResolver,
-                    TimeSpan.FromMinutes(externalIPRefreshMinutes), m_log);
-                if (string.IsNullOrEmpty(m_ExternalIPResolver.CurrentIP))
-                    m_log.LogWarning("[USER AGENT SERVICE]: could not resolve gatekeeper host {0}; the NAT fallback in client verification is unavailable until a refresh succeeds",
-                        host);
+                // repeated every PublicRefreshMinutes (older name ExternalIPRefreshMinutes) so a
+                // dynamic-DNS change heals without a restart. A failed lookup logs a warning and never
+                // throws here.
+                m_ExternalAddress = GatekeeperExternalAddress.Create(host, userAgentSection,
+                    config.Configs[ViewerAddressConfig.SectionName], m_log);
             }
             // Finally some cleanup
             m_Database.DeleteOld();
@@ -460,6 +459,17 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         return htgGrid.Equals(thisGridExternalName, StringComparison.InvariantCultureIgnoreCase);
     }
 
+    /// <summary>
+    /// A reported client address is accepted when it is the address recorded at login or, as the NAT
+    /// fallback, the public address of this grid.
+    /// </summary>
+    public static bool ClientIPMatches(string loginIP, string reportedIP, string externalIP)
+    {
+        if (loginIP == reportedIP)
+            return true;
+        return !string.IsNullOrEmpty(externalIP) && reportedIP == externalIP; // NATed
+    }
+
     public bool VerifyClient(UUID sessionID, string reportedIP)
     {
         if (m_BypassClientVerification)
@@ -474,9 +484,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
         TravelingAgentInfo travel = new(hgt);
 
-        bool result = travel.ClientIPAddress == reportedIP;
-        if(!result && !string.IsNullOrEmpty(m_MyExternalIP))
-            result = reportedIP == m_MyExternalIP; // NATed
+        bool result = ClientIPMatches(travel.ClientIPAddress, reportedIP, m_MyExternalIP);
 
         m_log.LogDebug("[USER AGENT SERVICE]: Comparing {0} with login IP {1} and MyIP {2}; result is {3}",
                             reportedIP, travel.ClientIPAddress, m_MyExternalIP, result);

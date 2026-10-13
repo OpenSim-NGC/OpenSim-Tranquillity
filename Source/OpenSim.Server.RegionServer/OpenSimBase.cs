@@ -479,6 +479,12 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             scene.SnmpService.BootInfo("Grid Registration in progress", scene);
         }
 
+        // The address viewers on a local network use to reach this region is registered with the grid, so
+        // that regions on other machines can hand it out. Nothing is registered unless LocalAddress is set.
+        IConfig viewerAddressSection = Config.Configs[ViewerAddressConfig.SectionName];
+        ViewerAddressConfig.ApplyRegionLocalAddress(viewerAddressSection, regionInfo, m_log);
+        ReportViewerAddressSection(viewerAddressSection, regionInfo);
+
         try
         {
             scene.RegisterRegionWithGrid();
@@ -749,6 +755,20 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         Scene target;
         if (SceneManager.TryGetScene(name, out target))
             CloseRegion(target);
+    }
+
+    /// <summary>
+    /// Logs once per server start that [ViewerAddress] is in use, when any of its keys is set.
+    /// </summary>
+    private void ReportViewerAddressSection(IConfig section, RegionInfo regionInfo)
+    {
+        ViewerAddressConfig config = ViewerAddressConfig.FromConfig(section, null);
+        if (config.SetKeys.Count == 0)
+            return;
+
+        ViewerAddressSelector selector = ViewerAddressSelector.Create(config, m_log);
+        ViewerAddressStartupLog.Shared.ReportOnce(m_log, config, selector, regionInfo.ExternalHostName)
+            .ContinueWith(_ => selector.Dispose());
     }
 
     /// <summary>

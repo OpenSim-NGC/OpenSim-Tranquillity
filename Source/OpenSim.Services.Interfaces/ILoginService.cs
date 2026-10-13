@@ -47,5 +47,15 @@ public interface ILoginService
 {
     LoginResponse Login(string firstName, string lastName, string passwd, string startLocation, UUID scopeID,
         string clientVersion, string channel, string mac, string id0, IPEndPoint clientIP);
+
+    /// <summary>
+    /// As the login above, with the address the viewer is classified by (local network or not) when the
+    /// region address it is given is chosen. <paramref name="clientIP"/> is still the address recorded for
+    /// the login. A service that does not choose addresses per viewer ignores <paramref name="viewerSource"/>.
+    /// </summary>
+    LoginResponse Login(string firstName, string lastName, string passwd, string startLocation, UUID scopeID,
+        string clientVersion, string channel, string mac, string id0, IPEndPoint clientIP, IPAddress viewerSource)
+        => Login(firstName, lastName, passwd, startLocation, scopeID, clientVersion, channel, mac, id0, clientIP);
+
     Hashtable SetLevel(string firstName, string lastName, string passwd, int level, IPEndPoint clientIP);
 }

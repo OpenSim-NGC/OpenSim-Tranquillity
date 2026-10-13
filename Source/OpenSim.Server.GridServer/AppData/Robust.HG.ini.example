@@ -555,6 +555,67 @@
     DefaultLibrary = "./inventory/Libraries.xml"
 
 
+[ViewerAddress]
+    ;; Which address a viewer is given for its region in the login response. The region servers have the same
+    ;; section in OpenSim.ini (and per region in Regions.ini) for teleports, crossings and neighbouring regions;
+    ;; set the same values in both.
+    ;;
+    ;; By default every viewer is given the address that the region's ExternalHostName resolves to on this
+    ;; machine. A viewer outside your network cannot use it when this machine resolves your public host name to
+    ;; a private address (a hosts-file entry, split-horizon DNS): it logs in but its region connection never
+    ;; completes. Set PublicAddress or PublicDnsServer to give viewers outside your network the public address
+    ;; instead, and LocalNetworks so viewers inside it keep the address that works for them.
+    ;;
+    ;; With neither PublicAddress nor PublicDnsServer set, nothing changes: every viewer is given the address
+    ;; as before. LocalNetworks alone changes nothing.
+    ;;
+    ;; A viewer is classified by the address of its connection to this login service. The X-Forwarded-For header
+    ;; is used for this only when [LoginService] HasProxy = true. The address recorded for the session is not
+    ;; affected by this section.
+    ;;
+    ;; Only regions of this grid are given a chosen address; a destination on another grid (hypergrid) is
+    ;; always given its own address.
+    ;;
+    ;; Addresses given to viewers are IPv4: the viewer protocol carries four address bytes.
+    ;;
+    ;; Known limit: the public port is the region's port. A router that maps a different public port to the
+    ;; region is not supported.
+    ;;
+    ;; Example for a grid behind a home router, public host name resolved by the DNS server 1.1.1.1:
+    ;;   PublicDnsServer = "1.1.1.1"
+    ;;   LocalNetworks = "192.168.0.0/16"
+
+    ;; The address given to viewers outside LocalNetworks: an IPv4 address (use this for a fixed public address),
+    ;; or a host name that is looked up as described under PublicDnsServer. Default: empty, meaning the region's
+    ;; ExternalHostName is looked up.
+    ; PublicAddress = ""
+
+    ;; A DNS server asked directly, as "ip" or "ip:port", to look up the public name (PublicAddress, or the
+    ;; region's ExternalHostName). Asking it directly bypasses this machine's hosts file, so a private override of
+    ;; your own public name does not matter. Default: empty, meaning the operating system resolver is used.
+    ;; The gatekeeper address used to verify hypergrid visitors ([UserAgentService]) is looked up with this
+    ;; server too; it replaces [UserAgentService] ExternalIPResolver, which still works.
+    ; PublicDnsServer = ""
+
+    ;; Minutes between repeated lookups, so a dynamic-DNS change takes effect without a restart. 0 never repeats.
+    ;; A failed lookup keeps the last good address. Default 30. Replaces [UserAgentService]
+    ;; ExternalIPRefreshMinutes, which still works.
+    ; PublicRefreshMinutes = 30
+
+    ;; Networks whose viewers are not given the public address, comma separated. Each entry is "CIDR" (the
+    ;; viewer is given the LocalAddress the region registered with the grid, else the address the region's host
+    ;; name resolves to on this machine) or "CIDR=address" (the viewer is given that address, for a machine with
+    ;; several network cards). The first matching entry is used. LocalAddress is set in the regions' OpenSim.ini
+    ;; or Regions.ini; Robust only passes on what the regions registered.
+    ;; Example: LocalNetworks = "192.168.1.0/24=192.168.1.20, 10.8.0.0/24=10.8.0.1"
+    ;; Default: empty.
+    ;;
+    ;; If you already have a hosts-file entry that maps your public host name to a private address for the
+    ;; benefit of viewers in your network, it does no harm with these settings and is optional to remove; whether
+    ;; your router can carry the viewers' HTTP traffic back into your network without it is for you to test.
+    ; LocalNetworks = ""
+
+
 [LoginService]
     ; for the server connector
     LocalServiceModule = "OpenSim.Services.LLLoginService.dll:LLLoginService"
@@ -857,13 +918,15 @@
     ;; Set ExternalIPResolver to a public DNS server to resolve the hostname by
     ;; querying that server directly, bypassing the OS resolver and any hosts-file
     ;; override. Accepts "ip" or "ip:port". Leave commented to keep using the OS
-    ;; resolver.
+    ;; resolver. [ViewerAddress] PublicDnsServer does the same and is used instead
+    ;; when it is set.
     ; ExternalIPResolver = "1.1.1.1"
     ;;
     ;; How often, in minutes, to re-resolve the hostname so a dynamic-DNS address
     ;; change takes effect without restarting Robust. Applies to both resolution
     ;; paths. 0 disables the refresh. Default 30. A failed lookup is logged as a
-    ;; warning and the previous address is kept.
+    ;; warning and the previous address is kept. [ViewerAddress] PublicRefreshMinutes
+    ;; does the same and is used instead when it is set.
     ; ExternalIPRefreshMinutes = 30
 
 

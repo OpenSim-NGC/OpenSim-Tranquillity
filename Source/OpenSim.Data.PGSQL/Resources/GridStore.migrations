@@ -240,3 +240,11 @@ ALTER TABLE regions ADD "parcelMapTexture" uuid NULL;
 
 COMMIT;
 
+:VERSION 10
+
+BEGIN TRANSACTION;
+
+ALTER TABLE regions ADD "viewerLocalAddress" varchar(64) NULL;
+
+COMMIT;
+

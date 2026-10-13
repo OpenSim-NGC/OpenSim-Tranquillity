@@ -79,6 +79,12 @@
 
 
 [Startup]
+    ;# {ChildPresenceWaitSeconds} {} {Seconds a region waits for a crossing avatar's viewer to connect} {} 30
+    ;; When an avatar crosses into this region, the region waits this long for the viewer to connect before
+    ;; refusing the crossing. After a refused crossing the neighbouring region that sent it does not try the
+    ;; same avatar again for 60 seconds. (default is 30)
+    ; ChildPresenceWaitSeconds = 30
+
     ;# {ConsolePrompt} {} {ConsolePrompt} {} "Region (\R) "
     ;; Console prompt
     ;; Certain special characters can be used to customize the prompt
@@ -819,6 +825,77 @@
     ;# {shout_distance} {} {Distance at which a shout is heard, in meters?} {} 100
     ;; Distance in meters that shouts should travel.
     ; shout_distance = 100
+
+
+[ViewerAddress]
+    ;; Which address a viewer is given for a neighbouring or destination region: when it teleports, crosses a
+    ;; region border, or is told about the regions around it. Robust has the same section (Robust.ini) for the
+    ;; login response; set the same values in both. Regions.ini can override PublicAddress and LocalNetworks for
+    ;; one region.
+    ;;
+    ;; By default every viewer is given the address that the other region's ExternalHostName resolves to on this
+    ;; machine. A viewer outside your network cannot use it when this machine resolves your public host name to
+    ;; a private address (a hosts-file entry, split-horizon DNS): crossing into a neighbouring region then waits
+    ;; for a connection that never arrives and fails. Set PublicAddress or PublicDnsServer to give viewers
+    ;; outside your network the public address instead, and LocalNetworks so viewers inside it keep the address
+    ;; that works for them.
+    ;;
+    ;; With neither PublicAddress nor PublicDnsServer set, nothing changes: every viewer is given the address
+    ;; as before. LocalNetworks alone changes nothing.
+    ;;
+    ;; A viewer is classified by the address its region connection comes from (for a viewer not yet connected to
+    ;; this region, the address recorded when it logged in). Server-to-server traffic between regions and the
+    ;; grid service always uses the address the host name resolves to on this machine.
+    ;;
+    ;; Addresses given to viewers are IPv4: the viewer protocol carries four address bytes.
+    ;;
+    ;; Known limit: the public port is the region's port. A router that maps a different public port to the
+    ;; region is not supported.
+    ;;
+    ;; Example for a grid behind a home router, public host name resolved by the DNS server 1.1.1.1:
+    ;;   PublicDnsServer = "1.1.1.1"
+    ;;   LocalNetworks = "192.168.0.0/16"
+
+    ;# {PublicAddress} {} {Address given to viewers outside the local networks (IPv4 address or host name)} {} ""
+    ;; The address given to viewers outside LocalNetworks: an IPv4 address (use this for a fixed public address),
+    ;; or a host name that is looked up as described under PublicDnsServer. Default: empty, meaning the other
+    ;; region's ExternalHostName is looked up.
+    ; PublicAddress = ""
+
+    ;# {PublicDnsServer} {} {DNS server asked directly for the public address (ip or ip:port)} {} ""
+    ;; A DNS server asked directly, as "ip" or "ip:port", to look up the public name (PublicAddress, or the
+    ;; other region's ExternalHostName). Asking it directly bypasses this machine's hosts file, so a private
+    ;; override of your own public name does not matter. Default: empty, meaning the operating system resolver
+    ;; is used.
+    ; PublicDnsServer = ""
+
+    ;# {PublicRefreshMinutes} {} {Minutes between repeated lookups} {} 30
+    ;; Minutes between repeated lookups, so a dynamic-DNS change takes effect without a restart. 0 never repeats.
+    ;; A failed lookup keeps the last good address. Default 30.
+    ; PublicRefreshMinutes = 30
+
+    ;# {LocalNetworks} {} {Networks whose viewers are not given the public address} {} ""
+    ;; Networks whose viewers are not given the public address, comma separated. Each entry is "CIDR" (the
+    ;; viewer is given the LocalAddress the region registered with the grid, else the address the region's host
+    ;; name resolves to on this machine) or "CIDR=address" (the viewer is given that address, for a machine with
+    ;; several network cards). The first matching entry is used.
+    ;; Example: LocalNetworks = "192.168.1.0/24=192.168.1.20, 10.8.0.0/24=10.8.0.1"
+    ;; Default: empty.
+    ;;
+    ;; If you already have a hosts-file entry that maps your public host name to a private address for the
+    ;; benefit of viewers in your network, it does no harm with these settings and is optional to remove; whether
+    ;; your router can carry the viewers' HTTP traffic back into your network without it is for you to test.
+    ; LocalNetworks = ""
+
+    ;# {LocalAddress} {} {Address of this machine that viewers on a local network use} {} ""
+    ;; For regions that run on more than one machine: the IPv4 address of THIS machine that viewers on your
+    ;; local network use to reach its regions. Each region registers it with the grid, and the other regions
+    ;; and Robust give it to a viewer that matches a "CIDR" entry of LocalNetworks, so a viewer on your network
+    ;; is sent to the right machine whatever the other machines' host-name lookups answer. Regions.ini can set it
+    ;; for one region. It is only used together with LocalNetworks and a public address, and only by regions
+    ;; and a Robust of a version that knows it; others ignore it and behave as before.
+    ;; Default: empty, nothing is registered.
+    ; LocalAddress = ""
 
 
 [EntityTransfer]
