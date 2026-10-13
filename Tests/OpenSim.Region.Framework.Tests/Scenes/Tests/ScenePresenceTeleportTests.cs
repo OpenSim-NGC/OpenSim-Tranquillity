@@ -87,6 +87,32 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         }
 
         [Fact]
+        public void TestLandmarkRequestWhileCrossingIsAnsweredWithTeleportFailed()
+        {
+            TestHelpers.InMethod();
+
+            EntityTransferModule etm = new EntityTransferModule();
+
+            IConfigSource config = new IniConfigSource();
+            config.AddConfig("Modules");
+            config.Configs["Modules"].Set("EntityTransferModule", etm.Name);
+
+            TestScene scene = new SceneHelpers().SetupScene("sceneA", TestHelpers.ParseTail(0x100), 1000, 1000);
+            SceneHelpers.SetupSceneModules(scene, config, etm);
+
+            ScenePresence sp = SceneHelpers.AddScenePresence(scene, TestHelpers.ParseTail(0x1));
+            Vector3 start = new Vector3(30, 31, 32);
+            sp.AbsolutePosition = start;
+            sp.IsInTransit = true; // a border crossing is waiting for the neighbour
+
+            // the landmark is not read while the avatar is in transit, so none is needed
+            scene.RequestTeleportLandmark(sp.ControllingClient, null, new Vector3(20, 21, 22));
+
+            Assert.Equal(start, sp.AbsolutePosition);
+            Assert.Single(((TestClient)sp.ControllingClient).TeleportFailedReasons);
+        }
+
+        [Fact]
         public void TestSameRegion()
         {
             TestHelpers.InMethod();
