@@ -4999,6 +4999,10 @@ public class SceneObjectPart : EntityBase, IDisposable
             // we are going to tell rest of code about physics so better have this here
             PhysActor = pa;
 
+            // A motion that is already running has not told this new actor yet (the object's physics was rebuilt).
+            if (isroot)
+                KeyframeMotion?.UpdatePhysicsHint();
+
             //                DoPhysicsPropertyUpdate(isPhysical, true);
             // lets expand it here just with what it really needs to do
 
