@@ -36,20 +36,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 
-      Include all files within the 'AppData' folder and its subfolders.
-      The 'Link' metadata flattens the output by omitting the top-level 'AppData' folder 
-      while preserving subdirectories.
-    -->
+    <!-- Include all files within the 'AppData' folder and its subfolders. -->
     <Content Include="AppData\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      <!-- 
-        This line is the key to stripping the top-level folder on build/publish.
-        It ensures files are placed directly in the output directory or in subfolders 
-        relative to the output root, not nested under "AppData" in the output.
-      -->
       <Link>%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </Content>
+
+    <!-- Include all JSON configuration files matching the pattern 'appsettings*.json' -->
+    <Content Include="appsettings*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
   </ItemGroup>
 
