@@ -152,13 +152,10 @@ public class TestOSHttpRequest : IOSHttpRequest
         }
     }
 
-    public IPEndPoint RemoteIPEndPoint
-    {
-        get
-        {
-            throw new NotImplementedException();
-        }
-    }
+    /// <summary>
+    /// The address reported as the caller's. Defaults to a documentation address (RFC 5737).
+    /// </summary>
+    public IPEndPoint RemoteIPEndPoint { get; set; } = new IPEndPoint(IPAddress.Parse("192.0.2.1"), 0);
 
     public IPEndPoint LocalIPEndPoint
     {
