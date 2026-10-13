@@ -420,6 +420,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.False(rezzed[0].RootPart.DIE_AT_EDGE);
             Assert.False(rezzed[0].RootPart.RETURN_AT_EDGE);
             Assert.False(rezzed[0].DieAtVoidEdge);
+            Assert.False(rezzed[0].RootPart.GetDieAtEdge());
         }
 
         [Fact]
@@ -435,6 +436,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.Single(rezzed);
             Assert.True(rezzed[0].DieAtVoidEdge);
             Assert.False(rezzed[0].RootPart.DIE_AT_EDGE);   // the stored flag, which acts at every crossing, is not set
+            Assert.True(rezzed[0].RootPart.GetDieAtEdge());   // what llGetStatus(STATUS_DIE_AT_EDGE) returns
             Assert.False(rezzed[0].RootPart.RETURN_AT_EDGE);
         }
 
@@ -502,6 +504,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.Single(rezzed);
             Assert.False(rezzed[0].RootPart.DIE_AT_EDGE);
             Assert.False(rezzed[0].DieAtVoidEdge);
+            Assert.False(rezzed[0].RootPart.GetDieAtEdge());
         }
 
         [Fact]
