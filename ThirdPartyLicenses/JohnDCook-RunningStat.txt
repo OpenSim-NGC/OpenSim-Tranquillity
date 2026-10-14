@@ -1,0 +1,8 @@
+RunningStat (running mean, variance, skewness, minimum and maximum)
+John D. Cook, http://www.johndcook.com/standard_deviation.html and
+http://www.johndcook.com/skewness_kurtosis.html
+
+Used in OpenSim.Region.CoreModules/World/Wind/Plugins/ZephyrWind.cs (class RunningStat), carried over
+from Halcyon's ZephyrWind.cs, which names those two pages as its source.
+
+The author's terms for the code are: "You may use the code however you wish".

@@ -954,6 +954,18 @@
     ;; Adjusts wind strength. 0.0 = no wind, 1.0 = normal wind.
     ; strength = 1.0
 
+    ;; The ZephyrWind plugin is selected with wind_plugin = ZephyrWind. It models terrain-shaped surface
+    ;; wind, wind aloft, currents under the water and a prevailing wind that follows the region's sun,
+    ;; on 16 m cells (a larger region has more cells). It takes these keys, shown with their defaults.
+    ;; The strength key above belongs to SimpleRandomWind and is not read by ZephyrWind.
+    ;; Winds set by scripts with iwSetWind are kept in memory only and are lost when the region restarts.
+    ; avg_strength = 5.0
+    ; avg_direction = 0.0
+    ; var_strength = 5.0
+    ; var_direction = 30.0
+    ; rate_change_aloft = 1.0
+    ; rate_change_flutter = 64.0
+
 
 [Materials]
     ;# {enable_materials} {} {Enable Materials support?} {true false} true

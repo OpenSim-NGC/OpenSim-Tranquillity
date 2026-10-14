@@ -1548,8 +1548,10 @@ public class LSL_Api : ILSL_Api, IScriptApi
             Vector3 pos = m_host.GetWorldPosition();
             int x = (int)(pos.X + offset.x);
             int y = (int)(pos.Y + offset.y);
+            int z = (int)(pos.Z + offset.z);
 
-            Vector3 windSpeed = module.WindSpeed(x, y, 0);
+            // The height matters to a wind model that has layers (a current under the water, the wind aloft).
+            Vector3 windSpeed = module.WindSpeed(x, y, z);
 
             wind.x = windSpeed.X;
             wind.y = windSpeed.Y;
