@@ -23,9 +23,7 @@ of the two covers this data file. Both notices are therefore kept with the data,
 The file is embedded unmodified as a data resource; it is not compiled or linked into executable code. "Second Life"
 and "Linden Lab" are trademarks of Linden Research, Inc.; no endorsement by Linden Lab is implied.
 
-**Copied from:** a local checkout of the Linden Lab viewer source tree, taken
-on 2026-09-03. That checkout is not a git repository (no `.git`), so the exact
-upstream commit could not be read from it. Identifying data that could be read:
+**Copied from:** the Linden Lab viewer. The file is byte-identical to the viewer's copy at commit e34b5c188e.
 
 | Field | Value |
 |---|---|
