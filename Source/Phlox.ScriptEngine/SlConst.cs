@@ -1,9 +1,19 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 /*
  * SL constants the implementation needs, by their SL names and with SL's values, so a
  * function body never carries a bare number (or a private copy) that can drift from the compiler's
  * table. LSLSystemAPI.cs reaches them through "using static". SlConstTests.SlConstMatchesTable pins
  * every field here against InWorldz.Phlox.Compiler.DefaultConstants.Constants, and
  * SlConstantsTests.SlConstantsMatchLL pins that table against SL's own (lsl-definitions @ 10741b9).
+ *
+ * The names and values are Second Life's, as published in secondlife/lsl-definitions (MIT licence; the
+ * holder is Linden Research, Inc.; see ThirdPartyLicenses/lsl-definitions.txt).
  */
 namespace Phlox.ScriptEngine
 {
