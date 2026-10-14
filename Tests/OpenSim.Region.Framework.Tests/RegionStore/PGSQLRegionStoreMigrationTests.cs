@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

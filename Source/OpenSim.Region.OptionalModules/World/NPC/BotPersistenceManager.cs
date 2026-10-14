@@ -1,5 +1,9 @@
 /*
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  * BotPersistenceManager.cs — Persistent bot storage and respawn system
  * Saves bot data to SQLite and auto-respawns on region load.
  */

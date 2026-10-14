@@ -22,7 +22,7 @@ namespace InWorldz.Phlox.Tests;
 /// </para>
 ///
 /// <para>
-/// The script is <c>Fixtures/lmap4.lsl</c>, a four-state lamp from a resident's prim. There is
+/// The script is <c>Fixtures/lmap4.lsl</c>, a four-state lamp written for these tests. There is
 /// nothing exotic in it, which is the point: whatever the compiler trips over is something ordinary.
 /// </para>
 ///
