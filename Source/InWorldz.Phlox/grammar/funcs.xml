@@ -1,3 +1,8 @@
+<!--
+  From HalcyonGrid/phlox (grammar/funcs.xml, commit e805a56).
+  Licence: Apache License 2.0, see ThirdPartyLicenses/Phlox.txt.
+  Modified 2026 by Legion Builds.
+-->
 <root>
 		<string name="LSLTipText_llSin" translate="false">
 	float llSin(float theta)
