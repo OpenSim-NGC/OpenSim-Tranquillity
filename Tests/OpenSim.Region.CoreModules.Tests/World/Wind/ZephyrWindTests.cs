@@ -326,6 +326,57 @@ public class ZephyrWindTests : OpenSimTestCase
         Near(aloft, z.WindSpeed(40, 40, 81f));                  // above it: the wind aloft
     }
 
+    [Fact]
+    public void TheSurfaceLayerEndsAtTheWaterHeightPlusTheCellsHeightAndRange()
+    {
+        // Water at 20 m, ground at 30 m with one 10 m bump: the cell's highest ground stands 20 m out of the water
+        // and its range is 10 (the 15 m minimum applies), so the layer ends at 20 + 20 + 15 = 55 m in region height.
+        TestScene scene = NewScene();
+        scene.RegionInfo.RegionSettings.WaterHeight = 20;
+        Flat(scene, 30f);
+        scene.Heightmap[35, 36] = 40f;
+        var z = NewPlugin(scene, Steady);
+        z.WindUpdate(0);
+        Vector3 aloft = z.WindSpeed(40, 40, Aloft);
+
+        Assert.NotEqual(aloft, z.WindSpeed(40, 40, 54f));   // still the surface wind (the old boundary was 35 m)
+        Near(aloft, z.WindSpeed(40, 40, 56f));
+    }
+
+    [Fact]
+    public void TheSurfaceBoundaryMovesUpWithTheWaterHeight()
+    {
+        TestScene scene = NewScene();
+        scene.Heightmap[35, 36] = 40f;
+        var dry = NewPlugin(scene, Steady);
+        dry.WindUpdate(0);
+        Vector3 aloft = dry.WindSpeed(40, 40, Aloft);
+        Assert.Equal(dry.WindSpeed(40, 40, 79f), dry.WindSpeed(40, 40, 60f));   // dry region: the layer ends at 80 m
+        Near(aloft, dry.WindSpeed(40, 40, 81f));
+
+        // Water at 10 m: the bump stands 30 m out of the water, so the layer ends at 10 + 30 + 30 = 70 m.
+        scene.RegionInfo.RegionSettings.WaterHeight = 10;
+        var wet = NewPlugin(scene, Steady);
+        wet.WindUpdate(0);
+        Assert.NotEqual(aloft, wet.WindSpeed(40, 40, 69f));
+        Near(aloft, wet.WindSpeed(40, 40, 71f));
+    }
+
+    [Fact]
+    public void TheViewerArrayStaysTheSurfaceLayerWhateverTheWaterHeight()
+    {
+        TestScene scene = NewScene();
+        scene.RegionInfo.RegionSettings.WaterHeight = 20;
+        Flat(scene, 5f);
+        var z = NewPlugin(scene, Steady);
+        z.WindUpdate(0);
+        Vector2[] viewer = z.WindLLClientArray();
+
+        // A script at the surface, just above the water, reads what the viewers are given.
+        Vector3 script = z.WindSpeed(48, 48, 25f);
+        Near(new Vector2(script.X, script.Y), viewer[3 * 16 + 3]);
+    }
+
     // ---- terrain shaping ----
 
     /// <summary>Population skewness of the heights, worked out directly rather than as the plugin does.</summary>

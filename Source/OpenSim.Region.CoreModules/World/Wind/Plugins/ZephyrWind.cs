@@ -422,7 +422,8 @@ public class ZephyrWind : IWindModelPlugin
             //Set the wind maxtrix based on the z-position
             float maxheight = m_maxheights[y0 * m_cellsX + x0];
             float range = Math.Max(m_ranges[y0 * m_cellsX + x0], 15.0f);
-            float boundary = maxheight + range;
+            // The cell statistics are heights above the water, so the boundary in region height adds the water height.
+            float boundary = h2o + maxheight + range;
             Vector2[] windmatrix;
 
             if (fZ < h2o)
