@@ -29,6 +29,8 @@
  */
 
 /*
+ * Copyright (c) 2026 Legion Builds
+ * Copyright (c) Contributors
  * BotManager.cs — Bot/NPC management module for Phlox script engine
  * Wraps OpenSim's INPCModule with additional tracking for tags, profiles,
  * outfits, navigation, speed, and event registration.

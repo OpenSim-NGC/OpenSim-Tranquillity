@@ -29,6 +29,8 @@
  */
 
 /*
+ * Copyright (c) 2026 Legion Builds
+ * Copyright (c) Contributors
  * IBotManager.cs — Bot/NPC management interface for Phlox script engine
  * Bridges InWorldz-style bot* LSL functions to OpenSim's INPCModule infrastructure.
  *
