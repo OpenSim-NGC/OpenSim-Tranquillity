@@ -43,8 +43,11 @@ namespace Phlox.ScriptEngine
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private const string DB_DIR  = "ScriptEngines/Phlox/state";
-        private const string DB_FILE = "ScriptEngines/Phlox/state/script_state.db";
+        // The state folder and file when no engine is given one (a test's manager built without an engine):
+        // the default ScriptEnginesPath. A real engine passes its own, honouring [InWorldz.Phlox] ScriptEnginesPath.
+        private static readonly string DB_DIR =
+            Path.Combine(PhloxEngine.DefaultScriptEnginesPath, "Phlox", "state");
+        private static readonly string DB_FILE = Path.Combine(DB_DIR, PhloxEngine.StateDbFileName);
         private readonly string m_DbFile;
 
         // Diagnostics: what the log lines count, readable by a test.
@@ -164,7 +167,7 @@ namespace Phlox.ScriptEngine
         private const long PURGE_INTERVAL_MS = 6L * 60 * 60 * 1000;
         private long m_NextPurgeTick;
 
-        public StateManager(PhloxEngine engine) : this(engine, DB_FILE) { }
+        public StateManager(PhloxEngine engine) : this(engine, engine?.StateDbFile ?? DB_FILE) { }
 
         /// <summary>The DB file is a parameter so a test can run against a temp file.</summary>
         internal StateManager(PhloxEngine engine, string dbFile) : this(engine, dbFile, BUSY_TIMEOUT_MS) { }

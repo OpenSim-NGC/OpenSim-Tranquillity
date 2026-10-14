@@ -22,7 +22,10 @@ namespace InWorldz.Phlox.Tests;
 /// </summary>
 internal static class SavedStateRig
 {
-    /// <summary>The state database every harness engine shares (StateManager's DB_FILE, relative to the test run).</summary>
+    /// <summary>
+    /// The state database every harness engine shares: the default ScriptEnginesPath, relative to the test run.
+    /// Harnesses leave [InWorldz.Phlox] ScriptEnginesPath unset, so every engine lands here.
+    /// </summary>
     public const string DbFile = "ScriptEngines/Phlox/state/script_state.db";
 
     public static PhloxExecutionScheduler Exe(SchedulerHarness h)

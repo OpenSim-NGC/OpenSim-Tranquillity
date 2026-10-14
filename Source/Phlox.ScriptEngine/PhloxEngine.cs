@@ -7,6 +7,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Threading;
 using Nini.Config;
@@ -71,6 +72,15 @@ namespace Phlox.ScriptEngine
         /// already applies to the other engine.
         /// </summary>
         public const float DefaultMinTimerInterval = 0.1f;
+
+        /// <summary>
+        /// The folder saved state and cached bytecode live under when no <c>ScriptEnginesPath</c> is configured,
+        /// relative to the region server's working directory. Same default as YEngine's.
+        /// </summary>
+        public const string DefaultScriptEnginesPath = "ScriptEngines";
+
+        /// <summary>The name of the SQLite file holding saved script state.</summary>
+        internal const string StateDbFileName = "script_state.db";
 
         /// <summary>
         /// The floor a positive <c>llSetTimerEvent</c> request is raised to, in seconds. Config key
@@ -175,6 +185,14 @@ namespace Phlox.ScriptEngine
             m_Enabled = m_Config.GetBoolean("Enabled", false);
             m_log.LogInformation("[PhloxEngine]: Enabled = {0}", m_Enabled);
 
+            // Where this engine's saved state and bytecode cache live. Named as YEngine names it -
+            // [InWorldz.Phlox] ScriptEnginesPath, else "ScriptEngines" - so an operator can move this engine's
+            // data out of the published binary tree. "Phlox" is appended to keep these files apart from
+            // YEngine's. Each engine reads only its own section, so moving one never moves the other.
+            // Unlike YEngine no region id is appended: one state database serves every region in the process.
+            ScriptEnginePath = ResolveScriptEnginePath(m_Config);
+            m_log.LogInformation("[PhloxEngine]: ScriptEnginePath = {0}", ScriptEnginePath);
+
             // The floor for llSetTimerEvent. Same key name and same default as the
             // other engine on this grid, so an operator sets one number and both agree:
             // LSL_Api.llSetTimerEvent clamps at m_MinTimerInterval (LSL_Api.cs:4005-4011) and
@@ -271,7 +289,20 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// [InWorldz.Phlox] SchedulerThreadPriority: a <see cref="ThreadPriority"/> name (Lowest, BelowNormal, Normal,
+        /// The folder holding this engine's saved state and bytecode cache: <c>ScriptEnginesPath</c> from
+        /// <paramref name="phloxConfig"/>, else <see cref="DefaultScriptEnginesPath"/>, with "Phlox" appended.
+        /// Only this engine's own section is read: YEngine's <c>ScriptEnginesPath</c> moves YEngine alone.
+        /// </summary>
+        internal static string ResolveScriptEnginePath(IConfig phloxConfig)
+        {
+            string basePath = phloxConfig?.GetString("ScriptEnginesPath");
+            if (string.IsNullOrWhiteSpace(basePath))
+                basePath = DefaultScriptEnginesPath;
+
+            return Path.Combine(basePath.Trim(), "Phlox");
+        }
+
+
         /// AboveNormal, Highest), case and surrounding spaces ignored. Unset (or no section) gives
         /// <see cref="DefaultSchedulerThreadPriority"/> with no warning. Any other value, numbers included, gives the
         /// default and a warning naming the value.
@@ -2112,13 +2143,27 @@ namespace Phlox.ScriptEngine
         public IScriptModule ScriptModule => this;
         public IConfig Config => m_Config;
         public IConfigSource ConfigSource => m_ConfigSource;
-        public string ScriptEnginePath => "ScriptEngines/Phlox";
+        /// <summary>
+        /// Where this engine's saved state and bytecode cache live, "Phlox" included. Set by
+        /// <see cref="Initialise"/> from [InWorldz.Phlox] ScriptEnginesPath; the default until then (and when the
+        /// setting is absent) is the working directory's ScriptEngines/Phlox, exactly as before the setting existed.
+        /// </summary>
+        public string ScriptEnginePath { get; private set; } = Path.Combine(DefaultScriptEnginesPath, "Phlox");
+
+        /// <summary>The SQLite file holding saved script state, under <see cref="ScriptEnginePath"/>.</summary>
+        internal string StateDbFile => Path.Combine(ScriptEnginePath, "state", StateDbFileName);
+
+        /// <summary>
+        /// The folder for this engine's bytecode cache and its schema stamp, under <see cref="ScriptEnginePath"/>
+        /// unless a test set <see cref="BytecodeCacheDir"/>.
+        /// </summary>
+        internal string BytecodeDir => BytecodeCacheDir ?? Path.Combine(ScriptEnginePath, "bytecode");
 
         /// <summary>
         /// Test seam, inert in production. The folder for this engine's bytecode cache and its schema stamp,
-        /// read once when <see cref="AddRegion"/> builds the loader. Null (always, outside tests) means the loader's
-        /// constant "ScriptEngines/Phlox/bytecode", exactly as before. Test harnesses running in parallel set it so
-        /// each class has its own folder instead of all sharing one.
+        /// read once when <see cref="AddRegion"/> builds the loader. Null (always, outside tests) means
+        /// <see cref="BytecodeDir"/> resolves to "bytecode" under <see cref="ScriptEnginePath"/>, exactly as before.
+        /// Test harnesses running in parallel set it so each class has its own folder instead of all sharing one.
         /// </summary>
         internal string BytecodeCacheDir { get; set; }
         public string ScriptClassName => "PhloxScript";

@@ -30,7 +30,8 @@ namespace Phlox.ScriptEngine
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private const string CACHE_DIR = "ScriptEngines/Phlox/bytecode";
+        private static readonly string CACHE_DIR =
+            Path.Combine(PhloxEngine.DefaultScriptEnginesPath, "Phlox", "bytecode");
         private const string SCRIPT_EXT = ".plx";
         private const int CACHE_PREFIX_LEN = 2;
         private const int MAX_UNLOADED_CACHE = 128;
@@ -61,8 +62,8 @@ namespace Phlox.ScriptEngine
         private const int CACHE_SCHEMA_VERSION = 7;
         private const string VERSION_FILE_NAME = ".schema_version";
 
-        // CACHE_DIR and its stamp, unless the engine was given another folder (a test seam; production never
-        // sets one, so these are the constants above).
+        // CACHE_DIR and its stamp, unless the engine was given another folder (its configured ScriptEnginesPath,
+        // or a test seam).
         private readonly string m_CacheDir;
         private readonly string m_VersionFile;
 
@@ -155,7 +156,7 @@ namespace Phlox.ScriptEngine
             m_ExeScheduler = exeScheduler;
             m_WorkArrived = workArrived;
             m_Engine = engine;
-            m_CacheDir = engine?.BytecodeCacheDir ?? CACHE_DIR;
+            m_CacheDir = engine?.BytecodeDir ?? CACHE_DIR;
             m_VersionFile = Path.Combine(m_CacheDir, VERSION_FILE_NAME);
 
             Directory.CreateDirectory(m_CacheDir);

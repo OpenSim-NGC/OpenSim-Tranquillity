@@ -129,6 +129,7 @@ This is every key the engine reads from the section. All of them are optional.
 | `SensorMaxRange` | `96.0` | Largest range in metres a sensor may use. |
 | `SensorMaxResults` | `16` | Most objects or avatars one sensor reports. |
 | `StateRowMaxAgeDays` | `0` | Deletes saved-state rows not saved or loaded for this many days whose scripts are not loaded in the simulator; checked every 6 hours, first 1 hour after start. `0`: never (the default). |
+| `ScriptEnginesPath` | `ScriptEngines` | Parent folder for saved state and the bytecode cache. See [Where Phlox keeps its files](#where-phlox-keeps-its-files). |
 
 Setting any anti-abuse switch to `false` removes that slowdown and nothing else.
 
@@ -177,16 +178,29 @@ script chat travels, as for every other listener.
 
 ## Where Phlox keeps its files
 
-Both paths are relative to the region server's working directory, and neither is
-configurable. `[YEngine] ScriptEnginesPath` does not move them.
+Both live under `[InWorldz.Phlox] ScriptEnginesPath` with `Phlox` appended. The setting
+defaults to `ScriptEngines`; a relative value is relative to the region server's working
+directory. Set it to keep script state out of the published binary tree, in its own data
+directory:
 
-- **Saved script state:** `ScriptEngines/Phlox/state/script_state.db`, one SQLite database
+```ini
+[InWorldz.Phlox]
+    ScriptEnginesPath = "/var/opensim/data/ScriptEngines"
+```
+
+which puts the files below under `/var/opensim/data/ScriptEngines/Phlox/`. Unlike YEngine, no
+region id is appended: every region in the process shares the one folder. Moving an existing
+installation means moving the `Phlox` folder to the new location before the next start;
+otherwise scripts start with no saved state and recompile. `[YEngine] ScriptEnginesPath`
+moves YEngine's files only: each engine reads the key from its own section.
+
+- **Saved script state:** `<ScriptEnginesPath>/Phlox/state/script_state.db`, one SQLite database
   shared by every region in the process.
   - Each row is keyed by the script item and checked against the script asset. A row for an
     older version of the script is discarded.
   - Changed state is written every 2.5 s, and when a script unloads.
   - A reset deletes the script's row.
-- **Bytecode cache:** `ScriptEngines/Phlox/bytecode/`, one `.plx` file per script asset.
+- **Bytecode cache:** `<ScriptEnginesPath>/Phlox/bytecode/`, one `.plx` file per script asset.
   - Files are grouped in sub-folders named by the first two characters of the asset id.
   - A `.schema_version` file records the cache format.
 
