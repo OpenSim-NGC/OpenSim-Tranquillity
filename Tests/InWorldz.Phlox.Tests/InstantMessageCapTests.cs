@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Linq;
 using System.Text;
@@ -9,9 +16,9 @@ using Xunit;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// llInstantMessage's message length, as the SL wiki states it (https://wiki.secondlife.com/wiki/LlInstantMessage):
-/// "Messages longer than 1023 bytes will be truncated to 1023 bytes. This can convey 1023 ASCII characters, or fewer
-/// if non-ASCII characters are present." The cap counts bytes of UTF-8; a character the cut would split is dropped
+/// llInstantMessage's message length, as the SL wiki states it (https://wiki.secondlife.com/wiki/LlInstantMessage): a message
+/// over 1023 bytes is cut to 1023 bytes, which holds 1023 ASCII characters, or fewer when non-ASCII characters are in the
+/// text. The cap counts bytes of UTF-8; a character the cut would split is dropped
 /// whole, so the message stays valid text.
 /// </summary>
 // No test reaches a network service: the IM transfer module is an in-memory recorder.

@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Linq;
 using Xunit;
@@ -17,7 +24,7 @@ namespace InWorldz.Phlox.Tests;
 /// "Accept &lt;&lt;= and &gt;&gt;= as an extension", so they compile again for integers (Halcyon's rule) and stay an
 /// error on their line for any other type (ShiftAssignTests);</item>
 /// <item><c>list != list</c> is the length difference, <c>==</c> is TRUE when the lengths match
-/// ("Equality test on lists does not compare contents, only the length", same page).</item>
+/// (the same page says equality on lists compares only their length, not their contents).</item>
 /// </list>
 /// </summary>
 // No longer in "phlox-state": this class touches no process-wide state, so it runs in parallel.

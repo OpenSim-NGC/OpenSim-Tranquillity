@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,9 +20,9 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// A dataserver answer goes to every script in the asking script's prim, each with
-/// the same query key and data. SL wiki dataserver: "Dataserver requests will trigger dataserver events in all scripts
-/// within the same prim where the request was made." "dataserver events will not be triggered in scripts contained in
-/// other prims in the same linked object." The wiki says nothing of a reset, state change or removal before the answer,
+/// the same query key and data. SL wiki dataserver (https://wiki.secondlife.com/wiki/Dataserver): a request raises
+/// dataserver events in every script of the prim it was made from, and scripts in other prims of the same linked
+/// object do not get them. The wiki says nothing of a reset, state change or removal before the answer,
 /// so the reset rule is kept for the asker (an answer it is no longer owed is not posted to it) and the others still get
 /// it. The cross-engine case (a YEngine script in the prim) is DataserverToPrimYEngineTests.
 /// Each test has its own harness and scene (the notecard gate is that scene's asset service, the key-value fake is

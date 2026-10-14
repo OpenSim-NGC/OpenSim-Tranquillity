@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,10 +22,11 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// A link message from a Phlox script reaches every script in the targeted prims, whatever engine runs it. SL wiki
-/// llMessageLinked: "It triggers a link_message event with the same parameters num, str, and id in all scripts in the
-/// prim(s) described by link." LINK_SET "sends to all prims", LINK_ALL_OTHERS "sends to all other prims", LINK_THIS "sends
-/// to the prim the script is in". SL wiki link_message: sender_num is "The link number of the prim that contained the
-/// script that called llMessageLinked."
+/// llMessageLinked page (https://wiki.secondlife.com/wiki/LlMessageLinked) says the call raises a link_message event
+/// carrying the same num, str and id values in every script of the prim(s) that link selects. LINK_SET goes to every
+/// prim, LINK_ALL_OTHERS to every prim but the sender's, LINK_THIS to the sender's own prim. The link_message page
+/// (https://wiki.secondlife.com/wiki/Link_message) gives sender_num as the link number held by the prim whose script
+/// called llMessageLinked.
 /// The shared pieces: a three-prim linkset (links 1, 2, 3), a Phlox sender in link 1 driven on channel 7, and receivers
 /// that say "&lt;tag&gt; got &lt;sender&gt; &lt;num&gt; &lt;str&gt; &lt;id&gt;" for every link message.
 /// </summary>

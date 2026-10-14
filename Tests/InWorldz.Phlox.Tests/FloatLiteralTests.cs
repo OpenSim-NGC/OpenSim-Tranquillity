@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Globalization;
 using InWorldz.Phlox.Compiler;
 using Xunit;
@@ -6,11 +13,11 @@ using Xunit.Abstractions;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// A float literal keeps its exact 32-bit value. SL wiki Float: "The LSL "float" type is a floating point data
-/// type that uses 32 bit in IEEE-754 form." "The valid range is 1.401298464E-45 to 3.402823466E+38". "Floats can be
-/// specified in scientific notation such as 2.6E-5." Before, GenVisitor.FormatFloat wrote the literal for the assembler
-/// with a custom format that keeps 7 significant digits: 2147483520.0 became 2147484000.0 (read back as 2147483904) and
-/// 1.17549435E-38 became 0.0.
+/// A float literal keeps its exact 32-bit value. SL wiki Float (https://wiki.secondlife.com/wiki/Float): the LSL
+/// float is a 32-bit IEEE-754 floating point type; its valid range runs from 1.401298464E-45 to 3.402823466E+38;
+/// a literal may be given in scientific notation (2.6E-5 is an example). Before, GenVisitor.FormatFloat wrote the literal
+/// for the assembler with a custom format that keeps 7 significant digits: 2147483520.0 became 2147484000.0 (read back
+/// as 2147483904) and 1.17549435E-38 became 0.0.
 ///
 /// The oracle is the run-time cast (float)"text", which parses the same text exactly (float.Parse); run-time
 /// (string) of a float still prints 7 significant digits (Util/Encoding.cs, not changed here), so the exact value is shown
@@ -87,7 +94,8 @@ public class FloatLiteralTests
     [Fact]
     public void AroundTwoToTheTwentyFour()
     {
-        // Floats are exact to 16777216 (wiki: "Only the values between -16,777,216 and 16,777,216 are precise"); above
+        // Floats are exact to 16777216 (wiki Float page, https://wiki.secondlife.com/wiki/Float: values from
+        // -16,777,216 to 16,777,216 are the only exact ones); above
         // it they step by 2. 16777217.0 rounds to 16777216 (ties to even); 16777215.0 was 16777220 before.
         var r = Run(@"
         llOwnerSay((string)(integer)16777215.0);

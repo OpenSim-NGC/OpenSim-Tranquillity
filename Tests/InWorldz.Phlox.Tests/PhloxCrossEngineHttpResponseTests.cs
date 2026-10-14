@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Collections;
 using System.Net;
 using System.Net.Sockets;
@@ -25,8 +32,9 @@ namespace InWorldz.Phlox.Tests;
 /// http_response, in the script that made it, with its body and status; no script gets a duplicate, another script's
 /// response or a wrong body or status.
 /// YEngine's pump (the core's Shared/Api/Plugins/HttpRequest.cs) now offers what it takes to every script engine
-/// of the region, so a Phlox script's response it takes reaches it too. And, as SL says ("triggered in all scripts in the
-/// prim, not just in the requesting script"), a prim with a YEngine and a Phlox script gets each response in both.
+/// of the region, so a Phlox script's response it takes reaches it too. And, as SL says (http_response,
+/// https://wiki.secondlife.com/wiki/Http_response: every script in the prim gets the event, not only the script that made the
+/// request), a prim with a YEngine and a Phlox script gets each response in both.
 /// In "phlox-state" (runs alone), as PhloxMimeTypeYEngineTests: it needs YEngine's statics and the core HttpRequestModule's
 /// process-wide filter at once. The endpoint is a loopback listener opened by an Except entry.
 /// </summary>
@@ -308,8 +316,9 @@ public class PhloxCrossEngineHttpResponseTests
     }
 
     /// <summary>
-    /// SL - "The corresponding http_response event will be triggered in all scripts in the prim, not just in the
-    /// requesting script." A YEngine and a Phlox script in each prim: both hear every response of their prim, once each,
+    /// SL (http_response, https://wiki.secondlife.com/wiki/Http_response): the matching http_response event goes to every
+    /// script in the prim, and not to the requesting script alone. A YEngine and a Phlox script in each prim: both hear every
+    /// response of their prim, once each,
     /// whichever script asked and whichever pump took it.
     /// </summary>
     [Fact]

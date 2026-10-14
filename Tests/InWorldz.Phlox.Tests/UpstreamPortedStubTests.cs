@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -59,7 +66,10 @@ public class UpstreamPortedStubTests
         Assert.Equal(1, h.Said.Count(s => s.StartsWith("hit:")));
     }
 
-    /// <summary>wiki: accept TRUE "only accept collisions with objects name AND id".</summary>
+    /// <summary>
+    /// wiki (https://wiki.secondlife.com/wiki/LlCollisionFilter): with accept set to TRUE, only collisions with objects
+    /// matching both the name and the id are accepted.
+    /// </summary>
     [Fact]
     public void AnAcceptFilterLetsOnlyThatNameThrough()
     {

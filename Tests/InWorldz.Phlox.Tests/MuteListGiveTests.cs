@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
@@ -12,8 +19,8 @@ namespace InWorldz.Phlox.Tests;
 /// A give to an avatar who has muted the object, or its owner, is not made.
 /// Halcyon (InWorldz.Phlox.Engine/LSLSystemAPI.cs IsScriptMuted :4388-4403, _GiveInventory :5368-5372,
 /// _GiveLinkInventoryList :8443-8447): "Not offering inventory from muted ...", IW_DELIVER_MUTED, the normal delay, and
-/// the ll/iwGive forms say nothing. SL (wiki llGiveInventory): an avatar that refuses "by manual decline or muting" does
-/// not get it.
+/// the ll/iwGive forms say nothing. SL (wiki llGiveInventory, https://wiki.secondlife.com/wiki/LlGiveInventory): an avatar who
+/// declines the offer by hand, or has the giver muted, does not get it.
 /// </summary>
 // Parallel: the fake mute service is registered on this test's own scene; none of the process-wide hooks
 // (Clock, FailLoadForTest, compile delays, ThrowForTest, cache/state-DB files, real-time measurement) is touched.

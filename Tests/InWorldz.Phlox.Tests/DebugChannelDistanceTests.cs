@@ -1,6 +1,10 @@
 /*
  * Phlox Script Engine tests
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 using System;
@@ -17,7 +21,8 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// A script's run-time error reaches scripts listening on DEBUG_CHANNEL as far as llSay reaches, not a shout's
-/// 100 m. SL wiki (DEBUG_CHANNEL): "Server-generated errors are broadcast the same distance as llSay." The text and
+/// 100 m. SL wiki (DEBUG_CHANNEL, https://wiki.secondlife.com/wiki/DEBUG_CHANNEL): errors the server generates carry
+/// as far as llSay does. The text and
 /// the error pause are unchanged (ErrorPauseTests). A script's own llShout or llWhisper on DEBUG_CHANNEL keeps its own
 /// distance, also when the chat module has rewritten the chat's type to DebugChannel before Phlox sees it, as it does
 /// on a region (ChatModule.DeliverChatToAvatars runs first: it subscribes in AddRegion, Phlox in RegionLoaded).

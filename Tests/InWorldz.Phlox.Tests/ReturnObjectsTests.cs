@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Reflection;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -322,8 +329,9 @@ public class ReturnObjectsTests
     [Fact]
     public void AnEstateManagersScriptReturnsOnAParcelItDoesNotOwn()
     {
-        // SL llReturnObjectsByID: "If the script is owned by an estate owner or manager, this function works for objects
-        // located on any parcel in the region." (Halcyon refuses: its parcel-owner test runs first.)
+        // SL llReturnObjectsByID (https://wiki.secondlife.com/wiki/LlReturnObjectsByID): when the script's owner is an
+        // estate owner or manager, the function works on objects on any parcel of the region. (Halcyon refuses: its
+        // parcel-owner test runs first.)
         using var r = NewRig();
         r.H.Scene.RegionInfo.EstateSettings.AddEstateManager(r.ScriptOwner);
         r.H.Prim.ParentGroup.UpdateGroupPosition(East);
