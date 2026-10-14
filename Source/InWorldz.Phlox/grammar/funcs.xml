@@ -1,1892 +1,1832 @@
 <root>
 		<string name="LSLTipText_llSin" translate="false">
 	float llSin(float theta)
-	Returns the sine of theta (theta in radians)
+	Sine of an angle given in radians.
 		</string>
 		<string name="LSLTipText_llCos" translate="false">
 	float llCos(float theta)
-	Returns the cosine of theta (theta in radians)
+	Cosine of an angle given in radians.
 		</string>
 		<string name="LSLTipText_llTan" translate="false">
 	float llTan(float theta)
-	Returns the tangent of theta (theta in radians)
+	Tangent of an angle given in radians.
 		</string>
 		<string name="LSLTipText_llAtan2" translate="false">
 	float llAtan2(float y, float x)
-	Returns the arctangent2 of y, x
+	Angle in radians of the point (x, y) measured from the positive x axis; the signs of both arguments pick the quadrant.
 		</string>
 		<string name="LSLTipText_llSqrt" translate="false">
 	float llSqrt(float val)
-	Returns the square root of val, or returns 0 and triggers a Math Error for imaginary results
+	Square root of val. A negative val gives 0 and raises a math error in the script.
 		</string>
 		<string name="LSLTipText_llPow" translate="false">
 	float llPow(float base, float exponent)
-	Returns the base raised to the power exponent, or returns 0 and triggers Math Error for imaginary results
+	base raised to exponent. A result that is not a real number gives 0 and raises a math error in the script.
 		</string>
 		<string name="LSLTipText_llAbs" translate="false">
 	integer llAbs(integer val)
-	Returns the positive version of val
+	Absolute value of an integer.
 		</string>
 		<string name="LSLTipText_llFabs" translate="false">
 	float llFabs(float val)
-	Returns the positive version of val
+	Absolute value of a float.
 		</string>
 		<string name="LSLTipText_llFrand" translate="false">
 	float llFrand(float mag)
-	Returns a pseudo random number in the range [0,mag) or (mag,0]
+	Random float from 0 up to mag. The mag end is never returned. A negative mag gives values between mag and 0 instead.
 		</string>
 		<string name="LSLTipText_llFloor" translate="false">
 	integer llFloor(float val)
-	Returns largest integer value &lt;= val
+	Largest integer that is not greater than val (rounds toward negative infinity).
 		</string>
 		<string name="LSLTipText_llCeil" translate="false">
 	integer llCeil(float val)
-	Returns smallest integer value &gt;= val
+	Smallest integer that is not less than val (rounds toward positive infinity).
 		</string>
 		<string name="LSLTipText_llRound" translate="false">
 	integer llRound(float val)
-	Returns val rounded to the nearest integer
+	val rounded to the closest integer.
 		</string>
 		<string name="LSLTipText_llVecMag" translate="false">
 	float llVecMag(vector v)
-	Returns the magnitude of v
+	Length of vector v.
 		</string>
 		<string name="LSLTipText_llVecNorm" translate="false">
 	vector llVecNorm(vector v)
-	Returns the v normalized
+	Vector with the same direction as v and a length of 1.
 		</string>
 		<string name="LSLTipText_llVecDist" translate="false">
 	float llVecDist(vector v1, vector v2)
-	Returns the 3D distance between v1 and v2
+	Straight-line distance between the points v1 and v2.
 		</string>
 		<string name="LSLTipText_llRot2Euler" translate="false">
 	vector llRot2Euler(rotation q)
-	Returns the Euler representation (roll, pitch, yaw) of q
+	Converts rotation q to Euler angles in radians, returned as a vector (x = roll, y = pitch, z = yaw).
 		</string>
 		<string name="LSLTipText_llEuler2Rot" translate="false">
 	rotation llEuler2Rot(vector v)
-	Returns the rotation representation of Euler Angles v
+	Converts Euler angles v (radians, x = roll, y = pitch, z = yaw) to a rotation.
 		</string>
 		<string name="LSLTipText_llAxes2Rot" translate="false">
 	rotation llAxes2Rot(vector fwd, vector left, vector up)
-	Returns the rotation defined by the coordinate axes
+	Builds the rotation whose local forward, left and up axes point along the three given vectors.
 		</string>
 		<string name="LSLTipText_llRot2Fwd" translate="false">
 	vector llRot2Fwd(rotation q)
-	Returns the forward vector defined by q
+	The forward (+X) axis of rotation q, as a unit vector.
 		</string>
 		<string name="LSLTipText_llRot2Left" translate="false">
 	vector llRot2Left(rotation q)
-	Returns the left vector defined by q
+	The left (+Y) axis of rotation q, as a unit vector.
 		</string>
 		<string name="LSLTipText_llRot2Up" translate="false">
 	vector llRot2Up(rotation q)
-	Returns the up vector defined by q
+	The up (+Z) axis of rotation q, as a unit vector.
 		</string>
 		<string name="LSLTipText_llRotBetween" translate="false">
 	rotation llRotBetween(vector v1, vector v2)
-	Returns the rotation to rotate v1 to v2
+	Smallest rotation that turns the direction of v1 onto the direction of v2.
 		</string>
 		<string name="LSLTipText_llWhisper" translate="false">
 	llWhisper(integer channel, string msg)
-	Whispers the text of msg on channel
+	Speaks msg on channel at whisper volume (heard within 10 m).
 		</string>
 		<string name="LSLTipText_llSay" translate="false">
 	llSay(integer channel, string msg)
-	Says the text of msg on channel
+	Speaks msg on channel at normal volume (heard within 20 m).
 		</string>
 		<string name="LSLTipText_llShout" translate="false">
 	llShout(integer channel, string msg)
-	Shouts the text of msg on channel
+	Speaks msg on channel at shout volume (heard within 100 m).
 		</string>
 		<string name="LSLTipText_llListen" translate="false">
 	integer llListen(integer channel, string name, key id, string msg)
-	Sets a callback for msg on channel from name and id (name, id, and/or msg can be empty) and returns an identifier that can be used to deactivate or remove the listen
+	Starts listening for chat on channel and returns a handle. name, id and msg act as filters, and an empty value for any of them matches everything. The handle is used with llListenControl and llListenRemove.
 		</string>
 		<string name="LSLTipText_llListenControl" translate="false">
 	llListenControl(integer number, integer active)
-	Makes a listen event callback active or inactive
+	Pauses (active = FALSE) or resumes (active = TRUE) the listener with handle number.
 		</string>
 		<string name="LSLTipText_llListenRemove" translate="false">
 	llListenRemove(integer number)
-	Removes listen event callback number
+	Cancels the listener with handle number.
 		</string>
 		<string name="LSLTipText_llSensor" translate="false">
 	llSensor(string name, key id, integer type, float range, float arc)
-	Performs a single scan for name and id with type (AGENT, ACTIVE, PASSIVE, and/or SCRIPTED) within range meters and arc radians of forward vector (name, id, and/or keytype can be empty or 0)
+	Scans once for objects or avatars. name and id filter the results (empty, or NULL_KEY for id, matches anything), type is a mix of AGENT, ACTIVE, PASSIVE and SCRIPTED, range is in meters and arc is the half-angle in radians around the object's forward axis. Results arrive in a sensor event, or no_sensor if nothing matched.
 		</string>
 		<string name="LSLTipText_llSensorRepeat" translate="false">
 	llSensorRepeat(string name, key id, integer type, float range, float arc, float rate)
-	Sets a callback for name and id with type (AGENT, ACTIVE, PASSIVE, and/or SCRIPTED) within range meters and arc radians of forward vector (name, id, and/or keytype can be empty or 0) and repeats every rate seconds
+	Same scan as llSensor, but repeated every rate seconds until llSensorRemove is called.
 		</string>
 		<string name="LSLTipText_llSensorRemove" translate="false">
 	llSensorRemove()
-	Removes the sensor setup by llSensorRepeat
+	Stops the repeating scan started by llSensorRepeat.
 		</string>
 		<string name="LSLTipText_llDetectedName" translate="false">
 	string llDetectedName(integer number)
-	Returns the name of detected object number (returns empty string if number is not a valid sensed object)
+	Name of the detected item at index number in the current event. Empty string if the index is out of range.
 		</string>
 		<string name="LSLTipText_llDetectedKey" translate="false">
 	key llDetectedKey(integer number)
-	Returns the key of detected object number (returns empty key if number is not a valid sensed object)
+	UUID of the detected item at index number in the current event. NULL_KEY if the index is out of range.
 		</string>
 		<string name="LSLTipText_llDetectedOwner" translate="false">
 	key llDetectedOwner(integer number)
-	Returns the key of detected object&apos;s owner (returns empty key if number is not a valid sensed object)
+	UUID of the owner of the detected item at index number. NULL_KEY if the index is out of range.
 		</string>
 		<string name="LSLTipText_llDetectedType" translate="false">
 	integer llDetectedType(integer number)
-	Returns the type (AGENT, ACTIVE, PASSIVE, SCRIPTED) of detected object (returns 0 if number is not a valid sensed object)
+	Bit mask describing the detected item at index number (AGENT, ACTIVE, PASSIVE and/or SCRIPTED). 0 if the index is out of range.
 		</string>
 		<string name="LSLTipText_llDetectedPos" translate="false">
 	vector llDetectedPos(integer number)
-	Returns the position of detected object number (returns &lt;0,0,0&gt; if number is not a valid sensed object)
+	Position of the detected item at index number. &lt;0,0,0&gt; if the index is out of range.
 		</string>
 		<string name="LSLTipText_llDetectedVel" translate="false">
 	vector llDetectedVel(integer number)
-	Returns the velocity of detected object number (returns &lt;0,0,0&gt; if number is not a valid sensed object)
+	Velocity of the detected item at index number. &lt;0,0,0&gt; if the index is out of range.
 		</string>
 		<string name="LSLTipText_llDetectedGrab" translate="false">
 	vector llDetectedGrab(integer number)
-	Returns the grab offset of the user touching object (returns &lt;0,0,0&gt; if number is not a valid sensed object)
+	For touch events, the offset of the grab point for the toucher at index number. &lt;0,0,0&gt; if the index is out of range.
 		</string>
 		<string name="LSLTipText_llDetectedRot" translate="false">
 	rotation llDetectedRot(integer number)
-	Returns the rotation of detected object number (returns &lt;0,0,0,1&gt; if number is not a valid sensed object)
+	Rotation of the detected item at index number. &lt;0,0,0,1&gt; if the index is out of range.
 		</string>
 		<string name="LSLTipText_llDetectedGroup" translate="false">
 	integer llDetectedGroup(integer number)
-	Returns TRUE if detected object is part of same group as owner
+	TRUE when the detected item at index number is in the same group as the object's owner.
 		</string>
 		<string name="LSLTipText_llDetectedLinkNumber" translate="false">
 	integer llDetectedLinkNumber(integer number)
-	Returns the link position of the triggered event for touches and collisions only
+	Link number of the prim that was touched or collided with. Only meaningful in touch and collision events.
 		</string>
 		<string name="LSLTipText_llDie" translate="false">
 	llDie()
-	Deletes the object
+	Removes the whole object from the region.
 		</string>
 		<string name="LSLTipText_llGround" translate="false">
 	float llGround(vector offset)
-	Returns the ground height below the object position + offset
+	Terrain height at the object's position shifted by offset.
 		</string>
 		<string name="LSLTipText_llCloud" translate="false">
 	float llCloud(vector offset)
-	Returns the cloud density at the object position + offset
+	Cloud density at the object's position shifted by offset.
 		</string>
 		<string name="LSLTipText_llWind" translate="false">
 	vector llWind(vector offset)
-	Returns the wind velocity at the object position + offset
+	Wind velocity at the object's position shifted by offset.
 		</string>
 		<string name="LSLTipText_llSetStatus" translate="false">
 	llSetStatus(integer status, integer value)
-	Sets status (STATUS_PHYSICS, STATUS_PHANTOM, STATUS_BLOCK_GRAB, STATUS_ROTATE_X, STATUS_ROTATE_Y, and/or STATUS_ROTATE_Z) to value
+	Turns object status flags on or off. status can combine STATUS_PHYSICS, STATUS_PHANTOM, STATUS_BLOCK_GRAB and the STATUS_ROTATE_* axis locks; value is TRUE to set them or FALSE to clear them.
 		</string>
 		<string name="LSLTipText_llGetStatus" translate="false">
 	integer llGetStatus(integer status)
-	Returns value of status (STATUS_PHYSICS, STATUS_PHANTOM, STATUS_BLOCK_GRAB, STATUS_ROTATE_X, STATUS_ROTATE_Y, and/or STATUS_ROTATE_Z)
+	Tells whether the given status flag is set (STATUS_PHYSICS, STATUS_PHANTOM, STATUS_BLOCK_GRAB, STATUS_ROTATE_X/Y/Z).
 		</string>
 		<string name="LSLTipText_llSetScale" translate="false">
 	llSetScale(vector scale)
-	Sets the scale of the prim
+	Resizes the prim to scale (meters per axis).
 		</string>
 		<string name="LSLTipText_llGetScale" translate="false">
 	vector llGetScale()
-	Returns the scale of the prim
+	Size of the prim in meters per axis.
 		</string>
 		<string name="LSLTipText_llSetColor" translate="false">
 	llSetColor(vector color, integer face)
-	Sets the color on face of the prim
+	Tints one face of the prim, or every face when face is ALL_SIDES.
 		</string>
 		<string name="LSLTipText_llGetAlpha" translate="false">
 	float llGetAlpha(integer face)
-	Returns the alpha of face
+	Opacity of the given face, from 0.0 (invisible) to 1.0 (opaque).
 		</string>
 		<string name="LSLTipText_llSetAlpha" translate="false">
 	llSetAlpha(float alpha, integer face)
-	Sets the alpha on face
+	Sets the opacity of one face, or every face when face is ALL_SIDES.
 		</string>
 		<string name="LSLTipText_llGetColor" translate="false">
 	vector llGetColor(integer face)
-	Returns the color on face
+	Tint color of the given face as an RGB vector.
 		</string>
 		<string name="LSLTipText_llSetTexture" translate="false">
 	llSetTexture(string texture, integer face)
-	Sets the texture of face or ALL_SIDES
+	Applies a texture to one face, or to every face when face is ALL_SIDES. texture is an inventory name or a UUID.
 		</string>
 		<string name="LSLTipText_llScaleTexture" translate="false">
 	llScaleTexture(float u, float v, integer face)
-	Sets the texture u &amp; v scales for the chosen face or ALL_SIDES
+	Sets the horizontal (u) and vertical (v) texture repeats on one face, or on every face for ALL_SIDES.
 		</string>
 		<string name="LSLTipText_llOffsetTexture" translate="false">
 	llOffsetTexture(float u, float v, integer face)
-	Sets the texture u &amp; v offsets for the chosen face or ALL_SIDES
+	Sets the horizontal (u) and vertical (v) texture offset on one face, or on every face for ALL_SIDES.
 		</string>
 		<string name="LSLTipText_llRotateTexture" translate="false">
 	llRotateTexture(float rotation, integer face)
-	Sets the texture rotation for the chosen face
+	Rotates the texture on one face by rotation radians, or on every face for ALL_SIDES.
 		</string>
 		<string name="LSLTipText_llGetTexture" translate="false">
 	string llGetTexture(integer face)
-	Returns a string that is the texture on face (the inventory name if it is a texture in the prim&apos;s inventory, otherwise the key)
+	Texture on the given face. The result is the item name when that texture is in the prim's inventory, and the UUID string otherwise.
 		</string>
 		<string name="LSLTipText_llSetPos" translate="false">
 	llSetPos(vector pos)
-	Moves the object or prim towards pos without using physics (if the script isn&apos;t physical)
+	Moves the prim to pos without physics. In a child prim pos is relative to the root. Does nothing useful for physical objects.
 		</string>
 		<string name="LSLTipText_llGetPos" translate="false">
 	vector llGetPos()
-	Returns the position of the task in region coordinates
+	Position of the prim in region coordinates.
 		</string>
 		<string name="LSLTipText_llGetLocalPos" translate="false">
 	vector llGetLocalPos()
-	Returns the position relative to the root
+	Position of the prim relative to the root prim of its link set.
 		</string>
 		<string name="LSLTipText_llSetRot" translate="false">
 	llSetRot(rotation rot)
-	Sets the rotation
+	Sets the rotation of the object or, for a child prim, its rotation relative to the root.
 		</string>
 		<string name="LSLTipText_llGetRot" translate="false">
 	rotation llGetRot()
-	Returns the rotation relative to the region&apos;s axes
+	Rotation of the prim in region coordinates.
 		</string>
 		<string name="LSLTipText_llGetLocalRot" translate="false">
 	rotation llGetLocalRot()
-	Returns the rotation local to the root
+	Rotation of the prim relative to the root prim of its link set.
 		</string>
 		<string name="LSLTipText_llSetForce" translate="false">
 	llSetForce(vector force, integer local)
-	Applies force to the object (if the script is physical), in local coords if local == TRUE
+	Sets a continuous force on a physical object. When local is TRUE the force is in the object's own axes, otherwise in region axes.
 		</string>
 		<string name="LSLTipText_llGetForce" translate="false">
 	vector llGetForce()
-	Returns the force (if the script is physical)
+	Continuous force currently set on a physical object.
 		</string>
 		<string name="LSLTipText_llTarget" translate="false">
 	integer llTarget(vector position, float range)
-	Sets positions within range of position as a target and return an ID for the target
+	Registers a position target: an area of radius range around position. Returns a handle. at_target or not_at_target events report whether the object is inside it.
 		</string>
 		<string name="LSLTipText_llTargetRemove" translate="false">
 	llTargetRemove(integer number)
-	Removes positional target number registered with llTarget
+	Cancels the position target with handle number.
 		</string>
 		<string name="LSLTipText_llRotTarget" translate="false">
 	integer llRotTarget(rotation rot, float error)
-	Set rotations with error of rot as a rotational target and return an ID for the rotational target
+	Registers a rotation target: orientations within error radians of rot. Returns a handle. at_rot_target or not_at_rot_target events report whether the object matches it.
 		</string>
 		<string name="LSLTipText_llRotTargetRemove" translate="false">
 	llRotTargetRemove(integer number)
-	Removes rotational target number registered with llRotTarget
+	Cancels the rotation target with handle number.
 		</string>
 		<string name="LSLTipText_llMoveToTarget" translate="false">
 	llMoveToTarget(vector target, float tau)
-	Critically damps to target in tau seconds (if the script is physical)
+	Pulls a physical object toward target, settling there with critical damping over about tau seconds.
 		</string>
 		<string name="LSLTipText_llStopMoveToTarget" translate="false">
 	llStopMoveToTarget()
-	Stops critically damped motion
+	Cancels the pull started by llMoveToTarget.
 		</string>
 		<string name="LSLTipText_llApplyImpulse" translate="false">
 	llApplyImpulse(vector force, integer local)
-	Applies impulse to object (if the script is physical), in local coords if local == TRUE
+	Gives a physical object a one-time push. When local is TRUE the push is in the object's own axes, otherwise in region axes.
 		</string>
 		<string name="LSLTipText_llApplyRotationalImpulse" translate="false">
 	llApplyRotationalImpulse(vector force, integer local)
-	Applies rotational impulse to object (if the script is physical), in local coords if local == TRUE
+	Gives a physical object a one-time spin. When local is TRUE the axes are the object's own, otherwise region axes.
 		</string>
 		<string name="LSLTipText_llSetTorque" translate="false">
 	llSetTorque(vector torque, integer local)
-	Sets the torque of object (if the script is physical), in local coords if local == TRUE
+	Sets a continuous turning force on a physical object. When local is TRUE the axes are the object's own, otherwise region axes.
 		</string>
 		<string name="LSLTipText_llGetTorque" translate="false">
 	vector llGetTorque()
-	Returns the torque (if the script is physical)
+	Continuous turning force currently set on a physical object.
 		</string>
 		<string name="LSLTipText_llSetForceAndTorque" translate="false">
 	llSetForceAndTorque(vector force, vector torque, integer local)
-	Sets the force and torque of object (if the script is physical), in local coords if local == TRUE
+	Sets both the continuous force and the continuous torque on a physical object. When local is TRUE the axes are the object's own, otherwise region axes.
 		</string>
 		<string name="LSLTipText_llGetVel" translate="false">
 	vector llGetVel()
-	Returns the velocity of the object
+	Current velocity of the object in region coordinates.
 		</string>
 		<string name="LSLTipText_llGetAccel" translate="false">
 	vector llGetAccel()
-	Returns the acceleration of the object relative to the region&apos;s axes
+	Current acceleration of the object in region coordinates.
 		</string>
 		<string name="LSLTipText_llGetOmega" translate="false">
 	vector llGetOmega()
-	Returns the rotation velocity in radians per second
+	Current angular velocity of the object, in radians per second.
 		</string>
 		<string name="LSLTipText_llGetTimeOfDay" translate="false">
 	float llGetTimeOfDay()
-	Returns the time in seconds since [SECOND_LIFE] server midnight or since region up-time, whichever is smaller
+	Seconds elapsed since the grid's day began, but never more than the time since the region started.
 		</string>
 		<string name="LSLTipText_llGetWallclock" translate="false">
 	float llGetWallclock()
-	Returns the time in seconds since midnight California Pacific time (PST/PDT)
+	Seconds elapsed since midnight in the US Pacific time zone.
 		</string>
 		<string name="LSLTipText_llGetTime" translate="false">
 	float llGetTime()
-	Returns the time in seconds since the last region reset, script reset, or call to either llResetTime or llGetAndResetTime
+	Seconds on the script's timer. It starts at region start or script reset, and returns to zero when llResetTime or llGetAndResetTime is called.
 		</string>
 		<string name="LSLTipText_llResetTime" translate="false">
 	llResetTime()
-	Sets the script timer to zero
+	Sets the script's timer back to zero.
 		</string>
 		<string name="LSLTipText_llGetAndResetTime" translate="false">
 	float llGetAndResetTime()
-	Returns the script time in seconds and then resets the script timer to zero
+	Returns the script's timer in seconds and sets it back to zero in one step.
 		</string>
 		<string name="LSLTipText_llSoplayund" translate="false">
 	llSound(string sound, float volume, integer queue, integer loop)
-	Plays sound at volume and whether it should loop or not
+	Plays a sound at the given volume. queue says whether it waits for the current sound, and loop whether it repeats.
 		</string>
 		<string name="LSLTipText_llPlaySound" translate="false">
 	llPlaySound(string sound, float volume)
-	Plays attached sound once at volume (0.0 - 1.0)
+	Plays a sound once from the prim itself, at volume 0.0 to 1.0.
 		</string>
 		<string name="LSLTipText_llLoopSound" translate="false">
 	llLoopSound(string sound, float volume)
-	Plays attached sound looping indefinitely at volume (0.0 - 1.0)
+	Plays a sound from the prim in a loop, at volume 0.0 to 1.0.
 		</string>
 		<string name="LSLTipText_llLoopSoundMaster" translate="false">
 	llLoopSoundMaster(string sound, float volume)
-	Plays attached sound looping at volume (0.0 - 1.0), declares it a sync master
+	Loops a sound from the prim at volume 0.0 to 1.0 and marks it as the timing source that slave sounds follow.
 		</string>
 		<string name="LSLTipText_llLoopSoundSlave" translate="false">
 	llLoopSoundSlave(string sound, float volume)
-	Plays attached sound looping at volume (0.0 - 1.0), synced to most audible sync master
+	Loops a sound from the prim at volume 0.0 to 1.0, kept in step with the loudest nearby master loop.
 		</string>
 		<string name="LSLTipText_llPlaySoundSlave" translate="false">
 	llPlaySoundSlave(string sound, float volume)
-	Plays attached sound once at volume (0.0 - 1.0), synced to next loop of most audible sync master
+	Plays a sound once from the prim at volume 0.0 to 1.0, starting on the next cycle of the loudest nearby master loop.
 		</string>
 		<string name="LSLTipText_llTriggerSound" translate="false">
 	llTriggerSound(string sound, float volume)
-	Plays sound at volume (0.0 - 1.0), centered at but not attached to object
+	Plays a sound once at volume 0.0 to 1.0 from where the object is now; the sound does not follow the object.
 		</string>
 		<string name="LSLTipText_llStopSound" translate="false">
 	llStopSound()
-	Stops currently attached sound
+	Stops the sound that is playing from the prim.
 		</string>
 		<string name="LSLTipText_llPreloadSound" translate="false">
 	llPreloadSound(string sound)
-	Preloads a sound on viewers within range
+	Asks viewers near the object to download the sound so it plays without delay later.
 		</string>
 		<string name="LSLTipText_llGetSubString" translate="false">
 	string llGetSubString(string src, integer start, integer end)
-	Returns the indicated substring
+	Part of src from index start to index end, both included. Negative indexes count back from the end of the string.
 		</string>
 		<string name="LSLTipText_llDeleteSubString" translate="false">
 	string llDeleteSubString(string src, integer start, integer end)
-	Removes the indicated substring and returns the result
+	Copy of src with the characters from index start to index end, both included, cut out. Negative indexes count back from the end.
 		</string>
 		<string name="LSLTipText_llInsertString" translate="false">
 	string llInsertString(string dst, integer position, string src)
-	Returns a destination string dst with the string src inserted starting at position pos
+	Copy of dst with src inserted so that it begins at index position.
 		</string>
 		<string name="LSLTipText_llToUpper" translate="false">
 	string llToUpper(string src)
-	Returns a string that is src with all upper-case characters
+	src with every letter converted to upper case.
 		</string>
 		<string name="LSLTipText_llToLower" translate="false">
 	string llToLower(string src)
-	Returns a string that is src with all lower-case characters
+	src with every letter converted to lower case.
 		</string>
 		<string name="LSLTipText_llGiveMoney" translate="false">
 	llGiveMoney(key destination, integer amount)
-	Transfers amount of L$ from script owner to destination
+	Pays amount L$ from the object owner's balance to destination. Needs the owner's debit permission.
 		</string>
 		<string name="LSLTipText_llMakeExplosion" translate="false">
 	llMakeExplosion(integer particles, float scale, float vel, float lifetime, float arc, string texture, vector offset)
-	Makes a round explosion of particles
+	Legacy one-call particle effect: a burst of particles spreading out in a round shape.
 		</string>
 		<string name="LSLTipText_llMakeFountain" translate="false">
 	llMakeFountain(integer particles, float scale, float vel, float lifetime, float arc, integer bounce, string texture, vector offset, float bounce_offset)
-	Makes a fountain of particles
+	Legacy one-call particle effect: particles shot upward in a fountain that can bounce off the ground.
 		</string>
 		<string name="LSLTipText_llMakeSmoke" translate="false">
 	llMakeSmoke(integer particles, float scale, float vel, float lifetime, float arc, string texture, vector offset)
-	Makes smoke like particles
+	Legacy one-call particle effect: rising smoke-like particles.
 		</string>
 		<string name="LSLTipText_llMakeFire" translate="false">
 	llMakeFire(integer particles, float scale, float vel, float lifetime, float arc, string texture, vector offset)
-	Makes fire like particles
+	Legacy one-call particle effect: flame-like particles.
 		</string>
 		<string name="LSLTipText_llRezObject" translate="false">
 	llRezObject(string inventory, vector pos, vector vel, rotation rot, integer param)
-	Instantiates owner&apos;s inventory object at pos with velocity vel and rotation rot with start parameter param
+	Creates a copy of an inventory object at pos with starting velocity vel and rotation rot. param is handed to the new object's scripts as its start parameter.
 		</string>
 		<string name="LSLTipText_llLookAt" translate="false">
 	llLookAt(vector target, float strength, float damping)
-	Causes object to point its up axis (positive z) towards target, while keeping its forward axis (positive x) below the horizon
+	Turns the object, with the given strength and damping, so its +Z axis points toward target while its +X axis is kept from rising above the horizon.
 		</string>
 		<string name="LSLTipText_llStopLookAt" translate="false">
 	llStopLookAt()
-	Stops causing object to point at a target
+	Cancels llLookAt or llRotLookAt.
 		</string>
 		<string name="LSLTipText_llSetTimerEvent" translate="false">
 	llSetTimerEvent(float sec)
-	Causes the timer event to be triggered a maximum of once every sec seconds
+	Makes the timer event fire every sec seconds. 0.0 turns the timer off.
 		</string>
 		<string name="LSLTipText_llSleep" translate="false">
 	llSleep(float sec)
-	Puts the script to sleep for sec seconds
+	Pauses the script for sec seconds.
 		</string>
 		<string name="LSLTipText_llGetMass" translate="false">
 	float llGetMass()
-	Returns the mass in Lindograms (Lg) of object that the script is attached to
+	Mass of the object the script is in, in Lindograms (Lg).
 		</string>
 		<string name="LSLTipText_llCollisionFilter" translate="false">
 	llCollisionFilter(string name, key id, integer accept)
-	Sets the collision filter, exclusively or inclusively. If accept == TRUE, only accept collisions with objects name and id (either is optional), otherwise with objects not name or id
+	Restricts which collisions raise events. With accept = TRUE only objects matching name and/or id count; with FALSE objects matching them are ignored. Empty values are not used as filters.
 		</string>
 		<string name="LSLTipText_llTakeControls" translate="false">
 	llTakeControls(integer controls, integer accept, integer pass_on)
-	Allows for intercepting keyboard and mouse clicks from the agent the script has permissions for
+	Lets the script receive the keyboard and mouse input of the avatar that granted control permission. controls selects the inputs, accept chooses whether they are taken, and pass_on whether the input also continues to the avatar.
 		</string>
 		<string name="LSLTipText_llReleaseControls" translate="false">
 	llReleaseControls()
-	Stops taking inputs that were taken with llTakeControls
+	Gives back the inputs taken with llTakeControls.
 		</string>
 		<string name="LSLTipText_llAttachToAvatar" translate="false">
 	llAttachToAvatar(integer attach_point)
-	Attaches the object to the avatar who has granted permission to the script
+	Attaches the object at attach_point to the avatar that granted the attach permission.
 		</string>
 		<string name="LSLTipText_llDetachFromAvatar" translate="false">
 	llDetachFromAvatar()
-	Detaches object from avatar
+	Detaches the object from the avatar wearing it.
 		</string>
 		<string name="LSLTipText_llTakeCamera" translate="false">
 	llTakeCamera(key avatar)
-	Moves avatar&apos;s viewpoint to task
+	Hands the camera of avatar over to this object. Deprecated.
 		</string>
 		<string name="LSLTipText_llReleaseCamera" translate="false">
 	llReleaseCamera(key avatar)
-	Returns camera to agent avatar
+	Returns the camera of avatar to the avatar. Deprecated.
 		</string>
 		<string name="LSLTipText_llGetOwner" translate="false">
 	key llGetOwner()
-	Returns the object owner&apos;s UUID
+	UUID of the avatar that owns the object.
 		</string>
 		<string name="LSLTipText_llInstantMessage" translate="false">
 	llInstantMessage(key user, string message)
-	Sends the specified string as an Instant Message to the user
+	Sends message as an instant message to user.
 		</string>
 		<string name="LSLTipText_llEmail" translate="false">
 	llEmail(string address, string subject, string message)
-	Sends an email to address with the subject and message
+	Sends an email with the given subject and message to address.
 		</string>
 		<string name="LSLTipText_llGetNextEmail" translate="false">
 	llGetNextEmail(string address, string subject)
-	Gets the next waiting email that comes from address, with specified subject
+	Asks for the next queued email for the object, optionally narrowed by sender address and subject. Delivered through the email event.
 		</string>
 		<string name="LSLTipText_llGetKey" translate="false">
 	key llGetKey()
-	Returns the key of the prim the script is attached to
+	UUID of the prim containing the script.
 		</string>
 		<string name="LSLTipText_llSetBuoyancy" translate="false">
 	llSetBuoyancy(float buoyancy)
-	Sets the buoyancy of the task or object (0 is disabled, &lt; 1.0 sinks, 1.0 floats, &gt; 1.0 rises)
+	Sets how strongly a physical object floats: 0 turns it off, below 1.0 sinks, 1.0 hovers, above 1.0 rises.
 		</string>
 		<string name="LSLTipText_llSetHoverHeight" translate="false">
 	llSetHoverHeight(float height, integer water, float tau)
-	Critically damps to a height above the ground (or water) in tau seconds
+	Makes a physical object settle at height above the ground (or above water when water is TRUE) over about tau seconds.
 		</string>
 		<string name="LSLTipText_llStopHover" translate="false">
 	llStopHover()
-	Stops hovering to a height
+	Cancels the hover set by llSetHoverHeight.
 		</string>
 		<string name="LSLTipText_llMinEventDelay" translate="false">
 	llMinEventDelay(float delay)
-	Sets the minimum time between events being handled
+	Sets the shortest allowed gap, in seconds, between two events delivered to the script.
 		</string>
 		<string name="LSLTipText_llSoundPreload" translate="false">
 	llSoundPreload(string sound)
-	Preloads a sound on viewers within range
+	Asks viewers near the object to download the sound so it plays without delay later.
 		</string>
 		<string name="LSLTipText_llRotLookAt" translate="false">
 	llRotLookAt(rotation target, float strength, float damping)
-	Causes object to point its forward axis towards target
+	Turns the object, with the given strength and damping, so its forward axis points along target.
 		</string>
 		<string name="LSLTipText_llStringLength" translate="false">
 	integer llStringLength(string str)
-	Returns the length of string
+	Number of characters in str.
 		</string>
 		<string name="LSLTipText_llStartAnimation" translate="false">
 	llStartAnimation(string anim)
-	Starts animation anim for agent that granted PERMISSION_TRIGGER_ANIMATION if the permission has not been revoked
+	Starts the animation named anim on the avatar that granted the trigger-animation permission.
 		</string>
 		<string name="LSLTipText_llStopAnimation" translate="false">
 	llStopAnimation(string anim)
-	Stops animation anim for agent that granted permission
+	Stops the animation named anim on the avatar that granted the trigger-animation permission.
 		</string>
 		<string name="LSLTipText_llPointAt" translate="false">
 	llPointAt(vector pos)
-	Makes agent that owns object point at pos
+	Makes the owner's avatar point toward pos.
 		</string>
 		<string name="LSLTipText_llStopPointAt" translate="false">
 	llStopPointAt()
-	Stops pointing agent that owns object
+	Stops the owner's avatar pointing.
 		</string>
 		<string name="LSLTipText_llTargetOmega" translate="false">
 	llTargetOmega(vector axis, float spinrate, float gain)
-	Rotates the object around axis at spinrate with strength gain
+	Makes the object spin about axis at spinrate radians per second, with gain setting how forcefully.
 		</string>
 		<string name="LSLTipText_llGetStartParameter" translate="false">
 	integer llGetStartParameter()
-	Returns an integer that is the script start/rez parameter
+	The integer passed to this script when its object was rezzed (0 if none was given).
 		</string>
 		<string name="LSLTipText_llGodLikeRezObject" translate="false">
 	llGodLikeRezObject(key inventory, vector pos)
-	Rezzes directly off of UUID if owner is in God Mode
+	Rezzes an object directly from its asset UUID. Works only when the owner has administrator powers.
 		</string>
 		<string name="LSLTipText_llRequestPermissions" translate="false">
 	llRequestPermissions(key agent, integer perm)
-	Asks the agent for permission to run certain classes of functions
+	Asks agent to grant the PERMISSION_* flags in perm. The answer arrives in the run_time_permissions event.
 		</string>
 		<string name="LSLTipText_llGetPermissionsKey" translate="false">
 	key llGetPermissionsKey()
-	Returns the key of the avatar that last granted permissions to the script
+	UUID of the avatar whose grant is currently held by the script.
 		</string>
 		<string name="LSLTipText_llGetPermissions" translate="false">
 	integer llGetPermissions()
-	Returns an integer bitfield with the permissions that have been granted
+	Bit field of the PERMISSION_* flags currently granted to the script.
 		</string>
 		<string name="LSLTipText_llGetLinkNumber" translate="false">
 	integer llGetLinkNumber()
-	Returns the link number of the prim containing the script (0 means not linked, 1 the prim is the root, 2 the prim is the first child, etc)
+	Link number of the prim holding the script: 0 for an unlinked prim, 1 for the root, 2 and up for children.
 		</string>
 		<string name="LSLTipText_llSetLinkColor" translate="false">
 	llSetLinkColor(integer linknumber, vector color, integer face)
-	Sets face to color if a task exists in the link chain at linknumber
+	Tints one face of the prim at linknumber (a number or a LINK_* constant).
 		</string>
 		<string name="LSLTipText_llCreateLink" translate="false">
 	llCreateLink(key target, integer parent)
-	Attempts to link the script&apos;s object with the target (requires that PERMISSION_CHANGE_LINKS be granted). If parent == TRUE, then the script&apos;s object becomes the root
+	Links this object to target. Needs the change-links permission. With parent = TRUE this object becomes the root, otherwise target does.
 		</string>
 		<string name="LSLTipText_llBreakLink" translate="false">
 	llBreakLink(integer linknum)
-	Delinks the prim with the given link number in a linked object set (requires that PERMISSION_CHANGE_LINKS be granted)
+	Unlinks the prim at link number linknum. Needs the change-links permission.
 		</string>
 		<string name="LSLTipText_llBreakAllLinks" translate="false">
 	llBreakAllLinks()
-	Delinks all prims in the link set (requires that PERMISSION_CHANGE_LINKS be granted)
+	Unlinks every prim in the link set. Needs the change-links permission.
 		</string>
 		<string name="LSLTipText_llGetLinkKey" translate="false">
 	key llGetLinkKey(integer linknumber)
-	Returns the key of the linked prim linknumber
+	UUID of the prim at link number linknumber.
 		</string>
 		<string name="LSLTipText_llGetLinkName" translate="false">
 	string llGetLinkName(integer linknumber)
-	Returns the name of linknumber in a link set
+	Name of the prim at link number linknumber.
 		</string>
 		<string name="LSLTipText_llGetInventoryNumber" translate="false">
 	integer llGetInventoryNumber(integer type)
-	Returns the number of items of a given type (INVENTORY_* flag) in the prim&apos;s inventory
+	How many inventory items of the given INVENTORY_* type the prim holds.
 		</string>
 		<string name="LSLTipText_llGetInventoryName" translate="false">
 	string llGetInventoryName(integer type, integer number)
-	Returns the name of the inventory item number of a given type
+	Name of inventory item number of the given INVENTORY_* type (counted from 0).
 		</string>
 		<string name="LSLTipText_llSetScriptState" translate="false">
 	llSetScriptState(string name, integer run)
-	Sets the running state of the specified script
+	Starts (run = TRUE) or stops (run = FALSE) the script named name in this prim.
 		</string>
 		<string name="LSLTipText_llGetEnergy" translate="false">
 	float llGetEnergy()
-	Returns how much energy is in the object as a percentage of maximum
+	Energy stored in the object, given as a percentage of its maximum.
 		</string>
 		<string name="LSLTipText_llGiveInventory" translate="false">
 	llGiveInventory(key destination, string inventory)
-	Gives inventory to destination
+	Copies the named inventory item to destination (an avatar or an object).
 		</string>
 		<string name="LSLTipText_llRemoveInventory" translate="false">
 	llRemoveInventory(string item)
-	Removes the named inventory item
+	Deletes the named item from the prim's inventory.
 		</string>
   <string name="LSLTipText_llSetText" translate="false">
 	llSetText(string text, vector color, float alpha)
-	Displays text that hovers over the prim with specific color and translucency specified with alpha
+	Shows floating text above the prim in the given color, with alpha as its opacity.
 		</string>
 		<string name="LSLTipText_llWater" translate="false">
 	float llWater(vector offset)
-	Returns the water height below the object position + offset
+	Water surface height at the object's position shifted by offset.
 		</string>
 		<string name="LSLTipText_llPassTouches" translate="false">
 	llPassTouches(integer pass)
-	If pass == TRUE, touches are passed from children on to parents
+	When pass is TRUE, touch events that reach this prim are also sent on to the parent prim.
 		</string>
 		<string name="LSLTipText_llRequestAgentData" translate="false">
 	key llRequestAgentData(key id, integer data)
-	Requests data about agent id. When data is available the dataserver event will be raised.
+	Asks for the DATA_* information about avatar id. The reply comes back in the dataserver event.
 		</string>
 		<string name="LSLTipText_llRequestInventoryData" translate="false">
 	key llRequestInventoryData(string name)
-	Requests data from object&apos;s inventory object. When data is available the dataserver event will be raised.
+	Asks for data about the named inventory item. The reply comes back in the dataserver event.
 		</string>
 		<string name="LSLTipText_llSetDamage" translate="false">
 	llSetDamage(float damage)
-	Sets the amount of damage that will be done when this object hits an avatar.
+	Sets how much damage the object does when it hits an avatar.
 		</string>
 		<string name="LSLTipText_llTeleportAgentHome" translate="false">
 	llTeleportAgentHome(key id)
-	Teleports avatar on the owner&apos;s land to their home location without any warning
+	Sends avatar id to their home location at once, with no confirmation. Works only on land the owner controls.
 		</string>
 		<string name="LSLTipText_llModifyLand" translate="false">
 	llModifyLand(integer action, integer brush)
-	Modifies land using the specified action on the specified brush size of land
+	Reshapes terrain with the given action (LAND_*) and brush size (LAND_SMALL_BRUSH and so on).
 		</string>
 		<string name="LSLTipText_llCollisionSound" translate="false">
 	llCollisionSound(string impact_sound, float impact_volume)
-	Suppresses default collision sounds, replaces default impact sounds with impact_sound at the volume impact_volume
+	Replaces the built-in collision sounds with impact_sound, played at impact_volume. Calling it also turns the default sounds off.
 		</string>
 		<string name="LSLTipText_llCollisionSprite" translate="false">
 	llCollisionSprite(string impact_sprite)
-	Suppresses default collision sprites, replaces default impact sprite with impact_sprite (use an empty string to just suppress)
+	Replaces the built-in collision particle sprite with impact_sprite. An empty string only turns the default sprite off.
 		</string>
 		<string name="LSLTipText_llGetAnimation" translate="false">
 	string llGetAnimation(key id)
-	Returns the name of the currently playing locomotion animation for avatar id
+	Name of the movement animation (walk, run, stand and so on) that avatar id is playing now.
 		</string>
 		<string name="LSLTipText_llResetScript" translate="false">
 	llResetScript()
-	Resets the script
+	Restarts this script from its beginning: variables are cleared and the default state is entered.
 		</string>
 		<string name="LSLTipText_llMessageLinked" translate="false">
 	llMessageLinked(integer linknum, integer num, string str, key id)
-	Allows scripts in the same object to communicate. Triggers a link_message event with the same parameters num, str, and id in all scripts in the prim(s) described by linknum.
+	Sends a message to the scripts of the prims chosen by linknum (a number or a LINK_* constant). Each receiving script gets a link_message event carrying num, str and id.
 		</string>
 		<string name="LSLTipText_llPushObject" translate="false">
 	llPushObject(key id, vector impulse, vector ang_impulse, integer local)
-	Applies impulse and ang_impulse to object id
+	Pushes the object or avatar id with a linear impulse and an angular impulse. local selects whether the impulses use the target's own axes or region axes.
 		</string>
 		<string name="LSLTipText_llPassCollisions" translate="false">
 	llPassCollisions(integer pass)
-	If pass == TRUE, collisions are passed from children on to parents (default is FALSE)
+	When pass is TRUE, collision events that reach this prim are also sent on to the parent prim. Off by default.
 		</string>
 		<string name="LSLTipText_llGetScriptName" translate="false">
 	string llGetScriptName()
-	Returns the name of the script that this function is used in
+	Name of the script that calls this function.
 		</string>
 		<string name="LSLTipText_llGetNumberOfSides" translate="false">
 	integer llGetNumberOfSides()
-	Returns the number of faces (or sides) of the prim
+	How many faces the prim has.
 		</string>
 		<string name="LSLTipText_llAxisAngle2Rot" translate="false">
 	rotation llAxisAngle2Rot(vector axis, float angle)
-	Returns the rotation that is a generated angle about axis
+	Rotation of angle radians around axis.
 		</string>
 		<string name="LSLTipText_llRot2Axis" translate="false">
 	vector llRot2Axis(rotation rot)
-	Returns the rotation axis represented by rot
+	Axis of the rotation rot, as a unit vector.
 		</string>
 		<string name="LSLTipText_llRot2Angle" translate="false">
 	float llRot2Angle(rotation rot)
-	Returns the rotation angle represented by rot
+	Angle of the rotation rot, in radians.
 		</string>
 		<string name="LSLTipText_llAcos" translate="false">
 	float llAcos(float val)
-	Returns the arccosine in radians of val
+	Angle in radians whose cosine is val. Needs val from -1 to 1.
 		</string>
 		<string name="LSLTipText_llAsin" translate="false">
 	float llAsin(float val)
-	Returns the arcsine in radians of val
+	Angle in radians whose sine is val. Needs val from -1 to 1.
 		</string>
 		<string name="LSLTipText_llAngleBetween" translate="false">
 	float llAngleBetween(rotation a, rotation b)
-	Returns angle between rotation a and b
+	Size in radians of the turn that takes rotation a to rotation b.
 		</string>
 		<string name="LSLTipText_llGetInventoryKey" translate="false">
 	key llGetInventoryKey(string name)
-	Returns the key that is the UUID of the inventory name
+	Asset UUID of the inventory item called name.
 		</string>
 		<string name="LSLTipText_llAllowInventoryDrop" translate="false">
 	llAllowInventoryDrop(integer add)
-	If add == TRUE, users without modify permissions can still drop inventory items onto a prim
+	When add is TRUE, anyone can drop items into the prim's inventory even without modify rights. FALSE restores the normal rule.
 		</string>
 		<string name="LSLTipText_llGetSunDirection" translate="false">
 	vector llGetSunDirection()
-	Returns a normalized vector of the direction of the sun in the region
+	Unit vector pointing from the region toward the sun.
 		</string>
 		<string name="LSLTipText_llGetTextureOffset" translate="false">
 	vector llGetTextureOffset(integer face)
-	Returns the texture offset of face in the x and y components of a vector
+	Texture offset of face, in the x and y fields of a vector.
 		</string>
 		<string name="LSLTipText_llGetTextureScale" translate="false">
 	vector llGetTextureScale(integer side)
-	Returns the texture scale of side in the x and y components of a vector
+	Texture repeats of side, in the x and y fields of a vector.
 		</string>
 		<string name="LSLTipText_llGetTextureRot" translate="false">
 	float llGetTextureRot(integer side)
-	Returns the texture rotation of side
+	Texture rotation of side, in radians.
 		</string>
 		<string name="LSLTipText_llSubStringIndex" translate="false">
 	integer llSubStringIndex(string source, string pattern)
-	Returns an integer that is the index in source where pattern first appears.
-	(Returns -1 if not found)
+	Position in source where pattern first occurs, counting from 0, or -1 when it does not occur.
 		</string>
 		<string name="LSLTipText_llGetOwnerKey" translate="false">
 	key llGetOwnerKey(key id)
-	Returns the owner of object id
+	UUID of the owner of the object id.
 		</string>
 		<string name="LSLTipText_llGetCenterOfMass" translate="false">
 	vector llGetCenterOfMass()
-	Returns the prim&apos;s center of mass (unless called from the root prim, where it returns the object&apos;s center of mass)
+	Center of mass of the prim, in region coordinates. When called from the root prim it gives the center of mass of the whole link set.
 		</string>
 		<string name="LSLTipText_llListSort" translate="false">
 	list llListSort(list src, integer stride, integer ascending)
-	Sorts the list into blocks of stride, in ascending order if ascending == TRUE.
-	The sort order is affected by type.
+	Sorts src and returns it. The list is treated as groups of stride entries, ordered by the first entry of each group, ascending when ascending is TRUE. Ordering depends on the entries' types.
 		</string>
 		<string name="LSLTipText_llGetListLength" translate="false">
 	integer llGetListLength(list src)
-	Returns the number of elements in the list
+	Number of entries in the list.
 		</string>
 		<string name="LSLTipText_llList2Integer" translate="false">
 	integer llList2Integer(list src, integer index)
-	Copies the integer at index in the list
+	Entry at index of the list, as an integer.
 		</string>
 		<string name="LSLTipText_llList2Float" translate="false">
 	float llList2Float(list src, integer index)
-	Copies the float at index in the list
+	Entry at index of the list, as a float.
 		</string>
 		<string name="LSLTipText_llList2String" translate="false">
 	string llList2String(list src, integer index)
-	Copies the string at index in the list
+	Entry at index of the list, as a string.
 		</string>
 		<string name="LSLTipText_llList2Key" translate="false">
 	key llList2Key(list src, integer index)
-	Copies the key at index in the list
+	Entry at index of the list, as a key.
 		</string>
 		<string name="LSLTipText_llList2Vector" translate="false">
 	vector llList2Vector(list src, integer index)
-	Copies the vector at index in the list
+	Entry at index of the list, as a vector.
 		</string>
 		<string name="LSLTipText_llList2Rot" translate="false">
 	rotation llList2Rot(list src, integer index)
-	Copies the rotation at index in the list
+	Entry at index of the list, as a rotation.
 		</string>
 		<string name="LSLTipText_llList2List" translate="false">
 	list llList2List(list src, integer start, integer end)
-	Copies the slice of the list from start to end
+	Sub-list of src from index start to index end, both included.
 		</string>
 		<string name="LSLTipText_llDeleteSubList" translate="false">
 	list llDeleteSubList(list src, integer start, integer end)
-	Removes the slice from start to end and returns the remainder of the list
+	Copy of src with the entries from index start to index end, both included, cut out.
 		</string>
 		<string name="LSLTipText_llGetListEntryType" translate="false">
 	integer llGetListEntryType(list src, integer index)
-	Returns the type of the index entry in the list
-	(TYPE_INTEGER, TYPE_FLOAT, TYPE_STRING, TYPE_KEY, TYPE_VECTOR, TYPE_ROTATION, or TYPE_INVALID if index is off list)
+	Type of the entry at index: TYPE_INTEGER, TYPE_FLOAT, TYPE_STRING, TYPE_KEY, TYPE_VECTOR or TYPE_ROTATION, or TYPE_INVALID when index is outside the list.
 		</string>
 		<string name="LSLTipText_llList2CSV" translate="false">
 	string llList2CSV(list src)
-	Creates a string of comma separated values from list
+	Joins the list entries into one string separated by commas.
 		</string>
 		<string name="LSLTipText_llCSV2List" translate="false">
 	list llCSV2List(string src)
-	Creates a list from a string of comma separated values
+	Splits a comma-separated string into a list.
 		</string>
 		<string name="LSLTipText_llListRandomize" translate="false">
 	list llListRandomize(list src, integer stride)
-	Returns a randomized list of blocks of size stride
+	Shuffles src and returns it. The list is treated as groups of stride entries, and whole groups are reordered.
 		</string>
 		<string name="LSLTipText_llList2ListStrided" translate="false">
 	list llList2ListStrided(list src, integer start, integer end, integer stride)
-	Copies the strided slice of the list from start to end
+	Takes every stride-th entry of src between index start and index end (both included) and returns them as a list.
 		</string>
 		<string name="LSLTipText_llGetRegionCorner" translate="false">
 	vector llGetRegionCorner()
-	Returns a vector in meters that is the global location of the south-west corner of the region which the object is in
+	Global coordinates, in meters, of the region's south-west corner for the region holding the object.
 		</string>
 		<string name="LSLTipText_llListInsertList" translate="false">
 	list llListInsertList(list dest, list src, integer start)
-	Returns a list that contains all the elements from dest but with the elements from src inserted at position start
+	Copy of dest with the entries of src inserted so that they begin at index start.
 		</string>
 		<string name="LSLTipText_llListFindList" translate="false">
 	integer llListFindList(list src, list test)
-	Returns the index of the first instance of test in src.
-	(Returns -1 if not found)
+	Index where the list test first appears as a run inside src, or -1 when it does not.
 		</string>
 		<string name="LSLTipText_llGetObjectName" translate="false">
 	string llGetObjectName()
-	Returns the name of the prim which the script is attached to
+	Name of the prim holding the script.
 		</string>
 		<string name="LSLTipText_llSetObjectName" translate="false">
 	llSetObjectName(string name)
-	Sets the prim&apos;s name to the name parameter
+	Renames the prim to name.
 		</string>
 		<string name="LSLTipText_llGetDate" translate="false">
 	string llGetDate()
-	Returns the current date in the UTC time zone in the format YYYY-MM-DD
+	Today's date in UTC, written YYYY-MM-DD.
 		</string>
 		<string name="LSLTipText_llEdgeOfWorld" translate="false">
 	integer llEdgeOfWorld(vector pos, vector dir)
-	Checks to see whether the border hit by dir from pos is the edge of the world (has no neighboring region)
+	TRUE when walking from pos in direction dir leads off the edge of the grid, with no region next door.
 		</string>
 		<string name="LSLTipText_llGetAgentInfo" translate="false">
 	integer llGetAgentInfo(key id)
-	Returns an integer bitfield containing the agent information about id.
-	Returns AGENT_FLYING, AGENT_ATTACHMENTS, AGENT_SCRIPTED, AGENT_SITTING, AGENT_ON_OBJECT, AGENT_MOUSELOOK, AGENT_AWAY, AGENT_BUSY, AGENT_TYPING, AGENT_CROUCHING, AGENT_ALWAYS_RUN, AGENT_WALKING and/or AGENT_IN_AIR.
+	Bit field of AGENT_* flags for avatar id: AGENT_FLYING, AGENT_ATTACHMENTS, AGENT_SCRIPTED, AGENT_SITTING, AGENT_ON_OBJECT, AGENT_MOUSELOOK, AGENT_AWAY, AGENT_BUSY, AGENT_TYPING, AGENT_CROUCHING, AGENT_ALWAYS_RUN, AGENT_WALKING and/or AGENT_IN_AIR.
 		</string>
 		<string name="LSLTipText_llAdjustSoundVolume" translate="false">
 	llAdjustSoundVolume(float volume)
-	Adjusts volume of attached sound (0.0 - 1.0)
+	Changes the volume (0.0 to 1.0) of the sound attached to the prim.
 		</string>
 		<string name="LSLTipText_llSetSoundQueueing" translate="false">
 	llSetSoundQueueing(integer queue)
-	Sets whether attached sounds wait for the current sound to finish (If queue == TRUE then queuing is enabled, if FALSE queuing is disabled [default])
+	When queue is TRUE, a new attached sound waits for the current one to end. When FALSE (the default), it replaces it.
 		</string>
 		<string name="LSLTipText_llSetSoundRadius" translate="false">
 	llSetSoundRadius(float radius)
-	Establishes a hard cut-off radius for audibility of scripted sounds (both attached and triggered)
+	Sets a distance beyond which sounds from this object, attached or triggered, cannot be heard.
 		</string>
 		<string name="LSLTipText_llKey2Name" translate="false">
 	string llKey2Name(key id)
-	Returns the name of the prim or avatar specified by id.
-	(The id must be a valid rezzed prim or avatar key in the current simulator, otherwise an empty string is returned.)
+	Name of the prim or avatar with UUID id. Gives an empty string unless that item is in this region.
 		</string>
 		<string name="LSLTipText_llSetTextureAnim" translate="false">
 	llSetTextureAnim(integer mode, integer face, integer sizex, integer sizey, float start, float length, float rate)
-	Animates the texture on the specified face/faces
+	Starts, changes or stops an animation of the texture on one face or all faces (mode holds ANIM_ON and the other ANIM_* flags). sizex and sizey give the frame grid, start and length pick the frames, rate is the speed.
 		</string>
 		<string name="LSLTipText_llTriggerSoundLimited" translate="false">
 	llTriggerSoundLimited(string sound, float volume, vector top_north_east, vector bottom_south_west)
-	Plays sound at volume (0.0 - 1.0), centered at but not attached to object, limited to the box defined by vectors top_north_east and bottom_south_west
+	Plays a sound once at volume 0.0 to 1.0 from the object's position, audible only inside the box between the corners top_north_east and bottom_south_west.
 		</string>
 		<string name="LSLTipText_llEjectFromLand" translate="false">
 	llEjectFromLand(key avatar)
-	Ejects avatar from the parcel
+	Removes avatar from the parcel the object is on.
 		</string>
 		<string name="LSLTipText_llParseString2List" translate="false">
 	list llParseString2List(string src, list separators, list spacers)
-	Breaks src into a list, discarding separators, keeping spacers
-	(separators and spacers must be lists of strings, maximum of 8 each)
+	Splits src into a list. Text matching an entry of separators is dropped, text matching an entry of spacers is kept as its own item. Each list may hold at most 8 strings.
 		</string>
 		<string name="LSLTipText_llOverMyLand" translate="false">
 	integer llOverMyLand(key id)
-	Returns TRUE if id is over land owned by the script owner, otherwise FALSE
+	TRUE when the avatar or object id is standing on or above land owned by the script's owner.
 		</string>
 		<string name="LSLTipText_llGetLandOwnerAt" translate="false">
 	key llGetLandOwnerAt(vector pos)
-	Returns the key of the land owner, returns NULL_KEY if public
+	UUID of the owner of the parcel at pos. NULL_KEY when the parcel is not owned by an individual or group.
 		</string>
 		<string name="LSLTipText_llGetNotecardLine" translate="false">
 	key llGetNotecardLine(string name, integer line)
-	Returns line line of notecard name via the dataserver event
+	Asks for line number line of the notecard name. The text comes back in the dataserver event, and the return value identifies the request.
 		</string>
 		<string name="LSLTipText_llGetAgentSize" translate="false">
 	vector llGetAgentSize(key id)
-	If the avatar is in the same region, returns the size of the bounding box of the requested avatar by id, otherwise returns ZERO_VECTOR
+	Size of the bounding box of avatar id, or ZERO_VECTOR when that avatar is not in the region.
 		</string>
 		<string name="LSLTipText_llSameGroup" translate="false">
 	integer llSameGroup(key id)
-	Returns TRUE if avatar id is in the same region and has the same active group, otherwise FALSE
+	TRUE when avatar id is present in this region and has the same active group as the object.
 		</string>
 		<string name="LSLTipText_llUnSit" translate="false">
 	key llUnSit(key id)
-	If avatar identified by id is sitting on the object the script is attached to or is over land owned by the object&apos;s owner, the avatar is forced to stand up
+	Makes avatar id stand up, if that avatar sits on this object or is on land owned by the object's owner.
 		</string>
 		<string name="LSLTipText_llGroundSlope" translate="false">
 	vector llGroundSlope(vector offset)
-	Returns the ground slope below the object position + offset
+	Slope of the terrain at the object's position shifted by offset.
 		</string>
 		<string name="LSLTipText_llGroundNormal" translate="false">
 	vector llGroundNormal(vector offset)
-	Returns the ground normal below the object position + offset
+	Surface normal of the terrain at the object's position shifted by offset.
 		</string>
 		<string name="LSLTipText_llGroundContour" translate="false">
 	vector llGroundCountour(vector offset)
-	Returns the ground contour direction below the object position + offset
+	Direction of the terrain's contour line at the object's position shifted by offset.
 		</string>
 		<string name="LSLTipText_llGetAttached" translate="false">
 	integer llGetAttached()
-	Returns the object&apos;s attachment point, or 0 if not attached
+	Attachment point the object is worn on, or 0 when it is not attached.
 		</string>
 		<string name="LSLTipText_llGetFreeMemory" translate="false">
 	integer llGetFreeMemory()
-	Returns the number of free bytes of memory the script can use
+	Bytes of script memory still available.
 		</string>
 		<string name="LSLTipText_llGetRegionName" translate="false">
 	string llGetRegionName()
-	Returns the current region name
+	Name of the region the object is in.
 		</string>
 		<string name="LSLTipText_llGetRegionTimeDilation" translate="false">
 	float llGetRegionTimeDilation()
-	Returns the current time dilation as a float between 0.0 (full dilation) and 1.0 (no dilation)
+	Region time dilation: 1.0 when the simulation runs at full speed, lower values when it falls behind.
 		</string>
 		<string name="LSLTipText_llGetRegionFPS" translate="false">
 	float llGetRegionFPS()
-	Returns the mean region frames per second
+	Average simulation frames per second of the region.
 		</string>
 		<string name="LSLTipText_llParticleSystem" translate="false">
 	llParticleSystem(list rules)
-	Creates a particle system based on rules.  An empty list removes the particle system.
-	List format is [ rule1, data1, rule2, data2 . . . rulen, datan ]
+	Starts a particle emitter described by rules, a list of PSYS_* parameter and value pairs. An empty list turns the emitter off.
 		</string>
 		<string name="LSLTipText_llGroundRepel" translate="false">
 	llGroundRepel(float height, integer water, float tau)
-	Critically damps to height if within height*0.5 of level (either above ground level, or above the higher of land and water if water == TRUE)
+	Keeps a physical object about height above the ground (or above the higher of ground and water when water is TRUE), easing over about tau seconds. Takes effect only within half of height of that level.
 		</string>
 		<string name="LSLTipText_llGiveInventoryList" translate="false">
 	llGiveInventoryList(key target, string folder, list inventory)
-	Gives inventory items to target, creating a new folder to put them in
+	Copies the inventory items named in inventory into a new folder called folder in the inventory of target.
 		</string>
 		<string name="LSLTipText_llSetVehicleType" translate="false">
 	llSetVehicleType(integer type)
-	Sets the vehicle to one of the default types
+	Turns the object into a vehicle of one of the preset VEHICLE_TYPE_* kinds.
 		</string>
 		<string name="LSLTipText_llSetVehicleFloatParam" translate="false">
 	llSetVehicleFloatParam(integer param, float value)
-	Sets the specified vehicle float parameter
+	Sets one float vehicle parameter (VEHICLE_* name) to value.
 		</string>
 		<string name="LSLTipText_llSetVehicleVectorParam" translate="false">
 	llSetVehicleVectorParam(integer param, vector vec)
-	Sets the specified vehicle vector parameter
+	Sets one vector vehicle parameter (VEHICLE_* name) to vec.
 		</string>
 		<string name="LSLTipText_llSetVehicleRotationParam" translate="false">
 	llSetVehicleVectorParam(integer param, rotation rot)
-	Sets the specified vehicle rotation parameter
+	Sets one rotation vehicle parameter (VEHICLE_* name) to rot.
 		</string>
 		<string name="LSLTipText_llSetVehicleFlags" translate="false">
 	llSetVehicleFlags(integer flags)
-	Sets the enabled bits in &apos;flags&apos;
+	Turns on the VEHICLE_FLAG_* bits given in flags and leaves other flags as they are.
 		</string>
 		<string name="LSLTipText_llRemoveVehicleFlags" translate="false">
 	llRemoveVehicleFlags(integer flags)
-	Removes the enabled bits in &apos;flags&apos;
+	Turns off the VEHICLE_FLAG_* bits given in flags and leaves other flags as they are.
 		</string>
 		<string name="LSLTipText_llSitTarget" translate="false">
 	llSitTarget(vector offset, rotation rot)
-	Sets the sit location for the prim.  If offset == &lt;0,0,0&gt; then the sit target is removed.
+	Sets where a sitting avatar is placed on the prim, as an offset and rotation. An offset of &lt;0,0,0&gt; clears the sit target.
 		</string>
 		<string name="LSLTipText_llAvatarOnSitTarget" translate="false">
 	key llAvatarOnSitTarget()
-	If an avatar is seated on the sit target, returns the avatar&apos;s key, otherwise NULL_KEY
+	UUID of the avatar sitting on the sit target, or NULL_KEY when nobody is.
 		</string>
   <string name="LSLTipText_llAddToLandPassList" translate="false">
 	llAddToLandPassList(key avatar, float hours)
-	Adds avatar to the land pass list for hours, or indefinitely if hours is 0
+	Gives avatar a pass for the parcel for hours hours. 0 hours makes the pass permanent.
 		</string>
 		<string name="LSLTipText_llSetTouchText" translate="false">
 	llSetTouchText(string text)
-	Displays text rather than the default &apos;Touch&apos; in the pie menu
+	Changes the label of the touch entry in the object's pie menu to text.
 		</string>
 		<string name="LSLTipText_llSetSitText" translate="false">
 	llSetSitText(string text)
-	Displays text rather than the default &apos;Sit Here&apos; in the pie menu
+	Changes the label of the sit entry in the object's pie menu to text.
 		</string>
 		<string name="LSLTipText_llSetCameraEyeOffset" translate="false">
 	llSetCameraEyeOffset(vector offset)
-	Sets the camera eye offset for avatars that sit on the object
+	Sets where the camera sits, relative to the object, for avatars seated on it.
 		</string>
 		<string name="LSLTipText_llSetCameraAtOffset" translate="false">
 	llSetCameraAtOffset(vector offset)
-	Sets the point the camera is looking at to offset for avatars that sit on the object
+	Sets the point the camera looks at, relative to the object, for avatars seated on it.
 		</string>
 		<string name="LSLTipText_llDumpList2String" translate="false">
 	string llDumpList2String(list src, string separator)
-	Returns the list in a single string, using separator between the entries
+	Joins the list entries into one string with separator between them.
 		</string>
 		<string name="LSLTipText_llScriptDanger" translate="false">
 	integer llScriptDanger(vector pos)
-	Returns TRUE if pos is over public land, sandbox land, land that doesn&apos;t allow everyone to edit and build, or land that doesn&apos;t allow outside scripts
+	TRUE when scripts at pos could be harmful or restricted there: public land, sandbox land, land where not everyone can build, or land that blocks outside scripts.
 		</string>
 		<string name="LSLTipText_llDialog" translate="false">
 	llDialog(key avatar, string message, list buttons, integer chat_channel
-	Shows a dialog box on the avatar&apos;s screen with a message and up to 12 buttons.
-	If a button is pressed, the avatar says the text of the button label on chat_channel.
+	Shows avatar a dialog with message and at most 12 buttons. When a button is clicked, the avatar speaks its label on chat_channel.
 		</string>
 		<string name="LSLTipText_llVolumeDetect" translate="false">
 	llVolumeDetect(integer detect)
-	If detect = TRUE, object works much like Phantom, but triggers collision_start and collision_end events when other objects start and stop interpenetrating.
-	Must be applied to the root prim.
+	With detect TRUE the object behaves like a phantom volume that still raises collision_start and collision_end events when others enter and leave it. Set it on the root prim.
 		</string>
 		<string name="LSLTipText_llResetOtherScript" translate="false">
 	llResetOtherScript(string name)
-	Resets script name
+	Restarts the script called name in this prim.
 		</string>
 		<string name="LSLTipText_llGetScriptState" translate="false">
 	integer llGetScriptState(string name)
-	Returns TRUE if the script name is running
+	TRUE while the script called name is running.
 		</string>
 		<string name="LSLTipText_llSetRemoteScriptAccessPin" translate="false">
 	llSetRemoteScriptAccessPin(integer pin)
-	If pin is set to a non-zero number, allows a prim to have scripts remotely loaded via llRemoteLoadScriptPin when it passes in the correct pin. Otherwise, llRemoteLoadScriptPin is ignored.
+	Sets the pin that lets other objects load scripts into this prim with llRemoteLoadScriptPin. A pin of 0 switches that off.
 		</string>
 		<string name="LSLTipText_llRemoteLoadScriptPin" translate="false">
 	llRemoteLoadScriptPin(key target, string name, integer pin, integer running, integer start_param)
-	Copies script name onto target, if the owner of this scripted object can modify target and is in the same region, and the matching pin is used.
-	If running == TRUE, starts the script with start_param
+	Copies the script called name into target, optionally starting it with start_param when running is TRUE. Succeeds only if pin matches the target's pin, the target is in this region and the owner may modify it.
 		</string>
 		<string name="LSLTipText_llOpenRemoteDataChannel" translate="false">
 	llOpenRemoteDataChannel()
-	Creates a channel to listen for XML-RPC calls, and will trigger a remote_data event with channel id once it is available
+	Opens an XML-RPC channel for this object. A remote_data event reports the channel once it is ready.
 		</string>
 		<string name="LSLTipText_llSendRemoteData" translate="false">
 	key llSendRemoteData(key channel, string dest, integer idata, string sdata)
-	Sends an XML-RPC request to dest through channel with payload of channel (in a string), integer idata and string sdata.
-	Returns a key that is the message_id for the resulting remote_data events.
+	Posts an XML-RPC request to dest over channel, carrying idata and sdata. The returned key identifies the request in later remote_data events.
 		</string>
 		<string name="LSLTipText_llRemoteDataReply" translate="false">
 	llRemoteDataReply(key channel, key message_id, string sdata, integer idata)
-	Sends an XML-RPC reply to message_id on channel with payload of string sdata and integer idata
+	Answers the XML-RPC request message_id on channel with sdata and idata.
 		</string>
 		<string name="LSLTipText_llCloseRemoteDataChannel" translate="false">
 	llCloseRemoteDataChannel(key channel)
-	Closes XML-RPC channel
+	Closes the XML-RPC channel.
 		</string>
 		<string name="LSLTipText_llMD5String" translate="false">
 	string llMD5String(string src, integer nonce)
-	Returns a string of 32 hex characters that is a RSA Data Security, Inc. MD5 Message-Digest Algorithm of src with nonce
+	MD5 hash of src plus nonce, as 32 hexadecimal characters.
 		</string>
 		<string name="LSLTipText_llSetPrimitiveParams" translate="false">
 	llSetPrimitiveParams(list rules)
-	Sets the prim&apos;s parameters according to rules
+	Changes several prim properties in one call; rules is a list of PRIM_* parameters, each followed by its values.
 		</string>
 		<string name="LSLTipText_llStringToBase64" translate="false">
 	string llStringToBase64(string str)
-	Converts a string to the Base64 representation of the string
+	Base64 encoding of str.
 		</string>
 		<string name="LSLTipText_llBase64ToString" translate="false">
 	string llBase64ToString(string str)
-	Converts a Base64 string to a conventional string.
-	If the conversion creates any unprintable characters, they are converted to spaces.
+	Decodes a Base64 string to text. Bytes that cannot be shown are replaced with spaces.
 		</string>
 		<string name="LSLTipText_llXorBase64Strings" translate="false">
 	string llXorBase64Strings(string s1, string s2)
-	DEPRECATED!  Please use llXorBase64StringsCorrect instead.
-	Incorrectly performs an exclusive or on two Base64 strings and returns a Base64 string.  s2 repeats if it is shorter than s1.  Retained for backwards compatability.
+	Deprecated; use llXorBase64StringsCorrect. XORs two Base64 strings in a way that is kept only for old scripts, repeating s2 when it is shorter than s1.
 		</string>
 		<string name="LSLTipText_llLog10" translate="false">
 	float llLog10(float val)
-	Returns the base 10 logarithm of val.  Returns zero if val &lt;= 0.
+	Base-10 logarithm of val. Returns 0 when val is 0 or negative.
 		</string>
 		<string name="LSLTipText_llLog" translate="false">
 	float llLog(float val)
-	Returns the natural logarithm of val.  Returns zero if val &lt;= 0.
+	Natural logarithm of val. Returns 0 when val is 0 or negative.
 		</string>
 		<string name="LSLTipText_llGetAnimationList" translate="false">
 	list llGetAnimationList(key id)
-	Returns a list of keys of playing animations for avatar described by id
+	List of UUIDs of the animations avatar id is playing.
 		</string>
 		<string name="LSLTipText_llSetParcelMusicURL" translate="false">
 	llSetParcelMusicURL(string url)
-	Sets the streaming audio URL for the parcel which the object is on
+	Sets the audio stream address for the parcel the object is on.
 		</string>
   <string name="LSLTipText_llGetParcelMusicURL" translate="false">
     string llGetParcelMusicURL()
-    Gets the streaming audio URL for the parcel which the object is on
+    Audio stream address of the parcel the object is on.
   </string>
   <string name="LSLTipText_llGetRootPosition" translate="false">
 	vector llGetRootPosition()
-	Returns the position (in region coordinates) of the root prim of the object which the script is attached to
+	Position of the root prim of this object, in region coordinates.
 		</string>
 		<string name="LSLTipText_llGetRootRotation" translate="false">
 	rotation llGetRootRotation()
-	Returns the rotation (relative to the region) of the root prim of the object which the script is attached to
+	Rotation of the root prim of this object, in region coordinates.
 		</string>
 		<string name="LSLTipText_llGetObjectDesc" translate="false">
 	string llGetObjectDesc()
-	Returns the description of the prim the script is attached to
+	Description text of the prim.
 		</string>
 		<string name="LSLTipText_llSetObjectDesc" translate="false">
 	llSetObjectDesc(string name)
-	Sets the prim&apos;s description
+	Sets the description text of the prim.
 		</string>
 		<string name="LSLTipText_llGetCreator" translate="false">
 	key llGetCreator()
-	Returns a key for the creator of the prim
+	UUID of the avatar who made the prim.
 		</string>
 		<string name="LSLTipText_llGetTimestamp" translate="false">
 	string llGetTimestamp()
-	Returns the timestamp in the UTC time zone in the format: YYYY-MM-DDThh:mm:ss.ff..fZ
+	Current UTC date and time in the form YYYY-MM-DDThh:mm:ss.ff..fZ.
 		</string>
 		<string name="LSLTipText_llSetLinkAlpha" translate="false">
 	llSetLinkAlpha(integer linknumber, float alpha, integer face)
-	If a prim exists in the link chain at linknumber, sets face to alpha
+	Sets the opacity of one face of the prim at linknumber.
 		</string>
 		<string name="LSLTipText_llGetNumberOfPrims" translate="false">
 	integer llGetNumberOfPrims()
-	Returns the number of prims in a link set the script is attached to
+	Number of prims in the link set containing the script.
 		</string>
 		<string name="LSLTipText_llGetNumberOfNotecardLines" translate="false">
 	key llGetNumberOfNotecardLines(string name)
-	Returns number of lines in notecard name via the dataserver event (cast return value to integer)
+	Asks for the number of lines in the notecard name. The count arrives in the dataserver event as text; the return value identifies the request.
 		</string>
 		<string name="LSLTipText_llGetBoundingBox" translate="false">
 	list llGetBoundingBox(key object)
-	Returns the bounding box around the object (including any linked prims) relative to its root prim, in a list in the format [ (vector) min_corner, (vector) max_corner ]
+	Bounding box of the object (all linked prims), relative to its root, as the list [min corner, max corner].
 		</string>
 		<string name="LSLTipText_llGetGeometricCenter" translate="false">
 	vector llGetGeometricCenter()
-	Returns the geometric center of the linked set the script is attached to.
+	Geometric center of the link set containing the script.
 		</string>
 		<string name="LSLTipText_llGetPrimitiveParams" translate="false">
 	list llGetPrimitiveParams(list params)
-	Returns the primitive parameters specified in the params list.
+	Reads prim properties: params lists the PRIM_* values wanted, and their current settings come back as a list.
 		</string>
 		<string name="LSLTipText_llIntegerToBase64" translate="false">
 	string llIntegerToBase64(integer number)
-	Returns a string that is a Base64 big endian encode of number
+	Base64 encoding of number as four bytes, most significant byte first.
 		</string>
 		<string name="LSLTipText_llBase64ToInteger" translate="false">
 	integer llBase64ToInteger(string str)
-	Returns an integer that is the str Base64 decoded as a big endian integer
+	Reads the first four bytes of the decoded Base64 string str as a big-endian integer.
 		</string>
 		<string name="LSLTipText_llGetGMTclock" translate="false">
 	float llGetGMTclock()
-	Returns the time in seconds since midnight GMT
+	Seconds since midnight GMT.
 		</string>
 		<string name="LSLTipText_llGetSimulatorHostname" translate="false">
 	string llGetSimulatorHostname()
-	Returns the hostname of the machine which the script is running on (same as string in viewer Help dialog)
+	Host name of the machine running this region.
 		</string>
 		<string name="LSLTipText_llSetLocalRot" translate="false">
 	llSetLocalRot(rotation rot)
-	Sets the rotation of a child prim relative to the root prim
+	Sets the orientation of a child prim relative to its root prim.
 		</string>
 		<string name="LSLTipText_llParseStringKeepNulls" translate="false">
 	list llParseStringKeepNulls(string src, list separators, list spacers)
-	Breaks src into a list, discarding separators, keeping spacers, keeping any null values generated.
-	(separators and spacers must be lists of strings, maximum of 8 each)
+	Like llParseString2List, but empty pieces between consecutive separators stay in the result. Each of separators and spacers may hold at most 8 strings.
 		</string>
 		<string name="LSLTipText_llRezAtRoot" translate="false">
 	llRezAtRoot(string inventory, vector pos, vector vel, rotation rot, integer param)
-	Instantiates owner&apos;s inventory object rotated to rot with its root at pos, moving at vel, using param as the start parameter
+	Creates a copy of an inventory object so that its root prim is at pos, with velocity vel and rotation rot. param becomes the new object's start parameter.
 		</string>
 		<string name="LSLTipText_llGetObjectPermMask" translate="false">
 	integer llGetObjectPermMask(integer mask)
-	Returns the requested permission mask for the root object the task is attached to
+	Permission mask of the given kind (MASK_*) for the root prim of this object.
 		</string>
 		<string name="LSLTipText_llSetObjectPermMask" translate="false">
 	llSetObjectPermMask(integer mask, integer value)
-	Sets the given permission mask to the new value on the root object the task is attached to (requires God Mode)
+	Changes the given kind of permission mask on the root prim of this object. Needs administrator powers.
 		</string>
 		<string name="LSLTipText_llGetInventoryPermMask" translate="false">
 	integer llGetInventoryPermMask(string item, integer mask)
-	Returns the requested permission mask for the inventory item
+	Permission mask of the given kind (MASK_*) for the inventory item.
 		</string>
 		<string name="LSLTipText_llSetInventoryPermMask" translate="false">
 	llSetInventoryPermMask(string item, integer mask, integer value)
-	Sets the given permission mask to the new value on the inventory item (requires God Mode)
+	Changes the given kind of permission mask on an inventory item. Needs administrator powers.
 		</string>
 		<string name="LSLTipText_llGetInventoryCreator" translate="false">
 	key llGetInventoryCreator(string item)
-	Returns a key for the creator of the inventory item
+	UUID of the avatar who made the inventory item.
 		</string>
 		<string name="LSLTipText_llOwnerSay" translate="false">
 	llOwnerSay(string msg)
-	Says msg to owner only.  (Owner must be in the same region.)
+	Sends msg in chat to the owner only. The owner must be in this region.
 		</string>
 		<string name="LSLTipText_llRequestSimulatorData" translate="false">
 	key llRequestSimulatorData(string simulator, integer data)
-	Requests data about simulator.  When data is available the dataserver event will be raised.
+	Asks for information (a DATA_* kind) about the region called simulator. The reply comes back in the dataserver event.
 		</string>
 		<string name="LSLTipText_llForceMouselook" translate="false">
 	llForceMouselook(integer mouselook)
-	If mouselook is TRUE, any avatar that sits upon the prim will be forced into mouselook mode
+	When mouselook is TRUE, avatars that sit on the prim are switched into mouselook view.
 		</string>
 		<string name="LSLTipText_llGetObjectMass" translate="false">
   float llGetObjectMass(key id)
-  Returns the mass in kilograms (KG) of the avatar or object in the region
+  Mass in kilograms of the avatar or object id in this region.
     </string>
 		<string name="LSLTipText_llListReplaceList" translate="false">
 	list llListReplaceList(list dest, list src, integer start, integer end)
-	Returns a list that is dest with start through end removed and src inserted at start
+	Copy of dest with entries start to end removed and the entries of src put in at start.
 		</string>
 		<string name="LSLTipText_llLoadURL" translate="false">
 	llLoadURL(key avatar, string message, string url)
-	Shows a dialog to avatar offering to load the web page at url with a message.
-	If user clicks yes, launches the page in their web browser.
+	Offers avatar a dialog with message asking whether to open url. Accepting opens the page in their browser.
 		</string>
 		<string name="LSLTipText_llParcelMediaCommandList" translate="false">
 	llParcelMediaCommandList(list command)
-	Sends a list of commands, some with arguments, to a parcel to control the playback of movies and other media
+	Controls the parcel's media playback with a list of PARCEL_MEDIA_COMMAND_* commands and their arguments.
 		</string>
 		<string name="LSLTipText_llParcelMediaQuery" translate="false">
 	list llParcelMediaQuery(list query)
-	Returns a list containing results of the sent query
+	Reads parcel media settings; query lists the PARCEL_MEDIA_COMMAND_* values wanted and the answers come back as a list.
 		</string>
 		<string name="LSLTipText_llModPow" translate="false">
 	integer llModPow(integer a, integer b, integer c)
-	Returns a raised to the b power, mod c. ((a**b)%c)
-	b is capped at 0xFFFF (16 bits).
+	Computes (a ** b) mod c. The exponent b is capped at 0xFFFF.
 		</string>
 		<string name="LSLTipText_llGetInventoryType" translate="false">
 	integer llGetInventoryType(string name)
-	Returns the type of the inventory item name
+	Kind of the inventory item name (an INVENTORY_* value), or INVENTORY_NONE when it does not exist.
 		</string>
 		<string name="LSLTipText_llSetPayPrice" translate="false">
 	llSetPayPrice(integer price, list quick_pay_buttons)
-	Sets the default amount on the dialog that appears when someone chooses to pay this prim
+	Sets the amount preset in the pay dialog for this prim and the quick-pay button values. Use PAY_DEFAULT or PAY_HIDE for special behavior.
 		</string>
 		<string name="LSLTipText_llGetCameraPos" translate="false">
 	vector llGetCameraPos()
-	Returns the current camera position for the agent the task has permissions for
+	Camera position of the avatar who granted camera permission.
 		</string>
 		<string name="LSLTipText_llGetCameraRot" translate="false">
 	rotation llGetCameraRot()
-	Returns the current camera orientation for the agent the task has permissions for
+	Camera rotation of the avatar who granted camera permission.
 		</string>
 		<string name="LSLTipText_llSetPrimURL" translate="false">
 	llSetPrimURL(string url)
-	Updates the URL for the web page shown on the sides of the object
+	Sets the web page address shown on the faces of the prim.
 		</string>
 		<string name="LSLTipText_llRefreshPrimURL" translate="false">
 	llRefreshPrimURL()
-	Reloads the web page shown on the sides of the object
+	Reloads the page displayed on the faces of the prim.
 		</string>
 		<string name="LSLTipText_llEscapeURL" translate="false">
 	string llEscapeURL(string url)
-	Returns an escaped/encoded version of url, replacing spaces with %20 etc.
+	Percent-encodes url so it is safe inside a URL, for example a space becomes %20.
 		</string>
 		<string name="LSLTipText_llUnescapeURL" translate="false">
 	string llUnescapeURL(string url)
-	Returns an unescaped/ unencoded version of url, replacing %20 with spaces etc.
+	Decodes a percent-encoded url, for example %20 becomes a space.
 		</string>
 		<string name="LSLTipText_llMapDestination" translate="false">
 	llMapDestination(string simname, vector pos, vector look_at)
-	Opens the World Map centered on the region simname with pos highlighted. (NOTE: look_at currently does nothing.)
-	Only works for scripts attached to avatar, or during touch events.
+	Opens the world map on region simname, marking pos. look_at is ignored. Works only from attachments or during touch events.
 		</string>
 		<string name="LSLTipText_llAddToLandBanList" translate="false">
 	llAddToLandBanList(key avatar, float hours)
-	Adds avatar to the land ban list for hours, or indefinitely if hours is 0
+	Bans avatar from the parcel for hours hours. 0 hours makes the ban permanent.
 		</string>
 		<string name="LSLTipText_llRemoveFromLandPassList" translate="false">
 	llRemoveFromLandPassList(key avatar)
-	Removes avatar from the land pass list
+	Takes avatar off the parcel's pass list.
 		</string>
 		<string name="LSLTipText_llRemoveFromLandBanList" translate="false">
 	llRemoveFromLandBanList(key avatar)
-	Removes avatar from the land ban list
+	Takes avatar off the parcel's ban list.
 		</string>
 		<string name="LSLTipText_llSetCameraParams" translate="false">
 	llSetCameraParams(list rules)
-	Sets multiple camera parameters at once.
-	List format is [ rule1, data1, rule2, data2 . . . rulen, datan ]
+	Sets several scripted-camera settings at once; rules is a list of CAMERA_* parameters, each followed by its value.
 		</string>
 		<string name="LSLTipText_llClearCameraParams" translate="false">
 	llClearCameraParams()
-	Resets all camera parameters to default values and turns off scripted camera control
+	Restores every camera setting to its default and ends scripted camera control.
 		</string>
 		<string name="LSLTipText_llListStatistics" translate="false">
 	float llListStatistics(integer operation, list src)
-	Performs statistical aggregate functions on list src using LIST_STAT_* operations
+	Computes a statistic over the numeric entries of src; operation is one of the LIST_STAT_* values.
 		</string>
 		<string name="LSLTipText_llGetUnixTime" translate="false">
 	integer llGetUnixTime()
-	Returns the number of seconds elapsed since 00:00 hours, Jan 1, 1970 UTC from the system clock
+	Seconds since 1 January 1970 00:00 UTC, read from the server clock.
 		</string>
 		<string name="LSLTipText_llGetParcelFlags" translate="false">
 	integer llGetParcelFlags(vector pos)
-	Returns a mask of the parcel flags (PARCEL_FLAG_*) for the parcel that includes the point pos
+	Bit mask of PARCEL_FLAG_* settings for the parcel containing pos.
 		</string>
 		<string name="LSLTipText_llGetRegionFlags" translate="false">
 	integer llGetRegionFlags()
-	Returns the region flags (REGION_FLAG_*) for the region the object is in
+	Bit mask of REGION_FLAG_* settings for the region holding the object.
 		</string>
 		<string name="LSLTipText_llXorBase64StringsCorrect" translate="false">
 	string llXorBase64StringsCorrect(string s1, string s2)
-	Correctly performs an exclusive or on two Base64 strings and returns a Base64 string.
-	s2 repeats if it is shorter than s1.
+	XORs two Base64 strings and returns the result as Base64, repeating s2 when it is shorter than s1.
 		</string>
 		<string name="LSLTipText_llHTTPRequest" translate="false">
 	llHTTPRequest(string url, list parameters, string body)
-	Sends an HTTP request to the specified url with the body of the request and parameters
+	Sends an HTTP request to url with the given parameters list (HTTP_* options) and body. The answer arrives in the http_response event.
 		</string>
 		<string name="LSLTipText_llResetLandBanList" translate="false">
 	llResetLandBanList()
-	Removes all Residents from the land ban list
+	Empties the parcel's ban list.
 		</string>
 		<string name="LSLTipText_llResetLandPassList" translate="false">
 	llResetLandPassList()
-	Removes all Residents from the land access/pass list
+	Empties the parcel's pass list.
 		</string>
 		<string name="LSLTipText_llGetObjectPrimCount" translate="false">
 	integer llGetObjectPrimCount(key object_id)
-	Returns the total number of prims for an object in the region
+	Total number of prims in the object object_id, if it is in this region.
 		</string>
 		<string name="LSLTipText_llGetParcelPrimOwners" translate="false">
 	list llGetParcelPrimOwners(vector pos)
-	Returns a list of all Residents who own objects on the parcel at pos and with individual prim counts.
-	Requires owner-like permissions for the parcel.
+	List of owners of objects on the parcel at pos, each followed by how many prims they have there. The script owner needs owner-level rights over the parcel.
 		</string>
 		<string name="LSLTipText_llGetParcelPrimCount" translate="false">
 	integer llGetParcelPrimCount(vector pos, integer category, integer sim_wide)
-	Returns the number of prims on the parcel at pos of the given category.
-	Categories: PARCEL_COUNT_TOTAL, _OWNER, _GROUP, _OTHER, _SELECTED, _TEMP
+	How many prims are on the parcel at pos in the chosen category (a PARCEL_COUNT_* value: total, owner, group, other, selected, temporary). sim_wide counts the whole region instead of one parcel.
 		</string>
 		<string name="LSLTipText_llGetParcelMaxPrims" translate="false">
 	integer llGetParcelMaxPrims(vector pos, integer sim_wide)
-	Returns the maximum number of prims allowed on the parcel at pos
+	Largest number of prims the parcel at pos may hold. sim_wide gives the limit for the whole region instead.
 		</string>
 		<string name="LSLTipText_llGetParcelDetails" translate="false">
 	list llGetParcelDetails(vector pos, list params)
-	Returns the parcel details specified in params for the parcel at pos.
-	Params is one or more of: PARCEL_DETAILS_NAME, _DESC, _OWNER, _GROUP, _AREA
+	Reads properties of the parcel at pos. params lists PARCEL_DETAILS_* values (name, description, owner, group, area and so on) and the answers come back as a list in the same order.
 		</string>
 		<string name="LSLTipText_llSetLinkPrimitiveParams" translate="false">
 	llSetLinkPrimitiveParams(integer linknumber, list rules)
-	Sets primitive parameters for linknumber based on rules
+	Changes prim properties on the prim at linknumber; rules is a list of PRIM_* parameters, each followed by its values.
 		</string>
 		<string name="LSLTipText_llSetLinkTexture" translate="false">
 	llSetLinkTexture(integer linknumber, string texture, integer face)
-	Sets the texture of face for a task that exists in the link chain at linknumber
+	Applies a texture to one face of the prim at linknumber.
 		</string>
 		<string name="LSLTipText_llStringTrim" translate="false">
 	string llStringTrim(string src, integer trim_type)
-	Trims the leading and/or trailing white spaces from a string.
-	trim_type can be STRING_TRIM, STRING_TRIM_HEAD or STRING_TRIM_TAIL.
+	Removes white space from src. trim_type is STRING_TRIM (both ends), STRING_TRIM_HEAD (start only) or STRING_TRIM_TAIL (end only).
 		</string>
 		<string name="LSLTipText_llRegionSay" translate="false">
 	llRegionSay(integer channel, string msg)
-	Broadcasts msg on channel (not 0) that can be heard anywhere in the region by a script listening on channel
+	Speaks msg on a nonzero channel to the whole region. Only scripts listening on that channel hear it.
 		</string>
 		<string name="LSLTipText_llGetObjectDetails" translate="false">
 	list llGetObjectDetails(key id, list params)
-	Returns the object details specified in params for the object with key id.
-	Params are OBJECT_NAME, _DESC, _POS, _ROT, _VELOCITY, _OWNER, _GROUP, _CREATOR
+	Reads properties of the object or avatar id. params lists OBJECT_* values (name, description, position, rotation, velocity, owner, group, creator and so on) and the answers come back as a list in the same order.
 		</string>
 		<string name="LSLTipText_llSetClickAction" translate="false">
 	llSetClickAction(integer action)
-	Sets the action performed when a prim is clicked upon
+	Chooses what happens when someone clicks the prim, using a CLICK_ACTION_* value.
 		</string>
 		<string name="LSLTipText_llGetRegionAgentCount" translate="false">
 	integer llGetRegionAgentCount()
-	Returns the number of avatars in the region
+	Number of avatars currently in the region.
 		</string>
 		<string name="LSLTipText_llTextBox" translate="false">
 	llTextBox(key avatar, string message, integer chat_channel)
-	Shows a window on the avatar&apos;s screen with the message.
-	It contains a text box for input, and if entered that text is chatted on chat_channel.
+	Opens a text entry window for avatar showing message. What they type is spoken on chat_channel.
 		</string>
 		<string name="LSLTipText_llGetAgentLanguage" translate="false">
 	string llGetAgentLanguage(key avatar)
-	Returns the language code of the preferred interface language of the avatar
+	Language code of the interface language avatar has chosen.
 		</string>
 		<string name="LSLTipText_llDetectedTouchUV" translate="false">
 	vector llDetectedTouchUV(integer index)
-	Returns the u and v coordinates in the first two components of a vector, for the texture coordinates where the prim was touched in a triggered touch event
+	Texture (u, v) coordinates of the touch point, in the first two fields of the vector. Used in touch events.
 		</string>
 		<string name="LSLTipText_llDetectedTouchFace" translate="false">
 	integer llDetectedTouchFace(integer index)
-	Returns the index of the face where the avatar clicked in a triggered touch event
+	Index of the face that was touched. Used in touch events.
 		</string>
 		<string name="LSLTipText_llDetectedTouchPos" translate="false">
 	vector llDetectedTouchPos(integer index)
-	Returns the position where the object was touched in a triggered touch event
+	Position of the touch point. Used in touch events.
 		</string>
 		<string name="LSLTipText_llDetectedTouchNormal" translate="false">
 	vector llDetectedTouchNormal(integer index)
-	Returns the surface normal for a triggered touch event
+	Surface normal at the touch point. Used in touch events.
 		</string>
 		<string name="LSLTipText_llDetectedTouchBinormal" translate="false">
 	vector llDetectedTouchBinormal(integer index)
-	Returns the surface binormal for a triggered touch event
+	Surface binormal at the touch point. Used in touch events.
 		</string>
 		<string name="LSLTipText_llDetectedTouchST" translate="false">
 	vector llDetectedTouchST(integer index)
-	Returns the s and t coordinates in the first two components of a vector, for the surface coordinates where the prim was touched in a triggered touch event
+	Surface (s, t) coordinates of the touch point, in the first two fields of the vector. Used in touch events.
 		</string>
 		<string name="LSLTipText_llSHA1String" translate="false">
 	string llSHA1String(string src)
-	Returns a string of 40 hex characters that is the SHA1 security Hash of src
+	SHA-1 hash of src, as 40 hexadecimal characters.
 		</string>
 		<string name="LSLTipText_llGetFreeURLs" translate="false">
 	integer llGetFreeURLs()
-	Returns the number of available URLs for the current script
+	How many more URLs this script may obtain.
 		</string>
 		<string name="LSLTipText_llRequestURL" translate="false">
 	key llRequestURL()
-	Requests one HTTP:// url for use by this object.
-	An http_request event is triggered with the results.
+	Asks for an HTTP URL that outside clients can use to reach this script. The result arrives in an http_request event.
 		</string>
 		<string name="LSLTipText_llRequestSecureURL" translate="false">
 	key llRequestSecureURL()
-	Requests one HTTPS:// (SSL) url for use by this object.
-	An http_request event is triggered with the results.
+	Asks for an HTTPS URL that outside clients can use to reach this script. The result arrives in an http_request event.
 		</string>
 		<string name="LSLTipText_llReleaseURL" translate="false">
 	llReleaseURL(string url)
-	Releases the specified URL, it will no longer be usable
+	Gives up url so that it stops working.
 		</string>
 		<string name="LSLTipText_llHTTPResponse" translate="false">
 	llHTTPResponse(key request_id, integer status, string body)
-	Responds to request_id with status and body
+	Answers the incoming HTTP request request_id with the given status code and body.
 	  </string>
 		<string name="LSLTipText_llGetHTTPHeader" translate="false">
 	string llGetHTTPHeader(key request_id, string header)
-	Returns the value for header for request_id
+	Value of the header called header in the incoming HTTP request request_id.
 		</string>
 	  <string name="LSLTipText_llSetPrimMediaParams" translate="false">
 	integer llSetPrimMediaParams(integer face, list params)
-	Sets the media params for a particular face on an object. If media is not already on this object, add it.
-	List is a set of name/value pairs in no particular order.  Params not specified are unchanged, or if new media is added then set to the default specified.
-	Returns an integer that is a STATUS_* flag which details the success/failure of the operation(s).
+	Adds media to a face, or changes it if present. params is a list of PRIM_MEDIA_* names each followed by a value; settings left out stay as they are, or take defaults for new media. Returns a STATUS_* code for the outcome.
 	  </string>
 	  <string name="LSLTipText_llSetLinkMedia" translate="false">
 	integer llSetLinkMedia(integer linknumber, integer face, list params)
-	Sets the media params for linknumber for a particular face on an object. If media is not already on this object, add it.
-	List is a set of name/value pairs in no particular order.  Params not specified are unchanged, or if new media is added then set to the default specified.
-	Returns an integer that is a STATUS_* flag which details the success/failure of the operation(s).
+	Same as llSetPrimMediaParams but acts on the prim at linknumber. Returns a STATUS_* code for the outcome.
 	  </string>	  
 	  <string name="LSLTipText_llGetPrimMediaParams" translate="false">
 	list llGetPrimMediaParams(integer face, list params)
-	Returns the media params for a particular face on an object, given the desired list of names, in the order requested.
-	(Returns an empty list if no media exists on the face.)
+	Reads media settings of a face. params lists the PRIM_MEDIA_* names wanted and values come back in that order. The list is empty when the face has no media.
 	  </string>
 	  <string name="LSLTipText_llGetLinkMedia" translate="false">
 	list llGetLinkMedia(integer linknumber, integer face, list params)
-	Returns the media params for linknumber for a particular face on an object, given the desired list of names, in the order requested.
-	(Returns an empty list if no media exists on the face.)
+	Same as llGetPrimMediaParams but acts on the prim at linknumber. The list is empty when the face has no media.
 	  </string>	  
 	  <string name="LSLTipText_llClearPrimMedia" translate="false">
 	integer llClearPrimMedia(integer face)
-	Clears (deletes) the media and all params from the given face.
-	Returns an integer that is a STATUS_* flag which details the success/failure of the operation(s).
+	Removes the media and all its settings from a face. Returns a STATUS_* code for the outcome.
 	  </string>
 	  <string name="LSLTipText_llClearLinkMedia" translate="false">
 	integer llClearLinkMedia(integer linknumber, integer face)
-	Clears (deletes) the media and all params from the given face on the given linknumber.
-	Returns an integer that is a STATUS_* flag which details the success/failure of the operation(s).
+	Removes the media and all its settings from a face of the prim at linknumber. Returns a STATUS_* code for the outcome.
 	  </string>	  
 	<string name="LSLTipText_llSetLinkPrimitiveParamsFast" translate="false">
 	llSetLinkPrimitiveParamsFast(integer linknumber,list rules)
-	Set primitive parameters for linknumber based on rules.
+	Same as llSetLinkPrimitiveParams, but without the built-in delay after the call.
 	</string>
 	<string name="LSLTipText_llGetLinkPrimitiveParams" translate="false">
 	llGetLinkPrimitiveParams(integer linknumber,list rules)
-	Get primitive parameters for linknumber based on rules.
+	Reads prim properties of the prim at linknumber; rules lists the PRIM_* values wanted and the answers come back as a list.
 	</string>
 	<string name="LSLTipText_llLinkParticleSystem" translate="false">
 	llLinkParticleSystem(integer linknumber,list rules)
-	Creates a particle system based on rules.  Empty list removes particle system from object.
-	List format is [ rule1, data1, rule2, data2 . . . rulen, datan ].
+	Starts a particle emitter on the prim at linknumber, described by rules (PSYS_* parameter and value pairs). An empty list turns it off.
 	</string>
 	<string name="LSLTipText_llSetLinkTextureAnim" translate="false">
 	llSetLinkTextureAnim(integer link, integer mode, integer face, integer sizex, integer sizey, float start, float length, float rate)
-	Animate the texture on the specified prim's face/faces.
+	Starts, changes or stops a texture animation on one face or all faces of the prim at link. Other arguments work as in llSetTextureAnim.
 	</string>
 	<string name="LSLTipText_llGetLinkNumberOfSides" translate="false">
 	integer llGetLinkNumberOfSides(integer link)
-	Returns the number of sides of the specified linked prim.
+	Number of faces of the prim at link number link.
 	</string>
 	<string name="LSLTipText_llGetUsername" translate="false">
 	string llGetUsername(key id)
-	Returns the single-word username of an avatar, iff the avatar is in the current region, otherwise the empty string.
+	Account user name of avatar id, or an empty string if that avatar is not in the region.
 	</string>
 	<string name="LSLTipText_llRequestUsername" translate="false">
 	key llRequestUsername(key id)
-	Requests single-word username of an avatar.  When data is available the dataserver event will be raised.
+	Asks for the account user name of avatar id. The answer arrives in the dataserver event.
 	</string>
 	<string name="LSLTipText_llGetDisplayName" translate="false">
 	  string llGetDisplayName(key id)
-	  Returns the name of an avatar, iff the avatar is in the current simulator, and the name has been cached, otherwise the same as llGetUsername.  Use llRequestDisplayName if you absolutely must have the display name.
+	  Display name of avatar id when it is already known to the region; otherwise the account user name. An empty string if the avatar is not in the region. Use llRequestDisplayName when the display name is required.
 	</string>
 	<string name="LSLTipText_llRequestDisplayName" translate="false">
 	key llRequestDisplayName(key id)
-	Requests name of an avatar.  When data is available the dataserver event will be raised.
+	Asks for the display name of avatar id. The answer arrives in the dataserver event.
 	</string>
   <string name="LSLTipText_llSetRegionPos" translate="false">
     integer llSetRegionPos(vector v)
-    Moves the position of the script host to the specified region location.
+    Moves the object to v, a position in the region. Returns TRUE if the move was made.
   </string>
   <string name="LSLTipText_iwGetLinkInventoryNumber" translate="false">
     integer iwGetLinkInventoryNumber(integer linknumber, integer type)
-    Returns an integer that is the number of items of a given type in the prims inventory.
+    Number of inventory items of the given type in the prim at linknumber.
   </string>
   <string name="LSLTipText_iwGetLinkInventoryType" translate="false">
     integer iwGetLinkInventoryType(integer linknumber, string name)
-    Returns an integer that is the type of the inventory item name.
+    Type (an INVENTORY_* value) of the item name in the prim at linknumber.
   </string>
   <string name="LSLTipText_iwGetLinkInventoryPermMask" translate="false">
     integer iwGetLinkInventoryPermMask(integer linknumber, string item, integer mask)
-    Returns an integer bitfield that is the requested permission mask for the inventory item.
+    Permission mask of the given kind (MASK_*) for an inventory item of the prim at linknumber.
   </string>
   <string name="LSLTipText_iwGetLinkInventoryName" translate="false">
     string iwGetLinkInventoryName(integer linknumber, integer type, integer number)
-    Returns a string that is the name of the inventory item number of type, or an empty string if no item of the specified type is found in the prim's inventory (or there are less than or equal to number items of the type).
+    Name of inventory item number of the given type in the prim at linknumber, counted from 0. Empty string when there is no such item.
   </string>
   <string name="LSLTipText_iwGetLinkInventoryKey" translate="false">
     key iwGetLinkInventoryKey(integer linknumber, string name)
-    Returns a key that is the UUID of the inventory name.
+    Asset UUID of the item name in the prim at linknumber.
   </string>
   <string name="LSLTipText_iwGetLinkInventoryCreator" translate="false">
     key iwGetLinkInventoryCreator(integer linknumber, string item)
-    Returns a key of the creator of the inventory item.
+    UUID of the creator of an inventory item of the prim at linknumber.
   </string>
   <string name="LSLTipText_iwSHA256String" translate="false">
     string iwSHA256String(string src)
-    Returns the SHA256 hash for the specified source text string.
+    SHA-256 hash of src, as a hexadecimal string.
   </string>
   <string name="LSLTipText_iwTeleportAgent" translate="false">
     void iwTeleportAgent(key agent, string region, vector pos, vector lookat)
-    Teleports the specified user to the location indicated, with no prompting or other dialogs.
+    Teleports agent to pos in region, facing lookat, without asking them first.
   </string>
   <string name="LSLTipText_llAvatarOnLinkSitTarget" translate="false">
     key llAvatarOnLinkSitTarget()
-    If an avatar is seated on a sit target on the specified prim, returns the avatar&apos;s key, otherwise NULL_KEY
+    UUID of the avatar on the sit target of the prim at link number, or NULL_KEY when nobody is.
   </string>
   <string name="LSLTipText_iwGetLastOwner" translate="false">
     key iwGetLastOwner()
-    Returns the UUID of the previous owner&apos;s to rez this object.
+    UUID of the owner this object had before the current one.
   </string>
   <string name="LSLTipText_iwRemoveLinkInventory" translate="false">
     iwRemoveLinkInventory(integer linknum, string item)
-    Removes the named inventory item from the specified prim.
+    Deletes the item named item from the inventory of the prim at linknum.
   </string>
   <string name="LSLTipText_iwGiveLinkInventory" translate="false">
     iwGiveLinkInventory(integer linknum, key target, string inventory)
-    Gives inventory from the specified prim to the specified target.
+    Copies an inventory item from the prim at linknum to target.
   </string>
   <string name="LSLTipText_iwGiveLinkInventoryList" translate="false">
     iwGiveLinkInventoryList(integer linknum, key target, string folder, list inventory)
-    Gives inventory items from the speified prim to target, creating a new folder to put them in.
+    Copies the items named in inventory from the prim at linknum into a new folder called folder in the inventory of target.
   </string>
   <string name="LSLTipText_iwGetNotecardSegment" translate="false">
     key iwGetNotecardSegment(string name, integer line, integer startOffset, integer maxLength)
-    Returns a line of the specified notecard via the dataserver event, from startOffset for maxLength characters.
+    Asks for part of line number line of the notecard name: maxLength characters starting at startOffset. The text comes back in the dataserver event.
   </string>
   <string name="LSLTipText_iwGetLinkNumberOfNotecardLines" translate="false">
     key iwGetLinkNumberOfNotecardLines(integer linknumber, string name);
-    Returns number of lines in specified notecard in the specified prim, via the dataserver event (cast return value to integer)
+    Asks for the line count of the notecard name in the prim at linknumber. The count arrives in the dataserver event as text; the return value identifies the request.
   </string>
   <string name="LSLTipText_iwGetLinkNotecardLine" translate="false">
     key iwGetLinkNotecardLine(integer linknumber, string name, integer line);
-    Returns specified line of the specified notecard in the specified prim, via the dataserver event.
+    Asks for one line of the notecard name in the prim at linknumber. The text comes back in the dataserver event.
   </string>
   <string name="LSLTipText_iwGetLinkNotecardSegment" translate="false">
     key iwGetLinkNotecardSegment(integer linknumber, string name, integer line, integer startOffset, integer maxLength);
-    Returns a line of the specified notecard in the specified prim, via the dataserver event, from startOffset for maxLength characters.
+    Asks for part of one line of a notecard in the prim at linknumber: maxLength characters starting at startOffset. The text comes back in the dataserver event.
   </string>
   <string name="LSLTipText_iwActiveGroup" translate="false">
     integer iwActiveGroup(key agentId, key groupId)
-    Returns TRUE if avatar id is in the same region and has the specific active group, otherwise FALSE
+    TRUE when avatar agentId is in this region and has groupId as the active group.
   </string>
   <string name="LSLTipText_iwAvatarOnLink" translate="false">
     key iwAvatarOnLink(integer linknumber)
-    If an avatar is seated on the specified prim, returns the avatar&apos;s key, otherwise NULL_KEY. Does not require a sit target.
+    UUID of the avatar seated on the prim at linknumber, or NULL_KEY. The prim does not need a sit target.
   </string>
   <string name="LSLTipText_llRegionSayTo" translate="false">
     llRegionSayTo(key destination, integer channel, string msg)
-    Sends msg on channel (not 0) to destination that can be heard anywhere in the region by a script listening on that channel
+    Speaks msg on a nonzero channel to destination only, anywhere in the region. Only a script of that recipient listening on that channel hears it.
   </string>
   <string name="LSLTipText_llGetUsedMemory" translate="false">
     integer llGetUsedMemory()
-    Returns the number of bytes of memory used by the script
+    Bytes of memory the script is using.
   </string>
   <string name="LSLTipText_iwGetLinkInventoryDesc" translate="false">
     string iwGetLinkInventoryDesc(integer linknumber, string name);
-    Returns the description text the specified inventory item.
+    Description text of an inventory item in the prim at linknumber.
   </string>
   <string name="LSLTipText_llGenerateKey" translate="false">
     key llGenerateKey();
-    Allocates and returns a new unique key (UUID).
+    Creates and returns a new, unique UUID.
   </string>
   <string name="LSLTipText_iwGetLinkInventoryLastOwner" translate="false">
     key iwGetLinkInventoryLastOwner(integer linknumber, string name);
-    Returns the key of the last owner key of the specified inventory item.
+    UUID of the owner an inventory item had before its current owner.
   </string>
   <string name="LSLTipText_iwRezObject" translate="false">
     key iwRezObject(string inventory, vector pos, vector vel, rotation rot, integer param)
-    Instantiates Contents object as specified like llRezObject but also returns the key of the new object.
+    Like llRezObject, but also returns the UUID of the newly created object.
   </string>
   <string name="LSLTipText_iwRezAtRoot" translate="false">
     key iwRezAtRoot(string inventory, vector pos, vector vel, rotation rot, integer param)
-    Instantiates Contents object as specified like llRezAtRoot but also returns the key of the new object.
+    Like llRezAtRoot, but also returns the UUID of the newly created object.
   </string>
   <string name="LSLTipText_iwRezPrim" translate="false">
     key iwRezPrim(list primParams, list particleSystem, list inventoryList, vector pos, vector vel, rotation rot, integer param)
-    Instantiates a new prim as specified with prim, particle and initial inventory Contents, returning the key of the new object.
+    Creates a new prim from primParams and particleSystem settings, filled with the inventoryList items, at pos with velocity vel and rotation rot. Returns the UUID of the new object.
   </string>
   <string name="LSLTipText_llGetAgentList" translate="false">
     list llGetAgentList(integer scope, list options)
-    Returns a list of up to 100 keys for users in a region according to the specifed scope.
-    The options parameter is not used.  See iwGetAgentList for more control.
+    List of up to 100 avatar UUIDs for the given scope (AGENT_LIST_*). options is not used; iwGetAgentList gives more control.
   </string>
   <string name="LSLTipText_iwGetAgentList" translate="false">
     list iwGetAgentList(integer scope, vector minPos, vector maxPos, list params)
-    Returns a list of up to 100 keys for users in a region according to the specifed scope
-    and bounding box specified by the minimum and maximum position vectors.
-    The params are the same as those used by llGetObjectDetails.
+    List of up to 100 avatar entries for the given scope, limited to the box between minPos and maxPos. params picks the details returned for each avatar, as in llGetObjectDetails.
   </string>
   <string name="LSLTipText_iwGetWorldBoundingBox" translate="false">
     list iwGetWorldBoundingBox(key object)
-    Returns the bounding box around the object (including any linked prims) in absolute world coordinates, in a list in the format [ (vector) min_corner, (vector) max_corner ]
+    Bounding box of the object (all linked prims) in absolute world (grid-wide) coordinates, as the list [min corner, max corner].
   </string>
   <string name="LSLTipText_llSetMemoryLimit" translate="false">
     integer llSetMemoryLimit(integer limit)
-    Sets the number of free bytes of memory the script can use. No effect under Phlox in InWorldz.
+    Requests a new memory limit, in bytes, for the script. Phlox ignores the request.
   </string>
   <string name="LSLTipText_llGetMemoryLimit" translate="false">
     integer llGetMemoryLimit()
-    Returns the number of free bytes of memory the script can use. Always 64K under Phlox in InWorldz.
+    Memory limit of the script, in bytes. Phlox always reports 64K.
   </string>
   <string name="LSLTipText_llManageEstateAccess" translate="false">
     integer llManageEstateAccess(integer action, key avatar)
-    This is used to add or remove agents from the estate's agent access or ban lists or groups from the estate's group access list. Returns FALSE on error, TRUE on success.
+    Changes the estate's access lists: adds or removes an avatar on the allowed or banned list, or a group on the allowed-group list, depending on action (ESTATE_ACCESS_*). Returns TRUE on success and FALSE on failure.
   </string>
   <string name="LSLTipText_llSubStringIndex" translate="false">
     integer iwSubStringIndex(string source, string pattern, integer offset, integer isCaseSensitive)
-    Returns an integer that is the index in source where pattern first appears, starting from offset. Pass FALSE or TRUE to the last parameter for case-sensitivity.
-    (Returns -1 if not found)
+    Position in source where pattern first occurs at or after offset, counting from 0, or -1 when it does not occur. isCaseSensitive picks whether letter case matters.
   </string>
   <string name="LSLTipText_llLinkSitTarget" translate="false">
     llLinkSitTarget( integer link, vector offset, rotation rot )
-    Sets the sit location for the prim specified by link.  If offset == &lt;0,0,0&gt; then the sit target is removed.
+    Sets where a sitting avatar is placed on the prim at link, as an offset and rotation. An offset of &lt;0,0,0&gt; clears that sit target.
   </string>
   <string name="LSLTipText_llGetMass" translate="false">
     float llGetMassMKS()
-    Returns the mass in Lindograms (Lg) of object that the script is attached to
+    Mass in kilograms of the object the script is in.
   </string>
   <string name="LSLTipText_llGetObjectMass" translate="false">
     float llGetObjectMass(key id)
-    Returns the mass in kilograms (KG) of the avatar or object in the region
+    Mass in kilograms of the avatar or object id in this region.
   </string>
   <string name="LSLTipText_iwSetGround" translate="false">
     iwSetGround(integer x1, integer y1, integer x2, integer y2, float height);
-    Modifies the terrain to set the ground the the height specified within the rectangle specified
+    Sets the terrain to height across the rectangle with corners (x1, y1) and (x2, y2).
   </string>
   <string name="LSLTipText_llSetContentType" translate="false">
     llSetContentType( key request_id, integer content_type );
-    Set the Internet media type of an LSL HTTP server response.
+    Sets the Content-Type of the reply to HTTP request request_id, using a CONTENT_TYPE_* value.
   </string>
   <string name="LSLTipText_llJsonGetValue" translate="false">
     string llJsonGetValue( string json, list specifiers );
-	Gets the value indicated by specifiers from the json string. When the input is invalid or no result can be found this function returns JSON_INVALID. If the result is null the function returns JSON_NULL.
+    Reads the value found by following specifiers (a path of keys and indexes) inside json. Returns JSON_INVALID when the json is malformed or the path is missing, and JSON_NULL when the value is null.
   </string>
   <string name="LSLTipText_llJsonValueType" translate="false">
     string llJsonValueType( string json, list specifiers );
-    Gets the JSON type for the value in json at the location specifiers.
+    Type of the JSON value found by following specifiers inside json (a JSON_* constant).
   </string>
   <string name="LSLTipText_llJsonSetValue" translate="false">
     string llJsonSetValue( string json, list specifiers, string value );
-	Returns a new JSON string which is string with the value indicated by specifiers set to value.
+    Returns a copy of json in which the value at the path specifiers is replaced by value.
   </string>
   <string name="LSLTipText_llList2Json" translate="false">
     string llList2Json( string type, list values );
-    This function takes a list and returns a JSON string of that list as either a json object or json array.  
+    Turns a list into JSON text: a JSON_OBJECT from key/value pairs or a JSON_ARRAY from plain entries, as chosen by type.
   </string>  
   <string name="LSLTipText_llJson2List" translate="false"> 
 	list llJson2List( string src );
-	This function takes a string representing JSON, and returns a list of the top level.
+	Splits the top level of a JSON string into a list of its entries.
   </string>
   <string name="LSLTipText_iwSetWind" translate="false">
     iwSetWind( integer type, vector offset, vector speed );
-    This function sets (or unsets) the current wind speed at the given region coordinates.
+    Sets, or clears, the wind speed at the given position in the region.
   </string>
   <string name="LSLTipText_iwHasParcelPowers" translate="false">
     integer iwHasParcelPowers( integer groupPower );
-    This function returns non-zero if the script owner has the specific group power (see IW_POWER_* constants).
-    IW_POWER_MANAGE_PASSES and the powers after it (IW_POWER_FREEZE_EJECT ... IW_POWER_OBJECT_RETURN) cannot be
-    combined with | : ask for each of them in its own call. The powers before it can be combined, and any one held is enough.
+    Non-zero when the script owner holds the given group power (an IW_POWER_* value). IW_POWER_MANAGE_PASSES and the powers after it, up to IW_POWER_OBJECT_RETURN, must each be asked for in a separate call and cannot be joined with |. The earlier powers can be joined, and holding any one of them is enough.
   </string>
   <string name="LSLTipText_iwGroundSurfaceNormal" translate="false">
     vector iwGroundSurfaceNormal(vector offset)
-    Returns the actual surface normal to the ground below the object position + offset
+    True surface normal of the terrain at the object's position shifted by offset.
   </string>
   <string name="LSLTipText_iwRequestAnimationData" translate="false">
     key iwGetAnimationData(string name)
-    Returns a key for a dataserver event that will provide details about an animation in the prim's contents.
+    Asks for details of an animation held in the prim's inventory. The answer comes back in the dataserver event, and the returned key identifies the request.
   </string>
   <string name="LSLTipText_llCastRay" translate="false">
     list llCastRay(vector start, vector end, list options)
-    Cast a ray from start to end and report collision data for intersections with objects.
-    Returns a list of strided values with an additional integer status_code on the end.
-    Each stride consists of two mandatory values {key uuid, vector position} and possibly 
-    some optional values {integer link_number, vector normal} see RC_DATA_FLAGS for details.
-    The status_code if it is negative is an error code, otherwise it is the number of hits (and strides) returned.
+    Traces a ray from start to end and reports what it hits. options is a list of RC_* settings. The result is a list of hits, each holding the UUID and position of what was hit and optionally more (link number and normal, depending on RC_DATA_FLAGS), followed by one integer: a negative error code, or else the number of hits returned.
   </string>
   <string name="LSLTipText_llSetKeyframedMotion" translate="false">
     llSetKeyframedMotion(list keyframes, list options)
-    Specify a list of times, positions, and orientations to be followed by an object.
-    The object will be smoothly moved between keyframes by the simulator.
+    Moves the object along a list of keyframes (positions, rotations and times). The simulator interpolates smoothly between them. options holds KFM_* settings.
   </string>
   <string name="LSLTipText_iwWind" translate="false">
     vector iwWind(vector offset)
-    Like llWind except that it can include a Z coordinate value.
+    Wind velocity at the object's position shifted by offset. Unlike llWind, offset may include a height.
   </string>
   <string name="LSLTipText_llGetPhysicsMaterial" translate="false">
     list llGetPhysicsMaterial()
-    Returns the physical characteristics of an object, as a list, in the form:
-    [ float gravity_multiplier, float restitution, float friction, float density ]
+    Physics settings of the object as the list [gravity multiplier, restitution, friction, density].
   </string>
   <string name="LSLTipText_iwGetLocalTime" translate="false">
     integer iwGetLocalTime()
-    Returns a unix time similar to llGetTime, but in LOCAL time, NOT GMT/UTC.
+    Current time as a Unix timestamp shifted to local time instead of UTC.
   </string>
   <string name="LSLTipText_iwGetLocalTimeOffset" translate="false">
     integer iwGetLocalTimeOffset()
-    Returns the difference in the unix time stamps for local and UTC time, in seconds. (e.g. -28800 for -8 hours for IW time)
+    Seconds that local time is ahead of UTC (negative when behind), for example -28800 for UTC-8.
   </string>
   <string name="LSLTipText_iwFormatTime" translate="false">
     iwFormatTime(integer unixtime, integer isUTC, string format)
-    Translates the specified unix time into a date/time timestamp string.
-    The unixtime may be specified in local time or UTC, and is indicated in the second parameter.
-    If the format specified is "", a default sortable format like 2013-12-31 23:59:08 is used.
+    Turns a Unix timestamp into text. isUTC says whether unixtime is already UTC (TRUE) or local time. An empty format gives a sortable form like 2013-12-31 23:59:08.
   </string>
   <string name="iwCheckRezError" translate="false">
     integer iwCheckRezError(vector offset, integer isTemp, integer landImpact)
-    Verifies whether an attempt to rez an object would succeed at the specified offset.
-    The second parameter, isTemp, can be set to any known temp status for the item being rezzed.  This is useful on scenic regions were temp objects are allowed.  Pass FALSE if unknown.
-    The third parameter specifies an optional known land impact of the object being rezzed. Pass 0 to skip the LI tests. This can be useful as a pre-check when the land impact of the object is known.
-    Returns one of: IW_REZ_OK (0), IW_REZ_NOT_PERMITTED (1), IW_REZ_REGION_SCENIC (2), IW_REZ_NO_LAND_PARCEL (3), IW_REZ_PARCEL_LAND_IMPACT (4), or IW_REZ_REGION_LAND_IMPACT (5).
+    Tests, without rezzing anything, whether an object could be created at offset. isTemp says whether the object would be temporary (pass FALSE if unknown) and landImpact is its land impact if known (pass 0 to skip that check). Returns IW_REZ_OK, IW_REZ_NOT_PERMITTED, IW_REZ_REGION_SCENIC, IW_REZ_NO_LAND_PARCEL, IW_REZ_PARCEL_LAND_IMPACT or IW_REZ_REGION_LAND_IMPACT.
   </string>
   <string name="iwParseList2String" translate="false">
     list iwParseString2List(string source, list separators, list spacers, list params)
-    An enhanced version of llParseString2List.  It will parse the input string, using the strings in separators to divide the strings.  Strings in the spacers list will be used likewise, but will be included in the string.
-    The list params allows optional arguments to be passed to the parser to control its output.
+    Extended llParseString2List: splits source at the strings in separators, keeps the strings in spacers as separate items, and params carries extra options that change the output.
   </string>
   <string name="iwChar2Int" translate="false">
     integer iwChar2int(string source, integer index)
-    Takes the a character from the source string, specified by index number, and converts it to its unicode integer value.
+    Unicode code of the character at position index in source.
   </string>
   <string name="iwInt2Char" translate="false">
     string iwInt2Char(integer num)
-    Takes the input integer value and converts it to a string value, using the integer as a unicode value.
+    One-character string for the Unicode code num.
   </string>
   <string name="iwReplaceString" translate="false">
     string iwReplaceString(string source, string pattern, string replacement)
-    Searches the source string for all instances of pattern, and substitutes them with the replacement string.  If the replacement string is blank, then the substrings are effectively deleted.
+    Copy of source in which every occurrence of pattern is replaced by replacement. An empty replacement simply removes the matches.
   </string>
   <string name="iwFormatString" translate="false">
     string iwFormatString(string source, list values)
-    Searches the string for curly-bracketed numbers, and then replaces them with the corresponding element in the supplied list of values.  All instances of {0} will be replaced with the element at index 0, all instances of {1} will be replaced with the element at index 1, etc.  As well, the list of values can be any data type, and will simply be automatically cast to strings when used.
+    Fills {0}, {1}, {2} and so on in source with the entries of values at those indexes, converting each entry to text. The entries may be of any type.
   </string>
   <string name="iwMatchString" translate="false">
     string iwMatchString(string source, string pattern, integer matchType)
-    Attempts to match the pattern string against the source string, returning an integer value depending on the results.
+    Checks source against pattern using the comparison chosen by matchType (an IW_MATCH_* value) and returns the outcome.
   </string>
   <string name="iwStringCodec" translate="false">
     string iwStringCodec(string source, string codec, integer operation, list extraParams);
-    Attempts to encode or decode a source string according to a specified codec.  Returns a null string if the operation failed.  Integer specifies the operation type; 0 indicates decoding and 1 indicates encoding.  The extraParams list is for additional parameters that some codecs might require.
+    Encodes (operation 1) or decodes (operation 0) source with the named codec. extraParams holds any extra settings a codec needs. Returns an empty string if the operation fails.
   </string>
   <string name="iwMatchList" translate="false">
     string iwMatchList(list list1, list list2, integer matchType);
-    Iterates over list1 and list2 and attempts to evaluate them for equality, based on the matchType input.  0 evaluates the entire list, 1 evaluates to check if list1 begins with list2, and 2 evaluates to check if list1 ends with list2.
+    Compares list1 with list2 according to matchType: 0 requires the lists to be equal, 1 tests whether list1 starts with list2, 2 tests whether list1 ends with list2.
   </string>
   <string name="iwColorConvert" translate="false">
     vector iwRGBColorToHSL(vector input, int color1, int color2);
-    Converts an input vector from color1's colorspace to color2's colorspace.  The color1 and color2 arguments can be any of the following constants: IW_COLORSPACE_RGB, IW_COLORSPACE_HSL, IW_COLORSPACE_HSV.
+    Converts the color vector input from the color space color1 to the color space color2. Each is IW_COLORSPACE_RGB, IW_COLORSPACE_HSL or IW_COLORSPACE_HSV.
   </string>
   <string name="iwNameToColor" translate="false">
     vector iwNameToColor(string name);
-    Obtains a color value from its name, without spaces.
+    Color vector for a color name written without spaces.
   </string>
   <string name="iwVerifyType" translate="false">
     integer iwVerifyType(string str, integer type);
-    Determines the data type of the value held within a string, and will return either TYPE_INTEGER, TYPE_FLOAT, TYPE_VECTOR, TYPE_ROTATION, TYPE_KEY, or TYPE_STRING if nothing else.
+    Works out what kind of value the text str holds and returns TYPE_INTEGER, TYPE_FLOAT, TYPE_VECTOR, TYPE_ROTATION or TYPE_KEY, or TYPE_STRING when it is none of those.
   </string>
   <string name="iwGroupInvite" translate="false">
     iwGroupInvite(key group, key user, string role)
-    Invites the specified user into the specified group with the specified role name. A role name of "" can be passed for the "Everyone" role. If the user, group or role name does not exist, it will report an error and do nothing.
+    Invites user to group with the role named role. An empty role name means the Everyone role. An unknown user, group or role reports an error and nothing happens.
   </string>
   <string name="iwGroupEject" translate="false">
     iwGroupEject(key group, key user)
-    Ejects the specified user from the specified group. If the user or group do not exist, it will report an error and do nothing.
+    Removes user from group. An unknown user or group reports an error and nothing happens.
   </string>
   <string name="LSLTipText_iwGetAgentData" translate="false">
     string iwGetAgentData(key id, integer data)
-    Requests data about an agent in the region. Unlike llRequestAgentData, when the agent is present, the data is returned directly to the caller.
+    Reads information (a DATA_* kind) about avatar id who is in the region. Unlike llRequestAgentData, the answer is returned directly instead of through an event.
   </string>
   <string name="LSLTipText_iwIsPlusUser" translate="false">
     integer iwIsPlusUser(key id)
-    Returns true if the user matching the specified id is a paid "Plus" account.
+    TRUE when avatar id has a paid Plus account.
   </string>
   <string name="LSLTipText_llAttachToAvatarTemp" translate="false">
     llAttachToAvatarTemp(integer id)
-    Attaches an object to the avatar but does not add it to the avatar's inventory
+    Attaches the object to the avatar at attach point id without putting it into the avatar's inventory.
   </string>
   <string name="iwListIncludesElements" translate="false">
     integer iwListIncludesElements(list src, list elements, integer any)
-    Returns true if the src list contains at least one instance of every element in the list of elements.  If the integer any is true, then it will instead check if it has at least one instance of any element.
+    TRUE when src contains every item of elements. When any is TRUE, it is enough that src contains at least one of them.
   </string>
   <string name="iwReverseString" translate="false">
     string iwReverseString(string src);
-    This will return a reversed version of the input string.
+    src with its characters in reverse order.
   </string>
   <string name="iwReverseList" translate="false">
     list iwReverseList(list src, integer stride);
-    This will return a reversed version of the input list.  If stride is more than one, then it will preserve the order of elements within a stride.
+    src with its entries in reverse order. With a stride above 1 the groups are reversed but the order inside each group is kept.
   </string>
   <string name="iwSearchInventory" translate="false">
     list iwSearchInventory(integer type, string pattern, integer matchtype);
-    This will return a list of all items of the specified type in the task inventory which match the specified pattern.  Pattern-matching is performed the same way as iwMatchString.
+    List of the items of the given type in this prim's inventory that match pattern. The comparison follows iwMatchString.
   </string>
   <string name="iwSearchLinkInventory" translate="false">
     list iwSearchInventory(integer link, integer type, string pattern, integer matchtype);
-    This will return a list of all items of the specified type in the specified link, which match the specified pattern.  Pattern-matching is performed the same way as iwMatchString.
+    List of the items of the given type in the inventory of the prim at link that match pattern. The comparison follows iwMatchString.
   </string>
   <string name="iwIntRand" translate="false">
     integer iwIntRand(integer max);
-    Returns a random integer, ranging from zero up to (and including) the maximum value specified.
+    Random integer from 0 to max, both included.
   </string>
   <string name="iwIntRandRange" translate="false">
     integer iwIntRandRange(integer min, integer max);
-    Returns a random integer ranging from min to max.
+    Random integer from min to max, both included.
   </string>
   <string name="iwFrandRange" translate="false">
     float iwFrandRange(float min, float max);
-    Returns a random float ranging from min to max.
+    Random float from min to max.
   </string>
   <string name="botSearchBotOutfits" translate="false">
     list botSearchBotOutfits(string pattern, integer matchType, integer start, integer end);
-    As botGetBotOutfits, except it only returns a list of bot outfits with names that match a specified pattern.  Pattern-matching is performed the same way as iwMatchString.
-    Passing an empty string as a pattern will act as a wildcard.  Also, using the start and end parameters, it will return a subset of the return results.
+    Like botGetBotOutfits, but only returns outfits whose names match pattern (compared as in iwMatchString). An empty pattern matches everything. start and end select a portion of the results.
   </string>
   <string name="iwListRemoveElements" translate="false">
     list iwListRemoveElements(list src, list elements, integer count, integer mode);
-    This will scan through the src list and find all occurences of the list elements, and then removes them.  If the count integer is more than 0, it will only remove an instance
-    of the specified element list that many times.  So, if you set it to one, it will only remove the first instance it finds, and if two it will only remove the first two instances
-    that it finds, and so on.
+    Returns src with occurrences of the entries of elements removed. When count is above 0, only that many occurrences are removed, starting from the front of the list.
   </string>
   <string name="iwListRemoveDuplicates">
     list iwListRemoveDuplicates(list src);
-    This will return a copy of the src list with all duplicated elements removed.  So if src was [1, 2, 1, 4, 2, 3, 4, -7], then it would return [1, 2, 3, 4, -7].
+    Copy of src that keeps only the last occurrence of each entry, so [1, 2, 1, 4, 2, 3, 4, -7] becomes [1, 2, 3, 4, -7].
   </string>
   <string name="iwStartLinkAnimation">
     iwStartLinkAnimation(integer link, string anim);
-    This function works as llStartAnimation, but instead of trying to start an animation in the current prim, it will instead start an animation from the specified link number.
+    Like llStartAnimation, but plays the animation anim taken from the prim at link number link.
   </string>
   <string name="iwStopLinkAnimation">
     iwStopLinkAnimation(integer link, string anim);
-    This function works as llStopAnimation, but instead of trying to stop an animation in the current prim, it will instead stop an animation from the specified link number.
+    Like llStopAnimation, but stops the animation anim taken from the prim at link number link.
   </string>
   <string name="iwClampInt">
     integer iwClampInt(integer value, integer min, integer max);
-    This function clamps the input value, forcing it to fall within the range of min and max if it is outside that range.
+    Returns value limited to the range from min to max.
   </string>
   <string name="iwClampFloat">
     float iwClampFloat(float value, float min, float max);
-    This function clamps the input value, forcing it to fall within the range of min and max if it is outside of that range.
+    Returns value limited to the range from min to max.
   </string>
   <string name="iwSearchLinksByName">
     list iwSearchLinksByName(string pattern, integer matchType, integer linksOnly);
-    This function searches the linkset and returns a strided list of link number and link name pairs for any links with names matching the pattern, following the semantics of iwMatchString.
-    If the integer linksOnly is TRUE, then the function will omit the link names and only return a list of link numbers.
+    Finds prims in the link set whose names match pattern (compared as in iwMatchString). Returns link number and name for each hit, or just the link numbers when linksOnly is TRUE.
   </string>
   <string name="iwSearchLinksByDesc">
     list iwSearchLinksByDesc(string pattern, integer matchType, integer linksOnly);
-    This function searches the linkset and returns a strided list of link number and link description pairs for any links with descriptions matching the pattern, following the semantics of iwMatchString.
-    If the integer linksOnly is TRUE, then the function will omit the link descriptions and only return a list of link numbers.
+    Finds prims in the link set whose descriptions match pattern (compared as in iwMatchString). Returns link number and description for each hit, or just the link numbers when linksOnly is TRUE.
   </string>
   <string name="botHasTag">
     integer botHasTag(key botID, string tag);
-    Returns TRUE if a bot has the specified tag, or FALSE if not.
+    TRUE when the bot botID carries the tag tag.
   </string>
   <string name="botGetBotTags">
     list botGetBotTags(key botID);
-    Returns a list of all tags associated with the specified bot, if any.
+    List of all tags on the bot botID (possibly empty).
   </string>
   <!--
   <string name="iwGetRezzerKey" translate="false">
     key iwGetRezzerKey(key id);
-    Returns the key of the object which rezzed the specified object.  If the input key is NULL_KEY, then it will get the rezzer key of the object the prim is contained in.
+    UUID of the object that rezzed object id. With NULL_KEY, the rezzer of the object that contains this script's prim.
   </string>
   -->
   <string name = "iwRemoteLoadScriptPin">
@@ -1895,61 +1835,54 @@
   </string>
   <string name="iwValidateURL">
     integer iwValidateURL(string url);
-    Returns TRUE if the input url's formatting is valid according to the HTTP, HTTPS, or WWW schemes.
+    TRUE when url is well formed for the http, https or www forms.
   </string>
   <string name="LSLTipText_iwDeliverInventory" translate="false">
     integer iwDeliverInventory(integer linknumber, key destination, string inventory)
-    Gives inventory from the specified prim to the specified target, returning an completion code.
+    Copies an inventory item from the prim at linknumber to destination and returns a code telling how it went.
   </string>
   <string name="LSLTipText_iwDeliverInventoryList" translate="false">
     integer iwDeliverInventoryList(integer linknumber, key target, string folder, list inventory)
-    Gives inventory items from the specified prim to target, creating a new folder to put them in, and returning an completion code.
+    Copies the items named in inventory from the prim at linknumber into a new folder called folder in the inventory of target, and returns a code telling how it went.
   </string>
   <string name="LSLTipText_llGetAttachedList" translate="false">
     list llGetAttachedList(key avatar)
-    Returns a list of the keys of the public attachments worn by an avatar.
+    List of UUIDs of the attachments avatar is wearing that can be seen publicly.
   </string>
   <string name="LSLTipText_llReturnObjectsByOwner" translate="false">
     integer llReturnObjectsByOwner(key owner, integer scope)
-    If the script is owned by an agent, PERMISSION_RETURN_OBJECTS may be granted by the owner. 
-    If the script is owned by a group, this permission may be granted by an agent belonging to the group's "Owners" role.
-    Returns an integer that is the number of objects successfully returned to their owners or an ERR_* flag.
+    Returns to their owners the objects of owner within scope (an OBJECT_RETURN_* value). Needs PERMISSION_RETURN_OBJECTS, granted by the script owner or, for group-owned scripts, by a member of the group's Owners role. Result is the number of objects returned or an ERR_* code.
   </string>
   <string name="LSLTipText_llReturnObjectsByID" translate="false">
     integer llReturnObjectsByID(integer linknumber, key target, string folder, list inventory)
-    If the script is owned by an agent, PERMISSION_RETURN_OBJECTS may be granted by the owner.
-    If the script is owned by a group, this permission may be granted by an agent belonging to the group's "Owners" role.
-    Returns an integer that is the number of objects successfully returned to their owners or an ERR_* flag.
+    Returns the listed objects to their owners. Needs PERMISSION_RETURN_OBJECTS, granted by the script owner or, for group-owned scripts, by a member of the group's Owners role. Result is the number of objects returned or an ERR_* code.
   </string>
   <string name="LSLTipText_llTransferLindenDollars" translate="false">
     key llTransferLindenDollars(key destination, integer amount)
-    Returns a key used in a matching transaction_result event for the success or failure of the transfer.
-    If the transaction is successful, this key will show in the transaction history.
+    Starts a payment of amount L$ from the script owner to destination and returns a key. The matching transaction_result event uses that key to report success or failure. A successful payment appears in the transaction history.
   </string>
   <string name="LSLTipText_iwGiveMoney" translate="false">
     string iwGiveMoney(key destination, integer amount)
-    Directly returns the transaction ID for the success or failure of a money transfer.
-    If the transaction is successful, it returns the actual transaction ID that will show in the transaction history.
-    If the transaction fails, or an error tag on error, e.g. "MISSING_PERMISSION_DEBIT".
+    Pays amount from the object owner's balance to destination and returns the transaction ID directly. On failure an error tag such as MISSING_PERMISSION_DEBIT is returned instead.
   </string>
   <string name="LSLTipText_iwStandTarget" translate="false">
     iwStandTarget(vector offset, rotation rot)
-    Specifies the location, relative to the current prim, for a seated avatar to be placed when they stand up.
+    Sets where, relative to this prim, an avatar is placed when it stands up from the prim.
   </string>
   <string name="LSLTipText_iwLinkStandTarget" translate="false">
     iwLinkStandTarget(integer link, vector offset, rotation rot)
-    Specifies the location, relative to the specified prim, for a seated avatar to be placed when they stand up.
+    Sets where, relative to the prim at link, an avatar is placed when it stands up from that prim.
   </string>
   <string name="LSLTipText_llGetAnimationOverride" translate="false">
     string llGetAnimationOverride(string anim_state)
-    Returns a string that is the name of the animation that is being used for the specified animation state (anim_state).  
+    Name of the animation currently used for the animation state anim_state.
   </string>
   <string name="LSLTipText_llSetAnimationOverride" translate="false">
     void llSetAnimationOverride(string anim_state, string anim)
-    Set the animation (anim) that will play for the given animation state (anim_state).    
+    Makes the animation anim play for the animation state anim_state.
   </string>
   <string name="LSLTipText_llResetAnimationOverride" translate="false">
     void llResetAnimationOverride(string anim_state)
-    Resets the animation override of the specified animation state (anim_state) to the corresponding default value.    
+    Puts the animation for anim_state back to its default.
   </string>
 </root>
