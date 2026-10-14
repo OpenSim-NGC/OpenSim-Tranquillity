@@ -283,8 +283,30 @@ public class SOPVehicle
             case Vehicle.ANGULAR_MOTOR_DECAY_TIMESCALE:
                 if (PerAxis(ref pValue, timestep)) vd.m_angularMotorDecayTimescaleAxes = pValue;
                 break;
+
+            // InWorldz's two wind efficiency vectors, each axis held to -10..10 as InWorldz holds them; a value that is not a
+            // number is not stored.
+            case Vehicle.LINEAR_WIND_EFFICIENCY:
+                if (WindEfficiency(ref pValue)) vd.m_linearWindEfficiency = pValue;
+                break;
+            case Vehicle.ANGULAR_WIND_EFFICIENCY:
+                if (WindEfficiency(ref pValue)) vd.m_angularWindEfficiency = pValue;
+                break;
         }
     }//end ProcessVectorVehicleParam
+
+    private const float MaxWindEfficiency = 10f;
+
+    private static bool WindEfficiency(ref Vector3 v)
+    {
+        if (!float.IsFinite(v.X) || !float.IsFinite(v.Y) || !float.IsFinite(v.Z))
+            return false;
+        v = new Vector3(
+            Math.Clamp(v.X, -MaxWindEfficiency, MaxWindEfficiency),
+            Math.Clamp(v.Y, -MaxWindEfficiency, MaxWindEfficiency),
+            Math.Clamp(v.Z, -MaxWindEfficiency, MaxWindEfficiency));
+        return true;
+    }
 
     private static bool PerAxis(ref Vector3 v, float least)
     {
@@ -328,6 +350,8 @@ public class SOPVehicle
         vd.m_linearMotorDecayTimescaleAxes = null;
         vd.m_angularMotorTimescaleAxes = null;
         vd.m_angularMotorDecayTimescaleAxes = null;
+        vd.m_linearWindEfficiency = null;
+        vd.m_angularWindEfficiency = null;
 
         // The defaults of InWorldz's parameters (VehicleDynamics.cs:1710-1720); the types below that differ set theirs.
         vd.m_mouselookAzimuth = MathF.PI / 4f;
@@ -664,6 +688,9 @@ public class SOPVehicle
         XWfloat("DMABOVE", vd.m_disableMotorsAbove);
         XWfloat("DMAFTER", vd.m_disableMotorsAfter);
         XWfloat("IBMOD", vd.m_invertedBankingModifier);
+        // The wind efficiency vectors, written only when the vehicle has them; a simulator that does not know them skips them
+        XWVectorIfSet("LWEFF", vd.m_linearWindEfficiency);
+        XWVectorIfSet("AWEFF", vd.m_angularWindEfficiency);
 
         XWQuat("REF_FRAME", vd.m_referenceFrame);
 
@@ -861,6 +888,8 @@ public class SOPVehicle
         m_VehicleXmlProcessors.Add("DMABOVE", () => { vd.m_disableMotorsAbove = XRfloat(); m_xmlSeen |= 8; });
         m_VehicleXmlProcessors.Add("DMAFTER", () => { vd.m_disableMotorsAfter = XRfloat(); m_xmlSeen |= 16; });
         m_VehicleXmlProcessors.Add("IBMOD", () => { vd.m_invertedBankingModifier = XRfloat(); m_xmlSeen |= 32; });
+        m_VehicleXmlProcessors.Add("LWEFF", () => { vd.m_linearWindEfficiency = XRvector(); });
+        m_VehicleXmlProcessors.Add("AWEFF", () => { vd.m_angularWindEfficiency = XRvector(); });
 
         vd = new VehicleData();
         m_xmlSeen = 0;
