@@ -24,9 +24,10 @@ namespace InWorldz.Phlox.Tests;
 /// <summary>
 /// A worn object is detached into inventory and worn again through the core's AttachmentsModule (detach:
 /// PrepareScriptInstanceForSave, SaveScriptedState, the item's asset updated; attach: RezSingleAttachmentFromInventory).
-/// The script keeps its state: on_rez, then attach, and no state_entry. SL: "A script will NOT automatically re-enter
-/// the default state state_entry event when the task is rezzed or attached" (wiki, State); "on_rez will be triggered
-/// prior to attach when attaching from inventory" (wiki, on_rez).
+/// The script keeps its state: on_rez, then attach, and no state_entry. SL (wiki, State,
+/// https://wiki.secondlife.com/wiki/State: the default state's state_entry event does NOT run again by itself when
+/// the object is rezzed or attached; wiki, on_rez, https://wiki.secondlife.com/wiki/On_rez: on_rez fires before
+/// attach when an object is attached from inventory).
 /// </summary>
 // Runs in parallel: its own harness, avatar, inventory and assets; nothing process-wide is changed.
 public class AttachCarriedStateTests

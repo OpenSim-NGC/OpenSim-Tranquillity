@@ -24,12 +24,13 @@ namespace InWorldz.Phlox.Tests;
 /// handler, the root as well only on pass-through; Halcyon EngineInterface.PostObjectEvent posts to that prim).</item>
 /// <item>llDetectedLinkNumber is the prim actually touched, also when the root takes it (SL llDetectedLinkNumber;
 /// Halcyon EventRouter touch_start uses originalID).</item>
-/// <item>The toucher's detect data comes from the avatar (Halcyon DetectParams.Populate); llDetectedGrab is zero
-/// outside touch() (SL llDetectedGrab: "only works in the touch event").</item>
+/// <item>The toucher's detect data comes from the avatar (Halcyon DetectParams.Populate); llDetectedGrab is zero outside
+/// touch() (SL llDetectedGrab, https://wiki.secondlife.com/wiki/LlDetectedGrab: it works in the touch event only).</item>
 /// <item>An index past the detected set gives TOUCH_INVALID_FACE and TOUCH_INVALID_TEXCOORD (SL wiki, Halcyon and
 /// YEngine alike) and NULL_KEY for keys.</item>
-/// <item>touch() repeats while the touch is held, every 100 ms as Halcyon's scheduler does (SL touch: "each minimum
-/// event delay while held"); grab updates only refresh the data the next repeat carries; touch_end stops it.</item>
+/// <item>touch() repeats while the touch is held, every 100 ms as Halcyon's scheduler does (SL touch,
+/// https://wiki.secondlife.com/wiki/Touch: repeats once per minimum event delay for as long as the touch is held); grab
+/// updates only refresh the data the next repeat carries; touch_end stops it.</item>
 /// </list>
 /// </summary>
 // Each test builds its own scene and touches nothing process-wide, so the class runs in parallel.
@@ -308,9 +309,10 @@ default
     [Fact]
     public void AScriptWithOnlyTouchRepeatsWhileHeldAndStopsAtRelease()
     {
-        // SL touch: "Triggered on touch start, each minimum event delay while held, and touch end." A state with touch()
-        // asks the region for touch_start and touch_end as well, so a script with touch() alone is started and stopped
-        // like any other: it repeats without grab updates and goes quiet at the release.
+        // SL touch (https://wiki.secondlife.com/wiki/Touch): the event is triggered when a touch starts, repeatedly (once
+        // per minimum event delay) while it is held, and when it ends. A state with touch() asks the region for touch_start
+        // and touch_end as well, so a script with touch() alone is started and stopped like any other: it repeats without
+        // grab updates and goes quiet at the release.
         using var h = new SchedulerHarness();
         h.RezScript(TouchOnly);
         WaitForMask(h, h.Prim, scriptEvents.touch);
@@ -332,9 +334,9 @@ default
     [Fact]
     public void AChildWithOnlyTouchTakesItsOwnTouch()
     {
-        // SL llPassTouches: whether a touch passes to the root "may also depend on if there is a script that in the prim
-        // that handles one of the touch events". A child whose script handles touch() takes the touch; the root's
-        // touch_start does not fire.
+        // SL llPassTouches (https://wiki.secondlife.com/wiki/LlPassTouches): whether a touch passes to the root may also
+        // depend on whether some script in the prim handles a touch event. A child whose script handles touch() takes the
+        // touch; the root's touch_start does not fire.
         using var h = new SchedulerHarness();
         var parts = TwoPrims(h);
         h.RezScriptInto(parts[0], Tagged("R"));

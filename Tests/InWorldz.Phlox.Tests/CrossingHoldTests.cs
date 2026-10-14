@@ -25,7 +25,8 @@ namespace InWorldz.Phlox.Tests;
 /// queue: it travels with the script's state and runs in the new region, or, when the crossing fails, runs where the
 /// object stayed. The timer stops while held and carries on with what it had left. Chat a listen hears while held is
 /// not kept: Halcyon took the script's listens away for the hold. SL keeps a paused script's pending events, in order
-/// ("Events ... are queued FIFO"; "If the script is paused ... pending events are preserved", LSL Events).
+/// (LSL Events page, https://wiki.secondlife.com/wiki/LSL_Events: events wait in a first-in first-out queue, and a
+/// paused script keeps the events pending for it).
 /// <para>
 /// Each test posts its events from its own OnGroupBeginInTransit handler, which runs after the engine's, on the thread
 /// that started the crossing and before the crossing's own thread starts, so the events are posted mid-crossing. A

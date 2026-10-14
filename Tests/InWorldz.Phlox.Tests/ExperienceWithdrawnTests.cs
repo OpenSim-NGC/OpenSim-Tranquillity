@@ -20,11 +20,11 @@ using Xunit;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// A grant from an Experience ends when its avatar enters a parcel where the Experience cannot run. SL wiki
-/// experience_permissions_denied, "The experience can no longer run": "The agent has moved to a parcel where the
-/// experience cannot run." The script's item loses the grant and the controls it took, and gets
-/// experience_permissions_denied with XP_ERROR_NOT_PERMITTED_LAND (17). Where the Experience still runs nothing changes,
-/// and a grant that did not come from an Experience is left alone.
+/// A grant from an Experience ends when its avatar enters a parcel on which that Experience is unable to run. SL wiki
+/// experience_permissions_denied (https://wiki.secondlife.com/wiki/Experience_permissions_denied), for an experience
+/// that can no longer run: the agent moved onto a parcel that the experience cannot run on. The script's item loses
+/// the grant and the controls it took, and gets experience_permissions_denied with XP_ERROR_NOT_PERMITTED_LAND (17).
+/// Where the Experience still runs nothing changes, and a grant that did not come from an Experience is left alone.
 /// </summary>
 // Runs in parallel: each test has its own harness, avatar, items and Experience module on its own scene.
 public class ExperienceWithdrawnTests
@@ -203,8 +203,9 @@ public class ExperienceWithdrawnTests
     }
     /// <summary>
     /// A grant from the Experience replaces the grant the script held, and the controls it took for that other granter are
-    /// released, as a new llRequestPermissions releases them (SL llRequestPermissions: "Scripts may hold permissions for
-    /// only one agent at a time").
+    /// released, as a new llRequestPermissions releases them (SL llRequestPermissions,
+    /// https://wiki.secondlife.com/wiki/LlRequestPermissions: a script is allowed to hold permissions from only one
+    /// agent at any moment).
     /// </summary>
     [Fact]
     public void AnExperienceGrantReleasesControlsTakenForAnotherGranter()

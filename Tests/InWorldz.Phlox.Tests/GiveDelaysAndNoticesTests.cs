@@ -16,10 +16,12 @@ using static InWorldz.Phlox.Tests.InventoryGivesRig;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// Gives. The delays: llGiveInventory "If destination is an avatar the script sleeps for 2.0 seconds. (Giving to
-/// objects or attachments has no delay)" (SL wiki), as Halcyon's _GiveInventory (LSLSystemAPI.cs:5351), which
-/// iwGiveLinkInventory (2 s) and iwDeliverInventory (100 ms) share; llGiveInventoryList "causes the script to sleep
-/// for 3.0 seconds" (SL wiki, no exception for prims) on every path; iwGiveLinkInventoryList and iwDeliverInventoryList
+/// Gives. The delays: llGiveInventory sleeps the script for 2.0 seconds when destination is an avatar, with no delay
+/// for giving to objects or attachments (SL wiki, https://wiki.secondlife.com/wiki/LlGiveInventory), as Halcyon's
+/// _GiveInventory (LSLSystemAPI.cs:5351), which
+/// iwGiveLinkInventory (2 s) and iwDeliverInventory (100 ms) share; llGiveInventoryList makes the script sleep 3.0
+/// seconds (SL wiki, https://wiki.secondlife.com/wiki/LlGiveInventoryList, no exception for prims) on every path;
+/// iwGiveLinkInventoryList and iwDeliverInventoryList
 /// wait only for an avatar (Halcyon :8469-8473). A list give to an avatar in the region sends the TaskInventoryOffered
 /// notice, and an item that cannot be given aborts the give (Halcyon :8478-8501). List entries may be task item keys
 /// (Halcyon :8453-8458); a missing entry is shouted on DEBUG_CHANNEL and the rest given (SL). iwGiveLinkInventoryList
