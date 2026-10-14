@@ -1,3 +1,9 @@
+/*
+ * From HalcyonGrid/phlox (grammar/Assembler.g, commit e805a56).
+ * Licence: Apache License 2.0, see ThirdPartyLicenses/Phlox.txt.
+ * Modified 2026 by Legion Builds.
+ */
+
 /** 
  *  A generic bytecode assembler whose instructions take 0..3 operands.
  *  Instruction set is dictated externally with a String[].  Implement

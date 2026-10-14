@@ -1,4 +1,9 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
+<!--
+  From HalcyonGrid/phlox (Source/Halcyon.Phlox.Tools/Halcyon.Phlox.Tools.csproj, commit e805a56).
+  Licence: Apache License 2.0, see ThirdPartyLicenses/Phlox.txt.
+  Modified 2026 by Legion Builds.
+-->
 <Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
