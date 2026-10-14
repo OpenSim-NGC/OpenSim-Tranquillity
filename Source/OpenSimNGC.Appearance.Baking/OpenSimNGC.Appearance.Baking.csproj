@@ -40,11 +40,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- The earlier compositor source is kept in the folder for reference but is no longer compiled; AvatarBakeCompositor replaces it. -->
-    <Compile Remove="TexLayerCompositor.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- Versions match the rest of the tree. -->
     <PackageReference Include="SkiaSharp" Version="4.151.1" />
     <PackageReference Include="CoreJ2K.Skia" Version="2.3.3.91" />
