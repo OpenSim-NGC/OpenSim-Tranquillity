@@ -1,12 +1,21 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+using OpenMetaverse;
+
 namespace OpenSimNGC.Appearance.Baking;
 
 /// <summary>
 /// The VisualParams block of AgentSetAppearance, built the way a viewer builds it.
 ///
-/// LLAgent::sendAgentSetAppearance sends one byte per parameter whose group is 0 (tweakable) or 3 (transmit,
-/// not tweakable), iterating the avatar's parameter map in id order: 253 parameters with the current
-/// avatar_lad.xml. Each byte is F32_to_U8(weight, min, max) = (U8)(((clamp(weight) - min) / (max - min)) * 255)
-/// in float32, truncated, not rounded. The weight is the avatar's current value: the value stored in the worn
+/// A viewer sends one byte per parameter whose group is 0 (tweakable) or 3 (transmit, not tweakable), in
+/// parameter id order: 253 parameters with the current avatar_lad.xml. Each byte is the parameter's weight,
+/// clamped to its range and scaled onto 0..255 in single precision, truncated rather than rounded
+/// (<see cref="Utils.FloatToByte(float, float, float)"/>). The weight is the avatar's current value: the value stored in the worn
 /// wearable of the parameter's type (the topmost when several are worn); for a type that is not worn the viewer
 /// keeps whatever the sim last stored for the avatar, so those bytes are carried forward from the sim's blob;
 /// only when there is no such blob does the avatar_lad.xml default apply.
@@ -20,15 +29,6 @@ public static class VisualParamEncoder
 
     /// <summary>Position of a parameter id in the send order, or -1.</summary>
     public static int IndexOf(AvatarLad lad, int id) => SendList(lad).FindIndex(p => p.Id == id);
-
-    /// <summary>llmath.h F32_to_U8: float32 arithmetic, truncation.</summary>
-    public static byte F32ToU8(float val, float lower, float upper)
-    {
-        val = Math.Clamp(val, lower, upper);
-        if (upper == lower) return 0;
-        float x = ((val - lower) / (upper - lower)) * 255f;
-        return (byte)x;
-    }
 
     /// <param name="lad">The parameter definitions.</param>
     /// <param name="worn">every worn wearable in wear order (later of a type is on top) with its stored parameters</param>
@@ -58,7 +58,7 @@ public static class VisualParamEncoder
             var p = list[i];
             if (p.Wearable is { Length: > 0 } owner && byType.TryGetValue(owner, out var prms) && prms.TryGetValue(p.Id, out var v))
             {
-                bytes[i] = F32ToU8(v, p.Min, p.Max);
+                bytes[i] = Utils.FloatToByte(v, p.Min, p.Max);
                 fromWearables++;
             }
             else if (useCarried)
@@ -68,7 +68,7 @@ public static class VisualParamEncoder
             }
             else
             {
-                bytes[i] = F32ToU8(p.Default, p.Min, p.Max);
+                bytes[i] = Utils.FloatToByte(p.Default, p.Min, p.Max);
                 defaults++;
             }
         }
