@@ -39,3 +39,10 @@ changes and new files in the Tranquillity code base are copyright:
  Various sources in the Addons directory are copyright their individual authors.
  See the files in question for copyright/license information.
 
+This tree also includes code from InWorldz Halcyon (BSD-3-Clause license) and from
+HalcyonGrid/phlox (Apache License 2.0). The license texts are in the ThirdPartyLicenses
+directory (Halcyon.txt and Phlox.txt); the files concerned carry their own notices.
+Smaller parts come from Lua, Luau and zlib, from the .NET Framework reference source (MIT license)
+and from lsl-definitions (MIT license); their license texts are in the same directory (Lua.txt, Luau.txt,
+zlib.txt, Microsoft-referencesource.txt and lsl-definitions.txt), and the files concerned carry their
+own notices.
