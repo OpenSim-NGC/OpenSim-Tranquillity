@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -52,7 +59,7 @@ public class BakeReuseTests
         public required FakeAvatarService Avatars;
         public required AvatarWearable[] Wearables;
         public required byte[] VisualParams;
-        public required TexLayerCompositor Compositor;
+        public required AvatarBakeCompositor Compositor;
         public AvatarAppearance Appearance = new();
 
         public (BakeOutcome Outcome, CountingBackend Backend) Bake(int size = Size, int cof = CofVersion)
@@ -85,7 +92,7 @@ public class BakeReuseTests
         foreach (var w in doc.RootElement.GetProperty("wearables").EnumerateArray())
             wearables[w.GetProperty("type").GetInt32()].Add(new UUID(w.GetProperty("itemId").GetString()), new UUID(w.GetProperty("assetId").GetString()));
         var vp = doc.RootElement.GetProperty("visualParams").EnumerateArray().Select(e => (byte)e.GetInt32()).ToArray();
-        return new Rig { Assets = assets, Avatars = new FakeAvatarService(), Wearables = wearables, VisualParams = vp, Compositor = new TexLayerCompositor() };
+        return new Rig { Assets = assets, Avatars = new FakeAvatarService(), Wearables = wearables, VisualParams = vp, Compositor = new AvatarBakeCompositor() };
     }
 
     /// <summary>The channels a bake of the truly-stock outfit produces.</summary>
@@ -199,7 +206,7 @@ public class BakeReuseTests
 
     /// <summary>
     /// The truly-stock outfit has an Undershirt. <c>avatar_lad.xml</c> gives the <c>upper_undershirt</c> local texture to the
-    /// <c>upper_body</c> layer set and to no other, so <see cref="TexLayerCompositor.WearableOf"/> maps that slot
+    /// <c>upper_body</c> layer set and to no other, so <see cref="AvatarBakeCompositor.WearableOf"/> maps that slot
     /// to <see cref="WearableKind.Undershirt"/> and <c>Upper</c> is the only channel the type feeds. Changing the
     /// undershirt must therefore re-bake Upper and reuse Head, Lower, Eyes and Hair — the whole point of hashing
     /// per channel rather than per outfit.

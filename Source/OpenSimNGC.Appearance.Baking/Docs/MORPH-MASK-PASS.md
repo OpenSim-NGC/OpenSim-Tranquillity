@@ -8,7 +8,7 @@ library produces as `CompositeResult.MorphMask` and encodes as component 4.
 Authority: the Linden Lab viewer source, read read-only (viewer 26.1.1 per
 `indra/newview/VIEWER_VERSION.txt`): `indra/llappearance/lltexlayer.cpp`, `lltexlayer.h`,
 `lltexlayerparams.cpp`, `indra/newview/llviewertexlayer.cpp`, and `indra/newview/character/avatar_lad.xml`.
-Line numbers below are from those files at that version. This document is the spec `TexLayerCompositor`
+Line numbers below are from those files at that version. This document is the spec `AvatarBakeCompositor`
 follows for the 5th component.
 
 ## 1. Finding: the bump layers are never rendered into a bake
@@ -198,7 +198,7 @@ contributes the mask of the **top worn wearable of its type**; a wearable counts
 occupied, whether or not it carries a texture asset. Its parameter values come from the avatar's parameters,
 which for an assetless wearable are supplied entirely by the caller's `VisualParams`.*
 
-## 3. What the library does (`TexLayerCompositor.Bake`)
+## 3. What the library does (`AvatarBakeCompositor.Bake`)
 
 1. `AvatarLad` parses `<morph_masks>` into `MorphMaskLayers[body_region] = { layer names }`.
 2. The colour pass renders a layer with a local texture once per worn wearable of its type and a layer

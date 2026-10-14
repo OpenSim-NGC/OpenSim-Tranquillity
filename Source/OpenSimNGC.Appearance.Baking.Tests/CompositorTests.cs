@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 using Xunit;
 
@@ -12,7 +19,7 @@ namespace OpenSimNGC.Appearance.Baking.Tests;
 public class CompositorTests
 {
     private static AvatarLad Lad => AvatarLad.Embedded;
-    private static TexLayerCompositor NewCompositor() => new(Lad, ResourceImages.Embedded);
+    private static AvatarBakeCompositor NewCompositor() => new(Lad, BakeResourceFiles.Embedded);
 
     internal static RgbaPlanes Flat(int w, int h, byte r, byte g, byte b, byte a = 255)
     {

@@ -1,7 +1,7 @@
 # Reference results for the bake compositor
 
 71 vectors, captured 2026-10-14 by running the current compositor as a black box (upstream/develop `1ab87a277b`,
-`TexLayerCompositor.Bake` and `Raster` called directly, no other code involved). They record behaviour, not
+the previous compositor's bake method and `Raster` called directly, no other code involved). They record behaviour, not
 code. A rewrite must reproduce each output byte for byte; `Docs/BAKE-COMPOSITOR-SPEC.md` (SPEC.md in code comments) is the description they test.
 
 They were produced by a separate harness (not part of this folder and not part of any repository) that writes the vectors (`gen`) and recomputes and compares them (`verify`). Two runs (`gen`, then `verify`) agreed on all 71.

@@ -22,7 +22,7 @@ namespace OpenSimNGC.Appearance.Baking;
 /// weights and resampling. The compositor holds no per-bake state, so one instance can serve concurrent bakes.
 /// </para>
 /// </summary>
-public sealed class AvatarBakeCompositor
+public sealed partial class AvatarBakeCompositor
 {
     /// <summary>SPEC.md 3.5: a layer's local_texture name, the texture slot it stands for and the wearable type that owns the slot.</summary>
     private static readonly Dictionary<string, (TextureSlot Slot, WearableKind Kind)> SlotTable = new(StringComparer.OrdinalIgnoreCase)
@@ -195,7 +195,7 @@ public sealed class AvatarBakeCompositor
                 var instances = _worn.Where(w => w.Kind == slot.Kind).ToList();
                 if (instances.Count == 0)
                 {
-                    _report.Add(new BakeLayerReport(layer.Name, "skipped", $"no {WearableKinds.TypeName(slot.Kind)} worn", null));
+                    _report.Add(new BakeLayerReport(layer.Name, "skipped", $"no {slot.Kind} worn", null));
                     continue;
                 }
                 foreach (var inst in instances) DrawLayer(li, layer, inst);
@@ -542,7 +542,7 @@ public sealed class AvatarBakeCompositor
                     mask = built.Mask;
                 }
                 for (var i = 0; i < _pixels; i++) _morph[i] = (byte)((_morph[i] * (mask[i] + 1)) >> 8);
-                _report.Add(new BakeLayerReport(layer.Name, "morph", "merged into the morph mask", inst?.Kind));
+                _report.Add(new BakeLayerReport(layer.Name, "morph", inst is null ? "once (plain layer): merged into the morph mask" : "merged into the morph mask", inst?.Kind));
             }
         }
 

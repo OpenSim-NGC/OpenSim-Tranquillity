@@ -53,6 +53,9 @@ public sealed class BakeResourceFiles
         }
     }
 
+    /// <summary>Whether the file is present and decodes.</summary>
+    public bool Exists(string file) => Load(file) is not null;
+
     /// <summary>The grey reading (SPEC.md 9.2): a grey file gives its values, a colour file with alpha its alpha plane, a colour file without alpha 255 everywhere.</summary>
     public (int W, int H, byte[] Data)? Grey(string file)
     {

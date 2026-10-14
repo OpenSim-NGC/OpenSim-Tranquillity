@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -65,7 +72,7 @@ public static class BakeOrchestrator
     /// fails the channels its type feeds (the shape feeds them all). Nothing else is refused (ADR-005). No
     /// texture is fetched here.
     /// </summary>
-    public static ResolvedWearables ResolveWearables(AvatarWearable[] wearables, byte[] visualParams, IAssetService assets, TexLayerCompositor compositor, BakeTimings timings = null)
+    public static ResolvedWearables ResolveWearables(AvatarWearable[] wearables, byte[] visualParams, IAssetService assets, AvatarBakeCompositor compositor, BakeTimings timings = null)
     {
         ArgumentNullException.ThrowIfNull(assets);
         ArgumentNullException.ThrowIfNull(compositor);
@@ -140,7 +147,7 @@ public static class BakeOrchestrator
     /// was not asked for, since such a channel is being reused and its face is not being rewritten.
     /// </summary>
     public static (IReadOnlyDictionary<UUID, TextureInput> Textures, IReadOnlyList<InputFailure> Failures) ResolveTextures(
-        IReadOnlyList<ParsedWearable> parsed, IReadOnlyCollection<BakeChannel> channels, IAssetService assets, TexLayerCompositor compositor, BakeTimings timings = null)
+        IReadOnlyList<ParsedWearable> parsed, IReadOnlyCollection<BakeChannel> channels, IAssetService assets, AvatarBakeCompositor compositor, BakeTimings timings = null)
     {
         ArgumentNullException.ThrowIfNull(assets);
         ArgumentNullException.ThrowIfNull(compositor);
@@ -174,7 +181,7 @@ public static class BakeOrchestrator
     /// full bake with no reuse. <see cref="Run"/> uses the two halves separately so the reuse check can run
     /// between them.
     /// </summary>
-    public static ResolvedInputs Resolve(AvatarWearable[] wearables, byte[] visualParams, IAssetService assets, TexLayerCompositor compositor, int bakeSize)
+    public static ResolvedInputs Resolve(AvatarWearable[] wearables, byte[] visualParams, IAssetService assets, AvatarBakeCompositor compositor, int bakeSize)
     {
         var w = ResolveWearables(wearables, visualParams, assets, compositor);
         var (textures, texFailures) = ResolveTextures(w.Parsed, AllChannels, assets, compositor);
@@ -189,14 +196,14 @@ public static class BakeOrchestrator
     }
 
     /// <summary>Channels whose layer sets draw a slot owned by the wearable type; the shape (parameters only) feeds every channel.</summary>
-    public static IEnumerable<BakeChannel> ChannelsFedBy(WearableKind kind, TexLayerCompositor compositor)
+    public static IEnumerable<BakeChannel> ChannelsFedBy(WearableKind kind, AvatarBakeCompositor compositor)
     {
         if (kind == WearableKind.Shape) return AllChannels;
-        return AllChannels.Where(ch => compositor.SlotsOf(ch).Any(s => TexLayerCompositor.WearableOf(s) == kind));
+        return AllChannels.Where(ch => compositor.SlotsOf(ch).Any(s => AvatarBakeCompositor.WearableOf(s) == kind));
     }
 
     /// <summary>Channels whose layer sets draw the given texture slot.</summary>
-    public static IEnumerable<BakeChannel> ChannelsDrawing(TextureSlot slot, TexLayerCompositor compositor)
+    public static IEnumerable<BakeChannel> ChannelsDrawing(TextureSlot slot, AvatarBakeCompositor compositor)
         => AllChannels.Where(ch => compositor.SlotsOf(ch).Contains(slot));
 
     // ------------------------------------------------------------------ step 3: the reuse decision (ADR-004)
@@ -226,7 +233,7 @@ public static class BakeOrchestrator
     /// never be trusted: the face would point at nothing and the avatar would go untextured for good.
     /// </summary>
     public static ReuseDecision DecideReuse(IReadOnlyList<BakeChannel> needed, BakeRequest hashRequest, BakeIndex index,
-        IAssetService assets, TexLayerCompositor compositor, int bakeSize)
+        IAssetService assets, AvatarBakeCompositor compositor, int bakeSize)
     {
         ArgumentNullException.ThrowIfNull(assets);
         var hashes = new Dictionary<BakeChannel, string>(needed.Count);
@@ -395,7 +402,7 @@ public static class BakeOrchestrator
 
     /// <summary>A full bake with no persistence: every channel is composited and nothing is written to the avatar service.</summary>
     public static BakeOutcome Run(UUID agentId, BakeReason reason, AvatarWearable[] wearables, byte[] visualParams, AvatarAppearance appearance,
-        IAssetService assets, IBakeBackend backend, TexLayerCompositor compositor, int bakeSize, CancellationToken ct)
+        IAssetService assets, IBakeBackend backend, AvatarBakeCompositor compositor, int bakeSize, CancellationToken ct)
         => Run(agentId, reason, wearables, visualParams, appearance, assets, null, backend, compositor, bakeSize, 0, ct);
 
     /// <summary>
@@ -405,7 +412,7 @@ public static class BakeOrchestrator
     /// <param name="avatars">The avatar service holding the ADR-004 index, or null for a run that neither reads nor writes it.</param>
     /// <param name="cofVersion">The Current Outfit folder's version at bake time; stored, not compared (the hash is the stronger test).</param>
     public static BakeOutcome Run(UUID agentId, BakeReason reason, AvatarWearable[] wearables, byte[] visualParams, AvatarAppearance appearance,
-        IAssetService assets, IAvatarService avatars, IBakeBackend backend, TexLayerCompositor compositor, int bakeSize, int cofVersion,
+        IAssetService assets, IAvatarService avatars, IBakeBackend backend, AvatarBakeCompositor compositor, int bakeSize, int cofVersion,
         CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();
