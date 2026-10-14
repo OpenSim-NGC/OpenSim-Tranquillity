@@ -97,11 +97,12 @@ public partial class Scene
 
     /// <summary>
     /// The script engine that will run a script: the engine named on the script's first line
-    /// ("//engine:language") if that engine is loaded, otherwise the default engine; null if neither is loaded.
+    /// ("//engine:language") if loaded, otherwise an engine with matching saved state (default first),
+    /// otherwise the default engine; null if no suitable engine is loaded.
     /// </summary>
     /// <param name="defaultEngine">the engine name the caller passes to CreateScriptInstance (DefaultScriptEngine)</param>
     /// <param name="scriptSource">the script source, or null if not known</param>
-    public IScriptModule ResolveScriptEngine(string defaultEngine, string scriptSource)
+    public IScriptModule ResolveScriptEngine(string defaultEngine, string scriptSource, TaskInventoryItem item = null)
     {
         IScriptModule[] engines = RequestModuleInterfaces<IScriptModule>();
 
@@ -125,12 +126,30 @@ public partial class Scene
             }
         }
 
+        IScriptModule defaultModule = null;
         foreach (IScriptModule engine in engines)
         {
             if (engine.ScriptEngineName == defaultEngine)
-                return engine;
+            {
+                defaultModule = engine;
+                break;
+            }
         }
-        return null;
+
+        if (item is not null)
+        {
+            if (defaultModule is IScriptStateProvider defaultState
+                && defaultState.HasSavedScriptState(item.ItemID, item.AssetID))
+                return defaultModule;
+
+            foreach (IScriptModule engine in engines)
+            {
+                if (engine != defaultModule && engine is IScriptStateProvider savedState
+                    && savedState.HasSavedScriptState(item.ItemID, item.AssetID))
+                    return engine;
+            }
+        }
+        return defaultModule;
     }
 
     /// <summary>

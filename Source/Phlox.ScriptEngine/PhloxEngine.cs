@@ -31,7 +31,7 @@ namespace Phlox.ScriptEngine
     /// <summary>Where syscalls that can reach a service run.</summary>
     public enum ServiceCallDeferralMode { Auto, Always, Never }
 
-    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine
+    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine, IScriptStateProvider
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -670,11 +670,14 @@ namespace Phlox.ScriptEngine
 
         #region Scene event handlers
 
+        public bool HasSavedScriptState(UUID itemID, UUID assetID)
+            => StateManager != null && StateManager.HasSavedState(itemID, assetID);
+
         private void OnRezScript(uint localID, UUID itemID, string script,
             int startParam, bool postOnRez, string engine, int stateSource)
         {
-            // Every engine of the region gets every rez, with the region's default engine name; the script's
-            // first line can name another. Phlox runs it exactly when YEngine's rule picks Phlox, so on a region running
+            // Every engine receives the selected engine name; the first-line header still takes priority.
+            // Phlox runs it exactly when YEngine's rule picks Phlox, so on a region running
             // both a script runs in one. A script that is not Phlox's has no Phlox instance or load (Disown); its saved state is kept.
             if (!IsPhloxScript(script, engine))
             {

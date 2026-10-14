@@ -71,6 +71,45 @@ public class StateWriteRetryTests
     }
 
     [Fact]
+    public void OwnershipLookupSeesQueuedSavesAndDeletesWithoutWritingThem()
+    {
+        string db = NewDb();
+        var compiled = Compiled();
+        using var m = new StateManager(null, db, ShortBusyMs);
+        var script = Script(compiled);
+        Assert.False(m.HasSavedState(script.ItemId, compiled.AssetId));
+
+        m.QueueUnloadSave(script);
+        Assert.True(m.HasSavedState(script.ItemId, compiled.AssetId));
+        Assert.False(m.HasSavedState(script.ItemId, UUID.Random()));
+        Assert.False(HasRow(db, script.ItemId));
+        Assert.True(m.WaitForWrites());
+        Assert.True(m.HasSavedState(script.ItemId, compiled.AssetId));
+
+        m.DeleteState(script.ItemId);
+        Assert.False(m.HasSavedState(script.ItemId, compiled.AssetId));
+        Assert.True(HasRow(db, script.ItemId));
+        Assert.True(m.WaitForWrites());
+    }
+
+    [Fact]
+    public void OwnershipLookupDoesNotConsumeCarriedState()
+    {
+        string db = NewDb();
+        var compiled = Compiled();
+        using var m = new StateManager(null, db, ShortBusyMs);
+        var script = Script(compiled);
+        m.Carry(script.ItemId, compiled.AssetId, StateManager.CaptureBlob(script));
+        Assert.True(m.HasSavedState(script.ItemId, compiled.AssetId));
+        Assert.True(m.HasSavedState(script.ItemId, compiled.AssetId));
+        Assert.False(m.HasSavedState(script.ItemId, UUID.Random()));
+        Assert.True(m.HasCarried(script.ItemId));
+        Assert.NotNull(m.LoadState(script.ItemId, compiled.AssetId, out bool carried));
+        Assert.True(carried);
+        Assert.False(m.HasCarried(script.ItemId));
+    }
+
+    [Fact]
     public void ASaveWhileTheDatabaseIsLockedLandsOnceTheLockGoes()
     {
         string db = NewDb();

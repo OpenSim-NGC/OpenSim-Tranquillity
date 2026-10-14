@@ -426,6 +426,35 @@ namespace Phlox.ScriptEngine
             m_WakeEvent.Set();
         }
 
+        /// <summary>Non-consuming ownership check, including carried state and saves/deletes not yet written.</summary>
+        internal bool HasSavedState(UUID itemId, UUID assetId)
+        {
+            lock (m_Lock)
+                if (m_Carried.TryGetValue(itemId, out var carried) && carried.AssetId == assetId)
+                    return true;
+
+            if (UnwrittenFor(itemId) is WriteOp pending)
+                return pending.Kind == WriteKind.Save && pending.AssetId == assetId;
+
+            try
+            {
+                lock (m_ReadLock)
+                {
+                    using var cmd = Reader().CreateCommand();
+                    cmd.CommandText = "SELECT 1 FROM script_state WHERE item_id = @id AND asset_id = @asset";
+                    cmd.Parameters.AddWithValue("@id", itemId.ToString());
+                    cmd.Parameters.AddWithValue("@asset", assetId.ToString());
+                    return cmd.ExecuteScalar() != null;
+                }
+            }
+            catch (SQLiteException e)
+            {
+                m_log.LogError("[PhloxState]: Cannot check saved state for {0}; retaining Phlox ownership so the normal loader can report or retry the failure: {1}",
+                    itemId, e.Message);
+                return true;
+            }
+        }
+
         /// <summary>
         /// Loads saved state for a script, validating that the asset ID matches.
         /// Returns null if no state exists or the script has been modified since last save.
