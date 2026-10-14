@@ -1,0 +1,81 @@
+{
+  "id": "E04-hair-alpha-wearable",
+  "title": "Hair alpha wearable on top of a hair texture",
+  "rules": [
+    "R13"
+  ],
+  "note": "",
+  "channel": "Hair",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Hair",
+      "label": "hair",
+      "params": {},
+      "textures": [
+        {
+          "slot": "Hair",
+          "generator": "grad",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": false,
+          "file": "tex-hair-Hair.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Alpha",
+      "label": "alpha",
+      "params": {},
+      "textures": [
+        {
+          "slot": "HairAlpha",
+          "generator": "bandA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-alpha-HairAlpha.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "35536b58420f7a820a298c1c8f8fad9394879d98498e4ccd66d8c17bda24ab16",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": "Hair",
+        "detail": "hair: Hair 64x64 -\u003E 64; colour (0.35,0.21,0.06,1.00)"
+      },
+      {
+        "layer": "hair_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "hair texture alpha layer",
+        "status": "mask",
+        "wearable": "Hair",
+        "detail": "hair: Hair has no alpha channel (opaque)"
+      },
+      {
+        "layer": "hair alpha",
+        "status": "mask",
+        "wearable": "Alpha",
+        "detail": "alpha: alpha *= HairAlpha (64x64)"
+      }
+    ]
+  }
+}

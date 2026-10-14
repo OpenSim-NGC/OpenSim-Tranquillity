@@ -1,0 +1,143 @@
+{
+  "id": "B12-upper-alpha-wearable",
+  "title": "Upper alpha wearable carving the visibility",
+  "rules": [
+    "R13"
+  ],
+  "note": "",
+  "channel": "Upper",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skin",
+      "label": "skin",
+      "params": {},
+      "textures": []
+    },
+    {
+      "kind": "Alpha",
+      "label": "alpha",
+      "params": {},
+      "textures": [
+        {
+          "slot": "UpperAlpha",
+          "generator": "bandA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-alpha-UpperAlpha.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "bf691343ac34aa08d0025a540e170ec8e26d61aa22a4b214c3d1a96800db846c",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.65,0.43,0.25,1.00); body_skingrain.tga"
+      },
+      {
+        "layer": "nipples",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "upperbody_color.tga\u002Balpha"
+      },
+      {
+        "layer": "shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "highlight",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (1.00,1.00,1.00,0.00)"
+      },
+      {
+        "layer": "upper_bodypaint",
+        "status": "skipped",
+        "wearable": "Skin",
+        "detail": "skin: no UpperBodypaint texture on the wearable"
+      },
+      {
+        "layer": "freckles upper",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [freckles upper#776=skip]"
+      },
+      {
+        "layer": "upper_tattoo",
+        "status": "skipped",
+        "wearable": "Tattoo",
+        "detail": "no Tattoo worn"
+      },
+      {
+        "layer": "upper_universal_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "upper_undershirt",
+        "status": "skipped",
+        "wearable": "Undershirt",
+        "detail": "no Undershirt worn"
+      },
+      {
+        "layer": "Nail Polish",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Nail Polish#710=skip]"
+      },
+      {
+        "layer": "upper_gloves",
+        "status": "skipped",
+        "wearable": "Gloves",
+        "detail": "no Gloves worn"
+      },
+      {
+        "layer": "upper_clothes_shadow",
+        "status": "skipped",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "skipped",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn"
+      },
+      {
+        "layer": "upper_jacket",
+        "status": "skipped",
+        "wearable": "Jacket",
+        "detail": "no Jacket worn"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "morph",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn: mask left at 255"
+      },
+      {
+        "layer": "upper alpha",
+        "status": "mask",
+        "wearable": "Alpha",
+        "detail": "alpha: alpha *= UpperAlpha (64x64)"
+      }
+    ]
+  }
+}

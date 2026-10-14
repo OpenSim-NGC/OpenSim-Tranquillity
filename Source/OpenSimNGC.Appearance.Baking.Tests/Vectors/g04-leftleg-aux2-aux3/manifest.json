@@ -1,0 +1,36 @@
+{
+  "id": "G04-leftleg-aux2-aux3",
+  "title": "Left leg, aux 2 and aux 3 with nothing worn",
+  "rules": [
+    "R04"
+  ],
+  "note": "",
+  "channel": "LeftLeg",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "180cfa8330cd945efde20db2ef62b990e62669b89f0158f5c8101927e0f12632",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.50,0.50,0.50,1.00); aux_base.tga\u002Balpha"
+      },
+      {
+        "layer": "leftleg_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      }
+    ]
+  }
+}

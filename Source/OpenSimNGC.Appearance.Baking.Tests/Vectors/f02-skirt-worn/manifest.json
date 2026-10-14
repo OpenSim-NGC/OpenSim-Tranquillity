@@ -1,0 +1,70 @@
+{
+  "id": "F02-skirt-worn",
+  "title": "Skirt with length and slits: hard-edged masks, replace mode, mask left in alpha",
+  "rules": [
+    "R09",
+    "R11",
+    "R13"
+  ],
+  "note": "",
+  "channel": "Skirt",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skirt",
+      "label": "skirt",
+      "params": {
+        "858": 0.6,
+        "859": 0.3,
+        "860": 0.5,
+        "861": 0.8,
+        "862": 0.2,
+        "921": 0.9,
+        "922": 0.5,
+        "923": 0.2
+      },
+      "textures": [
+        {
+          "slot": "Skirt",
+          "generator": "grad",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": false,
+          "file": "tex-skirt-Skirt.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "9d50e87ac8e9a52ba6a3d6e51d17c830894afbff2f65704756d188dc47fafb01",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "skirt_fabric",
+        "status": "drawn",
+        "wearable": "Skirt",
+        "detail": "skirt: Skirt 64x64 -\u003E 64; colour (0.90,0.50,0.20,1.00)"
+      },
+      {
+        "layer": "skirt_fabric_alpha",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "masks [Skirt Length#858=0.60*, Slit Front#859=0.30*, Slit Back#860=0.50*, Slit Left#861=0.80*, Slit Right#862=0.20*]"
+      },
+      {
+        "layer": "skirt_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      }
+    ]
+  }
+}

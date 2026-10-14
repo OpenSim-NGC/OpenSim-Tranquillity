@@ -20,6 +20,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Reference results for the bake compositor (Vectors/README.md). -->
+    <None Include="Vectors\**\*" CopyToOutputDirectory="PreserveNewest" LinkBase="Vectors" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../OpenSimNGC.Appearance.Baking/OpenSimNGC.Appearance.Baking.csproj" />
   </ItemGroup>
 

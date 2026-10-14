@@ -1,0 +1,56 @@
+{
+  "id": "G02-leftarm-tattoo",
+  "title": "Left-arm universal tattoo",
+  "rules": [
+    "R03",
+    "R05"
+  ],
+  "note": "",
+  "channel": "LeftArm",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Universal",
+      "label": "uni",
+      "params": {
+        "1215": 0.3
+      },
+      "textures": [
+        {
+          "slot": "LeftArmTattoo",
+          "generator": "gradA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-uni-LeftArmTattoo.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "2e171bcf706677453bbe40d581fcddb93c3361163e9f7df576fefe629b2f0fc3",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.50,0.50,0.50,1.00); aux_base.tga\u002Balpha"
+      },
+      {
+        "layer": "leftarm_tattoo",
+        "status": "drawn",
+        "wearable": "Universal",
+        "detail": "uni: LeftArmTattoo 64x64\u002Balpha -\u003E 64; colour (1.00,0.30,1.00,1.00)"
+      }
+    ]
+  }
+}
