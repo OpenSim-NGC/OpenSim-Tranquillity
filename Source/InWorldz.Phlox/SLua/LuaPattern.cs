@@ -1,11 +1,11 @@
 /*
-** $Id: lstrlib.c $
+** $Id: lstrlib.c,v 1.220 2014/12/11 13:40:40 roberto Exp roberto $
 ** Standard library for string operations and pattern-matching
 ** See Copyright Notice in lua.h
 */
 
 /******************************************************************************
-* Copyright (C) 1994-2023 Lua.org, PUC-Rio.
+* Copyright (C) 1994-2015 Lua.org, PUC-Rio.
 *
 * Permission is hereby granted, free of charge, to any person obtaining
 * a copy of this software and associated documentation files (the
@@ -28,10 +28,17 @@
 ******************************************************************************/
 
 /*
- * Port of the pattern matching in lstrlib.c from Lua (https://www.lua.org). The Lua notice above is the
- * one in Lua 5.4.6 (lstrlib.c and the licence block of lua.h). The code keeps Lua's own names (MAXCCALLS,
- * MatchState, CAP_UNFINISHED), not the ones Luau's lstrlib.cpp uses (LUAI_MAXCCALLS). The Lua release it
- * was translated from is not recorded; the licence text is the same in every 5.x release.
+ * Port of the pattern matching in lstrlib.c from Lua (https://www.lua.org). The two notices above are the ones in
+ * Lua 5.3.0: the head of lstrlib.c and the licence block of lua.h. This file follows Lua 5.3.0, the release it was
+ * compared with. The points that tell it from the neighbouring releases:
+ *  - Lua 5.2.3 words some errors differently ("invalid capture index" without the number, quote macros around
+ *    "[" and "%f"); this file uses the 5.3 wording;
+ *  - Lua 5.3.3 and later track the end of the last match in gmatch and gsub; 5.3.0 and this file instead step
+ *    one position past an empty match;
+ *  - Lua 5.4.6 clamps the start position with posrelatI; this file clamps it as 5.2 and 5.3 do.
+ * Lua 5.3.1 and 5.3.2 were not available to compare, so the release is not narrowed further than "5.3.0 or a 5.3.x before 5.3.3".
+ * The code keeps Lua's own names (MAXCCALLS, MatchState, CAP_UNFINISHED), not the ones Luau's lstrlib.cpp uses
+ * (LUAI_MAXCCALLS).
  * Adapted 2026 by Legion Builds
  */
 
