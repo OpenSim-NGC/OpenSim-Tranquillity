@@ -73,7 +73,9 @@ Read this section before replacing an existing installation.
 5. **Configure `ControlPlaneTrustedHosts` before a multi-host rollout.**
    Destination regions must trust the actual outbound addresses of the login/grid
    server and peer simulators. Missing entries can break login placement, child
-   agents, neighbour announcements and crossings. Loopback is trusted.
+   agents, neighbour announcements and crossings. Region-control endpoints still
+   trust loopback; `/assets` and `/xinventory` writes require an explicit loopback
+   address in `[Network] ControlPlaneTrustedHosts` when services connect locally.
    See [Security hardening](security/Hardening.md) for exact configuration,
    reverse-proxy guidance and `403`/`404` diagnosis.
 6. **Plan for changed Hypergrid behavior.** Hypergrid return-home requests are
