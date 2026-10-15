@@ -643,8 +643,12 @@ public class ZephyrWindTests : OpenSimTestCase
 
     // The default plugin is internal to the wind module's assembly.
     private static IWindModelPlugin DefaultPlugin()
-        => (IWindModelPlugin)Activator.CreateInstance(
-            typeof(WindModule).Assembly.GetType("OpenSim.Region.CoreModules.World.Wind.Plugins.SimpleRandomWind"));
+    {
+        Type type = typeof(WindModule).Assembly.GetType("OpenSim.Region.CoreModules.World.Wind.Plugins.SimpleRandomWind")
+            ?? throw new InvalidOperationException("SimpleRandomWind is not in the wind module's assembly");
+        return (IWindModelPlugin)(Activator.CreateInstance(type)
+            ?? throw new InvalidOperationException("SimpleRandomWind could not be created"));
+    }
 
     [Fact]
     public void TheDefaultPluginStillGivesTheViewerSixteenBySixteen()
