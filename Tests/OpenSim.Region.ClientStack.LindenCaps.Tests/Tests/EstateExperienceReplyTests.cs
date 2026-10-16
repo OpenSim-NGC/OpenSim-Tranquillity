@@ -1,5 +1,5 @@
 /*
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
  * Copyright (c) Contributors, http://opensimulator.org/
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *

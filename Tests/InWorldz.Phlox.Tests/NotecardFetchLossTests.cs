@@ -1,4 +1,4 @@
-/* Copyright (c) Legion Builds
+/* Copyright (c) 2026 Legion Builds
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,9 +25,10 @@ using Xunit;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// A notecard read whose answer never reaches the script. SL (llGetNotecardLine): when the notecard is missing or not a
-/// notecard "an error is shouted on DEBUG_CHANNEL"; the wiki for the dataserver event says "it is possible for any
-/// dataserver request to fail" and that a response may never come. What these tests pin is what the region's log holds
+/// A notecard read whose answer never reaches the script. SL (llGetNotecardLine,
+/// https://wiki.secondlife.com/wiki/LlGetNotecardLine): when the notecard is missing or not a notecard, an error goes out on
+/// DEBUG_CHANNEL; the dataserver page (https://wiki.secondlife.com/wiki/Dataserver) says any dataserver request can fail, and
+/// that a response may never come. What these tests pin is what the region's log holds
 /// when the asset service has no notecard to give (a null result, a result of another type, a throw), and what becomes of
 /// an answer that is produced just as the region stops: one still in the scheduler's incoming queue is saved with the
 /// script and given to it after the restart; a fetch still in flight is not (the request is not saved).

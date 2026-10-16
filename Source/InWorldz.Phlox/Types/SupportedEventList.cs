@@ -1,4 +1,10 @@
-﻿using System;
+﻿/*
+ * From HalcyonGrid/phlox (Source/Halcyon.Phlox/Types/SupportedEventList.cs, commit e805a56).
+ * Licence: Apache License 2.0, see ThirdPartyLicenses/Phlox.txt.
+ * Modified 2026 by Legion Builds.
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -375,8 +381,8 @@ namespace InWorldz.Phlox.Types
                 TableIndex = (int) Events.FINAL_DAMAGE
             }},
 
-            // wiki.secondlife.com/wiki/On_death - "on_death( )", "triggered on all attachments worn
-            // by an avatar when that avatar's health reaches 0". DELIVERED: PhloxEngine subscribes
+            // wiki.secondlife.com/wiki/On_death - "on_death( )"; the page says it fires for all attachments an avatar
+            // wears once that avatar's health hits 0. DELIVERED: PhloxEngine subscribes
             // EventManager.OnAvatarKilled and posts it to every script on every attachment of the
             // dead avatar.
             {"on_death", new FunctionSig {
@@ -388,8 +394,8 @@ namespace InWorldz.Phlox.Types
 
             // wiki.secondlife.com/wiki/Game_control - "game_control( key id, integer button_levels,
             // list axes )" - THREE parameters per the wiki, not four. COMPILE-ONLY, and it stays so:
-            // it is "triggered when compatible viewer sends fresh GameControlInput message", a
-            // viewer->sim message Tranquillity does not carry. Nothing here fakes a trigger.
+            // it is, per the wiki, raised by a compatible viewer's new GameControlInput message, a viewer->sim
+            // message Tranquillity does not carry. Nothing here fakes a trigger.
             {"game_control", new FunctionSig {
                 FunctionName = "game_control",
                 ReturnType = VarType.Void,

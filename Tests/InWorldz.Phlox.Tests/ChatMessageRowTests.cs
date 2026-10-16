@@ -1,6 +1,10 @@
 /*
  * Phlox Script Engine tests
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 using System;
@@ -15,8 +19,9 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// An object's instant message is kept for a recipient who is offline and carries the object's location, as Halcyon
-/// (LSLSystemAPI.cs:3910-3916) and YEngine send it; SL (llInstantMessage): "If the specified user is not signed in, the
-/// messages will be delivered to their email just like a regular instant message". And empty chat reaches Phlox
+/// (LSLSystemAPI.cs:3910-3916) and YEngine send it; SL (llInstantMessage,
+/// https://wiki.secondlife.com/wiki/LlInstantMessage): a message to a user who is not signed in goes to their email,
+/// as an ordinary instant message does. And empty chat reaches Phlox
 /// listeners, as it reaches Halcyon's and YEngine's (WorldCommModule.DeliverMessage has no empty-message guard).
 /// </summary>
 // No test reaches a network service: the IM transfer module is an in-memory recorder.

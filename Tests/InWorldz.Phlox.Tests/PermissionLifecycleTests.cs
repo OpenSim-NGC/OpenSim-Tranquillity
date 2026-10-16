@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,9 +24,11 @@ namespace InWorldz.Phlox.Tests;
 /// <summary>
 /// When a script's permissions end, and what goes with them. Halcyon where it has the rule
 /// (LSLSystemAPI OnScriptReset, ReleaseControlsInternal, llRequestPermissions, handleMustReleaseControls, the animation
-/// calls), SL where it does not (wiki llTakeControls: "The script will also lose this permission on reset, or if the object
-/// is deleted, detached, or dropped"; llReleaseControls: "If PERMISSION_TAKE_CONTROLS was previously granted, it will be
-/// revoked"; llRequestPermissions: "PERMISSION_TELEPORT cannot be held by temporary attachments").
+/// calls), SL where it does not (wiki llTakeControls, https://wiki.secondlife.com/wiki/LlTakeControls: the
+/// permission is also lost on reset, and when the object is deleted, detached or dropped; llReleaseControls,
+/// https://wiki.secondlife.com/wiki/LlReleaseControls: a previously granted PERMISSION_TAKE_CONTROLS is revoked;
+/// llRequestPermissions, https://wiki.secondlife.com/wiki/LlRequestPermissions: temporary attachments cannot hold
+/// PERMISSION_TELEPORT).
 /// </summary>
 // No longer in "phlox-state": this class touches no process-wide state, so it runs in parallel.
 public class PermissionLifecycleTests

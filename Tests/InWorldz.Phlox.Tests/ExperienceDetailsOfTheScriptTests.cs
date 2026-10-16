@@ -17,9 +17,9 @@ using Xunit;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// llGetExperienceDetails(NULL_KEY) answers for the script's own Experience. SL wiki llGetExperienceDetails: "If
-/// experience_id is NULL_KEY, then information about the script's experience is returned. In this situation, if the
-/// script isn't associated with an experience, an empty list is returned."
+/// llGetExperienceDetails(NULL_KEY) answers for the script's own Experience. SL wiki llGetExperienceDetails
+/// (https://wiki.secondlife.com/wiki/LlGetExperienceDetails): with NULL_KEY as experience_id the details of the
+/// script's own experience come back, and a script with no experience gets an empty list.
 /// </summary>
 // Runs in parallel: each test has its own harness and its own Experience module registered on its own scene.
 public class ExperienceDetailsOfTheScriptTests

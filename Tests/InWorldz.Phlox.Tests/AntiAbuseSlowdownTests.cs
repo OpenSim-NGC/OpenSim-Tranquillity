@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -668,8 +675,9 @@ public class AntiAbuseSlowdownTests
     /// taken out of the asset service after the first read and the cached answers still come.
     /// </summary>
     /// <summary>One read of each kind, each asked after the last answered, reported on channel 7 as one line.</summary>
-    // Every reader in the prim gets every answer (SL), so each takes only its own (the wiki's advice:
-    // "always use the queryid key"); before, a finished first reader went on asking on the second reader's answers.
+    // Every reader in the prim gets every answer (SL), so each takes only its own (the wiki's advice,
+    // https://wiki.secondlife.com/wiki/Dataserver: rely on the queryid key every time); before, a finished first
+    // reader went on asking on the second reader's answers.
     private const string Reader = @"
         list got;
         integer step = 0;

@@ -918,15 +918,13 @@
     ;; Set ExternalIPResolver to a public DNS server to resolve the hostname by
     ;; querying that server directly, bypassing the OS resolver and any hosts-file
     ;; override. Accepts "ip" or "ip:port". Leave commented to keep using the OS
-    ;; resolver. [ViewerAddress] PublicDnsServer does the same and is used instead
-    ;; when it is set.
+    ;; resolver.
     ; ExternalIPResolver = "1.1.1.1"
     ;;
     ;; How often, in minutes, to re-resolve the hostname so a dynamic-DNS address
     ;; change takes effect without restarting Robust. Applies to both resolution
     ;; paths. 0 disables the refresh. Default 30. A failed lookup is logged as a
-    ;; warning and the previous address is kept. [ViewerAddress] PublicRefreshMinutes
-    ;; does the same and is used instead when it is set.
+    ;; warning and the previous address is kept.
     ; ExternalIPRefreshMinutes = 30
 
 

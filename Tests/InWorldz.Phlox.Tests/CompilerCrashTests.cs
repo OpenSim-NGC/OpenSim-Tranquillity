@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using InWorldz.Phlox.Glue;
 using Xunit;
 using Xunit.Abstractions;
@@ -15,7 +22,7 @@ namespace InWorldz.Phlox.Tests;
 /// </para>
 ///
 /// <para>
-/// The script is <c>Fixtures/lmap4.lsl</c>, a four-state lamp from a resident's prim. There is
+/// The script is <c>Fixtures/lmap4.lsl</c>, a four-state lamp written for these tests. There is
 /// nothing exotic in it, which is the point: whatever the compiler trips over is something ordinary.
 /// </para>
 ///

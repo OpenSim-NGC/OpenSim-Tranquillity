@@ -717,6 +717,10 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
                     land, requiredPowers, false))
             {
                 land.UpdateAccessList(flags, transactionID, entries);
+
+                // UpdateAccessList changes the parcel's lists and flags in memory only; store it, or the
+                // change is lost on restart.
+                UpdateLandObject(land.LandData.LocalID, land.LandData);
             }
         }
         else

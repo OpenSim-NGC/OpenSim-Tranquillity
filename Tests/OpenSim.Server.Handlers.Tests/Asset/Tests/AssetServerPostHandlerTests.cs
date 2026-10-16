@@ -74,11 +74,46 @@ namespace OpenSim.Server.Handlers.Asset.Test
             }
 
             buffer.Position = 0;
-            asph.Handle(null, buffer, null, null);
+            TestOSHttpRequest request = new TestOSHttpRequest();
+            TestOSHttpResponse response = new TestOSHttpResponse();
+            byte[] reply = asph.Handle("/assets", buffer, request, response);
+
+            Xunit.Assert.NotEqual((int)HttpStatusCode.BadRequest, response.StatusCode);
+            Xunit.Assert.NotNull(reply);
+            Xunit.Assert.Contains(assetId.ToString(), Encoding.UTF8.GetString(reply));
 
             AssetBase retrievedAsset = assetService.Get(assetId.ToString());
 
-            // TODO: Fix this assertion
+            Xunit.Assert.NotNull(retrievedAsset);
+            Xunit.Assert.Equal(asset.Name, retrievedAsset.Name);
+            Xunit.Assert.Equal(asset.Type, retrievedAsset.Type);
+            Xunit.Assert.Equal(asset.Data, retrievedAsset.Data);
+        }
+
+        [Fact]
+        public void TestNullAssetStoreRequest()
+        {
+            TestHelpers.InMethod();
+
+            IConfigSource config = new IniConfigSource();
+            config.AddConfig("AssetService");
+            config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
+
+            AssetService assetService = new AssetService(config);
+
+            AssetServerPostHandler asph = new AssetServerPostHandler(assetService);
+
+            // A well-formed document that deserializes to a null asset (xsi:nil on the root element).
+            byte[] nilDocument = Encoding.UTF8.GetBytes(
+                "<?xml version=\"1.0\" encoding=\"utf-8\"?>" +
+                "<AssetBase xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:nil=\"true\" />");
+            MemoryStream buffer = new MemoryStream(nilDocument);
+
+            TestOSHttpRequest request = new TestOSHttpRequest();
+            TestOSHttpResponse response = new TestOSHttpResponse();
+            asph.Handle("/assets", buffer, request, response);
+
+            Xunit.Assert.Equal((int)HttpStatusCode.BadRequest, response.StatusCode);
         }
 
         [Fact]

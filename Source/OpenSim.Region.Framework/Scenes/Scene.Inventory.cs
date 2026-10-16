@@ -2928,6 +2928,11 @@ public partial class Scene
             group.RezzerID = rezzerID;
             group.RezStringParameter = null;
 
+            // llSetStatus: an object rezzed by a script is deleted when it goes off world, unless the script clears
+            // STATUS_DIE_AT_EDGE. Not the stored flag: that also acts at a crossing into a neighbouring region.
+            if (!humanRez && ScriptRezzedObjectsDieAtEdge)
+                group.DieAtVoidEdge = true;
+
             if (rezSelected)
             {
                 group.IsSelected = true;
@@ -3005,6 +3010,9 @@ public partial class Scene
         }
 
         sog.RezzerID = sourcePart.UUID;
+
+        if (ScriptRezzedObjectsDieAtEdge)
+            sog.DieAtVoidEdge = true;
 
         AddNewSceneObject(sog, true, pos, rot, vel);
 

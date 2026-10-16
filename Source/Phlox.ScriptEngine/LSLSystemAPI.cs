@@ -1,4 +1,39 @@
 /*
+ * Copyright (c) InWorldz Halcyon Developers
+ * Copyright (c) Contributors, http://opensimulator.org/
+ *
+ * Ported from LSL_Api.cs
+ * Massively adapted by InWorldz, LLC in March 2011
+ */
+
+/*
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ * 
+ *   * Redistributions of source code must retain the above copyright notice, this
+ *     list of conditions and the following disclaimer.
+ * 
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ * 
+ *   * Neither the name of halcyon nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
  * Phlox Script Engine Integration
  *
  * LSLSystemAPI — implementation of ISystemAPI.
@@ -7,6 +42,8 @@
  * Everything else stubs with a log warning and safe default.
  * Port methods from Halcyon's InWorldz/InWorldz.Phlox.Engine/LSLSystemAPI.cs
  * as needed, adapting Halcyon-specific APIs to standard OpenSim equivalents.
+ *
+ * Adapted 2026 by Legion Builds
  */
 
 using System;
@@ -530,12 +567,15 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// Run-time errors go out on DEBUG_CHANNEL, as SL does (wiki: "chat channel reserved for
-        /// script debugging and error messages"; viewers route it to the script-error window and filter
-        /// out other owners' objects) - not shouted on channel 0, where every avatar in range read them
+        /// Run-time errors go out on DEBUG_CHANNEL, as SL does (https://wiki.secondlife.com/wiki/DEBUG_CHANNEL
+        /// describes it as a
+        /// chat channel set aside for debugging output and error reports from scripts; viewers route it to the
+        /// script-error
+        /// window and filter out other owners' objects) - not shouted on channel 0, where every avatar in range read them
         /// in local chat. The text is unchanged. ChatModule turns the channel into ChatTypeEnum.DebugChannel.
-        /// They reach scripts listening on DEBUG_CHANNEL as far as llSay reaches (SL wiki, DEBUG_CHANNEL: "Server-generated
-        /// errors are broadcast the same distance as llSay"), and are cut as llSay's text is.
+        /// They reach scripts listening on DEBUG_CHANNEL as far as llSay reaches (the same DEBUG_CHANNEL page says
+        /// errors the
+        /// server generates carry as far as llSay chat does), and are cut as llSay's text is.
         /// </summary>
         public void ShoutError(string errorText)
         {
@@ -565,8 +605,9 @@ namespace Phlox.ScriptEngine
 
         // A reset and a state change drop every listen, as Halcyon's UnregisterScriptFromNotifications does.
         // A reset also ends every permission and the controls taken under them (Halcyon OnScriptReset:
-        // ReleaseControlsInternal, then PermsChange(item, UUID.Zero, 0); SL llTakeControls: "The script will also lose
-        // this permission on reset"). Animations already playing and camera parameters stay, as in both.
+        // ReleaseControlsInternal, then PermsChange(item, UUID.Zero, 0); the llTakeControls page
+        // (https://wiki.secondlife.com/wiki/LlTakeControls) says the script also loses that permission when it is reset).
+        // Animations already playing and camera parameters stay, as in both.
         public void OnScriptReset()
         {
             ReleaseScriptResources(ScriptEnd.Reset);
@@ -650,15 +691,22 @@ namespace Phlox.ScriptEngine
         /// sleeps and touch waits belong to the scheduler, which ends them one step earlier on the same three paths
         /// (PhloxExecutionScheduler.UnregisterFromNotifications).
         /// <list type="bullet">
-        /// <item>listens: every end (SL: "Listeners are removed"; state: "All listens are released"). Unload also forgets the listen-rate record.</item>
-        /// <item>llSensorRepeat: every end (SL reset: "Timers (including repeating sensors) are cleared"; state: "Repeating sensors are released";
+        /// <item>listens: every end (SL: a reset removes the listeners, per
+        /// https://wiki.secondlife.com/wiki/LlResetScript, and a state
+        /// change releases all listens, per https://wiki.secondlife.com/wiki/State). Unload also forgets the
+        /// listen-rate record.</item>
+        /// <item>llSensorRepeat: every end (SL: a reset also clears timers, repeating sensors included, and a state
+        /// change releases
+        /// repeating sensors, same two pages;
         /// Halcyon RemoveAllAsyncHandlers). Reset and state change also drop the MiscAttr record, so a later restore or parcel resume cannot
         /// bring the old sensor back; unload keeps it in the state that is saved for the object's return (Halcyon GetSerializationData).</item>
         /// <item>pending dataserver replies: every end (Halcyon Dataserver.RemoveEvents from RemoveAllAsyncHandlers).</item>
         /// <item>llHTTPRequest: reset and unload (Halcyon RemoveScript -> StopHttpRequest; a reset clears the event queue). Kept across a state
         /// change, as Halcyon (its HttpRequestPlugin.RemoveEvents did nothing).</item>
-        /// <item>URLs: reset and unload (SL: "Any granted URLs are released"; "deleting the prim ... release URLs"). Kept across a state
-        /// change (SL: "Unlike listeners, URLs persist across state changes").</item>
+        /// <item>URLs: reset and unload (SL, https://wiki.secondlife.com/wiki/LlRequestURL: granted URLs are
+        /// released, and deleting the
+        /// prim, among other things, releases them). Kept across a state
+        /// change (the same page contrasts URLs with listeners: URLs survive a state change).</item>
         /// <item>XML-RPC channels and llSendRemoteData: unload only (Halcyon RemoveScript; its reset did nothing and SL says nothing).</item>
         /// <item>permission requests still waiting for an answer, both kinds: reset and unload (<see cref="CancelPermissionRequests"/>).</item>
         /// </list>
@@ -845,8 +893,9 @@ namespace Phlox.ScriptEngine
         /// dialog, debit among them, is asked for again. A granter who has not arrived yet (a vehicle crossing before its
         /// rider, attachments rezzing as their wearer arrives) leaves the grant waiting as a claim, decided the same way
         /// when that avatar arrives on the object or wearing it (<see cref="OnGroupCrossedAvatarReady"/>); a claim never met
-        /// never acts. The SL wiki says nothing on a grant across a restart, rez or crossing; llRequestPermissions says
-        /// "Permissions persist across state changes".
+        /// never acts. The SL wiki says nothing on a grant across a restart, rez or crossing; the llRequestPermissions
+        /// page (https://wiki.secondlife.com/wiki/LlRequestPermissions) says that permissions stay in place across
+        /// state changes.
         /// </para>
         /// <para>
         /// A claim noted for carry (<see cref="NoteGrantForCarry"/>) is marked unverified; wherever it is restored from, a
@@ -897,8 +946,10 @@ namespace Phlox.ScriptEngine
                 {
                     // The land no longer lets the grant's Experience run (the estate blocks it, or neither allows nor
                     // trusts it now): it ends at the restore as it ends when its avatar enters such a parcel
-                    // (ExperienceLandChanged), told once with XP_ERROR_NOT_PERMITTED_LAND. SL wiki
-                    // experience_permissions_denied, "The experience can no longer run".
+                    // (ExperienceLandChanged), told once with XP_ERROR_NOT_PERMITTED_LAND. The
+                    // experience_permissions_denied page
+                    // (https://wiki.secondlife.com/wiki/Experience_permissions_denied) names, among its reasons, that
+                    // the Experience is no longer able to run.
                     EndExperienceGrant();
                     m_ScriptEngine.PostScriptEvent(m_itemID, new EventParams(
                         "experience_permissions_denied", new object[] { granter.ToString(), XP_ERROR_NOT_PERMITTED_LAND }, new DetectParams[0]));
@@ -1026,12 +1077,14 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// <paramref name="agentId"/>, who gave this script its grant from an Experience, entered a parcel. SL wiki
-        /// experience_permissions_denied, under "The experience can no longer run": "The agent has moved to a parcel where
-        /// the experience cannot run." When the land refuses the Experience by the decision llRequestExperiencePermissions
-        /// makes (XP_ERROR_NOT_PERMITTED_LAND: blocked here, or neither allowed nor trusted here), the grant ends with the
-        /// controls it took and experience_permissions_denied is posted with that code, as the core does for YEngine's
-        /// grants (ExperienceModule.UpdateScriptExperiencePerms). Scheduler thread.
+        /// <paramref name="agentId"/>, who gave this script its grant from an Experience, entered a parcel. The
+        /// experience_permissions_denied page (https://wiki.secondlife.com/wiki/Experience_permissions_denied) lists,
+        /// under the reason that the experience is no longer able to run, the case of an agent who has gone to a parcel
+        /// on which that experience is not permitted to run. When the land refuses the Experience by the decision
+        /// llRequestExperiencePermissions makes (XP_ERROR_NOT_PERMITTED_LAND: blocked here, or neither allowed nor
+        /// trusted here), the grant ends with the controls it took and experience_permissions_denied is posted with
+        /// that code, as the core does for YEngine's grants (ExperienceModule.UpdateScriptExperiencePerms). Scheduler
+        /// thread.
         /// </summary>
         internal void ExperienceLandChanged(UUID agentId)
         {
@@ -1048,8 +1101,10 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// The core ended the grant <paramref name="agentId"/> gave this script through <paramref name="experience"/>
-        /// (EventManager.OnExperiencePermissionsRevoked): the avatar blocked the Experience, SL wiki
-        /// experience_permissions_denied, "The agent has blocked the experience from the experience profile". The core
+        /// (EventManager.OnExperiencePermissionsRevoked): the avatar blocked the Experience; the
+        /// experience_permissions_denied page (https://wiki.secondlife.com/wiki/Experience_permissions_denied) gives,
+        /// as a reason, that the agent blocked the
+        /// experience in their experience profile. The core
         /// has already cleared the item's grant and posted experience_permissions_denied to the script, so the script is
         /// told nothing more here: what the engine keeps for the grant ends as when the land ends it, and a request this
         /// script is still waiting on from that avatar under that Experience ends unanswered, since the core's denial is
@@ -1215,8 +1270,9 @@ namespace Phlox.ScriptEngine
         public int llAbs(int i) => i == int.MinValue ? i : Math.Abs(i);
         public float llFabs(float f) => Math.Abs(f);
         public float llFrand(float mag) => (float)(ThreadRandom.NextDouble() * mag);
-        // SL wiki llFloor, "The returned value is -2147483648 (0x80000000) if the arithmetic result is outside
-        // of the range of valid integers"; NaN too. A plain (int) saturates on .NET 9+ x64.
+        // SL wiki llFloor (https://wiki.secondlife.com/wiki/LlFloor): the result is the minimum integer, -2147483648
+        // (0x80000000), when the arithmetic
+        // result lies beyond what an integer can hold; NaN too. A plain (int) saturates on .NET 9+ x64.
         public int llFloor(float f) => InWorldz.Phlox.Util.LslConvert.FloatToInteger(Math.Floor(f));
         public int llCeil(float f) => InWorldz.Phlox.Util.LslConvert.FloatToInteger(Math.Ceiling(f));
         public int llRound(float f) => InWorldz.Phlox.Util.LslConvert.FloatToInteger(Math.Round(f, MidpointRounding.AwayFromZero));
@@ -1372,10 +1428,12 @@ namespace Phlox.ScriptEngine
 
         // ── Chat ───────────────────────────────────────────────────────────────
 
-        // llSay, llShout, llWhisper and llRegionSayTo send at most 1024 bytes (SL wiki, llSay: "msg can be a maximum of
-        // 1024 bytes"; llShout and llWhisper: "Text can be a maximum of 1024 bytes"); llRegionSay at most 1024 characters
-        // (llRegionSay: "If msg is longer than 1024 characters it is truncated to 1024 characters"). Avatars and every
-        // engine's listens hear the same cut text.
+        // llSay, llShout, llWhisper and llRegionSayTo send at most 1024 bytes (SL wiki: the llSay page,
+        // https://wiki.secondlife.com/wiki/LlSay, caps msg
+        // at 1024 bytes, and the llShout and llWhisper pages give the same cap for their text); llRegionSay at most 1024
+        // characters (the llRegionSay page, https://wiki.secondlife.com/wiki/LlRegionSay, says a longer msg is
+        // truncated to that length).
+        // Avatars and every engine's listens hear the same cut text.
 
         public void llSay(int channel, string msg)
         {
@@ -1405,8 +1463,8 @@ namespace Phlox.ScriptEngine
         private const int MaxRegionSayCharacters = 1024;
 
         /// <summary>
-        /// Chat cut to SL's 1024 bytes of UTF-8. SL (llSay): "If a multibyte character ends up on the 1024 byte boundary,
-        /// it is discarded and not split into invalid bytes."
+        /// Chat cut to SL's 1024 bytes of UTF-8. The llSay page (https://wiki.secondlife.com/wiki/LlSay) says a
+        /// multibyte character that ends up on the 1024-byte boundary is dropped whole, not split into invalid bytes.
         /// </summary>
         private static string CapChatBytes(string msg) => CapUtf8Bytes(msg, MaxChatBytes);
 
@@ -1554,9 +1612,11 @@ namespace Phlox.ScriptEngine
         private const int MaxInstantMessageBytes = 1023;
 
         /// <summary>
-        /// llInstantMessage's message cut to SL's limit: "Messages longer than 1023 bytes will be truncated to 1023
-        /// bytes. This can convey 1023 ASCII characters, or fewer if non-ASCII characters are present."
-        /// (https://wiki.secondlife.com/wiki/LlInstantMessage). Bytes of UTF-8 are counted, and a multibyte character
+        /// llInstantMessage's message cut to SL's limit: the llInstantMessage page
+        /// (https://wiki.secondlife.com/wiki/LlInstantMessage) says a message over
+        /// 1023 bytes is truncated to 1023 bytes, which holds 1023 ASCII characters, or fewer when non-ASCII
+        /// characters occur.
+        /// Bytes of UTF-8 are counted, and a multibyte character
         /// the cut would split is dropped whole, as PrimSetText cuts floating text.
         /// </summary>
         private static string CapInstantMessage(string message) => CapUtf8Bytes(message, MaxInstantMessageBytes);
@@ -1652,8 +1712,10 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// A prim name as llSetObjectName and PRIM_NAME store it. SL wiki llSetObjectName: "The name is limited to 63
-        /// characters. Longer prim names are cut short." Halcyon cut it the same way (LimitLength(name, MAX_OBJ_NAME)).
+        /// A prim name as llSetObjectName and PRIM_NAME store it. The llSetObjectName page
+        /// (https://wiki.secondlife.com/wiki/LlSetObjectName) caps the name
+        /// at 63 characters and says a longer prim name is cut short. Halcyon cut it the same way (LimitLength(name,
+        /// MAX_OBJ_NAME)).
         /// </summary>
         private static string CapPrimName(string name)
         {
@@ -1736,7 +1798,8 @@ namespace Phlox.ScriptEngine
         }
 
         // The script's run time lives in its RuntimeState, as Halcyon's llGetTime (ScriptState.TotalRuntime): Reset()
-        // starts it again (SL llGetTime: the time "is reset when the script is reset") and it is saved with the state, so
+        // starts it again (the llGetTime page, https://wiki.secondlife.com/wiki/LlGetTime, says the time restarts on
+        // a script reset) and it is saved with the state, so
         // it carries across a region restart or a crossing.
         public float llGetTime() => m_thisScript?.ScriptState?.TotalRuntime ?? 0f;
 
@@ -1841,8 +1904,9 @@ namespace Phlox.ScriptEngine
         }
         public Vector3 llGetScale() => m_host?.Scale ?? Vector3.One;
         /// <summary>
-        /// SL wiki llSetScale: "Does not work on physical prims." Otherwise each component is rounded into
-        /// [0.01, 64.0] ("rounded to the nearest endpoint").
+        /// SL wiki llSetScale (https://wiki.secondlife.com/wiki/LlSetScale): it has no effect on physical prims.
+        /// Otherwise each component is rounded into
+        /// [0.01, 64.0] (a value outside is moved to the closest end of that range).
         /// </summary>
         public void llSetScale(Vector3 scale)
         {
@@ -1929,8 +1993,9 @@ namespace Phlox.ScriptEngine
             return m_host.Velocity;
         }
         /// <summary>
-        /// The object's acceleration in region axes; ZERO_VECTOR in an attachment or a child prim (SL wiki llGetAccel:
-        /// "Returns ZERO_VECTOR in attachments", "Returns ZERO_VECTOR in child prims").
+        /// The object's acceleration in region axes; ZERO_VECTOR in an attachment or a child prim (SL wiki llGetAccel,
+        /// https://wiki.secondlife.com/wiki/LlGetAccel: it gives ZERO_VECTOR for attachments, and likewise for child
+        /// prims).
         /// </summary>
         public Vector3 llGetAccel()
         {
@@ -1940,8 +2005,8 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// The root's angular velocity: a physical object's spin, or what llTargetOmega set (SL wiki llGetOmega:
-        /// "Returns the omega of the root if called in a child prim").
+        /// The root's angular velocity: a physical object's spin, or what llTargetOmega set (SL wiki llGetOmega,
+        /// https://wiki.secondlife.com/wiki/LlGetOmega: called in a child prim, it gives the root's omega).
         /// </summary>
         public Vector3 llGetOmega() => m_host?.ParentGroup?.RootPart.AngularVelocity ?? Vector3.Zero;
 
@@ -2005,7 +2070,8 @@ namespace Phlox.ScriptEngine
         }
         /// <summary>
         /// llSetRegionPos as the SL wiki documents it (https://wiki.secondlife.com/wiki/LlSetRegionPos):
-        /// - "Returns FALSE and does not move the object if position is more than 10m off region or above 4096m";
+        /// - FALSE, with the object left where it is, if the position is more than 10 m outside the region or above
+        /// 4096 m;
         /// - FALSE for a dynamic (physical) object, for an avatar attachment, and for parcel or region refusals;
         /// - below ground the object goes to ground level, and the call is FALSE if that is more than 0.1 m up.
         /// A position up to 10 m past the edge moves the object into the region there: core crosses an object whose
@@ -2062,8 +2128,9 @@ namespace Phlox.ScriptEngine
         // ── Physics ────────────────────────────────────────────────────────────
 
         /// <summary>
-        /// From an attachment, physical or not, this sets a constant force on the wearer ("Used on an attachment, it
-        /// will apply the force to the avatar", SL wiki llSetForce; Halcyon SceneObjectGroup.SetForce). A local force
+        /// From an attachment, physical or not, this sets a constant force on the wearer (the llSetForce page,
+        /// https://wiki.secondlife.com/wiki/LlSetForce, says that on an attachment the force is applied to the
+        /// avatar; Halcyon SceneObjectGroup.SetForce). A local force
         /// is handed on in the avatar's own axes for the physics engine to turn with the avatar on every step; a new
         /// call replaces it and a zero force ends it (see PhysicsActor.SetConstantForce). Otherwise only a physical
         /// object takes the force.
@@ -2591,8 +2658,9 @@ namespace Phlox.ScriptEngine
         /// A positive request below the region's floor is raised to it.
         ///
         /// <para>
-        /// Zero and negative are left exactly as they were: the SL wiki says "Passing in 0.0 stops
-        /// further timer events", and a negative value lands &lt;= 0 where the scheduler only arms a
+        /// Zero and negative are left exactly as they were: the SL wiki
+        /// (https://wiki.secondlife.com/wiki/LlSetTimerEvent) says a
+        /// value of 0.0 turns the timer events off, and a negative value lands &lt;= 0 where the scheduler only arms a
         /// timer for an interval &gt; 0. The floor must never resurrect a stopped timer.
         /// </para>
         ///
@@ -2626,7 +2694,8 @@ namespace Phlox.ScriptEngine
         private bool m_timerFloorLogged;
         public void llSleep(float sec) => ScriptSleep((int)(sec * 1000));
         /// <summary>
-        /// Wiki: "Set the minimum time between events being handled" - a floor between
+        /// The llMinEventDelay page (https://wiki.secondlife.com/wiki/LlMinEventDelay) describes this as setting the
+        /// least time between handled events - a floor between
         /// handler starts for THIS script, events inside the window queued, not dropped. The old
         /// comment said the scheduler made this unnecessary; serialising events is not the same as
         /// spacing them. Upstream forwards to the engine too (LSL_Api.cs:4433-4444).
@@ -2813,13 +2882,13 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// An event SL raises in every script of some prims, whatever engine runs them (llMessageLinked: "in all scripts in
-        /// the prim(s) described by link"; object_rez, email, linkset_data and dataserver likewise, see their callers).
-        /// Phlox's own posts reach only its own scripts, so each other script engine of the region is offered every script
-        /// item <paramref name="items"/> lists once, with plain values (int, string), as core modules post events; YEngine
-        /// unwraps those. An engine queues only for the scripts it runs, so no script gets it twice. An exception from
-        /// another engine is logged once for that engine and call and goes no further. With no other engine (a Phlox-only
-        /// region) nothing is listed or posted.
+        /// An event SL raises in every script of some prims, whatever engine runs them (llMessageLinked reaches all
+        /// scripts in the prim or prims that its link argument selects; object_rez, email, linkset_data and dataserver
+        /// likewise, see their callers). Phlox's own posts reach only its own scripts, so each other script engine of
+        /// the region is offered every script item <paramref name="items"/> lists once, with plain values (int,
+        /// string), as core modules post events; YEngine unwraps those. An engine queues only for the scripts it runs,
+        /// so no script gets it twice. An exception from another engine is logged once for that engine and call and
+        /// goes no further. With no other engine (a Phlox-only region) nothing is listed or posted.
         /// </summary>
         private void OfferToOtherEngines(string caller, Func<IEnumerable<UUID>> items, string eventName, Func<object[]> args)
         {
@@ -2864,9 +2933,11 @@ namespace Phlox.ScriptEngine
         }
         public int llGetMemoryLimit() { return 131072; /* 128 * 1024 */ }
         /// <summary>
-        /// Wiki: "Enables or disables the scripts profiling state" - PROFILE_SCRIPT_MEMORY (1)
-        /// starts recording, PROFILE_NONE (0) stops it, and llGetSPMaxMemory then returns "the most
-        /// memory used at any one time". Upstream is a no-op (LSL_Api.cs:17570); Phlox has MemInfo, so
+        /// The llScriptProfiler page (https://wiki.secondlife.com/wiki/LlScriptProfiler) says it switches script
+        /// profiling on or off - PROFILE_SCRIPT_MEMORY (1)
+        /// starts recording, PROFILE_NONE (0) stops it, and llGetSPMaxMemory (per its own wiki page) then returns the
+        /// peak
+        /// memory use. Upstream is a no-op (LSL_Api.cs:17570); Phlox has MemInfo, so
         /// this is a peak field and two reads. Starting resets the peak to the current usage.
         /// </summary>
         public void llScriptProfiler(int flags)
@@ -2898,10 +2969,11 @@ namespace Phlox.ScriptEngine
         /// <summary>
         /// Every permission request still waiting for its answer ends, from llRequestPermissions and from
         /// llRequestExperiencePermissions: the answer handlers are unhooked and the Experience request's timeout is
-        /// stopped, so a late answer installs nothing and posts no event. SL wiki llRequestExperiencePermissions:
-        /// "Outstanding permission requests will be lost if the script is de-rezzed, moved to another region, or reset."
-        /// The llRequestPermissions page says nothing on a waiting request, and the same rule is applied to it. Called on a
-        /// reset, an unload (a derez, a crossing or teleport out, a recompile, a shutdown) and an owner change.
+        /// stopped, so a late answer installs nothing and posts no event. The llRequestExperiencePermissions page
+        /// (https://wiki.secondlife.com/wiki/LlRequestExperiencePermissions) says a request still outstanding is lost
+        /// if the script is derezzed, reset, or taken to a different region. The llRequestPermissions page says nothing
+        /// on a waiting request, and the same rule is applied to it. Called on a reset, an unload (a derez, a crossing
+        /// or teleport out, a recompile, a shutdown) and an owner change.
         /// </summary>
         internal void CancelPermissionRequests()
         {
@@ -3045,8 +3117,9 @@ namespace Phlox.ScriptEngine
             ClearGrantClaim();   // The answer to this request replaces any grant a restore saved or left waiting
             ForgetExperienceGrant();   // and whatever it grants is not an Experience's grant
 
-            // Halcyon :4518-4527; SL llRequestPermissions "PERMISSION_TELEPORT cannot be held by temporary
-            // attachments". The rest of the request goes on (TELEPORT alone becomes a release).
+            // Halcyon :4518-4527; the llRequestPermissions page
+            // (https://wiki.secondlife.com/wiki/LlRequestPermissions) says a temporary attachment
+            // cannot hold PERMISSION_TELEPORT. The rest of the request goes on (TELEPORT alone becomes a release).
             if ((perm & PERMISSION_TELEPORT) != 0 && IsTempAttachment(m_host.ParentGroup))
             {
                 ScriptShoutError("Temporary attachments cannot request runtime permissions to teleport.");
@@ -3150,8 +3223,9 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// SL llReleaseControls "If PERMISSION_TAKE_CONTROLS was previously granted, it will be revoked." (Halcyon
-        /// :3756-3759, ReleaseControlsInternal with releasePerms).
+        /// SL llReleaseControls (https://wiki.secondlife.com/wiki/LlReleaseControls): if PERMISSION_TAKE_CONTROLS was
+        /// granted earlier, the call revokes it
+        /// (Halcyon :3756-3759, ReleaseControlsInternal with releasePerms).
         /// </summary>
         public void llReleaseControls() => EndPermissions(SlConst.PERMISSION_TAKE_CONTROLS, releaseControls: true, forgetControls: true);
 
@@ -3244,11 +3318,12 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// The core took permissions from this script's item with no event run (EventManager.OnScriptPermissionsRemoved):
-        /// a stand-up or a detach ends CONTROL_CAMERA (SL llSetCameraParams, "automatically revoked when the avatar stands
-        /// up from or detaches the object") even from a script that took no controls. The state notes the item's grant as
-        /// it is now and the script is saved again, so its row does not keep the ended bits for a restart to give back.
-        /// Scheduler thread.
+        /// The core took permissions from this script's item with no event run
+        /// (EventManager.OnScriptPermissionsRemoved): a stand-up or a detach ends CONTROL_CAMERA (SL llSetCameraParams,
+        /// https://wiki.secondlife.com/wiki/LlSetCameraParams: the permission is revoked on its own once the avatar
+        /// gets up from the object or detaches it) even from a script that took no controls. The state notes the item's
+        /// grant as it is now and the script is saved again, so its row does not keep the ended bits for a restart to
+        /// give back. Scheduler thread.
         /// </summary>
         internal void PermissionsRemovedByCore() => GrantChanged();
 
@@ -3636,11 +3711,14 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// SL (wiki llAttachToAvatarTemp) and Halcyon (AttachInternal): any avatar who granted
-        /// PERMISSION_ATTACH can wear it; a non-owner becomes the owner ("Can be used on non-owners (changing ownership
-        /// to the wearer)"), which needs the transfer right or fails with "No permission to transfer"; an object
+        /// SL (wiki llAttachToAvatarTemp, https://wiki.secondlife.com/wiki/LlAttachToAvatarTemp) and Halcyon
+        /// (AttachInternal): any avatar who granted
+        /// PERMISSION_ATTACH can wear it; a non-owner becomes the owner (the SL page says the call works on
+        /// non-owners and
+        /// changes ownership to the wearer), which needs the transfer right or fails with "No permission to
+        /// transfer"; an object
         /// already attached fails silently; no inventory is created. After the change of owner the permissions are
-        /// reset (SL: "When object ownership changes, any granted permissions are reset").
+        /// reset (the SL page says granted permissions are reset whenever the object's ownership changes).
         /// </summary>
         public void llAttachToAvatarTemp(int attachPoint)
         {
@@ -3743,13 +3821,17 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// PRIM_SIT_TARGET, llSitTarget and llLinkSitTarget on one prim (Halcyon SetSitTarget / RemoveSitTarget). An
-        /// active target takes the offset and rotation, the offset held to SL's [-300, 300] m on each axis ("Values
-        /// outside this range are automatically rounded to the nearest limit"; Halcyon does not cap). An inactive one
+        /// active target takes the offset and rotation, the offset held to SL's [-300, 300] m on each axis (per the
+        /// llSitTarget page,
+        /// https://wiki.secondlife.com/wiki/LlSitTarget, a value beyond that range is moved to the nearest limit;
+        /// Halcyon does not cap). An inactive one
         /// is removed: zero offset, identity rotation. The ll functions pass active only for a non-zero offset, as SL
-        /// ("If offset == &lt;0.0, 0.0, 0.0&gt; then the sit target is removed"); Halcyon also keeps a zero offset with a
+        /// (the same page: an offset of &lt;0.0, 0.0, 0.0&gt; removes the sit target); Halcyon also keeps a zero
+        /// offset with a
         /// turned rotation. The state is set with the offset and rotation (SceneObjectPart.SetSitTarget), so PRIM_SIT_TARGET
-        /// can make a target at ZERO_VECTOR and ZERO_ROTATION active, as SL ("an offset of &lt;0.0, 0.0, 0.0&gt; may be
-        /// explicitly set"). The region stores do not save that state: after a region restart such a target is off.
+        /// can make a target at ZERO_VECTOR and ZERO_ROTATION active, as SL (the same page says an offset of &lt;0.0,
+        /// 0.0, 0.0&gt;
+        /// can be set explicitly). The region stores do not save that state: after a region restart such a target is off.
         /// </summary>
         private static void PrimSetSitTarget(SceneObjectPart part, bool active, Vector3 offset, Quaternion rot)
         {
@@ -3861,10 +3943,11 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// PRIM_CLICK_ACTION and llSetClickAction on one prim (Halcyon llSetClickAction; Halcyon has no rule, SL's
-        /// PRIM_CLICK_ACTION is "as llSetClickAction"). The click action rides the object update. SL (llSetClickAction):
-        /// "If llSetClickAction is CLICK_ACTION_PAY then you must have a money event, or it will revert to
-        /// CLICK_ACTION_NONE"; Halcyon keeps PAY regardless. A child with no money event of its own counts the root's,
+        /// PRIM_CLICK_ACTION and llSetClickAction on one prim (Halcyon llSetClickAction; Halcyon has no rule, and SL's
+        /// PRIM_CLICK_ACTION page says it behaves as llSetClickAction). The click action rides the object update. SL
+        /// (llSetClickAction, https://wiki.secondlife.com/wiki/LlSetClickAction): CLICK_ACTION_PAY needs a money
+        /// event in the object, or the action falls back to
+        /// CLICK_ACTION_NONE; Halcyon keeps PAY regardless. A child with no money event of its own counts the root's,
         /// since a payment on such a child reaches the root's money event (PhloxEngine.HandleObjectPaid).
         /// </summary>
         private static void PrimSetClickAction(SceneObjectPart part, int action)
@@ -4024,9 +4107,12 @@ namespace Phlox.ScriptEngine
         /// Halcyon IsTeleportAuthorized (LSLSystemAPI.cs:14923-14961), the rule of iwTeleportAgent, llTeleportAgentHome
         /// and llEjectFromLand. Halcyon's "scripts cannot force-TP gods, unless the god is the owner of the script" is
         /// applies. The land test is Halcyon's too: its HasLandPrivileges is
-        /// CanEditParcel(owner, parcel, GroupPowers.LandEjectAndFreeze), and SL (wiki llTeleportAgentHome, llEjectFromLand)
-        /// admits on group land "The object is deeded to the same group" or "The object owner must have 'Eject and freeze
-        /// Residents on parcels' ability in the group". So on group land: an object deeded to that group, or an owner who
+        /// CanEditParcel(owner, parcel, GroupPowers.LandEjectAndFreeze), and SL (wiki llTeleportAgentHome
+        /// https://wiki.secondlife.com/wiki/LlTeleportAgentHome,
+        /// llEjectFromLand https://wiki.secondlife.com/wiki/LlEjectFromLand)
+        /// admits on group land an object deeded to the same group, or an object whose owner holds the group ability
+        /// to eject and
+        /// freeze residents on parcels. So on group land: an object deeded to that group, or an owner who
         /// holds Eject and Freeze in it; an object merely set to the group whose owner lacks the power is refused.
         /// </summary>
         private bool IsTeleportAuthorized(ScenePresence targetSP)
@@ -4069,9 +4155,9 @@ namespace Phlox.ScriptEngine
             return false;
         }
 
-        // SL llTeleportAgent: "Only 4 initial teleports can be done immediately, or You can keep teleporting every 1.4
-        // seconds"; throttled, "No further teleports will succeed until 10 seconds have passed". The wiki names no scope;
-        // this is per script (LSLSystemAPI is per script).
+        // SL llTeleportAgent (https://wiki.secondlife.com/wiki/LlTeleportAgent): only 4 initial teleports can go
+        // through immediately, or else one teleport can be made every 1.4 seconds; once throttled, no later teleport
+        // succeeds until 10 seconds have gone by. The wiki names no scope; this is per script (LSLSystemAPI is per script).
         private const int SlTeleportBurst = 4, SlTeleportRefillMs = 1400, SlTeleportLockoutMs = 10000;
         private readonly object m_slTeleportLock = new object();
         private double m_slTeleportTokens = SlTeleportBurst;
@@ -4282,10 +4368,11 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// SL llTeleportAgent. "Teleports an agent to a landmark stored in the object's inventory. If landmark is
-        /// an empty string, the avatar is teleported to the location position in the current region." "If landmark is not
-        /// an empty string and landmark is missing from the prim's inventory or it is not a landmark then an error is
-        /// shouted on DEBUG_CHANNEL." The landmark is an inventory NAME only (YEngine also takes a key or a region name).
+        /// SL llTeleportAgent (https://wiki.secondlife.com/wiki/LlTeleportAgent): the agent is sent to a landmark held
+        /// in the object's inventory; an empty landmark argument sends the avatar to the given position in the current
+        /// region instead. If the argument is not empty but the prim's inventory has no such item, or the item is not a
+        /// landmark, the script shouts an error on DEBUG_CHANNEL. The landmark is an inventory NAME only (YEngine also
+        /// takes a key or a region name).
         /// </summary>
         public void llTeleportAgent(string agent, string landmark, Vector3 pos, Vector3 lookAt)
         {
@@ -4377,12 +4464,13 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// The animation a start form plays: one in <paramref name="part"/>'s inventory by name, else a built-in animation
-        /// by name (SL wiki llStartAnimation: "an item in the inventory of the prim this script is in or built-in
-        /// animation"). Never a key: Halcyon and YEngine both say "Do NOT try to parse UUID, animations cannot be
-        /// triggered by ID" (YEngine LSL_Api.llStartAnimation), so a script cannot play animations it does not hold.
-        /// Nothing found shouts Halcyon's text on DEBUG_CHANNEL (SL: "an error is shouted on DEBUG_CHANNEL") and gives
-        /// UUID.Zero.
+        /// The animation a start form plays: one in <paramref name="part"/>'s inventory by name, else a built-in
+        /// animation by name (the llStartAnimation page, https://wiki.secondlife.com/wiki/LlStartAnimation, allows
+        /// either an inventory item of the script's prim or a built-in animation). Never a key: Halcyon and YEngine
+        /// both say "Do NOT try to parse UUID, animations cannot be triggered by ID" (YEngine
+        /// LSL_Api.llStartAnimation), so a script cannot play animations it does not hold. When nothing is found,
+        /// Halcyon's text is shouted on DEBUG_CHANNEL (SL also reports an error there, per the same wiki page) and
+        /// UUID.Zero is given.
         /// </summary>
         private UUID AnimationToStart(SceneObjectPart part, string anim)
         {
@@ -4560,12 +4648,12 @@ namespace Phlox.ScriptEngine
                 anim_state, sp.Name);
         }
         /// <summary>
-        /// SL wiki llGetUsername: "id must specify a valid avatar key, present in or otherwise known to the sim ...,
-        /// otherwise an empty string is returned"; llGetDisplayName answers for child agents too. As Halcyon
-        /// (ReturnUserFirstLastIfOnSim, LSLSystemAPI.cs:14821-14843) and YEngine (LSL_Api.cs:16024-16027, 16071-16089):
-        /// an avatar the region holds, root or child, else "", with no grid lookup. The display name comes from the
-        /// grid's display-name module where it has one, as YEngine reads it. llRequestUsername and llRequestDisplayName
-        /// answer for absent avatars.
+        /// The llGetUsername page (https://wiki.secondlife.com/wiki/LlGetUsername) requires the id to be a valid avatar
+        /// key that is in the sim or otherwise known to it, and says an empty string comes back when it is not;
+        /// llGetDisplayName answers for child agents too. As Halcyon (ReturnUserFirstLastIfOnSim,
+        /// LSLSystemAPI.cs:14821-14843) and YEngine (LSL_Api.cs:16024-16027, 16071-16089): an avatar the region holds,
+        /// root or child, else "", with no grid lookup. The display name comes from the grid's display-name module
+        /// where it has one, as YEngine reads it. llRequestUsername and llRequestDisplayName answer for absent avatars.
         /// </summary>
         public string llGetDisplayName(string id)
         {
@@ -4606,9 +4694,11 @@ namespace Phlox.ScriptEngine
                 UserAccount acct = World?.UserAccountService?.GetUserAccount(World.RegionInfo.ScopeID, key);
                 if (acct == null)
                 {
-                    // SL wiki llRequestUsername: "If id is not the UUID of an avatar, the dataserver event is not raised."
-                    // llRequestDisplayName: "If the request fails for any reason, there will be no error notice or
-                    // dataserver event." The query is owed nothing any more.
+                    // SL wiki llRequestUsername (https://wiki.secondlife.com/wiki/LlRequestUsername): when the id is
+                    // not an avatar's UUID, no dataserver event is raised. llRequestDisplayName
+                    // (https://wiki.secondlife.com/wiki/LlRequestDisplayName): when the request fails, whatever the
+                    // cause, the script receives neither an error notice nor a dataserver event. The query is owed
+                    // nothing any more.
                     m_PendingDataserver.TryRemove(requestID, out _);
                     return;
                 }
@@ -5327,9 +5417,9 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// The task items a give list names, in list order: an entry is an item's name or its task item key (Halcyon,
-        /// LSLSystemAPI.cs:8453-8458). With <paramref name="shoutMissing"/>, an entry that names nothing here is said on
-        /// DEBUG_CHANNEL (SL llGiveInventoryList: "If inventory is missing from the prim's inventory then an error is
-        /// shouted on DEBUG_CHANNEL") and the rest are still given.
+        /// LSLSystemAPI.cs:8453-8458). With <paramref name="shoutMissing"/>, an entry that names nothing here is said
+        /// on DEBUG_CHANNEL (the llGiveInventoryList page, https://wiki.secondlife.com/wiki/LlGiveInventoryList, says
+        /// an item absent from the prim's inventory causes an error shout there) and the rest are still given.
         /// </summary>
         private List<UUID> ListedItems(SceneObjectPart part, LSLList inventory, bool shoutMissing)
         {
@@ -5452,11 +5542,12 @@ namespace Phlox.ScriptEngine
             }
         }
         /// <summary>
-        /// The notecard a reader names in <paramref name="part"/>: a notecard item of that name, else the name read as a
-        /// notecard asset key (SL llGetNotecardLine: "a notecard in the inventory of the prim this script is in or a UUID
-        /// of a notecard"; "If name is a UUID then there are no new asset permissions consequences for the object").
-        /// Halcyon (LSLSystemAPI.cs:14530-14540) and YEngine read a key the same way. The fetch refuses an asset that is not
-        /// a notecard ("could not be found", AnswerNotecardRead). UUID.Zero when it names neither.
+        /// The notecard a reader names in <paramref name="part"/>: a notecard item of that name, else the name read as
+        /// a notecard asset key (the llGetNotecardLine page, https://wiki.secondlife.com/wiki/LlGetNotecardLine,
+        /// accepts a notecard in the script's prim or a notecard's UUID; it adds that naming by UUID brings no new
+        /// asset permission consequences for the object). Halcyon (LSLSystemAPI.cs:14530-14540) and YEngine read a key
+        /// the same way. The fetch refuses an asset that is not a notecard ("could not be found", AnswerNotecardRead).
+        /// UUID.Zero when it names neither.
         /// </summary>
         private static UUID NotecardAssetIn(SceneObjectPart part, string name)
         {
@@ -6094,9 +6185,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             => RezObjectInternal(inventory, pos, vel, rot, param, atRoot, null);
 
         /// <summary>
-        /// SL wiki object_rez: "Triggers in all running scripts with an object_rez event, AND in the same prim as the
-        /// script calling llRezObject or llRezAtRoot. Does NOT trigger in linked prims." Phlox's scripts in this prim, then
-        /// every other engine's, with the rezzed root's key.
+        /// SL wiki object_rez (https://wiki.secondlife.com/wiki/Object_rez): the event fires in every running script
+        /// that has an object_rez handler, and also in the prim of the script that called llRezObject or llRezAtRoot,
+        /// but not in other linked prims. Phlox's scripts in this prim, then every other engine's, with the rezzed
+        /// root's key.
         /// </summary>
         private void PostObjectRez(string rootKey)
         {
@@ -6305,9 +6397,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
             if (pusheeIsAvatar)
             {
-                // SL wiki LlPushObject: "In no-push areas an object can only push its owner or itself." An object
-                // pushing its owner, which includes an attachment pushing its wearer, is allowed whether the region
-                // or the parcel restricts pushing; YEngine allows it in both too.
+                // SL wiki LlPushObject (https://wiki.secondlife.com/wiki/LlPushObject): where pushing is disallowed, an
+                // object may push only its owner or itself. An object pushing its owner, which includes an attachment
+                // pushing its wearer, is allowed whether the region or the parcel restricts pushing; YEngine allows it
+                // in both too.
                 if (m_host.OwnerID == targetID)
                 {
                     pushAllowed = true;
@@ -6360,9 +6453,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 PhysicsActor pa = pusheeAv.PhysicsActor;
                 if (pa != null)
                 {
-                    // SL wiki LlPushObject, local: "if TRUE uses the local axis of target, if FALSE uses the region
-                    // axis." The target here is the avatar, so its rotation turns the push, as YEngine does; an
-                    // object target is turned by its own rotation in ApplyImpulse below.
+                    // SL wiki LlPushObject, local (https://wiki.secondlife.com/wiki/LlPushObject): TRUE applies the
+                    // force on the target's own local axes, FALSE on the region axes. The target here is the avatar, so
+                    // its rotation turns the push, as YEngine does; an object target is turned by its own rotation in
+                    // ApplyImpulse below.
                     if (local != 0)
                         appliedImpulse *= pusheeAv.GetWorldRotation();
                     pa.AddForce(appliedImpulse, true);
@@ -6491,8 +6585,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 ScriptSleep(1000);
                 return;
             }
-            // SL (wiki llCreateLink): "If the permission PERMISSION_CHANGE_LINKS is granted by anyone other
-            // than the owner, then when the function is called an error will be shouted". YEngine's text.
+            // SL (wiki llCreateLink, https://wiki.secondlife.com/wiki/LlCreateLink): if PERMISSION_CHANGE_LINKS was
+            // granted by someone other than the owner, the call shouts an error. YEngine's text.
             if (!AutomaticLinkPermission && item.PermsGranter != m_host.ParentGroup.OwnerID)
             {
                 ShoutError("llCreateLink: PERMISSION_CHANGE_LINKS not set by script owner");
@@ -6518,11 +6612,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// llCreateLink after its PERMISSION_CHANGE_LINKS check - the door osForceCreateLink takes (OSSL_Api.cs:2784-2789 calls the same split, m_LSL_Api.CreateLink).
-        /// SL's conditions - "target must be modifiable and have the same owner. This object must also be
-        /// modifiable." - with modify read from each root's OwnerMask as Halcyon and YEngine read it. Returns why it
-        /// did not link (llCreateLink shouts it, as SL does; osForceCreateLink stays silent, as YEngine's CreateLink),
-        /// or null.
+        /// llCreateLink after its PERMISSION_CHANGE_LINKS check - the door osForceCreateLink takes
+        /// (OSSL_Api.cs:2784-2789 calls the same split, m_LSL_Api.CreateLink). SL's conditions
+        /// (https://wiki.secondlife.com/wiki/LlCreateLink): the target must be modifiable and share the owner, and this
+        /// object must be modifiable as well - with modify read from each root's OwnerMask as Halcyon and YEngine read
+        /// it. Returns why it did not link (llCreateLink shouts it, as SL does; osForceCreateLink stays silent, as
+        /// YEngine's CreateLink), or null.
         /// </summary>
         private string CreateLinkCore(string target, int parent)
         {
@@ -6637,12 +6732,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (m_host?.ParentGroup == null) return;
             if (m_host.ParentGroup.IsAttachment) return;
 
-            // SL wiki llBreakAllLinks: "the script must request the PERMISSION_CHANGE_LINKS permission with
-            // llRequestPermissions and it must be granted by the owner"; without it "the script will shout an error on
-            // DEBUG_CHANNEL and the operation fails (but the script continues to run)"; "If PERMISSION_CHANGE_LINKS is
-            // granted by anyone other than the owner, then when the function is called an error will be shouted".
-            // YEngine LSL_Api.cs:4963-4975 checks it unless AutomaticLinkPermission, as Phlox's llBreakLink
-            // and llCreateLink do; their texts and forms. Halcyon had no check.
+            // SL wiki llBreakAllLinks (https://wiki.secondlife.com/wiki/LlBreakAllLinks): the script has to ask for
+            // PERMISSION_CHANGE_LINKS through llRequestPermissions and the owner has to grant it; without it the
+            // operation fails and the script shouts an error on DEBUG_CHANNEL, though the script itself keeps running;
+            // and if someone other than the owner granted PERMISSION_CHANGE_LINKS, an error is shouted when the
+            // function is called. YEngine LSL_Api.cs:4963-4975 checks it unless AutomaticLinkPermission, as Phlox's
+            // llBreakLink and llCreateLink do; their texts and forms. Halcyon had no check.
             TaskInventoryItem item = GetInventorySelf();
             if (item == null) return;
             if (!AutomaticLinkPermission && (item.PermsMask & PERMISSION_CHANGE_LINKS) == 0)
@@ -6824,10 +6919,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// A texture as PRIM_TEXTURE names it. SL wiki: "a texture in the inventory of the prim this
-        /// script is in or a UUID of a texture". The script's prim's texture item of that name first (Halcyon's
-        /// KeyOrName order: "no-one can name an inventory item with a UUID string" and get the named key), then a UUID.
-        /// Only a texture item matches, as SL's "it is not a texture" rule and YEngine's
+        /// A texture as PRIM_TEXTURE names it. SL wiki (https://wiki.secondlife.com/wiki/LlSetPrimitiveParams): either
+        /// a texture item in the script's prim or a texture's UUID. The script's prim's texture item of that name first
+        /// (Halcyon's KeyOrName order: "no-one can name an inventory item with a UUID string" and get the named key),
+        /// then a UUID. Only a texture item matches, as SL's rule that the item must be a texture and YEngine's
         /// GetAssetIdFromItemName(m_host, texture, AssetType.Texture). UUID.Zero when neither.
         /// </summary>
         private UUID TextureKeyOrName(string k)
@@ -7290,10 +7385,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         /// <summary>
         /// PRIM_ROTATION read (Halcyon GetPartRot): the prim's region rotation. On an attachment's root it is the
-        /// wearer's rotation, or the camera's in mouselook (SL: "PRIM_ROTATION incorrectly reports the avatars
-        /// rotation when called on the root of an attached object"). A seated wearer's is its region rotation, not
-        /// the one relative to its seat that the scene keeps (SL llGetRootRotation: "Returns an accurate facing for
-        /// Avatars seated"; OpenSim's LSL_Api llGetRootRotation reads GetWorldRotation too).
+        /// wearer's rotation, or the camera's in mouselook (the SL wiki notes that PRIM_ROTATION wrongly gives the
+        /// avatar's rotation for an attachment's root prim). A seated wearer's is its region rotation, not the one
+        /// relative to its seat that the scene keeps (SL llGetRootRotation,
+        /// https://wiki.secondlife.com/wiki/LlGetRootRotation, says it gives a correct facing for seated avatars;
+        /// OpenSim's LSL_Api llGetRootRotation reads GetWorldRotation too).
         /// </summary>
         private Quaternion PartRegionRot(SceneObjectPart part)
         {
@@ -7331,13 +7427,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// PRIM_SLICE on one prim: the shape's advanced cut (SL: "a shape attribute, equivalent to advanced_cut"), through
-        /// the scene's own UpdateSlice, which OpenSim's LSL_Api uses too. That is the slice PRIM_TYPE writes on a box,
-        /// cylinder or prism (PathBegin / PathEnd), and the dimple of a sphere or the profile cut of a torus, tube or
-        /// ring (ProfileBegin / ProfileEnd), so PRIM_TYPE reads those back. The scene keeps begin at least 0.02 below
-        /// end (SL: "x must be at least 0.05 smaller than y", with the wiki's note that "the difference can be as small
-        /// as 0.02"). A sculpt or mesh has no cut and is left alone, as Halcyon leaves every shape but box, cylinder and
-        /// prism.
+        /// PRIM_SLICE on one prim: the shape's advanced cut (SL describes it as a shape attribute equal to
+        /// advanced_cut), through the scene's own UpdateSlice, which OpenSim's LSL_Api uses too. That is the slice
+        /// PRIM_TYPE writes on a box, cylinder or prism (PathBegin / PathEnd), and the dimple of a sphere or the
+        /// profile cut of a torus, tube or ring (ProfileBegin / ProfileEnd), so PRIM_TYPE reads those back. The scene
+        /// keeps begin at least 0.02 below end (SL requires y to exceed x by at least 0.05, with the wiki's note that a
+        /// gap of just 0.02 is possible). A sculpt or mesh has no cut and is left alone, as Halcyon leaves every shape
+        /// but box, cylinder and prism.
         /// </summary>
         private void PrimSetSlice(SceneObjectPart part, Vector3 slice)
         {
@@ -7517,9 +7613,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     LogUnimplementedPrimRule(code, length - 1);
                 foreach (var sp in seated)
                 {
-                    // SL: "PRIM_OMEGA cannot be used on avatars sitting on the object. It will emit the error message
-                    // 'PRIM_OMEGA disallowed on agent'." The rules after it still apply. SL documents no other rule
-                    // as disallowed on an agent.
+                    // SL (https://wiki.secondlife.com/wiki/PRIM_OMEGA): PRIM_OMEGA cannot be applied to avatars sitting
+                    // on the object, and doing so emits the error message 'PRIM_OMEGA disallowed on agent'. The rules
+                    // after it still apply. SL documents no other rule as disallowed on an agent.
                     if (code == PRIM_OMEGA && sp.ParentID != 0) { ShoutError("PRIM_OMEGA disallowed on agent"); continue; }
                     if (SetSitterPrimRule(sp, code, data, values) && !moved.Contains(sp))
                         moved.Add(sp);
@@ -7572,9 +7668,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     try { offsets = (Vector3)data[idx++]; } catch { idx++; break; }
                     try { rot     = (float)Convert.ToDouble(data[idx++]); } catch { break; }
                     Primitive.TextureEntry texEntry = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
-                    // SL wiki PRIM_TEXTURE, "a texture in the inventory of the prim this script is in or a
-                    // UUID of a texture". A name no longer blanks the face. Neither found: the texture stays as it is and
-                    // the rest still applies (Halcyon SetTexture + ScaleTexture/OffsetTexture/RotateTexture).
+                    // SL wiki PRIM_TEXTURE (https://wiki.secondlife.com/wiki/LlSetPrimitiveParams): the texture is
+                    // either an item in the inventory of the script's prim or a texture's UUID. A name no longer blanks
+                    // the face. Neither found: the texture stays as it is and the rest still applies (Halcyon
+                    // SetTexture + ScaleTexture/OffsetTexture/RotateTexture).
                     UUID texUUID = TextureKeyOrName(tex);
                     void ApplyTex(Primitive.TextureEntryFace f) {
                         if (texUUID != UUID.Zero) f.TextureID = texUUID;
@@ -7697,9 +7794,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 case PRIM_PHANTOM:
                 case PRIM_TEMP_ON_REZ:
                 {
-                    // Object-wide in SL ("PRIM_PHANTOM, PRIM_PHYSICS and PRIM_TEMP_ON_REZ applies to the entire
-                    // object") and in Halcyon (part.ParentGroup), even through a child link. Any non-zero integer is
-                    // TRUE, as llSetStatus.
+                    // Object-wide in SL (the wiki says PRIM_PHANTOM, PRIM_PHYSICS and PRIM_TEMP_ON_REZ act on the whole
+                    // object, https://wiki.secondlife.com/wiki/LlSetPrimitiveParams) and in Halcyon (part.ParentGroup),
+                    // even through a child link. Any non-zero integer is TRUE, as llSetStatus.
                     if (data[idx] is not int flag) break;
                     SceneObjectGroup group = part.ParentGroup;
                     if (group == null || group.IsDeleted) break;
@@ -7921,7 +8018,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
 
                 case PRIM_CAST_SHADOWS:
-                    // [ PRIM_CAST_SHADOWS, integer boolean ]: a no-op in SL ("setting it will have no effect");
+                    // [ PRIM_CAST_SHADOWS, integer boolean ]: a no-op in SL (the wiki says setting it has no effect);
                     // Halcyon has no rule.
                     break;
 
@@ -9336,9 +9433,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// llGetTexture, PRIM_TEXTURE, the PRIM_TYPE sculpt map, PRIM_NORMAL / PRIM_SPECULAR and the projector reads):
         /// its name when it is in the script's prim's inventory (Halcyon's InventoryName searches m_host even when
         /// llGetLinkPrimitiveParams reads another prim); else its key when <paramref name="part"/> is full-perm for its
-        /// owner (<see cref="AssetKeyIfFullPerm"/>); otherwise NULL_KEY.
-        /// <paramref name="namesFrom"/>: the prim whose inventory names it, for the reads Halcyon has no rule for and
-        /// SL names "a material in the inventory of the target prim" (PRIM_RENDER_MATERIAL, and the GLTF reads with it).
+        /// owner (<see cref="AssetKeyIfFullPerm"/>); otherwise NULL_KEY. <paramref name="namesFrom"/>: the prim whose
+        /// inventory names it, for the reads Halcyon has no rule for and where SL names a material found in the target
+        /// prim's inventory (PRIM_RENDER_MATERIAL, and the GLTF reads with it).
         /// </summary>
         private string ConditionalTextureNameOrUUID(SceneObjectPart part, UUID assetID, SceneObjectPart namesFrom = null)
         {
@@ -9353,10 +9450,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// A render material or GLTF texture key as a script may see it. SL (llGetRenderMaterial): "If the
-        /// Material is in the prim's inventory, the return value is the inventory name ... NULL_KEY is returned when the
-        /// owner does not have full permissions to the object and the Material is not in the prim's inventory." A GLTF
-        /// override texture that is not a key (none set: empty) is returned as stored.
+        /// A render material or GLTF texture key as a script may see it. SL (llGetRenderMaterial,
+        /// https://wiki.secondlife.com/wiki/LlGetRenderMaterial): a material that sits in the prim's inventory is given
+        /// by its inventory name; NULL_KEY is given instead when the material is not there and the owner lacks full
+        /// permissions on the object. A GLTF override texture that is not a key (none set: empty) is returned as
+        /// stored.
         /// </summary>
         private string ConditionalMaterialNameOrUUID(SceneObjectPart part, string stored)
             => UUID.TryParse(stored, out UUID id) && id != UUID.Zero
@@ -9593,8 +9691,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         /// <summary>
         /// A sound as the sound calls name it: the script's prim's sound item of that name, else a UUID; UUID.Zero when
-        /// neither. SL (llPlaySound, llLoopSound): "If sound is missing from the prim's inventory and it is not a UUID or
-        /// it is not a sound then an error is shouted on DEBUG_CHANNEL" - an item of another type does not count.
+        /// neither. SL (llPlaySound, llLoopSound; https://wiki.secondlife.com/wiki/LlPlaySound): the script shouts an
+        /// error on DEBUG_CHANNEL when the prim's inventory lacks the sound and the argument is either not a UUID or
+        /// not a sound - an item of another type does not count.
         /// </summary>
         private UUID SoundKeyOrName(string k)
         {
@@ -9955,8 +10054,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return envModule.GetSunDir(m_host.GetWorldPosition());
         }
        
-        // The ground vectors are Halcyon's (LSLSystemAPI.cs:7998-8036, TerrainChannel.cs:416-531). The SL wiki says of
-        // llGroundNormal "This function does not return a unit vector"; the slope's length gives the steepness.
+        // The ground vectors are Halcyon's (LSLSystemAPI.cs:7998-8036, TerrainChannel.cs:416-531). The SL wiki page for
+        // llGroundNormal (https://wiki.secondlife.com/wiki/LlGroundNormal) notes that the result is not normalized; the
+        // slope's length gives the steepness.
 
         /// <summary>Halcyon llGroundNormal: &lt;slope.x, slope.y, 1.0&gt;, not normalised.</summary>
         public Vector3 llGroundNormal(Vector3 offset)
@@ -10042,15 +10142,21 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return (float)(World?.RegionInfo?.RegionSettings?.WaterHeight ?? 20.0);
         }
         /// <summary>
-        /// Not implemented: core's IWindModule has no way to set the wind at a point (Halcyon's WindSet). Halcyon let
-        /// estate managers and gods call it (:1459-1472) and ignored everyone else, so those callers are told on
-        /// DEBUG_CHANNEL; anyone else still gets nothing.
+        /// Sets the wind in the 16 m cell at the object's position plus offset, as Halcyon's iwSetWind does
+        /// (LSLSystemAPI.cs:1459-1472): only when the object's owner may issue estate commands or is a god; anyone else is ignored.
+        /// The type is WIND_SPEED_DEFAULT (back to the wind model's own wind, with terrain turbulence),
+        /// WIND_SPEED_FIXED (hold the given speed) or WIND_SPEED_TERRAIN_TURBULENCE (add the terrain's influence).
+        /// A wind model without wind setters, such as the default one, ignores the call. The setting is in memory
+        /// only and is gone after a region restart.
         /// </summary>
         public void iwSetWind(int type, Vector3 offset, Vector3 speed)
         {
             if (m_host == null || World == null) return;
-            if (World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false) || World.Permissions.IsGod(m_host.OwnerID))
-                NotImplemented("iwSetWind");
+            if (!World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false) && !World.Permissions.IsGod(m_host.OwnerID))
+                return;
+            IWindModule module = World.RequestModuleInterface<IWindModule>();
+            if (module == null) return;
+            module.WindSet(type, m_host.GetWorldPosition() + offset, speed);
         }
         public Vector3 iwWind(Vector3 offset)
         {
@@ -10727,12 +10833,12 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public void llPointAt(Vector3 pos) => NotImplemented("llPointAt");   // Halcyon LSLSystemAPI.cs:4332
         public void llStopPointAt() => NotImplemented("llStopPointAt");   // Halcyon LSLSystemAPI.cs:4338
         /// <summary>
-        /// Ported from upstream LSL_Api.cs:4036-4043. wiki: "Sets the collision filter,
-        /// exclusively or inclusively" - accept TRUE keeps only matches, FALSE excludes them; a blank
-        /// name or a null/invalid id matches everything. The part stores it
-        /// (SceneObjectPart.SetCollisionFilter) and the region's own collision path consults
-        /// CollisionFilteredOut before raising the event; PhloxEngine's handlers consult it too, so
-        /// the filter holds whichever door a collision arrives by.
+        /// Ported from upstream LSL_Api.cs:4036-4043. The llCollisionFilter page
+        /// (https://wiki.secondlife.com/wiki/LlCollisionFilter) describes it as setting the collision filter either to
+        /// exclude or to include matches - accept TRUE keeps only matches, FALSE excludes them; a blank name or a
+        /// null/invalid id matches everything. The part stores it (SceneObjectPart.SetCollisionFilter) and the region's
+        /// own collision path consults CollisionFilteredOut before raising the event; PhloxEngine's handlers consult it
+        /// too, so the filter holds whichever door a collision arrives by.
         /// </summary>
         public void llCollisionFilter(string name, string id, int accept)
         {
@@ -11049,8 +11155,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             m_host.ParentGroup?.InvalidateDeepEffectivePerms();
         }
         /// <summary>
-        /// SL wiki llGetAgentList: "agents in God Mode depending on the level will have NULL_KEY returned instead of their
-        /// real key". A god keeps its place in the list, so counts stay true, and its key is not given.
+        /// SL wiki llGetAgentList (https://wiki.secondlife.com/wiki/LlGetAgentList): depending on the level, agents in
+        /// God Mode get NULL_KEY in place of their real key. A god keeps its place in the list, so counts stay true,
+        /// and its key is not given.
         /// </summary>
         public LSLList llGetAgentList(int scope, LSLList options)
         {
@@ -14009,10 +14116,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         /// <summary>
         /// The script owner may return objects over this parcel: it owns the parcel, or it is the estate owner or an
-        /// estate manager (SL lsl_definitions: "the script owner must own the parcel or be an estate manager/region
-        /// owner"; llReturnObjectsByID: "If the script is owned by an estate owner or manager, this function works for
-        /// objects located on any parcel in the region. Otherwise, the script can return objects located over land owned
-        /// by the owner of the script."). Halcyon never lets an EO/EM act on a parcel it does not own; SL is followed.
+        /// estate manager (SL lsl_definitions: the script's owner qualifies by owning the parcel, or by being an estate
+        /// manager or the region owner; llReturnObjectsByID, https://wiki.secondlife.com/wiki/LlReturnObjectsByID: when
+        /// an estate owner or manager owns the script, the function works on objects over any parcel in the region; in
+        /// any other case it can return only objects over land the script's owner owns). Halcyon never lets an EO/EM
+        /// act on a parcel it does not own; SL is followed.
         /// </summary>
         private bool MayReturnOnParcel(ILandObject parcel)
             => parcel != null && (parcel.LandData.OwnerID == m_host.OwnerID || IsEstateOwnerOrManager(m_host.OwnerID));
@@ -14574,9 +14682,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// <summary>
         /// YEngine's LSL_Api.Error (LSL_Api.cs:15684-15696) as a script sees it: "command: message", cut to 1023
         /// characters, on DEBUG_CHANNEL through the scene (viewers, Phlox's listens) and through WorldComm (YEngine's
-        /// listens). Unlike <see cref="ShoutError"/> there is no "Script error: " prefix, so both engines say the same text.
-        /// YEngine's listens hear it as far as llSay reaches, as ShoutError's errors are heard (SL wiki, DEBUG_CHANNEL:
-        /// "Server-generated errors are broadcast the same distance as llSay").
+        /// listens). Unlike <see cref="ShoutError"/> there is no "Script error: " prefix, so both engines say the same
+        /// text. YEngine's listens hear it as far as llSay reaches, as ShoutError's errors are heard (SL wiki,
+        /// DEBUG_CHANNEL, https://wiki.secondlife.com/wiki/DEBUG_CHANNEL: errors generated by the server travel the
+        /// same distance as llSay).
         /// </summary>
         private void YEngineError(string command, string message)
         {
@@ -14664,10 +14773,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// The nine X-SecondLife-* headers SL's simulator sends (wiki llHTTPRequest), built as Halcyon's
-        /// llHTTPRequest builds them. Region: SL's "global coordinates of the region's south-west corner" (WorldLocX/Y, as
-        /// YEngine; Halcyon printed grid units). Shard: [Network] shard, default "OpenSim", the setting and default YEngine
-        /// reads, so both engines in a region report the same shard.
+        /// The nine X-SecondLife-* headers SL's simulator sends (wiki llHTTPRequest), built as Halcyon's llHTTPRequest
+        /// builds them. Region: the south-west corner of the region, given in global coordinates, as SL defines it
+        /// (WorldLocX/Y, as YEngine; Halcyon printed grid units). Shard: [Network] shard, default "OpenSim", the
+        /// setting and default YEngine reads, so both engines in a region report the same shard.
         /// </summary>
         private void AddSimulatorHeaders(Dictionary<string, string> headers)
         {
@@ -14835,8 +14944,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                             email.numLeft
                         },
                         new DetectParams[0]));
-                // The email queue "is associated with the prim and any script in the prim can access it" (SL wiki email):
-                // every script in this prim, whatever engine runs it.
+                // Per the SL wiki email page (https://wiki.secondlife.com/wiki/Email), the email queue belongs to the
+                // prim and is open to any script inside it, so it is read by every script in this prim, whatever engine
+                // runs it.
                 SceneObjectPart host = m_host;
                 OfferToOtherEngines("llGetNextEmail", () => ScriptItemsIn(new[] { host }), "email", () => new object[] {
                     email.time ?? string.Empty, email.sender ?? string.Empty, email.subject ?? string.Empty,
@@ -14929,13 +15039,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public string llToUpper(string src) => src?.ToUpper() ?? string.Empty;
         public string llToLower(string src) => src?.ToLower() ?? string.Empty;
 
-        // SL's range rule for llGetSubString, llDeleteSubString, llList2List, llDeleteSubList and
-        // llListReplaceList. SL wiki: "Negative indexes count from the far end, the first item being indexed as
-        // -length, the last as -1." / "If start > end then the range operated on starts at 0 and goes to end and then
-        // starts again at start and goes to -1." / out-of-range indexes "are treated as if they were there but were
-        // removed just before output". So: add the length to a negative index once; the range is [start, end], or
-        // [0, end] + [start, -1] when start > end; indexes outside the list select nothing. Halcyon's GetSublist is
-        // this rule; its DeleteSublist and llDeleteSubString are off by one on the inverted case.
+        // SL's range rule for llGetSubString, llDeleteSubString, llList2List, llDeleteSubList and llListReplaceList (SL
+        // wiki, e.g. https://wiki.secondlife.com/wiki/LlList2List): a negative index counts from the end of the list,
+        // so the first item is -length and the last is -1. When start > end, the range runs from 0 up to end and then
+        // again from start through -1. Indexes out of range behave as if those positions existed but were dropped just
+        // before the result is produced. So: add the length to a negative index once; the range is [start, end], or [0,
+        // end] + [start, -1] when start > end; indexes outside the list select nothing. Halcyon's GetSublist is this
+        // rule; its DeleteSublist and llDeleteSubString are off by one on the inverted case.
         private static void NormaliseLslRange(int length, ref int start, ref int end)
         {
             if (start < 0) start += length;
@@ -15214,8 +15324,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         private const string s_b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
         /// <summary>
-        /// Ported as-is from upstream LSL_Api.cs:14509-14580. wiki: deprecated in favour of
-        /// llXorBase64, sleeps 0.3 s, and "incorrectly performs an exclusive or on two Base64 strings" -
+        /// Ported as-is from upstream LSL_Api.cs:14509-14580. wiki (https://wiki.secondlife.com/wiki/LlXorBase64Strings):
+        /// deprecated in favour of llXorBase64, sleeps 0.3 s, and its xor of two Base64 strings is described as
+        /// not done correctly -
         /// the padding quirks below ARE the documented behaviour, not a bug to fix here.
         /// </summary>
         public string llXorBase64Strings(string str1, string str2)
@@ -15495,8 +15606,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         public string llList2CSV(LSLList src)
         {
             // Each element as (string)list writes it (LSLList.GetLSLStringItem: floats, vectors and rotations
-            // with 6 decimals, YEngine's form), joined with SL's ", " (wiki: "the values are separated with a comma and a
-            // space"). Was .NET's ToString: "2", "<2, 3, 0>".
+            // with 6 decimals, YEngine's form), joined with SL's ", " (the llList2CSV page,
+            // https://wiki.secondlife.com/wiki/LlList2CSV, says the values are separated by a comma followed by a
+            // space). Was .NET's ToString: "2", "<2, 3, 0>".
             if (src == null || src.Length == 0) return string.Empty;
             return string.Join(", ", ListElementStrings(src));
         }
@@ -15568,10 +15680,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public LSLList llList2ListStrided(LSLList src, int start, int end, int stride)
         {
-            // SL wiki: "Returns a list of all the entries in the strided list whose index is a multiple
-            // of stride in the range start to end"; "start & end will not form an exclusion range when start is past
-            // end ... instead it will act as if start was zero & end was -1"; stride "if less than 1 it is assumed to be
-            // 1". YEngine agrees; Halcyon returned [] for start == end and wrapped an inverted range.
+            // SL wiki llList2ListStrided (https://wiki.secondlife.com/wiki/LlList2ListStrided): the result holds the
+            // entries of the strided list located at indexes that are multiples of stride, within the range start to
+            // end; when start is past end the pair does not make an exclusion range, and the call behaves as if start
+            // were zero and end were -1; a stride under 1 is taken as 1. YEngine agrees; Halcyon returned [] for start
+            // == end and wrapped an inverted range.
             if (src == null || src.Length == 0) return new LSLList();
             var result = new List<object>();
             int len = src.Length;
@@ -15657,15 +15770,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public LSLList llList2ListSlice(LSLList src, int start, int end, int stride, int slice_index)
         {
-            // SL wiki: "Returns a list of the slice_index'th element of every stride in strided list whose index
-            // is a multiple of stride in the range start to end"; "If slice_index is negative it is counted from the end of
-            // its stride regardless of whether or not the stride exceeds the end of the list"; "start & end will form an
-            // exclusion range when start is past end"; stride "if less than 1 it is assumed to be 1". Its five examples on
-            // [0,1,2,3,4,5,6] - (0,-1,3,0) [0,3,6], (0,-1,3,1) [1,4], (1,-1,3,1) [2,5], (2,-1,3,-1) [4], (4,2,1,0)
-            // [0,1,2,4,5,6] - are the range taken by llList2List's rule (exclusion range included) and the
-            // slice_index'th element of each stride of it, the last stride short. A slice_index outside -stride .. stride-1
-            // selects nothing. Was: an inverted range gave []. YEngine differs (whole list for an inverted range, strides
-            // at multiples of stride from 0).
+            // SL wiki llList2ListSlice (https://wiki.secondlife.com/wiki/LlList2ListSlice): the result takes the
+            // element at position slice_index out of each stride of the strided list, for each stride at an index that
+            // is a multiple of stride, within the range start to end; a negative slice_index counts back from the
+            // stride's last element, even when that stride runs past the end of the list; when start is past end, the
+            // pair does form an exclusion range; a stride under 1 is taken as 1. Its five examples on [0,1,2,3,4,5,6] -
+            // (0,-1,3,0) [0,3,6], (0,-1,3,1) [1,4], (1,-1,3,1) [2,5], (2,-1,3,-1) [4], (4,2,1,0) [0,1,2,4,5,6] - are
+            // the range taken by llList2List's rule (exclusion range included) and the slice_index'th element of each
+            // stride of it, the last stride short. A slice_index outside -stride .. stride-1 selects nothing. Was: an
+            // inverted range gave []. YEngine differs (whole list for an inverted range, strides at multiples of stride
+            // from 0).
             if (src == null || src.Length == 0) return new LSLList();
             if (stride < 1) stride = 1;
             if (slice_index < 0) slice_index += stride;
@@ -15720,9 +15834,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             if (dest == null) dest = new LSLList();
             if (src == null) src = new LSLList();
-            // SL's range rule (see NormaliseLslRange). SL wiki: "If end is a negative index past the
-            // beginning, then the operating range would be [start, -1]." / "If end is a positive index past the end, then
-            // the operating range would be [0, end]." An inverted range keeps what lies between end and start and puts
+            // SL's range rule (see NormaliseLslRange). SL wiki llListReplaceList
+            // (https://wiki.secondlife.com/wiki/LlListReplaceList): when end is a negative index before the beginning,
+            // the range
+            // worked on is [start, -1]; when end is a positive index beyond the end, the range worked on is [0, end]. An
+            // inverted range keeps what lies between end and start and puts
             // src after it (Halcyon and YEngine: dest.GetSublist(end + 1, start - 1) + src).
             int len = dest.Length;
             NormaliseLslRange(len, ref start, ref end);
@@ -15792,8 +15908,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
         public string llDumpList2String(LSLList src, string separator)
         {
-            // SL wiki: "Each element of the list is converted to string format in the result, so floats expand to
-            // six digits of precision, rotations and vectors are represented with "<" and ">" characters" - the (string)list
+            // SL wiki llDumpList2String (https://wiki.secondlife.com/wiki/LlDumpList2String): every element is turned
+            // into its
+            // string form in the result - floats are written with six digits of precision, and vectors and rotations are
+            // written with "<" and ">" characters - the (string)list
             // form (Halcyon: GetLSLStringItem, LSLSystemAPI.cs:8785). Was .NET's ToString: "2", "<2, 3, 0>".
             if (src == null || src.Length == 0) return string.Empty;
             return string.Join(separator ?? string.Empty, ListElementStrings(src));
@@ -16184,8 +16302,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             ScriptSleep(100);
         }
         /// <summary>
-        /// Wiki: "Requests data about region. When data is available the dataserver event
-        /// will be raised"; DATA_SIM_POS a vector of the region's global position, DATA_SIM_STATUS
+        /// Wiki (https://wiki.secondlife.com/wiki/LlRequestSimulatorData): asks for data about a region and raises the
+        /// dataserver event once the data is ready; DATA_SIM_POS a vector of the region's global position, DATA_SIM_STATUS
         /// "up"/..., DATA_SIM_RATING "PG"/"MATURE"/"ADULT"/"UNKNOWN", 1.0 s sleep. Ported from upstream
         /// LSL_Api.cs:13389-13485: the local region answers from RegionInfo; any other region is
         /// resolved through GridService.GetRegionByName, with the hypergrid RegionSecret dance for
@@ -16319,7 +16437,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (stats == null || statType < 0 || statType >= stats.Length) return 0f;
             return stats[statType];
         }
-        /// <summary>Wiki: "the most bytes used while llScriptProfiler was last active".
+        /// <summary>Wiki (https://wiki.secondlife.com/wiki/LlGetSPMaxMemory): the greatest number of bytes used at any
+        /// time while
+        /// llScriptProfiler was last active.
         /// 0 when profiling was never started - there is no LSO fixed size to report here.</summary>
         public int llGetSPMaxMemory()
         {
@@ -16328,8 +16448,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             st.SampleMemoryPeak();
             return st.PeakMemoryUsed;
         }
-        /// <summary>Ported from upstream LSL_Api.cs:4548-4556. wiki: "Returns a list of names
-        /// of animations playing in the current object"; the part tracks them in AnimationsNames.</summary>
+        /// <summary>Ported from upstream LSL_Api.cs:4548-4556. wiki
+        /// (https://wiki.secondlife.com/wiki/LlGetObjectAnimationNames):
+        /// gives the names of the animations the current object is playing; the part tracks them in
+        /// AnimationsNames.</summary>
         public LSLList llGetObjectAnimationNames()
         {
             var ret = new List<object>();
@@ -16340,8 +16462,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return new LSLList(ret);
         }
         /// <summary>
-        /// Ported from upstream LSL_Api.cs:4533-4541. wiki: the animation is "an item in the
-        /// inventory of the prim this script is in" - resolved by inventory name, then the default
+        /// Ported from upstream LSL_Api.cs:4533-4541. wiki (https://wiki.secondlife.com/wiki/LlStartObjectAnimation): the
+        /// animation is an inventory item of the prim holding this script - resolved by inventory name, then the default
         /// avatar animation names, never by UUID. The part manages the set and sends the update;
         /// whether anything moves is the mesh's business (Animesh needs a skeleton).
         /// </summary>
@@ -16401,7 +16523,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// Wiki: "Sets flags on the link's sittarget." Upstream's is a no-op (LSL_Api.cs:21168).
+        /// Wiki (https://wiki.secondlife.com/wiki/LlSetLinkSitFlags): sets flags on the sit target of the link.
+        /// Upstream's is a no-op (LSL_Api.cs:21168).
         /// Here ALLOW_UNSIT and SCRIPTED_ONLY are honoured by the region's sit path today, through the
         /// part properties it already checks; NO_COLLIDE and NO_DAMAGE are stored for read-back only -
         /// the presence has no seated collision-volume toggle and no damage distribution to seated
@@ -16485,8 +16608,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// SL wiki linkset_data: "The linkset_data event fires in all scripts in a linkset whenever the datastore has been
-        /// modified through a call to one of the llLinksetData functions." Phlox's scripts (PostObjectLinksetDataEvent fans
+        /// SL wiki linkset_data (https://wiki.secondlife.com/wiki/Linkset_data): the event is raised in every script of a
+        /// linkset each time the datastore is changed by one of the llLinksetData functions. Phlox's scripts
+        /// (PostObjectLinksetDataEvent fans
         /// out to every prim), then every other engine's script in every prim of the linkset. Offered here, not from the
         /// engine's PostObjectLinksetDataEvent, so another caller of that interface method is never offered back.
         /// </summary>
@@ -16822,8 +16946,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// <summary>
         /// Halcyon (LSLSystemAPI.cs:13348-13362) and YEngine (LSL_Api.llSetPayPrice): the prices go on the root prim,
         /// which the money modules read for the pay dialog; a button the list leaves out is PAY_HIDE; the object is
-        /// marked changed so the prices persist. A call from a child prim does nothing, as SL documents ("Calling it from
-        /// a child prim has no effect") and YEngine does; Halcyon set the root's prices.
+        /// marked changed so the prices persist. A call from a child prim does nothing, as the SL llSetPayPrice page
+        /// (https://wiki.secondlife.com/wiki/LlSetPayPrice) documents and YEngine does; Halcyon set the root's prices.
         /// </summary>
         public void llSetPayPrice(int price, LSLList quick_pay_buttons)
         {
@@ -17469,9 +17593,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// SL (llList2Json): string items "are interpreted as JSON"; true, false and null (and JSON_TRUE, JSON_FALSE,
+        /// SL (llList2Json, https://wiki.secondlife.com/wiki/LlList2Json): string items are treated as JSON text;
+        /// true, false and null (and JSON_TRUE, JSON_FALSE,
         /// JSON_NULL) become literals; strings are trimmed; JSON objects, arrays and quoted strings are kept as they are;
-        /// "Strings containing valid JSON numbers convert to JSON strings"; a JSON_OBJECT list must be strided key, value
+        /// a string that holds a valid JSON number is converted to a JSON string; a JSON_OBJECT list must be strided
+        /// key, value
         /// pairs, else JSON_INVALID (Halcyon :15438-15444).
         /// </summary>
         public string llList2Json(string type, LSLList values)
@@ -17546,10 +17672,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         }
 
         /// <summary>
-        /// SL (llJson2List): a single value gives "a list with 1 item"; an object "a strided list of key, value pairs";
-        /// nested objects and arrays "are returned as json strings". true, false and null give JSON_TRUE, JSON_FALSE and
-        /// JSON_NULL. Text that is not JSON comes back as a one-item list of itself, as Halcyon (:15296-15305) and
-        /// YEngine return it.
+        /// SL (llJson2List, https://wiki.secondlife.com/wiki/LlJson2List): a single value gives a one-item list; an
+        /// object gives a strided list in which each key is followed by its value; nested objects and arrays come back
+        /// as JSON strings. true, false and null give JSON_TRUE, JSON_FALSE and JSON_NULL. Text that is not JSON comes
+        /// back as a one-item list of itself, as Halcyon (:15296-15305) and YEngine return it.
         /// </summary>
         public LSLList llJson2List(string src)
         {
@@ -18883,8 +19009,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             // The asking script gets only a reply it is still owed - one asked for before a reset, state change or
             // unload is not posted to it (Halcyon Dataserver.RemoveEvents).
-            // Every other script in the prim gets it all the same (SL: "all scripts within the same prim
-            // where the request was made"; the wiki says nothing of a reset, state change or removal in between).
+            // Every other script in the prim gets it all the same (SL: the reply goes to every script in the prim that made
+            // the request; the wiki says nothing of a reset, state change or removal in between).
             bool owed = m_PendingDataserver.TryRemove(queryID, out _);
             m_ScriptEngine?.PostDataserverToPrim(m_host, owed ? UUID.Zero : m_itemID, m_itemID, queryID.ToString(), data);
         }
@@ -18894,8 +19020,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         private static readonly byte[] NotecardEmbeddedItemsMarker = Encoding.ASCII.GetBytes("Linden text version 2\n{\nLLEmbeddedItems version 1\n{\ncount ");
 
         /// <summary>
-        /// Does the notecard asset carry embedded inventory items? SL llGetNotecardLine: "If notecard contains embedded
-        /// inventory items (such as textures and landmarks), EOF will be returned". The core's reader for YEngine
+        /// Does the notecard asset carry embedded inventory items? SL llGetNotecardLine
+        /// (https://wiki.secondlife.com/wiki/LlGetNotecardLine): a notecard that has inventory items embedded in it (for
+        /// example textures or landmarks) makes the call return EOF. The core's reader for YEngine
         /// (SLUtil.ParseNotecardToArray) also gives such a notecard no lines.
         /// </summary>
         private static bool HasEmbeddedItems(byte[] data)
@@ -19571,8 +19698,10 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         /// <summary>
         /// SL's llAdjustDamage(integer number, float new_damage): inside on_damage, rewrite the
-        /// pending entry's amount before it lands (wiki: "modifies the amount of damage that will be applied
-        /// by the current on_damage event after it has completed"). Anywhere else: an error on DEBUG_CHANNEL,
+        /// pending entry's amount before it lands (wiki, https://wiki.secondlife.com/wiki/LlAdjustDamage: it changes
+        /// the damage
+        /// amount that the running on_damage event will apply once it has finished). Anywhere else: an error on
+        /// DEBUG_CHANNEL,
         /// as the wiki says. Out-of-range or negative index: silent. The older (key, amount) form,
         /// an OpenSim-ism with the same arity, is gone - llDamage is the SL way to deal damage.
         /// </summary>
@@ -19842,9 +19971,11 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         private const int VP_SUSPENDED = 1 << 7;
 
         /// <summary>
-        /// The XP_ERROR an Experience's own state gives, from its viewer property bits. SL wiki llGetExperienceErrorMessage:
-        /// XP_ERROR_EXPERIENCE_DISABLED (8) "The experience owner has temporarily disabled the experience.";
-        /// XP_ERROR_EXPERIENCE_SUSPENDED (9) "The experience has been suspended by Linden Lab customer support." With both
+        /// The XP_ERROR an Experience's own state gives, from its viewer property bits. SL wiki llGetExperienceErrorMessage
+        /// (https://wiki.secondlife.com/wiki/LlGetExperienceErrorMessage): XP_ERROR_EXPERIENCE_DISABLED (8) means the
+        /// experience owner has disabled the experience for the time being; XP_ERROR_EXPERIENCE_SUSPENDED (9) means
+        /// Linden Lab
+        /// customer support has suspended the experience. With both
         /// bits set, disabled is the answer, as YEngine checks it first (LSL_Api llRequestExperiencePermissions and
         /// llGetExperienceDetails).
         /// </summary>
@@ -19951,7 +20082,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         }
 
         // ── SL's key-value form ──
-        // wiki: every call "Start[s] an asynchronous transaction" and returns a key; the answer is a dataserver event
+        // wiki: every call starts an asynchronous transaction and returns a key; the answer is a dataserver event
         // with that key and cdl = llDumpList2String([ 1, ... ],",") on success or [ 0, integer error ] (XP_ERROR_*).
         // The query id is recorded (NewDataserverQuery), so an answer owed to a script that was reset, changed
         // state or was removed in between is dropped by PostDataserverEvent. The store work runs inside the syscall,
@@ -19959,8 +20090,8 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         // and one script's answers arrive in the order it asked.
         // No key-value store at all (no IExperienceService) answers XP_ERROR_STORE_DISABLED.
         // As SL: a script not compiled into an Experience (its item's ExperienceID is zero,
-        // GetScriptExperienceId) answers XP_ERROR_NO_EXPERIENCE, "This script is not associated with an experience."
-        // (wiki llGetExperienceErrorMessage; each call's page: "the script must be compiled into an Experience"), and
+        // GetScriptExperienceId) answers XP_ERROR_NO_EXPERIENCE, whose message says the script has no experience
+        // (wiki llGetExperienceErrorMessage; each call's page says the script has to be compiled into an Experience), and
         // the store is not touched. Phlox once used the owner's id here; Phlox's own names (llClearKeyValue and the
         // *SL variants) keep that fallback, so data stored under an owner's id stays reachable through them.
 
@@ -19997,9 +20128,10 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         private static string KvFail(int xpError) => "0," + xpError;
 
-        // SL's value limit, wiki llCreateKeyValue / llUpdateKeyValue: "As of Jan 1, 2016 maximum bytes is 1011 for
-        // key and 4095 for value for both LSO and Mono scripts." Over it is XP_ERROR_INVALID_PARAMETERS, "One of the
-        // string arguments was too big to fit in the key-value store." (wiki llGetExperienceErrorMessage). Nothing is
+        // SL's value limit, wiki llCreateKeyValue / llUpdateKeyValue (https://wiki.secondlife.com/wiki/LlCreateKeyValue):
+        // since Jan 1, 2016 a key may be at most 1011 bytes and a value at most 4095 bytes, whichever of LSO and Mono the
+        // script uses. Over the limit the call gives XP_ERROR_INVALID_PARAMETERS, whose message
+        // (wiki llGetExperienceErrorMessage) says a string argument was too large for the key-value store. Nothing is
         // written. Before, the store got the value: MySQL's VARCHAR(4095) column refused it (strict mode) or cut it.
         private const int MAX_EXPERIENCE_VALUE_BYTES = 4095;
         private static bool BadKvValue(string value) => KvBytes(value) > MAX_EXPERIENCE_VALUE_BYTES;
@@ -20035,8 +20167,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
 
         /// <summary>
         /// wiki: key llUpdateKeyValue(string k, string v, integer checked, string original_value). XP_ERROR_RETRY_UPDATE
-        /// when checked and the stored value is not original_value; a key that does not exist "will generate a new key with
-        /// the specified value, as if you had used llCreateKeyValue" (NGC's update does not create, so it is created here).
+        /// when checked and the stored value is not original_value; for a key that does not exist the call creates it
+        /// with the
+        /// given value, as llCreateKeyValue would (NGC's update does not create, so it is created here).
         /// </summary>
         public string llUpdateKeyValue(string k, string v, int isChecked, string original_value)
             => KeyValueRequest("llUpdateKeyValue", (store, expId) =>
@@ -20077,12 +20210,14 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         public string llKeyCountKeyValue()
             => KeyValueRequest("llKeyCountKeyValue", (store, expId) => "1," + store.KeyCountKeyValue(expId));
 
-        // wiki llKeysKeyValue: "may return fewer keys than requested if ... the result list exceeds 4096 characters".
+        // wiki llKeysKeyValue (https://wiki.secondlife.com/wiki/LlKeysKeyValue): the call can hand back fewer keys
+        // than asked
+        // for when the result list would be over 4096 characters.
         private const int MAX_KEYS_REPLY_CHARS = 4096;
 
         /// <summary>
         /// wiki: key llKeysKeyValue(integer first, integer count); success is llDumpList2String([ 1 ] + keys, ","), and
-        /// "XP_ERROR_KEY_NOT_FOUND is returned if there index given is greater than or equal to the number of keys".
+        /// the page says XP_ERROR_KEY_NOT_FOUND comes back when the given index is at or beyond the number of keys.
         /// Phlox's clamps are kept: count &lt;= 0 is 100, count &gt; 1000 is 1000, first &lt; 0 is 0.
         /// </summary>
         public string llKeysKeyValue(int start, int count)
@@ -20671,8 +20806,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         }
 
         /// <summary>
-        /// SL wiki (LlRezObjectWithParams): "Returns a key which will be the key of the object when it
-        /// is successfully rezzed in the world. On failure, returns (key)"" (in LSL)". The key is the
+        /// SL wiki (LlRezObjectWithParams): the call returns the key the object will have once it is rezzed in the
+        /// world, and on
+        /// failure returns an empty string (in LSL a (key) cast of ""). The key is the
         /// rezzed root's, the one object_rez reports (upstream LSL_Api returns the rezzed group's id too,
         /// but NULL_KEY on failure; SL's "" is kept here). The shim runs this async, so the script gets
         /// its value only from SysReturn, handed over on every path, a throw included.
@@ -20901,8 +21037,10 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         }
 
         // ── 651: llGetStartString ──
-        /// <summary>Ported from upstream LSL_Api.cs:4589-4593. wiki: "Returns a string that was
-        /// passed to the object's root prim on rez with llRezObjectWithParams"; blank when the object was
+        /// <summary>Ported from upstream LSL_Api.cs:4589-4593. wiki
+        /// (https://wiki.secondlife.com/wiki/LlGetStartString): gives
+        /// the string handed to the object's root prim when it was rezzed with llRezObjectWithParams; blank when the
+        /// object was
         /// rezzed any other way.</summary>
         public string llGetStartString()
         {
@@ -20958,9 +21096,9 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         public LSLList llListSortStrided(LSLList src, int stride, int stride_index, int ascending)
             => llSortListStrided(src, stride, stride_index, ascending);
 
-        /// <summary>wiki: string llSHA256String(string src) - "a string of 64 hex characters that is
-        /// the SHA-256 security hash of src", src as UTF-8, nothing appended. Distinct from the
-        /// (src, nonce) form, which hashes src + ":" + nonce.</summary>
+        /// <summary>wiki (https://wiki.secondlife.com/wiki/LlSHA256String): string llSHA256String(string src) - returns the
+        /// SHA-256 security hash, written as 64 hex characters, computed over src as UTF-8 with nothing appended. Distinct
+        /// from the (src, nonce) form, which hashes src + ":" + nonce.</summary>
         public string llSHA256String(string src)
         {
             byte[] data = System.Text.Encoding.UTF8.GetBytes(src ?? string.Empty);
@@ -21368,9 +21506,11 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         /// suspended (9), <see cref="ExperienceStateError"/>. Checked before the land and the agent, as YEngine does. The
         /// state is the Experience service's at this request (the adapter asks the service each time); the request runs on
         /// the service lane, so a slow service delays only this script. A lookup that fails is XP_ERROR_NOT_FOUND (6), SL
-        /// wiki llGetExperienceErrorMessage: "The sim was unable to verify the validity of the experience. Retrying after a
-        /// short wait is advised." An Experience the service answers it does not know is XP_ERROR_INVALID_EXPERIENCE (7),
-        /// SL wiki llGetExperienceErrorMessage: "The script is associated with an experience that no longer exists."
+        /// wiki llGetExperienceErrorMessage (https://wiki.secondlife.com/wiki/LlGetExperienceErrorMessage): the sim
+        /// could not
+        /// confirm that the experience is valid, and waiting a little before trying again is recommended. An Experience the
+        /// service answers it does not know is XP_ERROR_INVALID_EXPERIENCE (7),
+        /// SL wiki llGetExperienceErrorMessage: the script belongs to an experience that has ceased to exist.
         /// A disabled or suspended answer also ends every grant held from that Experience in the region
         /// (<see cref="NoteExperienceState"/>), this script's own among them.
         /// </summary>
@@ -21682,9 +21822,10 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (!UUID.TryParse(experienceId, out expId))
                 return new LSLList();
 
-            // SL wiki llGetExperienceDetails: "If experience_id is NULL_KEY, then information about the script's
-            // experience is returned. In this situation, if the script isn't associated with an experience, an empty
-            // list is returned."
+            // SL wiki llGetExperienceDetails (https://wiki.secondlife.com/wiki/LlGetExperienceDetails): when
+            // experience_id is
+            // NULL_KEY, the details returned are those of the script's own experience; in that case, if the script has no
+            // experience, the result is an empty list.
             if (expId.IsZero())
             {
                 expId = GetScriptExperienceId();

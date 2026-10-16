@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Globalization;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -10,9 +17,10 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// llSetPos goes through the same helper as PRIM_POSITION (Halcyon runs both through SetPos(part, v, true)),
-/// so the two cannot disagree. SL llSetPos: a child's vector is "a local coordinate relative to the root prim", an
-/// attached root's "relative to the attach point", an unattached root's a region coordinate, and "Movement is capped to
-/// 10m per call for unattached root prims". Halcyon's caps: an attached root 3.5 m from the attach point, a child of an
+/// so the two cannot disagree. SL llSetPos (https://wiki.secondlife.com/wiki/LlSetPos): a child's vector is a coordinate in the
+/// root prim's local space, an attached root's is measured from the attach point, an unattached root's is a region coordinate,
+/// and an unattached root prim moves at most 10m per call. Halcyon's caps: an attached root 3.5 m from the attach
+/// point, a child of an
 /// attachment 54 m from the root, any other child 256 m.
 /// </summary>
 // No longer in "phlox-state": this class touches no process-wide state, so it runs in parallel.

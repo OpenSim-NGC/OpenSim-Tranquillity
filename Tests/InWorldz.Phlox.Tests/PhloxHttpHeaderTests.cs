@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -15,8 +22,9 @@ namespace InWorldz.Phlox.Tests;
 /// <summary>
 /// llHTTPRequest sends the simulator's X-SecondLife-* headers and a script cannot forge,
 /// replace or remove them. Halcyon ScriptsHttpRequests.ScriptCanChangeHeader refuses "x-secondlife*" (any letter case);
-/// SL llHTTPRequest: "Use HTTP_MIMETYPE to set the Content-Type header. Attempts to use HTTP_CUSTOM_HEADER to set it will
-/// cause a runtime script error." What is checked is what the core's HttpRequestModule actually puts on the wire, read
+/// SL llHTTPRequest (https://wiki.secondlife.com/wiki/LlHTTPRequest): the Content-Type header is set through HTTP_MIMETYPE, and
+/// trying to set it with HTTP_CUSTOM_HEADER causes a runtime script error. What is checked is what the core's HttpRequestModule
+/// actually puts on the wire, read
 /// by a loopback listener, not the script's view.
 /// </summary>
 // No longer in "phlox-state". In "phlox-http" with PhloxOutboundFilterTests: both build the core

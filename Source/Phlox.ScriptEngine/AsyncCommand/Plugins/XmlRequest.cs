@@ -26,6 +26,7 @@
  */
 
 // Ported from Halcyon/InWorldz to this engine
+// Adapted 2026 by Legion Builds
 
 using System;
 using System.Collections.Generic;

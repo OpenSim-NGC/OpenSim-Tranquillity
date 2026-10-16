@@ -139,6 +139,7 @@
 	<Extension path = "/OpenSim/WindModule">    
         <WindModel id="ConfigurableWind" class="OpenSim.Region.CoreModules.World.Wind.Plugins.ConfigurableWind" />  
         <WindModel id="SimpleRandomWind" class="OpenSim.Region.CoreModules.World.Wind.Plugins.SimpleRandomWind" />
+        <WindModel id="ZephyrWind" class="OpenSim.Region.CoreModules.World.Wind.Plugins.ZephyrWind" />
     </Extension>
 
 </Addin>

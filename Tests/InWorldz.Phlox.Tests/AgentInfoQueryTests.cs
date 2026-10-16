@@ -16,9 +16,10 @@ using Xunit;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// llGetAgentInfo's flags as Halcyon sets them (LSLSystemAPI.llGetAgentInfo) and the SL wiki lists them: AGENT_TYPING
+/// llGetAgentInfo's flags as Halcyon sets them (LSLSystemAPI.llGetAgentInfo) and the SL wiki
+/// (https://wiki.secondlife.com/wiki/LlGetAgentInfo) lists them: AGENT_TYPING
 /// from the typing state, AGENT_BUSY from the BUSY animation, AGENT_CROUCHING and AGENT_WALKING from the movement
-/// animation ("walking, running or crouch walking"), AGENT_SITTING for a ground sit. llSameGroup as Halcyon's
+/// animation (a walk, a run or a crouched walk), AGENT_SITTING for a ground sit. llSameGroup as Halcyon's
 /// HasMatchingGroup. llSetCameraParams' vector rules. llGetRegionFlags from the estate module.
 /// </summary>
 // No test reaches a network service. No process-wide state: the class runs in parallel.

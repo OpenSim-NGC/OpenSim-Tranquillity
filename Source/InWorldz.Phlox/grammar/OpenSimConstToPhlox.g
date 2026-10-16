@@ -1,3 +1,8 @@
+/*
+ * From HalcyonGrid/phlox (grammar/OpenSimConstToPhlox.g, commit e805a56).
+ * Licence: Apache License 2.0, see ThirdPartyLicenses/Phlox.txt.
+ */
+
 grammar OpenSimConstToPhlox;
 
 @members {

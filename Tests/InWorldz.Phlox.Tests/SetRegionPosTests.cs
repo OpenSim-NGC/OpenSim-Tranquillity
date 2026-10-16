@@ -1,6 +1,6 @@
 /*
+ * Copyright (c) 2026 Legion Builds
  * Copyright (c) Contributors, http://opensimulator.org/
- * Copyright (c) Legion Builds
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,7 +42,7 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// llSetRegionPos as the SL wiki documents it (https://wiki.secondlife.com/wiki/LlSetRegionPos):
-/// - "Returns FALSE and does not move the object if position is more than 10m off region or above 4096m";
+/// - returns FALSE, leaving the object in place, if the target is over 10m outside the region or above 4096m;
 /// - FALSE for a dynamic (physical) object, an avatar attachment, or a parcel or region refusal;
 /// - below ground the object goes to ground level: TRUE within 0.1 m, FALSE (but still moved) further down.
 /// Up to 10 m past the edge the object crosses into the region there, which core's crossing does; with no region

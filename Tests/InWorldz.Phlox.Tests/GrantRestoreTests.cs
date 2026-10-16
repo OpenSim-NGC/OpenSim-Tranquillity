@@ -309,9 +309,9 @@ public class GrantRestoreTests
 
     /// <summary>
     /// A stand-up after the script was last saved, from a script that holds CONTROL_CAMERA and took no controls: the
-    /// core ends the camera grant (SL llSetCameraParams: "automatically revoked when the avatar stands up from or
-    /// detaches the object") with no controls released and no event run, and the shutdown save still writes the row
-    /// again, so a restart does not give the camera grant back.
+    /// core ends the camera grant (SL llSetCameraParams, https://wiki.secondlife.com/wiki/LlSetCameraParams: it ends on its
+    /// own when the avatar rises from the object or detaches it) with no controls released and no event run, and the
+    /// shutdown save still writes the row again, so a restart does not give the camera grant back.
     /// </summary>
     [Fact]
     public void ACameraGrantTheCoreEndsOnAStandIsSavedAtShutdown()

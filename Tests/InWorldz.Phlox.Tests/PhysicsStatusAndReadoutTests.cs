@@ -1,6 +1,6 @@
 /*
+ * Copyright (c) 2026 Legion Builds
  * Copyright (c) Contributors, http://opensimulator.org/
- * Copyright (c) Legion Builds
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -43,15 +43,16 @@ namespace InWorldz.Phlox.Tests;
 /// Physical status and read-outs:
 /// - llSetStatus STATUS_ROTATE_X/Y/Z use the SL bits 0x002, 0x004, 0x008 (SL wiki llSetStatus), the same bits core
 ///   and every physics engine read from SceneObjectPart.RotationAxisLocks (SceneObjectGroup.axisSelect). Status is
-///   an object attribute (SL: "all prims in an object share the same status"), so the locks are the root's, from
-///   any prim of the object, and llGetStatus reads them back.
+///   an object attribute (SL llSetStatus page, https://wiki.secondlife.com/wiki/LlSetStatus: every prim of an object has the
+///   same status), so the locks are the root's, from any prim of the object, and llGetStatus reads them back.
 /// - llApplyImpulse drops an impulse with a NaN or infinite component: the 20000 cap's length test is false for a
 ///   NaN and turns an infinity into a NaN, which would otherwise reach the body or the wearer.
 /// - llGetForce returns the force llSetForce stored on the object's root (SceneObjectPart.Force), in region axes, as
 ///   YEngine does, so it does not depend on the physics engine keeping the force it was given.
 /// - llGetAccel is the object's acceleration, ZERO_VECTOR in a child prim or an attachment (SL wiki llGetAccel);
-///   llGetOmega is the root's angular velocity, a physical spin or a llTargetOmega (SL: "Returns the omega of the
-///   root if called in a child prim"); llGetTorque returns the torque llSetTorque stored on the root.
+///   llGetOmega is the root's angular velocity, a physical spin or a llTargetOmega (SL llGetOmega page,
+///   https://wiki.secondlife.com/wiki/LlGetOmega: from a child prim it gives the root's omega); llGetTorque returns the
+///   torque llSetTorque stored on the root.
 /// - llGetVel in an attachment returns the wearer's velocity, as YEngine (ScenePresence.GetWorldVelocity) and
 ///   Halcyon (SceneObjectPart.GetWearerVelocity) do; the SL wiki page says nothing about attachments.
 /// </summary>

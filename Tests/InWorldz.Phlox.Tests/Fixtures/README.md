@@ -12,4 +12,4 @@ worthless without the body, so the body is committed.
 
 | file | asset | why it is here |
 |---|---|---|
-| `lmap4.lsl` | `1ee3b9b1-39c7-4f20-a5f3-6dbd79046218` | A four-state lamp from a resident's prim (`lmap4`). Crashed the Phlox compiler with a `NullReferenceException` on every region start. sha256 `d92967d068e5f693ccf5de669659cd3522f672290f54e7005ff4d7c27699f352`. |
+| `lmap4.lsl` | - | A four-state lamp written for these tests (`lmap4`): touch moves through three brightness states and back to default. The compiler once crashed with a `NullReferenceException` on a script of this shape. sha256 `ef100184bd43ce2a3255cc697f57547c39343c9460295849594fc3d7f98c4fa9`. |

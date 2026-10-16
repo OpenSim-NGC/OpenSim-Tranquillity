@@ -20,9 +20,10 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// A script's state travels inside its object: the core asks the engine for it when the object is serialized (take,
-/// take copy, detach, a crossing, a teleport's attachments) and hands it back before the scripts start. SL: "A script will
-/// NOT automatically re-enter the default state state_entry event when the task is rezzed or attached (even by a new
-/// owner), nor if the task is moved to another SIM" (wiki, State). State another engine wrote, or that cannot be read,
+/// take copy, detach, a crossing, a teleport's attachments) and hands it back before the scripts start. SL (wiki,
+/// State, https://wiki.secondlife.com/wiki/State): the default state's state_entry event does NOT run again by itself
+/// when the object is rezzed or attached, even to a new owner, or when it moves to another SIM. State another engine
+/// wrote, or that cannot be read,
 /// gives a fresh start and never a failed load.
 /// </summary>
 // Runs in parallel: each test has its own harness, items and assets; nothing process-wide is changed.

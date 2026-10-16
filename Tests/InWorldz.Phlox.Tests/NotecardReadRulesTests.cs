@@ -16,15 +16,17 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// Notecard reads and landmark data. A line read returns at most NotecardLineReadCharsMax bytes of UTF-8, 1024 by
-/// default (SL llGetNotecardLine: "If the requested line is longer than 1024 bytes (not characters), dataserver will
-/// only return the first 1024 bytes"); [InWorldz.Phlox] sets it, else [YEngine]'s setting of the same name. A negative
+/// default (SL llGetNotecardLine, https://wiki.secondlife.com/wiki/LlGetNotecardLine: a line longer than 1024 bytes, counted
+/// in bytes and not characters, is returned by dataserver as its first 1024 bytes only); [InWorldz.Phlox] sets it, else
+/// [YEngine]'s setting of the same name. A negative
 /// line answers "". iwGetNotecardSegment answers "" for a zero or negative length or a negative line (Halcyon
-/// NotecardCache.GetLine, LSLSystemAPI.cs:18685-18709). Every reader takes a notecard asset key for the name (SL: "a
-/// notecard in the inventory of the prim this script is in or a UUID of a notecard"), refusing an asset that is not a
+/// NotecardCache.GetLine, LSLSystemAPI.cs:18685-18709). Every reader takes a notecard asset key for the name (SL: the name
+/// argument is a notecard name from the script's own prim or a notecard's UUID), refusing an asset that is not a
 /// notecard. iwGetLinkNotecardSegment says when no prim holds the notecard, as iwGetLinkNotecardLine does.
 /// iwMakeNotecard waits its 5 s on every path (Halcyon :14740-14790). llRequestInventoryData answers a landmark's
-/// position as an offset from this region's corner (SL: "a global position as an offset from the current region's
-/// origin"), and for a missing landmark returns "", says so on DEBUG_CHANNEL and still sleeps its 1 s (SL; Halcyon
+/// position as an offset from this region's corner (SL llRequestInventoryData,
+/// https://wiki.secondlife.com/wiki/LlRequestInventoryData: the position is global, expressed relative to the origin of the
+/// present region), and for a missing landmark returns "", says so on DEBUG_CHANNEL and still sleeps its 1 s (SL; Halcyon
 /// :5686-5692).
 /// </summary>
 // No test reaches a network service. Test grouping: no process-wide state, so the class runs in parallel.

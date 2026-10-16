@@ -25,12 +25,12 @@ namespace InWorldz.Phlox.Tests;
 /// <summary>
 /// A scripted vehicle crosses from one region into the next, each region with its own Phlox engine and scheduler thread,
 /// through the core's crossing (EntityTransferModule, LocalSimulationConnector: GetStateSnapshot, then SetState). The
-/// script carries on in the new region: SL's "A script will NOT automatically re-enter the default state state_entry
-/// event ... if the task is moved to another SIM" (wiki, State). It keeps its globals and its listen; its start parameter
-/// is 0 (llGetStartParameter: it does not survive "region change (SVC-3258, crossing or teleport)"). Its grant comes back
-/// only as a silent llRequestPermissions would give it, once the granter has arrived seated on it; until then the grant
-/// and the record of the controls it took wait as a claim. Taken controls on a seated avatar travel in the core's agent
-/// data for every engine.
+/// script carries on in the new region: SL's rule that a script does NOT run the default state's state_entry again on its
+/// own after its task moves to another SIM (wiki, https://wiki.secondlife.com/wiki/State). It keeps its globals and its
+/// listen; its start parameter is 0 (llGetStartParameter: the value is lost on a region change, by crossing or teleport;
+/// see SVC-3258). Its grant comes back only as a silent llRequestPermissions would give it, once the granter has arrived
+/// seated on it; until then the grant and the record of the controls it took wait as a claim. Taken controls on a seated
+/// avatar travel in the core's agent data for every engine.
 /// </summary>
 // Runs in parallel: regions (7310, 7310), (7310, 7309), (7320, 7320), (7320, 7319), (7350, 7350) and (7350, 7349) are
 // used by no other test; the scenes, engines and items are its own.

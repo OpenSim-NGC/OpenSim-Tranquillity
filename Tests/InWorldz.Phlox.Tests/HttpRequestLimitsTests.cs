@@ -20,8 +20,8 @@ namespace InWorldz.Phlox.Tests;
 /// <para>Back-pressure, under [InWorldz.Phlox] HttpInFlightThrottle: Halcyon's llHTTPRequest sleeps up to 50 ms when the
 /// script's event queue is 60% or more full, and 80 ms after any request that returns NULL_KEY (LSLSystemAPI.cs
 /// :13757-13774, :13856). A throttled request also shouts on DEBUG_CHANNEL unless the script set HTTP_VERBOSE_THROTTLE
-/// to FALSE (SL wiki llHTTPRequest: "If TRUE, shout error messages to DEBUG_CHANNEL if the outgoing request rate
-/// exceeds the server limit", default TRUE).</para>
+/// to FALSE (SL wiki llHTTPRequest, https://wiki.secondlife.com/wiki/LlHTTPRequest: when TRUE, a message on DEBUG_CHANNEL
+/// reports that the outgoing request rate went over the server limit; default TRUE).</para>
 /// <para>Headers, as YEngine's llHTTPRequest refuses them (LSL_Api.HttpForbiddenHeaders): a name in the fatal half of its
 /// table, or starting "proxy-" or "sec-", stops the request with YEngine's error; a name in the other half is left out
 /// silently; at most 8 custom headers; a name and value of at most 253 characters together.</para>

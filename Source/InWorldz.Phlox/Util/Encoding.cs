@@ -1,4 +1,10 @@
-﻿using System;
+﻿/*
+ * From HalcyonGrid/phlox (Source/Halcyon.Phlox/Util/Encoding.cs, commit e805a56).
+ * Licence: Apache License 2.0, see ThirdPartyLicenses/Phlox.txt.
+ * Modified 2026 by Legion Builds.
+ */
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -112,8 +118,8 @@ namespace InWorldz.Phlox.Util
             return value;
         }
 
-        // SL wiki Typecast: (string) of a float has 6 decimals - `(string) -PI; // "-3.141593" with
-        // precision set to 6 decimal places by zero padding or rounding` - and of a vector or rotation 5 - `(string) <1.0,
+        // SL wiki Typecast: (string) of a float has 6 decimals - `(string) -PI; // "-3.141593"`, zero padded or
+        // rounded to 6 decimal places - and of a vector or rotation 5 - `(string) <1.0,
         // 2.3, 4.56>; // "<1.00000, 2.30000, 4.56000>"`; lists use 6 for all three (wiki List). The float's own value is
         // written: formatting a float keeps only 7 significant digits on .NET (2147483520.0 printed "2147484000.000000"),
         // so each value is widened to double first, which is exact. Halcyon's rule: -0 prints as 0 (any value

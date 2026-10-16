@@ -1,3 +1,9 @@
+/*
+ * From HalcyonGrid/phlox (Source/Halcyon.Phlox/Compiler/LSLTreeAdaptor.cs, commit e805a56).
+ * Licence: Apache License 2.0, see ThirdPartyLicenses/Phlox.txt.
+ * Modified 2026 by Legion Builds.
+ */
+
 using System;
 
 namespace InWorldz.Phlox.Compiler
