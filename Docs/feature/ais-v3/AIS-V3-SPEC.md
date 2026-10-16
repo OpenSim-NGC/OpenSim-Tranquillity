@@ -31,7 +31,7 @@ If AIS answers an error, the operation simply does not happen.
 
 ### 0.2 Configuration
 
-In the simulator's ini (`OpenSimDefaults.ini` ships the default):
+In the simulator's ini (`RegionServerDefaults.ini` ships the default):
 
 ```ini
 [AIS]
@@ -82,7 +82,7 @@ advertises.
 | Request handling | `AisHandler.cs`, `AisRouter.cs` (URL parsing), `AisEnvelope.cs` (responses), `AisMutation.cs`, `AisSlam.cs`, `AisPurge.cs`, `AisCopy.cs`, `AisFolderLocks.cs`, `AisWornAssets.cs` in the same folder |
 | Inventory seam | `IAisInventoryBackend.cs`, `AisInventory.cs` |
 | Module discovery | `Source/OpenSim.Region.ClientStack.LindenCaps/PluginRegistration.cs` |
-| Shipped config | `Source/OpenSim.Server.RegionServer/AppData/OpenSimDefaults.ini`, `[AIS]` |
+| Shipped config | `Source/OpenSim.Server.RegionServer/AppData/RegionServerDefaults.ini`, `[AIS]` |
 | Tests and golden fixtures | `Tests/OpenSim.Region.ClientStack.LindenCaps.AIS.Tests/` |
 
 The handler logic sits behind `IAisInventoryBackend`, so the same handler could later be hosted on Robust

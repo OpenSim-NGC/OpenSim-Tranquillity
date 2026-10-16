@@ -104,7 +104,6 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         public void TestSendImage()
         {
             TestHelpers.InMethod();
-//            XmlConfigurator.Configure();
 
             scene.AssetService.Store(m_testImageAsset);
 
@@ -125,7 +124,6 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         public void TestDiscardImage()
         {
             TestHelpers.InMethod();
-//            XmlConfigurator.Configure();
 
             scene.AssetService.Store(m_testImageAsset);
 
@@ -155,7 +153,6 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         public void TestMissingImage()
         {
             TestHelpers.InMethod();
-//            XmlConfigurator.Configure();
 
             TextureRequestArgs args = new TextureRequestArgs();
             args.RequestedAssetID = m_testImageAsset.FullID;

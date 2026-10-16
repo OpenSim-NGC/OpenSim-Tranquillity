@@ -43,9 +43,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps;
 /// </summary>
 public class MeshUploadFlagModule : INonSharedRegionModule
 {
-//        private static readonly ILog m_log =
-//            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
     /// <summary>
     /// Is this module enabled?
     /// </summary>

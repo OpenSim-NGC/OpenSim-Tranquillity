@@ -14,9 +14,9 @@
 ;; save_crashes = false in the [Startup] section below.
 ;;
 ;; All settings are initially commented out and the default value used, as
-;; found in OpenSimDefaults.ini.  To change a setting, first uncomment it by
+;; found in RegionServerDefaults.ini.  To change a setting, first uncomment it by
 ;; deleting the initial semicolon (;) and then change the value.  This will
-;; override the value in OpenSimDefaults.ini
+;; override the value in RegionServerDefaults.ini
 ;;
 ;; If you want to find out what configuration OpenSimulator has finished with
 ;; once all the configuration files are loaded then type "config show" on the
@@ -669,10 +669,10 @@
     ;http_listener_cert_pass = "mycertpass"
     
     ; By default, OpenSimulator does not allow scripts to make HTTP calls to addresses on the simulator's LAN.
-    ; See the OutboundDisallowForUserScripts parameter in OpenSimDefaults.ini for more information on this filter.
+    ; See the OutboundDisallowForUserScripts parameter in RegionServerDefaults.ini for more information on this filter.
     ; If you need to allow scripts to make some LAN calls use the OutboundDisallowForUserScriptsExcept parameter below.
     ; We recommend that you do not override OutboundDisallowForUserScripts directly unless you are very sure about what you're doing.
-    ; this HTTP calls can also use ssl see opensimDefaults.ini
+    ; this HTTP calls can also use ssl see RegionServerDefaults.ini
     ;
     ; You can whitelist individual endpoints by IP or FQDN, e.g.
     ;
@@ -763,7 +763,7 @@
 [ClientStack.LindenUDP]
     ;; See OpensSimDefaults.ini for the throttle options. You can copy the
     ;; relevant sections and override them here.
-    ;; DO NOT MODIFY OpenSimDefaults.ini, as your changes would be lost
+    ;; DO NOT MODIFY RegionServerDefaults.ini, as your changes would be lost
     ;; with the next update!
 
     ;# {DisableFacelights} {} {Stop facelights from working?} {true false} false
@@ -778,7 +778,7 @@
 
 
 [ClientStack.LindenCaps]
-    ;; For the long list of capabilities, see OpenSimDefaults.ini
+    ;; For the long list of capabilities, see RegionServerDefaults.ini
     ;; Here are the few ones you may want to change. Possible values
     ;; are:
     ;;   "" -- empty, capability disabled
@@ -1056,7 +1056,7 @@
     ;; It runs the scripts whose first line is //InWorldz.Phlox:, and every script without
     ;; an engine header when [Startup] DefaultScriptEngine = "InWorldz.Phlox".
     ;; Saved state and the bytecode cache live under ScriptEngines/Phlox/ (created as needed).
-    ;; Every setting and its default is listed in OpenSimDefaults.ini; see Docs/PhloxSetup.md.
+    ;; Every setting and its default is listed in RegionServerDefaults.ini; see Docs/PhloxSetup.md.
     Enabled = true
 
 [YEngine]
@@ -1309,7 +1309,7 @@
     ; ExperienceCreators = EstateManagersAndRegionOwners
 
 [AIS]
-    ;; AIS v3 (InventoryAPIv3 / LibraryAPIv3) for the whole simulator. See [AIS] in OpenSimDefaults.ini for what
+    ;; AIS v3 (InventoryAPIv3 / LibraryAPIv3) for the whole simulator. See [AIS] in RegionServerDefaults.ini for what
     ;; enabling it means - it routes ALL of an LL viewer's inventory traffic through it. One line, no region named:
     ;;
     ; Enabled = true
@@ -1319,7 +1319,7 @@
 
 
 [Appearance]
-    ;; Server-side baking for the whole simulator. See [Appearance] in OpenSimDefaults.ini. One line, no region
+    ;; Server-side baking for the whole simulator. See [Appearance] in RegionServerDefaults.ini. One line, no region
     ;; named:
     ;;
     ; ServerSideBaking = true

@@ -45,10 +45,10 @@ This workstream should be done before deep server-by-server rewrites.
 
 Create a shared library or shared set of abstractions for:
 
-- typed startup options for `logconfig`, `inifile`, `inimaster`, `inidirectory`, `console`, and server-specific switches
+- typed startup options for `inifile`, `inimaster`, `inidirectory`, `console`, and server-specific switches
 - ini loading with include expansion and environment merge
 - legacy Nini-to-host configuration adapter
-- log4net bootstrap service
+- logging bootstrap service
 - console factory returning `ICommandConsole`
 - PID file service
 - process setup service for culture, thread pool, DNS, and HTTP client defaults
@@ -230,7 +230,7 @@ Move out of `Application.Main()` into shared bootstrap services:
 - `ServicePointManager` defaults
 - thread pool tuning
 - command-line switch parsing
-- log4net initialization
+- logging initialization
 - background or foreground mode selection
 
 `Application` should become either:

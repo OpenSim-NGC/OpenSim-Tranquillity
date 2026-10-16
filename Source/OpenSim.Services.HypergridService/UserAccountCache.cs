@@ -10,10 +10,6 @@ public class UserAccountCache : IUserAccountService
 {
     private const double CACHE_EXPIRATION_SECONDS = 120000.0; // 33 hours!
 
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
-
     private ExpiringCache<UUID, UserAccount> m_UUIDCache;
 
     private IUserAccountService m_UserAccountService;

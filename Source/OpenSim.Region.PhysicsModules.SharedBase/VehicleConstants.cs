@@ -52,6 +52,12 @@ public enum Vehicle : int
     TYPE_BOAT = 3,
     TYPE_AIRPLANE = 4,
     TYPE_BALLOON = 5,
+
+    /// <summary>InWorldz's VEHICLE_TYPE_SAILBOAT; Second Life has no such type.</summary>
+    TYPE_SAILBOAT = 10001,
+
+    /// <summary>InWorldz's VEHICLE_TYPE_MOTORCYCLE; Second Life has no such type.</summary>
+    TYPE_MOTORCYCLE = 10002,
     LINEAR_FRICTION_TIMESCALE = 16,
     /// <summary>
     /// vector of timescales for exponential decay of angular velocity about three axis
@@ -93,8 +99,21 @@ public enum Vehicle : int
     BANKING_TIMESCALE = 40,
     REFERENCE_FRAME = 44,
     BLOCK_EXIT = 45,
-    ROLL_FRAME = 46
+    ROLL_FRAME = 46,
 
+    // InWorldz's float parameters (Halcyon FloatParams.cs). Second Life has none of them.
+    /// <summary>The range of camera turn, in radians, that mouselook steering counts as a full turn.</summary>
+    MOUSELOOK_AZIMUTH = 11001,
+    /// <summary>The range of camera pitch, in radians, that mouselook steering counts as a full pitch.</summary>
+    MOUSELOOK_ALTITUDE = 11002,
+    /// <summary>The range of roll, in radians, that banking counts as full.</summary>
+    BANKING_AZIMUTH = 11003,
+    /// <summary>The height above the ground, in metres, beyond which the motors are disabled after DISABLE_MOTORS_AFTER.</summary>
+    DISABLE_MOTORS_ABOVE = 11004,
+    /// <summary>The time, in seconds, a vehicle may stay above DISABLE_MOTORS_ABOVE before its motors are disabled.</summary>
+    DISABLE_MOTORS_AFTER = 11005,
+    /// <summary>Multiplier of the banking efficiency while the vehicle is upside down.</summary>
+    INVERTED_BANKING_MODIFIER = 11006
 }
 
 [Flags]
@@ -115,7 +134,15 @@ public enum VehicleFlag
     NO_Z = 4096,
     LOCK_HOVER_HEIGHT = 8192,
     NO_DEFLECTION = 16392,
-    LOCK_ROTATION = 32784
+    LOCK_ROTATION = 32784,
+
+    // InWorldz's flags, with the numbers its scripts send (Halcyon VehicleFlags.cs).
+    REACT_TO_CURRENTS = 0x10000,
+    REACT_TO_WIND = 0x20000,
+    LIMIT_MOTOR_DOWN = 0x40000,
+    TORQUE_WORLD_Z = 0x80000,
+    MOUSEPOINT_STEER = 0x100000,
+    MOUSEPOINT_BANK = 0x200000
 }
 
 public struct VehicleData
@@ -159,4 +186,12 @@ public struct VehicleData
 
     // Axis
     public Quaternion m_referenceFrame;
+
+    // InWorldz's float parameters 11001 to 11006
+    public float m_mouselookAzimuth;
+    public float m_mouselookAltitude;
+    public float m_bankingAzimuth;
+    public float m_disableMotorsAbove;
+    public float m_disableMotorsAfter;
+    public float m_invertedBankingModifier;
 }

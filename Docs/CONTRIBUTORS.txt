@@ -238,7 +238,6 @@ This software uses components from the following developers:
 * Prototype JavaScript Framework ajax (http://www.prototypejs.org/)
 * C5 GENERIC COLLECTION LIBRARY FOR C#/CLI
 * Nini (http://nini.sourceforge.net/)
-* log4net (http://logging.apache.org/log4net/)
 * GlynnTucker.Cache (http://gtcache.sourceforge.net/)
 * NDesk.Options 0.2.1 (http://www.ndesk.org/Options)
 * zlib.net for C# 1.0.4 (http://www.componentace.com/zlib_.NET.htm)

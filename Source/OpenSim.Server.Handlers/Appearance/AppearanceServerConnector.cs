@@ -17,7 +17,7 @@ namespace OpenSim.Server.Handlers.Appearance;
 /// <c>LocalServiceModule</c> from its own config section and registers one
 /// <see cref="SimpleStreamHandler"/> on the server it is given.
 ///
-/// <para>Robust.HG.ini.example / Robust.ini.example:</para>
+/// <para>GridServer.HG.ini.example / GridServer.ini.example:</para>
 /// <code>
 /// [ServiceList]
 ///     AppearanceServiceConnector = "${Const|PublicPort}/OpenSim.Server.Handlers.dll:AppearanceServerConnector"

@@ -312,6 +312,7 @@ namespace Phlox.ScriptEngine
 
         // ── RC_* ──────────────────────────────────────────────────────────
         public const int RC_DATA_FLAGS = 2;
+        public const int RC_DETECT_PHANTOM = 1;
         public const int RC_GET_LINK_NUM = 4;
         public const int RC_GET_NORMAL = 1;
         public const int RC_GET_ROOT_KEY = 2;

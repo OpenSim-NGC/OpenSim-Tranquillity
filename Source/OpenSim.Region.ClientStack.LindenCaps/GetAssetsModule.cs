@@ -27,7 +27,6 @@
 
 using System.Collections;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Capabilities.Handlers;
@@ -43,9 +42,6 @@ namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class GetAssetsModule : INonSharedRegionModule
 {
-//        private static readonly ILog m_log =
-//            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
     private Scene m_scene;
     private bool m_Enabled;
 

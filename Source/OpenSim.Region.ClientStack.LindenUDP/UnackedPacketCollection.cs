@@ -27,10 +27,6 @@
 
 using OpenMetaverse;
 
-using Microsoft.Extensions.Logging;
-//using System.Reflection;
-//using log4net;
-
 namespace OpenSim.Region.ClientStack.LindenUDP;
 
 /// <summary>
@@ -59,8 +55,6 @@ public sealed class UnackedPacketCollection
             FromResend = fromResend;
         }
     }
-
-    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>Holds the actual unacked packet data, sorted by sequence number</summary>
     private SortedDictionary<uint, OutgoingPacket> m_packets = new SortedDictionary<uint, OutgoingPacket>();
@@ -198,9 +192,6 @@ public sealed class UnackedPacketCollection
                 expiredPackets.Add(packet);
             }
         }
-
-        // if (expiredPackets != null)
-        //     m_log.LogDebug("[UNACKED PACKET COLLECTION]: Found {0} expired packets on timeout of {1}", expiredPackets.Count, timeoutMS);
 
         return expiredPackets;
     }
