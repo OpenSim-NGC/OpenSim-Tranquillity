@@ -55,6 +55,9 @@ public class WindModule : IWindModule
     private string m_dWindPluginName = "SimpleRandomWind";
     private Dictionary<string, IWindModelPlugin> m_availableWindPlugins = new Dictionary<string, IWindModelPlugin>();
 
+    // Script-made wind volumes, from the [Weather] section. Off unless [Weather] enabled = true.
+    private IWindVolumeStore m_windVolumes = new WindVolumeStore(false);
+
     // Simplified windSpeeds based on the fact that the client protocal tracks at a resolution of 16m
     private Vector2[] windSpeeds = new Vector2[16 * 16];
 
@@ -63,6 +66,7 @@ public class WindModule : IWindModule
     public void Initialise(IConfigSource config)
     {
         m_windConfig = config.Configs["Wind"];
+        m_windVolumes = CreateWindVolumes(config.Configs["Weather"]);
 
 //            string desiredWindPlugin = m_dWindPluginName;
 
@@ -367,6 +371,32 @@ public class WindModule : IWindModule
     #endregion
 
 
+    /// <summary>
+    /// Reads the [Weather] section. Every key falls back to its default when absent or out of range; the section
+    /// absent, or enabled left false, gives a store that accepts nothing.
+    /// </summary>
+    public static IWindVolumeStore CreateWindVolumes(IConfig weather, Func<long> clockMs = null)
+    {
+        if (weather == null) return new WindVolumeStore(false, null, clockMs);
+
+        var defaults = new WindVolumeLimits();
+        var limits = new WindVolumeLimits
+        {
+            MaxVolumesRegion = Math.Max(0, weather.GetInt("max_volumes_region", defaults.MaxVolumesRegion)),
+            MaxVolumesObject = Math.Max(0, weather.GetInt("max_volumes_object", defaults.MaxVolumesObject)),
+            MaxRadius = Math.Max(0f, weather.GetFloat("max_radius", defaults.MaxRadius)),
+            MaxHeight = Math.Max(0f, weather.GetFloat("max_height", defaults.MaxHeight)),
+            MaxSpeed = Math.Max(0f, weather.GetFloat("max_speed", defaults.MaxSpeed)),
+            MaxLifetimeSeconds = Math.Max(0f, weather.GetFloat("max_lifetime", defaults.MaxLifetimeSeconds)),
+        };
+        bool enabled = weather.GetBoolean("enabled", false);
+        if (enabled)
+            m_log.LogInformation(
+                "[WEATHER] Enabled: at most {0} wind volumes per region and {1} per object, radius {2} m, height {3} m, speed {4} m/s, lifetime {5} s.",
+                limits.MaxVolumesRegion, limits.MaxVolumesObject, limits.MaxRadius, limits.MaxHeight, limits.MaxSpeed, limits.MaxLifetimeSeconds);
+        return new WindVolumeStore(enabled, limits, clockMs);
+    }
+
     #region IWindModule Methods
 
     /// <summary>
@@ -421,6 +451,8 @@ public class WindModule : IWindModule
         }
     }
 
+    public IWindVolumeStore WindVolumes => m_windVolumes;
+
     public string WindActiveModelPluginName
     {
         get
@@ -445,6 +477,8 @@ public class WindModule : IWindModule
     {
         if ((!m_ready || m_inUpdate || (m_frame++ % m_frameUpdateRate) != 0))
             return;
+
+        m_windVolumes.PruneExpired();
 
         m_inUpdate = true;
         Util.FireAndForget(delegate
