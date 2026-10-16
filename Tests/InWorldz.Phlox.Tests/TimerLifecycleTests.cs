@@ -1,5 +1,9 @@
 /*
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  * TimerLifecycleTests.cs - the script timer, llGetTime and the Running flag across stop, start, state change and reset.
  */
 
@@ -13,8 +17,9 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// What a script's timer and its run time do across llSetTimerEvent(0), a state change, the Running flag and a reset.
-/// SL wiki llSetTimerEvent: "Setting sec to 0.0 stops the timer" and "The timer persists across state changes, but gets
-/// removed when the script is reset". SL wiki llGetTime: the time "is reset when the script is reset". Halcyon
+/// SL wiki llSetTimerEvent (https://wiki.secondlife.com/wiki/LlSetTimerEvent): an interval of 0.0 stops the timer, and
+/// the timer survives state changes but is dropped by a reset of the script. SL wiki llGetTime
+/// (https://wiki.secondlife.com/wiki/LlGetTime): the time starts over when the script is reset. Halcyon
 /// (ExecutionScheduler ScriptSetTimer, DoStateTransitionAndFindEventHandler, EnableScript/InjectScript, AfterDisable)
 /// where SL says nothing.
 /// <para>

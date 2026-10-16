@@ -76,6 +76,122 @@ public class LandManagementModuleTests : OpenSimTestCase
         }
     }
 
+    private sealed class ParcelFixture
+    {
+        public readonly UUID OwnerId = TestHelpers.ParseTail(0x1);
+        public readonly LandManagementModule Module = new LandManagementModule();
+        public readonly Scene Scene = new SceneHelpers().SetupScene();
+        public readonly TestClient Client;
+        public readonly ILandObject Parcel;
+        public int Stores;
+
+        public ParcelFixture()
+        {
+            SceneHelpers.SetupSceneModules(Scene, Module);
+            // No PermissionsModule is loaded, so the parcel permission checks allow the owner's edits.
+            Client = new TestClient(SceneHelpers.GenerateAgentData(OwnerId), Scene);
+
+            ILandObject lo = new LandObject(OwnerId, false, Scene);
+            lo.SetLandBitmap(
+                lo.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
+            Parcel = Module.AddLandObject(lo);
+
+            // The scene stores a parcel whenever this event fires.
+            Scene.EventManager.OnLandObjectAdded += _ => Stores++;
+        }
+
+        public void SendAccessList(AccessList list, UUID transaction, params UUID[] agents)
+        {
+            List<LandAccessEntry> entries = new();
+            foreach (UUID agent in agents)
+                entries.Add(new LandAccessEntry { AgentID = agent, Flags = list, Expires = 0 });
+            Module.ClientOnParcelAccessListUpdateRequest(
+                OwnerId, (uint)list, transaction, Parcel.LandData.LocalID, entries, Client);
+        }
+
+        public LandData Current => Module.GetLandObject(0, 0).LandData;
+    }
+
+    // The viewer's Access and Ban tabs send the list as one request, and the region stores the parcel as a result.
+    // Without that, the list is held in memory only and is gone after a restart.
+    [Theory]
+    [InlineData(AccessList.Ban, ParcelFlags.UseBanList)]
+    [InlineData(AccessList.Access, ParcelFlags.UseAccessList)]
+    public void TestAccessListUpdateIsStored(AccessList list, ParcelFlags flag)
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        UUID target = TestHelpers.ParseTail(0x2);
+
+        f.SendAccessList(list, UUID.Random(), target);
+
+        Assert.Contains(f.Current.ParcelAccessList, e => e.AgentID.Equals(target) && e.Flags == list);
+        Assert.NotEqual(0u, f.Current.Flags & (uint)flag);
+        Assert.True(f.Stores > 0, "the parcel was not stored after the list update");
+    }
+
+    [Fact]
+    public void TestClearingTheBanListIsStored()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        f.SendAccessList(AccessList.Ban, UUID.Random(), TestHelpers.ParseTail(0x2));
+        f.Stores = 0;
+
+        // The viewer clears a list by sending one entry with a zero agent id.
+        f.SendAccessList(AccessList.Ban, UUID.Random(), UUID.Zero);
+
+        Assert.DoesNotContain(f.Current.ParcelAccessList, e => e.Flags == AccessList.Ban);
+        Assert.Equal(0u, f.Current.Flags & (uint)ParcelFlags.UseBanList);
+        Assert.True(f.Stores > 0, "the cleared list was not stored");
+    }
+
+    private static LandUpdateArgs PropertiesSave(LandData data, uint parcelFlags)
+    {
+        return new LandUpdateArgs
+        {
+            ParcelFlags = parcelFlags,
+            Name = data.Name,
+            Desc = data.Description,
+            MediaURL = data.MediaURL,
+            MusicURL = data.MusicURL,
+            MediaType = data.MediaType,
+        };
+    }
+
+    // Every tab of the viewer's parcel floater but Access sends the whole flag word at the value it cached, and the
+    // viewer has no control for the ban list's on/off flag, so a save can arrive with the flag cleared while the
+    // parcel still holds bans. Taking the word as it comes would leave bans that are stored but no longer enforced.
+    [Fact]
+    public void TestPropertiesSaveOmittingUseBanListPreservesBanFlag()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        f.SendAccessList(AccessList.Ban, UUID.Random(), TestHelpers.ParseTail(0x2));
+        Assert.NotEqual(0u, f.Current.Flags & (uint)ParcelFlags.UseBanList);
+
+        f.Parcel.UpdateLandProperties(
+            PropertiesSave(f.Current, f.Current.Flags & ~(uint)ParcelFlags.UseBanList), f.Client, out _, out _);
+
+        Assert.NotEqual(0u, f.Current.Flags & (uint)ParcelFlags.UseBanList);
+    }
+
+    // The ban flag is restored only for a parcel that holds a ban, and no other list flag is managed this way: a
+    // parcel with an access list may be saved with the flag off (public access on, list kept).
+    [Fact]
+    public void TestPropertiesSaveDoesNotInventListFlags()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        f.SendAccessList(AccessList.Access, UUID.Random(), TestHelpers.ParseTail(0x2));
+
+        f.Parcel.UpdateLandProperties(
+            PropertiesSave(f.Current, f.Current.Flags & ~(uint)ParcelFlags.UseAccessList), f.Client, out _, out _);
+
+        Assert.Equal(0u, f.Current.Flags & (uint)ParcelFlags.UseAccessList);
+        Assert.Equal(0u, f.Current.Flags & (uint)ParcelFlags.UseBanList);
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>

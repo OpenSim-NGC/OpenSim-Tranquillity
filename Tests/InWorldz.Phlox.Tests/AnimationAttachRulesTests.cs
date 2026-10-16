@@ -19,12 +19,14 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// Which animations a script may start, and the attach, detach and unsit rules.
-/// <para>Starting an animation (SL wiki llStartAnimation): anim is "an item in the inventory of the prim this script is
-/// in or built-in animation", and "If anim is missing from the prim's inventory then an error is shouted on
-/// DEBUG_CHANNEL". Halcyon and YEngine both say "Do NOT try to parse UUID, animations cannot be triggered by ID"
+/// <para>Starting an animation (SL wiki llStartAnimation, https://wiki.secondlife.com/wiki/LlStartAnimation): anim
+/// names either a built-in animation or one stored in inventory of the script's own prim, and when anim is not in
+/// that prim's inventory the script shouts an error on DEBUG_CHANNEL. Halcyon and YEngine both say "Do NOT try to
+/// parse UUID, animations cannot be triggered by ID"
 /// (YEngine LSL_Api.llStartAnimation). The stop forms keep accepting a key, as in YEngine.</para>
-/// <para>llAttachToAvatar appends (SL: "Attach points can be occupied by multiple attachments"; "If the object is
-/// already attached the function fails silently"). llDetachFromAvatar needs the owner's PERMISSION_ATTACH (Halcyon
+/// <para>llAttachToAvatar appends (SL, https://wiki.secondlife.com/wiki/LlAttachToAvatar: an attach point can hold
+/// several attachments; on an object that is already attached the call fails without any message). llDetachFromAvatar
+/// needs the owner's PERMISSION_ATTACH (Halcyon
 /// llDetachFromAvatar). llUnSit has no owner-stands-self case (SL, Halcyon, YEngine).</para>
 /// </summary>
 // No test reaches a network service. No process-wide state: the class runs in parallel.

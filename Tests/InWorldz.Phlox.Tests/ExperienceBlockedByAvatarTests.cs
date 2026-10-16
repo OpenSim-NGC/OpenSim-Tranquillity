@@ -1,4 +1,4 @@
-/* Copyright (c) Legion Builds
+/* Copyright (c) 2026 Legion Builds
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -25,8 +25,9 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// An avatar blocking an Experience ends the grants that avatar gave to that Experience's scripts. SL wiki
-/// experience_permissions_denied, "When the experience can no longer run": "The agent has blocked the experience from the
-/// experience profile." The core's ExperienceModule clears the item's grant, posts experience_permissions_denied with
+/// experience_permissions_denied (https://wiki.secondlife.com/wiki/Experience_permissions_denied), in its section on
+/// an experience that can no longer run: the agent blocked that experience via the experience profile. The core's
+/// ExperienceModule clears the item's grant, posts experience_permissions_denied with
 /// XP_ERROR_NOT_PERMITTED (4) and raises EventManager.OnExperiencePermissionsRevoked; Phlox then ends what it keeps for the
 /// grant as it does when the land ends it (the controls taken, the grant noted for the saved state, a request still
 /// waiting), and tells the script nothing more. Grants under other Experiences and other avatars' grants stay.

@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using OpenMetaverse;
@@ -234,8 +241,9 @@ default
     [Fact]
     public void UpdatingAMissingKeyCreatesIt()
     {
-        // wiki llUpdateKeyValue: "will not generate XP_ERROR_KEY_NOT_FOUND. Instead, it will generate a new key with the
-        // specified value, as if you had used llCreateKeyValue." NGC's update answers "missing", so Phlox creates.
+        // wiki llUpdateKeyValue (https://wiki.secondlife.com/wiki/LlUpdateKeyValue): a missing key does not give
+        // XP_ERROR_KEY_NOT_FOUND; the call makes a new key holding the given value, just as llCreateKeyValue would.
+        // NGC's update answers "missing", so Phlox creates.
         using var r = Ask(new FakeStore(), @"
         ask(llUpdateKeyValue(""x"", ""new"", FALSE, """"), ""unchecked"");
         ask(llUpdateKeyValue(""y"", ""new"", TRUE, ""whatever""), ""checked"");
@@ -329,7 +337,8 @@ default
     [Fact]
     public void KeysStopsAt4096Characters()
     {
-        // wiki llKeysKeyValue: fewer keys than asked "if ... the result list exceeds 4096 characters".
+        // wiki llKeysKeyValue (https://wiki.secondlife.com/wiki/LlKeysKeyValue): fewer keys than asked come back
+        // when the result list would go over 4096 characters.
         var store = new FakeStore();
         var d = store.Data.GetOrAdd(Exp, _ => new SortedDictionary<string, string>(StringComparer.Ordinal));
         for (int i = 0; i < 10; i++) d["k" + i + new string('x', 998)] = "v";   // 1000 characters each
@@ -411,8 +420,9 @@ default
     }
 
     // ── A script with no Experience (as SL) ──
-    // wiki (each call): "For this function to work, the script must be compiled into an Experience."; llGetExperienceErrorMessage:
-    // XP_ERROR_NO_EXPERIENCE | 5 | "This script is not associated with an experience." Phlox's own names keep the owner id.
+    // wiki (each call): the function only works when the script is compiled into an Experience; llGetExperienceErrorMessage
+    // (https://wiki.secondlife.com/wiki/LlGetExperienceErrorMessage): XP_ERROR_NO_EXPERIENCE is 5, and its text says the script
+    // has no experience associated with it. Phlox's own names keep the owner id.
 
     [Theory]
     [InlineData("never")]
@@ -458,9 +468,10 @@ default
     }
 
     // ── SL's value limit ──
-    // wiki llCreateKeyValue / llUpdateKeyValue: "As of Jan 1, 2016 maximum bytes is 1011 for key and 4095 for value for both
-    // LSO and Mono scripts."; over it XP_ERROR_INVALID_PARAMETERS (3), "One of the string arguments was too big to fit in the
-    // key-value store." Bytes are UTF-8: 2048 x "é" is 4096 bytes.
+    // wiki llCreateKeyValue / llUpdateKeyValue (https://wiki.secondlife.com/wiki/LlCreateKeyValue): since Jan 1,
+    // 2016 a key may be
+    // 1011 bytes and a value 4095 bytes, in both LSO and Mono scripts; over that the result is XP_ERROR_INVALID_PARAMETERS (3),
+    // whose message says a string argument was too large for the key-value store. Bytes are UTF-8: 2048 x "é" is 4096 bytes.
 
     private const string BuildValues = @"
         string x = ""x""; integer i;

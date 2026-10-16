@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 // Scratch harness around Halcyon's iwStringCodec/CodecUtil (HalcyonCodec.cs, extracted verbatim).
 // Runs on .NET Framework 4.8.1 (the entry assembly declares v4.7.1, Halcyon's TargetFrameworkVersion).
 // Writes golden vectors as JSON lines. C# 5 (the in-box csc).

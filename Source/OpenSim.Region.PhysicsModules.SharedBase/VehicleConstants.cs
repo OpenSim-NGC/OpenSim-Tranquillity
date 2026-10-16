@@ -55,6 +55,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * The InWorldz float parameters and flags, with the numbers InWorldz scripts send, come from the
+ * InWorldz Halcyon code, under the Halcyon notice above: OpenSim/Region/Physics/Manager/Vehicle/FloatParams.cs and
+ * VehicleFlags.cs (Halcyon commit 3125cc15fc).
+ * Adapted 2026 by Legion Builds
+ */
+
 using OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModules.SharedBase;

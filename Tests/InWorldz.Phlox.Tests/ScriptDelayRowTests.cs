@@ -1,6 +1,10 @@
 /*
  * Phlox Script Engine tests
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 using System;
@@ -15,9 +19,9 @@ using Clock = InWorldz.Phlox.Util.Clock;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// llEmail's 20 s delay applies with or without an email module (SL: "This function causes the script to sleep for
-/// 20.0 seconds"; Halcyon sleeps in a finally, LSLSystemAPI.cs:3944-3957). llSoundPreload, which SL deprecated in
-/// favour of llPreloadSound, preloads without llPreloadSound's 1 s delay (Halcyon: no delay,
+/// llEmail's 20 s delay applies with or without an email module (SL, https://wiki.secondlife.com/wiki/LlEmail: the call
+/// makes the script sleep for 20.0 seconds; Halcyon sleeps in a finally, LSLSystemAPI.cs:3944-3957). llSoundPreload,
+/// which SL deprecated in favour of llPreloadSound, preloads without llPreloadSound's 1 s delay (Halcyon: no delay,
 /// LSLSystemAPI.cs:4050-4057, "documented to have no delay").
 /// <para>A delay is the script's ScriptSleep: the call sets the script Sleeping with its wake-up that far ahead. The
 /// clock is read, not frozen (the delays are seconds apart from any test noise), so no process-wide state is touched

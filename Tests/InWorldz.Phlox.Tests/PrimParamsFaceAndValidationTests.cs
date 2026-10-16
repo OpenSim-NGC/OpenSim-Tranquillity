@@ -1,6 +1,6 @@
 /*
+ * Copyright (c) 2026 Legion Builds
  * Copyright (c) Contributors, http://opensimulator.org/
- * Copyright (c) Legion Builds
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,8 +47,10 @@ namespace InWorldz.Phlox.Tests;
 /// - The per-face reads give one group per face for ALL_SIDES and nothing for a face the prim lacks (Halcyon
 ///   GetPrimParams; SL: ALL_SIDES returns one entry per face).
 /// - A multi-prim llGetLinkPrimitiveParams lists each rule for every prim before the next rule (Halcyon).
-/// - Names are cut to 63 characters ("The name is limited to 63 characters"), descriptions to 127 bytes ("The prim
-///   description is limited to 127 bytes"), by llSetObjectName, llSetObjectDesc, PRIM_NAME and PRIM_DESC.
+/// - Names are cut to 63 characters and descriptions to 127 bytes (the limits stated on the SL wiki pages
+///   https://wiki.secondlife.com/wiki/LlSetObjectName and https://wiki.secondlife.com/wiki/LlSetObjectDesc), by
+///   llSetObjectName,
+///   llSetObjectDesc, PRIM_NAME and PRIM_DESC.
 /// </summary>
 // Calls the API directly on the harness prim; no clock and no process-wide state, so the class runs in parallel.
 public class PrimParamsFaceAndValidationTests

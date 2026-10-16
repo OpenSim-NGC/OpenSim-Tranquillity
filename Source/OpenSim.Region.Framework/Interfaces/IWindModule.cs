@@ -29,6 +29,17 @@ using OpenMetaverse;
 
 namespace OpenSim.Region.Framework.Interfaces;
 
+/// <summary>
+/// How a wind setter treats a cell. The values are those of the LSL constants WIND_SPEED_DEFAULT,
+/// WIND_SPEED_FIXED and WIND_SPEED_TERRAIN_TURBULENCE.
+/// </summary>
+public enum WindConstants : int
+{
+    WindSpeedDefault = 0,
+    WindSpeedFixed = 1,
+    WindSpeedTurbulence = 2,
+}
+
 public interface IWindModule : INonSharedRegionModule
 {
 
@@ -36,6 +47,15 @@ public interface IWindModule : INonSharedRegionModule
     /// Retrieves the current wind speed at the given Region Coordinates
     /// </summary>
     Vector3 WindSpeed(int x, int y, int z);
+
+    /// <summary>
+    /// Sets (or unsets) the wind at the given region coordinates, for the wind plugins that support it.
+    /// The plugin treats the setting as in-memory state: it is not kept across a region restart.
+    /// </summary>
+    /// <param name="type">A <see cref="WindConstants"/> value</param>
+    /// <param name="loc">Region coordinates; the cell containing them is changed</param>
+    /// <param name="speed">The wind to hold in the cell when the type is fixed</param>
+    void WindSet(int type, Vector3 loc, Vector3 speed);
 
     /// <summary>
     /// Set Wind Plugin Parameter

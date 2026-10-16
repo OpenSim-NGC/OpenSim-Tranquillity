@@ -1,6 +1,10 @@
 /*
  * Phlox Script Engine tests
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
 using System;
@@ -17,10 +21,11 @@ using Xunit;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// Object chat is cut to SL's limits before anyone hears it. llSay (SL wiki): "msg can be a maximum of 1024 bytes"
-/// and "If a multibyte character ends up on the 1024 byte boundary, it is discarded and not split into invalid bytes";
-/// llShout, llWhisper and llRegionSayTo state the same 1024 bytes. llRegionSay: "If msg is longer than 1024 characters
-/// it is truncated to 1024 characters." A run-time error goes llSay's way, so it is cut as llSay.
+/// Object chat is cut to SL's limits before anyone hears it. llSay (SL wiki, https://wiki.secondlife.com/wiki/LlSay):
+/// msg is capped at 1024 bytes, and a multibyte character that lands on the 1024-byte boundary is discarded instead
+/// of being split into invalid bytes; llShout, llWhisper and llRegionSayTo state the same 1024 bytes. llRegionSay
+/// (https://wiki.secondlife.com/wiki/LlRegionSay): a msg longer than 1024 characters is cut down to 1024 characters.
+/// A run-time error goes llSay's way, so it is cut as llSay.
 /// </summary>
 // No test reaches a network service. Test grouping: no process-wide state, so the class runs in parallel.
 public class ChatLengthCapTests

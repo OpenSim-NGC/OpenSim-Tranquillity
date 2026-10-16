@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -57,9 +64,11 @@ public class DataserverQueryKeyTests
     public void RequestUsernameReturnsTheEventsKey() => Run(c => $"llRequestUsername(\"{c.AgentId}\")");
 
     /// <summary>
-    /// SL wiki llRequestUsername: "If id is not the UUID of an avatar, the dataserver event is not raised."
-    /// llRequestDisplayName: "If the request fails for any reason, there will be no error notice or dataserver
-    /// event." The script asks about a key no account has, and only once that call has returned asks about an
+    /// SL wiki llRequestUsername (https://wiki.secondlife.com/wiki/LlRequestUsername): when id is not an avatar's
+    /// UUID, no dataserver event is raised. llRequestDisplayName
+    /// (https://wiki.secondlife.com/wiki/LlRequestDisplayName): a request that fails, whatever the cause, gives
+    /// neither an error notice nor a dataserver event. The script asks about a key no account has, and only once that
+    /// call has returned asks about an
     /// avatar in the region. Events are queued in the order they are posted, so once the second answer has
     /// arrived, an answer to the first can no longer come.
     /// </summary>

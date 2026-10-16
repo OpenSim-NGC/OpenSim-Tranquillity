@@ -1,4 +1,4 @@
-/* Copyright (c) Legion Builds
+/* Copyright (c) 2026 Legion Builds
  *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -23,8 +23,9 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// An Experience its owner has disabled, or one that has been suspended, as the script sees it. SL wiki
-/// llGetExperienceErrorMessage: XP_ERROR_EXPERIENCE_DISABLED (8) "The experience owner has temporarily disabled the
-/// experience."; XP_ERROR_EXPERIENCE_SUSPENDED (9) "The experience has been suspended by Linden Lab customer support."
+/// llGetExperienceErrorMessage (https://wiki.secondlife.com/wiki/LlGetExperienceErrorMessage):
+/// XP_ERROR_EXPERIENCE_DISABLED (8), the owner has disabled the experience for the time being;
+/// XP_ERROR_EXPERIENCE_SUSPENDED (9), Linden Lab customer support has suspended it.
 /// llRequestExperiencePermissions is refused with that code, and llGetExperienceDetails reports it as the state, as
 /// YEngine does (LSL_Api.llRequestExperiencePermissions and llGetExperienceDetails: disabled first, then suspended).
 /// The state is the Experience service's at the call.
@@ -229,8 +230,9 @@ public class ExperienceStateTests
     [Fact]
     public void AnExperienceTheServiceCannotLookUpIsRefusedWithNotFound()
     {
-        // SL wiki llGetExperienceErrorMessage, XP_ERROR_NOT_FOUND (6): "The sim was unable to verify the validity of the
-        // experience. Retrying after a short wait is advised."
+        // SL wiki llGetExperienceErrorMessage (https://wiki.secondlife.com/wiki/LlGetExperienceErrorMessage),
+        // XP_ERROR_NOT_FOUND (6): the sim could not confirm that the experience is valid; the page advises trying
+        // again after a short wait.
         using var r = new Rig(0);
         r.Service.LookupFails = true;
         Assert.Equal(r.Denied(6), r.Request());
@@ -241,8 +243,8 @@ public class ExperienceStateTests
     [Fact]
     public void AnExperienceTheServiceDoesNotKnowIsRefusedWithInvalidExperience()
     {
-        // SL wiki llGetExperienceErrorMessage, XP_ERROR_INVALID_EXPERIENCE (7): "The script is associated with an
-        // experience that no longer exists."
+        // SL wiki llGetExperienceErrorMessage (https://wiki.secondlife.com/wiki/LlGetExperienceErrorMessage),
+        // XP_ERROR_INVALID_EXPERIENCE (7): the script is tied to an experience that has ceased to exist.
         using var r = new Rig(0);
         r.Service.Unknown = true;
         Assert.Equal(r.Denied(7), r.Request());

@@ -387,6 +387,14 @@ public class WindModule : IWindModule
         }
     }
 
+    /// <summary>
+    /// Set the wind at the given region coordinates, if the active wind plugin supports it.
+    /// </summary>
+    public void WindSet(int type, Vector3 loc, Vector3 speed)
+    {
+        m_activeWindPlugin?.WindSet(type, loc, speed);
+    }
+
     public void WindParamSet(string plugin, string param, float value)
     {
         if (m_availableWindPlugins.ContainsKey(plugin))

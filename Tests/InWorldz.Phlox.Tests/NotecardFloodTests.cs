@@ -22,11 +22,11 @@ using Clock = InWorldz.Phlox.Util.Clock;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// Notecard readers that ask for the next line from their dataserver handler, alone and sharing a prim. SL (dataserver):
-/// "Dataserver requests will trigger dataserver events in all scripts within the same prim where the request was
-/// made", "dataserver events will not be triggered in scripts contained in other prims in the same linked object";
-/// (Category:LSL_Events): "If more that 64 events are waiting, new events are discarded until free slots become
-/// available." Every case reports, per script, the events it received, its highest queue depth, the events dropped
+/// Notecard readers that ask for the next line from their dataserver handler, alone and sharing a prim. SL (dataserver,
+/// https://wiki.secondlife.com/wiki/Dataserver): a request raises dataserver events in every script of the prim it was made
+/// from, and in no script of another prim of the same linked object; (Category:LSL_Events,
+/// https://wiki.secondlife.com/wiki/Category:LSL_Events): if more than 64 events are waiting, new ones are discarded until slots
+/// free up. Every case reports, per script, the events it received, its highest queue depth, the events dropped
 /// (summed from the queue-full log lines), the requests it made and whether it reached EOF.
 /// Time is the engine's clock, moved by the test (see <see cref="Rig.RunUntil"/>); the clock and the log are
 /// process-wide, hence "phlox-state".
@@ -401,7 +401,8 @@ public class NotecardFloodTests
         return r.Now - start;
     }
 
-    // SL (llGetNotecardLine): "causes the script to sleep for 0.1 seconds". 20 lines and the EOF answer are 21 calls.
+    // SL (llGetNotecardLine, https://wiki.secondlife.com/wiki/LlGetNotecardLine): the call makes the script sleep 0.1 seconds.
+    // 20 lines and the EOF answer are 21 calls.
     [Fact]
     public void ATwentyLineReadTakesAtLeastTwoSecondsOfEngineTimeByDefault()
     {
@@ -637,7 +638,8 @@ public class NotecardFloodTests
             Assert.Contains("R three 3 EOF", r.H.Said);
             Assert.Contains("R three 100 EOF", r.H.Said);
             Assert.Contains("R empty 0 EOF", r.H.Said);
-            // SL (llGetNotecardLine): "If notecard contains embedded inventory items (such as textures and landmarks), EOF will be returned"
+            // SL (llGetNotecardLine, https://wiki.secondlife.com/wiki/LlGetNotecardLine): a notecard with embedded inventory
+            // items, for example textures and landmarks, makes the call give EOF
             Assert.Contains("R embedded 0 EOF", r.H.Said);
             Assert.Contains("R embedded 1 EOF", r.H.Said);
             Assert.Contains("R embedded 5 EOF", r.H.Said);

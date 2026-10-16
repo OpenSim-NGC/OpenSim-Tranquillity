@@ -55,6 +55,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * Parts of this file come from the InWorldz Halcyon vehicle code, under the Halcyon notice above:
+ * InWorldz/InWorldz.PhysxPhysics/Vehicle/VehicleDynamics.cs (Halcyon commit 3125cc15fc) lines 84-85 (the mouselook and
+ * banking angle limits), 239-296 (the parameter ranges), 1710-1720 (the defaults) and 1806-1844 and 1886-1924 (the
+ * values of the two InWorldz vehicle types).
+ * Adapted 2026 by Legion Builds
+ */
+
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;

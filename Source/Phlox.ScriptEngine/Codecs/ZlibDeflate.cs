@@ -1,3 +1,44 @@
+/* zlib.h -- interface of the 'zlib' general purpose compression library
+  version 1.2.13, October 13th, 2022
+
+  Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
+
+  This software is provided 'as-is', without any express or implied
+  warranty.  In no event will the authors be held liable for any damages
+  arising from the use of this software.
+
+  Permission is granted to anyone to use this software for any purpose,
+  including commercial applications, and to alter it and redistribute it
+  freely, subject to the following restrictions:
+
+  1. The origin of this software must not be misrepresented; you must not
+     claim that you wrote the original software. If you use this software
+     in a product, an acknowledgment in the product documentation would be
+     appreciated but is not required.
+  2. Altered source versions must be plainly marked as such, and must not be
+     misrepresented as being the original software.
+  3. This notice may not be removed or altered from any source distribution.
+
+  Jean-loup Gailly        Mark Adler
+  jloup@gzip.org          madler@alumni.caltech.edu
+
+
+  The data format used by the zlib library is described by RFCs (Request for
+  Comments) 1950 to 1952 in the files http://tools.ietf.org/html/rfc1950
+  (zlib format), rfc1951 (deflate format) and rfc1952 (gzip format).
+*/
+
+/* deflate.c -- compress data using the deflation algorithm
+ * Copyright (C) 1995-2022 Jean-loup Gailly and Mark Adler
+ * For conditions of distribution and use, see copyright notice in zlib.h
+ */
+
+/* trees.c -- output deflated data using Huffman coding
+ * Copyright (C) 1995-2021 Jean-loup Gailly
+ * detect_data_type() function provided freely by Cosmin Truta, 2006
+ * For conditions of distribution and use, see copyright notice in zlib.h
+ */
+
 /*
  * Raw deflate, byte for byte as zlib 1.2.13 writes it with level 6, windowBits -15, memLevel 8 and the
  * default strategy: deflate_slow, longest_match, fill_window (deflate.c) and the block and Huffman code
@@ -13,6 +54,9 @@
  * 1. The origin of this software must not be misrepresented; 2. Altered source versions must be plainly
  * marked as such, and must not be misrepresented as being the original software; 3. This notice may not
  * be removed or altered from any source distribution. This file is an altered (ported) version.
+ *
+ * This file is an altered (ported) version of deflate.c and trees.c from zlib 1.2.13; the zlib notices above stay with it.
+ * Adapted 2026 by Legion Builds
  */
 
 using System;

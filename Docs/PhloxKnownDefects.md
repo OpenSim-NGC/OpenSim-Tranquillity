@@ -46,9 +46,8 @@ SL behaviour is cited from the SL wiki (`https://wiki.secondlife.com/wiki/<Page>
 
 ### Run-time errors
 - Errors are said on DEBUG_CHANNEL with the prefix `Script error: `. Scripts listening on
-  DEBUG_CHANNEL hear them as far as `llSay` reaches (20 m by default), as SL documents:
-  "Server-generated errors are broadcast the same distance as llSay"
-  ([DEBUG_CHANNEL](https://wiki.secondlife.com/wiki/DEBUG_CHANNEL)). Viewers show them only to
+  DEBUG_CHANNEL hear them as far as `llSay` reaches (20 m by default), as SL documents (the DEBUG_CHANNEL page says errors the server generates are broadcast as far as `llSay` carries;
+  [DEBUG_CHANNEL](https://wiki.secondlife.com/wiki/DEBUG_CHANNEL)). Viewers show them only to
   the object's owner. An error is cut to 1024 bytes, as `llSay` text is.
 - The errors Phlox gives in YEngine's words, without the prefix (`llHTTPRequest`'s refused
   headers and MIME types, the outbound URL filter), reach YEngine's listens at the same
@@ -83,8 +82,7 @@ SL behaviour is cited from the SL wiki (`https://wiki.secondlife.com/wiki/<Page>
   the listens in that avatar's attachments (the avatar itself sees it on channel 0).
 - Empty chat (`llSay(5, "")`) reaches listeners, as it does on YEngine.
 - Chat is cut before anyone hears it. `llSay`, `llShout`, `llWhisper` and `llRegionSayTo` send
-  at most 1024 bytes of UTF-8 ([LlSay](https://wiki.secondlife.com/wiki/LlSay): "msg can be a
-  maximum of 1024 bytes"); a character the cut would split is dropped whole. `llRegionSay` sends
+  at most 1024 bytes of UTF-8 ([LlSay](https://wiki.secondlife.com/wiki/LlSay) gives 1024 bytes as the longest message); a character the cut would split is dropped whole. `llRegionSay` sends
   at most 1024 characters ([LlRegionSay](https://wiki.secondlife.com/wiki/LlRegionSay)). YEngine
   does not cut what scripted listeners hear.
 
@@ -265,8 +263,7 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   said chat from the bot's position once the bot is there. A script that was stopped stays
   stopped. It starts fresh when its source changes, and when it is reset.
 - **What does not.** `llGetStartParameter` is 0 after a restart or a crossing, as SL documents
-  ([LlGetStartParameter](https://wiki.secondlife.com/wiki/LlGetStartParameter): "The start
-  parameter does not survive region restarts ... or region change"); a rez gives it the rez's
+  ([LlGetStartParameter](https://wiki.secondlife.com/wiki/LlGetStartParameter) says the start parameter is not kept across a region restart or a change of region); a rez gives it the rez's
   parameter.
 - **Rows that cannot be read.** A saved row that cannot be decoded is moved to the
   `script_state_rejected` table of the state database and the script starts fresh, as
@@ -308,10 +305,7 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - a region crossing, also into a region of another simulator process; its start parameter
     is then 0.
 
-  The SL wiki ([State](https://wiki.secondlife.com/wiki/State)): "A script will NOT
-  automatically re-enter the default state state_entry event when the task is rezzed or
-  attached (even by a new owner), nor if the task is moved to another SIM, nor on SIM
-  restart." Carried state is used before the state database's row; carried state saved for
+  The SL wiki ([State](https://wiki.secondlife.com/wiki/State)) says a script does not run the default state's `state_entry` event again on its own after a rez or an attach (a new owner included), a move to another region, or a simulator restart. Carried state is used before the state database's row; carried state saved for
   another asset (the script was edited) gives way to the row.
 
   What the script is told on arrival, once, after `state_entry` or the event it was in the
@@ -388,7 +382,7 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   and its scripts carry on there: the held events run in order, each once, the timer comes
   back with the time it had left, and the sensor repeat starts again. Scripts of other
   objects are not held. The SL wiki says nothing about events during a crossing; it says
-  events are "queued FIFO" and that when a script is paused "pending events are preserved"
+  events are queued first in, first out, and that pending events are kept while a script is paused
   ([LSL Events](https://wiki.secondlife.com/wiki/Category:LSL_Events)).
 
   Before this hold, an event that reached the object during a crossing ran in the region it
@@ -416,7 +410,7 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   granter, the mask, and the object's owner then) and puts it back when the script is
   restored. The SL wiki does not say what happens to a grant across a restart, rez or
   crossing; [llRequestPermissions](https://wiki.secondlife.com/wiki/LlRequestPermissions)
-  says only "Permissions persist across state changes".
+  says only that permissions stay in place across state changes.
   - From the region's own state database (a restart): the grant comes back whole, when the
     object's owner is still the owner saved with it. Otherwise nothing comes back. A grant
     still waiting for its granter when the state was saved is decided as carried state
@@ -442,8 +436,8 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     granter.
   - Detaching into inventory loses take controls and control camera, as the simulator
     removes them before it saves the object (SL: a script loses `PERMISSION_TAKE_CONTROLS`
-    "on reset, or if the object is deleted, detached, or dropped",
-    [llTakeControls](https://wiki.secondlife.com/wiki/LlTakeControls)). A logout and login
+    when it is reset or when the object is deleted, detached or dropped;
+    see [llTakeControls](https://wiki.secondlife.com/wiki/LlTakeControls)). A logout and login
     or a teleport keeps them, and the controls are taken again.
   - The records of taken controls and of `PERMISSION_SILENT_ESTATE_MANAGEMENT` act only
     while the item holds their grant, and wait with a grant that waits.
@@ -454,8 +448,8 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
     owner, or the script leaves the region (derez, crossing, teleport): an answer that comes
     later does nothing, and posts no event. The SL wiki says so for
     [llRequestExperiencePermissions](https://wiki.secondlife.com/wiki/LlRequestExperiencePermissions)
-    ("Outstanding permission requests will be lost if the script is de-rezzed, moved to
-    another region, or reset"); the llRequestPermissions page says nothing on it, and the
+    (a request still outstanding is lost if the script is derezzed, moved to
+    another region or reset); the llRequestPermissions page says nothing on it, and the
     same rule is applied.
   - A grant from an Experience: when `llRequestExperiencePermissions` grants (the agent
     allowed the Experience before, the Experience is trusted here, or the agent accepts the
@@ -485,13 +479,12 @@ These are facts about Phlox's compiler. Where SL's rule is known, it is cited.
   - A grant from an Experience ends when its granter enters a parcel where the Experience
     cannot run: the estate blocks it, or neither allows nor trusts it. The script loses the
     grant and the controls it took, and gets `experience_permissions_denied` with
-    `XP_ERROR_NOT_PERMITTED_LAND` (17), as SL lists under "The experience can no longer run":
-    "The agent has moved to a parcel where the experience cannot run"
+    `XP_ERROR_NOT_PERMITTED_LAND` (17), as SL lists it among the reasons the experience can no longer run: the agent entered a parcel on which the experience is not allowed to run
     ([experience_permissions_denied](https://wiki.secondlife.com/wiki/Experience_permissions_denied)).
   - When an avatar blocks an Experience from its profile, the simulator ends every grant that
     avatar gave to a script of that Experience and posts `experience_permissions_denied` with
-    `XP_ERROR_NOT_PERMITTED` (4), as SL lists: "The agent has blocked the experience from the
-    experience profile". The script gets that event once, loses the controls it took, and a
+    `XP_ERROR_NOT_PERMITTED` (4), as SL lists: the agent has blocked the experience through the agent's
+    experience profile. The script gets that event once, loses the controls it took, and a
     region restart does not give the grant back. A request the script is still waiting on from
     that avatar ends with that one answer. The same avatar's grants to scripts of other
     Experiences, and other avatars' grants, stay.
@@ -596,7 +589,7 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   While the touch is held, `touch()` repeats every 100 ms, as Halcyon did; the viewer's grab updates only change the
   data the next repeat carries, and `touch_end` stops it. A script whose state has `touch()` but no `touch_start` or
   `touch_end` repeats the same way, and a child prim with such a script takes its own touch, as SL's `touch()` is
-  "Triggered on touch start, each minimum event delay while held, and touch end"
+  triggered when a touch starts, again after each minimum event delay while it is held, and when it ends
   ([Touch](https://wiki.secondlife.com/wiki/Touch)). YEngine raises `touch()` once for each grab update the viewer
   sends.
 - `llDetectedGroup` compares the group captured with the event, so it still answers after the avatar or object has
@@ -605,9 +598,9 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - `llGroundSlope`, `llGroundNormal` and `llGroundContour` give Halcyon's values: the slope is the heightmap
   triangle's downhill vector, not normalised, with a negative z on sloped ground (its length gives the steepness);
   the normal is `<slope.x, slope.y, 1.0>`; the contour is `<-slope.y, slope.x, 0>`. YEngine normalises all three.
-  The SL wiki says of `llGroundNormal`: "This function does not return a unit vector."
+  The SL wiki says the vector `llGroundNormal` returns is not of unit length ([LlGroundNormal](https://wiki.secondlife.com/wiki/LlGroundNormal)).
 - `llApplyImpulse` in an attachment pushes the wearer, as in YEngine and Halcyon. `llApplyRotationalImpulse` in an
-  attachment does nothing, as the SL wiki says ("It does not work on attachments"); Halcyon turned the wearer.
+  attachment does nothing, as the SL wiki says ([LlApplyRotationalImpulse](https://wiki.secondlife.com/wiki/LlApplyRotationalImpulse): it has no effect in attachments); Halcyon turned the wearer.
 - `llApplyImpulse` pauses for the physics throttle (`PhysicsThrottle`) after every call, also a call that does
   nothing, as Halcyon did; YEngine does not pause. This is deliberate. An impulse with a NaN or infinite component is
   dropped; it used to reach the object or the wearer.
@@ -616,7 +609,7 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   neighbouring region is kept. YEngine passes the target on unchanged. This is deliberate.
 - `llSetStatus` with `STATUS_ROTATE_X`, `_Y` or `_Z` locks or frees the axis it names, for the whole object from any
   of its prims, and `llGetStatus` reads it back, as YEngine does. The SL wiki gives the values 0x002, 0x004 and 0x008
-  and says "all prims in an object share the same status"
+  and says every prim of an object has the same status
   ([LlSetStatus](https://wiki.secondlife.com/wiki/LlSetStatus)). Phlox used to write other bits, so locking X did
   nothing, Y locked X and Z locked Y, and a call from a child prim locked nothing.
 - `llGetForce` and `llGetTorque` return the force and torque `llSetForce` and `llSetTorque` last stored on the
@@ -625,7 +618,7 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - `llGetAccel` gives the object's acceleration, and `ZERO_VECTOR` in an attachment or a child prim, as the SL wiki
   says ([LlGetAccel](https://wiki.secondlife.com/wiki/LlGetAccel)); YEngine gives the prim's own value there.
   `llGetOmega` gives the root's angular velocity, the physical spin or what `llTargetOmega` set, also in a child prim
-  ("Returns the omega of the root if called in a child prim",
+  (the page says it returns the root's omega when called from a child prim;
   [LlGetOmega](https://wiki.secondlife.com/wiki/LlGetOmega)); YEngine gives the calling prim's. Both used to give
   `ZERO_VECTOR`.
 - `llGetVel` in an attachment gives the wearer's velocity (the seat object's when the wearer sits), as YEngine and
@@ -636,14 +629,11 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   number of casts refused since that script's warning before:
   `[PhloxAPI]: llCastRay refused for script <item id> in <object>; refused casts since its last warning: <count>; reason: <reason>`.
   Before, every refused cast wrote its own line, so a script casting in a loop could write thousands a second.
-- `llPushObject` with `local` TRUE turns the impulse by the target's rotation, avatar or object, as the SL wiki says:
-  "if TRUE uses the local axis of target, if FALSE uses the region axis"
+- `llPushObject` with `local` TRUE turns the impulse by the target's rotation, avatar or object, as the SL wiki says: with `local` TRUE the target's own axes are used, with FALSE the region's axes
   ([LlPushObject](https://wiki.secondlife.com/wiki/LlPushObject)). YEngine does the same. A local push on an avatar
-  used to be turned by the pushing prim's rotation. `ang_impulse` is not applied to an avatar ("ang_impulse is
-  ignored when applying to agents or their attachments"), and Phlox does not apply it to objects either.
+  used to be turned by the pushing prim's rotation. `ang_impulse` is not applied to an avatar (the same page says the `ang_impulse` argument is ignored for agents and their attachments), and Phlox does not apply it to objects either.
 - `llPushObject` on land where pushing is restricted, by the parcel's Restrict Pushing or by the region's setting:
-  an object may push its owner, and so an attachment may push its wearer, as the SL wiki says: "In no-push areas an
-  object can only push its owner or itself." Phlox used to refuse it. Pushing another avatar there still works only
+  an object may push its owner, and so an attachment may push its wearer, as the SL wiki says ([LlPushObject](https://wiki.secondlife.com/wiki/LlPushObject)): where pushing is not allowed, an object may push only its owner or itself. Phlox used to refuse it. Pushing another avatar there still works only
   for an object owned by the land's owner or by the estate owner or an estate manager, and on a region that restricts
   pushing, an avatar with no parcel under it can only be pushed by its own objects. YEngine allows an object to push its
   owner on both settings, but refuses when the region restricts pushing and finds no parcel; YEngine also lets any
@@ -687,15 +677,15 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   `llRequestExperiencePermissions` answers `experience_permissions_denied` with
   `XP_ERROR_EXPERIENCE_DISABLED` (8) or `XP_ERROR_EXPERIENCE_SUSPENDED` (9), and 8 when both
   apply, before the land or the avatar is looked at. `llGetExperienceDetails` gives the same code
-  and its message as the state. The SL wiki gives the codes ("The experience owner has temporarily
-  disabled the experience.", "The experience has been suspended by Linden Lab customer support.",
+  and its message as the state. The SL wiki gives the codes (the experience's owner has turned it off for the time being; Linden Lab customer support has suspended it;
   [llGetExperienceErrorMessage](https://wiki.secondlife.com/wiki/LlGetExperienceErrorMessage)) but
   not when they are raised; YEngine raises them in the same places and order. The state is read
   from the Experience service at each call. When the service cannot answer, the request is refused
-  with `XP_ERROR_NOT_FOUND` (6), "The sim was unable to verify the validity of the experience."
+  with `XP_ERROR_NOT_FOUND` (6), with the message the SL page lists for it (the simulator could not verify that the
+  experience is valid).
   An Experience the service answers it does not know is refused with
-  `XP_ERROR_INVALID_EXPERIENCE` (7), "The script is associated with an experience that no longer
-  exists."
+  `XP_ERROR_INVALID_EXPERIENCE` (7), with the message the SL page lists for it (the script belongs to an
+  experience that no longer exists).
   - A grant a script already holds ends when its Experience is disabled or suspended, whether or
     not the script makes another call. Nothing tells a region of the change (the owner's edit is
     stored by the Experience service, a suspension is set there alone), so the region reads the
@@ -717,17 +707,17 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
 - Start-up events come in SL's order: `state_entry` (a new script), then `on_rez`, then
   `attach` (an attachment worn from inventory), then `changed(CHANGED_REGION_START)`, which every
   script started by the region's start gets, new or restored. YEngine posts them in the same order.
-- A state change, as the SL wiki's [State](https://wiki.secondlife.com/wiki/State) page lists it: "The event queue is
-  cleared.", "All listens are released." and "Repeating sensors are released." After the `state` statement the only
+- A state change, as the SL wiki's [State](https://wiki.secondlife.com/wiki/State) page lists it: the event queue is
+  emptied, all listens are removed and repeating sensors are stopped. After the `state` statement the only
   handler of the old state that runs is `state_exit`, then the new state's `state_entry`. An event posted to the
   script before the statement, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the
   old state while the state changes, is dropped: it runs neither in the old state's handler nor in the new state.
   Phlox used to run such an event after the statement, now and then, when a sensor sweep or a listen delivery was
-  under way at that moment. The timer carries on into the new state, as the SL wiki says of `llSetTimerEvent`: "The
-  timer persists across state changes".
-- A reset, as the SL wiki's [llResetScript](https://wiki.secondlife.com/wiki/LlResetScript) page lists it: "Timers
-  (including repeating sensors) are cleared.", "Listeners are removed.", "The event queue is cleared." and "If it has
-  a state_entry event, then it is queued." This holds for every reset: `llResetScript`, `llResetOtherScript`,
+  under way at that moment. The timer carries on into the new state, as the SL wiki says of `llSetTimerEvent` ([LlSetTimerEvent](https://wiki.secondlife.com/wiki/LlSetTimerEvent)): the
+  timer stays set across a state change.
+- A reset, as the SL wiki's [llResetScript](https://wiki.secondlife.com/wiki/LlResetScript) page lists it: timers
+  (repeating sensors included) are cleared, listeners are removed, the event queue is emptied, and a
+  `state_entry` event is queued if the script has one. This holds for every reset: `llResetScript`, `llResetOtherScript`,
   `osResetAllScripts`, the viewer's Reset, a reset asked for while the script is still compiling, and starting a
   crashed script again. The fresh script's first event is its `state_entry`. An event posted to the script before
   the reset, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the old script while
@@ -862,9 +852,6 @@ name) promises.
   `llMakeSmoke` and `llMakeFire` shout "Command deprecated".
 - `llParcelMediaCommandList` and `llParcelMediaQuery` reject the parameters they do not
   handle.
-- `iwSetWind` shouts "Command not implemented: iwSetWind" on `DEBUG_CHANNEL` when its owner is an estate manager
-  or a god (the callers Halcyon let set the wind); for anyone else it does nothing. The region's wind module has no
-  way to set the wind at a point.
 
 ### Functions that return a fixed value
 | Function | Returns |
@@ -938,8 +925,7 @@ such list.
 - `iwStandTarget` and `iwLinkStandTarget` set the stand offset, which is saved with the object;
   the rotation is ignored.
 - `llSetForce` and `llSetForceAndTorque` in an attachment, physical or not, set a constant force on the wearer
-  ([LlSetForce](https://wiki.secondlife.com/wiki/LlSetForce): "Used on an attachment, it will apply the force to the
-  avatar"). The avatar holds it and hands it to the physics engine (`PhysicsActor.SetConstantForce`), which is to
+  ([LlSetForce](https://wiki.secondlife.com/wiki/LlSetForce) says that used in an attachment it applies the force to the avatar). The avatar holds it and hands it to the physics engine (`PhysicsActor.SetConstantForce`), which is to
   apply it on every step; a local force (`local` TRUE) is in the avatar's own axes and turns with the avatar. A new
   call from any attachment replaces it and `ZERO_VECTOR` ends it. As in Halcyon, detaching the object or resetting or
   removing the script does not end it, so a script that should stop pushing when taken off sets `ZERO_VECTOR` in its

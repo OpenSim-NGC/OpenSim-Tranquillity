@@ -17,10 +17,11 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// Several scripts in one prim each read the same notecard one line per dataserver event, and one of them sleeps for
-/// part of its read: every reader finishes, with none of its own lines lost. SL (dataserver): "Dataserver requests
-/// will trigger dataserver events in all scripts within the same prim where the request was made", so every reader also
-/// gets every other reader's answers; SL (Category:LSL_Events): "If more that 64 events are waiting, new events are
-/// discarded until free slots become available." While the sleeper sleeps, the others' answers queue up to half its
+/// part of its read: every reader finishes, with none of its own lines lost. SL (dataserver,
+/// https://wiki.secondlife.com/wiki/Dataserver): a request raises dataserver events in every script of the prim it was made
+/// from, so every reader also gets every other reader's answers; SL (Category:LSL_Events,
+/// https://wiki.secondlife.com/wiki/Category:LSL_Events): if more than 64 events are waiting, new ones are discarded until slots
+/// free up. While the sleeper sleeps, the others' answers queue up to half its
 /// limit (32) and the rest of them are dropped; its own answer arrives straight after its own request and is kept.
 /// This guards the notecard read delays: with a 0.1 s pause after each read the others are still reading when the
 /// sleeper wakes, its own answer arrives while its queue is full of theirs, and its read stops.

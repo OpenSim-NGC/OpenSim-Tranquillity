@@ -13,13 +13,14 @@ using static InWorldz.Phlox.Tests.InventoryGivesRig;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// Money: llGiveMoney transfers through the region's IMoneyModule and always returns 0, with no sleep (SL llGiveMoney:
-/// "Returns an integer that is always zero", forced delay 0.0; YEngine LSL_Api.llGiveMoney). llTransferLindenDollars
-/// answers with transaction_result(key, success, data) (SL; Halcyon LSLSystemAPI.cs:3083-3085), with Halcyon's checks
-/// and error tags (:3018-3089); iwGiveMoney returns the transaction id or the tag, with no event (:3096-3100).
-/// llSetPayPrice writes the root prim's prices, hides the buttons the list leaves out and marks the object changed
-/// (Halcyon :13348-13362, YEngine LSL_Api.llSetPayPrice); from a child prim it does nothing (SL: "Calling it from a
-/// child prim has no effect"; YEngine ignores it too).
+/// Money: llGiveMoney transfers through the region's IMoneyModule and always returns 0, with no sleep (SL llGiveMoney,
+/// https://wiki.secondlife.com/wiki/LlGiveMoney: the integer it returns is always zero; forced delay 0.0; YEngine
+/// LSL_Api.llGiveMoney). llTransferLindenDollars answers with transaction_result(key, success, data) (SL; Halcyon
+/// LSLSystemAPI.cs:3083-3085), with Halcyon's checks and error tags (:3018-3089); iwGiveMoney returns the transaction
+/// id or the tag, with no event (:3096-3100). llSetPayPrice writes the root prim's prices, hides the buttons the list
+/// leaves out and marks the object changed (Halcyon :13348-13362, YEngine LSL_Api.llSetPayPrice); from a child prim it
+/// does nothing (SL llSetPayPrice, https://wiki.secondlife.com/wiki/LlSetPayPrice: a call made from a child prim does
+/// not do anything; YEngine ignores it too).
 /// </summary>
 // No test reaches a network service: the money module is an in-memory recorder.
 // Test grouping: no process-wide state, so the class runs in parallel.

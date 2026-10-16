@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections;
 using System.Collections.Concurrent;
@@ -415,10 +422,11 @@ public class ScriptCleanupTests
     /// A sensor sweep already under way when the script changes state. The sensor plugin holds its repeater lock for the
     /// whole pass (CheckSenseRepeaterEvents -> SensorSweep -> PostScriptEvent), and the state change's release of the
     /// sensor (LSLSystemAPI ReleaseScriptResources -> SensorRepeat.RemoveScript) waits for that lock. The sweep's
-    /// no_sensor must not run after the state statement, in either state. SL State: "The event queue is cleared."
-    /// "Repeating sensors are released." A helper thread stands in for the sweep: it holds the plugin's lock, waits (no
-    /// clock) until the state change has begun - the release drops the script's listens before it reaches the sensor -
-    /// posts the no_sensor as SensorSweep does, and lets go.
+    /// no_sensor must not run after the state statement, in either state. SL State
+    /// (https://wiki.secondlife.com/wiki/State): a state change empties the event queue and releases repeating sensors. A
+    /// helper thread stands in for the sweep: it holds the plugin's lock, waits (no clock) until the state change has begun
+    /// - the release drops the script's listens before it reaches the sensor - posts the no_sensor as SensorSweep does, and
+    /// lets go.
     /// </summary>
     [Fact]
     public void ASweepUnderWayAtAStateChangeDoesNotReachTheNewState()
@@ -551,9 +559,10 @@ public class ScriptCleanupTests
     }
 
     /// <summary>
-    /// What a state change keeps: the timer goes on into the new state (SL llSetTimerEvent: "The timer persists across
-    /// state changes"), and state_exit then state_entry run once each, in that order, also with a sensor repeat, a listen
-    /// and an event waiting at the change.
+    /// What a state change keeps: the timer goes on into the new state (SL llSetTimerEvent,
+    /// https://wiki.secondlife.com/wiki/LlSetTimerEvent: a timer carries over from one state to the next), and state_exit
+    /// then state_entry run once each, in that order, also with a sensor repeat, a listen and an event waiting at the
+    /// change.
     /// </summary>
     [Fact]
     public void TheTimerAndTheStateEventsSurviveTheStateChange()
@@ -582,10 +591,11 @@ public class ScriptCleanupTests
     }
 
     /// <summary>
-    /// A line of chat delivered while a reset is under way does not reach the fresh script. SL llResetScript: "Listeners
-    /// are removed." "The event queue is cleared." "If it has a state_entry event, then it is queued." The listen
-    /// manager's test hook delivers the line at the moment the reset starts to release the script's listens, as a
-    /// delivery on another thread can; the fresh script's state_entry runs first and once, and the line never runs.
+    /// A line of chat delivered while a reset is under way does not reach the fresh script. SL llResetScript
+    /// (https://wiki.secondlife.com/wiki/LlResetScript): listeners are removed, the event queue is emptied, and a
+    /// state_entry event, if the script has one, is queued. The listen manager's test hook delivers the line at the moment
+    /// the reset starts to release the script's listens, as a delivery on another thread can; the fresh script's
+    /// state_entry runs first and once, and the line never runs.
     /// </summary>
     [Fact]
     public void AListenDeliveryUnderWayAtAResetDoesNotReachTheFreshScript()
@@ -619,11 +629,12 @@ public class ScriptCleanupTests
     }
 
     /// <summary>
-    /// A sensor sweep under way when the owner resets the script (the viewer's Reset, the queued path) does not reach
-    /// the fresh script. SL llResetScript: "Timers (including repeating sensors) are cleared." "The event queue is
-    /// cleared." A helper thread stands in for the sweep, as in the state change test: it holds the sensor plugin's lock,
-    /// waits (no clock) until the reset has released the listens, posts a no_sensor and an event a caller waits on, and
-    /// lets go. state_entry runs first and once; the no_sensor never runs; the waiter is not left waiting.
+    /// A sensor sweep under way when the owner resets the script (the viewer's Reset, the queued path) does not reach the
+    /// fresh script. SL llResetScript (https://wiki.secondlife.com/wiki/LlResetScript): timers, repeating sensors among
+    /// them, are cleared, and the event queue is emptied. A helper thread stands in for the sweep, as in the state change
+    /// test: it holds the sensor plugin's lock, waits (no clock) until the reset has released the listens, posts a
+    /// no_sensor and an event a caller waits on, and lets go. state_entry runs first and once; the no_sensor never runs;
+    /// the waiter is not left waiting.
     /// </summary>
     [Fact]
     public void ASweepUnderWayAtAResetDoesNotReachTheFreshScript()
@@ -698,9 +709,10 @@ public class ScriptCleanupTests
     /// delete and add them, and the scripts call llListenRemove. A listen delivery posts while it holds the listen
     /// manager's lock, which the state change, the reset, llListenRemove and the unload take to release a listen, so this
     /// checks that none of them freezes against a delivery: every thread, the scheduler's pump included, must finish
-    /// inside its limit. And no listen of the state a script left is heard after its state statement (SL State: "All
-    /// listens are released."), and no line heard before a reset runs in the fresh script before its state_entry (SL
-    /// llResetScript: "Listeners are removed." "The event queue is cleared.").
+    /// inside its limit. And no listen of the state a script left is heard after its state statement (SL State,
+    /// https://wiki.secondlife.com/wiki/State: all listens are released), and no line heard before a reset runs in the
+    /// fresh script before its state_entry (SL llResetScript, https://wiki.secondlife.com/wiki/LlResetScript: listeners are
+    /// removed and the event queue is emptied).
     /// </summary>
     [Fact]
     public void ListensUnderAChatFloodWithStateChangesResetsAndRemovals()
@@ -875,8 +887,9 @@ public class ScriptCleanupTests
     /// <summary>
     /// A response to another engine's request that Phlox's pump happens to take is not dropped. It goes to that
     /// engine as YEngine's pump sends it (PhloxCrossEngineHttpResponseTests proves the delivery with YEngine running).
-    /// Phlox's own scripts in the prim get it too, once: SL - "triggered in all scripts in the prim, not just in the
-    /// requesting script" (they once did not, as YEngine's pump never gave them one).
+    /// Phlox's own scripts in the prim get it too, once: SL (https://wiki.secondlife.com/wiki/Http_response) says the event
+    /// fires in every script of the prim, not only in the one that made the request (they once did not, as YEngine's pump
+    /// never gave them one).
     /// </summary>
     [Fact]
     public void AnotherEnginesResponseIsNotDropped()

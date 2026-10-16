@@ -1,6 +1,6 @@
 /*
+ * Copyright (c) 2026 Legion Builds
  * Copyright (c) Contributors, http://opensimulator.org/
- * Copyright (c) Legion Builds
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,21 +42,24 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// Positions, rotations, scale and forces:
-/// - llSetScale does nothing on a physical prim (SL wiki llSetScale: "Does not work on physical prims."); otherwise
-///   it still rounds each component into [0.01, 64.0].
+/// - llSetScale does nothing on a physical prim (SL wiki llSetScale, https://wiki.secondlife.com/wiki/LlSetScale:
+///   physical prims are unsupported); otherwise it still rounds each component into [0.01, 64.0].
 /// - llGetPos and PRIM_POSITION of a child prim in an attachment: its offset turned by the wearer's rotation plus the
 ///   wearer's position (Halcyon GetSLCompatiblePosition).
-/// - llSetRot in a child prim is offset by the root's rotation (SL: "If the prim is not the root prim it is offset by
-///   the root's rotation"), and the rotation is normalised; llSetLocalRot normalises too.
+/// - llSetRot in a child prim is shifted by the root's rotation (SL llSetRot page,
+///   https://wiki.secondlife.com/wiki/LlSetRot: a prim other than the root gets the root's rotation applied as an
+///   offset), and the rotation is normalised; llSetLocalRot normalises too.
 /// - llApplyImpulse from an attachment pushes the wearer (Halcyon and YEngine); llApplyRotationalImpulse from one
-///   does nothing (SL: "It does not work on attachments.").
+///   does nothing (SL llApplyRotationalImpulse page, https://wiki.secondlife.com/wiki/LlApplyRotationalImpulse:
+///   attachments are not supported).
 /// - llSetForce and llSetForceAndTorque from an attachment, physical or not, set a constant force on the wearer
-///   (SL: "Used on an attachment, it will apply the force to the avatar"); a local force keeps its frame for the
-///   engine to turn with the avatar, a new call replaces it and a zero force ends it. Detaching does not end it
-///   (Halcyon SceneObjectGroup.SetForce). An unattached object behaves as before.
+///   (SL llSetForce page, https://wiki.secondlife.com/wiki/LlSetForce: in an attachment the force acts on the avatar);
+///   a local force keeps its frame for the engine to turn with the avatar, a new call replaces it and a zero force
+///   ends it. Detaching does not end it (Halcyon SceneObjectGroup.SetForce). An unattached object behaves as before.
 /// - llMoveToTarget keeps a target with no region beyond the edge inside the region (Halcyon).
-/// - llLookAt points +Z at the target with +Y level and +X below the horizon (SL: "keeping its forward axis
-///   (positive x) below the horizon"); straight above or below keeps the current turn.
+/// - llLookAt points +Z at the target with +Y level and +X below the horizon (SL llLookAt page,
+///   https://wiki.secondlife.com/wiki/LlLookAt: the forward axis, positive x, is kept below the horizon); straight above or
+///   below keeps the current turn.
 /// - llEdgeOfWorld: TRUE for a zero direction ("TRUE is always returned"), and whatever the direction's length.
 /// </summary>
 // Calls the API directly on the harness prims; no clock and no process-wide state, so the class runs in parallel.

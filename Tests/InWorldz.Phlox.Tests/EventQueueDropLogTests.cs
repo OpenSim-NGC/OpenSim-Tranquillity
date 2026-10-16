@@ -19,8 +19,9 @@ using Clock = InWorldz.Phlox.Util.Clock;
 namespace InWorldz.Phlox.Tests;
 
 /// <summary>
-/// The log line for events a full queue drops. SL (Category:LSL_Events): "If more that 64 events are waiting, new events
-/// are discarded until free slots become available"; what is dropped does not change here, only how it is logged: a run
+/// The log line for events a full queue drops. SL (https://wiki.secondlife.com/wiki/Category:LSL_Events): with more
+/// than 64 events waiting, new ones are discarded until slots free up; what is dropped does not change here, only how
+/// it is logged: a run
 /// of drops lasts until a minute passes with no drop, and writes a line when it starts, then one a minute with how many
 /// of each kind were dropped since the line before, and the rest when the script is unloaded. The engine's clock is moved by the test only when nothing can run, and the log is captured
 /// through LoggerProvider; both are process-wide, hence "phlox-state".

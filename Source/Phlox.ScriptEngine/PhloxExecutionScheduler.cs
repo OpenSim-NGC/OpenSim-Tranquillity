@@ -1,4 +1,34 @@
 /*
+ * Copyright (c) 2015, InWorldz Halcyon Developers
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ * 
+ *   * Redistributions of source code must retain the above copyright notice, this
+ *     list of conditions and the following disclaimer.
+ * 
+ *   * Redistributions in binary form must reproduce the above copyright notice,
+ *     this list of conditions and the following disclaimer in the documentation
+ *     and/or other materials provided with the distribution.
+ * 
+ *   * Neither the name of halcyon nor the names of its
+ *     contributors may be used to endorse or promote products derived from
+ *     this software without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/*
  * Phlox Script Engine Integration
  * Adapted from InWorldz Halcyon ExecutionScheduler.cs
  * Copyright (c) InWorldz Halcyon Developers (original)
@@ -558,13 +588,16 @@ namespace Phlox.ScriptEngine
         /// <summary>
         /// The changed() bits a script's start brings, from the state source the core starts it with, or 0.
         /// <list type="bullet">
-        /// <item>RegionStart: CHANGED_REGION_START, to every script ("The region this object is in has just come
-        /// online").</item>
+        /// <item>RegionStart: CHANGED_REGION_START, to every script (wiki,
+        /// https://wiki.secondlife.com/wiki/CHANGED_REGION_START: the object's region has only just come
+        /// online).</item>
         /// <item>PrimCrossing (an object crossing, or a worn object crossing with its wearer) and Teleporting (worn objects
         /// arriving with a wearer who teleported): CHANGED_REGION, and CHANGED_TELEPORT for an attachment, as one event
-        /// (YEngine XMRInstCtor: CHANGED_REGION | CHANGED_TELEPORT). SL wiki CHANGED_REGION: "The object has changed region
-        /// by crossing a region boundary (or by teleporting, if attached). This event only occurs in the root prim of a
-        /// linkset"; CHANGED_TELEPORT: "This event only occurs in the root prim of an attachment". So a script in a child
+        /// (YEngine XMRInstCtor: CHANGED_REGION | CHANGED_TELEPORT). SL wiki CHANGED_REGION
+        /// (https://wiki.secondlife.com/wiki/CHANGED_REGION): the object crossed a region boundary (or teleported,
+        /// when attached), and the event is limited to a linkset's root prim; CHANGED_TELEPORT
+        /// (https://wiki.secondlife.com/wiki/CHANGED_TELEPORT): likewise limited to an attachment's root prim. So a
+        /// script in a child
         /// prim gets neither. The teleport bit goes to an attachment only: the core also starts an unworn object's
         /// scripts as Teleporting when the object's owner is in the region and arrived there by teleport
         /// (EntityTransferModule.GetStateSource asks the owner's presence for any object).</item>
@@ -786,7 +819,8 @@ namespace Phlox.ScriptEngine
             }
             script.SetScriptEventFlags();
 
-            // SL llResetScript: "The event queue is cleared", and with it what was posted to the script and not yet taken
+            // SL llResetScript (https://wiki.secondlife.com/wiki/LlResetScript): the event queue is emptied, and with
+            // it what was posted to the script and not yet taken
             // into the queue. Dropped only now: script.Reset() has released the listens and the sensor repeat
             // (LSLSystemAPI.OnScriptReset), and that release waits for a listen delivery or a sensor sweep under way, so
             // what they posted is here. Under one lock with the fresh state_entry, so nothing gets in between.
@@ -1510,7 +1544,8 @@ namespace Phlox.ScriptEngine
 
         // ── touch() repeat while held ───────────────────────────────────────────
         //
-        // SL touch(): "Triggered on touch start, each minimum event delay while held, and touch end." Halcyon's scheduler
+        // SL touch() (https://wiki.secondlife.com/wiki/Touch): raised when a touch starts, repeated once per minimum
+        // event delay for as long as the touch lasts, and raised again when it ends. Halcyon's scheduler
         // (ExecutionScheduler.CheckAndResetTouchWait, ResetTouchInterval, ProcessTouchInfoUpdates): touch_start starts a
         // touch() every 100 ms for a script whose state has a touch() handler, carrying the latest detect data; a grab
         // update only replaces that data; touch_end stops it.
@@ -2993,7 +3028,8 @@ namespace Phlox.ScriptEngine
 				return null;
 			if (evt.TransitionToState != PostedEvent.NO_TRANSITION && script.ScriptState.Enabled)
 			{
-				// SL llSetTimerEvent: "The timer persists across state changes". OnStateChange took the timer's wake
+				// SL llSetTimerEvent (https://wiki.secondlife.com/wiki/LlSetTimerEvent): a timer carries over a state
+				// change. OnStateChange took the timer's wake
 				// off the heap with the rest; the new state gets it back when it has a timer() to run, as Halcyon
 				// DoStateTransitionAndFindEventHandler does. A stopped script is re-armed when it is started.
 				PhloxEventInfo timer = script.Script.FindEvent(state, (int)SupportedEventList.Events.TIMER);

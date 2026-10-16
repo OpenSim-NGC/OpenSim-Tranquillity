@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,14 +22,16 @@ namespace InWorldz.Phlox.Tests;
 /// <summary>
 /// object_rez, email, linkset_data and osMessageObject's dataserver, raised by a Phlox script, reach every script SL names,
 /// whatever engine runs it, once each, and no other.
-/// SL wiki object_rez: "Triggers in all running scripts with an object_rez event, AND in the same prim as the script
-/// calling llRezObject or llRezAtRoot. Does NOT trigger in linked prims."
-/// SL wiki email: "The email queue is associated with the prim and any script in the prim can access it." (posted to the
+/// SL wiki object_rez (https://wiki.secondlife.com/wiki/Object_rez): it reaches every running script that has an
+/// object_rez event, AND the scripts in the prim of the script that called llRezObject or llRezAtRoot; it does NOT
+/// reach scripts in linked prims.
+/// SL wiki email (https://wiki.secondlife.com/wiki/Email): the email queue belongs to the prim, and every script in
+/// that prim has access to it. (posted to the
 /// calling script's prim, as OpenSimulator's LSL_Api does.)
-/// SL wiki linkset_data: "The linkset_data event fires in all scripts in a linkset whenever the datastore has been modified
-/// through a call to one of the llLinksetData functions."
-/// SL wiki dataserver: "Dataserver requests will trigger dataserver events in all scripts within the same prim where the
-/// request was made." OSSL osMessageObject raises it on every script of the target prim.
+/// SL wiki linkset_data (https://wiki.secondlife.com/wiki/Linkset_data): the event is raised in every script of a
+/// linkset each time the datastore is changed by any of the llLinksetData functions.
+/// SL wiki dataserver (https://wiki.secondlife.com/wiki/Dataserver): a request raises dataserver events in every
+/// script of the prim the request came from. OSSL osMessageObject raises it on every script of the target prim.
 /// The shared pieces: a three-prim linkset (links 1, 2, 3) with a Phlox driver D and a Phlox hearer P1 in link 1 and a
 /// Phlox hearer P2 in link 2. Each script says "&lt;tag&gt; &lt;event&gt; &lt;values&gt;" for every such event it gets.
 /// </summary>

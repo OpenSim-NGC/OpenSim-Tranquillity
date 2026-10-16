@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
@@ -8,7 +15,8 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// llGetAttachedList leaves out HUD attachments, as Halcyon (ScenePresence.CollectVisibleAttachmentIds,
-/// which skips IsAttachedHUD) and the SL wiki ("does not include HUD attachments") do.
+/// which skips IsAttachedHUD) and the SL wiki (https://wiki.secondlife.com/wiki/LlGetAttachedList: HUD attachments
+/// are not in the list) do.
 /// </summary>
 // No longer in "phlox-state": this class touches no process-wide state, so it runs in parallel.
 public class AttachedListTests

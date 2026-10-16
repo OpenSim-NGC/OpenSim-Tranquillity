@@ -31,6 +31,7 @@
 //   - A bot's sweep (botSensor, botSensorRepeat) keeps Halcyon's bot branches: the bot is not in its own results,
 //     and every entry, no_sensor's too, carries the bot's key for iwDetectedBot
 //   - PostScriptEvent by itemID used for sensor/no_sensor events
+// Adapted 2026 by Legion Builds
 
 using System;
 using System.Collections.Generic;
@@ -304,7 +305,8 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
                 SceneObjectPart part = sog.RootPart;
                 if (sog.AttachmentPoint != 0) continue;
 
-                // SL SCRIPTED: "objects containing any active script"; Halcyon tested the whole linkset (IsScripted)
+                // SL SCRIPTED (https://wiki.secondlife.com/wiki/LlDetectedType): objects with at least one active
+                // script; Halcyon tested the whole linkset (IsScripted)
                 if (sog.ContainsScripts())
                     objtype |= ACTIVE | SCRIPTED;
                 else if (part.Velocity.Equals(ZeroVector))
