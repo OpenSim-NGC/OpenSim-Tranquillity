@@ -867,8 +867,8 @@
     ;;
     ;; How often, in minutes, to re-resolve the name so a dynamic-DNS address
     ;; change takes effect without restarting Robust. 0 disables the refresh.
-    ;; Default 30. The operating system caches answers for a few minutes, so a
-    ;; change can take a little longer than this to show. A failed lookup is
+    ;; Default 30. Each answer is also cached for 5 minutes after its last use,
+    ;; so a value under 5 does not find a change any sooner. A failed lookup is
     ;; logged as a warning and the previous address is kept.
     ; ExternalIPRefreshMinutes = 30
 
