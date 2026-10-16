@@ -607,7 +607,8 @@
 
     ;; Minutes between repeated lookups of the host names in Addresses, so a dynamic-DNS change takes effect
     ;; without a restart. 0 never repeats. A failed lookup keeps the last good address, and until a name has been
-    ;; looked up successfully its viewers are given today's address. Default 30.
+    ;; looked up successfully its viewers are given today's address. Each answer is also cached for 5 minutes
+    ;; after its last use, so a value under 5 does not find a change any sooner. Default 30.
     ; RefreshMinutes = 30
 
 
