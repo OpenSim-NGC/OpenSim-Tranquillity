@@ -822,6 +822,15 @@
 
 
 [EntityTransfer]
+    ;# {ScriptRezzedObjectsDieAtEdge} {} {Start objects rezzed by a script with STATUS_DIE_AT_EDGE set (Second Life's default).} {false true} false
+    ;; Second Life gives an object rezzed by a script (llRezObject, llRezAtRoot) STATUS_DIE_AT_EDGE = TRUE, so that it is
+    ;; deleted, not returned, when it goes off the world. When true, an object rezzed by a script is deleted when it
+    ;; reaches a region edge with no neighbouring region; it still crosses into a neighbouring region as usual. The
+    ;; script can clear this with llSetStatus(STATUS_DIE_AT_EDGE, FALSE). When false, nothing changes.
+    ;; STATUS_DIE_AT_EDGE and STATUS_RETURN_AT_EDGE set by a script are honoured whatever this is set to, and act at
+    ;; every region crossing.
+    ;ScriptRezzedObjectsDieAtEdge = false
+
     ;# {DisableInterRegionTeleportCancellation} {} {Determine whether the cancel button is shown at all during teleports.} {false true} false
     ;; This option exists because cancelling at certain points can result in an unuseable session (frozen avatar, etc.)
     ;; Disabling cancellation can be okay in small closed grids where all teleports are highly likely to suceed.

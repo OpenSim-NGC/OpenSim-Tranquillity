@@ -233,6 +233,14 @@ public partial class Scene : SceneBase
     /// </summary>
     public bool DisableObjectTransfer { get; set; }
 
+    /// <summary>
+    /// When true, an object rezzed by a script (llRezObject, llRezAtRoot) is deleted, not returned, when it reaches a
+    /// region edge with no neighbouring region (SceneObjectGroup.DieAtVoidEdge), as the llSetStatus documentation
+    /// describes for STATUS_DIE_AT_EDGE. It crosses into a neighbouring region as usual. The script can clear it with
+    /// llSetStatus. Off by default.
+    /// </summary>
+    public bool ScriptRezzedObjectsDieAtEdge { get; set; }
+
     public bool m_useFlySlow;
     public bool m_useTrashOnDelete = true;
 
@@ -1120,6 +1128,7 @@ public partial class Scene : SceneBase
         {
             AllowAvatarCrossing = entityTransferConfig.GetBoolean("AllowAvatarCrossing", AllowAvatarCrossing);
             DisableObjectTransfer = entityTransferConfig.GetBoolean("DisableObjectTransfer", false);
+            ScriptRezzedObjectsDieAtEdge = entityTransferConfig.GetBoolean("ScriptRezzedObjectsDieAtEdge", false);
         }
 
         #region Interest Management

@@ -2569,7 +2569,8 @@ public class SceneObjectPart : EntityBase, IDisposable
         if (ParentGroup.IsDeleted)
             return false;
 
-        return ParentGroup.RootPart.DIE_AT_EDGE;
+        // an object rezzed by a script reports TRUE while ScriptRezzedObjectsDieAtEdge has marked it (llSetStatus)
+        return ParentGroup.RootPart.DIE_AT_EDGE || ParentGroup.DieAtVoidEdge;
     }
 
     public bool GetReturnAtEdge()
@@ -3745,6 +3746,8 @@ public class SceneObjectPart : EntityBase, IDisposable
             return;
 
         ParentGroup.RootPart.DIE_AT_EDGE = p;
+        if (!p)
+            ParentGroup.DieAtVoidEdge = false;
     }
 
     public void SetFloatOnWater(int floatYN)
