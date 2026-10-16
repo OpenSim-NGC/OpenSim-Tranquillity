@@ -73,7 +73,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
     /// <summary>
     /// Resolves (and periodically re-resolves) the public address of the gatekeeper host.
-    /// See [UserAgentService] ExternalIPResolver / ExternalIPRefreshMinutes.
+    /// See [UserAgentService] PublicAddress / ExternalIPRefreshMinutes.
     /// </summary>
     protected static ExternalIPResolver m_ExternalIPResolver;
 
@@ -125,10 +125,6 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
             m_BypassClientVerification = serverConfig.GetBoolean("BypassClientVerification", false);
 
-            // Read these before the legacy ExternalName block below, which may reassign serverConfig.
-            string externalIPResolver = serverConfig.GetString("ExternalIPResolver", string.Empty);
-            int externalIPRefreshMinutes = serverConfig.GetInt("ExternalIPRefreshMinutes", 30);
-
             if (gridService.Length == 0 || gridUserService.Length == 0 || gatekeeperService.Length == 0)
                 throw new Exception(String.Format("Incomplete specifications, UserAgent Service cannot function."));
 
@@ -169,17 +165,16 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
                     throw new Exception(String.Format("[UserAgentService] could not parse gatekeeper uri"));
                 string host = gateURI.DnsSafeHost;
 
-                // Resolve the gatekeeper's public address. With ExternalIPResolver unset this is
-                // Util.GetHostFromDNS through the OS resolver, as before; when set, the named DNS
-                // server is queried directly so a hosts-file or split-horizon override of our own
-                // hostname cannot feed a LAN address into VerifyClient's NAT fallback. The lookup is
-                // repeated every ExternalIPRefreshMinutes so a dynamic-DNS change heals without a
-                // restart. A failed lookup logs a warning and never throws here.
-                m_ExternalIPResolver = new ExternalIPResolver(host, externalIPResolver,
-                    TimeSpan.FromMinutes(externalIPRefreshMinutes), m_log);
+                // Resolve the gatekeeper's public address through the operating system resolver, as
+                // before. [UserAgentService] PublicAddress names the host (or IP address) to resolve
+                // instead of the gatekeeper host, so a grid whose own hosts file maps the gatekeeper
+                // name to a private address can name a public one. The lookup is repeated every
+                // ExternalIPRefreshMinutes so a dynamic-DNS change heals without a restart. A failed
+                // lookup logs a warning and never throws here.
+                m_ExternalIPResolver = ExternalIPResolver.FromConfig(config, host, m_log);
                 if (string.IsNullOrEmpty(m_ExternalIPResolver.CurrentIP))
-                    m_log.LogWarning("[USER AGENT SERVICE]: could not resolve gatekeeper host {0}; the NAT fallback in client verification is unavailable until a refresh succeeds",
-                        host);
+                    m_log.LogWarning("[USER AGENT SERVICE]: could not resolve {0}; the NAT fallback in client verification is unavailable until a refresh succeeds",
+                        m_ExternalIPResolver.Host);
             }
             // Finally some cleanup
             m_Database.DeleteOld();
