@@ -13,11 +13,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Tests of GatekeeperExternalAddress, which is out of the build (see the HypergridService project). -->
-    <Compile Remove="GatekeeperExternalAddressTests.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="10.0.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>

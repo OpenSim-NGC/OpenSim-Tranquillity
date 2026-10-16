@@ -28,10 +28,5 @@
   <ItemGroup>
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
   </ItemGroup>
-
-  <ItemGroup>
-    <!-- Superseded by [UserAgentService] PublicAddress (ExternalIPResolver.FromConfig); kept out of the build until it is removed. -->
-    <Compile Remove="GatekeeperExternalAddress.cs" />
-  </ItemGroup>
   
 </Project>

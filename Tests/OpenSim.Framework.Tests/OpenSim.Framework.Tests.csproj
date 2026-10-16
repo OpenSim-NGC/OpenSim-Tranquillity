@@ -14,11 +14,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Tests of the IPv6 option of PublicAddressResolver, which only the gatekeeper address used; the option is gone. -->
-    <Compile Remove="PublicAddressResolverIPv6Tests.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
