@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Text;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -109,7 +116,7 @@ public class BomAuxChannelTests
     [Fact]
     public void TheLibraryProducesAnAuxChannelOnlyForASlotThatIsPainted()
     {
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
 
         foreach (var (channel, slot, _) in Aux)
         {
@@ -127,7 +134,7 @@ public class BomAuxChannelTests
     [Fact]
     public void AllFiveAuxChannelsCompositeAndEncodeTogether()
     {
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
         var (assets, wearables, painted) = Outfit(Aux.Select(a => a.Slot).ToArray());
         Assert.Equal(5, painted.Count);
 
@@ -160,7 +167,7 @@ public class BomAuxChannelTests
     [Fact]
     public void TheOrchestratorStoresEachAuxChannelAndWritesFaces40To44()
     {
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
         var (assets, wearables, _) = Outfit(Aux.Select(a => a.Slot).ToArray());
         var avatars = new FakeAvatarService();
         var appearance = new AvatarAppearance();
@@ -197,7 +204,7 @@ public class BomAuxChannelTests
     [Fact]
     public void TheRobustRouteServesEveryAuxChannel()
     {
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
         var (assets, wearables, _) = Outfit(Aux.Select(a => a.Slot).ToArray());
         var avatars = new FakeAvatarService();
         var appearance = new AvatarAppearance();

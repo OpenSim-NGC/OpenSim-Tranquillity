@@ -1,3 +1,11 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+using OpenMetaverse;
 using Xunit;
 
 namespace OpenSimNGC.Appearance.Baking.Tests;
@@ -23,14 +31,38 @@ public class VisualParamEncoderTests
         Assert.Equal(252, VisualParamEncoder.IndexOf(Lad, 11001)); // hover, the last one
     }
 
+    /// <summary>
+    /// The byte for every parameter of avatar_lad.xml at a fine grid of values across its range (and just outside it,
+    /// where the value is clamped) is the clamped fraction of the range scaled by 255 in single precision and truncated.
+    /// </summary>
+    [Fact]
+    public void the_library_conversion_gives_the_truncated_single_precision_fraction_for_every_parameter()
+    {
+        long checkedValues = 0;
+        foreach (var p in Lad.Params.Values.Where(p => p.Max > p.Min))
+        {
+            var range = p.Max - p.Min;
+            var values = new List<float> { p.Min, p.Max, p.Default, MathF.BitIncrement(p.Min), MathF.BitDecrement(p.Max), p.Min - 1f, p.Max + 1f };
+            for (var i = 0; i <= 4096; i++) values.Add(p.Min + range * i / 4096f);
+            foreach (var v in values)
+            {
+                var clamped = Math.Clamp(v, p.Min, p.Max);
+                var expected = (byte)(((clamped - p.Min) / (p.Max - p.Min)) * 255f);
+                Assert.True(expected == Utils.FloatToByte(v, p.Min, p.Max), $"parameter {p.Id} value {v:R}");
+                checkedValues++;
+            }
+        }
+        Assert.True(checkedValues > 1_000_000, $"{checkedValues} values checked");
+    }
+
     [Fact]
     public void bytes_are_float32_truncated_like_the_viewer()
     {
-        Assert.Equal(74, VisualParamEncoder.F32ToU8(0f, -0.5f, 1.2f));   // 0.5/1.7*255 = 74.999 in float32: 74, not 75
-        Assert.Equal(255, VisualParamEncoder.F32ToU8(1f, 0f, 1f));
-        Assert.Equal(0, VisualParamEncoder.F32ToU8(-3f, 0f, 1f));         // clamped
-        Assert.Equal(51, VisualParamEncoder.F32ToU8(0.2f, 0f, 1f));
-        Assert.Equal(204, VisualParamEncoder.F32ToU8(0.8f, 0f, 1f));
+        Assert.Equal(74, Utils.FloatToByte(0f, -0.5f, 1.2f));   // 0.5/1.7*255 = 74.999 in float32: 74, not 75
+        Assert.Equal(255, Utils.FloatToByte(1f, 0f, 1f));
+        Assert.Equal(0, Utils.FloatToByte(-3f, 0f, 1f));         // clamped
+        Assert.Equal(51, Utils.FloatToByte(0.2f, 0f, 1f));
+        Assert.Equal(204, Utils.FloatToByte(0.8f, 0f, 1f));
     }
 
     [Fact]
@@ -51,14 +83,14 @@ public class VisualParamEncoderTests
         var r = VisualParamEncoder.Encode(lad, worn, carried);
         Assert.Equal(253, r.Bytes.Length);
         Assert.Equal(255, r.Bytes[idx800]);
-        Assert.Equal(VisualParamEncoder.F32ToU8(1f, lad.Params[33].Min, lad.Params[33].Max), r.Bytes[idx33]);
+        Assert.Equal(Utils.FloatToByte(1f, lad.Params[33].Min, lad.Params[33].Max), r.Bytes[idx33]);
         Assert.Equal(carried[idx608], r.Bytes[idx608]);
         Assert.Equal(2, r.FromWearables);
         Assert.Equal(251, r.Carried);
         Assert.Equal(0, r.Defaults);
 
         var noSim = VisualParamEncoder.Encode(lad, worn, null);
-        Assert.Equal(VisualParamEncoder.F32ToU8(lad.Params[608].Default, lad.Params[608].Min, lad.Params[608].Max), noSim.Bytes[idx608]);
+        Assert.Equal(Utils.FloatToByte(lad.Params[608].Default, lad.Params[608].Min, lad.Params[608].Max), noSim.Bytes[idx608]);
         Assert.Equal(251, noSim.Defaults);
 
         var wrongLength = VisualParamEncoder.Encode(lad, worn, new byte[218]);   // a stale blob is not carried

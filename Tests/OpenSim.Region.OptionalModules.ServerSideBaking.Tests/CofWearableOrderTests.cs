@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
@@ -221,7 +228,7 @@ public class CofWearableOrderTests
         const int size = 256;
         var red = UUID.Random(); var blue = UUID.Random();
         var textures = new Dictionary<UUID, RgbaPlanes> { [red] = Flat(255, 0, 0), [blue] = Flat(0, 0, 255) };
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
 
         // "@400" red, "@401" blue: blue is on top, and nothing red survives it.
         var blueOnTop = CofWearables.Derive(Empty(), new[]

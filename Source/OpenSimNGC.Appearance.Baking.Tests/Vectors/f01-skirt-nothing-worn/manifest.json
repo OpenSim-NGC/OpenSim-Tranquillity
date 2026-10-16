@@ -1,0 +1,42 @@
+{
+  "id": "F01-skirt-nothing-worn",
+  "title": "Skirt channel with no skirt worn: nothing drawn",
+  "rules": [
+    "R18"
+  ],
+  "note": "",
+  "channel": "Skirt",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": true,
+    "rgbaSha256": "62fb561c59d0cea247fc588f3311ee665375f35d8675b186e2792cb7dfcff88c",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "skirt_fabric",
+        "status": "skipped",
+        "wearable": "Skirt",
+        "detail": "no Skirt worn"
+      },
+      {
+        "layer": "skirt_fabric_alpha",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "masks [Skirt Length#858=skip, Slit Front#859=skip, Slit Back#860=skip, Slit Left#861=skip, Slit Right#862=skip]"
+      },
+      {
+        "layer": "skirt_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      }
+    ]
+  }
+}

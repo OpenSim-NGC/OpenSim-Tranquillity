@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 
 namespace OpenSimNGC.Appearance.Baking;
@@ -21,7 +28,7 @@ public static class FidelityCheck
     public sealed record WornSummary(WearableKind Kind, string Label, IReadOnlyDictionary<TextureSlot, UUID> Textures);
 
     /// <summary>Every reason the outfit cannot be baked faithfully for the given channels; empty means supported.</summary>
-    public static List<string> Check(IReadOnlyList<WornSummary> worn, TexLayerCompositor compositor, IEnumerable<BakeChannel> channels)
+    public static List<string> Check(IReadOnlyList<WornSummary> worn, AvatarBakeCompositor compositor, IEnumerable<BakeChannel> channels)
     {
         var reasons = new List<string>();
         var channelList = channels.ToList();
@@ -38,13 +45,13 @@ public static class FidelityCheck
             foreach (var (idx, id) in w.Textures)
             {
                 if (id == UUID.Zero || id == BakeConstants.DefaultAvatarTexture) continue;
-                if (TexLayerCompositor.WearableOf(idx) == WearableKind.Invalid) { reasons.Add($"{w.Label}: texture slot {idx} is unknown to the compositor"); continue; }
+                if (AvatarBakeCompositor.WearableOf(idx) == WearableKind.Invalid) { reasons.Add($"{w.Label}: texture slot {idx} is unknown to the compositor"); continue; }
                 if (!slotsInScope.Contains(idx) && idx != TextureSlot.Skirt && idx != TextureSlot.SkirtTattoo)
                     reasons.Add($"{w.Label}: texture slot {idx} is not drawn by any of the bakes being made");
             }
         }
         foreach (var file in channelList.SelectMany(compositor.ResourceFilesOf).Distinct(StringComparer.OrdinalIgnoreCase))
-            if (!compositor.Resources.Exists(file))
+            if (!compositor.Files.Exists(file))
                 reasons.Add($"bundled resource {file} is missing or unreadable");
         return reasons;
     }

@@ -1,0 +1,131 @@
+{
+  "id": "B01-upper-skin-freckles",
+  "title": "Upper body, skin with freckles driven by body freckles",
+  "rules": [
+    "R09",
+    "R12"
+  ],
+  "note": "",
+  "channel": "Upper",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skin",
+      "label": "skin",
+      "params": {
+        "150": 0.5,
+        "775": 0.8
+      },
+      "textures": []
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "ed73a2a4ebc4d64a33a5a2fcc1b5cc85febfde20050c44cd7a6392304e3cbecb",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.65,0.43,0.25,1.00); body_skingrain.tga"
+      },
+      {
+        "layer": "nipples",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "upperbody_color.tga\u002Balpha"
+      },
+      {
+        "layer": "shadow",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.00,0.00,0.00,0.25); upperbody_shading_alpha.tga (mask)"
+      },
+      {
+        "layer": "highlight",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (1.00,1.00,1.00,0.13); upperbody_highlights_alpha.tga (mask)"
+      },
+      {
+        "layer": "upper_bodypaint",
+        "status": "skipped",
+        "wearable": "Skin",
+        "detail": "skin: no UpperBodypaint texture on the wearable"
+      },
+      {
+        "layer": "freckles upper",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.47,0.18,0.08,0.50); masks [freckles upper#776=0.80\u002B]; flat fill"
+      },
+      {
+        "layer": "upper_tattoo",
+        "status": "skipped",
+        "wearable": "Tattoo",
+        "detail": "no Tattoo worn"
+      },
+      {
+        "layer": "upper_universal_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "upper_undershirt",
+        "status": "skipped",
+        "wearable": "Undershirt",
+        "detail": "no Undershirt worn"
+      },
+      {
+        "layer": "Nail Polish",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Nail Polish#710=skip]"
+      },
+      {
+        "layer": "upper_gloves",
+        "status": "skipped",
+        "wearable": "Gloves",
+        "detail": "no Gloves worn"
+      },
+      {
+        "layer": "upper_clothes_shadow",
+        "status": "skipped",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "skipped",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn"
+      },
+      {
+        "layer": "upper_jacket",
+        "status": "skipped",
+        "wearable": "Jacket",
+        "detail": "no Jacket worn"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "morph",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn: mask left at 255"
+      },
+      {
+        "layer": "upper alpha",
+        "status": "skipped",
+        "wearable": "Alpha",
+        "detail": "no Alpha worn"
+      }
+    ]
+  }
+}

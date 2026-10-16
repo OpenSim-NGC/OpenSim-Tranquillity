@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using OpenMetaverse;
@@ -157,7 +164,7 @@ public class ChangeTriggerTests
             wearables[w.GetProperty("type").GetInt32()].Add(new UUID(w.GetProperty("itemId").GetString()), new UUID(w.GetProperty("assetId").GetString()));
         var vp = doc.RootElement.GetProperty("visualParams").EnumerateArray().Select(e => (byte)e.GetInt32()).ToArray();
 
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
         var avatars = new FakeAvatarService();
         var appearance = new AvatarAppearance();
         BakeOutcome Bake(BakeReason r) => BakeOrchestrator.Run(Agent, r, wearables, vp, appearance, assets, avatars,

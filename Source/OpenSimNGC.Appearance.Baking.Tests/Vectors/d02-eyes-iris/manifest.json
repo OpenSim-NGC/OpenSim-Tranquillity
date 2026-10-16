@@ -1,0 +1,70 @@
+{
+  "id": "D02-eyes-iris",
+  "title": "Iris texture tinted by the eye colour global colour",
+  "rules": [
+    "R05",
+    "R07",
+    "R11"
+  ],
+  "note": "",
+  "channel": "Eyes",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Eyes",
+      "label": "eyes",
+      "params": {
+        "98": 0.7,
+        "99": 0.4
+      },
+      "textures": [
+        {
+          "slot": "EyesIris",
+          "generator": "gradA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-eyes-EyesIris.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "79741398652ac161aa8ca4ad5bc2151034f1383dadc476ac0fe3993dc8455c77",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "whites",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "eyewhite.tga"
+      },
+      {
+        "layer": "iris",
+        "status": "drawn",
+        "wearable": "Eyes",
+        "detail": "eyes: EyesIris 64x64\u002Balpha -\u003E 64; colour (1.00,1.00,1.00,1.00)"
+      },
+      {
+        "layer": "eyes_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "eyes alpha",
+        "status": "skipped",
+        "wearable": "Alpha",
+        "detail": "no Alpha worn"
+      }
+    ]
+  }
+}

@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -139,7 +146,7 @@ public class GoldenTests
     {
         var overlay = new Dictionary<int, float>();
         if (bytes is null || bytes.Count == 0) return overlay;
-        var list = VisualParamEncoder.SendList(new TexLayerCompositor().Lad);
+        var list = VisualParamEncoder.SendList(new AvatarBakeCompositor().Lad);
         if (bytes.Count != list.Count) return overlay;
         for (var i = 0; i < list.Count; i++)
             overlay[list[i].Id] = list[i].Min + bytes[i] / 255f * (list[i].Max - list[i].Min);
