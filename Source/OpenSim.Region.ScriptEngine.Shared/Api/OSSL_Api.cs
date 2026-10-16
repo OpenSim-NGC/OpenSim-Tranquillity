@@ -1696,12 +1696,77 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
         IWindModule module = World.RequestModuleInterface<IWindModule>();
         if (module is not null)
         {
+            // With [Weather] enabled, only an estate owner, estate manager or god may change the region's wind from a
+            // script; with it off the call is open to every script that passes the [OSSL] gate, as before.
+            if (module.WindVolumes?.Enabled == true && !WindVolumeAccess.MayChangeWind(World, m_host.OwnerID))
+                return;
+
             try
             {
                 module.WindParamSet(plugin, param, (float)value);
             }
             catch (Exception) { }
         }
+    }
+
+    /// <summary>
+    /// Creates a wind volume, a place where wind is added to the base field. The rules are pairs of a WV_ number and a
+    /// value (WindVolumeRules). Returns the handle (1 or more), or a negative WV_ERR_ code: WV_ERR_DISABLED when
+    /// [Weather] is not enabled, WV_ERR_NOT_ALLOWED unless the object's owner may issue estate commands or is a god, and
+    /// the store's errors for bad or over-cap values.
+    /// </summary>
+    public LSL_Integer osWindVolumeCreate(LSL_List rules)
+    {
+        CheckThreatLevel(ThreatLevel.High, "osWindVolumeCreate");
+
+        IWindVolumeStore store = World.RequestModuleInterface<IWindModule>()?.WindVolumes;
+        if (store is null || !store.Enabled) return WindVolumeError.Disabled;
+        if (!WindVolumeAccess.MayChangeWind(World, m_host.OwnerID)) return WindVolumeError.NotAllowed;
+
+        int bad = WindVolumeRules.TryParse(ToPlainRules(rules), out WindVolumeSpec spec);
+        if (bad != WindVolumeError.Ok) return bad;
+        return store.Create(m_host.ParentGroup.UUID, m_host.OwnerID, spec);
+    }
+
+    /// <summary>Removes a wind volume this object made: 0, or a negative WV_ERR_ code (not allowed, or no such volume).</summary>
+    public LSL_Integer osWindVolumeRemove(LSL_Integer handle)
+    {
+        CheckThreatLevel(ThreatLevel.High, "osWindVolumeRemove");
+
+        IWindVolumeStore store = World.RequestModuleInterface<IWindModule>()?.WindVolumes;
+        if (store is null || !store.Enabled) return WindVolumeError.Disabled;
+        if (!WindVolumeAccess.MayChangeWind(World, m_host.OwnerID)) return WindVolumeError.NotAllowed;
+        return store.Remove(handle, m_host.ParentGroup.UUID);
+    }
+
+    /// <summary>The handles of the wind volumes this object made, oldest first. Empty when weather is off or the owner may not use them.</summary>
+    public LSL_List osWindVolumes()
+    {
+        CheckThreatLevel(ThreatLevel.None, "osWindVolumes");
+
+        LSL_List result = new();
+        IWindVolumeStore store = World.RequestModuleInterface<IWindModule>()?.WindVolumes;
+        if (store is not null && store.Enabled && WindVolumeAccess.MayChangeWind(World, m_host.OwnerID))
+            foreach (WindVolume v in store.List(m_host.ParentGroup.UUID))
+                result.Add(new LSL_Integer(v.Id));
+        return result;
+    }
+
+    // The script list as plain objects (int, float, Vector3) for WindVolumeRules.
+    private static List<object> ToPlainRules(LSL_List rules)
+    {
+        var plain = new List<object>(rules.Length);
+        foreach (object o in rules.Data)
+        {
+            plain.Add(o switch
+            {
+                LSL_Integer i => (int)i,
+                LSL_Float f => (float)f.value,
+                LSL_Vector v => new Vector3((float)v.x, (float)v.y, (float)v.z),
+                _ => o,
+            });
+        }
+        return plain;
     }
 
     public LSL_Float osGetWindParam(string plugin, string param)
