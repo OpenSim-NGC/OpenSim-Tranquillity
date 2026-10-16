@@ -89,12 +89,12 @@ class ConfigurableWind : IWindModelPlugin
         {
             // Uses strength value if avg_strength not specified
             m_avgStrength = windConfig.GetFloat("strength", 5.0F);
-            m_avgStrength = windConfig.GetFloat("avg_strength", 5.0F);
+            m_avgStrength = WindValues.ReadFinite(windConfig, Name, "avg_strength", 5.0F, m_log);
 
-            m_avgDirection = windConfig.GetFloat("avg_direction", 0.0F);
-            m_varStrength  = windConfig.GetFloat("var_strength", 5.0F);
-            m_varDirection = windConfig.GetFloat("var_direction", 30.0F);
-            m_rateChange   = windConfig.GetFloat("rate_change", 1.0F);
+            m_avgDirection = WindValues.ReadFinite(windConfig, Name, "avg_direction", 0.0F, m_log);
+            m_varStrength  = WindValues.ReadFinite(windConfig, Name, "var_strength", 5.0F, m_log);
+            m_varDirection = WindValues.ReadFinite(windConfig, Name, "var_direction", 30.0F, m_log);
+            m_rateChange   = WindValues.ReadFinite(windConfig, Name, "rate_change", 1.0F, m_log);
 
             LogSettings();
         }

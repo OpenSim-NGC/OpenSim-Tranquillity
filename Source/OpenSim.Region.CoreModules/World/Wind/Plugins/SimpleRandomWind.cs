@@ -25,14 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Reflection;
+
+using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 
+using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 
 namespace OpenSim.Region.CoreModules.World.Wind.Plugins;
 
 class SimpleRandomWind : IWindModelPlugin
 {
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
+
     private Vector2[] m_windSpeeds = new Vector2[16 * 16];
     private float m_strength = 1.0f;
 
@@ -71,7 +77,7 @@ class SimpleRandomWind : IWindModelPlugin
         {
             if (windConfig.Contains("strength"))
             {
-                m_strength = windConfig.GetFloat("strength", 1.0F);
+                m_strength = WindValues.ReadFinite(windConfig, Name, "strength", 1.0F, m_log);
             }
         }
     }

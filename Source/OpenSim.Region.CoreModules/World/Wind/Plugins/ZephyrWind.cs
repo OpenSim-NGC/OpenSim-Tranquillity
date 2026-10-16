@@ -185,13 +185,13 @@ public class ZephyrWind : IWindModelPlugin
         if (windConfig != null)
         {
             // As in the original, the strength key of the other wind plugins does not apply here: avg_strength does.
-            m_avgWindStrength = windConfig.GetFloat("avg_strength", 5.0F);
+            m_avgWindStrength = WindValues.ReadFinite(windConfig, Name, "avg_strength", 5.0F, m_log);
 
-            m_avgWindDirection = windConfig.GetFloat("avg_direction", 0.0F);
-            m_varWindStrength  = windConfig.GetFloat("var_strength", 5.0F);
-            m_varWindDirection = windConfig.GetFloat("var_direction", 30.0F);
-            m_rateChangeAloft   = windConfig.GetFloat("rate_change_aloft", 1.0f);
-            m_rateChangeFlutter = windConfig.GetFloat("rate_change_flutter", 64.0f);
+            m_avgWindDirection = WindValues.ReadFinite(windConfig, Name, "avg_direction", 0.0F, m_log);
+            m_varWindStrength  = WindValues.ReadFinite(windConfig, Name, "var_strength", 5.0F, m_log);
+            m_varWindDirection = WindValues.ReadFinite(windConfig, Name, "var_direction", 30.0F, m_log);
+            m_rateChangeAloft   = WindValues.ReadFinite(windConfig, Name, "rate_change_aloft", 1.0f, m_log);
+            m_rateChangeFlutter = WindValues.ReadFinite(windConfig, Name, "rate_change_flutter", 64.0f, m_log);
 
             LogSettings();
         }
@@ -586,6 +586,9 @@ public class ZephyrWind : IWindModelPlugin
             case "rateChangeFlutter":
                  m_rateChangeFlutter = value;
                  break;
+            default:
+                 // Nothing changed, so nothing is logged.
+                 return;
         }
 
         LogSettings();
@@ -615,13 +618,12 @@ public class ZephyrWind : IWindModelPlugin
 
     #endregion
 
+    /// <summary>One line with every setting, written when the settings are read and once for each change.</summary>
     private void LogSettings()
     {
-        m_log.LogInformation("[{0}] Average Strength   : {1}", Name, m_avgWindStrength);
-        m_log.LogInformation("[{0}] Average Direction  : {1}", Name, m_avgWindDirection);
-        m_log.LogInformation("[{0}] Varience Strength  : {1}", Name, m_varWindStrength);
-        m_log.LogInformation("[{0}] Varience Direction : {1}", Name, m_varWindDirection);
-        m_log.LogInformation("[{0}] Rate Change        : {1}", Name, m_rateChangeAloft);
+        m_log.LogInformation(
+            "[{0}] Settings: average strength {1}, average direction {2}, strength variance {3}, direction variance {4}, rate change aloft {5}, rate change flutter {6}",
+            Name, m_avgWindStrength, m_avgWindDirection, m_varWindStrength, m_varWindDirection, m_rateChangeAloft, m_rateChangeFlutter);
     }
 }
 
