@@ -48,8 +48,8 @@ namespace InWorldz.Phlox.Tests;
 ///   https://wiki.secondlife.com/wiki/LlGroundNormal: the result is not a unit-length vector); the contour is
 ///   &lt;-slope.y, slope.x, 0&gt;. iwGroundSurfaceNormal is Halcyon's unit normal averaged over the cell's two triangles.
 /// - llWind returns no z (Halcyon and YEngine).
-/// - iwSetWind is not implemented: estate managers and gods, who could call it on InWorldz, are told so on
-///   DEBUG_CHANNEL; anyone else gets nothing, as before.
+/// - iwSetWind hands the cell at the object's position plus the offset to the region's wind module, for estate
+///   managers and gods only (Halcyon); anyone else is ignored.
 /// - PARCEL_MEDIA_COMMAND_AGENT applies the command to that agent only and leaves the parcel's media settings
 ///   (SL wiki llParcelMediaCommandList).
 /// - iwGetWorldBoundingBox gives the box in region coordinates (Halcyon).
@@ -136,29 +136,112 @@ public class TerrainWindMediaBoxTests
         Near(new Vector3(1, 2, 3), api.iwWind(Vector3.Zero));
     }
 
+    [Fact]
+    public void BothEnginesAskForTheWindAtTheHeightOfThePosition()
+    {
+        // A wind model with layers (a current under the water, the wind aloft) needs the height from llWind too.
+        using var h = new SchedulerHarness(withYEngine: true);
+        var wind = RecordWind(h);
+        var origin = h.Prim.GetWorldPosition();
+        var item = OpenSim.Tests.Common.TaskInventoryHelpers.AddScript(h.Scene.AssetService, h.Prim, UUID.Random(), UUID.Random(), "yengine-api", "default { }");
+        var yengine = new OpenSim.Region.ScriptEngine.Shared.Api.LSL_Api();
+        yengine.Initialize(h.YEngine, h.Prim, item);
+
+        Api(h).llWind(new Vector3(3, 4, -7));
+        yengine.llWind(new OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3(3, 4, -7));
+        Assert.Equal(2, wind.Asked.Count);
+        Assert.Equal(wind.Asked[0], wind.Asked[1]);
+        Assert.Equal(((int)(origin.X + 3), (int)(origin.Y + 4), (int)(origin.Z - 7)), wind.Asked[0]);
+    }
+
     // ---- iwSetWind ----
 
     private static string[] Errors(SchedulerHarness h)
         => h.SaidOn.Where(s => s.Channel == DEBUG_CHANNEL).Select(s => s.Message).ToArray();
 
+    private class RecordingWind : DispatchProxy
+    {
+        public readonly System.Collections.Generic.List<(int Type, Vector3 Loc, Vector3 Speed)> Sets = new();
+        public readonly System.Collections.Generic.List<(int X, int Y, int Z)> Asked = new();
+
+        protected override object Invoke(MethodInfo targetMethod, object[] args)
+        {
+            if (targetMethod.Name == "WindSpeed")
+                lock (Asked) Asked.Add(((int)args[0], (int)args[1], (int)args[2]));
+            if (targetMethod.Name == "WindSet")
+                lock (Sets) Sets.Add(((int)args[0], (Vector3)args[1], (Vector3)args[2]));
+            var rt = targetMethod.ReturnType;
+            return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);
+        }
+    }
+
+    private static RecordingWind RecordWind(SchedulerHarness h)
+    {
+        var proxy = DispatchProxy.Create<IWindModule, RecordingWind>();
+        h.Scene.RegisterModuleInterface<IWindModule>(proxy);
+        return (RecordingWind)(object)proxy;
+    }
+
     [Fact]
-    public void SetWindTellsAnEstateManagerItIsNotImplemented()
+    public void SetWindPassesTheCellPositionToTheWindModuleForAnEstateManager()
     {
         using var h = new SchedulerHarness();
         UUID owner = h.Prim.OwnerID;
         h.Scene.Permissions.OnIsAdministrator += id => false;
         h.Scene.Permissions.OnIssueEstateCommand += (user, ownerCommand) => user == owner;
-        Api(h).iwSetWind(0, Vector3.Zero, new Vector3(1, 0, 0));
-        Assert.Contains(Errors(h), e => e.EndsWith("Command not implemented: iwSetWind"));
+        var wind = RecordWind(h);
+        var origin = h.Prim.GetWorldPosition();
+        Api(h).iwSetWind(1, new Vector3(16, -8, 2), new Vector3(3, 4, 0));
+        var set = Assert.Single(wind.Sets);
+        Assert.Equal(1, set.Type);
+        Near(origin + new Vector3(16, -8, 2), set.Loc);
+        Near(new Vector3(3, 4, 0), set.Speed);
+        Assert.Empty(Errors(h));
     }
 
     [Fact]
-    public void SetWindIsSilentForAnyoneElse()
+    public void SetWindWorksForAGod()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID;
+        h.Scene.Permissions.OnIsAdministrator += id => id == owner;
+        h.Scene.Permissions.OnIssueEstateCommand += (user, ownerCommand) => false;
+        var wind = RecordWind(h);
+        Api(h).iwSetWind(0, Vector3.Zero, Vector3.Zero);
+        Assert.Single(wind.Sets);
+    }
+
+    [Fact]
+    public void SetWindDefaultsFormIsPassedThroughAsType0()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID;
+        h.Scene.Permissions.OnIsAdministrator += id => false;
+        h.Scene.Permissions.OnIssueEstateCommand += (user, ownerCommand) => user == owner;
+        var wind = RecordWind(h);
+        Api(h).iwSetWind(0, Vector3.Zero, new Vector3(9, 9, 9));
+        Assert.Equal(0, Assert.Single(wind.Sets).Type);
+    }
+
+    [Fact]
+    public void SetWindIsSilentAndChangesNothingForAnyoneElse()
     {
         using var h = new SchedulerHarness();
         h.Scene.Permissions.OnIsAdministrator += id => false;
         h.Scene.Permissions.OnIssueEstateCommand += (user, ownerCommand) => false;
-        Api(h).iwSetWind(0, Vector3.Zero, new Vector3(1, 0, 0));
+        var wind = RecordWind(h);
+        Api(h).iwSetWind(1, Vector3.Zero, new Vector3(1, 0, 0));
+        Assert.Empty(wind.Sets);
+        Assert.Empty(Errors(h));
+    }
+
+    [Fact]
+    public void SetWindWithoutAWindModuleDoesNothing()
+    {
+        using var h = new SchedulerHarness();
+        UUID owner = h.Prim.OwnerID;
+        h.Scene.Permissions.OnIssueEstateCommand += (user, ownerCommand) => user == owner;
+        Api(h).iwSetWind(1, Vector3.Zero, new Vector3(1, 0, 0));
         Assert.Empty(Errors(h));
     }
 

@@ -10142,15 +10142,21 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return (float)(World?.RegionInfo?.RegionSettings?.WaterHeight ?? 20.0);
         }
         /// <summary>
-        /// Not implemented: core's IWindModule has no way to set the wind at a point (Halcyon's WindSet). Halcyon let
-        /// estate managers and gods call it (:1459-1472) and ignored everyone else, so those callers are told on
-        /// DEBUG_CHANNEL; anyone else still gets nothing.
+        /// Sets the wind in the 16 m cell at the object's position plus offset, as Halcyon's iwSetWind does
+        /// (LSLSystemAPI.cs:1459-1472): only when the object's owner may issue estate commands or is a god; anyone else is ignored.
+        /// The type is WIND_SPEED_DEFAULT (back to the wind model's own wind, with terrain turbulence),
+        /// WIND_SPEED_FIXED (hold the given speed) or WIND_SPEED_TERRAIN_TURBULENCE (add the terrain's influence).
+        /// A wind model without wind setters, such as the default one, ignores the call. The setting is in memory
+        /// only and is gone after a region restart.
         /// </summary>
         public void iwSetWind(int type, Vector3 offset, Vector3 speed)
         {
             if (m_host == null || World == null) return;
-            if (World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false) || World.Permissions.IsGod(m_host.OwnerID))
-                NotImplemented("iwSetWind");
+            if (!World.Permissions.CanIssueEstateCommand(m_host.OwnerID, false) && !World.Permissions.IsGod(m_host.OwnerID))
+                return;
+            IWindModule module = World.RequestModuleInterface<IWindModule>();
+            if (module == null) return;
+            module.WindSet(type, m_host.GetWorldPosition() + offset, speed);
         }
         public Vector3 iwWind(Vector3 offset)
         {

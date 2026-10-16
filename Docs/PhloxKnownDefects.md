@@ -852,9 +852,6 @@ name) promises.
   `llMakeSmoke` and `llMakeFire` shout "Command deprecated".
 - `llParcelMediaCommandList` and `llParcelMediaQuery` reject the parameters they do not
   handle.
-- `iwSetWind` shouts "Command not implemented: iwSetWind" on `DEBUG_CHANNEL` when its owner is an estate manager
-  or a god (the callers Halcyon let set the wind); for anyone else it does nothing. The region's wind module has no
-  way to set the wind at a point.
 
 ### Functions that return a fixed value
 | Function | Returns |

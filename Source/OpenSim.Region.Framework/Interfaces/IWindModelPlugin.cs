@@ -55,6 +55,14 @@ public interface IWindModelPlugin : IPlugin
     Vector3 WindSpeed(float x, float y, float z);
 
     /// <summary>
+    /// Sets (or unsets) the wind at the given local region coordinates. A plugin without wind setters ignores it.
+    /// </summary>
+    /// <param name="type">A <see cref="WindConstants"/> value</param>
+    void WindSet(int type, Vector3 loc, Vector3 speed)
+    {
+    }
+
+    /// <summary>
     /// Generate a 16 x 16 Vector2 array of wind speeds for LL* based viewers
     /// </summary>
     /// <returns>Must return a Vector2[256]</returns>

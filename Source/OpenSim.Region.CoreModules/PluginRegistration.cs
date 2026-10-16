@@ -158,6 +158,7 @@ public class PluginRegistration : IPluginRegistryProvider
         RegisterByName(registry, "/OpenSim/RegionModules", "WorldMapModule", "OpenSim.Region.CoreModules.World.WorldMap.WorldMapModule", "WorldMapModule");
         RegisterByName(registry, "/OpenSim/WindModule", "ConfigurableWind", "OpenSim.Region.CoreModules.World.Wind.Plugins.ConfigurableWind", "ConfigurableWind");
         RegisterByName(registry, "/OpenSim/WindModule", "SimpleRandomWind", "OpenSim.Region.CoreModules.World.Wind.Plugins.SimpleRandomWind", "SimpleRandomWind");
+        RegisterByName(registry, "/OpenSim/WindModule", "ZephyrWind", "OpenSim.Region.CoreModules.World.Wind.Plugins.ZephyrWind", "ZephyrWind");
     }
 
     private static void RegisterByName(PluginRegistry registry, string extensionPath, string id, string typeName, string displayName)
