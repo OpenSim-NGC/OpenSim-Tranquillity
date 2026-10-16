@@ -61,6 +61,7 @@
  * banking angle limits), 239-296 (the parameter ranges), 1710-1720 (the defaults) and 1806-1844 and 1886-1924 (the
  * values of the two InWorldz vehicle types).
  * Adapted 2026 by Legion Builds
+ * This change adds the per-axis motor timescales and the wind efficiency vectors 12001 and 12002 to the record (Halcyon VectorParams.cs:53-60).
  */
 
 using OpenMetaverse;
