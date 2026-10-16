@@ -70,6 +70,15 @@ public class ExternalIPResolverTests
         Assert.Equal(0, log.Count(LogLevel.Warning));
     }
 
+    [Fact]
+    public void TheServiceSendsNoDnsQueriesOfItsOwn()
+    {
+        // Every name goes through the operating system resolver: the assembly must not use a DNS client library.
+        string[] references = typeof(ExternalIPResolver).Assembly.GetReferencedAssemblies()
+            .Select(a => a.Name ?? string.Empty).ToArray();
+        Assert.DoesNotContain(references, name => name.Contains("DnsClient", StringComparison.OrdinalIgnoreCase));
+    }
+
     // ---- which host is resolved: [UserAgentService] PublicAddress, else the gatekeeper host -
 
     [Fact]
