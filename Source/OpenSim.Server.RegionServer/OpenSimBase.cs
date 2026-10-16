@@ -129,6 +129,8 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
 
     private bool m_securePermissionsLoading = true;
 
+    private TimerResolution m_timerResolution;
+
     /// <value>
     /// The config information passed into the OpenSimulator region server.
     /// </value>
@@ -203,6 +205,21 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
     /// </summary>
     protected override void StartupSpecific()
     {
+        try
+        {
+            StartupSpecificCore();
+        }
+        catch
+        {
+            // A start that fails after [Startup] TimerResolutionMs was applied gives the timer back.
+            m_timerResolution?.Dispose();
+            m_timerResolution = null;
+            throw;
+        }
+    }
+
+    private void StartupSpecificCore()
+    {
         IConfig startupConfig = Config.Configs["Startup"];
         if (startupConfig != null)
         {
@@ -220,6 +237,9 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             userStatsURI = startupConfig.GetString("Stats_URI", string.Empty);
 
             m_securePermissionsLoading = startupConfig.GetBoolean("SecurePermissionsLoading", true);
+
+            // Empty or 0 (the default) leaves the Windows timer alone; see TimerResolution.
+            m_timerResolution = TimerResolution.Apply(startupConfig.GetString("TimerResolutionMs", "0"));
 
             string permissionModules = Util.GetConfigVarFromSections<string>(Config, "permissionmodules",
                 new string[] { "Startup", "Permissions" }, "DefaultPermissionsModule");
@@ -971,6 +991,9 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
         {
             m_log.LogError(e, "[SHUTDOWN]: Ignoring failure during shutdown - ");
         }
+
+        m_timerResolution?.Dispose();
+        m_timerResolution = null;
 
         base.ShutdownSpecific();
     }
