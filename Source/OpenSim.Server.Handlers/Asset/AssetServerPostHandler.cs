@@ -72,6 +72,13 @@ public class AssetServerPostHandler : BaseStreamHandler
             return null;
         }
 
+        // A well-formed document such as <AssetBase xsi:nil="true"/> deserializes to null.
+        if (asset == null)
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+            return null;
+        }
+
         m_log.LogInformation($"[AssetServerPost]: From {httpRequest.RemoteIPEndPoint} Asset {asset.ID}: " +
             $"Name = {asset.Metadata.Name},Type = {(OpenMetaverse.AssetType)asset.Metadata.Type}, " +
             $"CreatorID = {asset.Metadata.CreatorID}, Description = {asset.Metadata.Description}");
