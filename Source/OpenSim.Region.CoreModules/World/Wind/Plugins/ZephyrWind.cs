@@ -35,6 +35,9 @@
 //   - The quantising fudge added to the sun position is gone: the day fraction is continuous.
 //   - A cell whose wind speed is zero keeps a zero ground wind (the original divided by the speed).
 //   - Ported to this tree's plugin interface (ILogger, Initialise, WindUpdate returns bool).
+//   - Each update builds the new cell arrays (and, when the terrain changed, the new terrain statistics) and
+//     publishes them as one immutable snapshot. Samplers read the current snapshot without taking a lock, so they
+//     never wait for an update. Updates, WindSet and WindConfig still take turns with each other.
 // The wind states set with WindSet are held in memory only; they are lost when the region restarts.
 
 using System.Reflection;
@@ -58,22 +61,50 @@ public class ZephyrWind : IWindModelPlugin
     /// <summary>The viewer's wind layer is always 16 x 16 cells, stretched over the region.</summary>
     public const int ViewerCells = 16;
 
+    // Taken by the writers (WindUpdate, WindSet, WindConfig, Dispose) so that they take turns. Samplers never take it.
     private readonly object m_lock = new object();
+
+    /// <summary>
+    /// Everything a sampler reads, as one immutable set: the three bands of currents and the terrain statistics.
+    /// A snapshot is never changed after it is published; a writer makes a new one, which may share the arrays that
+    /// did not change (the terrain statistics are shared by every update until the terrain changes).
+    /// </summary>
+    private sealed class Snapshot
+    {
+        public readonly int CellsX;
+        public readonly int CellsY;
+        public readonly Vector2[] WaterCurrent;
+        public readonly Vector2[] WindsGround;
+        public readonly Vector2[] WindsAloft;
+        public readonly float[] Skews;
+        public readonly float[] Ranges;
+        public readonly float[] MaxHeights;
+
+        public Snapshot(int cellsX, int cellsY, Vector2[] water, Vector2[] ground, Vector2[] aloft,
+            float[] skews, float[] ranges, float[] maxHeights)
+        {
+            CellsX = cellsX;
+            CellsY = cellsY;
+            WaterCurrent = water;
+            WindsGround = ground;
+            WindsAloft = aloft;
+            Skews = skews;
+            Ranges = ranges;
+            MaxHeights = maxHeights;
+        }
+    }
 
     // To improve realism, Zephyr creates three bands of currents: sea, surface, and aloft.
     // sea 'wind' is an undulating current that simulates the back and forth surge.
     // surface wind is subject to terrain turblence.
     // wind aloft is laminar with gentle shifts.
-    // Cells are stored row by row (y * m_cellsX + x), 16 m on a side, south-west corner origin.
-    private int m_cellsX;
-    private int m_cellsY;
-    private Vector2[] m_waterCurrent;
-    private Vector2[] m_windsGround;
-    private Vector2[] m_windsAloft;
+    // Cells are stored row by row (y * CellsX + x), 16 m on a side, south-west corner origin.
+    // Samplers read the current snapshot once (null until WindConfig, and again after Dispose); writers replace it
+    // while holding m_lock.
+    private volatile Snapshot m_snapshot;
+
+    // Per cell, what the cell is allowed to do (fixed speed, terrain turbulence). Only read and changed under m_lock.
     private WindConstants[] m_options;
-    private float[] m_skews;
-    private float[] m_ranges;
-    private float[] m_maxheights;
 
     private float m_avgWindStrength     = 5.0f; // Average magnitude of the wind vector
     private float m_avgWindDirection    = 0.0f; // Average direction of the wind in degrees
@@ -94,10 +125,10 @@ public class ZephyrWind : IWindModelPlugin
     private bool m_terrainHooked;
 
     /// <summary>Number of wind cells along the region's width (one per 16 m).</summary>
-    public int CellsX => m_cellsX;
+    public int CellsX => m_snapshot?.CellsX ?? 0;
 
     /// <summary>Number of wind cells along the region's depth (one per 16 m).</summary>
-    public int CellsY => m_cellsY;
+    public int CellsY => m_snapshot?.CellsY ?? 0;
 
     /// <summary>
     /// Supplies the fraction of the region's day (0 to 1) that the prevailing wind follows. When null, the region
@@ -134,13 +165,8 @@ public class ZephyrWind : IWindModelPlugin
 
         lock (m_lock)
         {
-            m_waterCurrent = null;
-            m_windsGround = null;
-            m_windsAloft  = null;
-            m_options     = null;
-            m_skews       = null;
-            m_ranges      = null;
-            m_maxheights  = null;
+            m_snapshot = null;
+            m_options = null;
         }
     }
 
@@ -158,22 +184,18 @@ public class ZephyrWind : IWindModelPlugin
 
         lock (m_lock)
         {
-            m_cellsX = cellsX;
-            m_cellsY = cellsY;
             int count = cellsX * cellsY;
-            m_waterCurrent = new Vector2[count];
-            m_windsGround = new Vector2[count];
-            m_windsAloft = new Vector2[count];
             m_options = new WindConstants[count];
-            m_skews = new float[count];
-            m_ranges = new float[count];
-            m_maxheights = new float[count];
 
             // Default to ground turbulence
             for (int i = 0; i < count; i++)
                 m_options[i] = WindConstants.WindSpeedTurbulence;
 
             m_terrainDirty = true;
+
+            m_snapshot = new Snapshot(cellsX, cellsY,
+                new Vector2[count], new Vector2[count], new Vector2[count],
+                new float[count], new float[count], new float[count]);
         }
 
         if (!m_terrainHooked)
@@ -228,7 +250,8 @@ public class ZephyrWind : IWindModelPlugin
 
         lock (m_lock)
         {
-            if (m_windsGround == null)
+            Snapshot current = m_snapshot;
+            if (current == null)
                 return false;
 
             // Based on the Prevailing wind algorithm
@@ -274,31 +297,48 @@ public class ZephyrWind : IWindModelPlugin
                 m_terrainDirty = true;
             }
 
+            // The terrain statistics of the snapshot in use stay until the terrain changed; then the update makes new
+            // ones and publishes them with the new cells.
+            int cellsX = current.CellsX;
+            int cellsY = current.CellsY;
+            float[] skews = current.Skews;
+            float[] ranges = current.Ranges;
+            float[] maxheights = current.MaxHeights;
+
             bool computeTerrain = m_terrainDirty;
             if (computeTerrain)
             {
                 // A missing heightmap is flat ground, and is looked at again next time.
                 m_terrainDirty = terrain == null;
-                ComputeTerrainStatistics(terrain, h2o);
+                skews = new float[cellsX * cellsY];
+                ranges = new float[cellsX * cellsY];
+                maxheights = new float[cellsX * cellsY];
+                ComputeTerrainStatistics(terrain, h2o, cellsX, cellsY, skews, ranges, maxheights);
             }
+
+            // Winds aloft and water currents carry the fixed values of cells set with WindSet from one update to the
+            // next, so the new arrays start as copies of the published ones; the ground wind is made new every time.
+            Vector2[] windsAloft = (Vector2[])current.WindsAloft.Clone();
+            Vector2[] waterCurrent = (Vector2[])current.WaterCurrent.Clone();
+            Vector2[] windsGround = new Vector2[cellsX * cellsY];
 
             // Set the predominate wind in each cell, but examine the terrain heights
             // to adjust the winds. Elevation and the pattern of heights in each 16m
             // cell infuence the ground winds.
-            for (int y = 0; y < m_cellsY; y++)
+            for (int y = 0; y < cellsY; y++)
             {
-                for (int x = 0; x < m_cellsX; x++)
+                for (int x = 0; x < cellsX; x++)
                 {
-                    int cell = y * m_cellsX + x;
+                    int cell = y * cellsX + x;
 
                     // Look for the range of heights in the cell and the overall skewness. Use this
                     // to determine ground induced deflection. It is a rough approximation of
                     // ground wind turbulance. The max height is used later to determine the boundary layer.
-                    float cellrange = Math.Max(m_ranges[cell] / 5.0f, 1.0f);
-                    float cellskew = m_skews[cell];
+                    float cellrange = Math.Max(ranges[cell] / 5.0f, 1.0f);
+                    float cellskew = skews[cell];
 
                     // Begin with winds aloft,starting with the fixed wind value set by wind setters.
-                    Vector2 wind = m_windsAloft[cell];
+                    Vector2 wind = windsAloft[cell];
 
                     // Update the cell with default zephyr winds aloft (no turbulence) if the wind speed is not fixed.
                     if ((m_options[cell] & WindConstants.WindSpeedFixed) == 0)
@@ -308,7 +348,7 @@ public class ZephyrWind : IWindModelPlugin
                         wind.Y = (float)Math.Sin(windDir);
                         wind.X *= (float)windSpeed;
                         wind.Y *= (float)windSpeed;
-                        m_windsAloft[cell] = wind;
+                        windsAloft[cell] = wind;
                     }
 
                     // Compute ground winds (apply terrain turbulence) from the winds aloft cell.
@@ -327,7 +367,7 @@ public class ZephyrWind : IWindModelPlugin
                         }
                     }
 
-                    m_windsGround[cell] = wind;
+                    windsGround[cell] = wind;
 
                     // Update the cell with default zephyr water currents if the speed is not fixed.
                     if ((m_options[cell] & WindConstants.WindSpeedFixed) == 0)
@@ -336,10 +376,12 @@ public class ZephyrWind : IWindModelPlugin
                         wind.Y = (float)Math.Sin(waterDir);
                         wind.X *= (float)waterSpeed;
                         wind.Y *= (float)waterSpeed;
-                        m_waterCurrent[cell] = wind;
+                        waterCurrent[cell] = wind;
                     }
                 }
             }
+
+            m_snapshot = new Snapshot(cellsX, cellsY, waterCurrent, windsGround, windsAloft, skews, ranges, maxheights);
         }
 
         return true;
@@ -349,15 +391,16 @@ public class ZephyrWind : IWindModelPlugin
     /// Gather, for every cell, the range of heights, their skewness and the highest point. For the purpose of these
     /// computations, it is the above water height that matters: any ground below water is treated as zero.
     /// </summary>
-    private void ComputeTerrainStatistics(ITerrainChannel terrain, float h2o)
+    private static void ComputeTerrainStatistics(ITerrainChannel terrain, float h2o, int cellsX, int cellsY,
+        float[] cellSkews, float[] cellRanges, float[] cellMaxHeights)
     {
         RunningStat rsCell = new RunningStat();
         int width = terrain?.Width ?? 0;
         int height = terrain?.Height ?? 0;
 
-        for (int y = 0; y < m_cellsY; y++)
+        for (int y = 0; y < cellsY; y++)
         {
-            for (int x = 0; x < m_cellsX; x++)
+            for (int x = 0; x < cellsX; x++)
             {
                 rsCell.Clear();
 
@@ -378,18 +421,18 @@ public class ZephyrWind : IWindModelPlugin
                     }
                 }
 
-                int cell = y * m_cellsX + x;
+                int cell = y * cellsX + x;
                 if (rsCell.NumDataValues() == 0)
                 {
-                    m_ranges[cell] = 0;
-                    m_skews[cell] = 0;
-                    m_maxheights[cell] = 0;
+                    cellRanges[cell] = 0;
+                    cellSkews[cell] = 0;
+                    cellMaxHeights[cell] = 0;
                     continue;
                 }
 
-                m_ranges[cell] = (float)(rsCell.Max() - rsCell.Min());
-                m_skews[cell] = (float)rsCell.Skewness();
-                m_maxheights[cell] = (float)rsCell.Max();
+                cellRanges[cell] = (float)(rsCell.Max() - rsCell.Min());
+                cellSkews[cell] = (float)rsCell.Skewness();
+                cellMaxHeights[cell] = (float)rsCell.Max();
             }
         }
     }
@@ -409,60 +452,61 @@ public class ZephyrWind : IWindModelPlugin
 
         float h2o = (float)_scene.RegionInfo.RegionSettings.WaterHeight;
 
-        lock (m_lock)
-        {
-            if (m_windsGround == null)
-                return Vector3.Zero;
+        // One read of the current snapshot, and no lock: an update in progress is not waited for.
+        Snapshot snapshot = m_snapshot;
+        if (snapshot == null)
+            return Vector3.Zero;
 
-            int x0 = (int)fX / CellSize;
-            int y0 = (int)fY / CellSize;
-            if (x0 >= m_cellsX || y0 >= m_cellsY)
-                return Vector3.Zero;
+        int x0 = (int)fX / CellSize;
+        int y0 = (int)fY / CellSize;
+        if (x0 >= snapshot.CellsX || y0 >= snapshot.CellsY)
+            return Vector3.Zero;
 
-            //Set the wind maxtrix based on the z-position
-            float maxheight = m_maxheights[y0 * m_cellsX + x0];
-            float range = Math.Max(m_ranges[y0 * m_cellsX + x0], 15.0f);
-            // The cell statistics are heights above the water, so the boundary in region height adds the water height.
-            float boundary = h2o + maxheight + range;
-            Vector2[] windmatrix;
+        //Set the wind maxtrix based on the z-position
+        float maxheight = snapshot.MaxHeights[y0 * snapshot.CellsX + x0];
+        float range = Math.Max(snapshot.Ranges[y0 * snapshot.CellsX + x0], 15.0f);
+        // The cell statistics are heights above the water, so the boundary in region height adds the water height.
+        float boundary = h2o + maxheight + range;
+        Vector2[] windmatrix;
 
-            if (fZ < h2o)
-                windmatrix = m_waterCurrent;
-            else if (fZ <= boundary)
-                windmatrix = m_windsGround;
-            else
-                windmatrix = m_windsAloft;
+        if (fZ < h2o)
+            windmatrix = snapshot.WaterCurrent;
+        else if (fZ <= boundary)
+            windmatrix = snapshot.WindsGround;
+        else
+            windmatrix = snapshot.WindsAloft;
 
-            Vector2 wind = Bilinear(windmatrix, fX, fY);
-            return new Vector3(wind.X, wind.Y, 0f);
-        }
+        Vector2 wind = Bilinear(snapshot, windmatrix, fX, fY);
+        return new Vector3(wind.X, wind.Y, 0f);
     }
 
     /// <summary>
-    /// Perform a bilinear interpolation of wind speeds between the four cells around the position (the caller holds
-    /// the lock and has checked that the position is inside the region).
+    /// Perform a bilinear interpolation of wind speeds between the four cells around the position (the caller has
+    /// checked that the position is inside the region).
     /// f(x,y) = f(0,0) * (1-x)(1-y) + f(1,0) * x(1-y) + f(0,1) * (1-x)y + f(1,1) * xy.
     /// </summary>
-    private Vector2 Bilinear(Vector2[] windmatrix, float fX, float fY)
+    private static Vector2 Bilinear(Snapshot snapshot, Vector2[] windmatrix, float fX, float fY)
     {
-        int x0 = Math.Min((int)fX / CellSize, m_cellsX - 1);
-        int y0 = Math.Min((int)fY / CellSize, m_cellsY - 1);
-        int x1 = Math.Min(x0 + 1, m_cellsX - 1);
-        int y1 = Math.Min(y0 + 1, m_cellsY - 1);
+        int cellsX = snapshot.CellsX;
+        int cellsY = snapshot.CellsY;
+        int x0 = Math.Min((int)fX / CellSize, cellsX - 1);
+        int y0 = Math.Min((int)fY / CellSize, cellsY - 1);
+        int x1 = Math.Min(x0 + 1, cellsX - 1);
+        int y1 = Math.Min(y0 + 1, cellsY - 1);
 
         float dx = (fX - x0 * CellSize) / (float)CellSize;
         float dy = (fY - y0 * CellSize) / (float)CellSize;
 
         Vector2 wind = Vector2.Zero;
-        wind.X  = windmatrix[y0 * m_cellsX + x0].X * (1.0f-dx) * (1.0f-dy);
-        wind.X += windmatrix[y0 * m_cellsX + x1].X * dx * (1.0f-dy);
-        wind.X += windmatrix[y1 * m_cellsX + x0].X * dy * (1.0f-dx);
-        wind.X += windmatrix[y1 * m_cellsX + x1].X * dx *dy;
+        wind.X  = windmatrix[y0 * cellsX + x0].X * (1.0f-dx) * (1.0f-dy);
+        wind.X += windmatrix[y0 * cellsX + x1].X * dx * (1.0f-dy);
+        wind.X += windmatrix[y1 * cellsX + x0].X * dy * (1.0f-dx);
+        wind.X += windmatrix[y1 * cellsX + x1].X * dx *dy;
 
-        wind.Y  = windmatrix[y0 * m_cellsX + x0].Y * (1.0f-dx) * (1.0f-dy);
-        wind.Y += windmatrix[y0 * m_cellsX + x1].Y * dx * (1.0f-dy);
-        wind.Y += windmatrix[y1 * m_cellsX + x0].Y * dy * (1.0f-dx);
-        wind.Y += windmatrix[y1 * m_cellsX + x1].Y * dx *dy;
+        wind.Y  = windmatrix[y0 * cellsX + x0].Y * (1.0f-dx) * (1.0f-dy);
+        wind.Y += windmatrix[y0 * cellsX + x1].Y * dx * (1.0f-dy);
+        wind.Y += windmatrix[y1 * cellsX + x0].Y * dy * (1.0f-dx);
+        wind.Y += windmatrix[y1 * cellsX + x1].Y * dx *dy;
 
         return wind;
     }
@@ -482,14 +526,18 @@ public class ZephyrWind : IWindModelPlugin
         float h2o = (float)_scene.RegionInfo.RegionSettings.WaterHeight;
         WindConstants wtype = (WindConstants)type;
 
+        // Takes its turn with the updates: a WindSet made while an update runs is applied after it, on top of what
+        // the update published, so it is never overwritten by that update's older copy of the cell.
         lock (m_lock)
         {
-            if (m_windsGround == null)
+            Snapshot current = m_snapshot;
+            if (current == null)
                 return;
 
+            int cellsX = current.CellsX;
             int x = (int)loc.X / CellSize;
             int y = (int)loc.Y / CellSize;
-            if (x >= m_cellsX || y >= m_cellsY)
+            if (x >= cellsX || y >= current.CellsY)
                 return;
 
             // Handle default case, which really means not fixed + terrain turbulence
@@ -499,16 +547,28 @@ public class ZephyrWind : IWindModelPlugin
             }
 
             //  Save the overrides
-            m_options[y * m_cellsX + x] = wtype;
+            m_options[y * cellsX + x] = wtype;
 
             // If fixed wind set, copy the set windspeed into the winds aloft cell.
             // If the z location is underwater, then set the water current speed.
+            // The published arrays are never changed: the one that changes is copied, the others are shared.
             if ((wtype & WindConstants.WindSpeedFixed) != 0)
             {
+                Vector2 fixedWind = new Vector2(speed.X, speed.Y);
                 if (loc.Z >= h2o)
-                    m_windsAloft[y * m_cellsX + x] = new Vector2(speed.X, speed.Y);
+                {
+                    Vector2[] aloft = (Vector2[])current.WindsAloft.Clone();
+                    aloft[y * cellsX + x] = fixedWind;
+                    m_snapshot = new Snapshot(cellsX, current.CellsY, current.WaterCurrent, current.WindsGround, aloft,
+                        current.Skews, current.Ranges, current.MaxHeights);
+                }
                 else
-                    m_waterCurrent[y * m_cellsX + x] = new Vector2(speed.X, speed.Y);
+                {
+                    Vector2[] water = (Vector2[])current.WaterCurrent.Clone();
+                    water[y * cellsX + x] = fixedWind;
+                    m_snapshot = new Snapshot(cellsX, current.CellsY, water, current.WindsGround, current.WindsAloft,
+                        current.Skews, current.Ranges, current.MaxHeights);
+                }
             }
         }
     }
@@ -524,19 +584,18 @@ public class ZephyrWind : IWindModelPlugin
     {
         Vector2[] viewer = new Vector2[ViewerCells * ViewerCells];
 
-        lock (m_lock)
+        // The current snapshot, read once and without a lock.
+        Snapshot snapshot = m_snapshot;
+        if (snapshot == null)
+            return viewer;
+
+        float stepX = _scene.RegionInfo.RegionSizeX / (float)ViewerCells;
+        float stepY = _scene.RegionInfo.RegionSizeY / (float)ViewerCells;
+
+        for (int j = 0; j < ViewerCells; j++)
         {
-            if (m_windsGround == null)
-                return viewer;
-
-            float stepX = _scene.RegionInfo.RegionSizeX / (float)ViewerCells;
-            float stepY = _scene.RegionInfo.RegionSizeY / (float)ViewerCells;
-
-            for (int j = 0; j < ViewerCells; j++)
-            {
-                for (int i = 0; i < ViewerCells; i++)
-                    viewer[j * ViewerCells + i] = Bilinear(m_windsGround, i * stepX, j * stepY);
-            }
+            for (int i = 0; i < ViewerCells; i++)
+                viewer[j * ViewerCells + i] = Bilinear(snapshot, snapshot.WindsGround, i * stepX, j * stepY);
         }
 
         return viewer;
