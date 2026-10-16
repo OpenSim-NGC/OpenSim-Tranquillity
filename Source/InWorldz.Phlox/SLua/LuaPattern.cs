@@ -1,3 +1,47 @@
+/*
+** $Id: lstrlib.c,v 1.220 2014/12/11 13:40:40 roberto Exp roberto $
+** Standard library for string operations and pattern-matching
+** See Copyright Notice in lua.h
+*/
+
+/******************************************************************************
+* Copyright (C) 1994-2015 Lua.org, PUC-Rio.
+*
+* Permission is hereby granted, free of charge, to any person obtaining
+* a copy of this software and associated documentation files (the
+* "Software"), to deal in the Software without restriction, including
+* without limitation the rights to use, copy, modify, merge, publish,
+* distribute, sublicense, and/or sell copies of the Software, and to
+* permit persons to whom the Software is furnished to do so, subject to
+* the following conditions:
+*
+* The above copyright notice and this permission notice shall be
+* included in all copies or substantial portions of the Software.
+*
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+* EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+* MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+* IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+* CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+* TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+******************************************************************************/
+
+/*
+ * Port of the pattern matching in lstrlib.c from Lua (https://www.lua.org). The two notices above are the ones in
+ * Lua 5.3.0: the head of lstrlib.c and the licence block of lua.h. This file follows Lua 5.3.0, the release it was
+ * compared with. The points that tell it from the neighbouring releases:
+ *  - Lua 5.2.3 words some errors differently ("invalid capture index" without the number, quote macros around
+ *    "[" and "%f"); this file uses the 5.3 wording;
+ *  - Lua 5.3.3 and later track the end of the last match in gmatch and gsub; 5.3.0 and this file instead step
+ *    one position past an empty match;
+ *  - Lua 5.4.6 clamps the start position with posrelatI; this file clamps it as 5.2 and 5.3 do.
+ * Lua 5.3.1 and 5.3.2 were not available to compare, so the release is not narrowed further than "5.3.0 or a 5.3.x before 5.3.3".
+ * The code keeps Lua's own names (MAXCCALLS, MatchState, CAP_UNFINISHED), not the ones Luau's lstrlib.cpp uses
+ * (LUAI_MAXCCALLS).
+ * Adapted 2026 by Legion Builds
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Text;
