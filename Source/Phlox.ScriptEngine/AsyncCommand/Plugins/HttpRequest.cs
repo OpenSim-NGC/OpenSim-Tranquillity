@@ -29,6 +29,7 @@
 // Adaptations:
 //   - HttpRequestObject replaced with IHttpServiceRequest interface (no concrete cast)
 //   - Uses PostObjectEvent by LocalID; another engine's response goes through the region's other engines
+// Adapted 2026 by Legion Builds
 
 using System;
 using System.Collections.Generic;
@@ -86,7 +87,8 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
 
                     default:
                     {
-                        // SL - "triggered in all scripts in the prim, not just in the requesting script". Phlox's
+                        // SL http_response (https://wiki.secondlife.com/wiki/Http_response) - delivered to every
+                        // script in the prim, not only to the requesting one. Phlox's
                         // own request or another engine's (the core's one completed queue is drained by every
                         // engine's pump), every script in the prim gets it: Phlox's here, each other engine's through it.
                         object[] resobj = new object[]

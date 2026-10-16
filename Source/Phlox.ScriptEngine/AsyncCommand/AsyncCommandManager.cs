@@ -31,6 +31,7 @@
 //   - IScriptEngine is PhloxEngine which already implements the interface
 //   - Timer and Dataserver plugins excluded — handled natively by Phlox
 //   - Listener plugin excluded — handled by PhloxListenManager
+// Adapted 2026 by Legion Builds
 
 using System;
 using System.Collections.Generic;
