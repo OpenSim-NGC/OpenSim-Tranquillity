@@ -93,6 +93,9 @@ public class ZephyrWind : IWindModelPlugin
     private ITerrainChannel m_terrainSeen;
     private bool m_terrainHooked;
 
+    // Whether the warning about a day fraction that is not a number has been written since it last was a number.
+    private bool m_dayFractionWarned;
+
     /// <summary>Number of wind cells along the region's width (one per 16 m).</summary>
     public int CellsX => m_cellsX;
 
@@ -214,6 +217,22 @@ public class ZephyrWind : IWindModelPlugin
             dayFraction = env.GetRegionDayFractionTime();
         else
             dayFraction = (float)((DateTime.UtcNow.TimeOfDay.TotalSeconds / 600.0) % 24.0) / 24.0f;
+
+        // A day length of 0 in the environment gives a day fraction that is not a number, and that would turn every
+        // wind cell into NaN. Use the start of the day instead, and say so once until the fraction is a number again.
+        if (!float.IsFinite(dayFraction))
+        {
+            if (!m_dayFractionWarned)
+            {
+                m_dayFractionWarned = true;
+                m_log.LogWarning("[{0}] The region's day fraction is {1}, not a finite number (a day length of 0?); using 0.", Name, dayFraction);
+            }
+            dayFraction = 0f;
+        }
+        else
+        {
+            m_dayFractionWarned = false;
+        }
 
         return Utils.Clamp(dayFraction, 0f, 1f) * 24.0f;
     }

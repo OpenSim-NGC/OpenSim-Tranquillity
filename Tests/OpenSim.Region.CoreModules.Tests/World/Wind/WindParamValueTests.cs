@@ -11,6 +11,7 @@ using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.CoreModules.World.Wind;
+using OpenSim.Region.CoreModules.World.Wind.Plugins;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 using Xunit;
@@ -260,5 +261,66 @@ public class WindParamValueTests : OpenSimTestCase
         WindModule module = ModuleOn(scene, "ZephyrWind", ("avg_strength", "9"));
         Assert.Single(m_capture.Wind(), l => l.Text.Contains("[ZephyrWind] Settings"));
         module.RemoveRegion(scene);
+    }
+
+    // ---- the region's day fraction ----
+
+    private static ZephyrWind ZephyrOn(TestScene scene, Func<float> day)
+    {
+        var z = new ZephyrWind { DayFractionSource = day };
+        IConfig windConfig = new IniConfigSource().AddConfig("Wind");
+        windConfig.Set("var_strength", "3");
+        windConfig.Set("var_direction", "25");
+        z.WindConfig(scene, windConfig);
+        return z;
+    }
+
+    [Theory]
+    [MemberData(nameof(NotNumbers))]
+    public void ADayFractionThatIsNotANumberGivesTheWindOfTheStartOfTheDay(float bad)
+    {
+        TestScene scene = NewScene();
+        var atZero = ZephyrOn(scene, () => 0f);
+        atZero.WindUpdate(0);
+
+        var z = ZephyrOn(scene, () => bad);
+        m_capture.Clear();
+        z.WindUpdate(0);
+
+        Vector3 expected = atZero.WindSpeed(40, 40, 500f);
+        Vector3 actual = z.WindSpeed(40, 40, 500f);
+        Assert.True(float.IsFinite(actual.X) && float.IsFinite(actual.Y), $"got {actual}");
+        Assert.Equal(expected, actual);
+        Assert.All(z.WindLLClientArray(), v => Assert.True(float.IsFinite(v.X) && float.IsFinite(v.Y)));
+    }
+
+    [Fact]
+    public void TheDayFractionWarningIsWrittenOnceUntilTheFractionIsANumberAgain()
+    {
+        TestScene scene = NewScene();
+        float day = float.NaN;
+        var z = ZephyrOn(scene, () => day);
+        m_capture.Clear();
+
+        z.WindUpdate(0);
+        z.WindUpdate(1);
+        z.WindUpdate(2);
+        Assert.Single(m_capture.Wind(), l => l.Level == LogLevel.Warning && l.Text.Contains("day fraction"));
+
+        day = 0.4f;
+        z.WindUpdate(3);
+        day = float.PositiveInfinity;
+        z.WindUpdate(4);
+        Assert.Equal(2, m_capture.Wind().Count(l => l.Level == LogLevel.Warning && l.Text.Contains("day fraction")));
+    }
+
+    [Fact]
+    public void AnOrdinaryDayFractionWritesNoWarning()
+    {
+        TestScene scene = NewScene();
+        var z = ZephyrOn(scene, () => 0.3f);
+        m_capture.Clear();
+        z.WindUpdate(0);
+        Assert.DoesNotContain(m_capture.Wind(), l => l.Level == LogLevel.Warning);
     }
 }
