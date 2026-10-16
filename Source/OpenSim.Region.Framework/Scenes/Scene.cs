@@ -4985,8 +4985,15 @@ Label_GroupsDone:
         }
 
         ScenePresence sp = GetScenePresence(remoteClient.AgentId);
-        if (sp is null || sp.IsDeleted || sp.IsInTransit)
+        if (sp is null || sp.IsDeleted)
             return;
+
+        // a border crossing is waiting for the neighbour: answer, or the viewer's teleport never ends
+        if (sp.IsInTransit)
+        {
+            remoteClient.SendTeleportFailed("Previous teleport process incomplete.  Please retry shortly.");
+            return;
+        }
 
         ulong regionHandle = 0;
         if(regionName == RegionInfo.RegionName)
@@ -5026,8 +5033,15 @@ Label_GroupsDone:
         }
 
         ScenePresence sp = GetScenePresence(remoteClient.AgentId);
-        if (sp is null || sp.IsDeleted || sp.IsInTransit)
+        if (sp is null || sp.IsDeleted)
             return;
+
+        // a border crossing is waiting for the neighbour: answer, or the viewer's teleport never ends
+        if (sp.IsInTransit)
+        {
+            remoteClient.SendTeleportFailed("Previous teleport process incomplete.  Please retry shortly.");
+            return;
+        }
 
         EntityTransferModule.Teleport(sp, regionHandle, position, lookAt, teleportFlags);
     }
@@ -5041,8 +5055,16 @@ Label_GroupsDone:
         }
 
         ScenePresence sp = GetScenePresence(remoteClient.AgentId);
-        if (sp is null || sp.IsDeleted || sp.IsInTransit)
+        if (sp is null || sp.IsDeleted)
             return;
+
+        // a border crossing is waiting for the neighbour: answer, or the viewer's teleport never ends
+        if (sp.IsInTransit)
+        {
+            remoteClient.SendTeleportFailed("Previous teleport process incomplete.  Please retry shortly.");
+            return;
+        }
+
         EntityTransferModule.RequestTeleportLandmark(remoteClient, lm, lookAt);
     }
 
