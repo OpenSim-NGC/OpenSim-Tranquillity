@@ -24,8 +24,9 @@ namespace InWorldz.Phlox.Tests;
 /// (Halcyon DetectParams.FromDetectedObject copies the DetectedObject).</item>
 /// <item>money(): llDetectedLinkNumber(0) is the prim that was paid, also when the root's money() takes it (Halcyon
 /// EventRouter.HandleObjectPaid passes the paid link).</item>
-/// <item>A sensor counts an object as SCRIPTED when any of its prims holds a script (SL llDetectedType: "Objects
-/// containing any active script"; Halcyon SensorRepeat tests the whole linkset).</item>
+/// <item>A sensor counts an object as SCRIPTED when any of its prims holds a script (SL llDetectedType
+/// (https://wiki.secondlife.com/wiki/LlDetectedType): objects with at least one active script; Halcyon SensorRepeat
+/// tests the whole linkset).</item>
 /// </list>
 /// </summary>
 // No process-wide state: each test has its own scene, so the class runs in parallel.

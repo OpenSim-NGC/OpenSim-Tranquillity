@@ -23,10 +23,12 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// A permission request still waiting for its answer ends with a reset, an owner change, and the script leaving the
-/// region (an unload: a crossing, a derez). SL wiki llRequestExperiencePermissions: "Outstanding permission requests will
-/// be lost if the script is de-rezzed, moved to another region, or reset." The llRequestPermissions page says nothing
-/// on a waiting request; its only rule on two requests is "If a script makes two permission requests, whichever response
-/// is last is considered the granted permissions", so the same rule is applied to it. An answer that arrives after the
+/// region (an unload: a crossing, a derez). SL wiki llRequestExperiencePermissions
+/// (https://wiki.secondlife.com/wiki/LlRequestExperiencePermissions): a permission request still outstanding is lost when the
+/// script is derezzed, moves to another region, or is reset. The llRequestPermissions page
+/// (https://wiki.secondlife.com/wiki/LlRequestPermissions) says nothing
+/// on a waiting request; its only rule on two requests is that the response coming last decides the granted permissions,
+/// so the same rule is applied to it. An answer that arrives after the
 /// request ended installs nothing and posts no event; the Experience request's timeout is stopped with it.
 /// </summary>
 // Runs in parallel: each test has its own harness or regions (7380, 7380) and (7380, 7379), used by no other test;
