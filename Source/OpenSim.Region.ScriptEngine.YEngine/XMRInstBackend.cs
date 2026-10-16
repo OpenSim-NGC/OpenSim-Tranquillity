@@ -604,7 +604,8 @@ public partial class XMRInstance
         m_XMRLSLApi.acm.TimerPlugin.CreateFromData(m_LocalID, m_ItemID, UUID.Zero, timers);
 
         // Tell whoever cares which event handlers the new state has.
-        m_Part.RemoveScriptTargets(m_ItemID);
+        // llTarget()/llRotTarget() targets are kept: the SL State page does not list them among what a state
+        // change releases, and a target fires until llTargetRemove()/llRotTargetRemove().
         m_Part.SetScriptEvents(m_ItemID, GetStateEventFlags(stateCode));
 
         // keep link messages
