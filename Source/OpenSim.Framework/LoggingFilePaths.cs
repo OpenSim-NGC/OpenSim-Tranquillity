@@ -25,64 +25,43 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net.Appender;
-using log4net.Core;
-
-namespace OpenSim.Framework.Console;
+namespace OpenSim.Framework;
 
 /// <summary>
-/// Writes log information out onto the console
+/// Holds the file paths used by the configured logging pipeline.
 /// </summary>
-public class OpenSimAppender : AnsiColorTerminalAppender
+public static class LoggingFilePaths
 {
-    private ConsoleBase m_console = null;
+    private static string _logFilePath = "./OpenSim.log";
+    private static string _statsLogFilePath = "./OpenSimStats.log";
+    private static bool _rollingFilesEnabled;
+    private static bool _statsLogFileEnabled;
 
-    public ConsoleBase Console
+    public static string CurrentLogFilePath
     {
-        get { return m_console; }
-        set { m_console = value; }
+        get => _rollingFilesEnabled ? GetCurrentRollingFilePath(_logFilePath) : _logFilePath;
     }
 
-    override protected void Append(LoggingEvent le)
+    public static string CurrentStatsLogFilePath
     {
-        //if (m_console != null)
-        //    m_console.LockOutput();
+        get => _statsLogFileEnabled ? GetCurrentRollingFilePath(_statsLogFilePath) : _statsLogFilePath;
+    }
 
-        string loggingMessage = RenderLoggingEvent(le);
+    public static void Configure(string logFilePath, string statsLogFilePath, bool statsLogFileEnabled)
+    {
+        _logFilePath = logFilePath;
+        _statsLogFilePath = statsLogFilePath;
+        _rollingFilesEnabled = true;
+        _statsLogFileEnabled = statsLogFileEnabled;
+    }
 
-        try
-        {
-            if (m_console != null)
-            {
-                ConsoleLevel level;
+    private static string GetCurrentRollingFilePath(string path)
+    {
+        string extension = Path.GetExtension(path);
+        string dateSuffix = DateTime.Now.ToString("yyyyMMdd", System.Globalization.CultureInfo.InvariantCulture);
 
-                if (le.Level == Level.Error)
-                    level = "error";
-                else if (le.Level == Level.Warn)
-                    level = "warn";
-                else
-                    level = "normal";
-
-                m_console.Output(loggingMessage, level);
-            }
-            else
-            {
-                if (!loggingMessage.EndsWith("\n"))
-                    System.Console.WriteLine(loggingMessage);
-                else
-                    System.Console.Write(loggingMessage);
-            }
-        }
-        catch (Exception e)
-        {
-            System.Console.WriteLine("Couldn't write out log message: {0}", e.ToString());
-        }
-        /*
-        finally
-        {
-            if (m_console != null)
-                m_console.UnlockOutput();
-        }
-        */
+        return extension.Length == 0
+            ? $"{path}{dateSuffix}"
+            : $"{path[..^extension.Length]}{dateSuffix}{extension}";
     }
 }

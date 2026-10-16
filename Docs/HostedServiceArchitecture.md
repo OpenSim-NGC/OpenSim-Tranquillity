@@ -67,7 +67,7 @@ substitute fakes.
 
 | Component | Interface / Type | Responsibility |
 | --- | --- | --- |
-| Log bootstrap | `ILog4NetBootstrapper` / `Log4NetBootstrapper` | Configure log4net before the host is built; resolve the effective config file. |
+| Logging setup | `OpenSimLoggingBuilderExtensions.AddOpenSimLogging` | Configure console and rolling file logging (Serilog / Microsoft.Extensions.Logging). |
 | Process setup | `IProcessSetupService` / `ProcessSetupService` (+ `ProcessSetupHostedService`, `ProcessSetupOptions`) | Apply culture, `ServicePointManager`, thread-pool, DNS, HTTP-client defaults. |
 | PID file | `IPidFileManager` / `PidFileManager` (+ `PidFileHostedService`) | Create the PID file on start, remove on stop. |
 | Main server access | `IMainServerAccessor` / `MainServerAccessor` | Wrap the static `MainServer.Instance` (HTTP server registry / `Stop()`). |
@@ -75,7 +75,7 @@ substitute fakes.
 | Startup failure | `IStartupFailureCoordinator` / `StartupFailureCoordinator` | Centralize fatal-startup handling so failures surface as exceptions through `StartAsync`. |
 | Console context | `IConsoleContext` / `ConsoleContext`, `IConsoleFactory` / `ConsoleFactory` | Create an `ICommandConsole` (`basic`/`local`/`rest`/`mock`) and publish it to the static `MainConsole.Instance`. |
 | Legacy config bridge | `ILegacyConfigSourceAccessor` / `LegacyIniConfigSourceAccessor` | Expose a Nini `IConfigSource` for components not yet on `IConfiguration`. |
-| Startup options | `ServerStartupOptions` | Typed `logconfig` / `inifile` / `inimaster` / `inidirectory` / `console`. |
+| Startup options | `ServerStartupOptions` | Typed `inifile` / `inimaster` / `inidirectory` / `console`. |
 | Ini configuration | `IniConfigurationExtensions` (`AddOpenSimIniFiles`) | Add OpenSim ini precedence (master → files → directory) to `IConfiguration`. |
 
 Connector discovery for the service hosts is handled by
@@ -156,7 +156,7 @@ hosted services.
 Because the RegionServer inheritance chain (`OpenSim` → `OpenSimBase` →
 `RegionApplicationBase` → `BaseOpenSimServer` → `ServerBase`) is **`new`-constructed, not
 DI-resolved**, its extracted collaborators are exposed as `protected` properties with
-default implementations (log4net-based, self-instantiable). Only the DI-constructed
+default implementations (self-instantiable). Only the DI-constructed
 `RegionRuntime` receives constructor-injected `ILogger` services.
 
 | Seam | Interface / Type | Extracted concern | Host property |

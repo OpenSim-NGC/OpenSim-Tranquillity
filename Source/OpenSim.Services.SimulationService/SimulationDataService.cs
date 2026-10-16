@@ -36,10 +36,6 @@ namespace OpenSim.Services.SimulationService;
 
 public class SimulationDataService : ServiceBase, ISimulationDataService
 {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
-
     protected ISimulationDataStore m_database;
 
     public SimulationDataService(IConfigSource config)

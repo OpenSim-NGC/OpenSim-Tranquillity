@@ -21,7 +21,7 @@ server.
 
 ## Enabling it
 
-Phlox is the default script engine as shipped: `OpenSimDefaults.ini` sets
+Phlox is the default script engine as shipped: `RegionServerDefaults.ini` sets
 `[Startup] DefaultScriptEngine = "InWorldz.Phlox"` and enables both Phlox and
 YEngine. Phlox coexists with YEngine; each engine only handles the scripts
 routed to it, and YEngine stays loaded as the backup engine.

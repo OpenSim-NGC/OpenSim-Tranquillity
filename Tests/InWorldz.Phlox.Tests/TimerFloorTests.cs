@@ -21,7 +21,7 @@ namespace InWorldz.Phlox.Tests;
 /// <c>TimerInterval = (int)(sec * 1000)</c> with no minimum
 /// (<c>InWorldz.Phlox.Engine/ExecutionScheduler.cs:1846-1853</c>). The floor comes from the other engine
 /// in this very repo: upstream's <c>LSL_Api.llSetTimerEvent</c> clamps at <c>m_MinTimerInterval</c>
-/// (<c>LSL_Api.cs:4005-4011</c>), whose shipped value in <c>OpenSimDefaults.ini</c> <c>[YEngine]</c> is
+/// (<c>LSL_Api.cs:4005-4011</c>), whose shipped value in <c>RegionServerDefaults.ini</c> <c>[YEngine]</c> is
 /// <b>0.1</b> — and that is what a region on the shipped defaults runs. Before this, the same call behaved differently
 /// depending on which engine happened to run the script.
 /// </para>

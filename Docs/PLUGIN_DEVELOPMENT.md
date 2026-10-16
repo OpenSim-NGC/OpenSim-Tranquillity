@@ -189,7 +189,6 @@ Minimal `csproj` pattern:
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
 
@@ -226,7 +225,6 @@ Minimal `csproj` pattern:
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
 

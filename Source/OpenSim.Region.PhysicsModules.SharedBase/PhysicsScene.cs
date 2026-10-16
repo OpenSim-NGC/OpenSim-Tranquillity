@@ -258,6 +258,29 @@ public abstract class PhysicsScene
     }
 
     /// <summary>
+    /// True if the actors of this scene turn a physical root prim toward the rotation target they are given
+    /// (<see cref="PhysicsActor.APIDTarget"/>, <see cref="PhysicsActor.APIDStrength"/>,
+    /// <see cref="PhysicsActor.APIDDamping"/> and <see cref="PhysicsActor.APIDActive"/>), and so the scene asks core not
+    /// to run its own look-at controller.
+    /// </summary>
+    /// <remarks>
+    /// The four members are set-only, so core cannot read back whether an engine uses them; this is how an engine says so.
+    /// An engine that answers true must:
+    /// - take a target (a world rotation), a strength and a damping in seconds, as llRotLookAt gives them, and turn the
+    ///   root toward the target while <see cref="PhysicsActor.APIDActive"/> is true;
+    /// - accept a new target, strength or damping while the target is on, and use it from then on (a rotate-drag moves
+    ///   the target on every update of the mouse);
+    /// - stop turning the body when the target is switched off.
+    /// Core sets the target, strength and damping, then switches the target on. It never also sets the body's angular
+    /// velocity for an object it has handed a target to, and it hands the target again to an actor that replaces the root's.
+    /// The default is false: core steers the body itself, as it does for an engine that ignores the members.
+    /// </remarks>
+    public virtual bool SupportsRotationTarget()
+    {
+        return false;
+    }
+
+    /// <summary>
     /// Queue a raycast against the physics scene.
     /// The provided callback method will be called when the raycast is complete
     ///

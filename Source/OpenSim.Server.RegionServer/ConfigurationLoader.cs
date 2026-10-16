@@ -79,7 +79,7 @@ public class ConfigurationLoader
 
         List<string> sources = new List<string>();
 
-        string masterFileName = startupConfig.GetString("inimaster", "OpenSimDefaults.ini");
+        string masterFileName = startupConfig.GetString("inimaster", "RegionServerDefaults.ini");
 
         if (masterFileName == "none")
             masterFileName = String.Empty;

@@ -35,7 +35,7 @@ Goal: Create one reusable host bootstrap path and compatibility layer that all t
 
 Scope:
 
-- create typed option models for common switches such as `logconfig`, `inifile`, `inimaster`, `inidirectory`, and `console`
+- create typed option models for common switches such as `inifile`, `inimaster`, `inidirectory`, and `console`
 - separate common options from server-specific options
 - normalize option defaults now scattered across individual `Program.cs` files
 
@@ -112,13 +112,13 @@ Suggested PR slice:
 
 - adapter plus registration in one server
 
-### A4. Extract log4net bootstrap service
+### A4. Modernize shared logging bootstrap service
 
 Scope:
 
-- move log4net setup out of individual entry points and legacy base constructors where practical
-- standardize log configuration selection
-- preserve existing log file behavior and config file compatibility
+- move logging setup out of individual entry points and legacy base constructors where practical
+- standardize Serilog and console logging configuration
+- preserve existing log file behavior and rolling log configuration
 
 Deliverables:
 
@@ -669,7 +669,7 @@ Acceptance criteria:
 
 ### Wave 3: Shared bootstrap hardening
 
-- A4 log4net bootstrap service
+- A4 shared logging bootstrap service
 - A6 process setup and PID services
 - B2 wrap `MainServer.Instance`
 - B3 wrap watchdog and work manager lifecycle

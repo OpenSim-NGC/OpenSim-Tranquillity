@@ -98,7 +98,7 @@ When the Groups addon is enabled, Hypergrid `POSTGROUP` and `ADDNOTICE` writes r
 
 ## Default services and logging
 
-- The OpenID connector is disabled by default in `Robust.ini.example` and `Robust.HG.ini.example`. Enable it only when it is intentionally deployed and protected.
+- The OpenID connector is disabled by default in `GridServer.ini.example` and `GridServer.HG.ini.example`. Enable it only when it is intentionally deployed and protected.
 - Reusable web login keys are no longer logged by the XML-RPC login handler.
 - Map tile requests always release their process-wide lock, including malformed requests.
 
