@@ -1,3 +1,9 @@
+# Copyright (c) 2026 Legion Builds
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Fuzz corpus for the gzip decoder: truncations, bit flips and random bodies of RFC 1952 members.
 import zlib, struct, random, sys
 def raw(b, lvl=6):

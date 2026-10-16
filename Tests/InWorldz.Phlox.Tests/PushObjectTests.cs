@@ -1,6 +1,6 @@
 /*
+ * Copyright (c) 2026 Legion Builds
  * Copyright (c) Contributors, http://opensimulator.org/
- * Copyright (c) Legion Builds
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,9 +41,9 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// llPushObject (SL wiki LlPushObject):
-/// - local: "if TRUE uses the local axis of target, if FALSE uses the region axis." A local push on an avatar is turned
-///   by the avatar's rotation, on an object by the object's; the pusher's own rotation plays no part.
-/// - "ang_impulse is ignored when applying to agents or their attachments."
+/// - local: TRUE makes the push follow the target's own axes, FALSE makes it follow the region's axes. A local push on an
+///   avatar is turned by the avatar's rotation, on an object by the object's; the pusher's own rotation plays no part.
+/// - ang_impulse has no effect when the target is an avatar or one of its attachments.
 /// </summary>
 // Calls the API directly on the harness prims; no clock and no process-wide state, so the class runs in parallel.
 public class PushObjectTests
@@ -164,9 +164,10 @@ public class PushObjectTests
     }
 
     // ---- push-restricted land ----
-    // SL wiki LlPushObject: "Only works on land where Push is not restricted or where the script is owned by the land
-    // owner." and "In no-push areas an object can only push its owner or itself." The parcel's Restrict Pushing
-    // (PARCEL_FLAG_RESTRICT_PUSHOBJECT) and the region's (REGION_FLAG_RESTRICT_PUSHOBJECT) are each a no-push area.
+    // SL wiki LlPushObject (https://wiki.secondlife.com/wiki/LlPushObject): the function works only on land that allows
+    // pushing, or where the land owner is also the owner of the script; in a no-push area an object can push only its
+    // owner or itself. The parcel's Restrict Pushing (PARCEL_FLAG_RESTRICT_PUSHOBJECT) and the region's
+    // (REGION_FLAG_RESTRICT_PUSHOBJECT) are each a no-push area.
 
     public static IEnumerable<object[]> NoPushAreas() => new[] { new object[] { "parcel" }, new object[] { "region" } };
 

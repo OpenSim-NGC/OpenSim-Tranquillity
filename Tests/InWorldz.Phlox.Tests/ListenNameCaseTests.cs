@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 using Xunit;
 using Xunit.Abstractions;
@@ -6,7 +13,8 @@ namespace InWorldz.Phlox.Tests;
 
 /// <summary>
 /// An llListen name filter matches the speaker's name exactly, case included: the SL wiki's
-/// llListen page says the speaker's legacy name "must match name exactly (case sensitive)", and
+/// llListen page (https://wiki.secondlife.com/wiki/LlListen) says the speaker's legacy name has to equal the filter
+/// exactly, with case counting, and
 /// Halcyon's and YEngine's listener managers compare case-sensitively too. An empty name still hears
 /// every speaker. The key and message filters are untouched, and an osListenRegex name pattern
 /// stays a .NET regular expression without options: case-sensitive unless the pattern says (?i).

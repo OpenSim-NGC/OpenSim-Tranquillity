@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Collections.Concurrent;
 using System.Reflection;
 using System.Text;
@@ -242,8 +249,9 @@ public class LlTeleportAgentTests
     [Fact]
     public void ANonOwnerWhoGrantedTheirOwnPermissionIsStillRefused()
     {
-        // SL: "This function can only teleport the owner of the object (unless part of an Experience)". The object's
-        // owner also owns the land under both of them - YEngine's legacy land path would move them; SL does not.
+        // SL (llTeleportAgent, https://wiki.secondlife.com/wiki/LlTeleportAgent): the function can teleport only the object's
+        // owner, except when the object is part of an Experience. The object's owner also owns the land under both of
+        // them - YEngine's legacy land path would move them; SL does not.
         using var r = new TeleportRig(_out, UUID.Zero, TeleportRig.Middle);
         r.Avatar(r.Owner, TeleportRig.East);
         var visitor = r.Avatar(UUID.Random(), TeleportRig.Middle);
@@ -432,9 +440,10 @@ public class IwTeleportAgentTests
     [Fact]
     public void AGroupTaggedObjectIsRefusedOnGroupLandUnlessItsOwnerHoldsEjectAndFreeze()
     {
-        // The port admitted any object carrying the land's group tag. The correction: Halcyon's
-        // HasLandPrivileges asks CanEditParcel(owner, parcel, LandEjectAndFreeze), and SL admits "The object owner must
-        // have 'Eject and freeze Residents on parcels' ability in the group". Every other power is not enough.
+        // The port admitted any object carrying the land's group tag. The correction: Halcyon's HasLandPrivileges asks
+        // CanEditParcel(owner, parcel, LandEjectAndFreeze), and SL admits an object whose owner has the 'Eject and freeze
+        // Residents on parcels' ability in the group (https://wiki.secondlife.com/wiki/LlTeleportAgent). Every other power
+        // is not enough.
         using (var r = new TeleportRig(_out, Member, TeleportRig.West, null, (Member, ulong.MaxValue & ~(ulong)GroupPowers.LandEjectAndFreeze)))
             Assert.False(Teleports(r, r.Avatar(UUID.Random(), TeleportRig.West)));
         using (var r = new TeleportRig(_out, UUID.Random(), TeleportRig.West))

@@ -1,5 +1,9 @@
 /*
- * Copyright (c) Legion Builds
+ * Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  * EventQueueRoutingTests.cs - which events a script's queue keeps when it is full or the script is stopped, the
  * order a prim's events arrive in, and which script an event is for.
  */

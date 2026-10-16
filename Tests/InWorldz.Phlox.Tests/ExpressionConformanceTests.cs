@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using Xunit;
 
 namespace InWorldz.Phlox.Tests;
@@ -11,12 +18,12 @@ namespace InWorldz.Phlox.Tests;
 /// <list type="bullet">
 /// <item><b>OPS</b>: wiki.secondlife.com/wiki/LSL_Operators. Its precedence table, highest first:
 ///   () [] (type); ! ~ ++ --; * / %; -; +; &lt;&lt; &gt;&gt;; &lt; &lt;= &gt; &gt;=; == !=; &amp;; ^; |; &amp;&amp; ||;
-///   = += -= *= /= %=. "&amp;&amp; and || have the same precedence"; "both operands are always
-///   evaluated" (no short-circuit); "the order of evaluation is from right to left"; % "has
-///   the same sign as the first operand". The table lists - and + on separate rows; for the
+///   = += -= *= /= %=. &amp;&amp; and || rank equally; each operand is evaluated in every case (no short-circuit);
+///   evaluation runs from right to left; % takes the sign of its first operand. The table lists - and + on separate
+///   rows; for the
 ///   integer cases below either reading gives the same value.</item>
-/// <item><b>INT</b>: wiki.secondlife.com/wiki/Integer: "a signed 32 bit value between
-///   -2,147,483,648 and +2,147,483,647 (0x80000000 to 0x7FFFFFFF)". Arithmetic wraps in two's
+/// <item><b>INT</b>: wiki.secondlife.com/wiki/Integer: a 32-bit signed integer, from -2,147,483,648 up to
+/// +2,147,483,647 (0x80000000 to 0x7FFFFFFF). Arithmetic wraps in two's
 ///   complement.</item>
 /// <item><b>CAST</b>: wiki.secondlife.com/wiki/Typecast: (string)float has 6 decimal places;
 ///   (integer)"0x12A" is 298.</item>

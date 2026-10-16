@@ -1,6 +1,6 @@
 /*
+ * Copyright (c) 2026 Legion Builds
  * Copyright (c) Contributors, http://opensimulator.org/
- * Copyright (c) Legion Builds
  * See CONTRIBUTORS.TXT for a full list of copyright holders.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -44,9 +44,9 @@ namespace InWorldz.Phlox.Tests;
 /// <summary>
 /// Ground vectors, wind, iwSetWind, parcel media for one agent, and the world bounding box:
 /// - llGroundSlope, llGroundNormal and llGroundContour are Halcyon's: the slope is the heightmap triangle's downhill
-///   vector, not normalised, with a negative z on sloped ground; the normal is &lt;slope.x, slope.y, 1&gt; (SL:
-///   "This function does not return a unit vector"); the contour is &lt;-slope.y, slope.x, 0&gt;.
-///   iwGroundSurfaceNormal is Halcyon's unit normal averaged over the cell's two triangles.
+///   vector, not normalised, with a negative z on sloped ground; the normal is &lt;slope.x, slope.y, 1&gt; (SL,
+///   https://wiki.secondlife.com/wiki/LlGroundNormal: the result is not a unit-length vector); the contour is
+///   &lt;-slope.y, slope.x, 0&gt;. iwGroundSurfaceNormal is Halcyon's unit normal averaged over the cell's two triangles.
 /// - llWind returns no z (Halcyon and YEngine).
 /// - iwSetWind is not implemented: estate managers and gods, who could call it on InWorldz, are told so on
 ///   DEBUG_CHANNEL; anyone else gets nothing, as before.

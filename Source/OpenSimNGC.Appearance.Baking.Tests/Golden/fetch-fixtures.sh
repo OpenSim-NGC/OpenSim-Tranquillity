@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Legion Builds
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Populate <set>/fixtures/ (gitignored) with one avatar's current wearables, the textures they
 # reference, and the reference bakes (LL compositor output, captured via the client-bake path
 # named in that set's manifest.json).

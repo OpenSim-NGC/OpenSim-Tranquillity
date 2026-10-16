@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 using Xunit;
 using Xunit.Abstractions;
@@ -22,9 +29,9 @@ public class RemainingStubTests
     // ------------------------------------------------------------------ sit flags
 
     /// <summary>
-    /// wiki: llSetLinkSitFlags "sets flags on the link's sittarget", llGetLinkSitFlags reads them.
-    /// ALLOW_UNSIT and SCRIPTED_ONLY land on the part properties the sit path honours; NO_COLLIDE and
-    /// NO_DAMAGE are stored and read back; SIT_TARGET is read-only and comes from the sit target.
+    /// wiki (https://wiki.secondlife.com/wiki/LlSetLinkSitFlags): llSetLinkSitFlags applies flags to the sit target of a
+    /// link, llGetLinkSitFlags reads them. ALLOW_UNSIT and SCRIPTED_ONLY land on the part properties the sit path honours;
+    /// NO_COLLIDE and NO_DAMAGE are stored and read back; SIT_TARGET is read-only and comes from the sit target.
     /// </summary>
     [Fact]
     public void SitFlagsSetOnTheLinkReadBackAndReachThePart()
@@ -49,9 +56,9 @@ public class RemainingStubTests
     // ------------------------------------------------------------------ llMinEventDelay
 
     /// <summary>
-    /// wiki: "Set the minimum time between events being handled" - a floor between handler starts,
-    /// events inside the window queued. Two touch_starts posted 10 ms apart with delay=1.0 must be
-    /// handled at least 1 s apart, and BOTH must be handled - nothing is dropped.
+    /// wiki (https://wiki.secondlife.com/wiki/LlMinEventDelay): the call fixes the shortest allowed gap between handled
+    /// events - a floor between handler starts, events inside the window queued. Two touch_starts posted 10 ms apart with
+    /// delay=1.0 must be handled at least 1 s apart, and BOTH must be handled - nothing is dropped.
     /// <para>
     /// The engine holds the floor on its own clock (Clock.Now, Environment.TickCount64 by default), which
     /// on Windows advances in 15-16 ms steps; the script reads llGetTime from DateTime.UtcNow. Measured
@@ -94,9 +101,9 @@ public class RemainingStubTests
     // ------------------------------------------------------------------ profiler
 
     /// <summary>
-    /// wiki: PROFILE_SCRIPT_MEMORY starts recording; after PROFILE_NONE, llGetSPMaxMemory "will return
-    /// the most memory used at any one time". Allocating a large list inside the window must raise the
-    /// peak above what was used before it; before this the answer was a constant 16384.
+    /// wiki (https://wiki.secondlife.com/wiki/LlGetSPMaxMemory): PROFILE_SCRIPT_MEMORY starts recording; after
+    /// PROFILE_NONE, llGetSPMaxMemory gives the highest memory use reached at any moment. Allocating a large list inside
+    /// the window must raise the peak above what was used before it; before this the answer was a constant 16384.
     /// </summary>
     [Fact]
     public void TheProfilerReportsThePeakOfMemoryUsedInsideTheWindow()

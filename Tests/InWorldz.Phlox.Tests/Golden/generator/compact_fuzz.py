@@ -1,3 +1,9 @@
+# Copyright (c) 2026 Legion Builds
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
 # Turns fuzz.py's corpus (one hex stream per line) and GzProbe's Framework results (one line each) into
 # gzip-decoder-vectors.jsonl: the base streams once, each case as a truncation or bit flip of a base or as raw hex,
 # each result as the output bytes (hex, when short) or their length and SHA-256, or the exception "Type: message".
