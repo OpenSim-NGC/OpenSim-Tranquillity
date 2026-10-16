@@ -36,12 +36,13 @@ namespace OpenSim.Framework;
 /// Chooses the address a viewer is given for a region, by the viewer's own source address.
 /// </summary>
 /// <remarks>
-/// Unset configuration returns the region's own endpoint for every viewer, exactly as before. When a
-/// public address is configured, a viewer whose source address is in a listed local network keeps the
-/// region's own address (or the address listed for that network) and every other viewer is given the
-/// public address. The port is never changed. While the public address is not known the viewer is
-/// given the region's own address. Server-to-server address use is not affected: only callers that
-/// build a message for a viewer ask this class.
+/// An empty list returns the region's own endpoint for every viewer, exactly as before. Otherwise the
+/// first entry of the operator's list whose network contains the viewer's source address decides: the
+/// entry's address (an IPv4 address, or a host name looked up through the operating system resolver),
+/// or, for an entry without one, the region's registered local address, else the region's own address.
+/// No match gives the region's own address. The port is never changed. While a host name is not
+/// resolved the viewer is given the region's own address. Server-to-server address use is not affected:
+/// only callers that build a message for a viewer ask this class.
 /// </remarks>
 public sealed class ViewerAddressSelector : IDisposable
 {
@@ -70,8 +71,8 @@ public sealed class ViewerAddressSelector : IDisposable
         if (config is null || !config.Enabled)
             return Disabled;
 
-        PublicAddressResolver resolver = config.PublicLiteral is null
-            ? new PublicAddressResolver(config.PublicDnsServer, config.RefreshInterval, log)
+        PublicAddressResolver resolver = config.Hosts.Count > 0
+            ? new PublicAddressResolver(config.RefreshInterval, log)
             : null;
         return new ViewerAddressSelector(config, resolver, true);
     }
@@ -79,19 +80,17 @@ public sealed class ViewerAddressSelector : IDisposable
     public bool Enabled => m_config.Enabled;
 
     /// <summary>
-    /// True when the configuration holds an address of this grid (PublicAddress, or a network's own address), so
-    /// that the answer depends on whether the destination is a region of another grid.
+    /// True when the list holds an address of this grid (an entry with an address or a host name), so that the
+    /// answer depends on whether the destination is a region of another grid.
     /// </summary>
-    public bool HoldsGridAddress => m_config.PublicLiteral is not null || m_config.PublicHost is not null
-        || m_config.LocalNetworks.Any(network => network.Address is not null);
+    public bool HoldsGridAddress => m_config.LocalNetworks.Any(network => network.Address is not null || network.Host is not null);
 
-    /// <param name="regionHostName">The region's ExternalHostName, looked up when no public host name is configured.</param>
     /// <param name="port">The port to hand out (the region's port).</param>
     /// <param name="localEndPoint">The region's own endpoint as resolved by the operating system; may be null.</param>
     /// <param name="viewerSource">The viewer's source address; null when unknown.</param>
     /// <param name="foreignDestination">True for a region of another grid (a hypergrid destination).</param>
     /// <param name="registeredLocal">The local address the region registered with the grid, or null when it did not.</param>
-    public IPEndPoint ForViewer(string regionHostName, int port, IPEndPoint localEndPoint, IPAddress viewerSource,
+    public IPEndPoint ForViewer(int port, IPEndPoint localEndPoint, IPAddress viewerSource,
         bool foreignDestination = false, IPAddress registeredLocal = null)
     {
         if (!m_config.Enabled || viewerSource is null)
@@ -103,26 +102,26 @@ public sealed class ViewerAddressSelector : IDisposable
         {
             if (!network.Contains(viewer))
                 continue;
-            // A network's address, and a region's registered local address, are addresses of this grid's own regions.
+
+            // The first entry that contains the viewer decides. Its address, and a region's registered local
+            // address, are addresses of this grid's own regions: never given for a region of another grid.
             if (foreignDestination)
                 return localEndPoint;
-            // A network listed with its own address keeps it; a bare network gives the address the region
-            // registered, else the region's own address as the operating system resolves it.
-            IPAddress local = network.Address ?? registeredLocal;
-            return local is null ? localEndPoint : new IPEndPoint(local, port);
+
+            IPAddress address = network.Address;
+            if (address is null && network.Host is not null)
+                address = m_resolver?.Resolve(network.Host);
+            else if (address is null)
+                address = registeredLocal;
+
+            return address is null ? localEndPoint : new IPEndPoint(address, port);
         }
 
-        // PublicAddress names this grid's own public address, so it is never given for a region of
-        // another grid. Without it the region's own host name is looked up, which is right for any grid.
-        if (foreignDestination && (m_config.PublicLiteral is not null || m_config.PublicHost is not null))
-            return localEndPoint;
-
-        IPAddress pub = m_config.PublicLiteral ?? m_resolver?.Resolve(m_config.PublicHost ?? regionHostName);
-        return pub is null ? localEndPoint : new IPEndPoint(pub, port);
+        return localEndPoint;
     }
 
-    /// <summary>Looks a host up through this selector's resolver; null when it is not known or there is no resolver.</summary>
-    public IPAddress LookupPublic(string host)
+    /// <summary>Looks a host name up through this selector's resolver; null when it is not known or there is no resolver.</summary>
+    public IPAddress LookupHost(string host)
     {
         return m_resolver?.Resolve(host);
     }

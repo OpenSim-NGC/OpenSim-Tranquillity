@@ -97,8 +97,13 @@ public class ViewerAddressWiringTests : OpenSimTestCase
         public GridRegion RegionC => new(SceneC.RegionInfo);
     }
 
+    /// <summary>A list that keeps the given networks on the region's own address (a bare network) and gives every other viewer the address.</summary>
+    private static string AddressList(string publicAddress, string localNetworks)
+        => string.IsNullOrEmpty(publicAddress) ? localNetworks
+            : (localNetworks.Length > 0 ? localNetworks + ", " : string.Empty) + "0.0.0.0/0=" + publicAddress;
+
     private static ViewerAddressSelector Selector(string publicAddress, string localNetworks)
-        => ViewerAddressSelector.Create(ViewerAddressConfig.Create(publicAddress, "", 0, localNetworks, null), null);
+        => ViewerAddressSelector.Create(ViewerAddressConfig.Create(AddressList(publicAddress, localNetworks), 0, null), null);
 
     /// <summary>
     /// A at 1000,1000 with a root viewer, B next to it, C out of draw distance. The selector is set after
@@ -239,8 +244,7 @@ public class ViewerAddressWiringTests : OpenSimTestCase
         TestHelpers.InMethod();
         IConfigSource config = new IniConfigSource();
         IConfig section = config.AddConfig("ViewerAddress");
-        section.Set("PublicAddress", PublicAddress);
-        section.Set("LocalNetworks", LocalNetworks);
+        section.Set("Addresses", AddressList(PublicAddress, LocalNetworks));
 
         Rig rig = Build(RemoteViewer, null, config);
 
@@ -249,25 +253,58 @@ public class ViewerAddressWiringTests : OpenSimTestCase
     }
 
     [Fact]
-    public void RegionSettingsReplaceTheSectionsPublicAddressAndLocalNetworks()
+    public void RegionSettingsReplaceTheSectionsAddresses()
     {
         TestHelpers.InMethod();
         static IConfigSource Section()
         {
             IConfigSource config = new IniConfigSource();
             IConfig section = config.AddConfig("ViewerAddress");
-            section.Set("PublicAddress", PublicAddress);
-            section.Set("LocalNetworks", "10.1.0.0/16");
+            section.Set("Addresses", AddressList(PublicAddress, "10.1.0.0/16"));
             return config;
         }
 
         // The viewer is on the network the region lists and gets the region's own address;
         // the section alone would have sent it the public one.
-        Rig lan = Build(LanViewer, null, Section(), ri => ri.SetExtraSetting("LocalNetworks", LocalNetworks));
+        Rig lan = Build(LanViewer, null, Section(), ri => ri.SetExtraSetting("Addresses", LocalNetworks));
         Assert.Equal(RegionOwn, lan.LastInform());
 
-        Rig remote = Build(RemoteViewer, null, Section(), ri => ri.SetExtraSetting("PublicAddress", "203.0.113.77"));
+        Rig remote = Build(RemoteViewer, null, Section(), ri => ri.SetExtraSetting("Addresses", "0.0.0.0/0=203.0.113.77"));
         Assert.Equal(new IPEndPoint(IPAddress.Parse("203.0.113.77"), 9000), remote.LastInform());
+    }
+
+    [Fact]
+    public void TheRemovedKeysChangeNothing()
+    {
+        TestHelpers.InMethod();
+        IConfigSource config = new IniConfigSource();
+        IConfig section = config.AddConfig("ViewerAddress");
+        section.Set("PublicAddress", PublicAddress);
+        section.Set("PublicDnsServer", "198.51.100.53");
+        section.Set("LocalNetworks", LocalNetworks);
+        section.Set("PublicRefreshMinutes", "5");
+
+        Rig rig = Build(RemoteViewer, null, config, ri =>
+        {
+            ri.SetExtraSetting("PublicAddress", "203.0.113.77");
+            ri.SetExtraSetting("LocalNetworks", LocalNetworks);
+        });
+
+        Assert.False(rig.EtmA.ViewerAddresses.Enabled);
+        Assert.Equal(RegionOwn, rig.LastInform());
+    }
+
+    [Fact]
+    public void AnEmptySectionLeavesTheSelectorDisabled()
+    {
+        TestHelpers.InMethod();
+        IConfigSource config = new IniConfigSource();
+        config.AddConfig("ViewerAddress");
+
+        Rig rig = Build(RemoteViewer, null, config);
+
+        Assert.False(rig.EtmA.ViewerAddresses.Enabled);
+        Assert.Equal(RegionOwn, rig.LastInform());
     }
 
     [Fact]
@@ -461,16 +498,14 @@ public class ViewerAddressWiringTests : OpenSimTestCase
     }
 
     [Fact]
-    public void WithOnlyADnsServerARegionOfAnotherGridIsResolvedByItsOwnName()
+    public void WithOnlyBareNetworksARegionOfAnotherGridKeepsItsOwnEndpoint()
     {
         TestHelpers.InMethod();
-        ViewerAddressSelector dnsOnly = ViewerAddressSelector.Create(
-            ViewerAddressConfig.Create("", "198.51.100.53", 0, LocalNetworks, null), null);
-        Rig rig = Build(RemoteViewer, dnsOnly);
+        Rig rig = Build(RemoteViewer, Selector("", LocalNetworks));
 
-        // The selector is enabled and, with no DNS server reachable, falls back to the region's own address.
         Assert.True(rig.EtmA.ViewerAddresses.Enabled);
         Assert.Equal(ForeignOwn, rig.EtmA.EndPointFor(ForeignRegion(), IPAddress.Parse(LanViewer)));
+        Assert.Equal(ForeignOwn, rig.EtmA.EndPointFor(ForeignRegion(), IPAddress.Parse(RemoteViewer)));
     }
 
     [Fact]

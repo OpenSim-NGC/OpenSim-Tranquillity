@@ -767,7 +767,7 @@ public class OpenSimBase : RegionApplicationBase, IOpenSimBase
             return;
 
         ViewerAddressSelector selector = ViewerAddressSelector.Create(config, m_log);
-        ViewerAddressStartupLog.Shared.ReportOnce(m_log, config, selector, regionInfo.ExternalHostName)
+        ViewerAddressStartupLog.Shared.ReportOnce(m_log, config, selector)
             .ContinueWith(_ => selector.Dispose());
     }
 

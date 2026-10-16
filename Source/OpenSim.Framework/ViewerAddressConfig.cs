@@ -36,14 +36,16 @@ namespace OpenSim.Framework;
 
 /// <summary>
 /// The [ViewerAddress] settings: which address a viewer is given for a region.
-/// With none of PublicAddress and PublicDnsServer set the section is disabled and every viewer is given
-/// the region's own address, as before; LocalNetworks alone changes nothing.
+/// With no Addresses entry the section is disabled and every viewer is given the region's own address,
+/// as before. Otherwise the operator's ordered list decides: the first entry whose network contains the
+/// viewer gives the address, and no match gives the region's own address.
 /// </summary>
 /// <remarks>
-/// Keys: PublicAddress (an IPv4 literal, or a host name), PublicDnsServer ("ip" or "ip:port", queried
-/// directly instead of the operating system resolver), PublicRefreshMinutes (default 30, 0 = never),
-/// LocalNetworks ("CIDR" or "CIDR=address", comma separated). The addresses handed to viewers are IPv4:
-/// the region's viewer protocol messages carry four address bytes.
+/// Keys: Addresses ("CIDR=address" or "CIDR", comma separated; the address is an IPv4 address or a host
+/// name, looked up through the operating system resolver), RefreshMinutes (default 30, 0 = never) and
+/// LocalAddress (the address a region registers for viewers on a bare "CIDR" network). Nothing is
+/// detected: every address handed out is one the operator wrote. The addresses are IPv4: the region's
+/// viewer protocol messages carry four address bytes.
 /// </remarks>
 public sealed class ViewerAddressConfig
 {
@@ -51,19 +53,14 @@ public sealed class ViewerAddressConfig
 
     public static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromMinutes(30);
 
-    /// <summary>The public address as an IPv4 literal, or null.</summary>
-    public IPAddress PublicLiteral { get; private set; }
-
-    /// <summary>The host name to resolve for the public address, or null to use the region's own host name.</summary>
-    public string PublicHost { get; private set; }
-
-    /// <summary>The DNS server queried directly, or null for the operating system resolver.</summary>
-    public IPEndPoint PublicDnsServer { get; private set; }
-
-    /// <summary>Interval between re-resolutions; zero disables them.</summary>
+    /// <summary>Interval between re-resolutions of host names; zero disables them.</summary>
     public TimeSpan RefreshInterval { get; private set; } = DefaultRefreshInterval;
 
+    /// <summary>The Addresses list, in the order the operator wrote it.</summary>
     public IReadOnlyList<LocalNetwork> LocalNetworks { get; private set; } = Array.Empty<LocalNetwork>();
+
+    /// <summary>The host names in the list, each once (the first spelling of a name that repeats).</summary>
+    public IReadOnlyList<string> Hosts { get; private set; } = Array.Empty<string>();
 
     /// <summary>The address this machine's regions register with the grid for viewers on a local network, or null.</summary>
     public IPAddress LocalAddress { get; private set; }
@@ -71,46 +68,23 @@ public sealed class ViewerAddressConfig
     /// <summary>The names of the keys that were set to a non-empty value, in the order they are documented.</summary>
     public IReadOnlyList<string> SetKeys { get; private set; } = Array.Empty<string>();
 
-    /// <summary>True when a public address is configured; otherwise every viewer gets the region's own address.</summary>
-    public bool Enabled => PublicLiteral is not null || PublicHost is not null || PublicDnsServer is not null;
+    /// <summary>True when the list has an entry; otherwise every viewer gets the region's own address.</summary>
+    public bool Enabled => LocalNetworks.Count > 0;
 
     public static ViewerAddressConfig Disabled { get; } = new();
 
-    public static ViewerAddressConfig Create(string publicAddress, string publicDnsServer, int refreshMinutes,
-        string localNetworks, ILogger log, string localAddress = null, bool refreshSet = false)
+    public static ViewerAddressConfig Create(string addresses, int refreshMinutes, ILogger log,
+        string localAddress = null, bool refreshSet = false)
     {
         ViewerAddressConfig config = new()
         {
             RefreshInterval = refreshMinutes > 0 ? TimeSpan.FromMinutes(refreshMinutes) : TimeSpan.Zero,
         };
 
-        publicAddress = publicAddress?.Trim();
-        if (!string.IsNullOrEmpty(publicAddress))
-        {
-            if (IPAddress.TryParse(publicAddress, out IPAddress literal) && (literal.AddressFamily == AddressFamily.InterNetworkV6
-                    || publicAddress.Split('.').Length == 4))
-            {
-                if (literal.AddressFamily == AddressFamily.InterNetwork && !literal.Equals(IPAddress.Any))
-                    config.PublicLiteral = literal;
-                else
-                    log?.LogWarning("[VIEWER ADDRESS]: PublicAddress \"{0}\" ignored: viewers can only be given an IPv4 address", publicAddress);
-            }
-            else if (Uri.CheckHostName(publicAddress) == UriHostNameType.Dns)
-                config.PublicHost = publicAddress;
-            else
-                log?.LogWarning("[VIEWER ADDRESS]: PublicAddress \"{0}\" ignored: not an IPv4 address or a host name", publicAddress);
-        }
-
-        publicDnsServer = publicDnsServer?.Trim();
-        if (!string.IsNullOrEmpty(publicDnsServer))
-        {
-            if (TryParseDnsServer(publicDnsServer, out IPEndPoint server))
-                config.PublicDnsServer = server;
-            else
-                log?.LogWarning("[VIEWER ADDRESS]: PublicDnsServer \"{0}\" ignored: not an IP address or ip:port", publicDnsServer);
-        }
-
-        config.LocalNetworks = LocalNetwork.ParseList(localNetworks, log);
+        List<LocalNetwork> entries = LocalNetwork.ParseList(addresses, log);
+        config.LocalNetworks = entries;
+        config.Hosts = entries.Where(entry => entry.Host is not null).Select(entry => entry.Host)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
 
         localAddress = localAddress?.Trim();
         if (!string.IsNullOrEmpty(localAddress))
@@ -119,14 +93,10 @@ public sealed class ViewerAddressConfig
         }
 
         List<string> keys = new();
-        if (!string.IsNullOrEmpty(publicAddress))
-            keys.Add("PublicAddress");
-        if (!string.IsNullOrEmpty(publicDnsServer))
-            keys.Add("PublicDnsServer");
+        if (!string.IsNullOrWhiteSpace(addresses))
+            keys.Add("Addresses");
         if (refreshSet)
-            keys.Add("PublicRefreshMinutes");
-        if (!string.IsNullOrWhiteSpace(localNetworks))
-            keys.Add("LocalNetworks");
+            keys.Add("RefreshMinutes");
         if (!string.IsNullOrEmpty(localAddress))
             keys.Add("LocalAddress");
         config.SetKeys = keys;
@@ -163,13 +133,11 @@ public sealed class ViewerAddressConfig
         if (section is null)
             return Disabled;
 
-        return Create(section.GetString("PublicAddress", string.Empty),
-            section.GetString("PublicDnsServer", string.Empty),
-            section.GetInt("PublicRefreshMinutes", (int)DefaultRefreshInterval.TotalMinutes),
-            section.GetString("LocalNetworks", string.Empty),
+        return Create(section.GetString("Addresses", string.Empty),
+            section.GetInt("RefreshMinutes", (int)DefaultRefreshInterval.TotalMinutes),
             log,
             section.GetString("LocalAddress", string.Empty),
-            !string.IsNullOrWhiteSpace(section.GetString("PublicRefreshMinutes", string.Empty)));
+            !string.IsNullOrWhiteSpace(section.GetString("RefreshMinutes", string.Empty)));
     }
 
     /// <summary>
@@ -186,28 +154,5 @@ public sealed class ViewerAddressConfig
 
         IPAddress parsed = ParseLocalAddress(value.Trim(), log);
         region.ViewerLocalAddress = parsed?.ToString();
-    }
-
-    /// <summary>"ip" (port 53) or "ip:port" / "[v6]:port".</summary>
-    public static bool TryParseDnsServer(string value, out IPEndPoint endpoint)
-    {
-        endpoint = null;
-        if (string.IsNullOrWhiteSpace(value))
-            return false;
-
-        value = value.Trim();
-        if (IPAddress.TryParse(value, out IPAddress bare))
-        {
-            endpoint = new IPEndPoint(bare, 53);
-            return true;
-        }
-
-        if (IPEndPoint.TryParse(value, out IPEndPoint parsed) && parsed.Port != 0)
-        {
-            endpoint = parsed;
-            return true;
-        }
-
-        return false;
     }
 }

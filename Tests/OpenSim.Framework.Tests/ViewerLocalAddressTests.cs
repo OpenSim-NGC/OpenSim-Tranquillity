@@ -61,14 +61,14 @@ public class ViewerLocalAddressTests
     private static readonly IPAddress s_registered = IPAddress.Parse("10.0.0.20");
     private static IPAddress Ip(string s) => IPAddress.Parse(s);
 
-    private static ViewerAddressConfig Cfg(string pub = "", string dns = "", string nets = "", string local = "",
+    private static ViewerAddressConfig Cfg(string addresses = "", string local = "",
         int refresh = 30, bool refreshSet = false, ILogger? log = null)
-        => ViewerAddressConfig.Create(pub, dns, refresh, nets, log, local, refreshSet);
+        => ViewerAddressConfig.Create(addresses, refresh, log, local, refreshSet);
 
-    private static ViewerAddressSelector Sel(ViewerAddressConfig cfg, Func<string, IPEndPoint, IPAddress?>? direct = null)
+    /// <summary>A selector whose host name lookups go to <paramref name="os"/> (default: the public test address).</summary>
+    private static ViewerAddressSelector Sel(ViewerAddressConfig cfg, Func<string, IPAddress?>? os = null)
     {
-        PublicAddressResolver r = new(cfg.PublicDnsServer, TimeSpan.Zero, new CapturingLogger(),
-            osResolver: _ => null!, directResolver: direct ?? ((_, _) => s_pub)!);
+        PublicAddressResolver r = new(TimeSpan.Zero, new CapturingLogger(), osResolver: os ?? (_ => s_pub)!);
         return new ViewerAddressSelector(cfg, r);
     }
 
@@ -86,15 +86,15 @@ public class ViewerLocalAddressTests
     [Fact]
     public void Every_key_set_is_listed_in_the_documented_order()
     {
-        ViewerAddressConfig cfg = Cfg("region.example.org", "9.9.9.9", "10.0.0.0/8", "192.168.1.10", 15, refreshSet: true);
-        Assert.Equal(new[] { "PublicAddress", "PublicDnsServer", "PublicRefreshMinutes", "LocalNetworks", "LocalAddress" }, cfg.SetKeys);
+        ViewerAddressConfig cfg = Cfg("10.0.0.0/8=region.example.org", "192.168.1.10", 15, refreshSet: true);
+        Assert.Equal(new[] { "Addresses", "RefreshMinutes", "LocalAddress" }, cfg.SetKeys);
     }
 
     [Fact]
     public void A_refresh_value_counts_as_a_key_only_when_it_was_set()
     {
         Assert.Empty(Cfg(refresh: 30).SetKeys);
-        Assert.Equal(new[] { "PublicRefreshMinutes" }, Cfg(refresh: 30, refreshSet: true).SetKeys);
+        Assert.Equal(new[] { "RefreshMinutes" }, Cfg(refresh: 30, refreshSet: true).SetKeys);
     }
 
     [Fact]
@@ -102,12 +102,12 @@ public class ViewerLocalAddressTests
     {
         IniConfigSource source = new();
         IConfig section = source.AddConfig(ViewerAddressConfig.SectionName);
-        section.Set("LocalNetworks", "192.168.0.0/16");
-        section.Set("PublicRefreshMinutes", "30");
-        section.Set("PublicDnsServer", "");
+        section.Set("Addresses", "192.168.0.0/16");
+        section.Set("RefreshMinutes", "30");
+        section.Set("LocalAddress", "");
 
         ViewerAddressConfig cfg = ViewerAddressConfig.FromConfig(section, null);
-        Assert.Equal(new[] { "PublicRefreshMinutes", "LocalNetworks" }, cfg.SetKeys);
+        Assert.Equal(new[] { "Addresses", "RefreshMinutes" }, cfg.SetKeys);
     }
 
     // ---- LocalAddress ----
@@ -135,58 +135,67 @@ public class ViewerLocalAddressTests
 
     // ---- the selector with a registered local address ----
 
+    private const string LanAndPublic = "192.168.0.0/16, 0.0.0.0/0=198.51.100.7";
+
     [Fact]
     public void A_bare_network_gives_a_local_viewer_the_address_the_region_registered()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16"));
+        ViewerAddressSelector s = Sel(Cfg(LanAndPublic));
         Assert.Equal(new IPEndPoint(s_registered, 9000),
-            s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55"), false, s_registered));
+            s.ForViewer(9000, s_local, Ip("192.168.1.55"), false, s_registered));
     }
 
     [Fact]
     public void Without_a_registered_address_a_local_viewer_gets_the_resolved_one_as_before()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16"));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55"), false, null));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55")));
+        ViewerAddressSelector s = Sel(Cfg(LanAndPublic));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("192.168.1.55"), false, null));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("192.168.1.55")));
     }
 
     [Fact]
     public void A_network_with_its_own_address_keeps_that_address_over_the_registered_one()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16=192.168.1.99"));
+        ViewerAddressSelector s = Sel(Cfg("192.168.0.0/16=192.168.1.99"));
         Assert.Equal(new IPEndPoint(Ip("192.168.1.99"), 9000),
-            s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55"), false, s_registered));
+            s.ForViewer(9000, s_local, Ip("192.168.1.55"), false, s_registered));
     }
 
     [Fact]
-    public void A_viewer_outside_the_local_networks_gets_the_public_address_not_the_registered_one()
+    public void A_network_with_a_host_name_keeps_that_address_over_the_registered_one()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16"));
+        ViewerAddressSelector s = Sel(Cfg("192.168.0.0/16=lan.example.org"), os: _ => Ip("192.168.1.98"));
+        Assert.Equal(new IPEndPoint(Ip("192.168.1.98"), 9000),
+            s.ForViewer(9000, s_local, Ip("192.168.1.55"), false, s_registered));
+    }
+
+    [Fact]
+    public void A_viewer_outside_the_bare_network_gets_its_own_entrys_address_not_the_registered_one()
+    {
+        ViewerAddressSelector s = Sel(Cfg(LanAndPublic));
         Assert.Equal(new IPEndPoint(s_pub, 9000),
-            s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9"), false, s_registered));
+            s.ForViewer(9000, s_local, Ip("203.0.113.9"), false, s_registered));
     }
 
     [Fact]
     public void A_region_of_another_grid_never_gets_a_registered_address()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16"));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55"), true, s_registered));
+        ViewerAddressSelector s = Sel(Cfg(LanAndPublic));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("192.168.1.55"), true, s_registered));
     }
 
     [Fact]
-    public void Without_a_public_address_the_registered_one_is_not_used()
+    public void With_no_list_the_registered_address_is_not_used()
     {
-        ViewerAddressSelector s = Sel(Cfg(nets: "192.168.0.0/16"));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55"), false, s_registered));
-        Assert.Same(s_local, ViewerAddressSelector.Disabled.ForViewer(Host, 9000, s_local, Ip("192.168.1.55"), false, s_registered));
+        Assert.Same(s_local, ViewerAddressSelector.Disabled.ForViewer(9000, s_local, Ip("192.168.1.55"), false, s_registered));
+        Assert.Same(s_local, Sel(Cfg()).ForViewer(9000, s_local, Ip("192.168.1.55"), false, s_registered));
     }
 
     [Fact]
     public void An_unknown_viewer_source_gets_the_local_endpoint()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16"));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, null, false, s_registered));
+        ViewerAddressSelector s = Sel(Cfg(LanAndPublic));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, null, false, s_registered));
     }
 
     // ---- LocalAddress for a region ----
@@ -255,11 +264,11 @@ public class ViewerLocalAddressTests
     // ---- the start-up line ----
 
     private static async Task<List<string>> Report(ViewerAddressConfig cfg, ViewerAddressStartupLog? startup = null,
-        Func<string, IPEndPoint, IPAddress?>? direct = null, string? fallbackHost = Host, CapturingLogger? log = null)
+        Func<string, IPAddress?>? os = null, CapturingLogger? log = null)
     {
         log ??= new CapturingLogger();
-        ViewerAddressSelector selector = Sel(cfg, direct);
-        await (startup ?? new ViewerAddressStartupLog()).ReportOnce(log, cfg, selector, fallbackHost);
+        ViewerAddressSelector selector = Sel(cfg, os);
+        await (startup ?? new ViewerAddressStartupLog()).ReportOnce(log, cfg, selector);
         return log.Infos();
     }
 
@@ -268,26 +277,24 @@ public class ViewerLocalAddressTests
     {
         CapturingLogger log = new();
         int lookups = 0;
-        await Report(Cfg(), direct: (_, _) => { lookups++; return s_pub; }, log: log);
+        await Report(Cfg(), os: _ => { lookups++; return s_pub; }, log: log);
         Assert.Empty(log.Entries);
         Assert.Equal(0, lookups);
 
-        Assert.Empty(log.Entries);
-        await new ViewerAddressStartupLog().ReportOnce(log, ViewerAddressConfig.Disabled, ViewerAddressSelector.Disabled, Host);
+        await new ViewerAddressStartupLog().ReportOnce(log, ViewerAddressConfig.Disabled, ViewerAddressSelector.Disabled);
         Assert.Empty(log.Entries);
     }
 
     [Fact]
-    public async Task With_keys_set_one_line_names_the_keys_the_networks_and_the_lookup_result()
+    public async Task With_keys_set_one_line_names_the_keys_the_entries_and_the_lookup_result()
     {
-        List<string> lines = await Report(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16, 10.0.0.0/8=10.0.0.1"));
+        List<string> lines = await Report(Cfg("192.168.0.0/16, 10.0.0.0/8=10.0.0.1, 0.0.0.0/0=region.example.org"));
 
         string line = Assert.Single(lines);
         Assert.Contains("section is active", line);
-        Assert.Contains("PublicDnsServer", line);
-        Assert.Contains("LocalNetworks", line);
-        Assert.DoesNotContain("PublicAddress", line);
-        Assert.Contains("local networks: 2", line);
+        Assert.Contains("Addresses", line);
+        Assert.DoesNotContain("LocalAddress", line);
+        Assert.Contains("entries: 3", line);
         Assert.Contains(Host, line);
         Assert.Contains("succeeded", line);
         Assert.Contains("198.51.100.7", line);
@@ -296,44 +303,44 @@ public class ViewerLocalAddressTests
     [Fact]
     public async Task A_failed_first_lookup_is_reported_as_failed()
     {
-        List<string> lines = await Report(Cfg(dns: "9.9.9.9"), direct: (_, _) => null);
+        List<string> lines = await Report(Cfg("0.0.0.0/0=region.example.org"), os: _ => null);
 
         string line = Assert.Single(lines);
         Assert.Contains("failed", line);
         Assert.DoesNotContain("succeeded", line);
-        Assert.Contains("local networks: 0", line);
+        Assert.Contains("entries: 1", line);
     }
 
     [Fact]
-    public async Task A_configured_host_name_is_the_one_looked_up()
+    public async Task Every_host_name_in_the_list_is_looked_up_once()
     {
-        string? asked = null;
-        await Report(Cfg(pub: "grid.example.org", dns: "9.9.9.9"), direct: (host, _) => { asked = host; return s_pub; });
-        Assert.Equal("grid.example.org", asked);
+        List<string> asked = new();
+        await Report(Cfg("10.0.0.0/8=grid.example.org, 0.0.0.0/0=other.example.org, 192.168.0.0/16=GRID.example.org"),
+            os: host => { lock (asked) asked.Add(host); return s_pub; });
+        Assert.Equal(new[] { "grid.example.org", "other.example.org" }, asked.OrderBy(h => h).ToArray());
     }
 
     [Fact]
-    public async Task A_literal_public_address_needs_no_lookup()
+    public async Task A_list_of_address_literals_needs_no_lookup()
     {
         int lookups = 0;
-        List<string> lines = await Report(Cfg(pub: "203.0.113.9"), direct: (_, _) => { lookups++; return s_pub; });
+        List<string> lines = await Report(Cfg("0.0.0.0/0=203.0.113.9"), os: _ => { lookups++; return s_pub; });
 
         string line = Assert.Single(lines);
-        Assert.Contains("PublicAddress", line);
-        Assert.Contains("203.0.113.9", line);
-        Assert.Contains("no lookup", line);
+        Assert.Contains("Addresses", line);
+        Assert.Contains("no host names", line);
         Assert.Equal(0, lookups);
     }
 
     [Fact]
-    public async Task Only_local_networks_set_is_reported_without_a_lookup()
+    public async Task Only_a_local_address_set_is_reported_without_a_lookup()
     {
         int lookups = 0;
-        List<string> lines = await Report(Cfg(nets: "192.168.0.0/16"), direct: (_, _) => { lookups++; return s_pub; });
+        List<string> lines = await Report(Cfg(local: "192.168.1.10"), os: _ => { lookups++; return s_pub; });
 
         string line = Assert.Single(lines);
-        Assert.Contains("LocalNetworks", line);
-        Assert.Contains("no public address", line);
+        Assert.Contains("LocalAddress", line);
+        Assert.Contains("entries: 0", line);
         Assert.Equal(0, lookups);
     }
 
@@ -342,7 +349,7 @@ public class ViewerLocalAddressTests
     {
         CapturingLogger log = new();
         ViewerAddressStartupLog startup = new();
-        ViewerAddressConfig cfg = Cfg(dns: "9.9.9.9");
+        ViewerAddressConfig cfg = Cfg("0.0.0.0/0=region.example.org");
 
         await Report(cfg, startup, log: log);
         await Report(cfg, startup, log: log);
@@ -353,7 +360,7 @@ public class ViewerLocalAddressTests
     [Fact]
     public async Task A_lookup_that_throws_is_reported_as_failed_and_does_not_escape()
     {
-        List<string> lines = await Report(Cfg(dns: "9.9.9.9"), direct: (_, _) => throw new InvalidOperationException("boom"));
+        List<string> lines = await Report(Cfg("0.0.0.0/0=region.example.org"), os: _ => throw new InvalidOperationException("boom"));
         Assert.Contains("failed", Assert.Single(lines));
     }
 }

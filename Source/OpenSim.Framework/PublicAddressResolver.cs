@@ -30,28 +30,24 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
-using DnsClient;
 using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
 /// <summary>
-/// Resolves host names to the IPv4 address a viewer outside the local network should be given, and
-/// keeps the answers fresh.
+/// Resolves the host names of the [ViewerAddress] Addresses list to the IPv4 address a viewer should be
+/// given, and keeps the answers fresh.
 /// </summary>
 /// <remarks>
-/// With a DNS server configured the name is looked up by asking that server directly, so a hosts-file
-/// entry or split-horizon answer on this machine cannot replace the public address. Without one the
-/// operating system resolver is used. An answer is kept until a later lookup gives another one: a
-/// failed refresh never replaces a good address. A name that cannot be resolved is not asked again for
-/// <see cref="FailureRetryInterval"/>, so a dead DNS server cannot stall every viewer message.
-/// Only IPv4 answers are accepted (the viewer messages carry four address bytes).
+/// Every name is looked up through the operating system resolver, so the hosts file and the system's
+/// resolver settings decide the answer; no DNS query is sent by this class. An answer is kept until a
+/// later lookup gives another one: a failed refresh never replaces a good address. A name that cannot be
+/// resolved is not asked again for <see cref="FailureRetryInterval"/>, so a dead DNS server cannot stall
+/// every viewer message. Only IPv4 answers are accepted (the viewer messages carry four address bytes).
 /// </remarks>
 public sealed class PublicAddressResolver : IDisposable
 {
     public static readonly TimeSpan FailureRetryInterval = TimeSpan.FromSeconds(30);
-
-    private static readonly TimeSpan s_directQueryTimeout = TimeSpan.FromSeconds(5);
 
     private sealed class Entry
     {
@@ -61,48 +57,32 @@ public sealed class PublicAddressResolver : IDisposable
     }
 
     private readonly ILogger m_log;
-    private readonly IPEndPoint m_dnsServer;
     private readonly TimeSpan m_refreshInterval;
     private readonly Func<string, IPAddress> m_osResolver;
-    private readonly Func<string, IPEndPoint, IPAddress> m_directResolver;
     private readonly TimeProvider m_time;
     private readonly ConcurrentDictionary<string, Entry> m_entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly object m_timerLock = new();
-    private LookupClient m_lookupClient;
     private Timer m_timer;
     private int m_disposed;
-    private readonly bool m_acceptIPv6;
 
-    /// <param name="acceptIPv6">
-    /// Also accept an IPv6 answer or literal. For callers that compare addresses and never put one in a viewer
-    /// message; an IPv4 answer is still preferred over an IPv6 one.
-    /// </param>
-    /// <param name="dnsServer">DNS server to query directly, or null for the operating system resolver.</param>
     /// <param name="refreshInterval">Period of the automatic refresh; zero or less disables it. The timer starts with the first resolved name.</param>
-    public PublicAddressResolver(IPEndPoint dnsServer, TimeSpan refreshInterval, ILogger log,
+    /// <param name="osResolver">Name lookup; defaults to <see cref="Util.GetHostFromDNS"/>, the operating system resolver.</param>
+    public PublicAddressResolver(TimeSpan refreshInterval, ILogger log,
         Func<string, IPAddress> osResolver = null,
-        Func<string, IPEndPoint, IPAddress> directResolver = null,
-        TimeProvider time = null,
-        bool acceptIPv6 = false)
+        TimeProvider time = null)
     {
-        m_dnsServer = dnsServer;
         m_refreshInterval = refreshInterval > TimeSpan.Zero ? refreshInterval : TimeSpan.Zero;
         m_log = log ?? LoggerProvider.CreateLogger<PublicAddressResolver>();
         m_osResolver = osResolver ?? Util.GetHostFromDNS;
-        m_directResolver = directResolver ?? QueryDnsServer;
         m_time = time ?? TimeProvider.System;
-        m_acceptIPv6 = acceptIPv6;
     }
 
-    private bool Acceptable(IPAddress ip)
+    private static bool Acceptable(IPAddress ip)
     {
-        if (ip.Equals(IPAddress.Any) || ip.Equals(IPAddress.IPv6Any))
-            return false;
-        return ip.AddressFamily == AddressFamily.InterNetwork
-            || (m_acceptIPv6 && ip.AddressFamily == AddressFamily.InterNetworkV6);
+        return ip.AddressFamily == AddressFamily.InterNetwork && !ip.Equals(IPAddress.Any);
     }
 
-    /// <summary>The address of the host (IPv4 unless the resolver was made to accept IPv6), or null when it is not known (yet).</summary>
+    /// <summary>The IPv4 address of the host, or null when it is not known (yet).</summary>
     public IPAddress Resolve(string host)
     {
         if (string.IsNullOrWhiteSpace(host))
@@ -144,7 +124,7 @@ public sealed class PublicAddressResolver : IDisposable
         IPAddress ip = null;
         try
         {
-            ip = m_dnsServer is not null ? m_directResolver(host, m_dnsServer) : m_osResolver(host);
+            ip = m_osResolver(host);
         }
         catch (Exception e)
         {
@@ -199,55 +179,6 @@ public sealed class PublicAddressResolver : IDisposable
         {
             m_log.LogWarning(e, "[VIEWER ADDRESS]: unexpected error during scheduled refresh");
         }
-    }
-
-    private IPAddress QueryDnsServer(string host, IPEndPoint dnsServer)
-    {
-        LookupClient client = m_lookupClient;
-        if (client is null)
-        {
-            LookupClientOptions options = new(dnsServer)
-            {
-                UseCache = false,
-                Timeout = s_directQueryTimeout,
-                Retries = 2,
-                ThrowDnsErrors = false,
-                UseTcpFallback = true,
-            };
-            client = new LookupClient(options);
-            m_lookupClient = client;
-        }
-
-        IDnsQueryResponse response = client.Query(host, QueryType.A);
-        if (response.HasError)
-        {
-            m_log.LogWarning("[VIEWER ADDRESS]: DNS server {0} answered the A query for {1} with error: {2}",
-                dnsServer, host, response.ErrorMessage);
-            if (!m_acceptIPv6)
-                return null;
-        }
-
-        foreach (DnsClient.Protocol.ARecord record in response.Answers.ARecords())
-        {
-            if (record.Address.AddressFamily == AddressFamily.InterNetwork)
-                return record.Address;
-        }
-
-        if (!m_acceptIPv6)
-            return null;
-
-        response = client.Query(host, QueryType.AAAA);
-        if (response.HasError)
-        {
-            m_log.LogWarning("[VIEWER ADDRESS]: DNS server {0} answered the AAAA query for {1} with error: {2}",
-                dnsServer, host, response.ErrorMessage);
-            return null;
-        }
-
-        foreach (DnsClient.Protocol.AaaaRecord record in response.Answers.AaaaRecords())
-            return record.Address;
-
-        return null;
     }
 
     public void Dispose()

@@ -455,17 +455,6 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         return htgGrid.Equals(thisGridExternalName, StringComparison.InvariantCultureIgnoreCase);
     }
 
-    /// <summary>
-    /// A reported client address is accepted when it is the address recorded at login or, as the NAT
-    /// fallback, the public address of this grid.
-    /// </summary>
-    public static bool ClientIPMatches(string loginIP, string reportedIP, string externalIP)
-    {
-        if (loginIP == reportedIP)
-            return true;
-        return !string.IsNullOrEmpty(externalIP) && reportedIP == externalIP; // NATed
-    }
-
     public bool VerifyClient(UUID sessionID, string reportedIP)
     {
         if (m_BypassClientVerification)
@@ -480,7 +469,9 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
         TravelingAgentInfo travel = new(hgt);
 
-        bool result = ClientIPMatches(travel.ClientIPAddress, reportedIP, m_MyExternalIP);
+        bool result = travel.ClientIPAddress == reportedIP;
+        if(!result && !string.IsNullOrEmpty(m_MyExternalIP))
+            result = reportedIP == m_MyExternalIP; // NATed
 
         m_log.LogDebug("[USER AGENT SERVICE]: Comparing {0} with login IP {1} and MyIP {2}; result is {3}",
                             reportedIP, travel.ClientIPAddress, m_MyExternalIP, result);

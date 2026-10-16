@@ -294,27 +294,21 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     }
 
     /// <summary>
-    /// Reads [ViewerAddress] for a region. A PublicAddress or LocalNetworks key in the region's own
-    /// settings replaces the section's value for that region.
+    /// Reads [ViewerAddress] for a region. An Addresses key in the region's own settings replaces the
+    /// section's list for that region.
     /// </summary>
     private static ViewerAddressSelector CreateViewerAddresses(IConfig section, RegionInfo regionInfo)
     {
-        string publicAddress = section?.GetString("PublicAddress", string.Empty);
-        string localNetworks = section?.GetString("LocalNetworks", string.Empty);
+        string addresses = section?.GetString("Addresses", string.Empty);
 
-        string regionPublic = regionInfo?.GetSetting("PublicAddress");
-        if (!string.IsNullOrWhiteSpace(regionPublic))
-            publicAddress = regionPublic;
+        string regionAddresses = regionInfo?.GetSetting("Addresses");
+        if (!string.IsNullOrWhiteSpace(regionAddresses))
+            addresses = regionAddresses;
 
-        string regionNetworks = regionInfo?.GetSetting("LocalNetworks");
-        if (!string.IsNullOrWhiteSpace(regionNetworks))
-            localNetworks = regionNetworks;
-
-        ViewerAddressConfig config = ViewerAddressConfig.Create(publicAddress,
-            section?.GetString("PublicDnsServer", string.Empty),
-            section?.GetInt("PublicRefreshMinutes", (int)ViewerAddressConfig.DefaultRefreshInterval.TotalMinutes)
+        ViewerAddressConfig config = ViewerAddressConfig.Create(addresses,
+            section?.GetInt("RefreshMinutes", (int)ViewerAddressConfig.DefaultRefreshInterval.TotalMinutes)
                 ?? (int)ViewerAddressConfig.DefaultRefreshInterval.TotalMinutes,
-            localNetworks, m_log);
+            m_log);
 
         return ViewerAddressSelector.Create(config, m_log);
     }
@@ -333,7 +327,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         // address for a viewer on a local network when the region is on another machine than this one.
         ViewerAddressConfig.TryParseLocalAddress(region.ViewerLocalAddress, out IPAddress registered);
 
-        return m_viewerAddresses.ForViewer(region.ExternalHostName, local.Port, local, viewerSource,
+        return m_viewerAddresses.ForViewer(local.Port, local, viewerSource,
             (m_viewerAddresses.HoldsGridAddress || registered is not null) && IsForeignRegion(region), registered);
     }
 

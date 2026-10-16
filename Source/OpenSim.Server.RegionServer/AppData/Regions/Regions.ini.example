@@ -29,8 +29,7 @@ ExternalHostName = SYSTEMIP
 ; * in OpenSim.ini for what they do, the default (unset: every viewer is given the address
 ; * ExternalHostName resolves to on this machine) and the known limit (the public port is InternalPort).
 ; *
-; PublicAddress = ""
-; LocalNetworks = ""
+; Addresses = ""
 ; LocalAddress = ""
 
 ;; Estate ID or Name to connect region to, leave blank for console prompt, remember estate id can not be less than 100

@@ -34,9 +34,10 @@ using Microsoft.Extensions.Logging;
 namespace OpenSim.Framework;
 
 /// <summary>
-/// A network whose viewers are given a local address of a region: written as "CIDR" or "CIDR=address".
-/// A bare CIDR means the region's own (operating system resolved) address; an address after the "="
-/// names the address to hand out to that network instead. A host without a prefix is a /32 (/128).
+/// One entry of the [ViewerAddress] Addresses list: a viewer network and the address its viewers are given,
+/// written as "CIDR=address" or just "CIDR". The address is an IPv4 address or a host name. A bare CIDR
+/// means the region's registered local address if it has one, else the region's own (operating system
+/// resolved) address. A host without a prefix is a /32 (/128).
 /// </summary>
 public sealed class LocalNetwork
 {
@@ -45,16 +46,20 @@ public sealed class LocalNetwork
 
     public int PrefixLength { get; }
 
-    /// <summary>The IPv4 address handed to viewers on this network, or null for the region's own address.</summary>
+    /// <summary>The IPv4 address handed to viewers on this network, or null (a host name, or the region's own address).</summary>
     public IPAddress Address { get; }
 
-    public LocalNetwork(IPAddress network, int prefixLength, IPAddress address)
+    /// <summary>The host name whose address is handed to viewers on this network, or null.</summary>
+    public string Host { get; }
+
+    public LocalNetwork(IPAddress network, int prefixLength, IPAddress address, string host = null)
     {
         if (network.IsIPv4MappedToIPv6)
             network = network.MapToIPv4();
         Network = Mask(network, prefixLength);
         PrefixLength = prefixLength;
         Address = address;
+        Host = host;
     }
 
     public bool Contains(IPAddress ip)
@@ -94,15 +99,25 @@ public sealed class LocalNetwork
 
         string cidr = entry.Trim();
         IPAddress address = null;
+        string host = null;
         int eq = cidr.IndexOf('=');
         if (eq >= 0)
         {
             string addressText = cidr[(eq + 1)..].Trim();
             cidr = cidr[..eq].Trim();
-            if (!TryParseIp(addressText, out address) || address.AddressFamily != AddressFamily.InterNetwork
-                || address.Equals(IPAddress.Any))
+            if (TryParseIp(addressText, out address))
             {
-                error = $"\"{addressText}\" is not an IPv4 address";
+                if (address.AddressFamily != AddressFamily.InterNetwork || address.Equals(IPAddress.Any))
+                {
+                    error = $"\"{addressText}\" is not an IPv4 address";
+                    return false;
+                }
+            }
+            else if (IsHostName(addressText))
+                host = addressText;
+            else
+            {
+                error = $"\"{addressText}\" is not an IPv4 address or a host name";
                 return false;
             }
         }
@@ -142,11 +157,11 @@ public sealed class LocalNetwork
             return false;
         }
 
-        network = new LocalNetwork(ip, prefix, address);
+        network = new LocalNetwork(ip, prefix, address, host);
         return true;
     }
 
-    /// <summary>Parses a comma or semicolon separated list; an entry that does not parse is skipped with a warning.</summary>
+    /// <summary>Parses a comma or semicolon separated list; an entry that does not parse is logged and skipped.</summary>
     public static List<LocalNetwork> ParseList(string value, ILogger log)
     {
         List<LocalNetwork> list = new();
@@ -158,9 +173,32 @@ public sealed class LocalNetwork
             if (TryParse(part, out LocalNetwork n, out string error))
                 list.Add(n);
             else
-                log?.LogWarning("[VIEWER ADDRESS]: LocalNetworks entry \"{0}\" ignored: {1}", part, error);
+                log?.LogWarning("[VIEWER ADDRESS]: Addresses entry \"{0}\" ignored: {1}", part, error);
         }
         return list;
+    }
+
+    // Letters, digits and hyphens in dot separated labels of 1 to 63 characters, no label starting or ending with a
+    // hyphen. A name made only of digits and dots is a mistyped address, not a host name.
+    private static bool IsHostName(string text)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length > 253)
+            return false;
+
+        bool onlyDigitsAndDots = true;
+        foreach (string label in text.Split('.'))
+        {
+            if (label.Length is 0 or > 63 || label[0] == '-' || label[^1] == '-')
+                return false;
+            foreach (char c in label)
+            {
+                if (!(c is >= 'a' and <= 'z' or >= 'A' and <= 'Z' or >= '0' and <= '9' or '-'))
+                    return false;
+                if (!char.IsAsciiDigit(c))
+                    onlyDigitsAndDots = false;
+            }
+        }
+        return !onlyDigitsAndDots;
     }
 
     // IPAddress.TryParse accepts "10" and "192.168.1" as shorthand addresses; a network list never means that.

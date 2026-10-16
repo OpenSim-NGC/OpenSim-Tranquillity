@@ -55,9 +55,12 @@ public class LoginViewerAddressTests
     private const string LanViewer = "192.168.1.50";
     private const string RemoteViewer = "203.0.113.25";
 
+    /// <summary>The viewers on <paramref name="networks"/> keep the region's own address; every other viewer is given <paramref name="publicAddress"/>.</summary>
     private static ViewerAddressSelector Selector(string publicAddress = "198.51.100.7", string networks = "192.168.0.0/16")
         => ViewerAddressSelector.Create(
-            ViewerAddressConfig.Create(publicAddress, string.Empty, 30, networks, NullLogger.Instance), NullLogger.Instance);
+            ViewerAddressConfig.Create(
+                networks + (publicAddress.Length > 0 ? ", 0.0.0.0/0=" + publicAddress : string.Empty), 30, NullLogger.Instance),
+            NullLogger.Instance);
 
     private static GridRegion Region() => new()
     {
@@ -119,7 +122,7 @@ public class LoginViewerAddressTests
     }
 
     [Fact]
-    public void LocalNetworksAlone_ChangeNothing()
+    public void BareNetworksAlone_ChangeNothing()
     {
         LLLoginResponse r = Response(RemoteViewer, Selector(publicAddress: string.Empty));
 
@@ -201,11 +204,21 @@ public class LoginViewerAddressTests
     [Fact]
     public void WithNoKeys_ARegisteredLocalAddressChangesNothing()
     {
-        foreach (ViewerAddressSelector? selector in new[] { null, ViewerAddressSelector.Disabled, Selector(publicAddress: string.Empty) })
+        ViewerAddressSelector emptyList = ViewerAddressSelector.Create(ViewerAddressConfig.Create(string.Empty, 30, NullLogger.Instance), NullLogger.Instance);
+        foreach (ViewerAddressSelector? selector in new[] { null, ViewerAddressSelector.Disabled, emptyList })
         {
             Assert.Equal("192.168.1.10", Xml(Response(LanViewer, selector, destination: RegionRegistered())));
             Assert.Equal("192.168.1.10", Llsd(Response(RemoteViewer, selector, destination: RegionRegistered())));
         }
+    }
+
+    [Fact]
+    public void ABareNetworkAlone_GivesItsViewersTheRegisteredAddress_AndOthersTheRegionsOwn()
+    {
+        ViewerAddressSelector bareOnly = Selector(publicAddress: string.Empty);
+
+        Assert.Equal("192.0.2.77", Xml(Response(LanViewer, bareOnly, destination: RegionRegistered())));
+        Assert.Equal("192.168.1.10", Xml(Response(RemoteViewer, bareOnly, destination: RegionRegistered())));
     }
 
     // ---- the handler: what is recorded, and what the viewer is classified by ----

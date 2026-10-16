@@ -29,12 +29,13 @@
 
 using System.Net;
 using Microsoft.Extensions.Logging;
+using Nini.Config;
 
 namespace OpenSim.Framework.Tests;
 
 /// <summary>
-/// Choice of the address a viewer is given for a region: unset keys change nothing, a viewer on a
-/// listed local network gets the region's own address, every other viewer gets the public one.
+/// Choice of the address a viewer is given for a region: with nothing set every viewer gets the region's
+/// own address; otherwise the first entry of the operator's list whose network contains the viewer decides.
 /// Only documentation (192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24) and generic private ranges are used.
 /// </summary>
 public class ViewerAddressTests
@@ -61,138 +62,177 @@ public class ViewerAddressTests
     private static readonly IPEndPoint s_local = new(IPAddress.Parse("192.168.1.10"), 9000);
     private static IPAddress Ip(string s) => IPAddress.Parse(s);
 
-    private static ViewerAddressConfig Cfg(string pub = "", string dns = "", string nets = "", int refresh = 30)
-        => ViewerAddressConfig.Create(pub, dns, refresh, nets, new CapturingLogger());
+    private static ViewerAddressConfig Cfg(string addresses = "", int refresh = 30, ILogger? log = null)
+        => ViewerAddressConfig.Create(addresses, refresh, log ?? new CapturingLogger());
 
-    private static ViewerAddressSelector Sel(ViewerAddressConfig cfg, Func<string, IPEndPoint, IPAddress>? direct = null,
-        Func<string, IPAddress>? os = null, TestClock? clock = null)
+    /// <summary>A selector whose host name lookups go to <paramref name="os"/> (default: no answer), the stand-in for the operating system resolver.</summary>
+    private static ViewerAddressSelector Sel(ViewerAddressConfig cfg, Func<string, IPAddress?>? os = null, TestClock? clock = null)
     {
-        PublicAddressResolver r = new(cfg.PublicDnsServer, TimeSpan.Zero, new CapturingLogger(),
-            osResolver: os ?? (_ => null!), directResolver: direct ?? ((_, _) => s_pub), time: clock);
+        PublicAddressResolver r = new(TimeSpan.Zero, new CapturingLogger(), osResolver: os ?? (_ => null!), time: clock);
         return new ViewerAddressSelector(cfg, r);
     }
 
-    // ---- unset keys: today's behaviour ----
+    // ---- nothing set: today's behaviour ----
 
     [Theory]
     [InlineData("192.168.1.55")]
     [InlineData("203.0.113.9")]
     [InlineData("2001:db8::5")]
-    public void Unset_keys_return_the_local_endpoint_for_every_source(string viewer)
+    public void Nothing_set_returns_the_local_endpoint_for_every_source(string viewer)
     {
         ViewerAddressSelector s = ViewerAddressSelector.Disabled;
         Assert.False(s.Enabled);
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip(viewer)));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip(viewer)));
     }
 
-    [Fact]
-    public void Local_networks_alone_change_nothing()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(" , ; ")]
+    public void An_empty_list_is_disabled_and_changes_nothing(string? addresses)
     {
-        ViewerAddressConfig cfg = Cfg(nets: "192.168.0.0/16=10.0.0.5");
+        ViewerAddressConfig cfg = ViewerAddressConfig.Create(addresses, 30, null);
         Assert.False(cfg.Enabled);
-        ViewerAddressSelector s = Sel(cfg);
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9")));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55")));
-    }
-
-    [Fact]
-    public void Create_with_a_null_logger_and_empty_strings_is_disabled()
-    {
-        Assert.False(ViewerAddressConfig.Create(null, null, 30, null, null).Enabled);
+        Assert.Empty(cfg.LocalNetworks);
         Assert.False(ViewerAddressConfig.Disabled.Enabled);
-    }
-
-    // ---- selection ----
-
-    [Fact]
-    public void Dns_server_only_local_viewer_keeps_the_local_address_and_other_viewers_get_the_resolved_one()
-    {
-        string? seenHost = null; IPEndPoint? seenServer = null;
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16"), (h, srv) => { seenHost = h; seenServer = srv; return s_pub; });
-
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55")));
-        Assert.Null(seenHost);
-
-        IPEndPoint? got = s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9"));
-        Assert.Equal(new IPEndPoint(s_pub, 9000), got);
-        Assert.Equal(Host, seenHost);
-        Assert.Equal(new IPEndPoint(Ip("9.9.9.9"), 53), seenServer);
+        Assert.Same(s_local, Sel(cfg).ForViewer(9000, s_local, Ip("203.0.113.9")));
     }
 
     [Fact]
-    public void The_port_given_is_the_port_handed_out()
+    public void A_list_where_every_entry_is_bad_is_disabled()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9"));
-        Assert.Equal(9123, s.ForViewer(Host, 9123, new IPEndPoint(s_local.Address, 9123), Ip("203.0.113.9"))!.Port);
+        CapturingLogger log = new();
+        ViewerAddressConfig cfg = Cfg("bad, 10.0.0.0/33", log: log);
+        Assert.False(cfg.Enabled);
+        Assert.Equal(2, log.Warnings);
+        Assert.Same(s_local, Sel(cfg).ForViewer(9000, s_local, Ip("203.0.113.9")));
     }
 
     [Fact]
-    public void A_literal_public_address_needs_no_lookup()
+    public void No_entry_matching_gives_the_local_address()
     {
-        int lookups = 0;
-        ViewerAddressSelector s = Sel(Cfg(pub: "198.51.100.77"), (_, _) => { lookups++; return s_pub; }, _ => { lookups++; return s_pub; });
-        Assert.Equal(new IPEndPoint(Ip("198.51.100.77"), 9000), s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9")));
-        Assert.Equal(0, lookups);
+        ViewerAddressSelector s = Sel(Cfg("192.168.1.0/24=192.168.1.20"));
+        Assert.True(s.Enabled);
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("203.0.113.9")));
+    }
+
+    // ---- selection: first match wins ----
+
+    [Fact]
+    public void A_matching_entry_with_an_address_gives_that_address_and_the_port_handed_in()
+    {
+        ViewerAddressSelector s = Sel(Cfg("203.0.113.0/24=198.51.100.20"));
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.20"), 9123),
+            s.ForViewer(9123, new IPEndPoint(s_local.Address, 9123), Ip("203.0.113.9")));
     }
 
     [Fact]
-    public void A_public_host_name_is_the_name_looked_up_instead_of_the_region_name()
+    public void The_first_matching_entry_wins_whatever_follows()
     {
-        string? seen = null;
-        ViewerAddressSelector s = Sel(Cfg(pub: "public.example.org", dns: "9.9.9.9"), (h, _) => { seen = h; return s_pub; });
-        s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9"));
-        Assert.Equal("public.example.org", seen);
+        ViewerAddressSelector s = Sel(Cfg("192.168.1.0/24=192.168.1.20, 10.8.0.0/24=10.8.0.1, 192.168.0.0/16=172.16.0.9, 0.0.0.0/0=198.51.100.20"));
+        Assert.Equal(new IPEndPoint(Ip("192.168.1.20"), 9000), s.ForViewer(9000, s_local, Ip("192.168.1.55")));
+        Assert.Equal(new IPEndPoint(Ip("10.8.0.1"), 9000), s.ForViewer(9000, s_local, Ip("10.8.0.77")));
+        Assert.Equal(new IPEndPoint(Ip("172.16.0.9"), 9000), s.ForViewer(9000, s_local, Ip("192.168.7.7")));
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.20"), 9000), s.ForViewer(9000, s_local, Ip("203.0.113.9")));
     }
 
     [Fact]
-    public void A_public_host_name_without_a_dns_server_uses_the_os_resolver()
+    public void Order_decides_when_two_entries_contain_the_viewer()
     {
-        string? seen = null;
-        ViewerAddressSelector s = Sel(Cfg(pub: "public.example.org"), os: h => { seen = h; return s_pub; });
-        Assert.Equal(new IPEndPoint(s_pub, 9000), s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9")));
-        Assert.Equal("public.example.org", seen);
+        IPEndPoint broadFirst = Sel(Cfg("192.168.0.0/16=198.51.100.1, 192.168.1.0/24=198.51.100.2")).ForViewer(9000, s_local, Ip("192.168.1.5"))!;
+        IPEndPoint narrowFirst = Sel(Cfg("192.168.1.0/24=198.51.100.2, 192.168.0.0/16=198.51.100.1")).ForViewer(9000, s_local, Ip("192.168.1.5"))!;
+        Assert.Equal(Ip("198.51.100.1"), broadFirst.Address);
+        Assert.Equal(Ip("198.51.100.2"), narrowFirst.Address);
     }
 
     [Fact]
-    public void A_listed_network_with_an_address_gets_that_address_first_match_wins()
+    public void A_bare_network_keeps_the_local_address_and_stops_the_search()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.1.0/24=192.168.1.20, 10.8.0.0/24=10.8.0.1, 192.168.0.0/16=172.16.0.9"));
-        Assert.Equal(new IPEndPoint(Ip("192.168.1.20"), 9000), s.ForViewer(Host, 9000, s_local, Ip("192.168.1.55")));
-        Assert.Equal(new IPEndPoint(Ip("10.8.0.1"), 9000), s.ForViewer(Host, 9000, s_local, Ip("10.8.0.77")));
-        Assert.Equal(new IPEndPoint(Ip("172.16.0.9"), 9000), s.ForViewer(Host, 9000, s_local, Ip("192.168.7.7")));
-        Assert.Equal(new IPEndPoint(s_pub, 9000), s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9")));
+        ViewerAddressSelector s = Sel(Cfg("192.168.0.0/16, 0.0.0.0/0=198.51.100.20"));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("192.168.1.55")));
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.20"), 9000), s.ForViewer(9000, s_local, Ip("203.0.113.9")));
     }
 
     [Fact]
     public void Ipv6_and_mapped_sources()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16, fd00::/8"));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("fd12:3456::1")));
-        Assert.Equal(new IPEndPoint(s_pub, 9000), s.ForViewer(Host, 9000, s_local, Ip("2001:db8::5")));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("::ffff:192.168.1.5")));
-        Assert.Equal(new IPEndPoint(s_pub, 9000), s.ForViewer(Host, 9000, s_local, Ip("::ffff:203.0.113.9")));
-    }
-
-    [Fact]
-    public void Public_address_not_known_yet_falls_back_to_the_local_address()
-    {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9"), (_, _) => null!);
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9")));
+        ViewerAddressSelector s = Sel(Cfg("192.168.0.0/16, fd00::/8, 0.0.0.0/0=198.51.100.20, ::/0=198.51.100.21"));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("fd12:3456::1")));
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.21"), 9000), s.ForViewer(9000, s_local, Ip("2001:db8::5")));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("::ffff:192.168.1.5")));
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.20"), 9000), s.ForViewer(9000, s_local, Ip("::ffff:203.0.113.9")));
     }
 
     [Fact]
     public void An_unknown_viewer_source_gets_the_local_address()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9"));
-        Assert.Same(s_local, s.ForViewer(Host, 9000, s_local, null));
+        ViewerAddressSelector s = Sel(Cfg("0.0.0.0/0=198.51.100.20"));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, null));
     }
 
     [Fact]
-    public void Unresolved_local_endpoint_still_gives_a_public_viewer_the_public_address()
+    public void An_unresolved_local_endpoint_still_gives_a_matching_viewer_its_address()
     {
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9", nets: "192.168.0.0/16"));
-        Assert.Equal(new IPEndPoint(s_pub, 9000), s.ForViewer(Host, 9000, null, Ip("203.0.113.9")));
-        Assert.Null(s.ForViewer(Host, 9000, null, Ip("192.168.1.5")));
+        ViewerAddressSelector s = Sel(Cfg("192.168.0.0/16, 0.0.0.0/0=198.51.100.20"));
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.20"), 9000), s.ForViewer(9000, null, Ip("203.0.113.9")));
+        Assert.Null(s.ForViewer(9000, null, Ip("192.168.1.5")));
+    }
+
+    // ---- host names resolve through the operating system resolver ----
+
+    [Fact]
+    public void A_host_name_entry_is_looked_up_through_the_os_resolver()
+    {
+        List<string> asked = new();
+        ViewerAddressSelector s = Sel(Cfg("192.168.0.0/16, 0.0.0.0/0=public.example.org"), os: h => { asked.Add(h); return s_pub; });
+
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("192.168.1.55")));
+        Assert.Empty(asked);
+
+        Assert.Equal(new IPEndPoint(s_pub, 9000), s.ForViewer(9000, s_local, Ip("203.0.113.9")));
+        Assert.Equal(new[] { "public.example.org" }, asked);
+    }
+
+    [Fact]
+    public void A_host_name_is_looked_up_once_and_the_answer_cached()
+    {
+        int lookups = 0;
+        ViewerAddressSelector s = Sel(Cfg("0.0.0.0/0=public.example.org"), os: _ => { lookups++; return s_pub; });
+        for (int i = 0; i < 5; i++)
+            s.ForViewer(9000, s_local, Ip("203.0.113.9"));
+        Assert.Equal(1, lookups);
+    }
+
+    [Fact]
+    public void An_address_literal_entry_needs_no_lookup()
+    {
+        int lookups = 0;
+        ViewerAddressSelector s = Sel(Cfg("0.0.0.0/0=198.51.100.77"), os: _ => { lookups++; return s_pub; });
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.77"), 9000), s.ForViewer(9000, s_local, Ip("203.0.113.9")));
+        Assert.Equal(0, lookups);
+        Assert.Empty(ViewerAddressConfig.Create("0.0.0.0/0=198.51.100.77", 30, null).Hosts);
+    }
+
+    [Fact]
+    public void A_host_name_that_does_not_resolve_gives_the_local_address()
+    {
+        ViewerAddressSelector s = Sel(Cfg("0.0.0.0/0=public.example.org"), os: _ => null);
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("203.0.113.9")));
+    }
+
+    [Fact]
+    public void A_host_name_that_resolves_to_an_ipv6_address_gives_the_local_address()
+    {
+        ViewerAddressSelector s = Sel(Cfg("0.0.0.0/0=public.example.org"), os: _ => Ip("2001:db8::1"));
+        Assert.Same(s_local, s.ForViewer(9000, s_local, Ip("203.0.113.9")));
+    }
+
+    [Fact]
+    public void Two_entries_with_the_same_name_ask_once_and_the_hosts_are_listed_once()
+    {
+        ViewerAddressConfig cfg = Cfg("203.0.113.0/24=Public.Example.org, 198.51.100.0/24=public.example.org, 192.0.2.0/24=other.example.org");
+        Assert.Equal(new[] { "Public.Example.org", "other.example.org" }, cfg.Hosts);
     }
 
     // ---- regions of another grid (hypergrid destinations) ----
@@ -200,81 +240,104 @@ public class ViewerAddressTests
     private static readonly IPEndPoint s_foreign = new(IPAddress.Parse("192.0.2.80"), 9100);
 
     [Theory]
-    [InlineData("198.51.100.7")]
-    [InlineData("public.example.org")]
-    public void A_public_address_is_never_given_for_a_region_of_another_grid(string publicAddress)
+    [InlineData("0.0.0.0/0=198.51.100.7")]
+    [InlineData("0.0.0.0/0=public.example.org")]
+    [InlineData("203.0.113.0/24, 0.0.0.0/0=198.51.100.7")]
+    public void An_address_of_this_grid_is_never_given_for_a_region_of_another_grid(string addresses)
     {
-        ViewerAddressSelector s = Sel(Cfg(pub: publicAddress, nets: "192.168.0.0/16"), os: _ => s_pub);
-        Assert.Same(s_foreign, s.ForViewer("foreign.example.net", 9100, s_foreign, Ip("203.0.113.9"), foreignDestination: true));
+        ViewerAddressSelector s = Sel(Cfg(addresses), os: _ => s_pub);
+        Assert.Same(s_foreign, s.ForViewer(9100, s_foreign, Ip("203.0.113.9"), foreignDestination: true));
     }
 
     [Fact]
-    public void A_network_address_is_not_given_for_a_region_of_another_grid()
+    public void A_network_address_is_not_given_for_a_region_of_another_grid_but_is_for_one_of_this_grid()
     {
-        ViewerAddressSelector s = Sel(Cfg(pub: "198.51.100.7", nets: "192.168.0.0/16=192.168.1.20"));
-        Assert.Same(s_foreign, s.ForViewer("foreign.example.net", 9100, s_foreign, Ip("192.168.7.7"), foreignDestination: true));
-        // The same viewer is still given the network's address for a region of this grid.
-        Assert.Equal(new IPEndPoint(Ip("192.168.1.20"), 9100), s.ForViewer("region.example.org", 9100, s_foreign, Ip("192.168.7.7")));
+        ViewerAddressSelector s = Sel(Cfg("192.168.0.0/16=192.168.1.20"));
+        Assert.True(s.HoldsGridAddress);
+        Assert.Same(s_foreign, s.ForViewer(9100, s_foreign, Ip("192.168.7.7"), foreignDestination: true));
+        Assert.Equal(new IPEndPoint(Ip("192.168.1.20"), 9100), s.ForViewer(9100, s_foreign, Ip("192.168.7.7")));
     }
 
     [Fact]
-    public void With_only_a_dns_server_a_region_of_another_grid_is_looked_up_by_its_own_name()
+    public void A_list_of_bare_networks_holds_no_address_of_the_grid()
     {
-        string? seen = null;
-        ViewerAddressSelector s = Sel(Cfg(dns: "9.9.9.9"), (h, _) => { seen = h; return s_pub; });
-        Assert.Equal(new IPEndPoint(s_pub, 9100), s.ForViewer("foreign.example.net", 9100, s_foreign, Ip("203.0.113.9"), foreignDestination: true));
-        Assert.Equal("foreign.example.net", seen);
+        Assert.False(Sel(Cfg("192.168.0.0/16")).HoldsGridAddress);
     }
 
     // ---- config parsing ----
 
     [Fact]
-    public void Create_reads_the_four_keys()
+    public void Create_reads_the_list_and_the_refresh()
     {
-        ViewerAddressConfig c = Cfg(pub: "198.51.100.7", dns: "9.9.9.9:5353", nets: "192.168.0.0/16", refresh: 5);
+        ViewerAddressConfig c = Cfg("192.168.0.0/16, 0.0.0.0/0=public.example.org", refresh: 5);
         Assert.True(c.Enabled);
-        Assert.Equal(s_pub, c.PublicLiteral);
-        Assert.Null(c.PublicHost);
-        Assert.Equal(new IPEndPoint(Ip("9.9.9.9"), 5353), c.PublicDnsServer);
         Assert.Equal(TimeSpan.FromMinutes(5), c.RefreshInterval);
-        Assert.Single(c.LocalNetworks);
+        Assert.Equal(2, c.LocalNetworks.Count);
+        Assert.Null(c.LocalNetworks[0].Address);
+        Assert.Null(c.LocalNetworks[0].Host);
+        Assert.Equal("public.example.org", c.LocalNetworks[1].Host);
     }
 
     [Fact]
     public void Defaults_and_refresh_limits()
     {
         Assert.Equal(ViewerAddressConfig.DefaultRefreshInterval, ViewerAddressConfig.Disabled.RefreshInterval);
-        Assert.Equal(TimeSpan.Zero, Cfg(dns: "9.9.9.9", refresh: 0).RefreshInterval);
-        Assert.Equal(TimeSpan.Zero, Cfg(dns: "9.9.9.9", refresh: -4).RefreshInterval);
+        Assert.Equal(TimeSpan.FromMinutes(30), ViewerAddressConfig.DefaultRefreshInterval);
+        Assert.Equal(TimeSpan.Zero, Cfg("0.0.0.0/0=public.example.org", refresh: 0).RefreshInterval);
+        Assert.Equal(TimeSpan.Zero, Cfg("0.0.0.0/0=public.example.org", refresh: -4).RefreshInterval);
     }
 
     [Fact]
-    public void An_ipv6_public_literal_is_rejected_with_a_warning()
+    public void Entries_are_split_on_commas_and_semicolons_and_trimmed()
     {
-        CapturingLogger log = new();
-        ViewerAddressConfig c = ViewerAddressConfig.Create("2001:db8::1", "", 30, "", log);
-        Assert.False(c.Enabled);
-        Assert.Equal(1, log.Warnings);
+        ViewerAddressConfig c = Cfg("  192.168.1.0/24 = 192.168.1.20 ;10.0.0.0/8,, 0.0.0.0/0=198.51.100.20  ");
+        Assert.Equal(3, c.LocalNetworks.Count);
+        Assert.Equal(Ip("192.168.1.20"), c.LocalNetworks[0].Address);
+        Assert.Equal(Ip("198.51.100.20"), c.LocalNetworks[2].Address);
     }
 
     [Fact]
-    public void A_bad_dns_server_is_ignored_with_a_warning()
+    public void Bad_entries_are_logged_one_warning_each_and_skipped_the_rest_still_work()
     {
         CapturingLogger log = new();
-        ViewerAddressConfig c = ViewerAddressConfig.Create("", "not-an-address", 30, "", log);
-        Assert.False(c.Enabled);
-        Assert.Null(c.PublicDnsServer);
-        Assert.Equal(1, log.Warnings);
+        ViewerAddressConfig c = Cfg("192.168.1.0/24=10.0.0.5, bad, 10.0.0.0/33, 10.0.0.0/8, 192.168.2.0/24=2001:db8::1, 192.168.3.0/24=-bad-.example.org, 0.0.0.0/0=198.51.100.20", log: log);
+        Assert.Equal(3, c.LocalNetworks.Count);
+        Assert.Equal(4, log.Warnings);
+        Assert.Contains(log.Entries, e => e.Message.Contains("bad") && e.Message.Contains("Addresses"));
+
+        ViewerAddressSelector s = Sel(c);
+        Assert.Equal(new IPEndPoint(Ip("10.0.0.5"), 9000), s.ForViewer(9000, s_local, Ip("192.168.1.9")));
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.20"), 9000), s.ForViewer(9000, s_local, Ip("203.0.113.9")));
     }
 
     [Fact]
-    public void Bad_network_entries_are_skipped_one_warning_each()
+    public void The_removed_keys_are_not_read_from_a_section()
     {
-        CapturingLogger log = new();
-        ViewerAddressConfig c = ViewerAddressConfig.Create("", "9.9.9.9", 30,
-            "192.168.1.0/24=10.0.0.5, bad, 10.0.0.0/33, 10.0.0.0/8, 192.168.2.0/24=2001:db8::1", log);
-        Assert.Equal(2, c.LocalNetworks.Count);
-        Assert.Equal(3, log.Warnings);
+        IniConfigSource source = new();
+        IConfig section = source.AddConfig(ViewerAddressConfig.SectionName);
+        section.Set("PublicAddress", "198.51.100.7");
+        section.Set("PublicDnsServer", "192.0.2.53");
+        section.Set("LocalNetworks", "192.168.0.0/16");
+        section.Set("PublicRefreshMinutes", "5");
+
+        ViewerAddressConfig cfg = ViewerAddressConfig.FromConfig(section, null);
+        Assert.False(cfg.Enabled);
+        Assert.Empty(cfg.SetKeys);
+        Assert.Equal(ViewerAddressConfig.DefaultRefreshInterval, cfg.RefreshInterval);
+    }
+
+    [Fact]
+    public void Addresses_and_RefreshMinutes_are_read_from_a_section()
+    {
+        IniConfigSource source = new();
+        IConfig section = source.AddConfig(ViewerAddressConfig.SectionName);
+        section.Set("Addresses", "0.0.0.0/0=public.example.org");
+        section.Set("RefreshMinutes", "7");
+
+        ViewerAddressConfig cfg = ViewerAddressConfig.FromConfig(section, null);
+        Assert.True(cfg.Enabled);
+        Assert.Equal(TimeSpan.FromMinutes(7), cfg.RefreshInterval);
+        Assert.Equal(new[] { "Addresses", "RefreshMinutes" }, cfg.SetKeys);
     }
 
     [Theory]
@@ -289,6 +352,19 @@ public class ViewerAddressTests
         Assert.Equal(Ip(network), n.Network);
         Assert.Equal(prefix, n.PrefixLength);
         Assert.Equal(address is null ? null : Ip(address), n.Address);
+        Assert.Null(n.Host);
+    }
+
+    [Theory]
+    [InlineData("0.0.0.0/0=public.example.org", "public.example.org")]
+    [InlineData("10.0.0.0/8 = Grid.Example.ORG ", "Grid.Example.ORG")]
+    [InlineData("10.0.0.0/8=gateway", "gateway")]
+    [InlineData("10.0.0.0/8=a-b.example.org", "a-b.example.org")]
+    public void A_host_name_after_the_equals_sign_parses_as_a_host(string text, string host)
+    {
+        Assert.True(LocalNetwork.TryParse(text, out LocalNetwork n, out string error), error);
+        Assert.Equal(host, n.Host);
+        Assert.Null(n.Address);
     }
 
     [Theory]
@@ -299,7 +375,15 @@ public class ViewerAddressTests
     [InlineData("fd00::/129")]
     [InlineData("10.0.0.0/8=")]
     [InlineData("10.0.0.0/8=fd00::1")]
-    [InlineData("10.0.0.0/8=nope")]
+    [InlineData("10.0.0.0/8=-nope.example.org")]
+    [InlineData("10.0.0.0/8=nope-.example.org")]
+    [InlineData("10.0.0.0/8=no pe.example.org")]
+    [InlineData("10.0.0.0/8=a..example.org")]
+    [InlineData("10.0.0.0/8=http://grid.example.org")]
+    [InlineData("10.0.0.0/8=grid.example.org:9000")]
+    [InlineData("10.0.0.0/8=300.1.1.1")]
+    [InlineData("10.0.0.0/8=10.1")]
+    [InlineData("10.0.0.0/8=0.0.0.0")]
     public void Bad_network_entries_do_not_parse(string text)
     {
         Assert.False(LocalNetwork.TryParse(text, out _, out string error));
@@ -321,14 +405,12 @@ public class ViewerAddressTests
     }
 
     [Fact]
-    public void Dns_server_parse()
+    public void The_framework_has_no_dns_client_of_its_own()
     {
-        Assert.True(ViewerAddressConfig.TryParseDnsServer("1.1.1.1", out IPEndPoint e));
-        Assert.Equal(new IPEndPoint(Ip("1.1.1.1"), 53), e);
-        Assert.True(ViewerAddressConfig.TryParseDnsServer("8.8.8.8:5353", out e));
-        Assert.Equal(5353, e.Port);
-        Assert.False(ViewerAddressConfig.TryParseDnsServer("1.1.1.1:0", out _));
-        Assert.False(ViewerAddressConfig.TryParseDnsServer("", out _));
+        // Every name goes through the operating system resolver: nothing here may send DNS queries itself.
+        string[] references = typeof(PublicAddressResolver).Assembly.GetReferencedAssemblies()
+            .Select(a => a.Name ?? string.Empty).ToArray();
+        Assert.DoesNotContain(references, name => name.Contains("DnsClient", StringComparison.OrdinalIgnoreCase));
     }
 
     // ---- the resolver ----
@@ -337,7 +419,7 @@ public class ViewerAddressTests
     public void Resolver_caches_an_answer_and_ignores_a_non_ipv4_os_answer()
     {
         int calls = 0;
-        using PublicAddressResolver r = new(null, TimeSpan.Zero, new CapturingLogger(),
+        using PublicAddressResolver r = new(TimeSpan.Zero, new CapturingLogger(),
             osResolver: h => { calls++; return h == "v4.example.org" ? s_pub : Ip("2001:db8::1"); });
         Assert.Equal(s_pub, r.Resolve("v4.example.org"));
         Assert.Equal(s_pub, r.Resolve("v4.example.org"));
@@ -348,7 +430,7 @@ public class ViewerAddressTests
     [Fact]
     public void Resolver_ip_literal_is_returned_as_is_and_any_is_refused()
     {
-        using PublicAddressResolver r = new(null, TimeSpan.Zero, new CapturingLogger(), osResolver: _ => throw new Exception("not called"));
+        using PublicAddressResolver r = new(TimeSpan.Zero, new CapturingLogger(), osResolver: _ => throw new Exception("not called"));
         Assert.Equal(Ip("198.51.100.9"), r.Resolve("198.51.100.9"));
         Assert.Null(r.Resolve("0.0.0.0"));
         Assert.Null(r.Resolve(""));
@@ -360,8 +442,8 @@ public class ViewerAddressTests
     {
         TestClock clock = new();
         int calls = 0;
-        using PublicAddressResolver r = new(new IPEndPoint(Ip("9.9.9.9"), 53), TimeSpan.Zero, new CapturingLogger(),
-            directResolver: (_, _) => { calls++; return calls < 3 ? null! : s_pub; }, time: clock);
+        using PublicAddressResolver r = new(TimeSpan.Zero, new CapturingLogger(),
+            osResolver: _ => { calls++; return calls < 3 ? null! : s_pub; }, time: clock);
 
         Assert.Null(r.Resolve(Host));
         Assert.Null(r.Resolve(Host));
@@ -383,8 +465,8 @@ public class ViewerAddressTests
     public void Resolver_lookup_that_throws_is_a_failure_not_an_exception()
     {
         CapturingLogger log = new();
-        using PublicAddressResolver r = new(new IPEndPoint(Ip("9.9.9.9"), 53), TimeSpan.Zero, log,
-            directResolver: (_, _) => throw new TimeoutException());
+        using PublicAddressResolver r = new(TimeSpan.Zero, log,
+            osResolver: _ => throw new TimeoutException());
         Assert.Null(r.Resolve(Host));
         Assert.True(log.Warnings >= 1);
     }
@@ -395,8 +477,8 @@ public class ViewerAddressTests
         IPAddress? answer = s_pub;
         bool fail = false;
         CapturingLogger log = new();
-        using PublicAddressResolver r = new(new IPEndPoint(Ip("9.9.9.9"), 53), TimeSpan.Zero, log,
-            directResolver: (_, _) => fail ? throw new TimeoutException() : answer!);
+        using PublicAddressResolver r = new(TimeSpan.Zero, log,
+            osResolver: _ => fail ? throw new TimeoutException() : answer!);
         Assert.Equal(s_pub, r.Resolve(Host));
 
         answer = Ip("198.51.100.8");
@@ -413,8 +495,8 @@ public class ViewerAddressTests
     public void Resolver_timer_refreshes_on_its_own()
     {
         int calls = 0;
-        using PublicAddressResolver r = new(new IPEndPoint(Ip("9.9.9.9"), 53), TimeSpan.FromMilliseconds(30), new CapturingLogger(),
-            directResolver: (_, _) => Ip("198.51.100." + (Interlocked.Increment(ref calls) + 10)));
+        using PublicAddressResolver r = new(TimeSpan.FromMilliseconds(30), new CapturingLogger(),
+            osResolver: _ => Ip("198.51.100." + (Interlocked.Increment(ref calls) + 10)));
         r.Resolve(Host);
         SpinWait.SpinUntil(() => Volatile.Read(ref calls) >= 3, TimeSpan.FromSeconds(20));
         Assert.True(Volatile.Read(ref calls) >= 3);
@@ -423,9 +505,9 @@ public class ViewerAddressTests
     [Fact]
     public void Create_builds_a_selector_from_the_config()
     {
-        using ViewerAddressSelector s = ViewerAddressSelector.Create(Cfg(pub: "198.51.100.77"), new CapturingLogger());
+        using ViewerAddressSelector s = ViewerAddressSelector.Create(Cfg("0.0.0.0/0=198.51.100.77"), new CapturingLogger());
         Assert.True(s.Enabled);
-        Assert.Equal(new IPEndPoint(Ip("198.51.100.77"), 9000), s.ForViewer(Host, 9000, s_local, Ip("203.0.113.9")));
+        Assert.Equal(new IPEndPoint(Ip("198.51.100.77"), 9000), s.ForViewer(9000, s_local, Ip("203.0.113.9")));
         using ViewerAddressSelector off = ViewerAddressSelector.Create(ViewerAddressConfig.Disabled, new CapturingLogger());
         Assert.False(off.Enabled);
     }

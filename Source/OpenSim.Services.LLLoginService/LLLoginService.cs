@@ -201,12 +201,10 @@ public class LLLoginService : ILoginService
             m_MaxAgentGroups = groupConfig.GetInt("MaxAgentGroups", m_MaxAgentGroups);
 
         // Which address a viewer is given for its region, by the viewer's source address. Without a
-        // [ViewerAddress] public address every viewer is given the region's own address, as before.
+        // [ViewerAddress] Addresses list every viewer is given the region's own address, as before.
         ViewerAddressConfig viewerAddressConfig = ViewerAddressConfig.FromConfig(config.Configs[ViewerAddressConfig.SectionName], m_log);
         m_ViewerAddresses = ViewerAddressSelector.Create(viewerAddressConfig, m_log);
-        // The gatekeeper's host is this grid's own public name, looked up when no PublicAddress host name is set.
-        ViewerAddressStartupLog.Shared.ReportOnce(m_log, viewerAddressConfig, m_ViewerAddresses,
-            Uri.TryCreate(m_GatekeeperURL, UriKind.Absolute, out Uri gatekeeperUri) ? gatekeeperUri.Host : null);
+        ViewerAddressStartupLog.Shared.ReportOnce(m_log, viewerAddressConfig, m_ViewerAddresses);
 
         IConfig presenceConfig = config.Configs["PresenceService"];
         if (presenceConfig is not null)

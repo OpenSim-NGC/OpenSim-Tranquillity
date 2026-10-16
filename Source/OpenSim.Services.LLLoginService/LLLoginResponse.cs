@@ -402,8 +402,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
         {
             // The local address the region registered with the grid, if any, for a viewer on a local network.
             ViewerAddressConfig.TryParseLocalAddress(destination.ViewerLocalAddress, out IPAddress registered);
-            endPoint = viewerAddresses.ForViewer(destination.ExternalHostName, endPoint.Port, endPoint, viewerSource,
-                false, registered);
+            endPoint = viewerAddresses.ForViewer(endPoint.Port, endPoint, viewerSource, false, registered);
         }
         SimAddress = endPoint.Address.ToString();
         SimPort = (uint)endPoint.Port;

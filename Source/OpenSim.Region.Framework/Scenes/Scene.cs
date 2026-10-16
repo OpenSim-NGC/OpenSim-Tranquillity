@@ -4795,7 +4795,7 @@ Label_GroupsDone:
         return string.Format(
             "[SCENE]: The viewer of agent {0} was authorised in {1} but never connected to {2}:{3}, the address this region " +
             "gives out for itself (the address recorded for the viewer is {4}). Viewers outside this region's network " +
-            "cannot reach that address: set PublicAddress or PublicDnsServer, and LocalNetworks, in [ViewerAddress].",
+            "cannot reach that address: list the address they should use for their network in [ViewerAddress] Addresses.",
             agentID, RegionInfo.RegionName, RegionInfo.ExternalHostName, RegionInfo.InternalEndPoint.Port, circuit.IPAddress);
     }
 

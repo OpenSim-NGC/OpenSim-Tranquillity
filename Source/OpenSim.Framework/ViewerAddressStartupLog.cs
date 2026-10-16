@@ -44,11 +44,10 @@ public sealed class ViewerAddressStartupLog
 
     /// <summary>
     /// Logs, once per instance and only when at least one [ViewerAddress] key is set, that the section is active:
-    /// which keys are set, how many local networks are listed, and the result of the first lookup of the public
-    /// address. The lookup runs in the returned task, so a slow DNS server does not delay server start.
+    /// which keys are set, how many entries the Addresses list has, and the result of the first lookup of each
+    /// host name in it. The lookups run in the returned task, so a slow resolver does not delay server start.
     /// </summary>
-    /// <param name="fallbackHost">The host name to look up when no PublicAddress host name is set (the server's own name).</param>
-    public Task ReportOnce(ILogger log, ViewerAddressConfig config, ViewerAddressSelector selector, string fallbackHost)
+    public Task ReportOnce(ILogger log, ViewerAddressConfig config, ViewerAddressSelector selector)
     {
         if (log is null || config is null || config.SetKeys.Count == 0)
             return Task.CompletedTask;
@@ -60,41 +59,40 @@ public sealed class ViewerAddressStartupLog
             string lookup;
             try
             {
-                lookup = DescribeLookup(config, selector, fallbackHost);
+                lookup = DescribeLookups(config, selector);
             }
             catch (Exception e)
             {
-                lookup = $"first public lookup failed: {e.Message}";
+                lookup = $"first lookup failed: {e.Message}";
             }
 
-            log.LogInformation("[VIEWER ADDRESS]: [{0}] section is active; keys set: {1}; local networks: {2}; {3}",
+            log.LogInformation("[VIEWER ADDRESS]: [{0}] section is active; keys set: {1}; entries: {2}; {3}",
                 ViewerAddressConfig.SectionName, string.Join(", ", config.SetKeys), config.LocalNetworks.Count, lookup);
         });
     }
 
-    private static string DescribeLookup(ViewerAddressConfig config, ViewerAddressSelector selector, string fallbackHost)
+    private static string DescribeLookups(ViewerAddressConfig config, ViewerAddressSelector selector)
     {
-        if (config.PublicLiteral is not null)
-            return $"public address {config.PublicLiteral} is used as given (no lookup)";
-        if (!config.Enabled)
-            return "no public address is configured (no lookup), so every viewer is given the region's own address";
+        if (config.Hosts.Count == 0)
+            return "no host names to look up";
 
-        string host = config.PublicHost ?? fallbackHost;
-        if (string.IsNullOrWhiteSpace(host))
-            return "no host name to look up for the public address";
-
-        IPAddress found = null;
-        try
+        List<string> results = new();
+        foreach (string host in config.Hosts)
         {
-            found = selector?.LookupPublic(host);
-        }
-        catch (Exception)
-        {
-            // reported as a failed lookup below
-        }
+            IPAddress found = null;
+            try
+            {
+                found = selector?.LookupHost(host);
+            }
+            catch (Exception)
+            {
+                // reported as a failed lookup below
+            }
 
-        return found is null
-            ? $"first public lookup of {host} failed"
-            : $"first public lookup of {host} succeeded: {found}";
+            results.Add(found is null
+                ? $"first lookup of {host} failed"
+                : $"first lookup of {host} succeeded: {found}");
+        }
+        return string.Join("; ", results);
     }
 }
