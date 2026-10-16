@@ -27,7 +27,6 @@
 
 using OpenMetaverse;
 using OpenSim.Framework;
-//using log4net;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 

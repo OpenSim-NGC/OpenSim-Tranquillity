@@ -154,7 +154,7 @@ derived set, and the agent keeps what it already wears for that type.
 
 ### 4.9 Configuration
 
-In the simulator, `[Appearance]` (defaults in `OpenSimDefaults.ini`):
+In the simulator, `[Appearance]` (defaults in `RegionServerDefaults.ini`):
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -184,7 +184,7 @@ To enable both SSB and AIS for a whole simulator:
     ServerSideBaking = true
 ```
 
-In Robust (`Robust.ini.example`; for standalone, `StandaloneCommon.ini.example` carries the
+In Robust (`GridServer.ini.example`; for standalone, `StandaloneCommon.ini.example` carries the
 `AgentAppearanceServiceURL` line):
 
 ```ini

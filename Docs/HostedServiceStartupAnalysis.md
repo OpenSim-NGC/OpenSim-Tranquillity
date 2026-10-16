@@ -37,7 +37,7 @@ MoneyServer is the closest to a workable hosted-service shape, but it still bloc
 
 ### MoneyServer
 
-The new `Program.cs` creates a generic host, configures Autofac, loads ini files into `IConfiguration`, wires log4net and console logging, and registers:
+The new `Program.cs` creates a generic host, configures Autofac, loads ini files into `IConfiguration`, wires logging (Serilog and console), and registers:
 
 - `MoneyService` as singleton and hosted service
 - `MoneySessionStore` as singleton
@@ -68,7 +68,7 @@ The practical result is that MoneyServer has a modern host shell, but the applic
 - generic host
 - Autofac service provider factory
 - ini-based configuration into `IConfiguration`
-- log4net and console logging
+- Serilog and console logging
 - ASP.NET Core controller host
 - singleton `GridService` registered as hosted service
 - `IServerBase` registered as a manual `ServerBase`
@@ -99,7 +99,7 @@ RegionServer still uses the full legacy startup chain.
 - culture setup
 - `ServicePointManager` tuning
 - thread pool tuning
-- log4net bootstrapping
+- logging setup
 - `ArgvConfigSource` switch setup
 - `background` mode branching
 - direct instantiation of `OpenSim` or `OpenSimBackground`
@@ -150,8 +150,8 @@ This class is the least problematic piece. It is mostly a utility base with muta
 - loads and merges ini files and includes
 - merges environment variables and argv back into the config
 - creates the console instance
-- configures log4net
-- registers common appenders, commands, and components
+- configures logging
+- registers common commands and components
 - creates PID files
 - calls overridable `ReadConfig()` and `Initialise()` hooks
 
@@ -267,7 +267,7 @@ The better first milestone is to extract a shared hosted startup substrate with 
 - command-line options parsing into typed options
 - ini loading and include expansion into a reusable adapter
 - console factory and console runner
-- log4net initialization
+- logging initialization
 - PID file ownership
 - process and environment initialization
 - legacy singleton lifetime wrappers

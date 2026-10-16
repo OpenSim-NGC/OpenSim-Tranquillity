@@ -206,6 +206,15 @@ public abstract class PhysicsActor
 
     public virtual bool Building { get; set; }
 
+    /// <summary>
+    /// True while keyframed motion (llSetKeyframedMotion) is moving this prim's object: set when the motion starts and
+    /// cleared when it stops, is paused, ends, or the object is selected. The positions and rotations set on a
+    /// non-physical prim in that time are the steps of the motion (about every 50 ms), not a script's or builder's
+    /// jumps, so an engine may carry what stands on the object along with it. Engines that do not need to tell the
+    /// two apart ignore it.
+    /// </summary>
+    public virtual bool MovedByKeyframedMotion { get => false; set { } }
+
     public virtual void getContactData(ref ContactData cdata)
     {
         cdata.mu = 0;
@@ -353,6 +362,14 @@ public abstract class PhysicsActor
         //Attractor properties
         this.VehicleFloatParam((int)Vehicle.VERTICAL_ATTRACTION_EFFICIENCY, vdata.m_verticalAttractionEfficiency);
         this.VehicleFloatParam((int)Vehicle.VERTICAL_ATTRACTION_TIMESCALE, vdata.m_verticalAttractionTimescale);
+
+        // InWorldz properties
+        this.VehicleFloatParam((int)Vehicle.MOUSELOOK_AZIMUTH, vdata.m_mouselookAzimuth);
+        this.VehicleFloatParam((int)Vehicle.MOUSELOOK_ALTITUDE, vdata.m_mouselookAltitude);
+        this.VehicleFloatParam((int)Vehicle.BANKING_AZIMUTH, vdata.m_bankingAzimuth);
+        this.VehicleFloatParam((int)Vehicle.DISABLE_MOTORS_ABOVE, vdata.m_disableMotorsAbove);
+        this.VehicleFloatParam((int)Vehicle.DISABLE_MOTORS_AFTER, vdata.m_disableMotorsAfter);
+        this.VehicleFloatParam((int)Vehicle.INVERTED_BANKING_MODIFIER, vdata.m_invertedBankingModifier);
 
         this.VehicleRotationParam((int)Vehicle.REFERENCE_FRAME, vdata.m_referenceFrame);
     }

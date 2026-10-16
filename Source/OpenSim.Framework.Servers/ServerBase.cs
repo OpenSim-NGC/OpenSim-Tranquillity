@@ -30,10 +30,6 @@ using System.Reflection;
 using System.Runtime;
 using System.Text;
 using System.Text.RegularExpressions;
-using log4net;
-using log4net.Appender;
-using log4net.Core;
-using log4net.Repository;
 using Nini.Config;
 using OpenSim.Framework.Console;
 using OpenSim.Framework.Monitoring;
@@ -66,7 +62,6 @@ public interface IServerBase
 
 public class ServerBase : IServerBase
 {
-    // Fully qualified: log4net.Core.ILogger is also in scope via the appender/repository usings below.
     private static readonly Microsoft.Extensions.Logging.ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public IConfigSource Config { get; set; }
@@ -93,10 +88,6 @@ public class ServerBase : IServerBase
     }
 
     protected ICommandConsole m_console;
-
-    protected OpenSimAppender m_consoleAppender;
-    protected FileAppender m_logFileAppender;
-    protected FileAppender m_statsLogFileAppender;
 
     protected DateTime m_startuptime;
     protected string m_version;
@@ -165,8 +156,6 @@ public class ServerBase : IServerBase
     /// </summary>
     public void LogEnvironmentInformation()
     {
-        // FIXME: This should be done down in ServerBase but we need to sort out and refactor the log4net
-        // XmlConfigurator calls first accross servers.
         m_log.LogInformation($"[SERVER BASE]: Starting in {m_startupDirectory}");
 
         m_log.LogInformation($"[SERVER BASE]: OpenSimulator version: {m_version}");
@@ -180,68 +169,12 @@ public class ServerBase : IServerBase
 
     public void RegisterCommonAppenders(IConfig startupConfig)
     {
-        // Routes ILogger output through the interactive console. During the log4net migration this
-        // runs alongside OpenSimAppender below; remove the appender half once no ILog call sites remain.
         OpenSimConsoleLogSink.Console = m_console as ConsoleBase;
 
-        ILoggerRepository repository = LogManager.GetRepository();
-        IAppender[] appenders = repository.GetAppenders();
+        m_log.LogInformation("[SERVER BASE]: Logging started to file {LogFile}", Util.logFile());
 
-        foreach (IAppender appender in appenders)
-        {
-            if (appender.Name == "Console")
-            {
-                m_consoleAppender = (OpenSimAppender)appender;
-            }
-            else if (appender.Name == "LogFileAppender")
-            {
-                m_logFileAppender = (FileAppender)appender;
-            }
-            else if (appender.Name == "StatsLogFileAppender")
-            {
-                m_statsLogFileAppender = (FileAppender)appender;
-            }
-        }
-
-        if (null == m_consoleAppender)
-        {
-            Notice("No appender named Console found (see the log4net config file for this executable)!");
-        }
-        else
-        {
-            // FIXME: This should be done through an interface rather than casting.
-            m_consoleAppender.Console = (ConsoleBase)m_console;
-
-            // If there is no threshold set then the threshold is effectively everything.
-            if (m_consoleAppender.Threshold is null)
-                m_consoleAppender.Threshold = Level.All;
-
-            //Notice($"Console log level is {m_consoleAppender.Threshold}");
-        }
-
-        if (m_logFileAppender != null && startupConfig != null)
-        {
-            string cfgFileName = startupConfig.GetString("logfile", null);
-            if (cfgFileName != null)
-            {
-                m_logFileAppender.File = cfgFileName;
-                m_logFileAppender.ActivateOptions();
-            }
-
-            m_log.LogInformation("[SERVER BASE]: Logging started to file {0}", m_logFileAppender.File);
-        }
-
-        if (m_statsLogFileAppender != null && startupConfig != null)
-        {
-            string cfgStatsFileName = startupConfig.GetString("StatsLogFile", null);
-            if (cfgStatsFileName != null)
-            {
-                m_statsLogFileAppender.File = cfgStatsFileName;
-                m_statsLogFileAppender.ActivateOptions();
-            }
-
-            m_log.LogInformation("[SERVER BASE]: Stats Logging started to file {0}", m_statsLogFileAppender.File);
-        }
+        if (!string.IsNullOrWhiteSpace(startupConfig?.GetString("StatsLogFile", null)))
+            m_log.LogInformation("[SERVER BASE]: Stats logging started to file {StatsLogFile}", Util.StatsLogFile());
     }
 
     /// <summary>
@@ -704,15 +637,6 @@ public class ServerBase : IServerBase
         }
 
         OpenSimConsoleLogSink.MinimumLevel = consoleLogLevel;
-
-        if (m_consoleAppender is not null)
-        {
-            ILoggerRepository repository = LogManager.GetRepository();
-            Level appenderLevel = repository.LevelMap[rawLevel];
-
-            if (appenderLevel is not null)
-                m_consoleAppender.Threshold = appenderLevel;
-        }
 
         ShowLogLevel();
     }

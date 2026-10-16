@@ -16558,6 +16558,8 @@ public void llDetachFromAvatar()
     }
 */
 
+    private const int CastRayMaxHits = 256;
+
     public LSL_List llCastRay(LSL_Vector start, LSL_Vector end, LSL_List options)
     {
         LSL_List list = new();
@@ -16583,15 +16585,16 @@ public void llDetachFromAvatar()
             if (options.GetIntegerItem(i) == ScriptBaseClass.RC_MAX_HITS)
                 count = options.GetIntegerItem(i + 1);
             else if (options.GetIntegerItem(i) == ScriptBaseClass.RC_DETECT_PHANTOM)
-                detectPhantom = (options.GetIntegerItem(i + 1) > 0);
+                detectPhantom = (options.GetIntegerItem(i + 1) != 0);
             else if (options.GetIntegerItem(i) == ScriptBaseClass.RC_DATA_FLAGS)
                 dataFlags = options.GetIntegerItem(i + 1);
             else if (options.GetIntegerItem(i) == ScriptBaseClass.RC_REJECT_TYPES)
                 rejectTypes = options.GetIntegerItem(i + 1);
         }
 
-        if (count > 16)
-            count = 16;
+        // The SL wiki gives RC_MAX_HITS a maximum of 256 (https://wiki.secondlife.com/wiki/LlCastRay).
+        if (count > CastRayMaxHits)
+            count = CastRayMaxHits;
 
         List<ContactResult> results = new();
 
@@ -16627,8 +16630,11 @@ public void llDetachFromAvatar()
             dist = (float)Math.Sqrt(dist);
             Vector3 direction = dir * (1.0f / dist);
 
-            // get some more contacts to sort ???
-            object physresults = World.RayCastFiltered(rayStart, direction, dist, 2 * count, rayfilter);
+            // Get some more contacts to sort, and one more for each prim of the host that is left out of the answer
+            // below, so that a hit the script does not get is not a place lost from the hits it asked for.
+            int hostHits = rejectHostGroup ? m_host.ParentGroup.PrimCount : (rejectHost ? 1 : 0);
+            object physresults = World.RayCastFiltered(rayStart, direction, dist,
+                Math.Min(CastRayMaxHits, 2 * count + hostHits), rayfilter);
 
             if (physresults != null)
             {

@@ -37,10 +37,6 @@ namespace OpenSim.Services.EstateService;
 
 public class MuteListService : ServiceBase, IMuteListService
 {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
-
     protected IMuteListData m_database;
 
     public MuteListService(IConfigSource config)

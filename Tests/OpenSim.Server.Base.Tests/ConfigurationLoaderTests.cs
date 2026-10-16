@@ -53,7 +53,7 @@ public sealed class ConfigurationLoaderTests : IDisposable
     [Fact]
     public void IncludeTests()
     {
-        const string mainIniFile = "OpenSimDefaults.ini";
+        const string mainIniFile = "RegionServerDefaults.ini";
         _config = new IniConfigSource();
 
         IniConfigSource ini;

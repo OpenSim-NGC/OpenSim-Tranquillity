@@ -21,7 +21,7 @@ export BINDIR="$BASE_DIR"
 export CONFIGDIR="${CONFIGDIR:-$HOME/config}"
 export DATADIR="${DATADIR:-$HOME/data}"
 export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/RegionServer.ini}"
-export DEFAULTCONFIG="${DEFAULTCONFIG:-${BINDIR}/OpenSimDefaults.ini}"
+export DEFAULTCONFIG="${DEFAULTCONFIG:-${BINDIR}/RegionServerDefaults.ini}"
 
 if [ ! -d $BINDIR ]; then
     echo "Runtime directory $BINDIR does not exist!"

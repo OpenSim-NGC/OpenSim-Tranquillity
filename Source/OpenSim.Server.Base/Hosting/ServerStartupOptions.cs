@@ -21,12 +21,6 @@ namespace OpenSim.Server.Base.Hosting;
 public class ServerStartupOptions
 {
     /// <summary>
-    /// Legacy compatibility for older callers that still track a log4net config path.
-    /// Startup now uses the shared ILogger/Serilog configuration and ignores this value.
-    /// </summary>
-    public string LogConfig { get; init; } = string.Empty;
-
-    /// <summary>
     /// Zero or more explicit <c>.ini</c> files to load in addition to the master.
     /// Applied in order after <see cref="IniMaster"/>.
     /// </summary>

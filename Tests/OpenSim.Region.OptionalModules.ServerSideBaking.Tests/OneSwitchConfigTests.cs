@@ -67,7 +67,7 @@ public class OneSwitchConfigTests
     public void the_two_global_lines_are_the_documented_keys_and_sections()
     {
         // If either name drifts, the line an operator was told to add stops working and nothing says so. These are
-        // the exact section and key names written into OpenSimDefaults.ini and the design brief's config contract.
+        // the exact section and key names written into RegionServerDefaults.ini and the design brief's config contract.
         Assert.Equal("AIS", AISv3Module.ConfigSection);
         Assert.Equal("Appearance", ServerSideBakingModule.ConfigSection);
 
