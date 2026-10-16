@@ -950,8 +950,16 @@ namespace OpenSim.Region.ClientStack.Linden
                         prim.RezzerID = creatorID;
                         prim.CreationDate = Util.UnixTimeSinceEpoch();
 
-                        if (inner_instance_list.ContainsKey("mesh_name") && !string.IsNullOrEmpty(inner_instance_list["mesh_name"].AsString()))
-                            prim.Name = inner_instance_list["mesh_name"].AsString();
+                        if (inner_instance_list.TryGetValue("mesh_name", out tmp))
+                        {
+                            string meshName = tmp.AsString();
+                            if (!string.IsNullOrWhiteSpace(meshName))
+                                prim.Name = meshName;
+                            else if (grp == null)
+                                prim.Name = assetName;
+                            else
+                                prim.Name = assetName + "#" + i.ToString();
+                        }
                         else if (grp == null)
                             prim.Name = assetName;
                         else
