@@ -3,9 +3,12 @@ using System.Collections.Specialized;
 using System.Net;
 using System.Text;
 using Nini.Config;
+using OpenMetaverse;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 using OpenSim.Server.Handlers.Inventory;
+using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 using Xunit;
 
@@ -105,16 +108,25 @@ public class ControlPlaneAccessTests
     }
 
     [Fact]
-    public void XInventoryMutationIsRejectedBeforeCallingInventoryService()
+    public void XInventoryMutationIsNotGatedByControlPlane()
     {
+        IniConfigSource config = new();
+        config.AddConfig("InventoryService")
+            .Set("StorageProvider", "OpenSim.Tests.Common.dll:TestXInventoryDataPlugin");
+        IInventoryService service = ServerUtils.LoadPlugin<IInventoryService>(
+            "OpenSim.Services.InventoryService.dll:XInventoryService", new object[] { config });
+        Xunit.Assert.NotNull(service);
         ControlPlaneAccess access = new(new IniConfigSource());
-        XInventoryConnectorPostHandler handler = new(null, null, access);
+        XInventoryConnectorPostHandler handler = new(service, null, access);
         TestOSHttpResponse response = new();
-        byte[] body = Encoding.UTF8.GetBytes("METHOD=CREATEUSERINVENTORY&PRINCIPAL=00000000-0000-0000-0000-000000000001");
+        UUID principal = UUID.Random();
+        using MemoryStream body = new(Encoding.UTF8.GetBytes($"METHOD=CREATEUSERINVENTORY&PRINCIPAL={principal}"));
 
-        handler.Handle(string.Empty, new MemoryStream(body), RequestFrom("203.0.113.10"), response);
+        byte[] result = handler.Handle("/xinventory", body, RequestFrom("203.0.113.10"), response);
 
-        Xunit.Assert.Equal((int)HttpStatusCode.Forbidden, response.StatusCode);
+        Xunit.Assert.Equal(0, response.StatusCode);
+        Xunit.Assert.Equal("True", ServerUtils.ParseXmlResponse(Encoding.UTF8.GetString(result))["RESULT"]);
+        Xunit.Assert.NotNull(service.GetRootFolder(principal));
     }
 
     [Fact]

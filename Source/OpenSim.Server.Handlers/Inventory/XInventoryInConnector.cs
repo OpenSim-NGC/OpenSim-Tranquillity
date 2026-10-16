@@ -119,10 +119,11 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
             string method = request["METHOD"].ToString();
             request.Remove("METHOD");
 
-            if (!IsReadOnlyMethod(method)
-                && !m_ControlPlaneAccess.AuthorizeControlPlaneMutation(
-                    httpRequest, httpResponse, $"POST /xinventory METHOD={method}"))
-                return Array.Empty<byte>();
+            // Deferred pending replacement authentication/authorization for assets and inventory.
+            // if (!IsReadOnlyMethod(method)
+            //     && !m_ControlPlaneAccess.AuthorizeControlPlaneMutation(
+            //         httpRequest, httpResponse, $"POST /xinventory METHOD={method}"))
+            //     return Array.Empty<byte>();
 
             switch (method)
             {

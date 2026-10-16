@@ -74,8 +74,8 @@ Read this section before replacing an existing installation.
    Destination regions must trust the actual outbound addresses of the login/grid
    server and peer simulators. Missing entries can break login placement, child
    agents, neighbour announcements and crossings. Region-control endpoints still
-   trust loopback; `/assets` and `/xinventory` writes require an explicit loopback
-   address in `[Network] ControlPlaneTrustedHosts` when services connect locally.
+   trust loopback. `/assets` and `/xinventory` control-plane checks are currently
+   disabled pending replacement authentication/authorization.
    See [Security hardening](security/Hardening.md) for exact configuration,
    reverse-proxy guidance and `403`/`404` diagnosis.
 6. **Plan for changed Hypergrid behavior.** Hypergrid return-home requests are

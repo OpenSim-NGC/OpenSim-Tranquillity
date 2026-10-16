@@ -87,7 +87,7 @@ namespace OpenSim.Server.Handlers.Asset.Test
         }
 
         [Fact]
-        public void TestUntrustedAssetStoreRequestIsRejectedBeforeMutation()
+        public void TestUntrustedAssetStoreRequestIsNotGatedByControlPlane()
         {
             TestHelpers.InMethod();
 
@@ -99,7 +99,7 @@ namespace OpenSim.Server.Handlers.Asset.Test
             AssetServerPostHandler handler = new AssetServerPostHandler(
                 assetService, null, new ControlPlaneAccess(new IniConfigSource()));
 
-            AssetBase asset = AssetHelpers.CreateNotecardAsset(assetId, "Blocked upload");
+            AssetBase asset = AssetHelpers.CreateNotecardAsset(assetId, "Upload without control-plane gating");
             using MemoryStream buffer = new MemoryStream();
             XmlSerializer serializer = new XmlSerializer(typeof(AssetBase));
             serializer.Serialize(buffer, asset);
@@ -109,8 +109,48 @@ namespace OpenSim.Server.Handlers.Asset.Test
             handler.Handle(string.Empty, buffer,
                 new TestRequest(new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000)), response);
 
-            Xunit.Assert.Equal((int)HttpStatusCode.Forbidden, response.StatusCode);
-            Xunit.Assert.Null(assetService.Get(assetId.ToString()));
+            Xunit.Assert.Equal(0, response.StatusCode);
+            Xunit.Assert.NotNull(assetService.Get(assetId.ToString()));
+        }
+
+        [Xunit.Theory]
+        [InlineData(AllowedRemoteDeleteTypes.All, true)]
+        [InlineData(AllowedRemoteDeleteTypes.None, false)]
+        [InlineData(AllowedRemoteDeleteTypes.MapTile, false)]
+        public void TestUntrustedAssetDeleteRetainsTypeRestrictions(
+            AllowedRemoteDeleteTypes allowedTypes, bool expectedDeleted)
+        {
+            UUID assetId = TestHelpers.ParseTail(0x1);
+            IConfigSource config = new IniConfigSource();
+            config.AddConfig("AssetService");
+            config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
+            DeletionTrackingAssetService assetService = new DeletionTrackingAssetService(config);
+            assetService.Store(AssetHelpers.CreateNotecardAsset(assetId, "Delete test"));
+            AssetServerDeleteHandler handler = new AssetServerDeleteHandler(
+                assetService, allowedTypes, null, new ControlPlaneAccess(new IniConfigSource()));
+
+            TestOSHttpResponse response = new TestOSHttpResponse();
+            byte[] result = handler.Handle("/assets/" + assetId, Stream.Null,
+                new TestRequest(new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000)), response);
+
+            using MemoryStream buffer = new MemoryStream(result);
+            bool deleted = Xunit.Assert.IsType<bool>(new XmlSerializer(typeof(bool)).Deserialize(buffer));
+            Xunit.Assert.Equal(0, response.StatusCode);
+            Xunit.Assert.Equal(expectedDeleted, deleted);
+            Xunit.Assert.Equal(expectedDeleted, assetService.DeleteCalled);
+        }
+
+        private sealed class DeletionTrackingAssetService : AssetService
+        {
+            public bool DeleteCalled { get; private set; }
+
+            public DeletionTrackingAssetService(IConfigSource config) : base(config) {}
+
+            public override bool Delete(string id)
+            {
+                DeleteCalled = true;
+                return true;
+            }
         }
 
         [Fact]

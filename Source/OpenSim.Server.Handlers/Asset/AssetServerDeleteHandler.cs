@@ -84,8 +84,9 @@ public class AssetServerDeleteHandler : BaseStreamHandler
     protected override byte[] ProcessRequest(string path, Stream request,
             IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        if (!m_ControlPlaneAccess.AuthorizeControlPlaneMutation(httpRequest, httpResponse, "DELETE /assets"))
-            return Array.Empty<byte>();
+        // Deferred pending replacement authentication/authorization for assets and inventory.
+        // if (!m_ControlPlaneAccess.AuthorizeControlPlaneMutation(httpRequest, httpResponse, "DELETE /assets"))
+        //     return Array.Empty<byte>();
 
         bool result = false;
 
