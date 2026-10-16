@@ -793,6 +793,12 @@ namespace InWorldz.Phlox.Glue
         LSLList llJson2List(string src);
         void iwSetWind(int type, Vector3 offset, Vector3 speed);
         Vector3 iwWind(Vector3 offset);
+        /// <summary>Creates a wind volume from a rule list; its handle (1 or more) or a negative WindVolumeError. Estate owner, estate manager or god only.</summary>
+        int iwWindVolumeCreate(LSLList rules);
+        /// <summary>Removes a volume this object made; 0 or a negative WindVolumeError.</summary>
+        int iwWindVolumeRemove(int handle);
+        /// <summary>The handles of the volumes this object made, as integers.</summary>
+        LSLList iwWindVolumes();
         int iwHasParcelPowers(int groupPower);
         Vector3 iwGroundSurfaceNormal(Vector3 offset);
         string iwRequestAnimationData(string name);

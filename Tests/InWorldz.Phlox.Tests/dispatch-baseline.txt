@@ -936,3 +936,6 @@ osRemoveLinkInventory 963
 osPerlinNoise2D 964
 osAgentSaveAppearance 965
 osMakeNotecard 967
+iwWindVolumeCreate 969
+iwWindVolumeRemove 970
+iwWindVolumes 971
