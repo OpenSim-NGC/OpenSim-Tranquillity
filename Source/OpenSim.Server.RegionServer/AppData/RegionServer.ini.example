@@ -103,6 +103,17 @@
     ;# {ConsoleHistoryTimeStamp} {} {Time stamp commands in history file} {} false
     ;; Time stamp commands in history file (default false)
     ; ConsoleHistoryTimeStamp = false
+
+    ;# {TimerResolutionMs} {} {Windows system timer resolution in milliseconds, 1 to 15 (0 = off)?} {} 0
+    ;; Windows only. Ask Windows for a finer system timer for as long as the region server runs.
+    ;; The scene loop sleeps a whole number of milliseconds and Windows wakes a sleeping thread on a timer
+    ;; tick, 15.625 ms by default, so frames come out one or more ticks long. With 1 here the sleep wakes
+    ;; within about 1 ms, which evens out the frames. It matters most when a faster frame rate is
+    ;; configured (a FrameTime well below the default 0.0909, for example 0.03125).
+    ;; The cost: Windows runs its system timer faster while the region server runs, which means more
+    ;; timer wake-ups and a little more power use. Measured at idle, the region server's CPU did not change.
+    ;; 0 leaves the timer alone (default). On other systems the setting is ignored with one log line.
+    ; TimerResolutionMs = 0
     
     ;# {save_crashes} {} {Save crashes to disk?} {true false} false
     ;; Set this to true if you want to log crashes to disk
