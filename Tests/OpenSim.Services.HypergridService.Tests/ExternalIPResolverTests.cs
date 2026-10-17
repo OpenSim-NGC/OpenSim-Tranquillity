@@ -7,14 +7,16 @@
 
 using System.Net;
 using Microsoft.Extensions.Logging;
+using Nini.Config;
 using OpenSim.Services.HypergridService;
 using Xunit;
 
 namespace OpenSim.Services.HypergridService.Tests;
 
 /// <summary>
-/// Unit tests for <see cref="ExternalIPResolver"/>. No network access: both resolution paths are
-/// replaced with delegates so the tests exercise selection, failure handling and refresh only.
+/// Unit tests for <see cref="ExternalIPResolver"/>. No network access: the operating system
+/// lookup is replaced with a delegate so the tests exercise host selection, failure handling and
+/// refresh only.
 /// </summary>
 public class ExternalIPResolverTests
 {
@@ -43,102 +45,116 @@ public class ExternalIPResolverTests
 
     private static IPAddress Ip(string s) => IPAddress.Parse(s);
 
-    // ---- config absent -> OS resolver path, unchanged ------------------------------------
+    private static IConfigSource Config(params (string Key, string Value)[] keys)
+    {
+        IniConfigSource source = new();
+        IConfig section = source.AddConfig("UserAgentService");
+        foreach ((string key, string value) in keys)
+            section.Set(key, value);
+        return source;
+    }
+
+    // ---- every lookup goes through the operating system resolver --------------------------
 
     [Fact]
-    public void ConfigAbsent_UsesOsResolver_AndNeverTouchesDirectPath()
+    public void Lookup_UsesTheOperatingSystemResolver_ForTheGivenHost()
     {
-        int osCalls = 0, directCalls = 0;
+        int osCalls = 0;
         CapturingLogger log = new();
 
-        using ExternalIPResolver r = new(Host, dnsServer: null, TimeSpan.Zero, log,
-            osResolver: h => { osCalls++; Assert.Equal(Host, h); return Ip("203.0.113.10"); },
-            directResolver: (_, _) => { directCalls++; return Ip("198.51.100.1"); });
+        using ExternalIPResolver r = new(Host, TimeSpan.Zero, log,
+            osResolver: h => { osCalls++; Assert.Equal(Host, h); return Ip("203.0.113.10"); });
 
-        Assert.False(r.UsesDirectQuery);
-        Assert.Null(r.DnsServer);
         Assert.Equal("203.0.113.10", r.CurrentIP);
         Assert.Equal(1, osCalls);
-        Assert.Equal(0, directCalls);
         Assert.Equal(0, log.Count(LogLevel.Warning));
+    }
+
+    [Fact]
+    public void TheServiceSendsNoDnsQueriesOfItsOwn()
+    {
+        // Every name goes through the operating system resolver: the assembly must not use a DNS client library.
+        string[] references = typeof(ExternalIPResolver).Assembly.GetReferencedAssemblies()
+            .Select(a => a.Name ?? string.Empty).ToArray();
+        Assert.DoesNotContain(references, name => name.Contains("DnsClient", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ---- which host is resolved: [UserAgentService] PublicAddress, else the gatekeeper host -
+
+    [Fact]
+    public void FromConfig_NothingSet_ResolvesTheGatekeeperHost()
+    {
+        string? asked = null;
+
+        using ExternalIPResolver r = ExternalIPResolver.FromConfig(Config(), "gate.example.org", new CapturingLogger(),
+            osResolver: h => { asked = h; return Ip("203.0.113.10"); });
+
+        Assert.Equal("gate.example.org", r.Host);
+        Assert.Equal("gate.example.org", asked);
+        Assert.Equal("203.0.113.10", r.CurrentIP);
+        Assert.Equal(TimeSpan.FromMinutes(30), r.RefreshInterval);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void EmptyOrBlankResolver_IsTreatedAsAbsent(string dnsServer)
+    public void FromConfig_BlankPublicAddress_IsTreatedAsUnset(string value)
     {
-        using ExternalIPResolver r = new(Host, dnsServer, TimeSpan.Zero, new CapturingLogger(),
-            osResolver: _ => Ip("203.0.113.10"),
-            directResolver: (_, _) => throw new InvalidOperationException("direct path must not be used"));
+        using ExternalIPResolver r = ExternalIPResolver.FromConfig(Config(("PublicAddress", value)), "gate.example.org",
+            new CapturingLogger(), osResolver: _ => Ip("203.0.113.10"));
 
-        Assert.False(r.UsesDirectQuery);
-        Assert.Equal("203.0.113.10", r.CurrentIP);
+        Assert.Equal("gate.example.org", r.Host);
     }
 
-    // ---- config set -> direct query path ---------------------------------------------------
-
     [Fact]
-    public void ConfigSet_UsesDirectQuery_AgainstConfiguredServer_AndSkipsOsResolver()
+    public void FromConfig_PublicAddressHostName_IsResolvedInsteadOfTheGatekeeperHost()
     {
-        int osCalls = 0;
-        IPEndPoint? seenServer = null;
-        CapturingLogger log = new();
+        List<string> asked = new();
 
-        using ExternalIPResolver r = new(Host, "1.1.1.1", TimeSpan.Zero, log,
-            osResolver: _ => { osCalls++; return Ip("192.168.1.10"); },   // the LAN answer a hosts file would give
-            directResolver: (h, server) => { Assert.Equal(Host, h); seenServer = server; return Ip("198.51.100.7"); });
+        using ExternalIPResolver r = ExternalIPResolver.FromConfig(Config(("PublicAddress", " public.example.org ")),
+            "gate.example.org", new CapturingLogger(),
+            osResolver: h => { asked.Add(h); return Ip("198.51.100.7"); });
 
-        Assert.True(r.UsesDirectQuery);
-        Assert.Equal(new IPEndPoint(Ip("1.1.1.1"), ExternalIPResolver.DefaultDnsPort), r.DnsServer);
-        Assert.Equal(new IPEndPoint(Ip("1.1.1.1"), 53), seenServer);
+        Assert.Equal("public.example.org", r.Host);
+        Assert.Equal(new[] { "public.example.org" }, asked);
         Assert.Equal("198.51.100.7", r.CurrentIP);
-        Assert.Equal(0, osCalls);
     }
 
     [Fact]
-    public void ConfigSet_WithPort_UsesThatPort()
+    public void FromConfig_PublicAddressLiteral_IsUsedAsGiven_ThroughTheDefaultResolver()
     {
-        using ExternalIPResolver r = new(Host, "9.9.9.9:5353", TimeSpan.Zero, new CapturingLogger(),
-            directResolver: (_, _) => Ip("198.51.100.7"));
+        // No osResolver override: the default operating system path hands an IP literal back unchanged.
+        using ExternalIPResolver r = ExternalIPResolver.FromConfig(Config(("PublicAddress", "198.51.100.9")),
+            "gate.example.org", new CapturingLogger());
 
-        Assert.Equal(new IPEndPoint(Ip("9.9.9.9"), 5353), r.DnsServer);
+        Assert.Equal("198.51.100.9", r.CurrentIP);
     }
 
     [Fact]
-    public void ConfigSet_Unparsable_WarnsAndFallsBackToOsResolver()
+    public void FromConfig_RemovedExternalIPResolverKey_IsIgnored_WithoutAWarning()
     {
         CapturingLogger log = new();
+        string? asked = null;
 
-        using ExternalIPResolver r = new(Host, "not-an-ip", TimeSpan.Zero, log,
-            osResolver: _ => Ip("203.0.113.10"),
-            directResolver: (_, _) => throw new InvalidOperationException("direct path must not be used"));
+        using ExternalIPResolver r = ExternalIPResolver.FromConfig(Config(("ExternalIPResolver", "192.0.2.53")),
+            "gate.example.org", log, osResolver: h => { asked = h; return Ip("203.0.113.10"); });
 
-        Assert.False(r.UsesDirectQuery);
+        Assert.Equal("gate.example.org", asked);
         Assert.Equal("203.0.113.10", r.CurrentIP);
-        Assert.Equal(1, log.Count(LogLevel.Warning));
-        Assert.Contains("not-an-ip", log.Entries.Single(e => e.Level == LogLevel.Warning).Message);
+        Assert.Equal(0, log.Count(LogLevel.Warning));
+        Assert.DoesNotContain(log.Entries, e => e.Message.Contains("ExternalIPResolver") || e.Message.Contains("192.0.2.53"));
     }
 
     [Theory]
-    [InlineData("1.1.1.1", "1.1.1.1", 53)]
-    [InlineData("8.8.8.8:5353", "8.8.8.8", 5353)]
-    [InlineData("2606:4700:4700::1111", "2606:4700:4700::1111", 53)]
-    [InlineData("[2606:4700:4700::1111]:53", "2606:4700:4700::1111", 53)]
-    public void TryParseDnsServer_AcceptsIpAndIpPort(string value, string expectedIp, int expectedPort)
+    [InlineData("0", 0)]
+    [InlineData("5", 5)]
+    [InlineData("-3", 0)]
+    public void FromConfig_RefreshMinutes_IsRead_AndNonPositiveDisablesIt(string value, int expectedMinutes)
     {
-        Assert.True(ExternalIPResolver.TryParseDnsServer(value, out IPEndPoint? ep));
-        Assert.Equal(new IPEndPoint(Ip(expectedIp), expectedPort), ep);
-    }
+        using ExternalIPResolver r = ExternalIPResolver.FromConfig(Config(("ExternalIPRefreshMinutes", value)),
+            "gate.example.org", new CapturingLogger(), osResolver: _ => Ip("203.0.113.10"));
 
-    [Theory]
-    [InlineData("")]
-    [InlineData("dns.example.org")]
-    [InlineData("1.1.1.1:0")]
-    [InlineData("1.1.1.1:notaport")]
-    public void TryParseDnsServer_RejectsNonIpValues(string value)
-    {
-        Assert.False(ExternalIPResolver.TryParseDnsServer(value, out _));
+        Assert.Equal(TimeSpan.FromMinutes(expectedMinutes), r.RefreshInterval);
     }
 
     // ---- failed lookup -> previous value retained, warning logged --------------------------
@@ -149,8 +165,8 @@ public class ExternalIPResolverTests
         IPAddress? answer = Ip("198.51.100.7");
         CapturingLogger log = new();
 
-        using ExternalIPResolver r = new(Host, "1.1.1.1", TimeSpan.Zero, log,
-            directResolver: (_, _) => answer);
+        using ExternalIPResolver r = new(Host, TimeSpan.Zero, log,
+            osResolver: _ => answer);
         Assert.Equal("198.51.100.7", r.CurrentIP);
 
         answer = null;
@@ -167,7 +183,7 @@ public class ExternalIPResolverTests
         bool fail = false;
         CapturingLogger log = new();
 
-        using ExternalIPResolver r = new(Host, null, TimeSpan.Zero, log,
+        using ExternalIPResolver r = new(Host, TimeSpan.Zero, log,
             osResolver: _ => fail ? throw new System.Net.Sockets.SocketException(11001) : Ip("203.0.113.10"));
         Assert.Equal("203.0.113.10", r.CurrentIP);
 
@@ -185,8 +201,8 @@ public class ExternalIPResolverTests
     {
         CapturingLogger log = new();
 
-        ExternalIPResolver r = new(Host, "1.1.1.1", TimeSpan.Zero, log,
-            directResolver: (_, _) => throw new TimeoutException("dns timeout"));
+        ExternalIPResolver r = new(Host, TimeSpan.Zero, log,
+            osResolver: _ => throw new TimeoutException("dns timeout"));
 
         using (r)
         {
@@ -199,8 +215,8 @@ public class ExternalIPResolverTests
     public void GoodValue_IsNeverOverwrittenByEmptyOrFailedResult()
     {
         int call = 0;
-        using ExternalIPResolver r = new(Host, "1.1.1.1", TimeSpan.Zero, new CapturingLogger(),
-            directResolver: (_, _) => call++ switch
+        using ExternalIPResolver r = new(Host, TimeSpan.Zero, new CapturingLogger(),
+            osResolver: _ => call++ switch
             {
                 0 => Ip("198.51.100.7"),
                 1 => null,
@@ -223,8 +239,8 @@ public class ExternalIPResolverTests
     public void ManualRefresh_PicksUpChangedAnswer()
     {
         IPAddress answer = Ip("198.51.100.7");
-        using ExternalIPResolver r = new(Host, "1.1.1.1", TimeSpan.Zero, new CapturingLogger(),
-            directResolver: (_, _) => answer);
+        using ExternalIPResolver r = new(Host, TimeSpan.Zero, new CapturingLogger(),
+            osResolver: _ => answer);
         Assert.Equal("198.51.100.7", r.CurrentIP);
 
         answer = Ip("203.0.113.77");                     // DDNS moved
@@ -237,7 +253,7 @@ public class ExternalIPResolverTests
     {
         IPAddress answer = Ip("198.51.100.7");
         int calls = 0;
-        using ExternalIPResolver r = new(Host, null, TimeSpan.FromMilliseconds(50), new CapturingLogger(),
+        using ExternalIPResolver r = new(Host, TimeSpan.FromMilliseconds(50), new CapturingLogger(),
             osResolver: _ => { Interlocked.Increment(ref calls); return answer; });
         Assert.Equal("198.51.100.7", r.CurrentIP);
         Assert.Equal(TimeSpan.FromMilliseconds(50), r.RefreshInterval);
@@ -257,8 +273,8 @@ public class ExternalIPResolverTests
     {
         int call = 0;
         CapturingLogger log = new();
-        using ExternalIPResolver r = new(Host, "1.1.1.1", TimeSpan.FromMilliseconds(30), log,
-            directResolver: (_, _) => Interlocked.Increment(ref call) == 1 ? Ip("198.51.100.7") : throw new TimeoutException());
+        using ExternalIPResolver r = new(Host, TimeSpan.FromMilliseconds(30), log,
+            osResolver: _ => Interlocked.Increment(ref call) == 1 ? Ip("198.51.100.7") : throw new TimeoutException());
 
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
         while (Volatile.Read(ref call) < 4 && DateTime.UtcNow < deadline)
@@ -274,7 +290,7 @@ public class ExternalIPResolverTests
     [InlineData(-5)]
     public void ZeroOrNegativeInterval_DisablesRefresh(int minutes)
     {
-        using ExternalIPResolver r = new(Host, null, TimeSpan.FromMinutes(minutes), new CapturingLogger(),
+        using ExternalIPResolver r = new(Host, TimeSpan.FromMinutes(minutes), new CapturingLogger(),
             osResolver: _ => Ip("203.0.113.10"));
         Assert.Equal(TimeSpan.Zero, r.RefreshInterval);
     }
@@ -283,7 +299,7 @@ public class ExternalIPResolverTests
     public async Task Dispose_StopsTimer()
     {
         int calls = 0;
-        ExternalIPResolver r = new(Host, null, TimeSpan.FromMilliseconds(20), new CapturingLogger(),
+        ExternalIPResolver r = new(Host, TimeSpan.FromMilliseconds(20), new CapturingLogger(),
             osResolver: _ => { Interlocked.Increment(ref calls); return Ip("203.0.113.10"); });
 
         DateTime deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
@@ -301,8 +317,8 @@ public class ExternalIPResolverTests
     [Fact]
     public void EmptyHost_NeverResolves_AndDoesNotThrow()
     {
-        using ExternalIPResolver r = new(string.Empty, "1.1.1.1", TimeSpan.Zero, new CapturingLogger(),
-            directResolver: (_, _) => throw new InvalidOperationException("must not be called"));
+        using ExternalIPResolver r = new(string.Empty, TimeSpan.Zero, new CapturingLogger(),
+            osResolver: _ => throw new InvalidOperationException("must not be called"));
         Assert.Equal(string.Empty, r.CurrentIP);
         Assert.False(r.Refresh());
     }

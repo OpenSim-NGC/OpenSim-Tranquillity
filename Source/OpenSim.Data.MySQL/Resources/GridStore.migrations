@@ -50,3 +50,11 @@ CREATE TABLE IF NOT EXISTS `regions` (
 
 COMMIT;
 
+:VERSION 11
+
+BEGIN;
+
+ALTER TABLE `regions` ADD COLUMN `viewerLocalAddress` varchar(64) DEFAULT NULL;
+
+COMMIT;
+

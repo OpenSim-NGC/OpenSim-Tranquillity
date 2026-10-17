@@ -55,6 +55,7 @@ public class LLLoginHandlers
     public XmlRpcResponse HandleXMLRPCLogin(XmlRpcRequest request, IPEndPoint remoteClient)
     {
         Hashtable requestData = (Hashtable)request.Params[0];
+        IPEndPoint peer = remoteClient;
         if (request.Params[3] != null)
         {
             IPEndPoint ep = Util.GetClientIPFromXFF((string)request.Params[3]);
@@ -62,6 +63,12 @@ public class LLLoginHandlers
                 // Bang!
                 remoteClient = ep;
         }
+
+        // The address recorded for the login is the forwarded-for address whenever the header is present,
+        // as before (HasProxy does not gate that). The address a viewer is classified by, to choose the region
+        // address it is given, is the connection's own address unless this server is configured as being
+        // behind a proxy: a viewer that connects directly can send any header it likes.
+        IPAddress viewerSource = m_Proxy ? remoteClient.Address : peer.Address;
 
         if (requestData != null)
         {
@@ -123,7 +130,7 @@ public class LLLoginHandlers
                 //m_log.LogInformation("[LOGIN]: XMLRPC Login Requested for {0} {1}, starting in {2}, using {3}", first, last, startLocation, clientVersion);
 
                 LoginResponse reply = null;
-                reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID, clientVersion, channel, mac, id0, remoteClient);
+                reply = m_LocalService.Login(first, last, passwd, startLocation, scopeID, clientVersion, channel, mac, id0, remoteClient, viewerSource);
 
                 XmlRpcResponse response = new XmlRpcResponse();
                 response.Value = reply.ToHashtable();

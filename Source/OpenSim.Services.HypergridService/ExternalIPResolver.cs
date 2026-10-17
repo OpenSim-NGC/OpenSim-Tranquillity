@@ -27,10 +27,9 @@
  */
 
 using System.Net;
-using System.Net.Sockets;
 using System.Reflection;
-using DnsClient;
 using Microsoft.Extensions.Logging;
+using Nini.Config;
 using OpenSim.Framework;
 
 namespace OpenSim.Services.HypergridService;
@@ -55,10 +54,11 @@ namespace OpenSim.Services.HypergridService;
 /// service is restarted.</item>
 /// </list>
 /// <para>
-/// This class addresses both: an optional DNS server can be queried directly (bypassing the OS
-/// resolver), and the answer is refreshed on a timer. When no DNS server is configured the OS
-/// path is <see cref="Util.GetHostFromDNS"/>, exactly as before. A failed lookup never throws
-/// and never replaces a previously obtained address.
+/// This class addresses both: the answer is refreshed on a timer, and the host to resolve can be
+/// named by the operator (<c>[UserAgentService] PublicAddress</c>). Every lookup goes through the
+/// operating system resolver (<see cref="Util.GetHostFromDNS"/>), so the hosts file and the
+/// system's resolver configuration decide the answer; this class sends no DNS queries of its own.
+/// A failed lookup never throws and never replaces a previously obtained address.
 /// </para>
 /// </remarks>
 public sealed class ExternalIPResolver : IDisposable
@@ -66,31 +66,18 @@ public sealed class ExternalIPResolver : IDisposable
     /// <summary>Resolves a hostname through the operating system resolver.</summary>
     public delegate IPAddress OsResolveFunc(string host);
 
-    /// <summary>Resolves a hostname by querying the given DNS server directly.</summary>
-    public delegate IPAddress DirectResolveFunc(string host, IPEndPoint dnsServer);
-
-    public const int DefaultDnsPort = 53;
     public static readonly TimeSpan DefaultRefreshInterval = TimeSpan.FromMinutes(30);
-    private static readonly TimeSpan s_directQueryTimeout = TimeSpan.FromSeconds(5);
 
     private readonly ILogger m_log;
     private readonly OsResolveFunc m_osResolver;
-    private readonly DirectResolveFunc m_directResolver;
     private readonly object m_refreshLock = new();
 
     private Timer m_timer;
-    private LookupClient m_lookupClient;
     private volatile string m_current = string.Empty;
     private int m_disposed;
 
-    /// <summary>The hostname being resolved.</summary>
+    /// <summary>The hostname (or IP literal) being resolved.</summary>
     public string Host { get; }
-
-    /// <summary>The DNS server queried directly, or null when the OS resolver is used.</summary>
-    public IPEndPoint DnsServer { get; }
-
-    /// <summary>True when lookups bypass the OS resolver and query <see cref="DnsServer"/>.</summary>
-    public bool UsesDirectQuery => DnsServer is not null;
 
     /// <summary>Interval between automatic refreshes; <see cref="TimeSpan.Zero"/> when disabled.</summary>
     public TimeSpan RefreshInterval { get; }
@@ -105,49 +92,56 @@ public sealed class ExternalIPResolver : IDisposable
     /// Creates a resolver, performs the initial lookup synchronously and starts the refresh
     /// timer. The constructor never throws because of a lookup failure.
     /// </summary>
-    /// <param name="host">Hostname (or IP literal) of the gatekeeper.</param>
-    /// <param name="dnsServer">
-    /// Optional DNS server to query directly, as "ip" or "ip:port". Null or empty selects the
-    /// OS resolver. An unparsable value is logged and the OS resolver is used.
-    /// </param>
+    /// <param name="host">Hostname (or IP literal) to resolve.</param>
     /// <param name="refreshInterval">Automatic refresh period; zero or negative disables it.</param>
     /// <param name="log">Logger; defaults to the ambient <see cref="LoggerProvider"/>.</param>
     /// <param name="osResolver">OS resolution function; defaults to <see cref="Util.GetHostFromDNS"/>.</param>
-    /// <param name="directResolver">Direct query function; defaults to a DnsClient lookup.</param>
     public ExternalIPResolver(
         string host,
-        string dnsServer,
         TimeSpan refreshInterval,
         ILogger log = null,
-        OsResolveFunc osResolver = null,
-        DirectResolveFunc directResolver = null)
+        OsResolveFunc osResolver = null)
     {
         Host = host ?? string.Empty;
         m_log = log ?? LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
         m_osResolver = osResolver ?? Util.GetHostFromDNS;
-        m_directResolver = directResolver ?? QueryDnsServer;
         RefreshInterval = refreshInterval > TimeSpan.Zero ? refreshInterval : TimeSpan.Zero;
-
-        if (!string.IsNullOrWhiteSpace(dnsServer))
-        {
-            if (TryParseDnsServer(dnsServer, out IPEndPoint endpoint))
-            {
-                DnsServer = endpoint;
-                m_log.LogInformation("[EXTERNAL IP RESOLVER]: resolving {0} via DNS server {1}, bypassing the OS resolver",
-                    Host, DnsServer);
-            }
-            else
-            {
-                m_log.LogWarning("[EXTERNAL IP RESOLVER]: ExternalIPResolver value \"{0}\" is not an IP address or ip:port; using the OS resolver",
-                    dnsServer);
-            }
-        }
 
         Refresh();
 
         if (RefreshInterval > TimeSpan.Zero)
             m_timer = new Timer(OnTimer, null, RefreshInterval, RefreshInterval);
     }
+
+    /// <summary>
+    /// Creates the resolver for a gatekeeper from its <c>[UserAgentService]</c> section:
+    /// <c>PublicAddress</c> (an IP address or host name; empty means <paramref name="gatekeeperHost"/>)
+    /// and <c>ExternalIPRefreshMinutes</c> (default 30, zero or negative never repeats).
+    /// </summary>
+    public static ExternalIPResolver FromConfig(
+        IConfig serverConfig,
+        string gatekeeperHost,
+        ILogger log = null,
+        OsResolveFunc osResolver = null)
+    {
+        string publicAddress = serverConfig?.GetString("PublicAddress", string.Empty)?.Trim() ?? string.Empty;
+        int refreshMinutes = serverConfig?.GetInt("ExternalIPRefreshMinutes", 30) ?? 30;
+
+        return new ExternalIPResolver(
+            publicAddress.Length > 0 ? publicAddress : gatekeeperHost,
+            TimeSpan.FromMinutes(refreshMinutes),
+            log, osResolver);
+    }
+
+    /// <summary>
+    /// Creates the resolver for a gatekeeper from its <c>[UserAgentService]</c> section.
+    /// </summary>
+    public static ExternalIPResolver FromConfig(
+        IConfigSource config,
+        string gatekeeperHost,
+        ILogger log = null,
+        OsResolveFunc osResolver = null)
+        => FromConfig(config?.Configs["UserAgentService"], gatekeeperHost, log, osResolver);
 
     /// <summary>
     /// Performs one lookup now. Returns true if an address was obtained. On failure the previous
@@ -163,7 +157,7 @@ public sealed class ExternalIPResolver : IDisposable
             IPAddress ip;
             try
             {
-                ip = UsesDirectQuery ? m_directResolver(Host, DnsServer) : m_osResolver(Host);
+                ip = m_osResolver(Host);
             }
             catch (Exception e)
             {
@@ -205,88 +199,6 @@ public sealed class ExternalIPResolver : IDisposable
             // Refresh() already catches lookup errors; this guards the timer thread against anything else.
             m_log.LogWarning(e, "[EXTERNAL IP RESOLVER]: unexpected error during scheduled refresh of {0}", Host);
         }
-    }
-
-    /// <summary>
-    /// Parses "ip" or "ip:port" (IPv6 as "[addr]:port"). Port defaults to 53.
-    /// </summary>
-    public static bool TryParseDnsServer(string value, out IPEndPoint endpoint)
-    {
-        endpoint = null;
-        if (string.IsNullOrWhiteSpace(value))
-            return false;
-
-        value = value.Trim();
-        if (IPAddress.TryParse(value, out IPAddress bare))
-        {
-            endpoint = new IPEndPoint(bare, DefaultDnsPort);
-            return true;
-        }
-
-        if (IPEndPoint.TryParse(value, out IPEndPoint parsed) && parsed.Port != 0)
-        {
-            endpoint = parsed;
-            return true;
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// Default direct lookup: query the given server for A (then AAAA) records with DnsClient.
-    /// Mirrors <see cref="Util.GetHostFromDNS"/> in preferring IPv4 and passing IP literals through.
-    /// </summary>
-    private IPAddress QueryDnsServer(string host, IPEndPoint dnsServer)
-    {
-        if (IPAddress.TryParse(host, out IPAddress literal))
-        {
-            if (literal.Equals(IPAddress.Any) || literal.Equals(IPAddress.IPv6Any))
-                return null;
-            return literal;
-        }
-
-        LookupClient client = m_lookupClient;
-        if (client is null)
-        {
-            LookupClientOptions options = new(dnsServer)
-            {
-                UseCache = false,
-                Timeout = s_directQueryTimeout,
-                Retries = 2,
-                ThrowDnsErrors = false,
-                UseTcpFallback = true,
-            };
-            client = new LookupClient(options);
-            m_lookupClient = client;
-        }
-
-        IDnsQueryResponse response = client.Query(host, QueryType.A);
-        if (response.HasError)
-        {
-            m_log.LogWarning("[EXTERNAL IP RESOLVER]: DNS server {0} answered A query for {1} with error: {2}",
-                dnsServer, host, response.ErrorMessage);
-        }
-        else
-        {
-            foreach (DnsClient.Protocol.ARecord record in response.Answers.ARecords())
-            {
-                if (record.Address.AddressFamily == AddressFamily.InterNetwork)
-                    return record.Address;
-            }
-        }
-
-        response = client.Query(host, QueryType.AAAA);
-        if (response.HasError)
-        {
-            m_log.LogWarning("[EXTERNAL IP RESOLVER]: DNS server {0} answered AAAA query for {1} with error: {2}",
-                dnsServer, host, response.ErrorMessage);
-            return null;
-        }
-
-        foreach (DnsClient.Protocol.AaaaRecord record in response.Answers.AaaaRecords())
-            return record.Address;
-
-        return null;
     }
 
     public void Dispose()
