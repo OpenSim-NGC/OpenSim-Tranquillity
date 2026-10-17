@@ -317,6 +317,14 @@ public abstract class PhysicsActor
     public abstract void VehicleRotationParam(int param, Quaternion rotation);
     public abstract void VehicleFlags(int param, bool remove);
 
+    // Called by core when it starts to cross a vehicle into another region, before the object is saved for the neighbour: an
+    // engine that keeps the vehicle's motors running writes their running state into the record, so that SetVehicle on the
+    // other side can take them up. The default writes nothing, and the motors start off there, as they do for a vehicle
+    // rezzed from inventory.
+    public virtual void CaptureVehicleRunningState(ref VehicleData vd)
+    {
+    }
+
     // This is an overridable version of SetVehicle() that works for all physics engines.
     // This is VERY inefficient. It behoves any physics engine to override this and
     //     implement a more efficient setting of all the vehicle parameters.

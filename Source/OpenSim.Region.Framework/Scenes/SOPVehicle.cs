@@ -61,6 +61,7 @@
  * banking angle limits), 239-296 (the parameter ranges), 1710-1720 (the defaults) and 1806-1844 and 1886-1924 (the
  * values of the two InWorldz vehicle types).
  * Adapted 2026 by Legion Builds
+ * This change adds the per-axis motor timescales and the wind efficiency vectors 12001 and 12002 to the record (Halcyon VectorParams.cs:53-60), and the optional running-state elements of the two motors (LMRAGE, LMRDIR, LMRTGT, AMRAGE, AMRDIR, AMRTGT: decay clock, direction and ramp velocity) that a region crossing writes.
  */
 
 using OpenMetaverse;
@@ -107,14 +108,17 @@ public class SOPVehicle
                 if (pValue < timestep) pValue = timestep;
                 vd.m_angularDeflectionTimescale = pValue;
                 break;
+            // The motor decay timescales are kept as sent (at least one step): the record does not cap them, each physics engine
+            // applies its own limit when it takes the record. A single value sets all three axes, so it replaces any per-axis one.
             case Vehicle.ANGULAR_MOTOR_DECAY_TIMESCALE:
                 if (pValue < timestep) pValue = timestep;
-                else if (pValue > 120) pValue = 120;
                 vd.m_angularMotorDecayTimescale = pValue;
+                vd.m_angularMotorDecayTimescaleAxes = null;
                 break;
             case Vehicle.ANGULAR_MOTOR_TIMESCALE:
                 if (pValue < timestep) pValue = timestep;
                 vd.m_angularMotorTimescale = pValue;
+                vd.m_angularMotorTimescaleAxes = null;
                 break;
             case Vehicle.BANKING_EFFICIENCY:
                 if (pValue < -1f) pValue = -1f;
@@ -158,12 +162,13 @@ public class SOPVehicle
                 break;
             case Vehicle.LINEAR_MOTOR_DECAY_TIMESCALE:
                 if (pValue < timestep) pValue = timestep;
-                else if (pValue > 120) pValue = 120;
                 vd.m_linearMotorDecayTimescale = pValue;
+                vd.m_linearMotorDecayTimescaleAxes = null;
                 break;
             case Vehicle.LINEAR_MOTOR_TIMESCALE:
                 if (pValue < timestep) pValue = timestep;
                 vd.m_linearMotorTimescale = pValue;
+                vd.m_linearMotorTimescaleAxes = null;
                 break;
             case Vehicle.VERTICAL_ATTRACTION_EFFICIENCY:
                 if (pValue < 0f) pValue = 0f;
@@ -271,8 +276,56 @@ public class SOPVehicle
                 if (len > 100.0f)
                     vd.m_linearMotorOffset *= (100.0f / len);
                 break;
+
+            // A value for each axis of the four motor timescales. It is kept beside the single value, which it does not touch,
+            // so a reader that knows only the single value reads what it always did; each axis is held to at least one step.
+            // A value that is not a number is not stored.
+            case Vehicle.LINEAR_MOTOR_TIMESCALE:
+                if (PerAxis(ref pValue, timestep)) vd.m_linearMotorTimescaleAxes = pValue;
+                break;
+            case Vehicle.LINEAR_MOTOR_DECAY_TIMESCALE:
+                if (PerAxis(ref pValue, timestep)) vd.m_linearMotorDecayTimescaleAxes = pValue;
+                break;
+            case Vehicle.ANGULAR_MOTOR_TIMESCALE:
+                if (PerAxis(ref pValue, timestep)) vd.m_angularMotorTimescaleAxes = pValue;
+                break;
+            case Vehicle.ANGULAR_MOTOR_DECAY_TIMESCALE:
+                if (PerAxis(ref pValue, timestep)) vd.m_angularMotorDecayTimescaleAxes = pValue;
+                break;
+
+            // InWorldz's two wind efficiency vectors, each axis held to -10..10 as InWorldz holds them; a value that is not a
+            // number is not stored.
+            case Vehicle.LINEAR_WIND_EFFICIENCY:
+                if (WindEfficiency(ref pValue)) vd.m_linearWindEfficiency = pValue;
+                break;
+            case Vehicle.ANGULAR_WIND_EFFICIENCY:
+                if (WindEfficiency(ref pValue)) vd.m_angularWindEfficiency = pValue;
+                break;
         }
     }//end ProcessVectorVehicleParam
+
+    private const float MaxWindEfficiency = 10f;
+
+    private static bool WindEfficiency(ref Vector3 v)
+    {
+        if (!float.IsFinite(v.X) || !float.IsFinite(v.Y) || !float.IsFinite(v.Z))
+            return false;
+        v = new Vector3(
+            Math.Clamp(v.X, -MaxWindEfficiency, MaxWindEfficiency),
+            Math.Clamp(v.Y, -MaxWindEfficiency, MaxWindEfficiency),
+            Math.Clamp(v.Z, -MaxWindEfficiency, MaxWindEfficiency));
+        return true;
+    }
+
+    private static bool PerAxis(ref Vector3 v, float least)
+    {
+        if (!float.IsFinite(v.X) || !float.IsFinite(v.Y) || !float.IsFinite(v.Z))
+            return false;
+        if (v.X < least) v.X = least;
+        if (v.Y < least) v.Y = least;
+        if (v.Z < least) v.Z = least;
+        return true;
+    }
 
     public void ProcessRotationVehicleParam(Vehicle pParam, Quaternion pValue)
     {
@@ -302,6 +355,12 @@ public class SOPVehicle
         vd.m_angularMotorDirection = Vector3.Zero;
         vd.m_linearMotorOffset = Vector3.Zero;
         vd.m_referenceFrame = Quaternion.Identity;
+        vd.m_linearMotorTimescaleAxes = null;
+        vd.m_linearMotorDecayTimescaleAxes = null;
+        vd.m_angularMotorTimescaleAxes = null;
+        vd.m_angularMotorDecayTimescaleAxes = null;
+        vd.m_linearWindEfficiency = null;
+        vd.m_angularWindEfficiency = null;
 
         // The defaults of InWorldz's parameters (VehicleDynamics.cs:1710-1720); the types below that differ set theirs.
         vd.m_mouselookAzimuth = MathF.PI / 4f;
@@ -535,6 +594,19 @@ public class SOPVehicle
         if (ph == null)
             return;
         ph.SetVehicle(vd);
+        // The running state of a crossing is taken up once: a saved or copied record must not start the motors again.
+        ClearRunningState();
+    }
+
+    /// <summary>Forgets the motors' running state a crossing put in the record (PhysicsActor.CaptureVehicleRunningState).</summary>
+    public void ClearRunningState()
+    {
+        vd.m_linearMotorRunAge = null;
+        vd.m_linearMotorRunDirection = null;
+        vd.m_linearMotorRunTarget = null;
+        vd.m_angularMotorRunAge = null;
+        vd.m_angularMotorRunDirection = null;
+        vd.m_angularMotorRunTarget = null;
     }
 
     public bool CameraDecoupled
@@ -568,6 +640,18 @@ public class SOPVehicle
         writer.WriteEndElement();
     }
 
+    private void XWfloatIfSet(string name, float? f)
+    {
+        if (f.HasValue)
+            XWfloat(name, f.Value);
+    }
+
+    private void XWVectorIfSet(string name, Vector3? vec)
+    {
+        if (vec.HasValue)
+            XWVector(name, vec.Value);
+    }
+
     private void XWQuat(string name, Quaternion quat)
     {
         writer.WriteStartElement(name);
@@ -592,12 +676,17 @@ public class SOPVehicle
         XWfloat("LMDTIME", vd.m_linearMotorDecayTimescale);
         XWfloat("LMTIME", vd.m_linearMotorTimescale);
         XWVector("LMOFF", vd.m_linearMotorOffset);
+        // A value for each axis, written only when the vehicle has one; a simulator that does not know these skips them
+        XWVectorIfSet("LMTIMEV", vd.m_linearMotorTimescaleAxes);
+        XWVectorIfSet("LMDTIMEV", vd.m_linearMotorDecayTimescaleAxes);
 
         //Angular properties
         XWVector("AMDIR", vd.m_angularMotorDirection);
         XWfloat("AMTIME", vd.m_angularMotorTimescale);
         XWfloat("AMDTIME", vd.m_angularMotorDecayTimescale);
         XWVector("AMFTIME", vd.m_angularFrictionTimescale);
+        XWVectorIfSet("AMTIMEV", vd.m_angularMotorTimescaleAxes);
+        XWVectorIfSet("AMDTIMEV", vd.m_angularMotorDecayTimescaleAxes);
 
         //Deflection properties
         XWfloat("ADEFF", vd.m_angularDeflectionEfficiency);
@@ -627,6 +716,16 @@ public class SOPVehicle
         XWfloat("DMABOVE", vd.m_disableMotorsAbove);
         XWfloat("DMAFTER", vd.m_disableMotorsAfter);
         XWfloat("IBMOD", vd.m_invertedBankingModifier);
+        // The wind efficiency vectors, written only when the vehicle has them; a simulator that does not know them skips them
+        XWVectorIfSet("LWEFF", vd.m_linearWindEfficiency);
+        XWVectorIfSet("AWEFF", vd.m_angularWindEfficiency);
+        // The motors' running state, written only by a crossing; a simulator that does not know it skips these elements
+        XWfloatIfSet("LMRAGE", vd.m_linearMotorRunAge);
+        XWVectorIfSet("LMRDIR", vd.m_linearMotorRunDirection);
+        XWVectorIfSet("LMRTGT", vd.m_linearMotorRunTarget);
+        XWfloatIfSet("AMRAGE", vd.m_angularMotorRunAge);
+        XWVectorIfSet("AMRDIR", vd.m_angularMotorRunDirection);
+        XWVectorIfSet("AMRTGT", vd.m_angularMotorRunTarget);
 
         XWQuat("REF_FRAME", vd.m_referenceFrame);
 
@@ -782,12 +881,16 @@ public class SOPVehicle
         m_VehicleXmlProcessors.Add("LMDTIME", ProcessXR_linearMotorDecayTimescale);
         m_VehicleXmlProcessors.Add("LMTIME", ProcessXR_linearMotorTimescale);
         m_VehicleXmlProcessors.Add("LMOFF", ProcessXR_linearMotorOffset);
+        m_VehicleXmlProcessors.Add("LMTIMEV", () => { vd.m_linearMotorTimescaleAxes = XRvector(); });
+        m_VehicleXmlProcessors.Add("LMDTIMEV", () => { vd.m_linearMotorDecayTimescaleAxes = XRvector(); });
 
         //Angular properties
         m_VehicleXmlProcessors.Add("AMDIR", ProcessXR_angularMotorDirection);
         m_VehicleXmlProcessors.Add("AMTIME", ProcessXR_angularMotorTimescale);
         m_VehicleXmlProcessors.Add("AMDTIME", ProcessXR_angularMotorDecayTimescale);
         m_VehicleXmlProcessors.Add("AMFTIME", ProcessXR_angularFrictionTimescale);
+        m_VehicleXmlProcessors.Add("AMTIMEV", () => { vd.m_angularMotorTimescaleAxes = XRvector(); });
+        m_VehicleXmlProcessors.Add("AMDTIMEV", () => { vd.m_angularMotorDecayTimescaleAxes = XRvector(); });
 
         //Deflection properties
         m_VehicleXmlProcessors.Add("ADEFF", ProcessXR_angularDeflectionEfficiency);
@@ -820,6 +923,14 @@ public class SOPVehicle
         m_VehicleXmlProcessors.Add("DMABOVE", () => { vd.m_disableMotorsAbove = XRfloat(); m_xmlSeen |= 8; });
         m_VehicleXmlProcessors.Add("DMAFTER", () => { vd.m_disableMotorsAfter = XRfloat(); m_xmlSeen |= 16; });
         m_VehicleXmlProcessors.Add("IBMOD", () => { vd.m_invertedBankingModifier = XRfloat(); m_xmlSeen |= 32; });
+        m_VehicleXmlProcessors.Add("LWEFF", () => { vd.m_linearWindEfficiency = XRvector(); });
+        m_VehicleXmlProcessors.Add("AWEFF", () => { vd.m_angularWindEfficiency = XRvector(); });
+        m_VehicleXmlProcessors.Add("LMRAGE", () => { vd.m_linearMotorRunAge = XRfloat(); });
+        m_VehicleXmlProcessors.Add("LMRDIR", () => { vd.m_linearMotorRunDirection = XRvector(); });
+        m_VehicleXmlProcessors.Add("LMRTGT", () => { vd.m_linearMotorRunTarget = XRvector(); });
+        m_VehicleXmlProcessors.Add("AMRAGE", () => { vd.m_angularMotorRunAge = XRfloat(); });
+        m_VehicleXmlProcessors.Add("AMRDIR", () => { vd.m_angularMotorRunDirection = XRvector(); });
+        m_VehicleXmlProcessors.Add("AMRTGT", () => { vd.m_angularMotorRunTarget = XRvector(); });
 
         vd = new VehicleData();
         m_xmlSeen = 0;

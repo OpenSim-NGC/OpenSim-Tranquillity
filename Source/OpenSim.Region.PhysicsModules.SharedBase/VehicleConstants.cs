@@ -60,6 +60,7 @@
  * InWorldz Halcyon code, under the Halcyon notice above: OpenSim/Region/Physics/Manager/Vehicle/FloatParams.cs and
  * VehicleFlags.cs (Halcyon commit 3125cc15fc).
  * Adapted 2026 by Legion Builds
+ * This change adds the wind efficiency codes 12001 and 12002 and the per-axis motor timescale fields (Halcyon VectorParams.cs:53-60), and the optional running-state fields of the two motors (m_linearMotorRunAge, m_linearMotorRunDirection, m_linearMotorRunTarget and the three angular ones) that a region crossing fills.
  */
 
 using OpenMetaverse;
@@ -150,7 +151,12 @@ public enum Vehicle : int
     /// <summary>The time, in seconds, a vehicle may stay above DISABLE_MOTORS_ABOVE before its motors are disabled.</summary>
     DISABLE_MOTORS_AFTER = 11005,
     /// <summary>Multiplier of the banking efficiency while the vehicle is upside down.</summary>
-    INVERTED_BANKING_MODIFIER = 11006
+    INVERTED_BANKING_MODIFIER = 11006,
+
+    /// <summary>InWorldz's linear wind efficiency vector: how much of the wind's push each axis of the vehicle takes (llSetVehicleVectorParam).</summary>
+    LINEAR_WIND_EFFICIENCY = 12001,
+    /// <summary>InWorldz's angular wind efficiency vector: how much of the wind's turning push the vehicle takes about each axis.</summary>
+    ANGULAR_WIND_EFFICIENCY = 12002
 }
 
 [Flags]
@@ -224,6 +230,15 @@ public struct VehicleData
     // Axis
     public Quaternion m_referenceFrame;
 
+    // A value for each axis of the four motor timescales above (llSetVehicleVectorParam with VEHICLE_LINEAR_MOTOR_TIMESCALE,
+    // _LINEAR_MOTOR_DECAY_TIMESCALE, _ANGULAR_MOTOR_TIMESCALE or _ANGULAR_MOTOR_DECAY_TIMESCALE). Null means the record holds
+    // none, and the axes are all the single value of the field above, as in a record saved before these existed. The single
+    // fields are never changed by a per-axis value, so a reader that does not know these keeps what it always read.
+    public Vector3? m_linearMotorTimescaleAxes;
+    public Vector3? m_linearMotorDecayTimescaleAxes;
+    public Vector3? m_angularMotorTimescaleAxes;
+    public Vector3? m_angularMotorDecayTimescaleAxes;
+
     // InWorldz's float parameters 11001 to 11006
     public float m_mouselookAzimuth;
     public float m_mouselookAltitude;
@@ -231,4 +246,20 @@ public struct VehicleData
     public float m_disableMotorsAbove;
     public float m_disableMotorsAfter;
     public float m_invertedBankingModifier;
+
+    // InWorldz's wind efficiency vectors 12001 and 12002 (llSetVehicleVectorParam). Null means the record holds none, and the
+    // engine's own value for the vehicle type stands, as in a record saved before these existed.
+    public Vector3? m_linearWindEfficiency;
+    public Vector3? m_angularWindEfficiency;
+
+    // The motors' running state, taken from the physics engine when the vehicle crosses a region border (PhysicsActor
+    // .CaptureVehicleRunningState) so that a held throttle goes on in the next region: the time on the motor's decay clock, the
+    // direction it drives toward and the velocity its ramp has reached. Null for a motor that is off, and in every record
+    // that was not saved by a crossing. The engine that takes the vehicle up clears them (SOPVehicle.SetVehicle).
+    public float? m_linearMotorRunAge;
+    public Vector3? m_linearMotorRunDirection;
+    public Vector3? m_linearMotorRunTarget;
+    public float? m_angularMotorRunAge;
+    public Vector3? m_angularMotorRunDirection;
+    public Vector3? m_angularMotorRunTarget;
 }
