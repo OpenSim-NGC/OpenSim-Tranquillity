@@ -6882,6 +6882,28 @@ namespace InWorldz.Phlox.Types
                 ParamNames = new string[] { "notecardName", "contents" },
                 TableIndex = 968
             }},
+            // Wind volumes: a rule list in, a handle or a negative error out; see WindVolumeRules.
+            {"iwWindVolumeCreate", new FunctionSig {
+                FunctionName = "iwWindVolumeCreate",
+                ReturnType = VarType.Integer,
+                ParamTypes = new VarType[] { VarType.List },
+                ParamNames = new string[] { "rules" },
+                TableIndex = 969
+            }},
+            {"iwWindVolumeRemove", new FunctionSig {
+                FunctionName = "iwWindVolumeRemove",
+                ReturnType = VarType.Integer,
+                ParamTypes = new VarType[] { VarType.Integer },
+                ParamNames = new string[] { "handle" },
+                TableIndex = 970
+            }},
+            {"iwWindVolumes", new FunctionSig {
+                FunctionName = "iwWindVolumes",
+                ReturnType = VarType.List,
+                ParamTypes = new VarType[] { },
+                ParamNames = new string[] { },
+                TableIndex = 971
+            }},
          };
 
         /// <summary>

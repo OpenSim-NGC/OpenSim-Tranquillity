@@ -329,6 +329,12 @@ public interface IOSSL_Api
           void osSetWindParam(string plugin, string param, LSL_Float value);
     //ApiDesc Get a parameter from a given wind plugin.
      LSL_Float osGetWindParam(string plugin, string param);
+    //ApiDesc Creates a wind volume from a list of WV_ rules. Returns its handle (1 or more) or a negative WV_ERR_ code. Estate owner, estate manager or god only, and only when [Weather] is enabled.
+   LSL_Integer osWindVolumeCreate(LSL_List rules);
+    //ApiDesc Removes a wind volume this object made. Returns 0 or a negative WV_ERR_ code.
+   LSL_Integer osWindVolumeRemove(LSL_Integer handle);
+    //ApiDesc Returns the handles of the wind volumes this object made.
+      LSL_List osWindVolumes();
 
     // Parcel commands
     //ApiDesc Returns the number of visitors to the region since start.

@@ -71,4 +71,10 @@ public interface IWindModule : INonSharedRegionModule
     /// Current active wind model plugin or String.Empty
     /// </summary>
     string WindActiveModelPluginName { get; }
+
+    /// <summary>
+    /// The region's wind volumes (the [Weather] section), or null for a module that has none. When
+    /// <see cref="IWindVolumeStore.Enabled"/> is false the store accepts no volumes and nothing about the wind changes.
+    /// </summary>
+    IWindVolumeStore WindVolumes => null;
 }

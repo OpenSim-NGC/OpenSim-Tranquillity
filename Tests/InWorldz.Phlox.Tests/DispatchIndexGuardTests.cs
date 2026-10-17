@@ -93,7 +93,8 @@ public class DispatchIndexGuardTests
         // The type-chosen overloads added eight signatures but only ONE new NAME (osSetDynamicTextureDataFace): the other
         // seven are type-discriminated overloads of names already here, and the baseline is keyed by name.
         // osMakeNotecard adds one name for its two forms.
-        Assert.Equal(933, baseline.Count);
+        // The wind-volume functions add three names (iwWindVolumeCreate, iwWindVolumeRemove, iwWindVolumes).
+        Assert.Equal(936, baseline.Count);
     }
 
     /// <summary>

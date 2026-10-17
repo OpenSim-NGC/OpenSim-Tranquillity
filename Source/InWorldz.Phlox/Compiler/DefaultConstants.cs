@@ -740,6 +740,27 @@ namespace InWorldz.Phlox.Compiler
             {"WIND_SPEED_FIXED", new ConstantSymbol("WIND_SPEED_FIXED", SymbolTable.INT, "1")},
             {"WIND_SPEED_TERRAIN_TURBULENCE", new ConstantSymbol("WIND_SPEED_TERRAIN_TURBULENCE", SymbolTable.INT, "2")},
 
+            // WV_*: the rules and shapes of iwWindVolumeCreate (OpenSim.Region.Framework.Interfaces.WindVolumeRules).
+            {"WV_SHAPE", new ConstantSymbol("WV_SHAPE", SymbolTable.INT, "0")},
+            {"WV_CENTER", new ConstantSymbol("WV_CENTER", SymbolTable.INT, "1")},
+            {"WV_RADIUS", new ConstantSymbol("WV_RADIUS", SymbolTable.INT, "2")},
+            {"WV_HEIGHT", new ConstantSymbol("WV_HEIGHT", SymbolTable.INT, "3")},
+            {"WV_FALLOFF", new ConstantSymbol("WV_FALLOFF", SymbolTable.INT, "4")},
+            {"WV_VELOCITY", new ConstantSymbol("WV_VELOCITY", SymbolTable.INT, "5")},
+            {"WV_LIFETIME", new ConstantSymbol("WV_LIFETIME", SymbolTable.INT, "6")},
+            {"WV_SPHERE", new ConstantSymbol("WV_SPHERE", SymbolTable.INT, "0")},
+            {"WV_CYLINDER", new ConstantSymbol("WV_CYLINDER", SymbolTable.INT, "1")},
+            // The negative results of the wind-volume functions (WindVolumeError).
+            {"WV_ERR_DISABLED", new ConstantSymbol("WV_ERR_DISABLED", SymbolTable.INT, "-1")},
+            {"WV_ERR_NOT_ALLOWED", new ConstantSymbol("WV_ERR_NOT_ALLOWED", SymbolTable.INT, "-2")},
+            {"WV_ERR_INVALID", new ConstantSymbol("WV_ERR_INVALID", SymbolTable.INT, "-3")},
+            {"WV_ERR_TOO_LARGE", new ConstantSymbol("WV_ERR_TOO_LARGE", SymbolTable.INT, "-4")},
+            {"WV_ERR_LIFETIME", new ConstantSymbol("WV_ERR_LIFETIME", SymbolTable.INT, "-5")},
+            {"WV_ERR_TOO_FAST", new ConstantSymbol("WV_ERR_TOO_FAST", SymbolTable.INT, "-6")},
+            {"WV_ERR_REGION_FULL", new ConstantSymbol("WV_ERR_REGION_FULL", SymbolTable.INT, "-7")},
+            {"WV_ERR_OBJECT_FULL", new ConstantSymbol("WV_ERR_OBJECT_FULL", SymbolTable.INT, "-8")},
+            {"WV_ERR_NOT_FOUND", new ConstantSymbol("WV_ERR_NOT_FOUND", SymbolTable.INT, "-9")},
+
             // IW_POWER_*: OpenMetaverse GroupPowers bits, for iwHasParcelPowers. An LSL integer is 32 bits: bits 31-48
             // are written as minus their bit number and decoded by iwHasParcelPowers. Their 64-bit values
             // overflowed to -1 in the assembler (as in Halcyon's), so each asked for every power.
