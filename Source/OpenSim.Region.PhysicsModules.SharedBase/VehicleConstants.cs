@@ -60,7 +60,7 @@
  * InWorldz Halcyon code, under the Halcyon notice above: OpenSim/Region/Physics/Manager/Vehicle/FloatParams.cs and
  * VehicleFlags.cs (Halcyon commit 3125cc15fc).
  * Adapted 2026 by Legion Builds
- * This change adds the wind efficiency codes 12001 and 12002 and the per-axis motor timescale fields (Halcyon VectorParams.cs:53-60).
+ * This change adds the wind efficiency codes 12001 and 12002 and the per-axis motor timescale fields (Halcyon VectorParams.cs:53-60), and the optional running-state fields of the two motors (m_linearMotorRunAge, m_linearMotorRunDirection, m_linearMotorRunTarget and the three angular ones) that a region crossing fills.
  */
 
 using OpenMetaverse;
@@ -251,4 +251,15 @@ public struct VehicleData
     // engine's own value for the vehicle type stands, as in a record saved before these existed.
     public Vector3? m_linearWindEfficiency;
     public Vector3? m_angularWindEfficiency;
+
+    // The motors' running state, taken from the physics engine when the vehicle crosses a region border (PhysicsActor
+    // .CaptureVehicleRunningState) so that a held throttle goes on in the next region: the time on the motor's decay clock, the
+    // direction it drives toward and the velocity its ramp has reached. Null for a motor that is off, and in every record
+    // that was not saved by a crossing. The engine that takes the vehicle up clears them (SOPVehicle.SetVehicle).
+    public float? m_linearMotorRunAge;
+    public Vector3? m_linearMotorRunDirection;
+    public Vector3? m_linearMotorRunTarget;
+    public float? m_angularMotorRunAge;
+    public Vector3? m_angularMotorRunDirection;
+    public Vector3? m_angularMotorRunTarget;
 }

@@ -61,7 +61,7 @@
  * banking angle limits), 239-296 (the parameter ranges), 1710-1720 (the defaults) and 1806-1844 and 1886-1924 (the
  * values of the two InWorldz vehicle types).
  * Adapted 2026 by Legion Builds
- * This change adds the per-axis motor timescales and the wind efficiency vectors 12001 and 12002 to the record (Halcyon VectorParams.cs:53-60).
+ * This change adds the per-axis motor timescales and the wind efficiency vectors 12001 and 12002 to the record (Halcyon VectorParams.cs:53-60), and the optional running-state elements of the two motors (LMRAGE, LMRDIR, LMRTGT, AMRAGE, AMRDIR, AMRTGT: decay clock, direction and ramp velocity) that a region crossing writes.
  */
 
 using OpenMetaverse;
@@ -594,6 +594,19 @@ public class SOPVehicle
         if (ph == null)
             return;
         ph.SetVehicle(vd);
+        // The running state of a crossing is taken up once: a saved or copied record must not start the motors again.
+        ClearRunningState();
+    }
+
+    /// <summary>Forgets the motors' running state a crossing put in the record (PhysicsActor.CaptureVehicleRunningState).</summary>
+    public void ClearRunningState()
+    {
+        vd.m_linearMotorRunAge = null;
+        vd.m_linearMotorRunDirection = null;
+        vd.m_linearMotorRunTarget = null;
+        vd.m_angularMotorRunAge = null;
+        vd.m_angularMotorRunDirection = null;
+        vd.m_angularMotorRunTarget = null;
     }
 
     public bool CameraDecoupled
@@ -625,6 +638,12 @@ public class SOPVehicle
         writer.WriteElementString("Y", vec.Y.ToString(Culture.FormatProvider));
         writer.WriteElementString("Z", vec.Z.ToString(Culture.FormatProvider));
         writer.WriteEndElement();
+    }
+
+    private void XWfloatIfSet(string name, float? f)
+    {
+        if (f.HasValue)
+            XWfloat(name, f.Value);
     }
 
     private void XWVectorIfSet(string name, Vector3? vec)
@@ -700,6 +719,13 @@ public class SOPVehicle
         // The wind efficiency vectors, written only when the vehicle has them; a simulator that does not know them skips them
         XWVectorIfSet("LWEFF", vd.m_linearWindEfficiency);
         XWVectorIfSet("AWEFF", vd.m_angularWindEfficiency);
+        // The motors' running state, written only by a crossing; a simulator that does not know it skips these elements
+        XWfloatIfSet("LMRAGE", vd.m_linearMotorRunAge);
+        XWVectorIfSet("LMRDIR", vd.m_linearMotorRunDirection);
+        XWVectorIfSet("LMRTGT", vd.m_linearMotorRunTarget);
+        XWfloatIfSet("AMRAGE", vd.m_angularMotorRunAge);
+        XWVectorIfSet("AMRDIR", vd.m_angularMotorRunDirection);
+        XWVectorIfSet("AMRTGT", vd.m_angularMotorRunTarget);
 
         XWQuat("REF_FRAME", vd.m_referenceFrame);
 
@@ -899,6 +925,12 @@ public class SOPVehicle
         m_VehicleXmlProcessors.Add("IBMOD", () => { vd.m_invertedBankingModifier = XRfloat(); m_xmlSeen |= 32; });
         m_VehicleXmlProcessors.Add("LWEFF", () => { vd.m_linearWindEfficiency = XRvector(); });
         m_VehicleXmlProcessors.Add("AWEFF", () => { vd.m_angularWindEfficiency = XRvector(); });
+        m_VehicleXmlProcessors.Add("LMRAGE", () => { vd.m_linearMotorRunAge = XRfloat(); });
+        m_VehicleXmlProcessors.Add("LMRDIR", () => { vd.m_linearMotorRunDirection = XRvector(); });
+        m_VehicleXmlProcessors.Add("LMRTGT", () => { vd.m_linearMotorRunTarget = XRvector(); });
+        m_VehicleXmlProcessors.Add("AMRAGE", () => { vd.m_angularMotorRunAge = XRfloat(); });
+        m_VehicleXmlProcessors.Add("AMRDIR", () => { vd.m_angularMotorRunDirection = XRvector(); });
+        m_VehicleXmlProcessors.Add("AMRTGT", () => { vd.m_angularMotorRunTarget = XRvector(); });
 
         vd = new VehicleData();
         m_xmlSeen = 0;
