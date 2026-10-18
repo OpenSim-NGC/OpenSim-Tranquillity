@@ -1,0 +1,8 @@
+{
+  "id": "J02-multiply-table",
+  "title": "Byte multiply table (a*b/255 with rounding) for all 256x256 inputs",
+  "rules": [
+    "R17"
+  ],
+  "layout": "out.bin[a*256\u002Bb] = Mul(a, b)"
+}

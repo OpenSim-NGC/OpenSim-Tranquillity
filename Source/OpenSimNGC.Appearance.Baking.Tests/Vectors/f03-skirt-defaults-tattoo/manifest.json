@@ -1,0 +1,78 @@
+{
+  "id": "F03-skirt-defaults-tattoo",
+  "title": "Skirt with default values plus a universal skirt tattoo",
+  "rules": [
+    "R09",
+    "R03"
+  ],
+  "note": "",
+  "channel": "Skirt",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skirt",
+      "label": "skirt",
+      "params": {},
+      "textures": [
+        {
+          "slot": "Skirt",
+          "generator": "gradA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-skirt-Skirt.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Universal",
+      "label": "uni",
+      "params": {
+        "1209": 0.1
+      },
+      "textures": [
+        {
+          "slot": "SkirtTattoo",
+          "generator": "checkA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-uni-SkirtTattoo.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "44f8df35bde04a4c72c2e2b84c2c761b47035b9fe61824e532d343dbdc7ccae5",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "skirt_fabric",
+        "status": "drawn",
+        "wearable": "Skirt",
+        "detail": "skirt: Skirt 64x64\u002Balpha -\u003E 64; colour (1.00,1.00,1.00,1.00)"
+      },
+      {
+        "layer": "skirt_fabric_alpha",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "masks [Skirt Length#858=0.40*, Slit Front#859=1.00*, Slit Back#860=1.00*, Slit Left#861=1.00*, Slit Right#862=1.00*]"
+      },
+      {
+        "layer": "skirt_tattoo",
+        "status": "drawn",
+        "wearable": "Universal",
+        "detail": "uni: SkirtTattoo 64x64\u002Balpha -\u003E 64; colour (1.00,0.10,1.00,1.00)"
+      }
+    ]
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "id": "I01-size-8",
+  "title": "Bake size 8 (texture 64 averaged by 8)",
+  "rules": [
+    "R15"
+  ],
+  "note": "",
+  "channel": "Upper",
+  "size": 8,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skin",
+      "label": "skin",
+      "params": {},
+      "textures": []
+    },
+    {
+      "kind": "Shirt",
+      "label": "shirt",
+      "params": {
+        "800": 0.5
+      },
+      "textures": [
+        {
+          "slot": "UpperShirt",
+          "generator": "gradA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-shirt-UpperShirt.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "ee457cfe9e4d16b1cc3abdda4728476c35bdf75d2b9d7cf6d38028b6753092ca",
+    "morphSha256": "5fbaf0e85f38791ddf36733e0ab02b5a4d22c3b196f6eeb6812cb44fc743a661",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.65,0.43,0.25,1.00); body_skingrain.tga"
+      },
+      {
+        "layer": "nipples",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "upperbody_color.tga\u002Balpha"
+      },
+      {
+        "layer": "shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "highlight",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (1.00,1.00,1.00,0.00)"
+      },
+      {
+        "layer": "upper_bodypaint",
+        "status": "skipped",
+        "wearable": "Skin",
+        "detail": "skin: no UpperBodypaint texture on the wearable"
+      },
+      {
+        "layer": "freckles upper",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [freckles upper#776=skip]"
+      },
+      {
+        "layer": "upper_tattoo",
+        "status": "skipped",
+        "wearable": "Tattoo",
+        "detail": "no Tattoo worn"
+      },
+      {
+        "layer": "upper_universal_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "upper_undershirt",
+        "status": "skipped",
+        "wearable": "Undershirt",
+        "detail": "no Undershirt worn"
+      },
+      {
+        "layer": "Nail Polish",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Nail Polish#710=skip]"
+      },
+      {
+        "layer": "upper_gloves",
+        "status": "skipped",
+        "wearable": "Gloves",
+        "detail": "no Gloves worn"
+      },
+      {
+        "layer": "upper_clothes_shadow",
+        "status": "skipped",
+        "wearable": "Shirt",
+        "detail": "shirt: colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "drawn",
+        "wearable": "Shirt",
+        "detail": "shirt: UpperShirt 64x64\u002Balpha -\u003E 8; colour (1.00,1.00,1.00,1.00); masks [Sleeve Length Cloth#600=0.43\u002B, Shirt Bottom Cloth#601=0.80*, Collar Front Height Cloth#602=0.80*, Collar Back Height Cloth#778=0.80*, texture alpha*]"
+      },
+      {
+        "layer": "upper_jacket",
+        "status": "skipped",
+        "wearable": "Jacket",
+        "detail": "no Jacket worn"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "morph",
+        "wearable": "Shirt",
+        "detail": "shirt: morph mask *= layer mask (mean 64.3)"
+      },
+      {
+        "layer": "upper alpha",
+        "status": "skipped",
+        "wearable": "Alpha",
+        "detail": "no Alpha worn"
+      }
+    ]
+  }
+}

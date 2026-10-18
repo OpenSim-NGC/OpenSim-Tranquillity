@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using OpenMetaverse;
 using OpenSim.Framework;
 using Xunit;
@@ -10,9 +17,9 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// throws the whole message away when the two disagree.
 ///
 /// <list type="bullet">
-///   <item><c>resolve_appearance_version</c> — both set and different → warns "inconsistent appearance_version
-///     settings" and returns false (<c>llvoavatar.cpp:9663-9690</c>).</item>
-///   <item>the caller then logs "bad appearance version info, discarding" and returns
+///   <item>the viewer's version resolution — both versions set and different → logs a warning about inconsistent
+///     version settings and reports failure (<c>llvoavatar.cpp:9663-9690</c>).</item>
+///   <item>the caller then logs that the version info is bad, discards the message and returns
 ///     (<c>llvoavatar.cpp:9720-9723</c>) — no TextureEntry applied, so no bake is ever fetched.</item>
 ///   <item>the parameter is transmitted as a byte through the parameter's own range, and id 11000 is
 ///     <c>value_min="0" value_max="255"</c>, so the mapping is the identity and the byte must literally equal the

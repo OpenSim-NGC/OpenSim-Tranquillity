@@ -38,7 +38,7 @@ namespace OpenSim.Region.Framework.Interfaces;
 /// whether it runs, typically by starting it paused and following EventManager.OnGroupCrossedToNewParcel,
 /// OnObjectOwnerOrGroupChanged and the land events.
 /// The engine is resolved per script: the engine named on the script's first line ("//engine:language") when that
-/// engine is loaded, otherwise the default script engine.
+/// engine is loaded, otherwise an engine with matching saved state (default first), then the default script engine.
 /// An engine that does not implement this, or returns false, gets the core's parcel check unchanged.
 /// </remarks>
 public interface IParcelScriptPolicyEngine

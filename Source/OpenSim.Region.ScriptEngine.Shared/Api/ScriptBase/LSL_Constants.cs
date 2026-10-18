@@ -549,7 +549,7 @@ public partial class ScriptBaseClass
     // PRIM_REFLECTION_PROBE flags
     public const int PRIM_REFLECTION_PROBE_BOX = 1; // 1
     public const int PRIM_REFLECTION_PROBE_DYNAMIC = 2; // 2
-    public const int PRIM_REFLECTION_PROBE_MIRROR = 4; // 2
+    public const int PRIM_REFLECTION_PROBE_MIRROR = 4; // 4
 
     public const int PROFILE_NONE = 0;
     public const int PROFILE_SCRIPT_MEMORY = 1;

@@ -37,7 +37,8 @@ namespace InWorldz.Phlox.Tests;
 /// </para>
 ///
 /// <para>
-/// <b>They share one SQLite file</b> (<c>StateManager.DB_FILE</c> is a fixed relative path), so they are
+/// <b>They share one SQLite file</b> (the harnesses leave <c>ScriptEnginesPath</c> unset, so they all take the
+/// same default relative path), so they are
 /// one xUnit collection and must not run beside each other. That shared file is also worth noting:
 /// it is more global state reachable from a harness test.
 /// </para>

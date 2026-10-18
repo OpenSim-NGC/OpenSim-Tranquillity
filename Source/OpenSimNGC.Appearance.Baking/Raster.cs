@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using SkiaSharp;
 
 namespace OpenSimNGC.Appearance.Baking;
@@ -61,7 +68,7 @@ public sealed class RgbaPlanes
     private static byte[] Filled(int n, byte v) { var a = new byte[n]; Array.Fill(a, v); return a; }
 }
 
-/// <summary>Pixel helpers: resampling and the viewer's alpha-mask ramp.</summary>
+/// <summary>Pixel helpers: resampling and the byte product.</summary>
 public static class Raster
 {
     public static byte Mul(byte a, byte b) => (byte)((a * b + 127) / 255);
@@ -114,29 +121,4 @@ public static class Raster
     }
 
     public static Plane Resample(Plane p, int w, int h) => w == p.W && h == p.H ? p : new Plane(w, h, Resample(p.Data, p.W, p.H, w, h));
-
-    /// <summary>
-    /// The viewer's LLImageTGA::decodeAndProcess: a mask file's grey value is pushed through a ramp whose
-    /// position follows the parameter weight and whose width is `domain` (0 = hard step at 1 - weight).
-    /// </summary>
-    public static byte[] ProcessAlpha(byte[] gray, float domain, float weight)
-    {
-        var lut = new byte[256];
-        var w = Math.Clamp(weight, 0f, 1f);
-        if (domain > 0f)
-        {
-            var scale = 1f / domain;
-            var offset = (1f - domain) * (1f - w);
-            var bias = -(scale * offset);
-            for (var i = 0; i < 256; i++) lut[i] = (byte)Math.Clamp(255f * (i / 255f * scale + bias), 0f, 255f);
-        }
-        else
-        {
-            var threshold = (byte)(255f * (1f - w));
-            for (var i = 0; i < 256; i++) lut[i] = i >= threshold ? (byte)255 : (byte)0;
-        }
-        var dst = new byte[gray.Length];
-        for (var i = 0; i < gray.Length; i++) dst[i] = lut[gray[i]];
-        return dst;
-    }
 }

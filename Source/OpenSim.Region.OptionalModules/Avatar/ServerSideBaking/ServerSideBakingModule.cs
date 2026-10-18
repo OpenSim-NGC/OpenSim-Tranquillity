@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -51,7 +58,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     private readonly List<Scene> m_scenes = new();
     private readonly Dictionary<Scene, ServerSideBakingRegion> m_regions = new();
     private IBakeBackend m_backend;
-    private TexLayerCompositor m_compositor;
+    private AvatarBakeCompositor m_compositor;
 
     /// <summary>The cap the LL viewer POSTs to after every COF change (viewer contract V3).</summary>
     public const string CapName = "UpdateAvatarAppearance";
@@ -170,7 +177,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
                 {
                     if (m_backend is null)
                     {
-                        m_compositor = new TexLayerCompositor();
+                        m_compositor = new AvatarBakeCompositor();
                         m_backend = new SkiaBakeBackend(m_compositor) { Quality = BakeQuality };
                     }
                 }

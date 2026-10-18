@@ -125,4 +125,56 @@ public class ReflectionProbeParamsTests : OpenSimTestCase
         Assert.IsType<LSL_Integer>(result.Data[3]);
         Assert.Equal(0, ((LSL_Integer)result.Data[3]).value);
     }
+
+    [Fact]
+    public void ABoxDynamicMirrorProbeReadsBackItsFlagsAsSeven()
+    {
+        TestScene scene = new SceneHelpers().SetupScene();
+        SceneObjectGroup so = SceneHelpers.CreateSceneObject(1, UUID.Random());
+        scene.AddNewSceneObject(so, false);
+        LSL_Api api = ApiIn(so.RootPart, scene);
+
+        api.llSetPrimitiveParams(new LSL_List(
+            new LSL_Integer(ScriptBaseClass.PRIM_REFLECTION_PROBE),
+            new LSL_Integer(1), new LSL_Float(1.0), new LSL_Float(10.0),
+            new LSL_Integer(ScriptBaseClass.PRIM_REFLECTION_PROBE_BOX
+                | ScriptBaseClass.PRIM_REFLECTION_PROBE_DYNAMIC
+                | ScriptBaseClass.PRIM_REFLECTION_PROBE_MIRROR)));
+        LSL_List result = api.llGetPrimitiveParams(ProbeRule());
+
+        Assert.Equal(7, ((LSL_Integer)result.Data[3]).value);
+    }
+
+    private static void SetProbe(LSL_Api api, float ambiance, float clip, int flags)
+        => api.llSetPrimitiveParams(new LSL_List(
+            new LSL_Integer(ScriptBaseClass.PRIM_REFLECTION_PROBE),
+            new LSL_Integer(1), new LSL_Float(ambiance), new LSL_Float(clip), new LSL_Integer(flags)));
+
+    [Fact]
+    public void ACopiedPrimHasItsOwnProbe()
+    {
+        TestScene scene = new SceneHelpers().SetupScene();
+        UUID owner = UUID.Random();
+        SceneObjectGroup original = SceneHelpers.CreateSceneObject(1, owner);
+        scene.AddNewSceneObject(original, false);
+        LSL_Api originalApi = ApiIn(original.RootPart, scene);
+        SetProbe(originalApi, 10f, 20f, ScriptBaseClass.PRIM_REFLECTION_PROBE_BOX | ScriptBaseClass.PRIM_REFLECTION_PROBE_MIRROR);
+
+        // The shift-copy path of the viewer: Scene.DuplicateObject -> SceneGraph.DuplicateObject -> SceneObjectGroup.Copy.
+        SceneObjectGroup copy = scene.SceneGraph.DuplicateObject(original.RootPart.LocalId, new Vector3(1, 0, 0), owner, UUID.Zero, Quaternion.Identity, false);
+        Assert.NotNull(copy);
+        Assert.NotSame(original.RootPart, copy.RootPart);
+        Assert.Equal(5, copy.RootPart.Shape.ReflectionProbe.Flags);
+        LSL_Api copyApi = ApiIn(copy.RootPart, scene);
+
+        SetProbe(copyApi, 50f, 60f, ScriptBaseClass.PRIM_REFLECTION_PROBE_BOX);
+        Assert.Equal(10f, original.RootPart.Shape.ReflectionProbe.Ambiance);
+        Assert.Equal(20f, original.RootPart.Shape.ReflectionProbe.ClipDistance);
+        Assert.Equal(5, original.RootPart.Shape.ReflectionProbe.Flags);
+
+        SetProbe(originalApi, 70f, 80f, 7);
+        Assert.Equal(50f, copy.RootPart.Shape.ReflectionProbe.Ambiance);
+        Assert.Equal(60f, copy.RootPart.Shape.ReflectionProbe.ClipDistance);
+        Assert.Equal(1, copy.RootPart.Shape.ReflectionProbe.Flags);
+    }
 }

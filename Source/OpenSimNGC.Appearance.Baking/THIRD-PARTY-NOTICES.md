@@ -7,16 +7,23 @@ This is the avatar "LAD" (Linden Avatar Definition) file: it defines the visual
 parameters, wearable layers, texture layer sets and morph targets that the bake
 compositor reproduces server-side (ADR-007).
 
-**Licence:** GNU Lesser General Public License v2.1, with the Second Life viewer
-linking exception granted by Linden Lab (the "Linden Lab Second Life Viewer
-Source License" exception that permits linking the viewer source with non-LGPL
-code). The file is embedded unmodified as a data resource; it is not compiled or
-linked into executable code. The full LGPL 2.1 text is in the viewer's `LICENSE`
-file and at <https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html>.
+**Author and licence:** Copyright Linden Research, Inc. (Linden Lab), who publish the Second Life viewer. The
+viewer repository distributes its source code under the GNU Lesser General Public License, version 2.1, and its
+artwork and other works under the Creative Commons Attribution-Share Alike 3.0 licence, and it does not say which
+of the two covers this data file. Both notices are therefore kept with the data, unaltered, in the repository's
+`ThirdPartyLicenses` folder and in this package:
 
-**Copied from:** a local checkout of the Linden Lab viewer source tree, taken
-on 2026-09-03. That checkout is not a git repository (no `.git`), so the exact
-upstream commit could not be read from it. Identifying data that could be read:
+- `ThirdPartyLicenses/SecondLifeViewer-LICENSE-source.txt` — Linden Lab's notice for the viewer source code
+  (the viewer's `doc/LICENSE-source.txt`);
+- `ThirdPartyLicenses/SecondLifeViewer-LGPL-2.1.txt` — the full LGPL 2.1 text (the viewer's `LICENSE`);
+- `ThirdPartyLicenses/SecondLifeViewer-LICENSE-logos.txt` — Linden Lab's artwork notice, which grants the work
+  under CC BY-SA 3.0 (the viewer's `doc/LICENSE-logos.txt`; the licence text itself is at
+  <http://creativecommons.org/licenses/by-sa/3.0/legalcode>).
+
+The file is embedded unmodified as a data resource; it is not compiled or linked into executable code. "Second Life"
+and "Linden Lab" are trademarks of Linden Research, Inc.; no endorsement by Linden Lab is implied.
+
+**Copied from:** the Linden Lab viewer. The file is byte-identical to the viewer's copy at commit e34b5c188e.
 
 | Field | Value |
 |---|---|
@@ -39,8 +46,9 @@ the skin base images, eye whites and the Bakes-on-Mesh `aux_base.tga` that the `
 `avatar_lad.xml` name by file. The compositor cannot reproduce a bake without them (every clothing layer is
 shaped by one), so they ship with the library alongside `avatar_lad.xml` (ADR-007, extended to cover them).
 
-**Licence:** the same as `avatar_lad.xml` above: GNU LGPL 2.1 with the Linden Lab viewer linking exception.
-Embedded unmodified as data resources; not compiled or linked.
+**Author and licence:** the same as `avatar_lad.xml` above: copyright Linden Research, Inc., from the Second Life
+viewer repository, which does not say whether its LGPL 2.1 source notice or its CC BY-SA 3.0 artwork notice covers these
+files; both notices are kept with the data (see above). Embedded unmodified as data resources; not compiled or linked.
 
 **Source:** the Linden Lab viewer source tree (viewer 26.1.1 per
 `indra/newview/VIEWER_VERSION.txt`), directory `indra/newview/character/`. The files were first taken (2026-09-03)

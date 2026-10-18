@@ -15,6 +15,7 @@ public class ControlPlaneAccess
     public const string JsonRpcLlHttpRequestKey = "__opensim_llhttprequest";
 
     private readonly HashSet<IPAddress> m_trustedHosts = new();
+    private readonly HashSet<IPAddress> m_controlPlaneTrustedHosts = new();
 
     public ControlPlaneAccess(IConfigSource config)
     {
@@ -26,8 +27,30 @@ public class ControlPlaneAccess
             AddTrustedHost(host.Trim());
 
         AddConfiguredLocalHost(config);
+        AddExplicitControlPlaneTrustedHosts(config);
 
         m_log.LogInformation("[CONTROL PLANE ACCESS]: Trusted control-plane addresses configured: {0}", m_trustedHosts.Count);
+    }
+
+    public bool IsTrustedControlPlaneCaller(IPEndPoint remote)
+    {
+        return remote != null && m_controlPlaneTrustedHosts.Contains(NormalizeAddress(remote.Address));
+    }
+
+    public bool AuthorizeControlPlaneMutation(IOSHttpRequest request, IOSHttpResponse response, string operation)
+    {
+        IPEndPoint remote = request.RemoteIPEndPoint;
+        if (IsTrustedControlPlaneCaller(remote))
+        {
+            m_log.LogDebug("Control-plane accept: {RemoteAddress} for {Operation}", remote.Address, operation);
+            return true;
+        }
+
+        m_log.LogWarning("Control-plane reject: {RemoteAddress} attempted {Operation}",
+            remote?.Address, operation);
+        response.StatusCode = (int)HttpStatusCode.Forbidden;
+        response.RawBuffer = Array.Empty<byte>();
+        return false;
     }
 
     public bool Authorize(IOSHttpRequest request, IOSHttpResponse response, HttpStatusCode blockedStatus = HttpStatusCode.Forbidden)
@@ -125,6 +148,31 @@ public class ControlPlaneAccess
             return;
 
         AddTrustedHost(network.GetString("hostname", string.Empty));
+    }
+
+    private void AddExplicitControlPlaneTrustedHosts(IConfigSource config)
+    {
+        IConfig network = config?.Configs["Network"];
+        string hosts = network?.GetString("ControlPlaneTrustedHosts", string.Empty) ?? string.Empty;
+
+        foreach (string host in hosts.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string addressText = host.Trim();
+            if (IPAddress.TryParse(addressText, out IPAddress address))
+            {
+                m_controlPlaneTrustedHosts.Add(NormalizeAddress(address));
+            }
+            else
+            {
+                m_log.LogWarning(
+                    "[CONTROL PLANE ACCESS]: Ignoring invalid ControlPlaneTrustedHosts address {Address}; IPv4 or IPv6 addresses are required",
+                    addressText);
+            }
+        }
+
+        m_log.LogInformation(
+            "[CONTROL PLANE ACCESS]: Explicit mutation caller addresses configured: {AddressCount}",
+            m_controlPlaneTrustedHosts.Count);
     }
 
     private void AddTrustedHost(string host)

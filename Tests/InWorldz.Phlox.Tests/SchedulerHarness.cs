@@ -135,7 +135,7 @@ public sealed class SchedulerHarness : IDisposable
         if (!keepMasterThread) StopMasterThread();
     }
 
-    /// <summary>The loader's own folder (PhloxScriptLoader.CACHE_DIR), relative to the working directory.</summary>
+    /// <summary>The loader's folder under the default ScriptEnginesPath, relative to the working directory.</summary>
     public const string ProductionBytecodeDir = "ScriptEngines/Phlox/bytecode";
 
     /// <summary>The folder this harness's engine caches bytecode in.</summary>

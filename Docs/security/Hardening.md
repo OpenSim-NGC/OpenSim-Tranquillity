@@ -10,14 +10,14 @@ OpenSim exposes public HTTP endpoints for viewers and Hypergrid interoperability
 - High-impact control-plane requests are accepted only from explicitly trusted simulator and service hosts.
 - No implicit trust domain is inferred from grid topology, region coordinates, a shared message key, or a Hypergrid identity.
 
-Configure trusted hosts in `[Network]` or `[Security]` on every region process that accepts region control-plane traffic:
+For the active region control-plane checks, configure trusted peer addresses in `[Network]` on each destination region:
 
 ```ini
 [Network]
 ControlPlaneTrustedHosts = 10.20.0.10, 10.20.0.21, 10.20.0.22
 ```
 
-Entries can be IPv4 addresses, IPv6 addresses, hostnames, or full HTTP(S) URLs. Separate entries with commas, semicolons, pipes, or whitespace. Loopback is always trusted.
+The region control-plane endpoints accept trusted hosts from `[Network]` or `[Security]` and may use hostnames, URLs, and the local `[Network] hostname`. The service checks the actual TCP peer address and does not use `X-Forwarded-For`. `/assets` and `/xinventory` are currently excluded from control-plane checks.
 
 The configured local `[Network] hostname` is also trusted. This keeps same-host multi-region deployments working when regions contact each other through the host's LAN name instead of loopback.
 
@@ -43,7 +43,7 @@ If the two regions run on different hosts, configure each destination host to tr
 
 If each region has its own per-region `.ini` with a `[Network]` section, verify that the destination process logs the expected `Trusted control-plane addresses` line at startup. Put `ControlPlaneTrustedHosts` in the per-region file if the shared setting is not present after per-region overrides are merged.
 
-This is expected fail-closed behavior. There is no separate domain-association configuration. In a multi-host grid, each region should normally list all region-service hosts and relevant ROBUST hosts. A one-host standalone commonly needs no setting because loopback is trusted.
+This is expected fail-closed behavior. There is no separate domain-association configuration. In a multi-host grid, each region should normally list all region-service hosts and relevant ROBUST hosts. A one-host standalone commonly needs no setting for the region control-plane endpoints because loopback is trusted.
 
 The protected region endpoints are:
 
@@ -54,13 +54,15 @@ The protected region endpoints are:
 
 The same trusted-host policy protects sensitive profile operations, Hypergrid groups write operations, privileged instant-message control dialogs, and untrusted Hypergrid logout requests.
 
+The control-plane authorization calls for `/assets` `POST`/`DELETE` and `/xinventory` inventory-changing RPCs are commented out. The implementation is retained for future work, but `ControlPlaneTrustedHosts` does not currently gate these endpoints. Replacement authentication/authorization is deferred, potentially using ASP.NET Core Identity or mTLS certificates. Existing service authentication, asset deletion-type restrictions, and read behavior remain unchanged. Protect backend asset and inventory endpoints with network access controls; the control-plane allowlist does not protect them.
+
 Requests carrying `X-SecondLife-Shard` are rejected on control-plane paths even when their source address is trusted. This prevents in-world `llHTTPRequest` calls from using a trusted simulator as a control-plane proxy.
 
 ### Marketplace and third-party delivery services
 
 No Kitely Market integration module is present in this source tree, so compatibility depends on the delivery protocol used by the external service.
 
-Normal viewer login requests, CAPS, inventory, and asset-service workflows are not gated by `ControlPlaneTrustedHosts`. The server-to-region agent placement performed after login is gated as described above. A marketplace using ordinary user-facing paths should be unaffected.
+Normal viewer login requests, CAPS, and viewer inventory/asset workflows are not directly gated by the control-plane checks. The `/assets` and `/xinventory` backend RPC checks are currently disabled as described above. The server-to-region agent placement performed after login is gated as described above. A marketplace using ordinary user-facing paths should be unaffected.
 
 A third-party delivery service that directly posts to a protected control-plane endpoint, particularly `POST /agent/...` or `POST /object/...`, will receive `403` unless its actual outbound source IP is listed in `ControlPlaneTrustedHosts`. Do not broadly allow a public marketplace network by default. First confirm the exact endpoint and source addresses with the provider, then allow only stable, provider-controlled addresses if that integration genuinely requires it.
 

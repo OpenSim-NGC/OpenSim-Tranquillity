@@ -83,10 +83,11 @@ public class AssetServiceConnector : ServiceConnector
         }
 
         IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
+        ControlPlaneAccess controlPlaneAccess = new(config);
 
         server.AddStreamHandler(new AssetServerGetHandler(m_AssetService, auth, redirectURL));
-        server.AddStreamHandler(new AssetServerPostHandler(m_AssetService, auth));
-        server.AddStreamHandler(new AssetServerDeleteHandler(m_AssetService, allowedRemoteDeleteTypes, auth));
+        server.AddStreamHandler(new AssetServerPostHandler(m_AssetService, auth, controlPlaneAccess));
+        server.AddStreamHandler(new AssetServerDeleteHandler(m_AssetService, allowedRemoteDeleteTypes, auth, controlPlaneAccess));
         server.AddStreamHandler(new AssetsExistHandler(m_AssetService));
 
         MainConsole.Instance.Commands.AddCommand("Assets", false,

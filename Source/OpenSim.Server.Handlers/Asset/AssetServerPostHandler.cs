@@ -33,6 +33,7 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
 
 using Microsoft.Extensions.Logging;
 
@@ -43,22 +44,32 @@ public class AssetServerPostHandler : BaseStreamHandler
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAssetService m_AssetService;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
 
     public AssetServerPostHandler(IAssetService service) :
-            base("POST", "/assets")
+        this(service, null, new ControlPlaneAccess(null))
     {
-        m_AssetService = service;
     }
 
     public AssetServerPostHandler(IAssetService service, IServiceAuth auth) :
+        this(service, auth, new ControlPlaneAccess(null))
+    {
+    }
+
+    public AssetServerPostHandler(IAssetService service, IServiceAuth auth, ControlPlaneAccess controlPlaneAccess) :
         base("POST", "/assets", auth)
     {
         m_AssetService = service;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override byte[] ProcessRequest(string path, Stream request,
             IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
+        // Deferred pending replacement authentication/authorization for assets and inventory.
+        // if (!m_ControlPlaneAccess.AuthorizeControlPlaneMutation(httpRequest, httpResponse, "POST /assets"))
+        //     return Array.Empty<byte>();
+
         AssetBase asset;
         XmlSerializer xs = new XmlSerializer(typeof(AssetBase));
 

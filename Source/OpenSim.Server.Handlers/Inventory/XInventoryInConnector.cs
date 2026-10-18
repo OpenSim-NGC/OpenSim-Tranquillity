@@ -70,8 +70,9 @@ public class XInventoryInConnector : ServiceConnector
                 ServerUtils.LoadPlugin<IInventoryService>(inventoryService, args);
 
         IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
+        ControlPlaneAccess controlPlaneAccess = new(config);
 
-        server.AddStreamHandler(new XInventoryConnectorPostHandler(m_InventoryService, auth));
+        server.AddStreamHandler(new XInventoryConnectorPostHandler(m_InventoryService, auth, controlPlaneAccess));
     }
 }
 
@@ -80,11 +81,21 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInventoryService m_InventoryService;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
 
     public XInventoryConnectorPostHandler(IInventoryService service, IServiceAuth auth) :
+        this(service, auth, new ControlPlaneAccess(null))
+    {
+    }
+
+    public XInventoryConnectorPostHandler(
+        IInventoryService service,
+        IServiceAuth auth,
+        ControlPlaneAccess controlPlaneAccess) :
             base("POST", "/xinventory", auth)
     {
         m_InventoryService = service;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override byte[] ProcessRequest(string path, Stream requestData,
@@ -107,6 +118,12 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
             string method = request["METHOD"].ToString();
             request.Remove("METHOD");
+
+            // Deferred pending replacement authentication/authorization for assets and inventory.
+            // if (!IsReadOnlyMethod(method)
+            //     && !m_ControlPlaneAccess.AuthorizeControlPlaneMutation(
+            //         httpRequest, httpResponse, $"POST /xinventory METHOD={method}"))
+            //     return Array.Empty<byte>();
 
             switch (method)
             {
@@ -161,6 +178,25 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         }
 
         return FailureResult();
+    }
+
+    private static bool IsReadOnlyMethod(string method)
+    {
+        return method switch
+        {
+            "GETINVENTORYSKELETON" or
+            "GETROOTFOLDER" or
+            "GETFOLDERFORTYPE" or
+            "GETFOLDERCONTENT" or
+            "GETMULTIPLEFOLDERSCONTENT" or
+            "GETFOLDERITEMS" or
+            "GETITEM" or
+            "GETMULTIPLEITEMS" or
+            "GETFOLDER" or
+            "GETACTIVEGESTURES" or
+            "GETASSETPERMISSIONS" => true,
+            _ => false
+        };
     }
 
     private byte[] FailureResult()

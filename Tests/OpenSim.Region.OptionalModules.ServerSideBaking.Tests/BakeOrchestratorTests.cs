@@ -1,3 +1,10 @@
+/* Copyright (c) 2026 Legion Builds
+ *
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -59,7 +66,7 @@ public class BakeOrchestratorTests
     {
         if (!FixturesPresent) { Console.WriteLine(SkipNote); return; }
         var (assets, wearables, vp) = LoadFixtures();
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
 
         var r = BakeOrchestrator.Resolve(wearables, vp, assets, compositor, 512);
 
@@ -139,7 +146,7 @@ public class BakeOrchestratorTests
     {
         if (!FixturesPresent) { Console.WriteLine(SkipNote); return; }
         var (assets, wearables, vp) = LoadFixtures();
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
         // the eyes wearable's Eyes-slot texture goes missing. (Not the hair texture: in this fixture set the hair
         // and the shoes share one texture id, so its absence correctly fails Hair *and* Lower.)
         var eyesAsset = assets.Get(wearables[(int)WearableType.Eyes][0].AssetID.ToString());
@@ -192,7 +199,7 @@ public class BakeOrchestratorTests
         // a shirt slot that is worn (a real item) with no asset, exactly as the aleric-max reference avatar wears it
         wearables[(int)WearableType.Shirt].Add(new UUID("77c41e39-38f9-f75a-0000-585989bf0000"), UUID.Zero);
 
-        var r = BakeOrchestrator.Resolve(wearables, null, assets, new TexLayerCompositor(), 512);
+        var r = BakeOrchestrator.Resolve(wearables, null, assets, new AvatarBakeCompositor(), 512);
 
         var shirt = Assert.Single(r.Request.Wearables);
         Assert.Equal((int)WearableType.Shirt, shirt.WearableType);
@@ -229,7 +236,7 @@ public class BakeOrchestratorTests
         wearables[(int)WearableType.Skirt].Add(UUID.Random(), UUID.Zero);   // worn, no asset
         var appearance = new AvatarAppearance();
         var before = Faces(appearance);
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
 
         var outcome = BakeOrchestrator.Run(Agent, BakeReason.Console, wearables, vp, appearance, assets,
             new SkiaBakeBackend(compositor) { Quality = 0.5 }, compositor, 128, CancellationToken.None);
@@ -260,7 +267,7 @@ public class BakeOrchestratorTests
         var (assets, wearables, vp) = LoadFixtures();
         var appearance = new AvatarAppearance();
         var before = Faces(appearance);
-        var compositor = new TexLayerCompositor();
+        var compositor = new AvatarBakeCompositor();
 
         var outcome = BakeOrchestrator.Run(Agent, BakeReason.Console, wearables, vp, appearance, assets,
             new SkiaBakeBackend(compositor) { Quality = 0.5 }, compositor, 128, CancellationToken.None);

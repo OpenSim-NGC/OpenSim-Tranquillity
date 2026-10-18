@@ -28,6 +28,8 @@
 
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Region.Framework.Scenes.Serialization;
+using OpenSim.Tests.Common;
 
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
@@ -78,6 +80,88 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             Assert.NotNull(probe);
             Assert.Equal(expected, probe.Ambiance);
+        }
+
+        // A mirror is a probe with the box (1) and mirror (4) flags; the viewer draws it, the region only has
+        // to keep the flags byte as it was given. 5 = box + mirror, 7 = box + dynamic + mirror.
+        private static byte[] ProbeBytes(float ambiance, float clip, byte flags)
+        {
+            byte[] data = new byte[9];
+            Utils.FloatToBytes(ambiance, data, 0);
+            Utils.FloatToBytes(clip, data, 4);
+            data[8] = flags;
+            return data;
+        }
+
+        private static void AssertProbe(Primitive.ReflectionProbe probe, float ambiance, float clip, byte flags)
+        {
+            Assert.NotNull(probe);
+            Assert.Equal(ambiance, probe.Ambiance);
+            Assert.Equal(clip, probe.ClipDistance);
+            Assert.Equal(flags, probe.Flags);
+        }
+
+        [Theory]
+        [InlineData((byte)4)]
+        [InlineData((byte)5)]
+        [InlineData((byte)7)]
+        public void AViewerEditKeepsTheFlagsAndTheyReadBackAsExtraParams(byte flags)
+        {
+            PrimitiveBaseShape shape = PrimitiveBaseShape.CreateBox();
+
+            shape.ReadInUpdateExtraParam(0x90, true, ProbeBytes(3.5f, 40f, flags));
+
+            AssertProbe(shape.ReflectionProbe, 3.5f, 40f, flags);
+            PrimitiveBaseShape reloaded = PrimitiveBaseShape.CreateBox();
+            reloaded.ExtraParams = shape.ExtraParams;
+            AssertProbe(reloaded.ReflectionProbe, 3.5f, 40f, flags);
+        }
+
+        [Theory]
+        [InlineData((byte)4)]
+        [InlineData((byte)5)]
+        [InlineData((byte)7)]
+        public void StoredExtraParamsBytesKeepTheFlags(byte flags)
+        {
+            PrimitiveBaseShape shape = PrimitiveBaseShape.CreateBox();
+            shape.ReflectionProbe = new Primitive.ReflectionProbe { Ambiance = 25f, ClipDistance = 64f, Flags = flags };
+
+            PrimitiveBaseShape loaded = PrimitiveBaseShape.CreateBox();
+            loaded.ExtraParams = shape.ExtraParams;
+
+            AssertProbe(loaded.ReflectionProbe, 25f, 64f, flags);
+        }
+
+        [Theory]
+        [InlineData((byte)4)]
+        [InlineData((byte)5)]
+        [InlineData((byte)7)]
+        public void TheSavedXmlFormKeepsTheFlagsOnARootAndAChild(byte flags)
+        {
+            TestScene scene = new SceneHelpers().SetupScene();
+            SceneObjectGroup group = SceneHelpers.CreateSceneObject(2, UUID.Random());
+            scene.AddNewSceneObject(group, false);
+            group.RootPart.Shape.ReflectionProbe = new Primitive.ReflectionProbe { Ambiance = 25f, ClipDistance = 64f, Flags = flags };
+            SceneObjectPart child = group.GetLinkNumPart(2);
+            child.Shape.ReflectionProbe = new Primitive.ReflectionProbe { Ambiance = 2f, ClipDistance = 8f, Flags = flags };
+
+            string xml = SceneObjectSerializer.ToOriginalXmlFormat(group);
+            SceneObjectGroup loaded = SceneObjectSerializer.FromOriginalXmlFormat(xml);
+
+            AssertProbe(loaded.RootPart.Shape.ReflectionProbe, 25f, 64f, flags);
+            AssertProbe(loaded.GetLinkNumPart(2).Shape.ReflectionProbe, 2f, 8f, flags);
+        }
+
+        [Fact]
+        public void AViewerEditWithTheParameterNotInUseRemovesTheProbe()
+        {
+            PrimitiveBaseShape shape = PrimitiveBaseShape.CreateBox();
+            shape.ReadInUpdateExtraParam(0x90, true, ProbeBytes(1f, 10f, 5));
+            Assert.NotNull(shape.ReflectionProbe);
+
+            shape.ReadInUpdateExtraParam(0x90, false, ProbeBytes(1f, 10f, 5));
+
+            Assert.Null(shape.ReflectionProbe);
         }
     }
 }

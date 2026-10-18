@@ -3,8 +3,12 @@ using System.Collections.Specialized;
 using System.Net;
 using System.Text;
 using Nini.Config;
+using OpenMetaverse;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
+using OpenSim.Server.Handlers.Inventory;
+using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 using Xunit;
 
@@ -50,6 +54,79 @@ public class ControlPlaneAccessTests
 
         Xunit.Assert.True(authorized);
         Xunit.Assert.Equal(0, response.StatusCode);
+    }
+
+    [Fact]
+    public void IsTrustedControlPlaneCallerUsesExplicitNetworkAddressesOnly()
+    {
+        IniConfigSource config = new();
+        config.AddConfig("Network")
+            .Set("ControlPlaneTrustedHosts", "203.0.113.10, 2001:db8::10");
+        config.Configs["Network"].Set("hostname", "203.0.113.11");
+        ControlPlaneAccess access = new(config);
+
+        Xunit.Assert.True(access.IsTrustedControlPlaneCaller(
+            new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000)));
+        Xunit.Assert.True(access.IsTrustedControlPlaneCaller(
+            new IPEndPoint(IPAddress.Parse("::ffff:203.0.113.10"), 9000)));
+        Xunit.Assert.True(access.IsTrustedControlPlaneCaller(
+            new IPEndPoint(IPAddress.Parse("2001:db8::10"), 9000)));
+        Xunit.Assert.False(access.IsTrustedControlPlaneCaller(
+            new IPEndPoint(IPAddress.Parse("203.0.113.11"), 9000)));
+        Xunit.Assert.False(access.IsTrustedControlPlaneCaller(
+            new IPEndPoint(IPAddress.Loopback, 9000)));
+    }
+
+    [Fact]
+    public void AuthorizeControlPlaneMutationReturnsForbiddenForUntrustedPeer()
+    {
+        ControlPlaneAccess access = new(new IniConfigSource());
+        TestOSHttpResponse response = new();
+
+        bool authorized = access.AuthorizeControlPlaneMutation(
+            RequestFrom("203.0.113.10"), response, "POST /assets");
+
+        Xunit.Assert.False(authorized);
+        Xunit.Assert.Equal((int)HttpStatusCode.Forbidden, response.StatusCode);
+        Xunit.Assert.Empty(response.RawBuffer);
+    }
+
+    [Fact]
+    public void AuthorizeControlPlaneMutationDoesNotTrustForwardedAddressHeaders()
+    {
+        IniConfigSource config = new();
+        config.AddConfig("Network").Set("ControlPlaneTrustedHosts", "203.0.113.10");
+        ControlPlaneAccess access = new(config);
+        TestOSHttpResponse response = new();
+        FakeRequest request = RequestFrom("198.51.100.20");
+        request.Headers["X-Forwarded-For"] = "203.0.113.10";
+
+        bool authorized = access.AuthorizeControlPlaneMutation(request, response, "POST /assets");
+
+        Xunit.Assert.False(authorized);
+        Xunit.Assert.Equal((int)HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public void XInventoryMutationIsNotGatedByControlPlane()
+    {
+        IniConfigSource config = new();
+        config.AddConfig("InventoryService")
+            .Set("StorageProvider", "OpenSim.Tests.Common.dll:TestXInventoryDataPlugin");
+        IInventoryService service = ServerUtils.LoadPlugin<IInventoryService>(
+            "OpenSim.Services.InventoryService.dll:XInventoryService", new object[] { config });
+        Xunit.Assert.NotNull(service);
+        ControlPlaneAccess access = new(new IniConfigSource());
+        XInventoryConnectorPostHandler handler = new(service, null, access);
+        TestOSHttpResponse response = new();
+        UUID principal = UUID.Random();
+        using MemoryStream body = new(Encoding.UTF8.GetBytes($"METHOD=CREATEUSERINVENTORY&PRINCIPAL={principal}"));
+
+        byte[] result = handler.Handle("/xinventory", body, RequestFrom("203.0.113.10"), response);
+
+        Xunit.Assert.Equal(0, response.StatusCode);
+        Xunit.Assert.Equal("True", ServerUtils.ParseXmlResponse(Encoding.UTF8.GetString(result))["RESULT"]);
+        Xunit.Assert.NotNull(service.GetRootFolder(principal));
     }
 
     [Fact]

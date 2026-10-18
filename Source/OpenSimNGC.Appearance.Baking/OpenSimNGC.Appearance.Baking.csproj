@@ -28,7 +28,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>OpenSimNGC.Appearance.Baking</PackageId>
     <Description>Server-side avatar bake compositor shared by OpenSim-Tranquillity regions and the NGC web-viewer gateway.</Description>
-    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageLicenseExpression>BSD-3-Clause AND MPL-2.0 AND LGPL-2.1-only AND CC-BY-SA-3.0</PackageLicenseExpression>
   </PropertyGroup>
 
   <ItemGroup>
@@ -58,6 +58,10 @@
     -->
     <EmbeddedResource Include="Data\character\*.tga" LogicalName="OpenSimNGC.Appearance.Baking.Data.character.%(Filename)%(Extension)" />
     <None Include="THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="" />
+    <!-- The licence notices that accompany the Second Life viewer data above; shipped beside THIRD-PARTY-NOTICES.md. -->
+    <None Include="..\..\ThirdPartyLicenses\SecondLifeViewer-LICENSE-source.txt" Pack="true" PackagePath="ThirdPartyLicenses\" Link="ThirdPartyLicenses\SecondLifeViewer-LICENSE-source.txt" />
+    <None Include="..\..\ThirdPartyLicenses\SecondLifeViewer-LGPL-2.1.txt" Pack="true" PackagePath="ThirdPartyLicenses\" Link="ThirdPartyLicenses\SecondLifeViewer-LGPL-2.1.txt" />
+    <None Include="..\..\ThirdPartyLicenses\SecondLifeViewer-LICENSE-logos.txt" Pack="true" PackagePath="ThirdPartyLicenses\" Link="ThirdPartyLicenses\SecondLifeViewer-LICENSE-logos.txt" />
   </ItemGroup>
 
 </Project>

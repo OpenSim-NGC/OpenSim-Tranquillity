@@ -40,8 +40,8 @@ namespace Phlox.ScriptEngine
 {
     /// <summary>
     /// Which engine a script belongs to, by the first-line header ("//&lt;engine&gt;:&lt;language&gt;") exactly as
-    /// YEngine reads it (XMREngine.OnRezScript). Every engine of a region receives every rez with the region's default
-    /// engine name, and each decides for itself; with both engines deciding by this one rule, a script runs in one.
+    /// YEngine reads it (XMREngine.OnRezScript). Every engine receives every rez with the engine name selected by
+    /// the scene's saved-state routing; a loaded engine named in the source still takes priority.
     /// </summary>
     internal static class PhloxEngineHeader
     {
@@ -90,7 +90,7 @@ namespace Phlox.ScriptEngine
 
         /// <summary>
         /// The engine that runs the script: the engine its header names when that engine is loaded in the region, otherwise
-        /// the default engine (a header naming an engine that is not loaded falls to the default, as in YEngine).
+        /// the engine passed by the scene (the saved-state owner or the default for a fresh compile).
         /// </summary>
         internal static string Owner(string script, string defaultEngine, IEnumerable<string> loadedEngines)
         {

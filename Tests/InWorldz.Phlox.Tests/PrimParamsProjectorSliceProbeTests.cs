@@ -663,6 +663,75 @@ public class PrimParamsProjectorSliceProbeTests
         Near(0.3f, copy.Friction);
     }
 
+    // A mirror is a probe with BOX (1) and MIRROR (4); the viewer draws it, the region keeps the flags byte.
+    private const string BoxDynamicMirror = "PRIM_REFLECTION_PROBE_BOX | PRIM_REFLECTION_PROBE_DYNAMIC | PRIM_REFLECTION_PROBE_MIRROR";
+
+    [Fact]
+    public void ABoxDynamicMirrorProbeReadsBackItsFlagsAsSeven()
+    {
+        using var h = new SchedulerHarness();
+
+        Run(h,
+            "llSetPrimitiveParams([PRIM_REFLECTION_PROBE, TRUE, 1.0, 10.0, " + BoxDynamicMirror + "]); " +
+            Say("probe", "PRIM_REFLECTION_PROBE"));
+
+        Assert.Equal("7", Fields(h, "probe=", 4)[3]);
+        Assert.Equal(7, h.Prim.Shape.ReflectionProbe.Flags);
+    }
+
+    [Fact]
+    public void AMirrorProbesFlagsCrossBetweenTheEngines()
+    {
+        using var h = new SchedulerHarness(withYEngine: true);
+        var yengine = YEngineApi(h, h.Prim);
+
+        // YEngine sets box + dynamic + mirror; Phlox reads 7.
+        yengine.llSetPrimitiveParams(new LSL_List(44, 1, F(1.0), F(10.0), 7));
+        Run(h, Say("fromYEngine", "PRIM_REFLECTION_PROBE"));
+        Assert.Equal("7", Fields(h, "fromYEngine=", 4)[3]);
+
+        // Phlox sets box + mirror; YEngine reads 5.
+        Run(h, "llSetPrimitiveParams([PRIM_REFLECTION_PROBE, TRUE, 2.0, 12.0, PRIM_REFLECTION_PROBE_BOX | PRIM_REFLECTION_PROBE_MIRROR]);");
+        var got = yengine.llGetPrimitiveParams(new LSL_List(44));
+        Assert.Equal(5, ((LSL_Types.LSLInteger)got.Data[3]).value);
+    }
+
+    [Fact]
+    public void ACopiedPrimHasItsOwnProbeWhicheverEngineChangesIt()
+    {
+        using var h = new SchedulerHarness(withYEngine: true);
+        var original = h.Prim;
+        var originalYEngine = YEngineApi(h, original);
+        Run(h, "llSetPrimitiveParams([PRIM_REFLECTION_PROBE, TRUE, 10.0, 20.0, PRIM_REFLECTION_PROBE_BOX | PRIM_REFLECTION_PROBE_MIRROR]);");
+
+        // The viewer's shift-copy: Scene.DuplicateObject -> SceneGraph.DuplicateObject -> SceneObjectGroup.Copy.
+        var group = h.Scene.SceneGraph.DuplicateObject(original.LocalId, new Vector3(1, 0, 0), original.OwnerID, UUID.Zero, Quaternion.Identity, false);
+        Assert.NotNull(group);
+        var copy = group.RootPart;
+        Assert.NotSame(original, copy);
+        Assert.Equal(5, copy.Shape.ReflectionProbe.Flags);
+        var copyYEngine = YEngineApi(h, copy);
+
+        // Phlox changes the copy: the original is unchanged. (A script already in the copy would be a copy of the
+        // original's script, so the Phlox setter is run from a script rezzed into the copy.)
+        Run(h, copy, "llSetPrimitiveParams([PRIM_REFLECTION_PROBE, TRUE, 50.0, 60.0, PRIM_REFLECTION_PROBE_BOX]);");
+        Assert.Equal(10f, original.Shape.ReflectionProbe.Ambiance);
+        Assert.Equal(20f, original.Shape.ReflectionProbe.ClipDistance);
+        Assert.Equal(5, original.Shape.ReflectionProbe.Flags);
+
+        // YEngine changes the original: the copy is unchanged.
+        originalYEngine.llSetPrimitiveParams(new LSL_List(44, 1, F(70.0), F(80.0), 7));
+        Assert.Equal(50f, copy.Shape.ReflectionProbe.Ambiance);
+        Assert.Equal(60f, copy.Shape.ReflectionProbe.ClipDistance);
+        Assert.Equal(1, copy.Shape.ReflectionProbe.Flags);
+
+        // YEngine changes the copy: the original keeps what YEngine just gave it.
+        copyYEngine.llSetPrimitiveParams(new LSL_List(44, 1, F(5.0), F(6.0), 4));
+        Assert.Equal(70f, original.Shape.ReflectionProbe.Ambiance);
+        Assert.Equal(7, original.Shape.ReflectionProbe.Flags);
+        Assert.Equal(4, copy.Shape.ReflectionProbe.Flags);
+    }
+
     [Fact]
     public void AReflectionProbeAmbianceAboveOneSurvivesTheSavedForm()
     {
