@@ -41,8 +41,8 @@
 
   <ItemGroup>
     <!-- Versions match the rest of the tree. -->
-    <PackageReference Include="SkiaSharp" Version="4.151.1" />
-    <PackageReference Include="CoreJ2K.Skia" Version="2.3.3.91" />
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.4.1.108" />
   </ItemGroup>
 
   <ItemGroup>

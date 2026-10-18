@@ -35,9 +35,9 @@
   </ItemGroup>
 
 <ItemGroup>
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.13" />
     <!-- System.Data.SQLite (+ native SQLite/e_sqlite3) backs both WebStats and the Phlox bot persistence DB -->
     <PackageReference Include="System.Data.SQLite" Version="2.0.4" />
-    <PackageReference Include="SQLite" Version="3.53.4" />
+    <PackageReference Include="SQLite" Version="3.54.0" />
   </ItemGroup>
 </Project>
