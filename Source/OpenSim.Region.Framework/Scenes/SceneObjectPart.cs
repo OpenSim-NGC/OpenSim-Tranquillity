@@ -3810,15 +3810,34 @@ public class SceneObjectPart : EntityBase, IDisposable
         if (type == (int)Vehicle.TYPE_NONE)
         {
             if (_parentID == 0 && PhysActor != null)
+            {
                 PhysActor.VehicleType = (int)Vehicle.TYPE_NONE;
+                StopTargetsForVehicleType();
+            }
             return;
         }
         m_vehicleParams = new SOPVehicle();
         m_vehicleParams.ProcessTypeChange((Vehicle)type);
         {
             if (_parentID == 0 && PhysActor != null)
+            {
                 PhysActor.VehicleType = type;
+                StopTargetsForVehicleType();
+            }
             return;
+        }
+    }
+
+    /// <summary>
+    /// An engine that follows InWorldz (<see cref="PhysicsActor.VehicleTypeStopsTargets"/>) ends the object's llRotLookAt
+    /// and llMoveToTarget when a script sets its vehicle type, whatever the type.
+    /// </summary>
+    private void StopTargetsForVehicleType()
+    {
+        if (PhysActor is { VehicleTypeStopsTargets: true } && ParentGroup is not null)
+        {
+            ParentGroup.StopMoveToTarget();
+            ParentGroup.StopLookAt();
         }
     }
 
