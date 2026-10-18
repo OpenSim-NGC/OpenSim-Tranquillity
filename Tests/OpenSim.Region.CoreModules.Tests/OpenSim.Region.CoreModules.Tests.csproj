@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="World\Archiver\Tests\Resources\test-sound.wav" />
+    <EmbeddedResource Include="World\Wind\Fixtures\*.bin" />
   </ItemGroup>
 
   <ItemGroup>
