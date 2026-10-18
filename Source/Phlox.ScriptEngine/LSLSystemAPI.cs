@@ -10168,6 +10168,51 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             return Vector3.Zero;
         }
+
+        /// <summary>
+        /// Creates a wind volume, a place where wind is added to the base field. The rules are pairs of a WV_ number
+        /// and a value (WindVolumeRules). Returns the handle (1 or more), or a negative WindVolumeError:
+        /// WV_ERR_DISABLED when [Weather] is not enabled, WV_ERR_NOT_ALLOWED unless the object's owner may issue estate
+        /// commands or is a god (the iwSetWind rule), and the store's errors for bad or over-cap values.
+        /// </summary>
+        public int iwWindVolumeCreate(LSLList rules)
+        {
+            IWindVolumeStore store = WindVolumesFor(out int error);
+            if (store == null) return error;
+            if (!WindVolumeAccess.MayChangeWind(World, m_host.OwnerID)) return WindVolumeError.NotAllowed;
+            int bad = WindVolumeRules.TryParse(rules?.Data, out WindVolumeSpec spec);
+            if (bad != WindVolumeError.Ok) return bad;
+            return store.Create(m_host.ParentGroup.UUID, m_host.OwnerID, spec);
+        }
+
+        /// <summary>Removes a volume this object made: 0, or a negative WindVolumeError (not allowed, or no such volume).</summary>
+        public int iwWindVolumeRemove(int handle)
+        {
+            IWindVolumeStore store = WindVolumesFor(out int error);
+            if (store == null) return error;
+            if (!WindVolumeAccess.MayChangeWind(World, m_host.OwnerID)) return WindVolumeError.NotAllowed;
+            return store.Remove(handle, m_host.ParentGroup.UUID);
+        }
+
+        /// <summary>The handles of the volumes this object made, oldest first. Empty when weather is off or the owner may not use the volumes.</summary>
+        public LSLList iwWindVolumes()
+        {
+            var handles = new List<object>();
+            IWindVolumeStore store = WindVolumesFor(out _);
+            if (store != null && WindVolumeAccess.MayChangeWind(World, m_host.OwnerID))
+                foreach (WindVolume v in store.List(m_host.ParentGroup.UUID))
+                    handles.Add(v.Id);
+            return new LSLList(handles);
+        }
+
+        // The region's store when weather is switched on; otherwise null and the error to return.
+        private IWindVolumeStore WindVolumesFor(out int error)
+        {
+            IWindVolumeStore store = m_host == null || World == null ? null : World.RequestModuleInterface<IWindModule>()?.WindVolumes;
+            error = store != null && store.Enabled ? WindVolumeError.Ok : WindVolumeError.Disabled;
+            return error == WindVolumeError.Ok ? store : null;
+        }
+
         public Vector3 iwGroundSurfaceNormal(Vector3 offset)
         {
             // Halcyon TerrainChannel.Calculate4PointNormalAt (:487-531): the unit normal averaged over the cell's two
@@ -13095,6 +13140,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             OsslCheck(TlVeryLow, "osSetWindParam");
             IWindModule wind = World?.RequestModuleInterface<IWindModule>();
             if (wind == null) return;
+            // With [Weather] enabled, only an estate owner, estate manager or god may change the region's wind from a
+            // script; with it off the call is open to every script that passes the [OSSL] gate, as before.
+            if (wind.WindVolumes?.Enabled == true && !WindVolumeAccess.MayChangeWind(World, m_host.OwnerID)) return;
             try { wind.WindParamSet(plugin, param, value); } catch (Exception) { }
         }
 

@@ -1059,6 +1059,9 @@ private static string ConvToString(object o)
 								Shim_osAgentSaveAppearance3,          //966
 								Shim_osMakeNotecard,                  //967
 								Shim_osMakeNotecardList,              //968
+								Shim_iwWindVolumeCreate,              //969
+								Shim_iwWindVolumeRemove,              //970
+								Shim_iwWindVolumes,                   //971
         };
 
         /// <summary>
@@ -7421,6 +7424,28 @@ private static string ConvToString(object o)
             LSLList p1 = ConvToLSLList(self._interpreter.ScriptState.Operands.Pop());
             string p0 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
             Defer(self, "osMakeNotecard", new object[] { p0, p1 }, () => { self._systemAPI.osMakeNotecard(p0, p1); return null; }, null, false);
+        }
+        static private void Shim_iwWindVolumeCreate(SyscallShim self)
+        {
+            LSLList p0 = ConvToLSLList(self._interpreter.ScriptState.Operands.Pop());
+
+            int ret = self._systemAPI.iwWindVolumeCreate(p0);
+
+            self._interpreter.SafeOperandsPush(ConvToLSLType(ret));
+        }
+        static private void Shim_iwWindVolumeRemove(SyscallShim self)
+        {
+            int p0 = ConvToInt(self._interpreter.ScriptState.Operands.Pop());
+
+            int ret = self._systemAPI.iwWindVolumeRemove(p0);
+
+            self._interpreter.SafeOperandsPush(ConvToLSLType(ret));
+        }
+        static private void Shim_iwWindVolumes(SyscallShim self)
+        {
+            LSLList ret = self._systemAPI.iwWindVolumes();
+
+            self._interpreter.SafeOperandsPush(ConvToLSLType(ret));
         }
         // The type-discriminated overloads
         static private void Shim_osSetProjectionParamsKey(SyscallShim self)
