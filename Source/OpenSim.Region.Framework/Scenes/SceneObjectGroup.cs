@@ -2510,7 +2510,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// </summary>
     public void ApplyPhysics()
     {
-        m_physicsApplyDepth++;
+        BeginPhysicsApply(false);
         try
         {
             ApplyPhysicsToParts();
@@ -2855,6 +2855,10 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     // How many operations that give this object's parts their physical status are running (UpdateFlags, ApplyPhysics,
     // LinkToGroup), and whether the physics engine said, during them, that the object is too complex to be physical.
     // The refusal is carried out when the outermost of them ends, never in the middle of one that is going through the parts.
+    // The engine may report from any thread (the Jolt module does from the asset service's thread when a mesh arrives), so
+    // the four fields below are read and written under m_physicsRefusalLock. The lock only decides: the alert and the change
+    // of physical status are done outside it, so no physics or scene call is made while holding it.
+    private readonly object m_physicsRefusalLock = new();
     private int m_physicsApplyDepth;
     private bool m_physicsTooComplex;
     private string m_physicsTooComplexDetail = "";
@@ -2875,11 +2879,17 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         if (m_scene is null || IsDeleted || !UsesPhysics)
             return;
 
-        m_physicsTooComplex = true;
-        m_physicsTooComplexDetail = detail;
+        string carryOut = null;
+        lock (m_physicsRefusalLock)
+        {
+            m_physicsTooComplex = true;
+            m_physicsTooComplexDetail = detail;
+            if (m_physicsApplyDepth == 0)
+                carryOut = TakePhysicsRefusal();
+        }
 
-        if (m_physicsApplyDepth == 0)
-            EndPhysicsRefusal();
+        if (carryOut is not null)
+            CarryOutPhysicsRefusal(carryOut);
     }
 
     /// <summary>
@@ -2888,25 +2898,54 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// </summary>
     public bool TakePhysicsTooComplexTold()
     {
-        bool told = m_physicsTooComplexTold;
-        m_physicsTooComplexTold = false;
-        return told;
+        lock (m_physicsRefusalLock)
+        {
+            bool told = m_physicsTooComplexTold;
+            m_physicsTooComplexTold = false;
+            return told;
+        }
+    }
+
+    // resetTold: an operation that starts the outermost change clears the mark of an earlier refusal.
+    private void BeginPhysicsApply(bool resetTold)
+    {
+        lock (m_physicsRefusalLock)
+        {
+            if (resetTold && m_physicsApplyDepth == 0)
+                m_physicsTooComplexTold = false;
+            m_physicsApplyDepth++;
+        }
     }
 
     private void EndPhysicsApply()
     {
-        if (--m_physicsApplyDepth == 0)
-            EndPhysicsRefusal();
+        string carryOut = null;
+        lock (m_physicsRefusalLock)
+        {
+            if (--m_physicsApplyDepth == 0)
+                carryOut = TakePhysicsRefusal();
+        }
+
+        if (carryOut is not null)
+            CarryOutPhysicsRefusal(carryOut);
     }
 
-    private void EndPhysicsRefusal()
+    // Called with m_physicsRefusalLock held. Returns the detail of a refusal that is to be carried out now, or null.
+    private string TakePhysicsRefusal()
     {
         if (!m_physicsTooComplex)
-            return;
+            return null;
         m_physicsTooComplex = false;
-        m_scene?.RequestModuleInterface<IDialogModule>()?.SendAlertToUser(OwnerID, "Object was too complex to be made physical: " + m_physicsTooComplexDetail);
+        return m_physicsTooComplexDetail;
+    }
+
+    // Called without the lock: it alerts the owner and changes the physical status, which calls into the scene and the engine.
+    private void CarryOutPhysicsRefusal(string detail)
+    {
+        m_scene?.RequestModuleInterface<IDialogModule>()?.SendAlertToUser(OwnerID, "Object was too complex to be made physical: " + detail);
         ScriptSetPhysicsStatus(false);
-        m_physicsTooComplexTold = true;   // after it: making the object non-physical clears the mark for the next change
+        lock (m_physicsRefusalLock)
+            m_physicsTooComplexTold = true;   // after it: making the object non-physical clears the mark for the next change
     }
 
     public void ScriptSetPhysicsStatus(bool usePhysics)
@@ -3486,7 +3525,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     // The group being linked need not be a linkset -- it can have just one prim.
     public void LinkToGroup(SceneObjectGroup objectGroup, bool insert)
     {
-        m_physicsApplyDepth++;
+        BeginPhysicsApply(false);
         try
         {
             LinkPartsToGroup(objectGroup, insert);
@@ -4542,9 +4581,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// <param name="SetVolumeDetect"></param>
     public void UpdateFlags(bool UsePhysics, bool SetTemporary, bool SetPhantom, bool SetVolumeDetect)
     {
-        if (m_physicsApplyDepth == 0)
-            m_physicsTooComplexTold = false;
-        m_physicsApplyDepth++;
+        BeginPhysicsApply(true);
         try
         {
             UpdatePartFlags(UsePhysics, SetTemporary, SetPhantom, SetVolumeDetect);

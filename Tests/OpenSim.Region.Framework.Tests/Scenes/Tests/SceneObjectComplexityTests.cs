@@ -68,6 +68,34 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             }
         }
 
+        /// <summary>
+        /// An actor that reports the object too complex from another thread while it is being made physical, as a module does
+        /// when a mesh arrives on the asset service's thread. It waits for that thread, so the report is certain to have
+        /// landed in the middle of the operation.
+        /// </summary>
+        private sealed class RefusesFromAnotherThread : Body
+        {
+            public Func<int> AlertsSoFar;
+            public int AlertsWhenReported = -1;
+            public override bool IsPhysical
+            {
+                get => base.IsPhysical;
+                set
+                {
+                    base.IsPhysical = value;
+                    if (!value)
+                        return;
+                    Thread reporter = new(() =>
+                    {
+                        RaiseComplexityError(Detail);
+                        AlertsWhenReported = AlertsSoFar();
+                    });
+                    reporter.Start();
+                    Assert.True(reporter.Join(TimeSpan.FromSeconds(30)), "the report from the other thread did not return");
+                }
+            }
+        }
+
         /// <summary>An actor that reports the object it is linked into too complex.</summary>
         private sealed class RefusesWhenLinked : Body
         {
@@ -196,6 +224,28 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             // a later change that is not refused does not read as one
             so.UpdateFlags(false, false, false, false);
             Assert.False(so.TakePhysicsTooComplexTold());
+        }
+
+        [Fact]
+        public void AReportRaisedFromAnotherThreadWhileAnOperationRunsIsCarriedOutOnceWhenItEnds()
+        {
+            TestHelpers.InMethod();
+            RefusesFromAnotherThread[] actors = { new(), new() };
+            int next = 0;
+            (TestScene scene, SceneObjectGroup so, Alerts alerts) = NewObject(2, () => actors[next++]);
+            foreach (RefusesFromAnotherThread actor in actors)
+                actor.AlertsSoFar = () => { lock (alerts.Sent) return alerts.Sent.Count; };
+
+            so.ScriptSetPhysicsStatus(true);
+
+            // both parts reported from their own thread inside the operation, and nothing had been done yet
+            Assert.All(actors, a => Assert.Equal(0, a.AlertsWhenReported));
+            // at the end of the operation the owner was told once and the object made non-physical
+            Assert.Equal(new[] { (so.OwnerID, Message) }, alerts.Sent);
+            Assert.False(so.UsesPhysics);
+            Assert.All(so.Parts, p => Assert.Equal((PrimFlags)0, p.Flags & PrimFlags.Physics));
+            Assert.All(so.Parts, p => Assert.False(p.PhysActor.IsPhysical));
+            Assert.True(so.TakePhysicsTooComplexTold());
         }
 
         [Fact]
