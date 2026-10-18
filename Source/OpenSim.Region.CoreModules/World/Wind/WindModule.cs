@@ -339,9 +339,10 @@ public class WindModule : IWindModule
         float value = 0f;
         if (cmdparams.Length == 4)
         {
-            if (!float.TryParse(cmdparams[3], out value))
+            if (!float.TryParse(cmdparams[3], out value) || !float.IsFinite(value))
             {
                 MainConsole.Instance.Output("Invalid value {0}", cmdparams[3]);
+                return;
             }
 
             try
@@ -429,6 +430,14 @@ public class WindModule : IWindModule
     {
         if (m_availableWindPlugins.ContainsKey(plugin))
         {
+            // Scripts and the console both come through here; a value that is not a number would reach the wind arrays.
+            if (!float.IsFinite(value))
+            {
+                m_log.LogWarning("[WIND] {0}: refused {1} = {2}, which is not a finite number; the value is unchanged.",
+                    plugin, param, value);
+                return;
+            }
+
             IWindModelPlugin windPlugin = m_availableWindPlugins[plugin];
             windPlugin.WindParamSet(param, value);
         }
