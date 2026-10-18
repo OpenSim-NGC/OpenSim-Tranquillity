@@ -13,18 +13,18 @@ using Xunit.Abstractions;
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
 /// <summary>
-/// The InWorldz Halcyon figures that are per step or in the wrong units, held under
+/// Halcyon's vehicle code has figures that are applied per step, or in the wrong units, held under
 /// <see cref="VehicleBehaviour.InWorldz"/> as Halcyon ran them at its own 15 ms step and made the same at every rate:
 /// the in-air motor-disable rule's ray cadence and clock, the upward-motor gravity check, the linear deflection's 0.005 m/s
-/// threshold and the tilt measure; and the rows that were already fixed and are checked here on the same grid: the sled's
+/// threshold and the tilt measure; and other behaviours that are checked here on the same grid: the sled's
 /// slope assist, the attractor's escalation, its dormancy and its damping. Each is run at 32, 45 and 64 Hz Updates with 1
 /// to 4 collision steps (the controller's own step listener split, <see cref="BehaviourRig.StepUpdate"/>), within 1% of
 /// the scale of the answer. Pure (a body with no engine), so the class runs in parallel.
 /// </summary>
-public class VehicleBugRowsRateTests
+public class InWorldzStepRateFiguresTests
 {
     private readonly ITestOutputHelper _out;
-    public VehicleBugRowsRateTests(ITestOutputHelper output) { _out = output; }
+    public InWorldzStepRateFiguresTests(ITestOutputHelper output) { _out = output; }
 
     private const double Deg = Math.PI / 180.0;
     private const double HalcyonStep = 0.015;
@@ -42,7 +42,7 @@ public class VehicleBugRowsRateTests
     private void Near(double got, double expected, double scale, string what, double rate, int n, double percent = 1.0)
     {
         double error = Math.Abs(got - expected) / scale * 100.0;
-        _out.WriteLine($"[bug1] {what} | {rate} Hz x {n} | {got:0.00000} against {expected:0.00000} | {error:0.000}% of {scale}");
+        _out.WriteLine($"[step-rate] {what} | {rate} Hz x {n} | {got:0.00000} against {expected:0.00000} | {error:0.000}% of {scale}");
         Assert.True(error <= percent, $"{what} at {rate} Hz with {n} collision steps: {got:0.00000} against {expected:0.00000} (within {percent}% of {scale})");
     }
 
@@ -193,7 +193,7 @@ public class VehicleBugRowsRateTests
         Assert.Equal(40.0, HalcyonVehicleLaws.TiltAngle(Tilt(0, -40, 77)) / Deg, 2);    // the yaw makes no difference
         double both = HalcyonVehicleLaws.TiltAngle(Tilt(45, 45, 0)) / Deg;
         Assert.Equal(2 * Math.Acos(Math.Cos(22.5 * Deg) * Math.Cos(22.5 * Deg)) / Deg, both, 2);   // 62.8 degrees
-        // The z axis is 60 degrees off up there: the measures differ, as the row says.
+        // The z axis is 60 degrees off up there: the measures differ.
         Assert.True(both > 62.0 && both < 63.5, $"{both}");
         Assert.Equal(180.0, HalcyonVehicleLaws.TiltAngle(Tilt(180, 0, 0)) / Deg, 2);
     }

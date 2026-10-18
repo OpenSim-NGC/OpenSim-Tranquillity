@@ -38,7 +38,7 @@
   <ItemGroup>
     <Compile Include="..\JoltTestShared\VehicleBehaviourRig.cs" Link="Shared\VehicleBehaviourRig.cs" />
     <Compile Include="..\JoltTestShared\FloatRounding.cs" Link="Shared\FloatRounding.cs" />
-    <Compile Include="..\JoltTestShared\HalcyonParityEModels.cs" Link="Shared\HalcyonParityEModels.cs" />
+    <Compile Include="..\JoltTestShared\HalcyonAttitudeAndHoverModels.cs" Link="Shared\HalcyonAttitudeAndHoverModels.cs" />
     <Compile Include="..\JoltTestShared\PinnedMaterialsAttribute.cs" Link="Shared\PinnedMaterialsAttribute.cs" />
     <Compile Include="..\JoltTestShared\MaterialPins.cs" Link="Shared\MaterialPins.cs" />
     <Compile Include="..\JoltTestShared\HalcyonLinearReference.cs" Link="Shared\HalcyonLinearReference.cs" />

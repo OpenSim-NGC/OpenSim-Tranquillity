@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 
 /// <summary>
-/// The vehicle behaviours ported from the InWorldz Halcyon code in the first compatibility order, each under
+/// The vehicle behaviours ported from the InWorldz Halcyon code, each under
 /// <see cref="VehicleBehaviour.InWorldz"/> with Second Life's behaviour checked unchanged beside it: a boat's ground drag
 /// (SimulateBoatGroundDrag), the motor offset on every linear force (VehicleMotor.AddForce), NO_DEFLECTION_UP zeroing only
 /// an upward change (SimulateLinearDeflection), banking by the sine of the roll and without the attractor
@@ -21,10 +21,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 /// vehicle's running motors carried over a region border. Each is run at 32, 45 and 64 Hz Updates with 1 to 4 collision
 /// steps. Pure (a body with no engine), so the class runs in parallel.
 /// </summary>
-public class VehicleParityC1Tests
+public class InWorldzVehicleBehaviourRateTests
 {
     private readonly ITestOutputHelper _out;
-    public VehicleParityC1Tests(ITestOutputHelper output) { _out = output; }
+    public InWorldzVehicleBehaviourRateTests(ITestOutputHelper output) { _out = output; }
 
     private static VehicleSettings InWorldz => new() { Behaviour = VehicleBehaviour.InWorldz };
     private static VehicleSettings SecondLife => new() { Behaviour = VehicleBehaviour.SecondLife };
@@ -46,7 +46,7 @@ public class VehicleParityC1Tests
     private void Near(double got, double expected, double scale, string what, double rate, int n, double percent = 1.5)
     {
         double error = Math.Abs(got - expected) / scale * 100.0;
-        _out.WriteLine($"[parity-c1] {what} | {rate} Hz x {n} | {got:0.00000} against {expected:0.00000} | {error:0.000}% of {scale}");
+        _out.WriteLine($"[inworldz-rate] {what} | {rate} Hz x {n} | {got:0.00000} against {expected:0.00000} | {error:0.000}% of {scale}");
         Assert.True(error <= percent, $"{what} at {rate} Hz with {n} collision steps: {got:0.00000} against {expected:0.00000} (within {percent}% of {scale})");
     }
 

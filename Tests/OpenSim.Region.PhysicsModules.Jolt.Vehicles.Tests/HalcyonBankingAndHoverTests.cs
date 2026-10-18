@@ -17,13 +17,12 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 /// Under <c>[Jolt] VehicleBehaviour = InWorldz</c> the module follows Halcyon's own laws for banking (its share of the angular
 /// motor's sum and its turn curve) and for the vehicle hover force. Each test runs the module in a pure rig (a body with no
 /// engine) at 45 Hz and at 11 Hz with six collision steps, against the translated model of Halcyon's law at Halcyon's own step of
-/// 15 ms (HalcyonAttitudeModel, HalcyonHoverModel), on the scenario HalcyonParityETests measured, with the tolerance stated in
-/// the test. Pure, parallel: no static state, no files, no engine.
+/// 15 ms (HalcyonAttitudeModel, HalcyonHoverModel), with the tolerance stated in the test. Pure, parallel: no static state, no files, no engine.
 /// </summary>
-public class HalcyonParityE2Tests
+public class HalcyonBankingAndHoverTests
 {
     private readonly ITestOutputHelper _out;
-    public HalcyonParityE2Tests(ITestOutputHelper output) => _out = output;
+    public HalcyonBankingAndHoverTests(ITestOutputHelper output) => _out = output;
 
     private const double Deg = Math.PI / 180.0;
     private static string F(double v) => v.ToString("0.000", CultureInfo.InvariantCulture);
