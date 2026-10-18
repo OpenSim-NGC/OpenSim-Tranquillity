@@ -470,6 +470,63 @@
     DefaultLibrary = "./inventory/Libraries.xml"
 
 
+[ViewerAddress]
+    ;; Which address a viewer is given for its region in the login response. The region servers have the same
+    ;; section in OpenSim.ini (and per region in Regions.ini) for teleports, crossings and neighbouring regions;
+    ;; set the same values in both.
+    ;;
+    ;; By default every viewer is given the address that the region's ExternalHostName resolves to on this
+    ;; machine. A viewer outside your network cannot use it when this machine resolves your public host name to
+    ;; a private address (a hosts-file entry, split-horizon DNS): it logs in but its region connection never
+    ;; completes. Addresses lists which address each network of viewers is given instead.
+    ;;
+    ;; Nothing is detected or guessed: the only addresses given are the ones you write in Addresses. With
+    ;; Addresses empty nothing changes: every viewer is given the address as before.
+    ;;
+    ;; Host names are looked up through the operating system resolver (the hosts file and the system's resolver
+    ;; settings, resolv.conf on Linux); no DNS server is queried directly.
+    ;;
+    ;; A viewer is classified by the address of its connection to this login service. The X-Forwarded-For header
+    ;; is used for this only when [LoginService] HasProxy = true. The address recorded for the session is not
+    ;; affected by this section.
+    ;;
+    ;; Only regions of this grid are given a chosen address; a destination on another grid (hypergrid) is
+    ;; always given its own address.
+    ;;
+    ;; Addresses given to viewers are IPv4: the viewer protocol carries four address bytes.
+    ;;
+    ;; Known limit: the public port is the region's port. A router that maps a different public port to the
+    ;; region is not supported.
+    ;;
+    ;; Example for a grid behind a home router, with a second name for the grid, public.grid.example.org, that
+    ;; is not in this machine's hosts file and resolves to your public address: viewers on your network keep
+    ;; the address the region has now, every other viewer is given the public one:
+    ;;   Addresses = "192.168.0.0/16, 0.0.0.0/0=public.grid.example.org"
+    ;; Example for a machine on several networks, one address for each network:
+    ;;   Addresses = "192.168.1.0/24=192.168.1.20, 10.8.0.0/24=10.8.0.1, 0.0.0.0/0=203.0.113.20"
+
+    ;; The list of viewer networks and the address each is given, comma separated, in the order you write it.
+    ;; An entry is "CIDR=address" (the viewer is given that address: an IPv4 address, or a host name looked up
+    ;; as described above) or just "CIDR" (the viewer is given the LocalAddress the region registered with the
+    ;; grid, else the address the region's ExternalHostName resolves to on this machine, which is what it is
+    ;; given today). The first entry whose network contains the viewer's address is used; a viewer that no entry
+    ;; matches is given today's address. 0.0.0.0/0 matches every IPv4 viewer, so put it last. An entry that
+    ;; cannot be read is logged and skipped. LocalAddress is set in the regions' OpenSim.ini or Regions.ini;
+    ;; Robust only passes on what the regions registered.
+    ;; Default: empty.
+    ;;
+    ;; If you already have a hosts-file entry that maps your public host name to a private address for the
+    ;; benefit of viewers in your network, it does no harm with these settings and is optional to remove; whether
+    ;; your router can carry the viewers' HTTP traffic back into your network without it is for you to test.
+    ; Addresses = ""
+
+    ;; Minutes between repeated lookups of the host names in Addresses, so a dynamic-DNS change takes effect
+    ;; without a restart. 0 never repeats. A failed lookup keeps the last good address, and until a name has been
+    ;; looked up successfully its viewers are given today's address. Each answer is also cached for 5 minutes
+    ;; after its last use, so a value under 5 does not find a change any sooner. Default 30.
+    ; RefreshMinutes = 30
+
+
 [LoginService]
     ; for the server connector
     LocalServiceModule = "OpenSim.Services.LLLoginService.dll:LLLoginService"

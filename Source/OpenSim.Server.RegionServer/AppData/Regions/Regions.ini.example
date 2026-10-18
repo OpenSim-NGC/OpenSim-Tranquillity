@@ -23,6 +23,15 @@ InternalPort = 9000
 AllowAlternatePorts = False
 ExternalHostName = SYSTEMIP
 
+; *
+; * Address given to viewers for this region, replacing the value of the same name in the [ViewerAddress]
+; * section of OpenSim.ini for this region only. Both are optional; see [ViewerAddress]
+; * in OpenSim.ini for what they do, the default (unset: every viewer is given the address
+; * ExternalHostName resolves to on this machine) and the known limit (the public port is InternalPort).
+; *
+; Addresses = ""
+; LocalAddress = ""
+
 ;; Estate ID or Name to connect region to, leave blank for console prompt, remember estate id can not be less than 100
 ;; this value is only used when creating a region and after that will be ignored. 0 Will use the next auto id provided by the database
 ;TargetEstate = 0

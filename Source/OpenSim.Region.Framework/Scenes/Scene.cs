@@ -940,6 +940,8 @@ public partial class Scene : SceneBase
 
             StartDisabled = startupConfig.GetBoolean("StartDisabled", false);
 
+            ChildPresenceWait = TimeSpan.FromSeconds(Math.Max(0, startupConfig.GetInt("ChildPresenceWaitSeconds", 30)));
+
             m_defaultDrawDistance = startupConfig.GetFloat("DefaultDrawDistance", m_defaultDrawDistance);
             m_maxDrawDistance = startupConfig.GetFloat("MaxDrawDistance", m_maxDrawDistance);
             m_maxRegionViewDistance = startupConfig.GetFloat("MaxRegionsViewDistance", m_maxRegionViewDistance);
@@ -4731,6 +4733,10 @@ Label_GroupsDone:
             return true;
         }
 
+        string neverConnected = ChildNeverConnectedWarning(cAgentData.AgentID);
+        if (neverConnected is not null)
+            m_log.LogWarning(neverConnected);
+
         return false;
     }
 
@@ -4771,13 +4777,36 @@ Label_GroupsDone:
     }
 
     /// <summary>
+    /// How long an incoming agent update waits for the viewer to connect to this region (the presence to appear).
+    /// Set from [Startup] ChildPresenceWaitSeconds; the default is 30 seconds.
+    /// </summary>
+    public TimeSpan ChildPresenceWait { get; set; } = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// The warning for an agent that was authorised in this region but whose viewer never connected, or null
+    /// when no circuit was authorised for the agent.
+    /// </summary>
+    public string ChildNeverConnectedWarning(UUID agentID)
+    {
+        AgentCircuitData circuit = m_authenticateHandler.GetAgentCircuitData(agentID);
+        if (circuit is null)
+            return null;
+
+        return string.Format(
+            "[SCENE]: The viewer of agent {0} was authorised in {1} but never connected to {2}:{3}, the address this region " +
+            "gives out for itself (the address recorded for the viewer is {4}). Viewers outside this region's network " +
+            "cannot reach that address: list the address they should use for their network in [ViewerAddress] Addresses.",
+            agentID, RegionInfo.RegionName, RegionInfo.ExternalHostName, RegionInfo.InternalEndPoint.Port, circuit.IPAddress);
+    }
+
+    /// <summary>
     /// Poll until the requested ScenePresence appears or we timeout.
     /// </summary>
     /// <returns>The scene presence is found, else null.</returns>
     /// <param name='agentID'></param>
     protected virtual ScenePresence WaitGetScenePresence(UUID agentID)
     {
-        int ntimes = 120; // 30s
+        int ntimes = (int)Math.Ceiling(ChildPresenceWait.TotalMilliseconds / 250.0);
         ScenePresence sp;
         while ((sp = GetScenePresence(agentID)) is null && (ntimes-- > 0))
             Thread.Sleep(250);
