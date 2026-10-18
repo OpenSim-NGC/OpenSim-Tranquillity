@@ -278,9 +278,9 @@ public class SculptFlagsTests
     // Volume: the largest difference seen between two decoders (CoreJ2K 2.3.3.91 and 2.4.1.108, both rounding the same
     // encoded maps) is 0.7, plus 0.05 for the recorded value being rounded to one decimal, so 0.75. Moving every
     // vertex by one level in the worst direction changes it by about 2 x surface area x level, near 1.1 for these
-    // shapes (an estimate, not measured). The tolerance is 1.0, a third above what was seen. An inverted shape differs
-    // by twice the volume (at least 34 here).
-    private const double VolumeTolerance = 1.0;
+    // shapes (an estimate, not measured). The tolerance is 1.5, which covers that estimate plus the 0.05 for rounding
+    // with about 30% to spare. An inverted shape differs by twice the volume, at least 34.8 here.
+    private const double VolumeTolerance = 1.5;
 
     // Bounds: one level of the prim size on that axis (size / 255: x 0.0078, y 0.0118, z 0.0157), plus 0.01 for the
     // recorded value being rounded to two decimals (0.005) with the same again as margin. That is 0.018, 0.022 and
