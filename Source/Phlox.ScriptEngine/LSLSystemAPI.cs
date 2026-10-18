@@ -2149,7 +2149,7 @@ namespace Phlox.ScriptEngine
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;
                 if (local != 0) force *= m_host.GetWorldRotation();
-                m_host.ParentGroup.RootPart.Force = force;   // stores it and passes it to the actor
+                m_host.ParentGroup.RootPart.SetForce(force, local != 0);   // stores it and passes it to the actor
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }
@@ -2173,7 +2173,7 @@ namespace Phlox.ScriptEngine
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;
                 if (local != 0) torque *= m_host.GetWorldRotation();
-                m_host.ParentGroup.RootPart.Torque = torque;   // stores it for llGetTorque and passes it to the actor
+                m_host.ParentGroup.RootPart.SetTorque(torque, local != 0);   // stores it for llGetTorque and passes it to the actor
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }
