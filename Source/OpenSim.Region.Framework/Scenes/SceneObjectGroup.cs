@@ -2510,6 +2510,19 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// </summary>
     public void ApplyPhysics()
     {
+        m_physicsApplyDepth++;
+        try
+        {
+            ApplyPhysicsToParts();
+        }
+        finally
+        {
+            EndPhysicsApply();
+        }
+    }
+
+    private void ApplyPhysicsToParts()
+    {
         SceneObjectPart[] parts = m_parts.GetArray();
         if (parts.Length > 1)
         {
@@ -2837,6 +2850,63 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         if (userExposed)
             RootPart.Velocity = Vector3.Zero; // In case source is moving
+    }
+
+    // How many operations that give this object's parts their physical status are running (UpdateFlags, ApplyPhysics,
+    // LinkToGroup), and whether the physics engine said, during them, that the object is too complex to be physical.
+    // The refusal is carried out when the outermost of them ends, never in the middle of one that is going through the parts.
+    private int m_physicsApplyDepth;
+    private bool m_physicsTooComplex;
+    private string m_physicsTooComplexDetail = "";
+    private bool m_physicsTooComplexTold;
+
+    // The owner's message and the refusal follow what InWorldz Halcyon does when an object is over its limit
+    // (an alert, then the physics flag cleared). No Halcyon code is copied.
+    /// <summary>
+    /// The physics engine says this object is over its limit on how complex a physical object may be (see
+    /// <see cref="PhysicsActor.OnComplexityError"/>). The owner is told, and the object is made non-physical, as
+    /// llSetStatus(STATUS_PHYSICS, FALSE) would: when the operation that is making it physical has finished, or at once
+    /// when none is running. An engine that counts as the parts arrive reports again as the count grows; the owner is
+    /// told the last count.
+    /// </summary>
+    /// <param name="detail">What the engine counted, for example "(300 of 256 convex hulls)".</param>
+    public void PhysicsTooComplex(string detail)
+    {
+        if (m_scene is null || IsDeleted || !UsesPhysics)
+            return;
+
+        m_physicsTooComplex = true;
+        m_physicsTooComplexDetail = detail;
+
+        if (m_physicsApplyDepth == 0)
+            EndPhysicsRefusal();
+    }
+
+    /// <summary>
+    /// True once, after the owner has been told this object was too complex to be physical. The build tool uses it to
+    /// skip its own, less specific, message.
+    /// </summary>
+    public bool TakePhysicsTooComplexTold()
+    {
+        bool told = m_physicsTooComplexTold;
+        m_physicsTooComplexTold = false;
+        return told;
+    }
+
+    private void EndPhysicsApply()
+    {
+        if (--m_physicsApplyDepth == 0)
+            EndPhysicsRefusal();
+    }
+
+    private void EndPhysicsRefusal()
+    {
+        if (!m_physicsTooComplex)
+            return;
+        m_physicsTooComplex = false;
+        m_scene?.RequestModuleInterface<IDialogModule>()?.SendAlertToUser(OwnerID, "Object was too complex to be made physical: " + m_physicsTooComplexDetail);
+        ScriptSetPhysicsStatus(false);
+        m_physicsTooComplexTold = true;   // after it: making the object non-physical clears the mark for the next change
     }
 
     public void ScriptSetPhysicsStatus(bool usePhysics)
@@ -3415,6 +3485,19 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     // Link an existing group to this group.
     // The group being linked need not be a linkset -- it can have just one prim.
     public void LinkToGroup(SceneObjectGroup objectGroup, bool insert)
+    {
+        m_physicsApplyDepth++;
+        try
+        {
+            LinkPartsToGroup(objectGroup, insert);
+        }
+        finally
+        {
+            EndPhysicsApply();
+        }
+    }
+
+    private void LinkPartsToGroup(SceneObjectGroup objectGroup, bool insert)
     {
 //            m_log.LogDebug(
 //                "[SCENE OBJECT GROUP]: Linking group with root part {0}, {1} to group with root part {2}, {3}",
@@ -4458,6 +4541,21 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// <param name="SetPhantom"></param>
     /// <param name="SetVolumeDetect"></param>
     public void UpdateFlags(bool UsePhysics, bool SetTemporary, bool SetPhantom, bool SetVolumeDetect)
+    {
+        if (m_physicsApplyDepth == 0)
+            m_physicsTooComplexTold = false;
+        m_physicsApplyDepth++;
+        try
+        {
+            UpdatePartFlags(UsePhysics, SetTemporary, SetPhantom, SetVolumeDetect);
+        }
+        finally
+        {
+            EndPhysicsApply();
+        }
+    }
+
+    private void UpdatePartFlags(bool UsePhysics, bool SetTemporary, bool SetPhantom, bool SetVolumeDetect)
     {
         if (m_scene is null || IsDeleted)
             return;
