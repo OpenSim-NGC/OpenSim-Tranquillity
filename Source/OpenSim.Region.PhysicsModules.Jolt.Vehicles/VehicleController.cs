@@ -61,10 +61,15 @@
  */
 
 /*
- * Vehicle dynamics ported from InWorldz Halcyon (InWorldz.PhysxPhysics/Vehicle/VehicleDynamics.cs),
- * through OpenSim's BulletSim vehicle code.
- * The code came to us through BulletSim's port of the Halcyon vehicle code, so the OpenSim notice
- * above and Halcyon's notice both apply.
+ * Two sources went into this file, and each notice above applies to what came from it:
+ *  - OpenSim's BulletSim vehicle code (OpenSim.Region.PhysicsModules.BulletS/BSDynamics.cs; the OpenSim notice): the
+ *    controller's entry points and their signatures (ProcessTypeChange, ProcessFloatVehicleParam,
+ *    ProcessVectorVehicleParam, ProcessRotationVehicleParam, ProcessVehicleFlags), the way gravity and buoyancy are
+ *    applied (ApplyGravity) and the terrain and water height queries, as the table below shows.
+ *  - The InWorldz Halcyon vehicle code (InWorldz.PhysxPhysics/Vehicle/VehicleDynamics.cs and VehicleProperties.cs;
+ *    Halcyon's notice): the frame structure, CheckResetMotors, ResetDynamics, the torque start and finish, the
+ *    linear-motor-stalled test, the legacy type presets, and the InWorldz behaviours, each cited at its code.
+ * BSDynamics.cs does not mention Halcyon; the two were compared separately.
  * Adapted 2026 by Legion Builds
  *
  * A backend-agnostic vehicle controller. The behaviours Second Life documents (the motors and

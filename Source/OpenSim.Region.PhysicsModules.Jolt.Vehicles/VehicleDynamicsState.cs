@@ -61,10 +61,9 @@
  */
 
 /*
- * Vehicle dynamics ported from InWorldz Halcyon (InWorldz.PhysxPhysics/Vehicle/DynamicsSimulationData.cs),
- * through OpenSim's BulletSim vehicle code.
- * The code came to us through BulletSim's port of the Halcyon vehicle code, so the OpenSim notice
- * above and Halcyon's notice both apply.
+ * Vehicle dynamics ported from InWorldz Halcyon (InWorldz.PhysxPhysics/Vehicle/DynamicsSimulationData.cs); Halcyon's notice above applies.
+ * No code from OpenSim's BulletSim vehicle code is in this file; the OpenSim notice above stays with the
+ * file's header.
  * Adapted 2026 by Legion Builds
  */
 
