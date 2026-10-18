@@ -191,6 +191,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PhloxCompileProbe", "Tests\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Services.HypergridService.Tests", "Tests\OpenSim.Services.HypergridService.Tests\OpenSim.Services.HypergridService.Tests.csproj", "{2DBDEB35-EEA6-4A29-8B06-732E44463C44}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModules.Jolt.Vehicles", "Source\OpenSim.Region.PhysicsModules.Jolt.Vehicles\OpenSim.Region.PhysicsModules.Jolt.Vehicles.csproj", "{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModules.Jolt.Vehicles.Tests", "Tests\OpenSim.Region.PhysicsModules.Jolt.Vehicles.Tests\OpenSim.Region.PhysicsModules.Jolt.Vehicles.Tests.csproj", "{AD42BFAA-4256-45A8-A046-FE97860DD440}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1293,6 +1297,30 @@ Global
 		{2DBDEB35-EEA6-4A29-8B06-732E44463C44}.Release|x64.Build.0 = Release|Any CPU
 		{2DBDEB35-EEA6-4A29-8B06-732E44463C44}.Release|x86.ActiveCfg = Release|Any CPU
 		{2DBDEB35-EEA6-4A29-8B06-732E44463C44}.Release|x86.Build.0 = Release|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Debug|x64.Build.0 = Debug|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Debug|x86.Build.0 = Debug|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Release|x64.ActiveCfg = Release|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Release|x64.Build.0 = Release|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Release|x86.ActiveCfg = Release|Any CPU
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F}.Release|x86.Build.0 = Release|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Debug|x64.Build.0 = Debug|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Debug|x86.Build.0 = Debug|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Release|x64.ActiveCfg = Release|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Release|x64.Build.0 = Release|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Release|x86.ActiveCfg = Release|Any CPU
+		{AD42BFAA-4256-45A8-A046-FE97860DD440}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1389,6 +1417,8 @@ Global
 		{6BC011C0-41E2-4785-9BE1-5A19CF16ADA9} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 		{1DC110CD-7D2E-4501-A5D0-46D12DE23E26} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 		{2DBDEB35-EEA6-4A29-8B06-732E44463C44} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
+		{5F302F80-F272-4EB8-B4F8-7B663C50BF5F} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
+		{AD42BFAA-4256-45A8-A046-FE97860DD440} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}
