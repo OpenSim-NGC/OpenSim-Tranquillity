@@ -2289,14 +2289,13 @@ namespace Phlox.ScriptEngine
         }
         public void llGroundRepel(float height, int water, float tau)
         {
-            // Halcyon used PIDHoverFlag.Ground|Repel; this port uses PIDHoverType which
-            // may not have a separate Repel flag. Use Ground (or Water) — SetHoverHeight
-            // with a positive height inherently repels from the ground.
+            // Halcyon's PIDHoverFlag.Ground|Repel: the hover type is the same as llSetHoverHeight's and the repel flag
+            // (PhysicsActor.PIDHoverRepel) tells an engine that the object is only pushed up.
             if (m_host?.PhysActor == null) return;
             PIDHoverType hoverType = PIDHoverType.Ground;
             if (water != 0)
                 hoverType = PIDHoverType.Water;
-            m_host.SetHoverHeight(height, hoverType, tau);
+            m_host.SetHoverHeight(height, hoverType, tau, repel: true);
         }
         // Base64 lookup tables for llIntegerToBase64 / llBase64ToInteger
         private static readonly char[] i2ctable =
