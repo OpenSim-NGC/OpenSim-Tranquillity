@@ -154,6 +154,15 @@ here needs to specify the URI to address the Janus server and the API keys
 to allow this simulator access to its interfaces. The example above
 contains just sample entries.
 
+#### Optional settings
+
+These keys are optional. The shipped `os-webrtc-janus.ini` lists them commented out with their defaults.
+
+| Key | Section | Default | Notes |
+|---|---|---|---|
+| `PluginName` | `[JanusWebRtcVoice]` | `janus.plugin.audiobridge` | The Janus plugin the region attaches voice handles to. The default is Janus's stock AudioBridge. `janus.plugin.slvoice` selects a spatial mixer that implements that plugin. |
+| `StunServers` | `[WebRtcVoice]` | empty | Comma-separated STUN server URIs (full ICE URIs, for example `stun:stun.example.org:3478`) advertised to viewers as the `stun-servers` simulator feature. Stock viewers need a valid entry to connect from outside the grid's network. When empty the entry is not advertised. Works with either plugin. |
+
 <a id="Configure_Robust"></a>
 ## Configure Robust Server for WebRTC Voice
 
