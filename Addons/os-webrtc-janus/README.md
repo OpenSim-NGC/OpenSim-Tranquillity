@@ -154,6 +154,26 @@ here needs to specify the URI to address the Janus server and the API keys
 to allow this simulator access to its interfaces. The example above
 contains just sample entries.
 
+#### Which parcel a voice request is checked against
+
+A stock viewer sends `parcel_local_id` only when the avatar stands on a parcel that has its own voice channel (the
+parcel's "use estate voice channel" option is off). On a parcel that uses the estate voice channel it sends none,
+and it sends none on the connection it opens to each neighbouring region.
+
+For an avatar that is in the region, the parcel is the one the avatar is standing on. The viewer's
+`parcel_local_id` is not used to choose it: a different id is logged and ignored. Voice applies the parcel's
+voice-off setting and ban list itself, on every estate, including TaxFree estates: a parcel with voice turned off
+refuses voice (HTTP 403), and an avatar on the parcel's ban list is refused (HTTP 403), whether or not the parcel
+uses the estate voice channel. The parcel's owner, the region's estate managers and owner, and administrators are
+not refused by the ban list.
+
+The avatar's room follows from that parcel. A parcel on the estate voice channel gets the region-wide room; a
+parcel with its own voice channel gets that parcel's room.
+
+For the viewer of an avatar that is in a neighbouring region, the named parcel is used only if it is near where
+that avatar is known to be; otherwise the request is treated as one that named no parcel and gets the region-wide
+room.
+
 #### Optional settings
 
 These keys are optional. The shipped `os-webrtc-janus.ini` lists them commented out with their defaults.
