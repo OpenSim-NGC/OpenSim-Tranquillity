@@ -711,6 +711,13 @@
     ; OutboundDisallowForUserScriptsExcept = 192.168.1.2/32
     ;
     ; See http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation for more information on CIDR notation
+    ;
+    ; A host name in OutboundDisallowForUserScriptsExcept is looked up when the region server starts and again
+    ; every OutboundDisallowForUserScriptsExceptRefreshMinutes minutes (default 30), so an exception for a host
+    ; whose address changes (dynamic DNS) keeps working. If a lookup fails the last good addresses are kept.
+    ; Address and network entries are not affected. 0 looks the names up only at start.
+    ;
+    ; OutboundDisallowForUserScriptsExceptRefreshMinutes = 30
 
     ;# {HttpBodyMaxLenMAX} {} {Maximum bytes allowed for HTTP_BODY_MAXLENGTH} {} 16384
     ;; By default, llHTTPRequest limits the response body to 2048 bytes.
