@@ -930,6 +930,18 @@
     ;; avatars with god permissions; SL lets gods land wherever they want.
     ;LandingPointBehavior = LandingPointBehavior_OS
 
+    ;# {EnableStandingRiderCrossing} {} {Carry avatars standing on an object across a region border with it.} {false true} false
+    ;; Crossing of objects with the avatars on them: one setting for the whole feature, off by default.
+    ;; On: an avatar standing on an object (a ferry, a train, a platform) is carried across a region border with it,
+    ;; the object and its riders are frozen until the crossing is complete, the region that receives the object holds it
+    ;; at rest until its riders have arrived (10 seconds at most), the region that sends it hides its old copy from its
+    ;; viewers meanwhile, the riders' attachment scripts wait with the object, and a rider that the other region will not
+    ;; take stays behind with an alert. Tracking which object each avatar stands on starts with it.
+    ;; A region with this on tells its neighbours so; a neighbour without it (or with it off) is treated as an older
+    ;; region: a standing rider is not carried to it, and an object is sent to it as before.
+    ;; Off: objects cross as they did before this feature: avatars standing on one are left behind.
+    ;EnableStandingRiderCrossing = false
+
 [Messaging]
     ;# {OfflineMessageModule} {} {Module to use for offline message storage} {OfflineMessageModule "Offline Message Module V2" *}
     ;; Module to handle offline messaging. The core module requires an external

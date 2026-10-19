@@ -348,6 +348,10 @@ public class SceneGraph
 
         bool ret = AddSceneObject(sceneObject, attachToBackup, sendClientUpdates);
 
+        // an object this region refused (one with its id is here already) is not touched
+        if (!ret)
+            return false;
+
         if (attachToBackup && (!alreadyPersisted))
         {
             sceneObject.ForceInventoryPersistence();

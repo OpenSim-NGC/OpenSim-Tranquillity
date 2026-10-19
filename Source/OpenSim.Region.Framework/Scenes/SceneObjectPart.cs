@@ -760,6 +760,21 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// The targets a crossing carried into this region in the saved object, until the new actor takes them up; null the rest
+    /// of the time. Only the root part holds it.
+    /// </summary>
+    public CrossingTargets CrossingTargets { get; set; }
+
+    /// <summary>The look-at a script has running on this root part (llRotLookAt), if any.</summary>
+    public bool TryGetLookAt(out Quaternion target, out float strength, out float damping)
+    {
+        target = m_APIDTarget;
+        strength = m_APIDStrength;
+        damping = m_APIDDamp;
+        return m_APIDActive;
+    }
+
     protected bool APIDActive
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -5036,6 +5051,10 @@ public class SceneObjectPart : EntityBase, IDisposable
             // A motion that is already running has not told this new actor yet (the object's physics was rebuilt).
             if (isroot)
                 KeyframeMotion?.UpdatePhysicsHint();
+
+            // A crossing may have brought the script's move-to, hover and look-at with the object: the new actor takes them up.
+            if (isroot && isPhysical)
+                ParentGroup.TakeUpCrossingTargets();
 
             //                DoPhysicsPropertyUpdate(isPhysical, true);
             // lets expand it here just with what it really needs to do
