@@ -66,13 +66,21 @@ public sealed class ViewerAddressSelector : IDisposable
     public static ViewerAddressSelector Disabled { get; } = new(ViewerAddressConfig.Disabled, null, false);
 
     /// <summary>Builds the selector and, when the configuration needs one, its resolver (disposed with the selector).</summary>
-    public static ViewerAddressSelector Create(ViewerAddressConfig config, ILogger log)
+    /// <param name="dnsPort">The port of the DNS servers in the configuration's DnsServers list.</param>
+    /// <param name="dnsTimeout">How long each DNS server is given to answer; defaults to <see cref="DnsAddressQuery.DefaultTimeout"/>.</param>
+    /// <param name="osResolver">Replaces the operating system resolver (tests).</param>
+    public static ViewerAddressSelector Create(ViewerAddressConfig config, ILogger log, int dnsPort = 53,
+        TimeSpan? dnsTimeout = null, Func<string, IPAddress> osResolver = null)
     {
         if (config is null || !config.Enabled)
             return Disabled;
 
+        DnsAddressQuery dns = config.DnsServers.Count > 0
+            ? new DnsAddressQuery(config.DnsServers.Select(server => new IPEndPoint(server, dnsPort)).ToList(),
+                dnsTimeout ?? DnsAddressQuery.DefaultTimeout)
+            : null;
         PublicAddressResolver resolver = config.Hosts.Count > 0
-            ? new PublicAddressResolver(config.RefreshInterval, log)
+            ? new PublicAddressResolver(config.RefreshInterval, log, osResolver, dnsQuery: dns)
             : null;
         return new ViewerAddressSelector(config, resolver, true);
     }
@@ -125,6 +133,9 @@ public sealed class ViewerAddressSelector : IDisposable
     {
         return m_resolver?.Resolve(host);
     }
+
+/// <summary>Looks every host name up again now; returns how many lookups succeeded.</summary>
+    public int Refresh() => m_resolver?.Refresh() ?? 0;
 
     public void Dispose()
     {

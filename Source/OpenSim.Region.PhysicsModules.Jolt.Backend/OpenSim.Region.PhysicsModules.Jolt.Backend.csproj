@@ -38,4 +38,8 @@
     <PackageReference Include="JoltPhysics.Native" Version="1.0.4" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenSim.Region.PhysicsModules.Jolt.Backend.Tests" />
+  </ItemGroup>
+
 </Project>
