@@ -207,6 +207,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JoltPhysicsHarness", "Tests
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModules.Jolt.Harness.Tests", "Tests\OpenSim.Region.PhysicsModules.Jolt.Harness.Tests\OpenSim.Region.PhysicsModules.Jolt.Harness.Tests.csproj", "{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModules.Jolt.Scenarios.Vehicle.Tests", "Tests\OpenSim.Region.PhysicsModules.Jolt.Scenarios.Vehicle.Tests\OpenSim.Region.PhysicsModules.Jolt.Scenarios.Vehicle.Tests.csproj", "{588E0E5D-8114-4ADF-B771-A2046F783E0D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1405,6 +1407,18 @@ Global
 		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|x64.Build.0 = Release|Any CPU
 		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|x86.ActiveCfg = Release|Any CPU
 		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|x86.Build.0 = Release|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Debug|x64.Build.0 = Debug|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Debug|x86.Build.0 = Debug|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Release|x64.ActiveCfg = Release|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Release|x64.Build.0 = Release|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Release|x86.ActiveCfg = Release|Any CPU
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1509,6 +1523,7 @@ Global
 		{F23323BB-E221-42B7-98D4-D42E5ACFAD26} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
+		{588E0E5D-8114-4ADF-B771-A2046F783E0D} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}
