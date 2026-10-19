@@ -160,6 +160,11 @@ public class TestEventQueueGetModule : IEventQueue, INonSharedRegionModule
         AddEvent(toAgent, "ChatterBoxSessionAgentListUpdates", sessionID, toAgent, updates);
     }
 
+    public void ChatterBoxSessionUpdate(UUID sessionID, UUID toAgent, bool voiceModerated)
+    {
+        AddEvent(toAgent, "ChatterBoxSessionUpdate", sessionID, voiceModerated);
+    }
+
     public void ChatterBoxForceClose (UUID toAgent, UUID sessionID, string reason)
     {
         AddEvent(toAgent, "ForceCloseChatterBoxSession", sessionID, reason);
