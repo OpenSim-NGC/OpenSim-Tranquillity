@@ -70,9 +70,10 @@ public partial class WebRtcVoiceRegionModule
 
     private NonSpatialVoiceSessionEngine m_nonSpatial;
 
-    // [WebRtcVoice] CarrierSecret signs and verifies the cross-process ring carrier. Unset, or shorter than
-    // CarrierAuth.MinSecretLength, it is off: no carrier is sent and every incoming one is refused. A grid that
-    // runs its regions in more than one process sets the same value on every region server.
+    // [WebRtcVoice] CarrierSecret signs and verifies the two cross-process carriers (the ring and the
+    // conference text line). Unset, or shorter than CarrierAuth.MinSecretLength, it is off: no carrier is
+    // sent and every incoming one is refused. A grid that runs its regions in more than one process sets
+    // the same value on every region server.
     private CarrierAuth m_carrierAuth = CarrierAuth.Off();
 
     // Reads [WebRtcVoice] CarrierSecret and says once, at startup, whether cross-process carriers are on.
@@ -84,8 +85,8 @@ public partial class WebRtcVoiceRegionModule
         if (problem is null)
         {
             m_carrierAuth = new CarrierAuth(secret);
-            m_log.LogInformation("{LogHeader} cross-process voice carriers on: group rings and "
-                + "avatar-to-avatar calls are signed with [WebRtcVoice] CarrierSecret", logHeader);
+            m_log.LogInformation("{LogHeader} cross-process voice carriers on: group and conference rings, "
+                + "conference text and avatar-to-avatar calls are signed with [WebRtcVoice] CarrierSecret", logHeader);
             return;
         }
         m_carrierAuth = CarrierAuth.Off();
@@ -95,8 +96,8 @@ public partial class WebRtcVoiceRegionModule
         else
             m_log.LogInformation("{LogHeader} cross-process voice carriers are off: [WebRtcVoice] CarrierSecret is not set. "
                 + "None is sent and every incoming one is refused. A grid that runs regions in more than one process "
-                + "sets the same CarrierSecret (at least {Min} characters) on every region server for group and "
-                + "avatar-to-avatar calls to ring across them", logHeader, CarrierAuth.MinSecretLength);
+                + "sets the same CarrierSecret (at least {Min} characters) on every region server for group, "
+                + "conference and avatar-to-avatar calls to ring across them", logHeader, CarrierAuth.MinSecretLength);
     }
 
     private void LogCarrierOff(UUID session)
@@ -118,8 +119,9 @@ public partial class WebRtcVoiceRegionModule
     }
 
     // [WebRtcVoice] MaxNonSpatialSessions / MaxSessionsPerAgent: how many non-spatial sessions this process
-    // holds, and how many live ones one agent may have started.
-    // A value below 1 is not usable, so it reads as the default.
+    // holds, and how many live ones one agent may have started. ConferenceRequestBurst /
+    // ConferenceRequestRefillSeconds: the per-agent token bucket on "start conference" and "invite".
+    // A value below 1 (above 0 for the refill) is not usable, so it reads as the default.
     public static NonSpatialLimits ReadNonSpatialLimits(IConfig pConfig)
         => new NonSpatialLimits
         {
@@ -127,7 +129,17 @@ public partial class WebRtcVoiceRegionModule
                                                       NonSpatialLimits.DefaultMaxNonSpatialSessions),
             MaxSessionsPerAgent = PositiveOrDefault(pConfig.GetInt("MaxSessionsPerAgent", NonSpatialLimits.DefaultMaxSessionsPerAgent),
                                                     NonSpatialLimits.DefaultMaxSessionsPerAgent),
+            ConferenceRequestBurst = PositiveOrDefault(pConfig.GetInt("ConferenceRequestBurst", NonSpatialLimits.DefaultConferenceRequestBurst),
+                                                       NonSpatialLimits.DefaultConferenceRequestBurst),
+            ConferenceRequestRefillSeconds = ReadPositiveDouble(pConfig, "ConferenceRequestRefillSeconds",
+                                                                NonSpatialLimits.DefaultConferenceRequestRefillSeconds),
         };
+
+    private static double ReadPositiveDouble(IConfig pConfig, string key, double fallback)
+    {
+        double value = pConfig.GetDouble(key, fallback);
+        return value > 0 && !double.IsNaN(value) && !double.IsInfinity(value) ? value : fallback;
+    }
 
     private static int PositiveOrDefault(int value, int fallback) => value >= 1 ? value : fallback;
 
@@ -163,6 +175,7 @@ public partial class WebRtcVoiceRegionModule
     private void SubscribeVoiceSessionEvents(Scene scene)
     {
         SubscribeGroupVoiceEvents(scene);
+        SubscribeConferenceEvents(scene);
         // A client that drops without a logout provision (crash, kill) would otherwise leave its Active A2A
         // record until the idle backstop, suppressing a re-ring between the same pair. Treat the close as that
         // party gone from every record it is in; the record is removed only when the other party is gone too
@@ -172,7 +185,7 @@ public partial class WebRtcVoiceRegionModule
         scene.EventManager.OnIncomingInstantMessage += OnIncomingA2ACarrier;
     }
 
-    // A client closed: drop its avatar-to-avatar records, then release its group seats.
+    // A client closed: drop its avatar-to-avatar records, then release its group and conference seats.
     private void OnVoiceClientClosed(Scene scene, UUID clientID, Scene s)
     {
         // Look the presence up in the scene the close fired for. OnClientClosed runs
@@ -218,7 +231,7 @@ public partial class WebRtcVoiceRegionModule
             if (becameActive)
                 SendA2AActivePair(s, scene);
         }
-        else if (admission.Kind == ProvisionKind.Group
+        else if ((admission.Kind == ProvisionKind.Group || admission.Kind == ProvisionKind.Adhoc)
                  && resp.TryGetString("viewer_session", out string groupVs) && !string.IsNullOrEmpty(groupVs))
         {
             RecordGroupSeatPresent(admission, groupVs, agentID, scene);
@@ -298,8 +311,8 @@ public partial class WebRtcVoiceRegionModule
         return true;
     }
 
-    // True when avatar-to-avatar calls or group voice is switched on.
-    private bool NonSpatialVoiceFeatureOn() => m_a2aVoiceEnabled || m_groupVoice.IsUsable;
+    // True when avatar-to-avatar calls, group voice or conferences are switched on.
+    private bool NonSpatialVoiceFeatureOn() => m_a2aVoiceEnabled || m_groupVoice.IsUsable || m_adhocVoiceEnabled;
 
     // A call request must come from the agent's ROOT region, the same presence rule the close path uses
     // (sp == null || sp.IsChildAgent). A child agent's request is refused before any registry state, but only
@@ -315,9 +328,9 @@ public partial class WebRtcVoiceRegionModule
         return false;
     }
 
-    // Handles the chat session requests the call features answer: the group arm, then the avatar-to-avatar
-    // decision and the shared reply. Returns false when none of them applies, so the stock handler in
-    // ChatSessionRequest answers.
+    // Handles the chat session requests the call features answer: the group and conference arms, then the
+    // avatar-to-avatar decision and the shared reply. Returns false when none of them applies, so the stock
+    // handler in ChatSessionRequest answers.
     private bool TryHandleNonSpatialChatSession(OSDMap reqmap, UUID agentID, ScenePresence sp, Scene scene, IOSHttpResponse response)
     {
         // The body the viewer actually sent, single-line and greppable, before any decision. It never carries a
@@ -334,9 +347,26 @@ public partial class WebRtcVoiceRegionModule
         // replacing the old UUID.Random fallback); "call" mints the per-session token and answers in the
         // HTTP body with voice_credentials { channel_uri, channel_credentials } (llvoicechannel.cpp:687).
         // Nothing in this method admits a multiagent provision; that is decided in ProvisionVoiceAccountRequest.
-        if (!m_a2aVoiceEnabled)
-            return false;   // the stock handler in ChatSessionRequest answers
-        ChatSessionOutcome outcome = ChatSessionRequestLogic.Decide(reqmap, agentID, sp.Name, m_a2aSessions);
+        // "start conference" opens the ad-hoc session and produces the two ids the viewer is waiting on. It is
+        // deliberately not an early return like the group and conference arms: the outcome falls into the shared
+        // tail below, whose Reply path already sends the event-queue ChatterBoxSessionStartReply. One sender for
+        // that event, not two.
+        //
+        // The order of the arms does not matter. The group arms take a "call" only when the voice session-id is a
+        // group the agent belongs to; a conference id is a server-minted random UUID and is never a group id. The
+        // conference arms take it only when the store holds an ad-hoc session with this agent as a member. The two
+        // discriminators are disjoint by construction.
+        if (TryHandleAdhocChatSession(reqmap, agentID, sp, scene, response))
+            return true;
+
+        if (!AdhocVoiceChatSession.TryHandleStartConference(reqmap, agentID, m_nonSpatial,
+                                                            scene.RegionInfo.RegionID, m_adhocVoiceEnabled,
+                                                            out ChatSessionOutcome outcome))
+        {
+            if (!m_a2aVoiceEnabled)
+                return false;   // the stock handler in ChatSessionRequest answers
+            outcome = ChatSessionRequestLogic.Decide(reqmap, agentID, sp.Name, m_a2aSessions);
+        }
 
         m_log.LogDebug("{LogHeader} {Line}", logHeader, outcome.Instrument);
 
@@ -386,13 +416,24 @@ public partial class WebRtcVoiceRegionModule
                     true,
                     string.Empty,
                     agentID);
+
+            // The conference just opened, so ring the invitees the viewer named in `params`.
+            // Fired on the engine's 0 -> 1 seat transition, which for AD-HOC is the creator's own
+            // seat inside Start -- there is no other accept to hang it on. Placed AFTER the re-key
+            // event so a ring failure can never cost the initiator the reply it is blocked on.
+            if (outcome.StartedRinging)
+                RingAdhocMembers(m_nonSpatial?.Store.Get(outcome.Reply.SessionId), agentID, sp.Name, null);
+            // The creator took the first seat inside Start, so the roster exists from
+            // this moment. One entry, the creator's own -- which is what the group path also sends
+            // to an agent opening a voice session (GroupsMessagingModule.cs).
+            SendConferenceRoster(m_nonSpatial?.Store.Get(outcome.Reply.SessionId), agentID, joined: true);
         }
 
         ApplyChatSessionOutcome(outcome, response);
         return true;
     }
 
-    // Reads the avatar-to-avatar and group settings and builds the non-spatial engine.
+    // Reads the avatar-to-avatar, group and conference settings and builds the non-spatial engine.
     private void InitialiseNonSpatial(IConfigSource config)
     {
         m_a2aVoiceEnabled = ReadA2AVoiceEnabled(m_Config);
@@ -418,11 +459,16 @@ public partial class WebRtcVoiceRegionModule
                 m_groupVoice.RequireVoicePower ? " (GP_SESSION_JOIN + GP_SESSION_VOICE)" : " (GP_SESSION_JOIN only)");
         }
 
+        m_adhocVoiceEnabled = ReadAdhocVoiceEnabled(m_Config);
+        if (m_adhocVoiceEnabled)
+            m_log.LogInformation("{LogHeader} ADHOC VOICE enabled ([WebRtcVoice] AdhocVoiceEnabled): "
+                + "\"start conference\" answers with an event-queue ChatterBoxSessionStartReply", logHeader);
+
         // The SAME grid id the room numbers are hashed from, so a room key derived here
         // and a room number derived in the bridge agree across the grid.
         m_nonSpatial = new NonSpatialVoiceSessionEngine(
             m_nonSpatialStore,
-            new INonSpatialAdmission[] { new P2PAdmission(), m_groupVoice.ToAdmissionOrNull() },
+            new INonSpatialAdmission[] { new P2PAdmission(), new AdhocAdmission(), m_groupVoice.ToAdmissionOrNull() },
             JanusAudioBridge.ReadGridId(config),
             limits: ReadNonSpatialLimits(m_Config));
 

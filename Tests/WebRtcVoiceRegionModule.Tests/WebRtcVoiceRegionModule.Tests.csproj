@@ -38,6 +38,13 @@
     <Compile Include="A2ASessionConcurrencyTests.cs" />
     <Compile Include="ProvisionPassthroughTests.cs" />
     <Compile Include="DefaultsChatSessionTests.cs" />
+    <Compile Include="NonSpatialInviteeBoundTests.cs" />
+    <Compile Include="NonSpatialRequestRateTests.cs" />
+    <Compile Include="AdhocConferenceTests.cs" />
+    <Compile Include="AdhocInvitationTests.cs" />
+    <Compile Include="AdhocVoiceTests.cs" />
+    <Compile Include="AdhocConferenceTextTests.cs" />
+    <Compile Include="AdhocChatLifecycleTests.cs" />
     <Compile Include="NonSpatialIdentityTests.cs" />
     <Compile Include="NonSpatialRoomKeyTests.cs" />
     <Compile Include="NonSpatialMembershipTests.cs" />

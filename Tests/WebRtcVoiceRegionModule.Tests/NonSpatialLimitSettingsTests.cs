@@ -34,16 +34,21 @@ namespace osWebRtcVoice.Tests
 
             Assert.That(limits.MaxNonSpatialSessions, Is.EqualTo(5000));
             Assert.That(limits.MaxSessionsPerAgent, Is.EqualTo(20));
+            Assert.That(limits.ConferenceRequestBurst, Is.EqualTo(5));
+            Assert.That(limits.ConferenceRequestRefillSeconds, Is.EqualTo(10));
         }
 
         [Test]
         public void TheKeysSetTheCeilings()
         {
             NonSpatialLimits limits = WebRtcVoiceRegionModule.ReadNonSpatialLimits(
-                Section(("MaxNonSpatialSessions", "250"), ("MaxSessionsPerAgent", "3")));
+                Section(("MaxNonSpatialSessions", "250"), ("MaxSessionsPerAgent", "3"),
+                        ("ConferenceRequestBurst", "8"), ("ConferenceRequestRefillSeconds", "2.5")));
 
             Assert.That(limits.MaxNonSpatialSessions, Is.EqualTo(250));
             Assert.That(limits.MaxSessionsPerAgent, Is.EqualTo(3));
+            Assert.That(limits.ConferenceRequestBurst, Is.EqualTo(8));
+            Assert.That(limits.ConferenceRequestRefillSeconds, Is.EqualTo(2.5));
         }
 
         [TestCase("0")]
@@ -51,10 +56,13 @@ namespace osWebRtcVoice.Tests
         public void AValueBelowOneReadsAsTheDefault(string value)
         {
             NonSpatialLimits limits = WebRtcVoiceRegionModule.ReadNonSpatialLimits(
-                Section(("MaxNonSpatialSessions", value), ("MaxSessionsPerAgent", value)));
+                Section(("MaxNonSpatialSessions", value), ("MaxSessionsPerAgent", value),
+                        ("ConferenceRequestBurst", value), ("ConferenceRequestRefillSeconds", value)));
 
             Assert.That(limits.MaxNonSpatialSessions, Is.EqualTo(5000));
             Assert.That(limits.MaxSessionsPerAgent, Is.EqualTo(20));
+            Assert.That(limits.ConferenceRequestBurst, Is.EqualTo(5));
+            Assert.That(limits.ConferenceRequestRefillSeconds, Is.EqualTo(10));
         }
     }
 }

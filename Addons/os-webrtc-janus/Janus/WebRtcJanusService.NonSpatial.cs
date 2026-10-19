@@ -63,6 +63,7 @@ public partial class WebRtcJanusService
         IConfig voice = _Config?.Configs["WebRtcVoice"];
         return voice is not null
             && (voice.GetBoolean("A2AVoiceEnabled", false)
-                || voice.GetBoolean("GroupVoiceEnabled", false));
+                || voice.GetBoolean("GroupVoiceEnabled", false)
+                || voice.GetBoolean("AdhocVoiceEnabled", false));
     }
 }

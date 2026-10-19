@@ -273,6 +273,45 @@ namespace osWebRtcVoice.Tests
             }
         }
 
+        // ---- ad-hoc conference ------------------------------------------------------------------
+
+        [Test]
+        public async Task Adhoc_ConferenceRoomCreateJoinLeave()
+        {
+            using var region = StockRegion.Create((voice, _) => voice.Set("AdhocVoiceEnabled", "true"));
+            region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
+            region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
+            var engine = region.GetPrivate<NonSpatialVoiceSessionEngine>(region.Region, "m_nonSpatial");
+            UUID regionId = region.Scene.RegionInfo.RegionID;
+
+            var start = new OSDMap
+            {
+                ["method"] = OSD.FromString("start conference"),
+                ["session-id"] = OSD.FromUUID(UUID.Random()),
+                ["params"] = new OSDArray { OSD.FromUUID(Bob) },
+                ["alt_params"] = new OSDMap { ["voice_server_type"] = OSD.FromString("webrtc") },
+            };
+            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(start, Alice, engine, regionId, true, out ChatSessionOutcome started), Is.True);
+            UUID conference = started.Reply.SessionId;
+
+            var callBody = new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(conference) };
+            Assert.That(AdhocVoiceChatSession.TryHandleCall(callBody, Alice, engine, regionId, true, out ChatSessionOutcome aliceCall), Is.True);
+            Assert.That(AdhocVoiceChatSession.TryHandleCall(callBody, Bob, engine, regionId, true, out ChatSessionOutcome bobCall), Is.True);
+            (string channel, string aliceToken) = CredentialsOf(new CapAnswer { Body = aliceCall.Body });
+            (_, string bobToken) = CredentialsOf(new CapAnswer { Body = bobCall.Body });
+
+            using Joined a = await region.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, channel, aliceToken));
+            using Joined b = await region.JoinAsync(Bob, o => StockRegion.MultiagentBody(o, channel, bobToken));
+            Assert.That(a.Answer.Provisioned, Is.True, "conference creator joined: " + a.Answer.Body);
+            Assert.That(b.Answer.Provisioned, Is.True, "invitee joined: " + b.Answer.Body);
+            Assert.That(b.Answer.Room, Is.EqualTo(a.Answer.Room), "one conference room");
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+
+            await region.LogoutAsync(a);
+            await region.LogoutAsync(b);
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True);
+        }
+
         // ---- every switch off ------------------------------------------------------------------
 
         [Test]

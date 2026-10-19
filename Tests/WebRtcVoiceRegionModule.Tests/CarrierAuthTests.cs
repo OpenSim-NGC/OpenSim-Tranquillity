@@ -43,21 +43,18 @@ namespace osWebRtcVoice.Tests
 
         private static NonSpatialVoiceSessionEngine Engine() => NewEngine();
 
-        /// <summary>A group voice session Alice started on engine <paramref name="a"/>.</summary>
-        private static NonSpatialVoiceSession GroupSession(NonSpatialVoiceSessionEngine a)
-        {
-            UUID grp = UUID.Random();
-            return a.Start(NonSpatialSessionType.Group, Alice, grp, grp, RegionA).Session;
-        }
+        /// <summary>A conference Alice started on engine <paramref name="a"/>, with these people invited.</summary>
+        private static NonSpatialVoiceSession Conference(NonSpatialVoiceSessionEngine a, params UUID[] invitees)
+            => a.StartAdhoc(Alice, UUID.Random(), RegionA, invitees).Session;
 
-        private static OSDMap GroupBody(NonSpatialVoiceSessionEngine a, NonSpatialVoiceSession s)
-            => GroupVoiceInvite.BuildBody(s, a.IssueToken(s.SessionId, Alice), Alice, "Test User", "Example Group");
+        private static OSDMap ConferenceBody(NonSpatialVoiceSessionEngine a, NonSpatialVoiceSession s)
+            => AdhocVoiceInvite.BuildBody(s, a.IssueToken(s.SessionId, Alice), Alice, "Test User");
 
         private static GridInstantMessage Ring(UUID target, NonSpatialVoiceSession s, OSDMap body, CarrierAuth auth)
             => GroupVoiceRingTransport.Build(target, Alice, "Test User", s.SessionId, RegionA, body, auth);
 
         private static RingIntake Offer(GridInstantMessage im, CarrierAuth auth, NonSpatialVoiceSessionEngine b)
-            => CarrierIntake.AcceptRing(im, auth, b, groupUsable: true, groupCap: 50);
+            => CarrierIntake.AcceptRing(im, auth, b, groupUsable: true, groupCap: 50, adhocEnabled: true);
 
         /// <summary>Edit the JSON payload of a carrier after it was signed, the way a forger or a hop in the middle could.</summary>
         private static void Rewrite(GridInstantMessage im, string magic, Action<OSDMap> edit)
@@ -89,8 +86,8 @@ namespace osWebRtcVoice.Tests
             Assert.That(off.Seal(new CarrierFields { Kind = CarrierAuth.KindRing }), Is.Null);
 
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            GridInstantMessage im = Ring(Bob, s, GroupBody(a, s), off);
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), off);
             Assert.That(Encoding.UTF8.GetString(im.binaryBucket), Does.Not.Contain(CarrierAuth.AuthKey),
                         "an unsigned build carries no auth block");
         }
@@ -99,9 +96,9 @@ namespace osWebRtcVoice.Tests
         public void WithNoSecretEveryIncomingCarrierIsRefusedAndNothingIsAdopted()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
+            NonSpatialVoiceSession s = Conference(a, Bob);
             // A carrier signed by a region that does have the secret.
-            GridInstantMessage im = Ring(Bob, s, GroupBody(a, s), Auth());
+            GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
 
             NonSpatialVoiceSessionEngine b = Engine();
             CarrierAuth off = CarrierAuth.Off();
@@ -113,6 +110,11 @@ namespace osWebRtcVoice.Tests
             Assert.That(b.Store.All(), Is.Empty);
             Assert.That(off.RefusalCount(CarrierAuth.NoSecret), Is.EqualTo(1));
 
+            NonSpatialVoiceSessionEngine c = Engine();
+            ThreeWayText(c, out _, out NonSpatialVoiceSession sc);
+            TextIntake t = CarrierIntake.AcceptText(Text(sc, Alice, Bob, "hello", Auth()), off, c);
+            Assert.That(t.Ok, Is.False);
+            Assert.That(t.Reason, Is.EqualTo(CarrierAuth.NoSecret));
         }
 
         [Test]
@@ -170,6 +172,23 @@ namespace osWebRtcVoice.Tests
         // ---- a ring ---------------------------------------------------------------------------------
 
         [Test]
+        public void AGenuineConferenceRingIsAcceptedAndTheAcceptIsAdmittedOnTheFarSide()
+        {
+            NonSpatialVoiceSessionEngine a = Engine();
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
+
+            NonSpatialVoiceSessionEngine b = Engine();
+            RingIntake r = Offer(im, Auth(), b);
+
+            Assert.That(r.Ok, Is.True, r.Decision + " " + r.Reason);
+            Assert.That(r.Decision, Is.EqualTo("ring-adopted"));
+            Assert.That(r.Body.ContainsKey(CarrierAuth.AuthKey), Is.False, "the viewer is handed the body without the auth block");
+            Assert.That(b.Store.Get(s.SessionId).RingSent, Is.True);
+            Assert.That(b.Accept(s.SessionId, Bob, RegionB).Ok, Is.True);
+        }
+
+        [Test]
         public void AGenuineGroupRingIsAccepted()
         {
             NonSpatialVoiceSessionEngine a = Engine();
@@ -189,8 +208,8 @@ namespace osWebRtcVoice.Tests
         public void ARingWithNoMacIsRefusedAndAdoptsNothing()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            GridInstantMessage im = Ring(Bob, s, GroupBody(a, s), auth: null);
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), auth: null);
 
             NonSpatialVoiceSessionEngine b = Engine();
             RingIntake r = Offer(im, Auth(), b);
@@ -204,37 +223,43 @@ namespace osWebRtcVoice.Tests
         public void ARingWithAWrongMacIsRefusedAndAdoptsNothing()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
+            NonSpatialVoiceSession s = Conference(a, Bob);
             NonSpatialVoiceSessionEngine b = Engine();
 
             // Signed with a different secret.
-            RingIntake other = Offer(Ring(Bob, s, GroupBody(a, s), Auth(OtherSecret)), Auth(), b);
+            RingIntake other = Offer(Ring(Bob, s, ConferenceBody(a, s), Auth(OtherSecret)), Auth(), b);
             Assert.That(other.Reason, Is.EqualTo(CarrierAuth.BadMac));
 
             // A genuine ring retargeted at someone else.
-            GridInstantMessage im = Ring(Bob, s, GroupBody(a, s), Auth());
+            GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             im.toAgentID = Carol.Guid;
             Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
 
             // A genuine ring whose session id was swapped.
-            im = Ring(Bob, s, GroupBody(a, s), Auth());
+            im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             im.imSessionID = UUID.Random().Guid;
             Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
 
+            // A genuine conference ring turned into a group ring.
+            im = Ring(Bob, s, ConferenceBody(a, s), Auth());
+            Rewrite(im, GroupVoiceRingTransport.BucketMagic,
+                    m => ((OSDMap)m["voice"])["invitation_type"] = OSD.FromInteger(0));
+            Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
+
             // A genuine ring with another credential put in.
-            im = Ring(Bob, s, GroupBody(a, s), Auth());
+            im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             Rewrite(im, GroupVoiceRingTransport.BucketMagic,
                     m => ((OSDMap)m["voice"])["channel_credentials"] = OSD.FromString("swapped"));
             Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
 
             // A garbage MAC.
-            im = Ring(Bob, s, GroupBody(a, s), Auth());
+            im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             Rewrite(im, GroupVoiceRingTransport.BucketMagic,
                     m => ((OSDMap)m[CarrierAuth.AuthKey])["mac"] = OSD.FromString(new string('0', 64)));
             Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.BadMac));
 
             // A MAC that is not hexadecimal at all.
-            im = Ring(Bob, s, GroupBody(a, s), Auth());
+            im = Ring(Bob, s, ConferenceBody(a, s), Auth());
             Rewrite(im, GroupVoiceRingTransport.BucketMagic,
                     m => ((OSDMap)m[CarrierAuth.AuthKey])["mac"] = OSD.FromString("not hex"));
             Assert.That(Offer(im, Auth(), b).Reason, Is.EqualTo(CarrierAuth.MalformedMac));
@@ -246,8 +271,8 @@ namespace osWebRtcVoice.Tests
         public void AStaleRingIsRefusedAndAnAgedButInWindowOneIsNot()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            OSDMap body = GroupBody(a, s);
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            OSDMap body = ConferenceBody(a, s);
             GridInstantMessage im = Ring(Bob, s, body, Auth());
 
             NonSpatialVoiceSessionEngine b = Engine();
@@ -264,8 +289,8 @@ namespace osWebRtcVoice.Tests
         public void ARingIssuedFarInTheFutureIsRefusedButSmallClockSkewIsTolerated()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            OSDMap body = GroupBody(a, s);
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            OSDMap body = ConferenceBody(a, s);
             NonSpatialVoiceSessionEngine b = Engine();
 
             _now = T0 + 500;
@@ -283,8 +308,8 @@ namespace osWebRtcVoice.Tests
         public void AReplayedRingIsRefused()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            GridInstantMessage im = Ring(Bob, s, GroupBody(a, s), Auth());
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
 
             NonSpatialVoiceSessionEngine b = Engine();
             CarrierAuth receiver = Auth();
@@ -299,8 +324,8 @@ namespace osWebRtcVoice.Tests
         public void ARingWithoutARoomKeyIsRefusedEvenWhenItIsSigned()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            OSDMap body = GroupBody(a, s);
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            OSDMap body = ConferenceBody(a, s);
             ((OSDMap)body["voice"]).Remove("channel_uri");
             GridInstantMessage im = Ring(Bob, s, body, Auth());
 
@@ -317,8 +342,8 @@ namespace osWebRtcVoice.Tests
         public void AWrongRoomKeyIsStillRefused()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            OSDMap body = GroupBody(a, s);
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            OSDMap body = ConferenceBody(a, s);
             ((OSDMap)body["voice"])["channel_uri"] = OSD.FromString("not-the-derived-key");
             NonSpatialVoiceSessionEngine b = Engine();
             RingIntake r = Offer(Ring(Bob, s, body, Auth()), Auth(), b);
@@ -331,11 +356,11 @@ namespace osWebRtcVoice.Tests
         public void ARefusedCarrierNeverReachesTheNonceStore()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
+            NonSpatialVoiceSession s = Conference(a, Bob);
             NonSpatialVoiceSessionEngine b = Engine();
             CarrierAuth receiver = Auth();
             for (int i = 0; i < 50; i++)
-                Offer(Ring(Bob, s, GroupBody(a, s), Auth(OtherSecret)), receiver, b);
+                Offer(Ring(Bob, s, ConferenceBody(a, s), Auth(OtherSecret)), receiver, b);
             Assert.That(receiver.NonceCount, Is.EqualTo(0), "only a valid MAC may spend a nonce slot");
         }
 
@@ -361,9 +386,9 @@ namespace osWebRtcVoice.Tests
         public void AForgedRingCannotLatchRingSentOnASessionThisInstanceHolds()
         {
             NonSpatialVoiceSessionEngine b = Engine();
-            NonSpatialVoiceSession mine = GroupSession(b);   // started here
+            NonSpatialVoiceSession mine = Conference(b, Bob);   // started here
             string tokenBefore = b.IssueToken(mine.SessionId, Alice);
-            OSDMap body = GroupBody(b, mine);
+            OSDMap body = ConferenceBody(b, mine);
             // The last seat goes, which ends the ring cycle: the next real call here must ring again.
             b.Depart(mine.SessionId, Alice, DepartureReason.VoiceTeardown);
             Assert.That(mine.RingSent, Is.False);
@@ -382,9 +407,9 @@ namespace osWebRtcVoice.Tests
         public void AGenuineRingNamingASessionStartedHereChangesNothingAboutIt()
         {
             NonSpatialVoiceSessionEngine b = Engine();
-            NonSpatialVoiceSession mine = GroupSession(b);
+            NonSpatialVoiceSession mine = Conference(b, Bob);
             string tokenBefore = b.IssueToken(mine.SessionId, Alice);
-            OSDMap body = GroupBody(b, mine);
+            OSDMap body = ConferenceBody(b, mine);
             ((OSDMap)body["voice"])["channel_credentials"] = OSD.FromString("a-different-credential");
             b.Depart(mine.SessionId, Alice, DepartureReason.VoiceTeardown);   // ends the ring cycle
             Assert.That(mine.RingSent, Is.False);
@@ -399,23 +424,110 @@ namespace osWebRtcVoice.Tests
             Assert.That(mine.WasInvited(Carol), Is.False);
         }
 
+        [Test]
+        public void ASecondGenuineRingMayInviteAnotherTargetIntoAnAdoptedConferenceAndNothingElse()
+        {
+            NonSpatialVoiceSessionEngine a = Engine();
+            NonSpatialVoiceSession s = Conference(a, Bob, Carol);
+            OSDMap body = ConferenceBody(a, s);
+
+            NonSpatialVoiceSessionEngine b = Engine();
+            Assert.That(Offer(Ring(Bob, s, body, Auth()), Auth(), b).Ok, Is.True);
+            NonSpatialVoiceSession adopted = b.Store.Get(s.SessionId);
+            string tokenBefore = adopted.Token;
+            DateTime seenBefore = adopted.LastSeenUtc;
+
+            ((OSDMap)body["voice"])["channel_credentials"] = OSD.FromString("a-different-credential");
+            RingIntake second = Offer(Ring(Carol, s, body, Auth()), Auth(), b);
+
+            Assert.That(second.Ok, Is.True);
+            Assert.That(second.Decision, Is.EqualTo("ring-adopt-idempotent"));
+            Assert.That(adopted.Find(Carol)?.State, Is.EqualTo(MemberState.Invited), "so Carol's accept is admitted here");
+            Assert.That(adopted.WasInvited(Carol), Is.True);
+            Assert.That(adopted.Token, Is.EqualTo(tokenBefore), "the credential is not replaced");
+            Assert.That(adopted.LastSeenUtc, Is.EqualTo(seenBefore));
+            Assert.That(adopted.SeatsHeld, Is.EqualTo(0), "a ring seats nobody");
+        }
+
+        [Test]
+        public void ARingOfTheOtherTypeCannotTouchAnExistingSession()
+        {
+            NonSpatialVoiceSessionEngine b = Engine();
+            UUID id = UUID.Random();
+            b.AdoptRemoteRing(id, NonSpatialRoomKey.Derive("example-grid", NonSpatialSessionType.Adhoc, id), "tok", 50,
+                              Alice, new[] { Bob }, NonSpatialSessionType.Adhoc);
+
+            SessionOutcome o = b.AdoptRemoteRing(id, NonSpatialRoomKey.Derive("example-grid", NonSpatialSessionType.Group, id),
+                                                 "tok2", 50, Alice, new[] { Carol }, NonSpatialSessionType.Group);
+
+            Assert.That(o.Ok, Is.False);
+            Assert.That(b.Store.Get(id).Find(Carol), Is.Null);
+        }
+
+        // ---- conference text -------------------------------------------------------------------------
+
+        /// <summary>Alice's conference with Bob and Carol seated, on one engine.</summary>
+        private static void ThreeWayText(NonSpatialVoiceSessionEngine e, out UUID sessionId, out NonSpatialVoiceSession session)
+        {
+            sessionId = e.StartAdhoc(Alice, UUID.Random(), RegionA, new List<UUID> { Bob, Carol }).Session.SessionId;
+            e.Accept(sessionId, Bob, RegionA, "vs-bob");
+            e.Accept(sessionId, Carol, RegionA, "vs-carol");
+            session = e.Store.Get(sessionId);
+        }
+
+        private static GridInstantMessage Text(NonSpatialVoiceSession s, UUID from, UUID to, string line, CarrierAuth auth,
+                                               string roomKey = "use-session")
+            => AdhocTextTransport.Build(to, from, "Test User", s.SessionId, RegionA, line, null,
+                                        roomKey == "use-session" ? s.RoomKey : roomKey, auth);
+
+        [Test]
+        public void AGenuineTextLineIsAccepted()
+        {
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession s);
+
+            TextIntake t = CarrierIntake.AcceptText(Text(s, Alice, Bob, "hello there", Auth()), Auth(), e);
+
+            Assert.That(t.Ok, Is.True, t.Decision + " " + t.Reason);
+            Assert.That(t.Message, Is.EqualTo("hello there"));
+            Assert.That(t.Sender, Is.EqualTo(Alice));
+            Assert.That(t.Target, Is.EqualTo(Bob));
+        }
+
         // ---- the accepted-carrier log line --------------------------------------------------------
+
+        [Test]
+        public void AnAcceptedTextLineIsMarkedAuthenticatedAndNamesItsOrigin()
+        {
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession s);
+
+            TextIntake t = CarrierIntake.AcceptText(Text(s, Alice, Bob, "hello there", Auth()), Auth(), e);
+
+            Assert.That(t.Authenticated, Is.True);
+            Assert.That(t.OriginRegion, Is.EqualTo(RegionA));
+            string line = CarrierAuth.AcceptedLine(CarrierAuth.KindText, t.SessionId, NonSpatialSessionType.Adhoc, t.OriginRegion);
+            Assert.That(line, Does.Contain("kind=text"));
+            Assert.That(line, Does.Contain("session=" + s.SessionId));
+            Assert.That(line, Does.Contain("type=Adhoc"));
+            Assert.That(line, Does.Contain("from=" + RegionA));
+            Assert.That(line, Does.Not.Contain("hello there"), "contents never reach the log");
+        }
 
         [Test]
         public void AnAcceptedRingCarriesItsTypeAndOrigin()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            GridInstantMessage im = Ring(Bob, s, GroupBody(a, s), Auth());
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            GridInstantMessage im = Ring(Bob, s, ConferenceBody(a, s), Auth());
 
             RingIntake r = Offer(im, Auth(), Engine());
 
             Assert.That(r.Authenticated, Is.True);
-            Assert.That(r.Type, Is.EqualTo(NonSpatialSessionType.Group));
+            Assert.That(r.Type, Is.EqualTo(NonSpatialSessionType.Adhoc));
             Assert.That(r.OriginRegion, Is.EqualTo(RegionA));
             string line = CarrierAuth.AcceptedLine(CarrierAuth.KindRing, r.GroupId, r.Type, r.OriginRegion);
             Assert.That(line, Does.Contain("kind=ring"));
-            Assert.That(line, Does.Contain("type=Group"));
             Assert.That(line, Does.Contain("session=" + s.SessionId));
             Assert.That(line, Does.Contain("from=" + RegionA));
         }
@@ -424,9 +536,115 @@ namespace osWebRtcVoice.Tests
         public void ARefusedCarrierIsNotMarkedAuthenticated()
         {
             NonSpatialVoiceSessionEngine a = Engine();
-            NonSpatialVoiceSession s = GroupSession(a);
-            GridInstantMessage forged = Ring(Bob, s, GroupBody(a, s), Auth(OtherSecret));
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            GridInstantMessage forged = Ring(Bob, s, ConferenceBody(a, s), Auth(OtherSecret));
             Assert.That(Offer(forged, Auth(), Engine()).Authenticated, Is.False);
+
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession ts);
+            Assert.That(CarrierIntake.AcceptText(Text(ts, Alice, Bob, "forged", null), Auth(), e).Authenticated, Is.False);
+        }
+
+        [Test]
+        public void ATextLineWithNoMacIsRefused()
+        {
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession s);
+
+            TextIntake t = CarrierIntake.AcceptText(Text(s, Alice, Bob, "forged", null), Auth(), e);
+
+            Assert.That(t.Ok, Is.False);
+            Assert.That(t.Reason, Is.EqualTo(CarrierAuth.MissingMac));
+        }
+
+        [Test]
+        public void ATextLineSignedWithAnotherSecretIsRefused()
+        {
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession s);
+            Assert.That(CarrierIntake.AcceptText(Text(s, Alice, Bob, "forged", Auth(OtherSecret)), Auth(), e).Reason,
+                        Is.EqualTo(CarrierAuth.BadMac));
+        }
+
+        [Test]
+        public void AForgedTextBodyOrSenderIsRefused()
+        {
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession s);
+
+            // Words put in a signed line.
+            GridInstantMessage im = Text(s, Alice, Bob, "meet at noon", Auth());
+            Rewrite(im, AdhocTextTransport.BucketMagic, m => m[AdhocTextTransport.KeyMessage] = OSD.FromString("send me money"));
+            TextIntake edited = CarrierIntake.AcceptText(im, Auth(), e);
+            Assert.That(edited.Ok, Is.False);
+            Assert.That(edited.Reason, Is.EqualTo(CarrierAuth.BadMac));
+
+            // A signed line attributed to another member.
+            im = Text(s, Alice, Bob, "meet at noon", Auth());
+            im.fromAgentID = Carol.Guid;
+            Assert.That(CarrierIntake.AcceptText(im, Auth(), e).Reason, Is.EqualTo(CarrierAuth.BadMac));
+
+            // A signed line aimed at another member.
+            im = Text(s, Alice, Bob, "meet at noon", Auth());
+            im.toAgentID = Carol.Guid;
+            Assert.That(CarrierIntake.AcceptText(im, Auth(), e).Reason, Is.EqualTo(CarrierAuth.BadMac));
+        }
+
+        [Test]
+        public void AStaleOrReplayedTextLineIsRefused()
+        {
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession s);
+            GridInstantMessage im = Text(s, Alice, Bob, "once", Auth());
+            CarrierAuth receiver = Auth();
+
+            Assert.That(CarrierIntake.AcceptText(im, receiver, e).Ok, Is.True);
+            Assert.That(CarrierIntake.AcceptText(im, receiver, e).Reason, Is.EqualTo(CarrierAuth.Replay));
+
+            GridInstantMessage old = Text(s, Alice, Bob, "old", Auth());
+            _now = T0 + 1000;
+            Assert.That(CarrierIntake.AcceptText(old, Auth(), e).Reason, Is.EqualTo(CarrierAuth.Stale));
+        }
+
+        [Test]
+        public void ASignedTextLineWithAMissingOrWrongRoomKeyIsRefused()
+        {
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession s);
+
+            TextIntake missing = CarrierIntake.AcceptText(Text(s, Alice, Bob, "hi", Auth(), roomKey: ""), Auth(), e);
+            Assert.That(missing.Ok, Is.False);
+            Assert.That(missing.Decision, Is.EqualTo(CarrierIntake.DecisionRoomKeyMismatch));
+
+            TextIntake wrong = CarrierIntake.AcceptText(Text(s, Alice, Bob, "hi", Auth(), roomKey: "other"), Auth(), e);
+            Assert.That(wrong.Ok, Is.False);
+            Assert.That(wrong.Decision, Is.EqualTo(CarrierIntake.DecisionRoomKeyMismatch));
+        }
+
+        [Test]
+        public void ASignedLineFromANonMemberIsStillRefused()
+        {
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession s);
+            UUID stranger = new UUID("99999999-9999-9999-9999-999999999999");
+
+            TextIntake t = CarrierIntake.AcceptText(Text(s, stranger, Bob, "hi", Auth()), Auth(), e);
+
+            Assert.That(t.Ok, Is.False);
+            Assert.That(t.Decision, Is.EqualTo(AdhocTextSession.DecisionNotMember));
+        }
+
+        [Test]
+        public void ARingIsNotReadAsTextAndTextIsNotReadAsARing()
+        {
+            NonSpatialVoiceSessionEngine a = Engine();
+            NonSpatialVoiceSession s = Conference(a, Bob);
+            GridInstantMessage ring = Ring(Bob, s, ConferenceBody(a, s), Auth());
+            Assert.That(CarrierIntake.AcceptText(ring, Auth(), a).Claimed, Is.False);
+
+            NonSpatialVoiceSessionEngine e = Engine();
+            ThreeWayText(e, out _, out NonSpatialVoiceSession ts);
+            Assert.That(Offer(Text(ts, Alice, Bob, "hi", Auth()), Auth(), e).Claimed, Is.False);
         }
     }
 }

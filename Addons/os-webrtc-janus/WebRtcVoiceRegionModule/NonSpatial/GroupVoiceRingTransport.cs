@@ -146,8 +146,8 @@ namespace osWebRtcVoice.NonSpatial
         }
 
         /// <summary>
-        /// What a ring is about, read from the invitation body the viewer will receive: the session type,
-        /// the room key, the credential and the caller.
+        /// What a ring is about, read from the invitation body the viewer will receive: the session type
+        /// (invitation_type tells a conference from a group), the room key, the credential and the caller.
         /// The sender signs these and the receiver verifies and adopts the same values, so the two sides
         /// cannot disagree about what was signed.
         /// </summary>
@@ -158,7 +158,10 @@ namespace osWebRtcVoice.NonSpatial
             roomKey = voice is not null && voice.TryGetString("channel_uri", out string ru) ? ru : null;
             credential = voice is not null && voice.TryGetString("channel_credentials", out string tk) ? tk : null;
             body.TryGetUUID("from_id", out caller);
-            type = NonSpatialSessionType.Group;
+            bool isConference = voice is not null
+                                && voice.TryGetValue("invitation_type", out OSD invType)
+                                && invType.AsInteger() == AdhocVoiceInvite.InvitationTypeConference;
+            type = isConference ? NonSpatialSessionType.Adhoc : NonSpatialSessionType.Group;
         }
 
         /// <summary>The fields a ring's MAC covers.</summary>

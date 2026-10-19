@@ -47,6 +47,13 @@ namespace osWebRtcVoice
         /// so anything that reads <c>Session</c> must never see this kind.
         /// </summary>
         Group,
+        /// <summary>
+        /// An AD-HOC CONFERENCE provision. Distinct from <see cref="Group"/> for the same
+        /// reason Group is distinct from <see cref="Multiagent"/> -- it carries no
+        /// <see cref="A2ASession"/>, and the kind is what the post-provision bookkeeping switches on.
+        /// Sharing Group's value would also make a conference seat log itself as a group seat.
+        /// </summary>
+        Adhoc,
     }
 
     public sealed class ProvisionAdmission

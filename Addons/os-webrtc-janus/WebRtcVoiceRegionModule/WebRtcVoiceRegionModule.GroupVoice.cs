@@ -199,10 +199,10 @@ public partial class WebRtcVoiceRegionModule
     /// </summary>
     private void OnIncomingGroupRing(GridInstantMessage msg)
     {
-        if (m_nonSpatial is null || !m_groupVoice.IsUsable)
+        if (m_nonSpatial is null || (!m_groupVoice.IsUsable && !m_adhocVoiceEnabled))
             return;
         RingIntake ring = CarrierIntake.AcceptRing(msg, m_carrierAuth, m_nonSpatial, m_groupVoice.IsUsable,
-                                                   m_groupVoice.Cap);
+                                                   m_groupVoice.Cap, m_adhocVoiceEnabled);
         if (!ring.Claimed)
             return;   // not ours: every other subscriber still sees it untouched
         if (ring.Authenticated)
@@ -355,7 +355,7 @@ public partial class WebRtcVoiceRegionModule
         scene.EventManager.OnIncomingInstantMessage += OnIncomingGroupRing;
     }
 
-    // The presence backstop for seats: a root close releases the agent's group seats.
+    // The presence backstop for seats: a root close releases the agent's group and conference seats.
     private void ReleaseSeatsOnClientClosed(Scene scene, UUID clientID, Scene s)
     {
         // A ROOT presence closing releases the agent's group seats too. Same guard as
@@ -369,17 +369,21 @@ public partial class WebRtcVoiceRegionModule
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
                 GroupVoiceChatSession.Line(clientID, gone.Owner, "group-seat-released-client-closed",
                     $"room={gone.RoomKey} region={s?.Name ?? scene.Name} seats={gone.SeatsHeld}/{gone.Cap}"));
+            // The presence backstop is a departure like any other, so the
+            // conference roster has to lose the name here too -- otherwise a crashed member
+            // sits in everyone's panel until the idle TTL.
+            SendConferenceRoster(gone, clientID, joined: false);
         }
     }
 
-    // Admits or refuses a group provision: a "multiagent" body whose channel is one of our room keys.
+    // Admits or refuses a group or conference provision: a "multiagent" body whose channel is one of our room keys.
     // Writes the refusal and returns false when it is not admitted.
     private bool TryAdmitGroupProvision(OSDMap map, UUID agentID, Scene scene, IOSHttpResponse response,
         out ProvisionAdmission admission)
     {
         admission = null;
         NonSpatialProvisionResult g = NonSpatialProvisionAdmission.Decide(
-            map, agentID, m_groupVoice, m_nonSpatial, scene.RegionInfo.RegionID);
+            map, agentID, m_groupVoice, m_nonSpatial, scene.RegionInfo.RegionID, m_adhocVoiceEnabled);
         map.TryGetString("channel", out string gch);
         m_log.LogDebug("{LogHeader} {Line}", logHeader,
             NonSpatialProvisionAdmission.Line(agentID, scene.Name, gch,
@@ -398,7 +402,9 @@ public partial class WebRtcVoiceRegionModule
         // Nothing below this line knows or needs to know that it was a group.
         admission = new ProvisionAdmission
         {
-            Kind = ProvisionKind.Group,
+            // The kind follows the type of the voice session, so a conference seat is never logged or
+            // torn down as a group one.
+            Kind = g.Session?.Type == NonSpatialSessionType.Adhoc ? ProvisionKind.Adhoc : ProvisionKind.Group,
             Decision = g.Decision,
             ChannelType = A2AProvisionAdmission.ChannelTypeMultiagent,
             Channel = gch ?? "-",
@@ -413,17 +419,23 @@ public partial class WebRtcVoiceRegionModule
         // first moment the seat can be tagged with it -- and tagging it is what makes the
         // logout teardown able to find the seat later (DepartByViewerSession). Also promotes
         // Accepted -> Present: the agent is now actually in the mixer room.
+        //
+        // Ad-hoc takes this SAME arm, and it has to. Leaving conferences out would
+        // repeat the exact defect found for groups -- a hang-up holding its seat until
+        // the 8 h idle TTL, with the cap load-bearing.
         NonSpatialVoiceSession gsess = m_nonSpatial?.Store.GetByRoomKey(admission.Channel);
         if (gsess is not null)
         {
             SessionOutcome pres = m_nonSpatial.MarkPresent(gsess.SessionId, agentID, scene.RegionInfo.RegionID, groupVs);
+            bool conf = gsess.Type == NonSpatialSessionType.Adhoc;
             string detail = $"room={admission.Channel} seats={m_nonSpatial.Store.Get(gsess.SessionId)?.SeatsHeld}/{gsess.Cap}";
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
-                GroupVoiceChatSession.Line(agentID, gsess.Owner, "group-present-" + pres.Decision, detail));
+                conf ? AdhocVoiceChatSession.Line(agentID, gsess.SessionId, "adhoc-present-" + pres.Decision, detail)
+                     : GroupVoiceChatSession.Line(agentID, gsess.Owner, "group-present-" + pres.Decision, detail));
         }
     }
 
-    // A voice teardown releases the group seats held under that viewer session.
+    // A voice teardown releases the group and conference seats held under that viewer session.
     private void ReleaseGroupSeatsOnLogout(UUID agentID, string a2aVs)
     {
         // The SAME teardown releases a group seat. Before this, the logout arm knew
@@ -435,9 +447,19 @@ public partial class WebRtcVoiceRegionModule
                  m_nonSpatial?.DepartByViewerSession(agentID, a2aVs, DepartureReason.VoiceTeardown)
                  ?? (IReadOnlyList<NonSpatialVoiceSession>)Array.Empty<NonSpatialVoiceSession>())
         {
+            // The same teardown already covered conferences -- DepartByViewerSession is
+            // type-blind and always was -- but it logged every release as a group one. The
+            // line now names what actually ended.
             string releaseDetail = $"room={gone.RoomKey} viewer_session={a2aVs} seats={gone.SeatsHeld}/{gone.Cap}";
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
-                GroupVoiceChatSession.Line(agentID, gone.Owner, "group-seat-released", releaseDetail));
+                gone.Type == NonSpatialSessionType.Adhoc
+                    ? AdhocVoiceChatSession.Line(agentID, gone.SessionId, "adhoc-seat-released", releaseDetail)
+                    : GroupVoiceChatSession.Line(agentID, gone.Owner, "group-seat-released", releaseDetail));
+            // The voice teardown deliberately sends no roster LEAVE: that would
+            // conflate lifecycles (3) and (1), because hanging up would take the member out of everyone's
+            // participant panel although they were still in the conversation and could still
+            // type. The seat is released above; the roster is deliberately NOT touched. The
+            // member leaves the roster only on a chat leave (dialog 18) or a presence close.
         }
     }
 

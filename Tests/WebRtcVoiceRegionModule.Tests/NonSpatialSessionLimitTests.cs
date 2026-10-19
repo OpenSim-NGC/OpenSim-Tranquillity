@@ -161,5 +161,25 @@ namespace osWebRtcVoice.Tests
             Assert.That(dropped, Is.EqualTo(1), "Alice was last seen 11 minutes ago, Bob half a minute ago");
             Assert.That(gate.ShouldLog(Bob, t0.AddMinutes(11)), Is.False, "Bob is still remembered");
         }
+
+        [Test]
+        public void TheConferenceHandlerAnswersACapRefusalWithForbiddenAndItsDecisionWord()
+        {
+            NonSpatialVoiceSessionEngine e = NewEngine(limits: Limits(global: 100, perAgent: 1));
+            OSDMap Start(UUID temp) => new OSDMap
+            {
+                ["method"] = "start conference",
+                ["session-id"] = temp,
+                ["params"] = new OSDArray { OSD.FromUUID(Bob) },
+            };
+            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(Start(UUID.Random()), Alice, e, RegionA, true, out _), Is.True);
+
+            Assert.That(AdhocVoiceChatSession.TryHandleStartConference(Start(UUID.Random()), Alice, e, RegionA, true,
+                out ChatSessionOutcome outcome), Is.True);
+
+            Assert.That(outcome.Status, Is.EqualTo(HttpStatusCode.Forbidden));
+            Assert.That(outcome.Reply, Is.Null);
+            Assert.That(outcome.Instrument, Does.Contain("decision=adhoc-refused-" + SessionOutcome.AgentSessionCap));
+        }
     }
 }

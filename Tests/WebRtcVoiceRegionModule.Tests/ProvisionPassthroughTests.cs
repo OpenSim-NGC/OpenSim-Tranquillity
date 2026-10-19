@@ -9,7 +9,7 @@
  * With no avatar-to-avatar, group or conference feature switched on, a provision whose channel_type is "multiagent" or
  * absent is answered as it was before those features existed: it goes to the voice service unexamined (a room for the
  * multiagent body, an empty answer for the body with no channel_type). Any other channel type is refused 403, where
- * the voice service threw and the request answered 500. With a feature on, the registry decides and an unknown
+ * the voice service threw and the request answered 500. With any of the features on, the registry decides and an unknown
  * channel, or any other channel type, is refused 403.
  */
 
@@ -122,6 +122,7 @@ namespace osWebRtcVoice.Tests
         }
 
         [TestCase("m_a2aVoiceEnabled")]
+        [TestCase("m_adhocVoiceEnabled")]
         public void X3b_WithAFeatureOn_AnotherChannelType_IsRefused(string field)
         {
             var (mod, scene, svc) = Harness(m => Set(m, field, true));
@@ -133,6 +134,7 @@ namespace osWebRtcVoice.Tests
         }
 
         [TestCase("m_a2aVoiceEnabled")]
+        [TestCase("m_adhocVoiceEnabled")]
         public void X4_WithAFeatureOn_AMultiagentProvisionForAnUnknownChannel_IsRefused(string field)
         {
             var (mod, scene, svc) = Harness(m => Set(m, field, true));
