@@ -28,6 +28,10 @@
     <Compile Include="PeerCtlBatchSerializer.cs" />
     <Compile Include="PeerCtlBatchPartitioner.cs" />
     <Compile Include="PeerCtlBatchSplitter.cs" />
+    <Compile Include="PositionTypes.cs" />
+    <Compile Include="PositionTolerance.cs" />
+    <Compile Include="PositionBatchSerializer.cs" />
+    <Compile Include="VoicePositionFeeder.cs" />
   </ItemGroup>
 
 </Project>
