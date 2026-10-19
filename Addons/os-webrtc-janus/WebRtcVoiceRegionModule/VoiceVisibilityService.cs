@@ -68,6 +68,8 @@ namespace osWebRtcVoice
         private readonly int m_heartbeatIntervalMs;   // [WebRtcVoice] VisibilityHeartbeatMs (default 1000)
         private readonly bool m_armingEnabled;    // [WebRtcVoice] VisibilityArmingEnabled (default false)
         private VisAuthority m_authority;         // one per StartLoop, so a new epoch per feeder start
+        private readonly PositionSettings m_positionSettings;   // null = the position feed is off: nothing is built, read or sent
+        private VoicePositionPump m_positions;    // built in StartLoop when the feed is on and a Janus sink exists
 
         // The sink is passed in directly (NOT resolved via scene.RequestModuleInterface): the sink
         // and the sender live in this module's AssemblyLoadContext, so IPeerCtlBatchSink identity
@@ -76,10 +78,11 @@ namespace osWebRtcVoice
         // is tolerated — the sender runs matrix-only and logs once.
         public VoiceVisibilityService(Scene scene, int cadenceMs, bool emitEnabled = false,
             IPeerCtlBatchSink sink = null, TimeSpan? adminTimeout = null, bool armingEnabled = false,
-            int heartbeatIntervalMs = VisAuthority.DefaultHeartbeatIntervalMs)
+            int heartbeatIntervalMs = VisAuthority.DefaultHeartbeatIntervalMs, PositionSettings positions = null)
         {
             m_armingEnabled = armingEnabled;
             m_heartbeatIntervalMs = heartbeatIntervalMs;
+            m_positionSettings = positions;
             m_scene = scene;
             m_cadenceMs = cadenceMs;
             m_emitEnabled = emitEnabled;
@@ -181,6 +184,8 @@ namespace osWebRtcVoice
             m_sender = new VisibilityBatchSender(m_feeder, m_sink, m_emitEnabled,
                 m_adminTimeout, m_scene.RegionInfo.RegionName, authority: authority, resolveRoom: resolveRoom);
 
+            StartPositionFeed();
+
             m_running = true;
             // Register with the OpenSim Watchdog so a dead or non-heartbeating tick thread is
             // reported instead of failing silently. StartThread creates, names, registers, and
@@ -215,6 +220,26 @@ namespace osWebRtcVoice
             else if (m_armingEnabled)
                 m_log.LogWarning($"{logHeader} [WebRtcVoice] VisibilityArmingEnabled is true but {m_scene.RegionInfo.RegionName} has no Janus " +
                     $"peer_ctl sink (emission off or admin config missing): arming is inactive");
+        }
+
+        // Builds the position feed when it is switched on and there is a Janus sink to send through. With the feed
+        // off no pump exists, so nothing is read from the scene or posted for it.
+        private void StartPositionFeed()
+        {
+            if (m_positionSettings is null)
+                return;
+            if (!m_emitEnabled || !(m_sink is JanusPeerCtlBatchSink positionSink))
+            {
+                m_log.LogWarning($"{logHeader} position feed is on but {m_scene.RegionInfo.RegionName} has no Janus peer_ctl sink " +
+                    "(emission off or admin config missing): positions are not sent");
+                return;
+            }
+            // The physics engine's own limit, in cm/s; zero when the engine declares none.
+            Func<double> engineMaxCmS = () => (m_scene.PhysicsScene?.MaximumLinearVelocity ?? 0f) * 100.0;
+            m_positions = new VoicePositionPump(m_world, positionSink, m_positionSettings, ResolveRoom, engineMaxCmS,
+                m_scene.RegionInfo.RegionName);
+            m_log.LogInformation($"{logHeader} position feed started for {m_scene.RegionInfo.RegionName} every {m_positionSettings.TickMs} ms; " +
+                $"positions are sent once the mixer advertises vis_protocol {VisAuthority.PositionProtocol}");
         }
 
         /// The mixer room each agent's latest successful provision joined, as a resolver for
@@ -370,6 +395,9 @@ namespace osWebRtcVoice
                 // snapshot-on-a-quiet-tick still get a chance.
                 if (batch != null)
                     m_sender?.Pump(batch);
+                // Positions ride the same thread: the scene walk is only ever done here. Does nothing unless the feed
+                // is on and the mixer has advertised the protocol that carries it.
+                m_positions?.OnFeederTick();
                 // The heartbeat does NOT ride this tick -- OnHeartbeatTimer owns it. This
                 // loop's only remaining duty to liveness is to stamp when it last completed, which the heartbeat
                 // reports as feed_age_ms and the mixer judges.

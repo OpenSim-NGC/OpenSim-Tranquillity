@@ -101,6 +101,7 @@
     <Compile Include="VoiceModerationMuteConsoleTests.cs" />
     <Compile Include="VisibilityDefaultsTests.cs" />
     <Compile Include="VisibilityArmingDefaultsTests.cs" />
+    <Compile Include="PositionFeedConfigTests.cs" />
     <Compile Include="VoiceFeatureSwitchTests.cs" />
     <Compile Include="StockModerationTests.cs" />
     <Compile Include="CallMuteEnforcementTests.cs" />

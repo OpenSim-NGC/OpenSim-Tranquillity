@@ -87,6 +87,10 @@ namespace osWebRtcVoice
         /// <summary>The reply vis_protocol at which the mixer understands peer_ctl_heartbeat.</summary>
         public const int HeartbeatProtocol = 2;
 
+        /// <summary>The reply vis_protocol at which the mixer understands peer_pos, the sim's report of where each
+        /// participant really is.</summary>
+        public const int PositionProtocol = 3;
+
         /// <summary>A re-arm request for an agent that never shows up in the population is dropped after this long.</summary>
         public const int RearmRequestTtlMs = 60000;
 

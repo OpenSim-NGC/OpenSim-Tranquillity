@@ -25,7 +25,7 @@ using OpenSim.Region.Framework.Scenes;
 
 namespace osWebRtcVoice
 {
-    public sealed class FeederWorldFromScene : IFeederWorld
+    public sealed class FeederWorldFromScene : IFeederWorld, IPositionWorld
     {
         // Unknown/absent parcel: benign (visible, voice-on, no bans) so an unresolved parcel
         // never spuriously hides or mutes. SeeAVs=true is important - default(ParcelView) would
@@ -106,6 +106,53 @@ namespace osWebRtcVoice
             => land is null || (land.Flags & (uint)ParcelFlags.UseEstateVoiceChan) != 0
                 ? JanusAudioBridge.REGION_ROOM_ID
                 : land.LocalID;
+
+        /// <summary>Where every presence that holds a voice session in this region is, in global centimetres, with the
+        /// sim's own speed for it. Same population as <see cref="SnapshotAgents"/>. A child agent's position is the one
+        /// its root region last sent across (already in this region's frame), and its velocity is not kept, so none is
+        /// given for it.</summary>
+        public IReadOnlyList<PositionView> SnapshotPositions()
+        {
+            var views = new List<PositionView>();
+            UUID regionId = m_scene.RegionInfo.RegionID;
+            uint worldLocX = m_scene.RegionInfo.WorldLocX;
+            uint worldLocY = m_scene.RegionInfo.WorldLocY;
+            m_scene.ForEachScenePresence(sp =>
+            {
+                if (!VoiceViewerSession.IsAgentInRegion(regionId, sp.UUID))
+                    return;
+                Vector3? seatedOn = null;
+                if (!sp.IsChildAgent && sp.IsSatOnObject)
+                {
+                    SceneObjectPart root = sp.ParentPart?.ParentGroup?.RootPart;
+                    if (root != null)
+                        seatedOn = root.Velocity;
+                }
+                views.Add(ToPositionView(sp.UUID, sp.IsChildAgent, worldLocX, worldLocY, sp.AbsolutePosition,
+                    sp.IsChildAgent ? Vector3.Zero : sp.Velocity, seatedOn));
+            });
+            return views;
+        }
+
+        /// <summary>One presence as the position feed sees it: its position in the global centimetres a viewer reports its
+        /// own position in, and its speed from the avatar's velocity or that of what it sits on.</summary>
+        public static PositionView ToPositionView(UUID id, bool isChild, uint worldLocX, uint worldLocY,
+            Vector3 position, Vector3 velocity, Vector3? seatedOnVelocity)
+        {
+            (int x, int y, int z) = GlobalCentimetres(worldLocX, worldLocY, position);
+            return new PositionView(id, isChild, x, y, z, PositionTolerance.SpeedCmS(velocity, seatedOnVelocity));
+        }
+
+        /// <summary>A position in EXACTLY the frame a viewer sends in SLData: global centimetres as integers,
+        /// (region global origin + region-local position) x 100. The viewer builds its "sp" as
+        /// (int)(getPositionGlobal() * 100), and the mixer only ever uses differences, so a position in any other
+        /// frame (region-local metres above all) is kilometres from every avatar. The origin is
+        /// RegionInfo.WorldLocX/Y in metres, which holds for a var region too: its origin is its south-west corner.
+        /// Truncation toward zero, as the viewer's (int) cast. Z has no origin.</summary>
+        public static (int X, int Y, int Z) GlobalCentimetres(uint worldLocX, uint worldLocY, Vector3 position)
+            => ((int)((worldLocX + (double)position.X) * 100.0),
+                (int)((worldLocY + (double)position.Y) * 100.0),
+                (int)((double)position.Z * 100.0));
 
         public ParcelView GetParcelAt(Vector3 position)
             => ToParcelView(m_scene.LandChannel?.GetLandObject(position.X, position.Y));

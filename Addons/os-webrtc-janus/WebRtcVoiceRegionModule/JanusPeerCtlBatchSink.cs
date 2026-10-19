@@ -48,7 +48,7 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice
 {
-    public sealed class JanusPeerCtlBatchSink : IPeerCtlBatchSink, IPeerCtlHeartbeatSink, IDisposable
+    public sealed class JanusPeerCtlBatchSink : IPeerCtlBatchSink, IPeerCtlHeartbeatSink, IPeerPosSink, IDisposable
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
         // Reused empty excl collection for a room that has only mute changes this op.
@@ -82,6 +82,9 @@ namespace osWebRtcVoice
         // (not done here). _lastSendRooms below is the room UNION (rooms addressed by either channel).
         private volatile int _lastSendMuteFallbackListeners;
         private volatile int _lastSendMuteFallbackSources;
+
+        // The vis_protocol last advertised by the mixer; see MixerVisProtocol.
+        private volatile int _mixerVisProtocol;
 
         // Inner-reply stats for the most recent send, summed across rooms (see LastSendStats).
         // Volatile ints mirror the LastSend* pattern above; SendAsync is single-flight from the sender.
@@ -199,6 +202,41 @@ namespace osWebRtcVoice
             MuteEntries = _statMuteEntries,
             Anomalies = _statAnomalies,
         };
+
+        /// <summary>The vis_protocol the mixer advertised in its latest reply to a peer_ctl request, or 0 when it has
+        /// not yet advertised one (no reply seen, or an older mixer whose replies carry none). The position feed sends
+        /// nothing until this reaches <see cref="VisAuthority.PositionProtocol"/>.</summary>
+        public int MixerVisProtocol => _mixerVisProtocol;
+
+        /// <summary>Send one peer_pos body, stamped with the room epoch when the region runs with arming. True when the
+        /// transport succeeded. Never throws.</summary>
+        public async Task<bool> SendPositionsAsync(OSDMap body)
+        {
+            VisAuthority authority = Authority;
+            if (authority != null)
+                body["room_epoch"] = OSD.FromString(authority.EpochString);
+            try
+            {
+                (AdminSendResult admin, string _) = await _sendOne(body).ConfigureAwait(false);
+                return admin == AdminSendResult.Ok;
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning(e, "{LogHeader} region {RegionName}: peer_pos send failed", LogHeader, _region);
+                return false;
+            }
+        }
+
+        // Remember the protocol version a reply advertises. A successful reply with no version is an older
+        // mixer; a reply that carries no inner object at all (an error, or a transport that returns none) says
+        // nothing and leaves what was learned.
+        private void ObserveProtocol(in SlvoiceReply reply)
+        {
+            if (reply.Present && reply.VisProtocol > 0)
+                _mixerVisProtocol = reply.VisProtocol;
+            else if (reply.Present && string.Equals(reply.Status, "applied", StringComparison.Ordinal))
+                _mixerVisProtocol = 0;
+        }
 
         public void Dispose()
         {
@@ -424,7 +462,10 @@ namespace osWebRtcVoice
                 return false;
             }
             bool ok = admin == AdminSendResult.Ok;
-            Authority?.OnHeartbeatOutcome(ok, ok ? VisAuthority.ParseHeartbeatReply(reply) : new VisAuthority.HeartbeatReply());
+            VisAuthority.HeartbeatReply parsed = ok ? VisAuthority.ParseHeartbeatReply(reply) : new VisAuthority.HeartbeatReply();
+            if (parsed.IsHeartbeat && parsed.VisProtocol > 0)
+                _mixerVisProtocol = parsed.VisProtocol;
+            Authority?.OnHeartbeatOutcome(ok, parsed);
             return ok;
         }
 
@@ -468,6 +509,7 @@ namespace osWebRtcVoice
             if (admin == AdminSendResult.Ok)   // only a janus:"success" carries an inner slvoice reply
             {
                 reply = ParseInnerReply(body);
+                ObserveProtocol(in reply);
                 int room = request.TryGetValue("room", out OSD ro) ? ro.AsInteger() : 0;
                 LogReply(room, in reply);
             }

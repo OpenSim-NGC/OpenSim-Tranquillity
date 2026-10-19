@@ -149,6 +149,16 @@
     ; both visibility keys above.
     ;VisibilityArmingEnabled = false
 
+    ; Position feed: the region tells the mixer where each voice participant really is (its position, a speed
+    ; allowance and a tolerance), so a viewer's own claim of its position can be compared with it. Default:
+    ; false, and nothing is computed or sent. Needs VisibilityFeederEnabled and VisibilityEmitEnabled, and a
+    ; mixer that advertises vis_protocol 3; an older mixer is sent nothing. Mixer only: on the stock plugin
+    ; it logs one warning and is turned off.
+    ;PositionFeedEnabled = false
+    ; observe or enforce. Default: observe (the mixer counts what it would change and changes nothing).
+    ; enforce is accepted but not active yet; positions are sent in observe mode.
+    ;PositionFeedMode = observe
+
     ; Parcel voice moderation (the SpatialVoiceModerationRequest capability and the voice moderation
     ; console commands). Default: false. With the slvoice mixer it needs VisibilityFeederEnabled. With the stock
     ; AudioBridge a mute is the plugin's own mute of that participant in its room (a mute-all is remembered per
