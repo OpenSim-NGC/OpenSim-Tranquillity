@@ -40,7 +40,9 @@ namespace OpenSim.Framework;
 /// </summary>
 /// <remarks>
 /// Every name is looked up through the operating system resolver, so the hosts file and the system's
-/// resolver settings decide the answer; no DNS query is sent by this class. An answer is kept until a
+/// resolver settings decide the answer; no DNS query is sent by this class. When a <see cref="DnsAddressQuery"/>
+/// is given (the [ViewerAddress] DnsServers key), names are asked of those DNS servers instead, and the
+/// operating system answers only for a name no server has ever answered. An answer is kept until a
 /// later lookup gives another one: a failed refresh never replaces a good address. A name that cannot be
 /// resolved is not asked again for <see cref="FailureRetryInterval"/>, so a dead DNS server cannot stall
 /// every viewer message. Only IPv4 answers are accepted (the viewer messages carry four address bytes).
@@ -60,6 +62,7 @@ public sealed class PublicAddressResolver : IDisposable
     private readonly TimeSpan m_refreshInterval;
     private readonly Func<string, IPAddress> m_osResolver;
     private readonly TimeProvider m_time;
+    private readonly DnsAddressQuery m_dns;
     private readonly ConcurrentDictionary<string, Entry> m_entries = new(StringComparer.OrdinalIgnoreCase);
     private readonly object m_timerLock = new();
     private Timer m_timer;
@@ -67,14 +70,17 @@ public sealed class PublicAddressResolver : IDisposable
 
     /// <param name="refreshInterval">Period of the automatic refresh; zero or less disables it. The timer starts with the first resolved name.</param>
     /// <param name="osResolver">Name lookup; defaults to <see cref="Util.GetHostFromDNS"/>, the operating system resolver.</param>
+    /// <param name="dnsQuery">When set, names are looked up through these DNS servers; see the class remarks.</param>
     public PublicAddressResolver(TimeSpan refreshInterval, ILogger log,
         Func<string, IPAddress> osResolver = null,
-        TimeProvider time = null)
+        TimeProvider time = null,
+        DnsAddressQuery dnsQuery = null)
     {
         m_refreshInterval = refreshInterval > TimeSpan.Zero ? refreshInterval : TimeSpan.Zero;
         m_log = log ?? LoggerProvider.CreateLogger<PublicAddressResolver>();
         m_osResolver = osResolver ?? Util.GetHostFromDNS;
         m_time = time ?? TimeProvider.System;
+        m_dns = dnsQuery;
     }
 
     private static bool Acceptable(IPAddress ip)
@@ -122,13 +128,37 @@ public sealed class PublicAddressResolver : IDisposable
     private bool Lookup(string host, Entry entry)
     {
         IPAddress ip = null;
-        try
+        if (m_dns is not null)
         {
-            ip = m_osResolver(host);
+            try
+            {
+                ip = m_dns.Lookup(host);
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning(e, "[VIEWER ADDRESS]: DNS lookup of {0} failed", host);
+            }
+
+            if (ip is null && entry.Good is not null)
+            {
+                m_log.LogWarning("[VIEWER ADDRESS]: no DNS server answered for {0}; keeping previous value \"{1}\"", host, entry.Good);
+                entry.RetryAt = m_time.GetUtcNow() + FailureRetryInterval;
+                return false;
+            }
+            if (ip is null)
+                m_log.LogWarning("[VIEWER ADDRESS]: no DNS server answered for {0}; using the operating system's answer", host);
         }
-        catch (Exception e)
+
+        if (ip is null)
         {
-            m_log.LogWarning(e, "[VIEWER ADDRESS]: lookup of {0} failed; keeping previous value \"{1}\"", host, entry.Good);
+            try
+            {
+                ip = m_osResolver(host);
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning(e, "[VIEWER ADDRESS]: lookup of {0} failed; keeping previous value \"{1}\"", host, entry.Good);
+            }
         }
 
         if (ip is null || !Acceptable(ip))
