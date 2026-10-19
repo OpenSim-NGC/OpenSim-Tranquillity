@@ -2763,7 +2763,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
             if (local != 0)
                 force *= llGetRot();
 
-            m_host.ParentGroup.RootPart.SetForce(force);
+            m_host.ParentGroup.RootPart.SetForce(force, local != 0);
         }
     }
 
