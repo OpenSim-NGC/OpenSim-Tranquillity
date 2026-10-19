@@ -165,6 +165,12 @@ These keys are optional. The shipped `os-webrtc-janus.ini` lists them commented 
 | `RemoveEmptyRooms`, `EmptyRoomGraceSeconds` | `[JanusWebRtcVoice]` | `true`, `60` | Remove a room this service created once it has stood empty for the grace period. The stock AudioBridge never removes an emptied room. Rooms the service did not create are never removed, and a plugin other than the stock AudioBridge is expected to remove its own. |
 | `RefusalCacheSeconds` | `[WebRtcVoice]` | `5` | Seconds a refused voice provision is remembered, so the viewer's immediate retries are answered without repeating the estate and parcel checks. `0` turns it off. |
 | `StunServers` | `[WebRtcVoice]` | empty | Comma-separated STUN server URIs (full ICE URIs, for example `stun:stun.example.org:3478`) advertised to viewers as the `stun-servers` simulator feature. Stock viewers need a valid entry to connect from outside the grid's network. When empty the entry is not advertised. Works with either plugin. |
+| `A2AVoiceEnabled` | `[WebRtcVoice]` | `false` | Avatar-to-avatar calls (the `call` and `start p2p voice` chat session requests). With it off the chat session handler answers as before. A call rings only an avatar whose region runs in the same region-server process as the caller's. |
+
+A call, group call or conference gets its own room, numbered from the grid's identity (`GatekeeperURI`, read from
+`[Const]`, `[Startup]` or `[Hypergrid]`), the call's channel and its type, so two grids that share one mixer do not
+share rooms. Without a `GatekeeperURI` the number is derived without the grid part, and a warning is logged at
+startup when a call feature is on.
 
 <a id="Configure_Robust"></a>
 ## Configure Robust Server for WebRTC Voice

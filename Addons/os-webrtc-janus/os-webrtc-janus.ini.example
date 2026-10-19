@@ -21,6 +21,11 @@
     ; Default: empty, and the entry is not advertised. Works with the stock plugin.
     ;StunServers = stun:stun.l.google.com:19302
 
+    ; Avatar-to-avatar calls (the "call" and "start p2p voice" chat session requests). Default: false.
+    ; With it off the chat session handler answers as it did before. A call rings only an avatar whose region
+    ; runs in the same region-server process as the caller's.
+    ;A2AVoiceEnabled = false
+
     ; Seconds a refused voice provision is remembered, so a viewer's immediate retries are answered without
     ; repeating the estate and parcel checks. 0 turns the cache off. Default: 5.
     ;RefusalCacheSeconds = 5
