@@ -4,8 +4,8 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-# Harness runs whose traces the Jolt harness workflow (.github/workflows/jolt-harness.yml) uploads from every runner in
-# its matrix, under traced/<name>/ in the artifact, so the platforms can be set side by side. Same format as runs.txt.
+# Harness runs whose traces are kept, under traced/<name>/ of the --out folder, so the platforms can be set side by
+# side. Same format as runs.txt.
 # They are not compared with a baseline: runs.txt lists the runs that are.
 
 # Ten 0.5 m boxes stacked on the ground at [Jolt] VelocityIterations 10, 20 and 40, at every step rate: does the tower
