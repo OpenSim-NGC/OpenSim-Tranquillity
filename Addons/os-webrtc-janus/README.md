@@ -154,6 +154,18 @@ here needs to specify the URI to address the Janus server and the API keys
 to allow this simulator access to its interfaces. The example above
 contains just sample entries.
 
+#### Optional settings
+
+These keys are optional. The shipped `os-webrtc-janus.ini` lists them commented out with their defaults.
+
+| Key | Section | Default | Notes |
+|---|---|---|---|
+| `PluginName` | `[JanusWebRtcVoice]` | `janus.plugin.audiobridge` | The Janus plugin the region attaches voice handles to. The default is Janus's stock AudioBridge. `janus.plugin.slvoice` selects a spatial mixer that implements that plugin. |
+| `RequestTimeoutMs` | `[JanusWebRtcVoice]` | `5000` | Milliseconds a Janus request that is answered with `ack` waits for its result before it fails. Before this setting such a request waited without limit. |
+| `RemoveEmptyRooms`, `EmptyRoomGraceSeconds` | `[JanusWebRtcVoice]` | `true`, `60` | Remove a room this service created once it has stood empty for the grace period. The stock AudioBridge never removes an emptied room. Rooms the service did not create are never removed, and a plugin other than the stock AudioBridge is expected to remove its own. |
+| `RefusalCacheSeconds` | `[WebRtcVoice]` | `5` | Seconds a refused voice provision is remembered, so the viewer's immediate retries are answered without repeating the estate and parcel checks. `0` turns it off. |
+| `StunServers` | `[WebRtcVoice]` | empty | Comma-separated STUN server URIs (full ICE URIs, for example `stun:stun.example.org:3478`) advertised to viewers as the `stun-servers` simulator feature. Stock viewers need a valid entry to connect from outside the grid's network. When empty the entry is not advertised. Works with either plugin. |
+
 #### Which parcel a voice request is checked against
 
 A stock viewer sends `parcel_local_id` only when the avatar stands on a parcel that has its own voice channel (the
@@ -173,18 +185,6 @@ parcel with its own voice channel gets that parcel's room.
 For the viewer of an avatar that is in a neighbouring region, the named parcel is used only if it is near where
 that avatar is known to be; otherwise the request is treated as one that named no parcel and gets the region-wide
 room.
-
-#### Optional settings
-
-These keys are optional. The shipped `os-webrtc-janus.ini` lists them commented out with their defaults.
-
-| Key | Section | Default | Notes |
-|---|---|---|---|
-| `PluginName` | `[JanusWebRtcVoice]` | `janus.plugin.audiobridge` | The Janus plugin the region attaches voice handles to. The default is Janus's stock AudioBridge. `janus.plugin.slvoice` selects a spatial mixer that implements that plugin. |
-| `RequestTimeoutMs` | `[JanusWebRtcVoice]` | `5000` | Milliseconds a Janus request that is answered with `ack` waits for its result before it fails. Before this setting such a request waited without limit. |
-| `RemoveEmptyRooms`, `EmptyRoomGraceSeconds` | `[JanusWebRtcVoice]` | `true`, `60` | Remove a room this service created once it has stood empty for the grace period. The stock AudioBridge never removes an emptied room. Rooms the service did not create are never removed, and a plugin other than the stock AudioBridge is expected to remove its own. |
-| `RefusalCacheSeconds` | `[WebRtcVoice]` | `5` | Seconds a refused voice provision is remembered, so the viewer's immediate retries are answered without repeating the estate and parcel checks. `0` turns it off. |
-| `StunServers` | `[WebRtcVoice]` | empty | Comma-separated STUN server URIs (full ICE URIs, for example `stun:stun.example.org:3478`) advertised to viewers as the `stun-servers` simulator feature. Stock viewers need a valid entry to connect from outside the grid's network. When empty the entry is not advertised. Works with either plugin. |
 
 <a id="Configure_Robust"></a>
 ## Configure Robust Server for WebRTC Voice
