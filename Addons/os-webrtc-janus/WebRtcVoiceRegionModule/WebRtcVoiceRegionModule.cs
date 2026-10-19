@@ -82,7 +82,7 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
                 _MessageDetails = m_Config.GetBoolean("MessageDetails", false);
                 InitialiseRefusalCache();
                 InitialiseStunServers();
-                InitialiseNonSpatial();
+                InitialiseNonSpatial(config);
 
                 m_log.LogInformation($"{logHeader}: enabled");
             }
@@ -128,6 +128,7 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
     // ISharedRegionModule.Close
     public void Close()
     {
+        StopNonSpatialMaintenance();
     }
 
     // ISharedRegionModule.Name

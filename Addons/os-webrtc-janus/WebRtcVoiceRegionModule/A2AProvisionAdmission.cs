@@ -36,11 +36,17 @@ namespace osWebRtcVoice
         Multiagent = 2,
         Logout = 3,
         /// <summary>
-        /// A body whose channel_type is not "local" (a "multiagent" one, or none at all) while avatar-to-avatar calls
-        /// are off. Nothing in this module issues a channel then, so it is handed to the voice service unexamined, as
-        /// it was before the feature existed. It records nothing and has no session.
+        /// A body whose channel_type is not "local" (a "multiagent" one, or none at all) while no call feature is on.
+        /// Nothing in this module issues a channel then, so it is handed to the voice service unexamined, as it was
+        /// before the features existed. It records nothing and has no session.
         /// </summary>
         Passthrough,
+        /// <summary>
+        /// A GROUP provision, admitted by the non-spatial engine. DISTINCT from
+        /// <see cref="Multiagent"/> on purpose: a group admission carries no <see cref="A2ASession"/>,
+        /// so anything that reads <c>Session</c> must never see this kind.
+        /// </summary>
+        Group,
     }
 
     public sealed class ProvisionAdmission

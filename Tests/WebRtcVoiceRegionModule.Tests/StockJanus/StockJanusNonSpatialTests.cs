@@ -16,6 +16,7 @@ using System.Net;
 using System.Threading.Tasks;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+using osWebRtcVoice.NonSpatial;
 using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
@@ -136,6 +137,63 @@ namespace osWebRtcVoice.Tests
             await region.LogoutAsync(b);
         }
 
+        // ---- group ------------------------------------------------------------------------------
+
+        private static (GroupVoicePolicy, NonSpatialVoiceSessionEngine) GroupFixture(StockRegion region)
+        {
+            // Membership answers come from the test, as in the module's own group tests: a scene has no groups service here.
+            var policy = new GroupVoicePolicy
+            {
+                Enabled = true,
+                RequireVoicePower = true,
+                Cap = NonSpatialCaps.DefaultConferenceCap,
+                IsMember = (a, g) => g == Group && (a == Alice || a == Bob),
+                Powers = (a, g) => g == Group ? GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice : 0UL,
+            };
+            var engine = new NonSpatialVoiceSessionEngine(
+                new InMemoryNonSpatialSessionStore(),
+                new INonSpatialAdmission[] { new P2PAdmission(), new AdhocAdmission(), policy.ToAdmissionOrNull() },
+                "example-grid");
+            region.SetPrivate(region.Region, "m_groupVoice", policy);
+            region.SetPrivate(region.Region, "m_nonSpatial", engine);
+            return (policy, engine);
+        }
+
+        [Test]
+        public async Task Group_CallRoomCreateJoinLeave()
+        {
+            using var region = StockRegion.Create((voice, _) => voice.Set("GroupVoiceEnabled", "true"));
+            region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
+            region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
+            (GroupVoicePolicy policy, NonSpatialVoiceSessionEngine engine) = GroupFixture(region);
+            UUID regionId = region.Scene.RegionInfo.RegionID;
+
+            CapAnswer aliceCall = Credentials(Alice, policy, engine, regionId);
+            CapAnswer bobCall = Credentials(Bob, policy, engine, regionId);
+            (string channel, string aliceToken) = CredentialsOf(aliceCall);
+            (_, string bobToken) = CredentialsOf(bobCall);
+
+            using Joined a = await region.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, channel, aliceToken));
+            using Joined b = await region.JoinAsync(Bob, o => StockRegion.MultiagentBody(o, channel, bobToken));
+            Assert.That(a.Answer.Provisioned, Is.True, "first member joined: " + a.Answer.Body);
+            Assert.That(b.Answer.Provisioned, Is.True, "second member joined: " + b.Answer.Body);
+            Assert.That(b.Answer.Room, Is.EqualTo(a.Answer.Room), "one group room");
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+            Assert.That(engine.Store.Get(Group).SeatsHeld, Is.EqualTo(2), "the engine holds both seats");
+
+            await region.LogoutAsync(a);
+            await region.LogoutAsync(b);
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True);
+            Assert.That(engine.Store.Get(Group).SeatsHeld, Is.EqualTo(0), "the seats are released");
+
+            static CapAnswer Credentials(UUID agent, GroupVoicePolicy p, NonSpatialVoiceSessionEngine e, UUID r)
+            {
+                var call = new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(Group) };
+                Assert.That(GroupVoiceChatSession.TryHandleCall(call, agent, p, e, r, out ChatSessionOutcome o), Is.True);
+                return new CapAnswer { Status = (int)o.Status, Body = o.Body };
+            }
+        }
+
         // ---- every switch off ------------------------------------------------------------------
 
         [Test]
@@ -180,7 +238,7 @@ namespace osWebRtcVoice.Tests
 
             foreach (ProbeRow row in rows) TestContext.Out.WriteLine(row);
             ProbeRow Row(string name) => rows.Find(r => r.Name == name);
-            // With avatar-to-avatar calls off, these answer as upstream/develop does (with its
+            // With no call feature on, these answer as upstream/develop does (with its
             // two start-up fixes): a multiagent provision is served, a provision with no channel_type gets an empty 200.
             foreach (string served in new[] { "provision multiagent, unknown session", "provision multiagent, group-style channel" })
             {

@@ -36,6 +36,21 @@
     <Compile Include="A2ASessionConcurrencyTests.cs" />
     <Compile Include="ProvisionPassthroughTests.cs" />
     <Compile Include="DefaultsChatSessionTests.cs" />
+    <Compile Include="NonSpatialIdentityTests.cs" />
+    <Compile Include="NonSpatialRoomKeyTests.cs" />
+    <Compile Include="NonSpatialMembershipTests.cs" />
+    <Compile Include="NonSpatialCapTests.cs" />
+    <Compile Include="NonSpatialIdempotencyTests.cs" />
+    <Compile Include="NonSpatialExpiryTests.cs" />
+    <Compile Include="NonSpatialSessionLimitTests.cs" />
+    <Compile Include="NonSpatialLimitSettingsTests.cs" />
+    <Compile Include="NonSpatialStartRaceTests.cs" />
+    <Compile Include="NonSpatialGridSeamTests.cs" />
+    <Compile Include="GroupVoiceTests.cs" />
+    <Compile Include="GroupProvisionHandlerTests.cs" />
+    <Compile Include="GroupVoiceInviteTests.cs" />
+    <Compile Include="GroupVoiceCrossHostTests.cs" />
+    <Compile Include="CarrierAuthTests.cs" />
     <!-- Opt-in integration tests against a real Janus gateway (skipped unless WEBRTC_JANUS_TEST_URL is set). -->
     <Compile Include="StockJanus\StockRegion.cs" />
     <Compile Include="StockJanus\DefaultsProbe.cs" />
