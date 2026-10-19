@@ -4,9 +4,9 @@
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-# Harness runs for the Jolt harness workflow (.github/workflows/jolt-harness.yml), on every runner in its matrix.
+# The harness runs the baseline check covers (--check-baseline).
 # One run per line: a name (letters, digits, - and _), a colon, then the harness arguments. Each run writes its
-# per-heartbeat traces and summary.csv under <name>/ in the uploaded artifact. Lines starting with # are skipped.
+# per-heartbeat traces and summary.csv under <name>/ of the run's --out folder. Lines starting with # are skipped.
 
 # Scenarios whose results are set side by side between Linux and Windows; earlier joltc builds gave different
 # results on the two.
