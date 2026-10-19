@@ -1887,8 +1887,13 @@ public class SceneObjectPart : EntityBase, IDisposable
                 return 0;
 
             float cost;
-            if (PhysActor != null)
-                cost = PhysActor.PhysicsCost;
+            PhysicsActor pa = PhysActor;
+            if (pa != null)
+            {
+                cost = pa.PhysicsCost;
+                if (pa.PhysicsCostIsShapeCount)
+                    return cost;    // the engine's count of collision shapes, as it is
+            }
             else
                 cost = 0.1f;
 
@@ -2520,8 +2525,16 @@ public class SceneObjectPart : EntityBase, IDisposable
                         pa.IsPhysical = UsePhysics;
                         pa.OnRequestTerseUpdate -= PhysicsRequestingTerseUpdate;
                         pa.OnOutOfBounds -= PhysicsOutOfBounds;
+                        pa.OnComplexityError -= PhysicsComplexityError;
                         pa.delink();
                     }
+                }
+
+                if (UsePhysics)
+                {
+                    // before the actor is made physical: an engine that limits complexity says so as it is
+                    pa.OnComplexityError -= PhysicsComplexityError;
+                    pa.OnComplexityError += PhysicsComplexityError;
                 }
 
                 if (pa.IsPhysical != UsePhysics)
@@ -3155,6 +3168,16 @@ public class SceneObjectPart : EntityBase, IDisposable
         // The whole object, as llSetStatus(STATUS_PHYSICS, FALSE) does: every part's flag, the region's
         // physical-prim count, and the parts' actor events
         ParentGroup.ScriptSetPhysicsStatus(false);
+    }
+
+    /// <summary>
+    /// The physics engine says the object is over its limit on how complex a physical object may be. The owner is told
+    /// and the object is made non-physical, as for <see cref="PhysicsOutOfBounds"/> (only the root part's actor is
+    /// listened to). <paramref name="detail"/> is what the engine counted, for example "(300 of 256 convex hulls)".
+    /// </summary>
+    public void PhysicsComplexityError(string detail)
+    {
+        ParentGroup?.PhysicsTooComplex(detail);
     }
 
     public void PhysicsRequestingTerseUpdate()
@@ -5067,6 +5090,7 @@ public class SceneObjectPart : EntityBase, IDisposable
 
                 pa.OnRequestTerseUpdate += PhysicsRequestingTerseUpdate;
                 pa.OnOutOfBounds += PhysicsOutOfBounds;
+                pa.OnComplexityError += PhysicsComplexityError;
 
                 if (_parentID != 0 && _parentID != LocalId)
                 {
@@ -5117,6 +5141,7 @@ public class SceneObjectPart : EntityBase, IDisposable
             pa.OnCollisionUpdate -= PhysicsCollision;
             pa.OnRequestTerseUpdate -= PhysicsRequestingTerseUpdate;
             pa.OnOutOfBounds -= PhysicsOutOfBounds;
+            pa.OnComplexityError -= PhysicsComplexityError;
 
             ParentGroup.Scene.PhysicsScene.RemovePrim(pa);
 
