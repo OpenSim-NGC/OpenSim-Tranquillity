@@ -1,8 +1,0 @@
-# Copyright (c) 2026 Legion Builds
-#
-# This Source Code Form is subject to the terms of the Mozilla Public
-# License, v. 2.0. If a copy of the MPL was not distributed with this
-# file, You can obtain one at https://mozilla.org/MPL/2.0/.
-
-# The runs for [Jolt] VehicleBehaviour = InWorldz (iw-car-pad, iw-car-ramp, iw-airplane, iw-mouselook-turn) are in
-# runs.txt now, with baselines for both stock joltc builds the project tests. This list has no runs left.
