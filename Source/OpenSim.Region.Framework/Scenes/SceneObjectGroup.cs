@@ -1124,6 +1124,13 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         // engine, and with it the ground under them
         if (entityTransfer is not null)
             destination = entityTransfer.GetObjectDestination(sog, val, out newpos);
+        else
+        {
+            // No module to send the object with: it stays, as it did before, and is not taken for an object that left the world
+            root.KeyframeMotion?.StartCrossingCheck();
+            root.PhysActor?.CrossingStart();
+            return sog;
+        }
 
         if (destination is not null && !isTeleport && sog.IsWaitingBeforeCrossingBack(sogScene))
         {
