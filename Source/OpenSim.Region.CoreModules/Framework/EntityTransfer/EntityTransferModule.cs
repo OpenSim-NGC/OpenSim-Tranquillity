@@ -308,7 +308,8 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         ViewerAddressConfig config = ViewerAddressConfig.Create(addresses,
             section?.GetInt("RefreshMinutes", (int)ViewerAddressConfig.DefaultRefreshInterval.TotalMinutes)
                 ?? (int)ViewerAddressConfig.DefaultRefreshInterval.TotalMinutes,
-            m_log);
+            m_log,
+            dnsServers: section?.GetString("DnsServers", string.Empty));
 
         return ViewerAddressSelector.Create(config, m_log);
     }

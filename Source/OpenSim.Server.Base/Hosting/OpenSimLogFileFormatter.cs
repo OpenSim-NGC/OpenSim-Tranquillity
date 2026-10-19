@@ -27,8 +27,12 @@ public sealed class OpenSimLogFileFormatter : ITextFormatter
         logEvent.RenderMessage(output);
         output.Write(Environment.NewLine);
 
+        // the exception text has no line end of its own: without one, the next entry would start on the stack's last line
         if (logEvent.Exception is not null)
+        {
             output.Write(logEvent.Exception);
+            output.Write(Environment.NewLine);
+        }
     }
 
     private static string LevelLabel(LogEventLevel level) => level switch

@@ -11,6 +11,7 @@
     Tests for the Jolt backend (JoltPhysicsBackend) driven directly, with no module around it.
     These drive real native joltc instances, which the tests run on for win-x64 and linux-x64. Helpers used by more
     than one Jolt test project are in ../JoltTestShared and are compiled into each project that uses them.
+    This project holds the tests of the native joltc package record (JoltNativePackageTests).
   -->
   <PropertyGroup>
     <Nullable>disable</Nullable>
