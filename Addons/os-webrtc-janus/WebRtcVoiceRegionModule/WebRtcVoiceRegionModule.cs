@@ -56,7 +56,7 @@ namespace osWebRtcVoice;
 /// The capabilities then pass the user request information to the IWebRtcVoiceService interface
 /// that has been registered for the reqion.
 /// </summary>
-public class WebRtcVoiceRegionModule : ISharedRegionModule
+public partial class WebRtcVoiceRegionModule : ISharedRegionModule
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string logHeader = "[REGION WEBRTC VOICE]";
@@ -79,6 +79,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
             if (m_Enabled)
             {
                 _MessageDetails = m_Config.GetBoolean("MessageDetails", false);
+                InitialiseStunServers();
 
                 m_log.LogInformation($"{logHeader}: enabled");
             }
@@ -113,6 +114,8 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
 
             ISimulatorFeaturesModule simFeatures = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
             simFeatures?.AddFeature("VoiceServerType", OSD.FromString("webrtc"));
+
+            AdvertiseStunServers(simFeatures);
         }
     }
 
