@@ -171,6 +171,11 @@ A call, group call or conference gets its own room, numbered from the grid's ide
 `[Const]`, `[Startup]` or `[Hypergrid]`), the call's channel and its type, so two grids that share one mixer do not
 share rooms. Without a `GatekeeperURI` the number is derived without the grid part, and a warning is logged at
 startup when a call feature is on.
+| `MaxNonSpatialSessions`, `MaxSessionsPerAgent` | `[WebRtcVoice]` | `5000`, `20` | The most non-spatial sessions this region server holds at once, and the most live ones a single agent may have started. A start beyond either is refused. An unanswered invitation expires after 2 minutes and an idle session after 8 hours. |
+| `GroupVoiceEnabled` | `[WebRtcVoice]` | `false` | Group voice. Needs the Groups module. |
+| `GroupVoiceRequireVoicePower` | `[WebRtcVoice]` | `true` | Require the group role power to speak (`GP_SESSION_VOICE`) as well as to join. `false` requires only the power to join. |
+| `GroupVoiceCap` | `[WebRtcVoice]` | `50` | The most seats in one group voice session. |
+| `CarrierSecret` | `[WebRtcVoice]` | empty | Signs the grid instant messages that ring a group member whose region runs in another process. A grid with regions in more than one process must set the same value, at least 32 characters, on every region server for group calls to ring across them. Unset, nothing is sent across processes and every such message that arrives is refused; regions of one process are not affected. |
 
 <a id="Configure_Robust"></a>
 ## Configure Robust Server for WebRTC Voice
