@@ -203,6 +203,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModul
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModules.Jolt.Tests", "Tests\OpenSim.Region.PhysicsModules.Jolt.Tests\OpenSim.Region.PhysicsModules.Jolt.Tests.csproj", "{F23323BB-E221-42B7-98D4-D42E5ACFAD26}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JoltPhysicsHarness", "Tests\JoltPhysicsHarness\JoltPhysicsHarness.csproj", "{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OpenSim.Region.PhysicsModules.Jolt.Harness.Tests", "Tests\OpenSim.Region.PhysicsModules.Jolt.Harness.Tests\OpenSim.Region.PhysicsModules.Jolt.Harness.Tests.csproj", "{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -1377,6 +1381,30 @@ Global
 		{F23323BB-E221-42B7-98D4-D42E5ACFAD26}.Release|x64.Build.0 = Release|Any CPU
 		{F23323BB-E221-42B7-98D4-D42E5ACFAD26}.Release|x86.ActiveCfg = Release|Any CPU
 		{F23323BB-E221-42B7-98D4-D42E5ACFAD26}.Release|x86.Build.0 = Release|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Debug|x64.Build.0 = Debug|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Debug|x86.Build.0 = Debug|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Release|x64.ActiveCfg = Release|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Release|x64.Build.0 = Release|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Release|x86.ActiveCfg = Release|Any CPU
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0}.Release|x86.Build.0 = Release|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Debug|x64.Build.0 = Debug|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Debug|x86.Build.0 = Debug|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|x64.ActiveCfg = Release|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|x64.Build.0 = Release|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|x86.ActiveCfg = Release|Any CPU
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -1479,6 +1507,8 @@ Global
 		{AD42BFAA-4256-45A8-A046-FE97860DD440} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 		{318B8A26-DBE6-4837-92CB-6ED18BC21850} = {E886CEB5-B01D-411F-A7A0-72AA1B71761D}
 		{F23323BB-E221-42B7-98D4-D42E5ACFAD26} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
+		{4FB07F5F-19BD-4E23-AC3A-3A61F69BDCA0} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
+		{5E9B9941-94C9-42F0-B161-2A22AF9FD9E9} = {7F5EC7C6-FD99-4084-8530-5D3F28D6D7C0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A40AD54B-8BC7-41E4-B241-19B59EA65D2A}
