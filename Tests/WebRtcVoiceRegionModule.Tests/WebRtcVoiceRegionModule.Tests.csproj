@@ -23,6 +23,11 @@
     <Compile Include="AssemblyInfo.cs" />
     <Compile Include="StunServersTests.cs" />
     <Compile Include="ProvisionAnswerTests.cs" />
+    <Compile Include="ProvisionParcelModuleTests.cs" />
+    <Compile Include="LandBanTests.cs" />
+    <Compile Include="ProvisionParcelResolverTests.cs" />
+    <Compile Include="ChildParcelProximityTests.cs" />
+    <Compile Include="ProvisionParcelAccessTests.cs" />
     <Compile Include="VoiceMembershipIndexTests.cs" />
     <Compile Include="VoiceSessionCloseCaptureTests.cs" />
     <!-- Opt-in integration tests against a real Janus gateway (skipped unless WEBRTC_JANUS_TEST_URL is set). -->
