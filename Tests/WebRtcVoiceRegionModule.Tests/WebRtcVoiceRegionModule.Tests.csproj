@@ -3,32 +3,79 @@
   <!--
     Tests for the os-webrtc-janus region module (namespace osWebRtcVoice).
     Run with: dotnet test Tests/WebRtcVoiceRegionModule.Tests
+
+    This is the only voice test project that pulls the real-Scene stack (OpenSim.Tests.Common and the core
+    modules), so SceneHelpers can build a live Scene. The tests in StockJanus/ are opt-in integration tests
+    against a real Janus gateway: they skip unless WEBRTC_JANUS_TEST_URL is set (see StockJanus/README.md in
+    Tests/WebRtcJanusService.Tests).
+
+    Build discipline: EnableDefaultItems=false and one <Compile Include> per file, so a test file that is not
+    listed does not compile silently.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <EnableDefaultItems>false</EnableDefaultItems>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="StunServersTests.cs" />
+    <Compile Include="ProvisionAnswerTests.cs" />
+    <Compile Include="VoiceMembershipIndexTests.cs" />
+    <Compile Include="VoiceSessionCloseCaptureTests.cs" />
+    <!-- Opt-in integration tests against a real Janus gateway (skipped unless WEBRTC_JANUS_TEST_URL is set). -->
+    <Compile Include="StockJanus\StockRegion.cs" />
+    <Compile Include="StockJanus\DefaultsProbe.cs" />
+    <Compile Include="StockJanus\DefaultsParityTests.cs" />
+    <Compile Include="StockJanus\StockJanusRegionTests.cs" />
+    <Compile Include="..\WebRtcJanusService.Tests\StockJanus\StockJanusSupport.cs" Link="StockJanus\StockJanusSupport.cs" />
+    <None Include="..\WebRtcJanusService.Tests\StockJanus\aiortc_peer.py" Link="StockJanus\aiortc_peer.py" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="XMLRPC">
+      <HintPath>..\..\Library\XMLRPC.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers\OpenSim.Framework.Servers.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.CoreModules\OpenSim.Region.CoreModules.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.SharedBase\OpenSim.Region.PhysicsModules.SharedBase.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.BasicPhysics\OpenSim.Region.PhysicsModules.BasicPhysics.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data.Null\OpenSim.Data.Null.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data\OpenSim.Data.csproj" />
+    <ProjectReference Include="..\..\Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
+    <!-- Service impls SceneHelpers loads by dll name (ServerUtils.LoadPlugin) - must be in bin. -->
+    <ProjectReference Include="..\..\Source\OpenSim.Services.InventoryService\OpenSim.Services.InventoryService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.GridService\OpenSim.Services.GridService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.AuthenticationService\OpenSim.Services.AuthenticationService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.AssetService\OpenSim.Services.AssetService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.UserAccountService\OpenSim.Services.UserAccountService.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.PresenceService\OpenSim.Services.PresenceService.csproj" />
+    <ProjectReference Include="..\..\Addons\os-webrtc-janus\WebRtcVoiceRegionModule\WebRtcVoiceRegionModule.csproj" />
+    <ProjectReference Include="..\..\Addons\os-webrtc-janus\Janus\WebRtcJanusService.csproj" />
+    <ProjectReference Include="..\..\Addons\os-webrtc-janus\WebRtcVoiceServiceModule\WebRtcVoiceServiceModule.csproj" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="NUnit" Version="4.3.2" />
     <PackageReference Include="NUnit.Analyzers" Version="4.9.2">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
-    <ProjectReference Include="..\..\Addons\os-webrtc-janus\WebRtcVoiceRegionModule\WebRtcVoiceRegionModule.csproj" />
   </ItemGroup>
 
   <ItemGroup>
