@@ -175,7 +175,9 @@ startup when a call feature is on.
 | `GroupVoiceEnabled` | `[WebRtcVoice]` | `false` | Group voice. Needs the Groups module. |
 | `GroupVoiceRequireVoicePower` | `[WebRtcVoice]` | `true` | Require the group role power to speak (`GP_SESSION_VOICE`) as well as to join. `false` requires only the power to join. |
 | `GroupVoiceCap` | `[WebRtcVoice]` | `50` | The most seats in one group voice session. |
-| `CarrierSecret` | `[WebRtcVoice]` | empty | Signs the grid instant messages that ring a group member whose region runs in another process. A grid with regions in more than one process must set the same value, at least 32 characters, on every region server for group calls to ring across them. Unset, nothing is sent across processes and every such message that arrives is refused; regions of one process are not affected. |
+| `CarrierSecret` | `[WebRtcVoice]` | empty | Signs the grid instant messages that ring a group or conference member whose region runs in another process, and the conference text lines that cross the same way. A grid with regions in more than one process must set the same value, at least 32 characters, on every region server for group and conference calls to ring across them. Unset, nothing is sent across processes and every such message that arrives is refused; regions of one process are not affected. |
+| `AdhocVoiceEnabled` | `[WebRtcVoice]` | `false` | Ad-hoc voice and conference text (`start conference`). Needs the Groups module for the conference text session. |
+| `ConferenceRequestBurst`, `ConferenceRequestRefillSeconds` | `[WebRtcVoice]` | `5`, `10` | A per-agent rate limit shared by `start conference` and `invite`: how many requests may come back to back, and the seconds for one more to become available. |
 
 <a id="Configure_Robust"></a>
 ## Configure Robust Server for WebRTC Voice
