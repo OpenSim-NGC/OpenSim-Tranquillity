@@ -45,8 +45,13 @@ public partial class JanusAudioBridge : JanusPlugin
     // than hardcoded, so a config-compatible mixer (e.g. janus.plugin.slvoice)
     // can be selected without a code change. Where it is read (WebRtcJanusService),
     // an unset key defaults to janus.plugin.audiobridge.
-    public JanusAudioBridge(JanusSession pSession, string pPluginName) : base(pSession, pPluginName)
+    public JanusAudioBridge(JanusSession pSession, string pPluginName) : this(pSession, pPluginName, string.Empty) { }
+
+    /// <param name="pGridId">The grid's identity for non-spatial room numbers: see
+    /// <see cref="ReadGridId"/>. Empty keeps the grid-less derivation.</param>
+    public JanusAudioBridge(JanusSession pSession, string pPluginName, string pGridId) : base(pSession, pPluginName)
     {
+        GridId = pGridId ?? string.Empty;
         // m_log.LogDebug("{0} JanusAudioBridge constructor (plugin={1})", LogHeader, pPluginName);
     }
 
@@ -123,7 +128,9 @@ public partial class JanusAudioBridge : JanusPlugin
     // The attempt is to deterministicly create a room number so all regions will generate the
     //     same room number across sessions and across the grid.
     // getHashCode() is not deterministic across sessions.
-    public static int CalcRoomNumber(string pRegionId, string pChannelType, int pParcelLocalID, string pChannelID)
+    /// <param name="pGridId">Enters ONLY the "multiagent" arm. The "local" arm is per
+    /// region+parcel and ignores it, so a spatial room number does not depend on the grid id.</param>
+    public static int CalcRoomNumber(string pGridId, string pRegionId, string pChannelType, int pParcelLocalID, string pChannelID)
     {
         var hasher = new BHasherMdjb2();
         // If there is a channel specified it must be group
@@ -136,8 +143,12 @@ public partial class JanusAudioBridge : JanusPlugin
                 hasher.Add(pParcelLocalID);
                 break;
             case "multiagent":
-                // A "multiagent" channel is unique to the grid
-                // should add a GridId here
+                // A "multiagent" channel is unique to the grid: grid id + channel (the session id of the call
+                // or conference) + type. An empty grid id (unconfigured grid) adds nothing to the hash,
+                // which gives the grid-less derivation. Any channel_type added below must fold the grid id
+                // in the same way before it is admitted.
+                if (!string.IsNullOrEmpty(pGridId))
+                    hasher.Add(pGridId);
                 hasher.Add(pChannelID);
                 hasher.Add(pChannelType);
                 break;
@@ -156,7 +167,7 @@ public partial class JanusAudioBridge : JanusPlugin
     /// bound to THIS bridge's plugin handle, or null when the create failed.</summary>
     public async Task<JanusRoom> SelectRoom(string pRegionId, string pChannelType, bool pSpatial, int pParcelLocalID, string pChannelID)
     {
-        int roomNumber = CalcRoomNumber(pRegionId, pChannelType, pParcelLocalID, pChannelID);
+        int roomNumber = CalcRoomNumber(GridId, pRegionId, pChannelType, pParcelLocalID, pChannelID);
         m_log.LogDebug("{0} SelectRoom: roomNumber={1}", LogHeader, roomNumber);
         string roomDesc = pRegionId + "/" + pChannelType + "/" + pParcelLocalID + "/" + pChannelID;
         return await SelectRoomCoalesced(roomNumber, () => CreateRoom(roomNumber, pSpatial, roomDesc))

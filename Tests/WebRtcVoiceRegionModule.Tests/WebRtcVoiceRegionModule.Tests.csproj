@@ -25,11 +25,19 @@
     <Compile Include="ProvisionAnswerTests.cs" />
     <Compile Include="VoiceMembershipIndexTests.cs" />
     <Compile Include="VoiceSessionCloseCaptureTests.cs" />
+    <Compile Include="A2AAgentListTests.cs" />
+    <Compile Include="A2AClientCloseGuardTests.cs" />
+    <Compile Include="A2AInvitationTests.cs" />
+    <Compile Include="A2ALifecycleTests.cs" />
+    <Compile Include="A2ASessionRegistryTests.cs" />
+    <Compile Include="ProvisionPassthroughTests.cs" />
+    <Compile Include="DefaultsChatSessionTests.cs" />
     <!-- Opt-in integration tests against a real Janus gateway (skipped unless WEBRTC_JANUS_TEST_URL is set). -->
     <Compile Include="StockJanus\StockRegion.cs" />
     <Compile Include="StockJanus\DefaultsProbe.cs" />
     <Compile Include="StockJanus\DefaultsParityTests.cs" />
     <Compile Include="StockJanus\StockJanusRegionTests.cs" />
+    <Compile Include="StockJanus\StockJanusNonSpatialTests.cs" />
     <Compile Include="..\WebRtcJanusService.Tests\StockJanus\StockJanusSupport.cs" Link="StockJanus\StockJanusSupport.cs" />
     <None Include="..\WebRtcJanusService.Tests\StockJanus\aiortc_peer.py" Link="StockJanus\aiortc_peer.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

@@ -143,7 +143,7 @@ namespace osWebRtcVoice.Tests
             StockJanusEnvironment.IgnoreUnlessAudioBridge();
             using var region = StockRegion.Create((voice, janus) => janus.Set("EmptyRoomGraceSeconds", "3"));
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
-            int room = JanusAudioBridge.CalcRoomNumber(region.Scene.RegionInfo.RegionID.ToString(), "local",
+            int room = JanusAudioBridge.CalcRoomNumber(string.Empty, region.Scene.RegionInfo.RegionID.ToString(), "local",
                 JanusAudioBridge.REGION_ROOM_ID, string.Empty);
             JsonObject made = await _janus.PluginRequestAsync(new JsonObject
             {

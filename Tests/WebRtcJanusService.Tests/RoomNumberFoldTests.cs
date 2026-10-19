@@ -77,7 +77,7 @@ namespace osWebRtcVoice.Tests
                 Assume.That(hc, Is.Not.EqualTo(int.MinValue), "fixed-input hash is not the 1-in-2^32 crash value");
 
                 int oldRoom = Math.Abs(hc);
-                int liveRoom = JanusAudioBridge.CalcRoomNumber(region, "local", parcel, string.Empty);
+                int liveRoom = JanusAudioBridge.CalcRoomNumber(string.Empty, region, "local", parcel, string.Empty);
                 Assert.That(liveRoom, Is.EqualTo(oldRoom),
                     $"CalcRoomNumber(local, {region}, {parcel}) must be unchanged by the fix");
                 Assert.That(liveRoom, Is.GreaterThanOrEqualTo(0), "a room number is non-negative");

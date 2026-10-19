@@ -11,7 +11,7 @@
  * DefaultsProbe sends one fixed set of requests to a region with every optional voice setting at its default.
  * The expected answers below were recorded by sending the same requests to the voice addon of upstream
  * develop with the session-start and shared-service fixes and nothing else (the probe compiles against both
- * trees). A request listed here must keep its answer; the one that differs is named in the comment on its row.
+ * trees). A request listed here must keep its answer; the ones that differ are named in the comment on their rows.
  */
 
 using System.Collections.Generic;
@@ -38,13 +38,17 @@ namespace osWebRtcVoice.Tests
             ["chat session: decline invitation"] = (200, false, "-", 0),
             ["chat session: fetch history"] = (200, false, "-", 0),
             ["chat session: unknown method"] = (400, false, "-", 0),
-            // A multiagent body with no channel_id always lands in the same room, which a gateway that has served one
-            // before already holds: -1 means "one room on a fresh gateway, none on one that has the room".
-            ["provision multiagent, unknown session"] = (200, true, "-", -1),
-            ["provision multiagent, group-style channel"] = (200, true, "-", 0),
+            // A difference in the rooms only: the recorded build read channel_id, which viewers do not send, so every
+            // multiagent body joined one room. The room now comes from `channel`, so each channel has a room of its own
+            // and a new one is created. The status and the answer are the same.
+            ["provision multiagent, unknown session"] = (200, true, "-", 1),
+            ["provision multiagent, group-style channel"] = (200, true, "-", 1),
             ["provision with no channel_type"] = (200, false, "-", 0),
-            ["provision channel_type=group"] = (500, false, "Exception", 0),
-            // The one difference from the build the answers were recorded on: a logout for a viewer session that
+            // A difference from the recorded build: a channel type the module issues no room for ("group" while
+            // group calls are off) is refused 403 before it reaches the voice service. That build passed it on, the
+            // service threw, and the request answered 500.
+            ["provision channel_type=group"] = (403, false, "-", 0),
+            // The other difference from the build the answers were recorded on: a logout for a viewer session that
             // does not exist is acknowledged with {response: closed}; that build answered an empty 200.
             ["logout, unknown viewer session"] = (200, false, "closed", 0),
         };

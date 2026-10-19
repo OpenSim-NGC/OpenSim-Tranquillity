@@ -258,13 +258,18 @@ namespace osWebRtcVoice.Tests
             return joined;
         }
 
-        /// <summary>The room a "local" provision joins: the region-wide estate room, or the room of the named parcel.</summary>
+        /// <summary>The room a provision joins. A "multiagent" one is the room of its channel (the region has no grid id
+        /// here, so the grid part of the number is empty); a "local" one is the region-wide estate room, or the room of
+        /// the named parcel.</summary>
         private int LocalRoomOf(OSDMap body)
         {
+            if (body.TryGetString("channel_type", out string channelType) && channelType == "multiagent")
+                return JanusAudioBridge.CalcRoomNumber(string.Empty, Scene.RegionInfo.RegionID.ToString(), "multiagent",
+                    JanusAudioBridge.REGION_ROOM_ID, body["channel"].AsString());
             int parcel = JanusAudioBridge.REGION_ROOM_ID;
             if (body.TryGetInt("parcel_local_id", out int named) && named != EstateChannelParcelLocalId)
                 parcel = named;
-            return JanusAudioBridge.CalcRoomNumber(Scene.RegionInfo.RegionID.ToString(), "local", parcel, string.Empty);
+            return JanusAudioBridge.CalcRoomNumber(string.Empty, Scene.RegionInfo.RegionID.ToString(), "local", parcel, string.Empty);
         }
 
         public async Task<CapAnswer> LogoutAsync(Joined j) => await ProvisionAsync(j.Agent, LogoutBody(j.Answer.ViewerSession));

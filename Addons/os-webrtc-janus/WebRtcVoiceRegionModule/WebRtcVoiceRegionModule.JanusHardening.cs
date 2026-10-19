@@ -47,8 +47,7 @@ public partial class WebRtcVoiceRegionModule
     // What one provision call decided, read back by the wrapper once the handler has answered.
     private sealed class ProvisionCallContext
     {
-        public bool IsLocal;                 // the request was a "local" (spatial) provision
-        public bool IsLogout;                // the request was a teardown ({logout: true})
+        public ProvisionKind? Kind;          // set once admission has decided (null: refused earlier)
         public bool AnsweredFromCache;       // the refusal cache answered this call
         public bool Provisioned;             // the voice service returned a success map (viewer_session)
     }
@@ -71,11 +70,11 @@ public partial class WebRtcVoiceRegionModule
         ProvisionVoiceAccountRequestCore(request, response, agentID, scene, ctx);
 
         UUID regionId = scene.RegionInfo.RegionID;
-        if (ctx.IsLogout || ctx.Provisioned)
+        if (ctx.Kind == ProvisionKind.Logout || ctx.Provisioned)
         {
             m_refusalCache.Clear(agentID, regionId);
         }
-        else if (ctx.IsLocal && !ctx.AnsweredFromCache && IsCacheableRefusalStatus(response.StatusCode))
+        else if (ctx.Kind == ProvisionKind.Local && !ctx.AnsweredFromCache && IsCacheableRefusalStatus(response.StatusCode))
         {
             int suppressed = m_refusalCache.RecordRefusal(agentID, regionId, new CachedRefusal(response.StatusCode, response.RawBuffer));
             if (suppressed > 0)
@@ -86,9 +85,11 @@ public partial class WebRtcVoiceRegionModule
 
     // Answers a repeat of a refusal this (agent, region) got within RefusalCacheSeconds straight from the cache.
     // Returns true when it has answered the request.
-    private bool TryReplayCachedRefusal(UUID agentID, Scene scene, IOSHttpResponse response, ProvisionCallContext ctx)
+    private bool TryReplayCachedRefusal(ProvisionAdmission admission, UUID agentID, Scene scene, IOSHttpResponse response,
+        ProvisionCallContext ctx)
     {
-        if (m_refusalCache.TryGetRefusal(agentID, scene.RegionInfo.RegionID, out object cachedRefusal)
+        if (admission.Kind == ProvisionKind.Local
+            && m_refusalCache.TryGetRefusal(agentID, scene.RegionInfo.RegionID, out object cachedRefusal)
             && cachedRefusal is CachedRefusal cached)
         {
             ctx.AnsweredFromCache = true;

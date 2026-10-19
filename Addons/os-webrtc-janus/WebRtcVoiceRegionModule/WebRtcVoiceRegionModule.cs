@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
 
@@ -81,6 +82,7 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
                 _MessageDetails = m_Config.GetBoolean("MessageDetails", false);
                 InitialiseRefusalCache();
                 InitialiseStunServers();
+                InitialiseNonSpatial();
 
                 m_log.LogInformation($"{logHeader}: enabled");
             }
@@ -96,11 +98,13 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
     public void AddRegion(Scene scene)
     {
         // todo register module to get parcels changes etc
+        RegisterSceneForVoiceSessions(scene);
     }
 
     // ISharedRegionModule.RemoveRegion
     public void RemoveRegion(Scene scene)
     {
+        UnregisterSceneForVoiceSessions(scene);
     }
 
     // ISharedRegionModule.RegionLoaded
@@ -112,6 +116,7 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
             {
                 OnRegisterCaps(scene, agentID, caps);
             };
+            SubscribeVoiceSessionEvents(scene);
 
             ISimulatorFeaturesModule simFeatures = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
             simFeatures?.AddFeature("VoiceServerType", OSD.FromString("webrtc"));
@@ -232,20 +237,22 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
 
         if (_MessageDetails) m_log.LogDebug($"{logHeader}[ProvisionVoice]: request: {map}");
 
-        // A teardown ({logout: true}) carries no channel_type; the wrapper clears the refusal cache for it.
-        ctx.IsLogout = map.TryGetBool("logout", out bool logout) && logout;
+        if (!TryAdmitProvision(map, agentID, scene, response, out ProvisionAdmission admission, out string channelType, out string a2aVs))
+            return;
 
-        if (map.TryGetString("channel_type", out string channelType))
+        // Record what admission decided for the wrapper, and answer a repeat of a refusal this (agent, region)
+        // got within RefusalCacheSeconds straight from the cache, before the estate and parcel checks run.
+        ctx.Kind = admission.Kind;
+        if (TryReplayCachedRefusal(admission, agentID, scene, response, ctx))
+            return;
+
+        // The estate and parcel checks below apply to a "local" request. A call, a conference, a group call and a
+        // teardown are admitted by TryAdmitProvision instead.
+        if (admission.Kind == ProvisionKind.Local)
         {
             //do fully not trust viewers voice parcel requests
             if (channelType == "local")
             {
-                // A repeat of a refusal this agent got a moment ago is answered from the cache, before the
-                // estate and parcel checks run again.
-                ctx.IsLocal = true;
-                if (TryReplayCachedRefusal(agentID, scene, response, ctx))
-                    return;
-
                 if (!scene.RegionInfo.EstateSettings.AllowVoice)
                 {
                     m_log.LogDebug($"{logHeader}[ProvisionVoice]:region \"{scene.Name}\": voice not enabled in estate settings");
@@ -330,6 +337,8 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
                 response.StatusCode = (int)HttpStatusCode.Conflict;
             else
                 response.StatusCode = (int)HttpStatusCode.OK;
+
+            OnProvisionAnswered(resp, admission, a2aVs, agentID, scene);
         }
         else
         {
@@ -412,6 +421,9 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
             return;
         }
 
+        if (RefuseChildChatSession(sp, agentID, scene, response))
+            return;
+
         OSDMap reqmap = BodyToMap(request, "[ChatSessionRequest]");
         if (reqmap is null)
         {
@@ -421,6 +433,9 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
         }
 
         m_log.LogDebug($"{logHeader} ChatSessionRequest");
+
+        if (TryHandleNonSpatialChatSession(reqmap, agentID, sp, scene, response))
+            return;
 
         if (!reqmap.TryGetString("method", out string method))
         {

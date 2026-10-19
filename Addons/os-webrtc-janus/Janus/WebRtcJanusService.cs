@@ -86,6 +86,7 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 _JanusAdminURI = janusConfig.GetString("JanusGatewayAdminURI", string.Empty);
                 _JanusAdminToken = janusConfig.GetString("AdminAPIToken", string.Empty);
                 ReadPluginNameConfig(janusConfig);
+                ReadGridIdConfig();
                 ReadRoomReaperConfig(janusConfig);
                 // Debugging options
                 _MessageDetails = janusConfig.GetBoolean("MessageDetails", false);
@@ -145,7 +146,7 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             _log.LogDebug("{0} JanusSession created", LogHeader);
 
             // Once the session is created, create a handle to the plugin for rooms
-            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName)
+            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName, _GridId)
             {
                 // Rooms this bridge creates are watched by the empty-room reaper (null when it is off).
                 RoomCreated = _roomReaper is null ? null : _roomReaper.NoteCreated,
@@ -261,9 +262,17 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             }
 
             // Get the parameters that select the room
-            // To get here, voice_server_type has already been checked to be 'webrtc' and channel_type='local'
+            // To get here, voice_server_type has already been checked to be 'webrtc' and the region module
+            // has admitted channel_type as 'local' (parcel/estate checks) or 'multiagent' (a call or conference
+            // the module knows: channel + member + credentials), or has passed the body through unexamined
+            // while no call feature is on.
             int parcel_local_id = pRequest.TryGetInt("parcel_local_id", out int pli) ? pli : JanusAudioBridge.REGION_ROOM_ID;
-            string channel_id = pRequest.TryGetString("channel_id", out string cli) ? cli : string.Empty;
+            // The viewer's multiagent body names the session under `channel` (SL llvoicewebrtc.cpp:3341-3343,
+            // Firestorm llvoicewebrtc.cpp:3695-3697), not `channel_id`. Reading only channel_id gave "" and put every
+            // call on the grid into one room. `channel_id` stays as a fallback.
+            string channel_id = pRequest.TryGetString("channel", out string chn) && !string.IsNullOrEmpty(chn)
+                ? chn
+                : pRequest.TryGetString("channel_id", out string cli) ? cli : string.Empty;
             string channel_credentials = pRequest.TryGetString("credentials", out string cred) ? cred : string.Empty;
             string channel_type = pRequest["channel_type"].AsString();
             bool isSpatial = channel_type == "local";

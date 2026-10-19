@@ -110,7 +110,7 @@ namespace osWebRtcVoice.Tests
         }
 
         private static int EstateRoomOf(UUID region)
-            => JanusAudioBridge.CalcRoomNumber(region.ToString(), "local", JanusAudioBridge.REGION_ROOM_ID, string.Empty);
+            => JanusAudioBridge.CalcRoomNumber(string.Empty, region.ToString(), "local", JanusAudioBridge.REGION_ROOM_ID, string.Empty);
 
         /// One viewer provision with a JSEP offer, exactly the shape the region module hands the service.
         private static Task<OSDMap> Provision(WebRtcJanusService svc, UUID region)
