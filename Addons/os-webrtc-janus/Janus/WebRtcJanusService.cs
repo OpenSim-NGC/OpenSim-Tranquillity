@@ -38,7 +38,7 @@ using Microsoft.Extensions.Logging;
 
 namespace osWebRtcVoice;
 
-public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
+public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
 {
     private static readonly ILogger _log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[JANUS WEBRTC SERVICE]";
@@ -76,6 +76,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 _JanusAPIToken = janusConfig.GetString("APIToken", string.Empty);
                 _JanusAdminURI = janusConfig.GetString("JanusGatewayAdminURI", string.Empty);
                 _JanusAdminToken = janusConfig.GetString("AdminAPIToken", string.Empty);
+                ReadPluginNameConfig(janusConfig);
                 // Debugging options
                 _MessageDetails = janusConfig.GetBoolean("MessageDetails", false);
 
@@ -130,7 +131,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             _log.LogDebug("{0} JanusSession created", LogHeader);
 
             // Once the session is created, create a handle to the plugin for rooms
-            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession);
+            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName);
 
             if (await audioBridge.Activate(_Config).ConfigureAwait(false))
             {
