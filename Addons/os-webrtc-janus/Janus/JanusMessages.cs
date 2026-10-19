@@ -330,9 +330,10 @@ public class TrickleReq : JanusMessageReq
         };
 
     }
+    // The viewer's candidates, per the Janus trickle API: an array goes as "candidates", a single
+    // candidate object as "candidate". No other members (the old "viewer_session" is not part of the API).
     public TrickleReq(JanusViewerSession pVSession, OSD pCandidates) : base("trickle")
     {
-        m_message["viewer_session"] = pVSession.ViewerSessionID;
         if (pCandidates is OSDArray)
             m_message["candidates"] = pCandidates;
         else
@@ -457,6 +458,13 @@ public class PluginMsgResp : JanusMessageResp
             return 0;
         return m_data.ContainsKey(pKey) ? (int)OSDToLong(m_data[pKey]) : 0;
     }
+    // Get a 64-bit value for a key in the response data or zero if not there
+    public long PluginRespDataLong(string pKey)
+    {
+        if (m_data is null)
+            return 0;
+        return m_data.ContainsKey(pKey) ? OSDToLong(m_data[pKey]) : 0;
+    }
     // Get a string value for a key in the response data or empty string if not there
     public string PluginRespDataString(string pKey)
     {
@@ -518,11 +526,15 @@ public class AudioBridgeCreateRoomReq : PluginMsgReq
 // ==============================================================
 public class AudioBridgeDestroyRoomReq : PluginMsgReq
 {
-    public AudioBridgeDestroyRoomReq(int pRoomId) : base(new OSDMap() {
+    public AudioBridgeDestroyRoomReq(int pRoomId) : this(pRoomId, true)
+    {
+    }
+    /// <param name="pPermanent">Also remove the room from the plugin's config file. False for a room made at run time.</param>
+    public AudioBridgeDestroyRoomReq(int pRoomId, bool pPermanent) : base(new OSDMap() {
                                             { "request", "destroy" },
                                             { "room", pRoomId },
-                                            { "permanent", true }
-                                        })  
+                                            { "permanent", pPermanent }
+                                        })
     {
     }
 }
@@ -543,7 +555,8 @@ public class AudioBridgeJoinRoomResp : AudioBridgeResp
     public AudioBridgeJoinRoomResp(JanusMessageResp pResp) : base(pResp)
     {
     }
-    public int ParticipantId { get { return PluginRespDataInt("id"); } }
+    // Janus assigns a participant a random 64-bit id, so this must not be narrowed to an int.
+    public long ParticipantId { get { return PluginRespDataLong("id"); } }
 }
 // ==============================================================
 public class AudioBridgeConfigRoomReq : PluginMsgReq
@@ -565,7 +578,7 @@ public class AudioBridgeConfigRoomResp : AudioBridgeResp
 // ==============================================================
 public class AudioBridgeLeaveRoomReq : PluginMsgReq
 {
-    public AudioBridgeLeaveRoomReq(int pRoomId, int pAttendeeId) : base(new OSDMap() {
+    public AudioBridgeLeaveRoomReq(int pRoomId, long pAttendeeId) : base(new OSDMap() {
                                             { "request", "leave" },
                                             { "room", pRoomId },
                                             { "id", pAttendeeId }

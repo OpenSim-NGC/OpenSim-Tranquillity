@@ -36,7 +36,7 @@ using OpenSim.Framework;
 namespace osWebRtcVoice;
 
 // Encapsulization of a Session to the Janus server
-public class JanusSession : IDisposable
+public partial class JanusSession : IDisposable
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[JANUS SESSION]";
@@ -58,12 +58,19 @@ public class JanusSession : IDisposable
     public string PluginId { get; set; }
 
     private CancellationTokenSource _CancelTokenSource = new CancellationTokenSource();
-    private HttpClient _HttpClient = new HttpClient();
+    private HttpClient _HttpClient;
 
     public bool IsConnected { get; set; }
 
     // Wrapper around the session connection to Janus-gateway
     public JanusSession(string pServerURI, string pAPIToken, string pAdminURI, string pAdminToken, bool pDebugMessages = false)
+        : this(pServerURI, pAPIToken, pAdminURI, pAdminToken, pDebugMessages, null)
+    {
+    }
+
+    // Test seam: pHandler replaces the network (null = a normal HttpClient).
+    public JanusSession(string pServerURI, string pAPIToken, string pAdminURI, string pAdminToken, bool pDebugMessages,
+                        HttpMessageHandler pHandler)
     {
         m_log.LogDebug("{0} JanusSession constructor", LogHeader);
         _JanusServerURI = pServerURI;
@@ -71,6 +78,7 @@ public class JanusSession : IDisposable
         _JanusAdminURI = pAdminURI;
         _JanusAdminToken = pAdminToken;
         _MessageDetails = pDebugMessages;
+        _HttpClient = pHandler is null ? new HttpClient() : new HttpClient(pHandler);
     }
 
     public void Dispose()
@@ -124,6 +132,9 @@ public class JanusSession : IDisposable
     public async Task<bool> DestroySession()
     {
         bool ret = false;
+        // Once the Janus session is destroyed Janus sends no more events, so complete every pending
+        // request now rather than leaving its caller waiting.
+        FailOutstanding(SessionDestroyedReason);
         try
         {
             JanusMessageResp resp = await SendToSession(new DestroySessionReq());
@@ -169,34 +180,17 @@ public class JanusSession : IDisposable
     }
 
     // ====================================================================
+    // forward the viewer's trickled candidates ({"janus":"trickle","candidates":[...]}). This used to
+    // send the end-of-candidates marker instead, so only the candidates already in the offer reached Janus.
     public async Task<JanusMessageResp> TrickleCandidates(JanusViewerSession pVSession, OSDArray pCandidates)
     {
-        JanusMessageResp ret = null;
-        // if the audiobridge is active, the trickle message is sent to it
-        if (pVSession.AudioBridge is null)
-        {
-            ret = await SendToJanusNoWait(new TrickleReq(pVSession));
-        }
-        else
-        {
-            ret = await SendToJanusNoWait(new TrickleReq(pVSession), pVSession.AudioBridge.PluginUri);
-        }
-        return ret;
+        return await SendTrickle(pVSession, new TrickleReq(pVSession, pCandidates));
     }
     // ====================================================================
+    // The viewer has finished trickling: {"janus":"trickle","candidate":{"completed":true}}.
     public async Task<JanusMessageResp> TrickleCompleted(JanusViewerSession pVSession)
     {
-        JanusMessageResp ret = null;
-        // if the audiobridge is active, the trickle message is sent to it
-        if (pVSession.AudioBridge is null)
-        {
-            ret = await SendToJanusNoWait(new TrickleReq(pVSession));
-        }
-        else
-        {
-            ret = await SendToJanusNoWait(new TrickleReq(pVSession), pVSession.AudioBridge.PluginUri);
-        }
-        return ret;
+        return await SendTrickle(pVSession, new TrickleReq(pVSession));
     }
     // ====================================================================
     public Dictionary<string, JanusPlugin> _Plugins = new Dictionary<string, JanusPlugin>();
@@ -242,15 +236,19 @@ public class JanusSession : IDisposable
         if (_MessageDetails) m_log.LogDebug("{0} SendToJanus. URI={1}, req={2}", LogHeader, pURI, pReq.ToJson());
 
         JanusMessageResp ret = null;
+        OutstandingRequest outReq = new OutstandingRequest
+        {
+            TransactionId = pReq.TransactionId,
+            RequestTime = DateTime.Now,
+            // Continuations run asynchronously, so a TrySetResult from the long-poll event task or
+            // FailOutstanding never runs this method's tail on the completing thread.
+            TaskCompletionSource = new TaskCompletionSource<JanusMessageResp>(TaskCreationOptions.RunContinuationsAsynchronously)
+        };
         try
         {
-            OutstandingRequest outReq = new OutstandingRequest
-            {
-                TransactionId = pReq.TransactionId,
-                RequestTime = DateTime.Now,
-                TaskCompletionSource = new TaskCompletionSource<JanusMessageResp>()
-            };
-            _OutstandingRequests.Add(pReq.TransactionId, outReq);
+            // Every _OutstandingRequests access is under its lock (the long-poll event task races this).
+            lock (_OutstandingRequests)
+                _OutstandingRequests.Add(pReq.TransactionId, outReq);
 
             string reqStr = pReq.ToJson();
 
@@ -267,29 +265,45 @@ public class JanusSession : IDisposable
                 {
                     // Some messages are asynchronous and completed with an event
                     if (_MessageDetails) m_log.LogDebug("{0} SendToJanus: ack response {1}", LogHeader, respStr);
-                    if (_OutstandingRequests.TryGetValue(pReq.TransactionId, out OutstandingRequest outstandingRequest))
+                    // Wait on THIS request's completion source, bounded by JanusRequestTimeout. It is
+                    // completed by its event (long poll), or with an error by FailOutstanding. Awaiting our own
+                    // TCS rather than looking the entry up again also keeps an event that beat the ack.
+                    Task done = await Task.WhenAny(outReq.TaskCompletionSource.Task,
+                                                   Task.Delay(JanusRequestTimeout, _CancelTokenSource.Token));
+                    if (done == outReq.TaskCompletionSource.Task || !RemoveOutstanding(outReq))
                     {
-                        ret = await outstandingRequest.TaskCompletionSource.Task;
-                        _OutstandingRequests.Remove(pReq.TransactionId);
+                        // Completed — or claimed at the deadline by the event task / FailOutstanding, which
+                        // complete it immediately after removing it.
+                        ret = await outReq.TaskCompletionSource.Task;
                     }
-                    // If there is no OutstandingRequest, the request was not waiting for an event or already processed
+                    else if (done.IsCanceled)
+                    {
+                        ret = MakeErrorResp(pReq.TransactionId, SessionDestroyedReason);
+                    }
+                    else
+                    {
+                        m_log.LogWarning("{0}: request {1} ({2}) timed out after {3} ms (sent {4:HH:mm:ss.fff})",
+                            LogHeader, pReq.TransactionId, DescribeOp(pReq), (long)JanusRequestTimeout.TotalMilliseconds, outReq.RequestTime);
+                        ret = MakeErrorResp(pReq.TransactionId, RequestTimeoutReason);
+                    }
                 }
                 else 
                 {
                     // If the response is not an ack, that means a synchronous request/response so return the response
-                    _OutstandingRequests.Remove(pReq.TransactionId);
+                    RemoveOutstanding(outReq);
                     if (_MessageDetails) m_log.LogDebug("{0} SendToJanus: response {1}", LogHeader, respStr);
                 }
             }
             else
             {
                 m_log.LogError("{0} SendToJanus: response not successful {1}", LogHeader, response);
-                _OutstandingRequests.Remove(pReq.TransactionId);
+                RemoveOutstanding(outReq);
             }
         }
         catch (Exception e)
         {
             m_log.LogError("{0} SendToJanus: exception {1}", LogHeader, e.Message);
+            RemoveOutstanding(outReq);   // don't leave a dead entry parked (only ever removes our own)
         }
 
         return ret;
@@ -560,7 +574,7 @@ public class JanusSession : IDisposable
                                     m_log.LogDebug("{0} EventLongPoll: error {1}", LogHeader, resp.ToString());
                                     if (TryGetOutstandingRequest(resp.TransactionId, out OutstandingRequest outstandingRequest))
                                     {
-                                        outstandingRequest.TaskCompletionSource.SetResult(resp);
+                                        outstandingRequest.TaskCompletionSource.TrySetResult(resp);
                                     }
                                     else
                                     {
@@ -573,11 +587,11 @@ public class JanusSession : IDisposable
                                     if (TryGetOutstandingRequest(resp.TransactionId, out OutstandingRequest outstandingRequest2))
                                     {
                                         // Someone is waiting for this event
-                                        outstandingRequest2.TaskCompletionSource.SetResult(resp);
+                                        outstandingRequest2.TaskCompletionSource.TrySetResult(resp);
                                     }
                                     else
                                     {
-                                        m_log.LogError("{0} EventLongPoll: event no outstanding request {1}", LogHeader, resp.ToString());
+                                        m_log.Log(UnclaimedEventLevel(resp), "{0} EventLongPoll: event no outstanding request {1}", LogHeader, resp.ToString());
                                         OnEvent?.Invoke(eventResp);
                                     }
                                     break;
@@ -625,6 +639,8 @@ public class JanusSession : IDisposable
                                     }   
                                     // This will cause the long poll to exit
                                     running = false;
+                                    // Nothing will deliver the pending requests' events now.
+                                    FailOutstanding(LongPollExitedReason);
                                     OnDisconnect?.Invoke(eventResp);
                                     break;
                                 default:
@@ -642,6 +658,7 @@ public class JanusSession : IDisposable
                 {
                     // This will cause the long poll to exit
                     running = false;
+                    FailOutstanding(LongPollExitedReason);   // as the GETERROR arm
                     m_log.LogError("{0} EventLongPoll: exception {1}", LogHeader, e);
                 }
             }

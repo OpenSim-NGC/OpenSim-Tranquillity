@@ -25,15 +25,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Collections.Concurrent;
 using System.Reflection;
 
 using Microsoft.Extensions.Logging;
+using Nini.Config;
 using OpenSim.Framework;
 
 namespace osWebRtcVoice;
 
 // Encapsulization of a Session to the Janus server
-public class JanusAudioBridge : JanusPlugin
+public partial class JanusAudioBridge : JanusPlugin
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[JANUS AUDIO BRIDGE]";
@@ -82,40 +84,19 @@ public class JanusAudioBridge : JanusPlugin
     /// <param name="pSpatial">boolean on whether room will be spatial or non-spatial</param>
     /// <param name="pRoomDesc">added as "description" to the created room</param>
     /// <returns></returns>
+    // Create room 'pRoomId', treating an already-existing room (Janus error 486) as
+    // reuse. If the first attempt is inconclusive (non-486 error, unexpected return
+    // code, or an exception), re-attempt ONCE: under a cross-PROCESS race (another
+    // region server process created the room in the same instant) the room now exists and the
+    // re-attempt returns 486 -> reuse. No in-process lock can cover that cross-process
+    // case, so this re-check is the load-bearing correctness. Janus keys rooms by
+    // number, so re-attempting create cannot produce a duplicate room.
     public async Task<JanusRoom> CreateRoom(int pRoomId, bool pSpatial, string pRoomDesc)
     {
-        JanusRoom ret = null;
-        try
+        JanusRoom ret = await CreateWithRecheck(() => TryCreateRoomOnce(pRoomId, pSpatial, pRoomDesc)).ConfigureAwait(false);
+        if (ret is null)
         {
-            JanusMessageResp resp = await SendPluginMsg(new AudioBridgeCreateRoomReq(pRoomId, pSpatial, pRoomDesc));
-            AudioBridgeResp abResp = new AudioBridgeResp(resp);
-
-            m_log.LogDebug("{0} CreateRoom. ReturnCode: {1}", LogHeader, abResp.AudioBridgeReturnCode);
-            switch (abResp.AudioBridgeReturnCode)
-            {
-                case "created":
-                    ret = new JanusRoom(this, pRoomId);
-                    break;
-                case "event":
-                    if (abResp.AudioBridgeErrorCode == 486)
-                    {
-                        m_log.LogWarning("{0} CreateRoom. Room {1} already exists. Reusing! {2}", LogHeader, pRoomId, abResp.ToString());
-                        // if room already exists, just use it
-                        ret = new JanusRoom(this, pRoomId);
-                    }
-                    else
-                    {
-                        m_log.LogError("{0} CreateRoom. XX Room creation failed: {1}", LogHeader, abResp.ToString());
-                    }
-                    break;
-                default:
-                    m_log.LogError("{0} CreateRoom. YY Room creation failed: {1}", LogHeader, abResp.ToString());
-                    break;
-            }   
-        }
-        catch (Exception e)
-        {
-            m_log.LogError("{0} CreateRoom. Exception {1}", LogHeader, e);
+            m_log.LogError("{LogHeader} CreateRoom. Room {RoomId} creation failed after re-check", LogHeader, pRoomId);
         }
         return ret;
     }
@@ -137,7 +118,6 @@ public class JanusAudioBridge : JanusPlugin
 
     // Constant used to denote that this is a spatial audio room for the region (as opposed to parcels)
     public const int REGION_ROOM_ID = -999;
-    private Dictionary<int, JanusRoom> _rooms = new Dictionary<int, JanusRoom>();
 
     // Calculate a room number for the given parameters. The room number is a hash of the parameters.
     // The attempt is to deterministicly create a room number so all regions will generate the
@@ -146,7 +126,7 @@ public class JanusAudioBridge : JanusPlugin
     public static int CalcRoomNumber(string pRegionId, string pChannelType, int pParcelLocalID, string pChannelID)
     {
         var hasher = new BHasherMdjb2();
-        // If there is a channel specified it must be group 
+        // If there is a channel specified it must be group
         switch (pChannelType)
         {
             case "local":
@@ -167,64 +147,20 @@ public class JanusAudioBridge : JanusPlugin
         var hashed = hasher.Finish();
         // The "Abs()" is because Janus room number must be a positive integer
         // And note that this is the BHash.GetHashCode() and not Object.getHashCode().
-        int roomNumber = Math.Abs(hashed.GetHashCode());
+        int roomNumber = FoldHashToRoom(hashed.GetHashCode());
         return roomNumber;
     }
+    /// <summary>The room for these parameters, made to exist by ASKING THE MIXER: a create is sent every time, and
+    /// "already exists" (486) is success on every path. The viewer provision calls
+    /// this before its JSEP join, so the join never meets a room this process merely believed in. Returns a JanusRoom
+    /// bound to THIS bridge's plugin handle, or null when the create failed.</summary>
     public async Task<JanusRoom> SelectRoom(string pRegionId, string pChannelType, bool pSpatial, int pParcelLocalID, string pChannelID)
     {
         int roomNumber = CalcRoomNumber(pRegionId, pChannelType, pParcelLocalID, pChannelID);
-
-        // Should be unique for the given use and channel type
         m_log.LogDebug("{0} SelectRoom: roomNumber={1}", LogHeader, roomNumber);
-
-        // Check to see if the room has already been created
-        lock (_rooms)
-        {
-            if (_rooms.ContainsKey(roomNumber))
-            {
-                return _rooms[roomNumber];
-            }
-        }
-
-        // The room doesn't exist. Create it.
         string roomDesc = pRegionId + "/" + pChannelType + "/" + pParcelLocalID + "/" + pChannelID;
-        JanusRoom ret = await CreateRoom(roomNumber, pSpatial, roomDesc);
-
-        JanusRoom existingRoom = null;
-        if (ret is not null)
-        {
-            lock (_rooms)
-            {
-                if (_rooms.ContainsKey(roomNumber))
-                {
-                    // If the room was created while we were waiting, 
-                    existingRoom = _rooms[roomNumber];
-                }
-                else
-                {
-                    // Our room is the first one created. Save it.
-                    _rooms[roomNumber] = ret;
-                }
-            }
-        }
-        if (existingRoom is not null)
-        {
-            // The room we created was already created by someone else. Delete ours and use the existing one
-            await DestroyRoom(ret);
-            ret = existingRoom;
-        }
-        return ret;
-    }
-
-    // Return the room with the given room ID or 'null' if no such room
-    public JanusRoom GetRoom(int pRoomId)
-    {
-        JanusRoom ret = null;
-        lock (_rooms)
-        {
-            _rooms.TryGetValue(pRoomId, out ret);
-        }
-        return ret;
+        return await SelectRoomCoalesced(roomNumber, () => CreateRoom(roomNumber, pSpatial, roomDesc))
+            .ConfigureAwait(false);
     }
 
     public override void Handle_Event(JanusMessageResp pResp)

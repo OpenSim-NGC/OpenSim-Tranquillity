@@ -46,6 +46,15 @@ public interface IVoiceViewerSession
     // The simulator has a GUID to identify the user
     public OMV.UUID AgentId { get; set; }
 
+    // Generation token: the OpenSim client login SessionID, captured once when this voice
+    // session is provisioned and never changed after. A relog mints a new SessionID, so
+    // close-time teardown selects exactly the dying login's sessions and can never touch a
+    // successor login's session even if a new provision races the close (region scoping
+    // alone cannot distinguish an orphan from a live session after a relog; this can). UUID.Zero means
+    // the capture failed - such a voice session is swept by ANY close for its agent, since a
+    // failed capture can only belong to an already-dead or now-dying login.
+    public OMV.UUID ClientSessionId { get; set; }
+
     // Disconnect the connection to the voice service for this session
     public Task Shutdown();
 }
