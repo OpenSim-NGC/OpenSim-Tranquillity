@@ -202,7 +202,9 @@ startup when a call feature is on.
 | `VoiceModerationEnabled` | `[WebRtcVoice]` | `false` | Parcel voice moderation: the `SpatialVoiceModerationRequest` capability and the `voice moderation` console commands. On the stock AudioBridge a mute is that plugin's own mute of the participant in its room (a mute-all is remembered for the parcel and also applies to whoever joins afterwards). With the mixer it needs `VisibilityFeederEnabled`. |
 
 **Mixer-only switches.** The visibility switches and call voice mutes in a group call need a Janus plugin that
-implements the `janus.plugin.slvoice` protocol (the slvoice mixer, release 1.2.0 or later). With the stock
+implements the `janus.plugin.slvoice` protocol (the slvoice mixer, release 1.2.0 or later). The mixer is
+legion-voice-mixer: its repository is https://github.com/JohnLegionH/legion-voice-mixer and its container image is
+`ghcr.io/johnlegionh/legion-voice-mixer:1.2.0`. With the stock
 AudioBridge, which is the default, a mixer-only switch that is on logs one warning at start naming the switch and the
 plugin, and is turned off. Parcel voice moderation and call voice mutes work on the stock AudioBridge.
 
