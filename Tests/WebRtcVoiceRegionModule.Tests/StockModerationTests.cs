@@ -59,7 +59,6 @@ namespace osWebRtcVoice.Tests
             public OSDMap ProvisionVoiceAccountRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pScene) => null;
             public OSDMap VoiceSignalingRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pScene) => null;
             public IVoiceViewerSession CreateViewerSession(OSDMap pRequest, UUID pUserID, UUID pScene) => null;
-            public int? EnsureSpatialRoom(UUID pSceneID, int pParcelLocalID) => null;
         }
 
         // A service that cannot mute a participant: it does not implement ISpatialParticipantMute.
@@ -70,7 +69,6 @@ namespace osWebRtcVoice.Tests
             public OSDMap ProvisionVoiceAccountRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pScene) => null;
             public OSDMap VoiceSignalingRequest(IVoiceViewerSession pVSession, OSDMap pRequest, UUID pUserID, UUID pScene) => null;
             public IVoiceViewerSession CreateViewerSession(OSDMap pRequest, UUID pUserID, UUID pScene) => null;
-            public int? EnsureSpatialRoom(UUID pSceneID, int pParcelLocalID) => null;
         }
 
         private Scene _scene;
