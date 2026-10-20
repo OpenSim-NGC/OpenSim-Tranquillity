@@ -154,8 +154,8 @@ namespace osWebRtcVoice
         public VisAuthority Authority { get; set; }
 
         /// <summary>The region's estate-channel room. An agent with no
-        /// record is not addressed here - such an agent is omitted. It remains the room a connector without a parcel of its own
-        /// registers into, and the number the reader prints as the region's estate room.</summary>
+        /// record is not addressed here - such an agent is omitted. It is the number the reader prints as the region's
+        /// estate room.</summary>
         public int FallbackRoom => _fallbackRoom;
 
         /// <summary>The room numbers the most recent send actually addressed, ascending. The console

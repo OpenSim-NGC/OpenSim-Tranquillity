@@ -285,7 +285,7 @@ namespace osWebRtcVoice
                     continue;
                 }
                 // CanArmNow gates EVERY path, including a standing re-arm request and a
-                // snapshot. A connector NPC never leaves the population, so its re-arm request never expired and the
+                // snapshot. A presence that never leaves the population, an NPC for one, never had its re-arm request expire and the
                 // first clause re-armed it into a missing room on every tick — 8,933 unknown_room lines at ~3.8/s in
                 // the 0.8 soak, with the authority's own backoff sitting there unread.
                 if ((snapshot || _authority.IsRearmRequested(l) || !_authority.IsArmed(room.Value, l))

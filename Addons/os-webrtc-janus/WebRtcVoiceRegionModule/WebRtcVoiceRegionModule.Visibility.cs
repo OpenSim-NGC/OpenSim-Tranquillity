@@ -167,9 +167,8 @@ public partial class WebRtcVoiceRegionModule
             svc.Start();
             lock (m_visibilityServices)
                 m_visibilityServices[scene] = svc;
-            // The connector module (same assembly, separate module instance) reaches
-            // the per-region service — room record + moderation store — through the scene, the
-            // same way it reaches INPCModule. Concrete type, deliberately: no other assembly
+            // Other modules in this assembly reach the per-region service (room record and
+            // moderation store) through the scene. Concrete type, deliberately: no other assembly
             // needs it.
             scene.RegisterModuleInterface<VoiceVisibilityService>(svc);
         }

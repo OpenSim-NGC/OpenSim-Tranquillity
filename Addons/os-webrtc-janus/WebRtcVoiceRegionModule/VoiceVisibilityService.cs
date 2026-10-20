@@ -247,8 +247,8 @@ namespace osWebRtcVoice
         public void OnListenerProvisioned(UUID listener)
             => OnListenerProvisioned(listener, null);
 
-        /// <summary>Something proved this room exists - a connector's capability fetch ensured
-        /// it, a viewer provisioned into it, or a batch to it applied. Clears that room's unknown_room backoff so
+        /// <summary>Something proved this room exists - an ensure created it,
+        /// a viewer provisioned into it, or a batch to it applied. Clears that room's unknown_room backoff so
         /// arming goes out on the very next tick. Safe before the loop starts (no authority yet: nothing to clear).</summary>
         public void RoomExists(int room) => m_authority?.RoomExists(room);
 

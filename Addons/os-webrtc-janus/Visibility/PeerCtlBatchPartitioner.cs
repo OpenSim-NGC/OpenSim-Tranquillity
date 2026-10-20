@@ -24,7 +24,7 @@
  * ONE policy for a missing record, both roles: roomOf(agent) = record ?? estateRoom. A source with
  * no record is NOT dropped; it is an estate-room source, kept for estate-room listeners and filtered
  * out for per-parcel listeners. The asymmetry OQ2 first drafted (drop unrecorded sources) is
- * superseded: under connector-topology skew NOBODY has a record, and dropping sources while
+ * superseded: when NOBODY has a record, dropping sources while
  * defaulting listeners would empty every column and silently collapse estate enforcement region-wide.
  * Symmetric fallback makes that state today's behaviour byte-for-byte - which is what the fast path
  * below returns literally, the same map instance, unfiltered.
