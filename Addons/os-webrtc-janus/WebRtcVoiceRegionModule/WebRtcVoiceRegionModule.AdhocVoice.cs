@@ -113,7 +113,7 @@ public partial class WebRtcVoiceRegionModule
             // A non-member's SessionSend for this voice session is refused AND LOGGED. Warning,
             // not debug: a stranger addressing a conference id is worth seeing without turning
             // debug on.
-            m_log.LogWarning("{LogHeader} {Line}", logHeader,
+            WarnRefusal("conference-text-" + decision, sender, () => logHeader + " " +
                 AdhocTextSession.Line(sender, sessionId, decision,
                     "region=\"" + (client?.Scene?.RegionInfo?.RegionName ?? string.Empty) + "\""));
             return;
@@ -328,7 +328,7 @@ public partial class WebRtcVoiceRegionModule
                 m_log.LogDebug("{LogHeader} {Line}", logHeader,
                     AdhocTextTransport.Line(text.Target, text.SessionId, text.Decision));
             else
-                m_log.LogWarning("{LogHeader} {Line}", logHeader,
+                WarnRefusal("conference-text-carrier-" + text.Decision, text.Sender, () => logHeader + " " +
                     AdhocTextTransport.Line(text.Target, text.SessionId, text.Decision,
                         text.Decision == AdhocTextSession.DecisionNotMember ? "from=" + text.Sender : null));
             return;

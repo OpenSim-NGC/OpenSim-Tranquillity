@@ -218,7 +218,7 @@ public partial class WebRtcVoiceRegionModule
         if (!ring.Ok)
         {
             if (ring.Decision != CarrierIntake.DecisionFeatureOff)   // that half is switched off on this instance
-                m_log.LogWarning("{LogHeader} {Line}", logHeader,
+                WarnRefusal("ring-" + ring.Decision, UUID.Zero, () => logHeader + " " +
                     GroupVoiceRingTransport.Line(ring.Target, ring.GroupId, ring.Decision,
                         "carried room key is missing or does not match this instance's derivation - check GatekeeperURI on both"));
             return;
@@ -406,14 +406,16 @@ public partial class WebRtcVoiceRegionModule
         {
             // Logged in full once for each window the viewer keeps trying; the retries in between are cached and counted.
             NoteRemovalRefusal(agentID, gch, g.Decision, scene);
-            m_log.LogWarning($"{logHeader}[ProvisionVoice]: refusing group provision ({g.Decision}) from agent {agentID} in region \"{scene.Name}\"");
+            WarnRefusal("group-provision", agentID, () =>
+                $"{logHeader}[ProvisionVoice]: refusing group provision ({g.Decision}) from agent {agentID} in region \"{scene.Name}\"");
             response.RawBuffer = llsdUndefAnswerBytes;
             response.StatusCode = g.Status;
             return false;
         }
         if (!g.Admitted)
         {
-            m_log.LogWarning($"{logHeader}[ProvisionVoice]: refusing group provision ({g.Decision}) from agent {agentID} in region \"{scene.Name}\"");
+            WarnRefusal("group-provision", agentID, () =>
+                $"{logHeader}[ProvisionVoice]: refusing group provision ({g.Decision}) from agent {agentID} in region \"{scene.Name}\"");
             response.RawBuffer = llsdUndefAnswerBytes;
             response.StatusCode = g.Status;
             return false;

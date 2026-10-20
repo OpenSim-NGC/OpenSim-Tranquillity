@@ -217,7 +217,7 @@ public partial class WebRtcVoiceRegionModule
         if (decision == A2ACarrierTransport.DecisionSent || decision == A2ACarrierTransport.DecisionNoRecord)
             m_log.LogDebug("{LogHeader} {Line}", logHeader, line);
         else
-            m_log.LogWarning("{LogHeader} {Line}", logHeader, line);
+            WarnRefusal("a2a-carrier-" + c.Step + "-" + decision, UUID.Zero, () => logHeader + " " + line);
     }
 
     // A carrier arrived from another region server. It is acted on only when it is authentic, fresh and not seen

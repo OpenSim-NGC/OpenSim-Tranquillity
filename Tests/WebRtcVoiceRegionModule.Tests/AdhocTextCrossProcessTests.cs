@@ -33,12 +33,12 @@ namespace osWebRtcVoice.Tests
     [TestFixture]
     public class AdhocTextCrossProcessTests
     {
-        private const string Grid = "example-grid";
-        private const string Secret = "0123456789abcdef0123456789abcdef-example";
+        internal const string Grid = "example-grid";
+        internal const string Secret = "0123456789abcdef0123456789abcdef-example";
         private static readonly UUID Carol = new UUID("33333333-3333-3333-3333-333333333333");
-        private static readonly UUID Stranger = new UUID("99999999-9999-9999-9999-999999999999");
+        internal static readonly UUID Stranger = new UUID("99999999-9999-9999-9999-999999999999");
 
-        private sealed class Node
+        internal sealed class Node
         {
             public Process Process;
             public WebRtcVoiceRegionModule Module;
@@ -55,11 +55,11 @@ namespace osWebRtcVoice.Tests
             public List<GridInstantMessage> HeardBy(UUID agent) => Heard.TryGetValue(agent, out var l) ? l : new();
         }
 
-        private static Node MakeNode(string region, uint x, INonSpatialSessionStore store, string secret = Secret)
+        internal static Node MakeNode(string region, uint x, INonSpatialSessionStore store, string secret = Secret, string grid = Grid)
         {
             Process p = new Process(region, x, 1000);
             NonSpatialVoiceSessionEngine engine = new NonSpatialVoiceSessionEngine(
-                store, new INonSpatialAdmission[] { new P2PAdmission(), new AdhocAdmission() }, Grid);
+                store, new INonSpatialAdmission[] { new P2PAdmission(), new AdhocAdmission() }, grid);
             WebRtcVoiceRegionModule mod = new WebRtcVoiceRegionModule();
             SetPrivate(mod, "m_Enabled", true);
             SetPrivate(mod, "m_adhocVoiceEnabled", true);
@@ -73,7 +73,7 @@ namespace osWebRtcVoice.Tests
         /// Alice starts a conference in the first process and invites <paramref name="invitees"/>, who are root in
         /// the second. The ring crosses as a carrier and is adopted there. Nobody has accepted yet.
         /// </summary>
-        private static (Node One, Node Two, UUID Session) Start(bool sharedStore, params UUID[] invitees)
+        internal static (Node One, Node Two, UUID Session) Start(bool sharedStore, params UUID[] invitees)
         {
             INonSpatialSessionStore store1 = new InMemoryNonSpatialSessionStore();
             Node one = MakeNode("Region One", 1000, store1);
@@ -98,7 +98,7 @@ namespace osWebRtcVoice.Tests
             return (one, two, session);
         }
 
-        private static void Type(Node node, UUID sender, UUID session, string text)
+        internal static void Type(Node node, UUID sender, UUID session, string text)
             => Invoke(node.Module, "OnViewerConferenceText", null, new GridInstantMessage
             {
                 dialog = AdhocTextSession.DialogSessionSend,

@@ -120,6 +120,20 @@ public partial class WebRtcVoiceRegionModule
     private void LogCarrierAccepted(string kind, UUID session, NonSpatialSessionType type, UUID origin)
         => m_log.LogDebug("{LogHeader} {Line}", logHeader, CarrierAuth.AcceptedLine(kind, session, type, origin));
 
+    // A refusal that a viewer or a sender can repeat as fast as it likes is worth one warning a minute for each kind of
+    // refusal and each agent. The line says how many it stands for.
+    private readonly RefusalLogGate m_refusalWarnGate = new RefusalLogGate();
+    private int m_refusalWarnCalls;
+
+    private void WarnRefusal(string kind, UUID key, Func<string> line)
+    {
+        DateTime now = DateTime.UtcNow;
+        if (m_refusalWarnGate.ShouldLog(kind, key, now, out int held))
+            m_log.LogWarning("{Line}{More}", line(), held > 0 ? $" ({held} more like this in the last minute)" : string.Empty);
+        if (Interlocked.Increment(ref m_refusalWarnCalls) % 1024 == 0)
+            m_refusalWarnGate.Prune(now, NonSpatialVoiceSessionEngine.TransientStateMaxAge);
+    }
+
     // A refused carrier is logged by reason and running count only, never by contents, and not on every
     // refusal: the first of each reason and then every hundredth, so a flood cannot flood the log.
     private void LogCarrierRefusal(string kind, string reason, long count)
@@ -319,7 +333,9 @@ public partial class WebRtcVoiceRegionModule
 
         if (!admission.Admitted)
         {
-            m_log.LogWarning($"{logHeader}[ProvisionVoice]: refusing provision with channel_type \"{channelType}\" ({admission.Decision}) from agent {agentID} in region \"{scene.Name}\"");
+            string refusedType = channelType, refusedDecision = admission.Decision;   // not out parameters inside the lambda
+            WarnRefusal("provision-channel-type", agentID, () =>
+                $"{logHeader}[ProvisionVoice]: refusing provision with channel_type \"{refusedType}\" ({refusedDecision}) from agent {agentID} in region \"{scene.Name}\"");
             response.RawBuffer = llsdUndefAnswerBytes;
             response.StatusCode = (int)HttpStatusCode.Forbidden;
             return false;
@@ -337,7 +353,8 @@ public partial class WebRtcVoiceRegionModule
     {
         if (sp.IsChildAgent && NonSpatialVoiceFeatureOn())
         {
-            m_log.LogWarning($"{logHeader} ChatSessionRequest: refusing child agent {agentID} in region \"{scene.RegionInfo.RegionName}\" (chat session requests come from the agent's root region)");
+            WarnRefusal("child-agent", agentID, () =>
+                $"{logHeader} ChatSessionRequest: refusing child agent {agentID} in region \"{scene.RegionInfo.RegionName}\" (chat session requests come from the agent's root region)");
             response.StatusCode = (int)HttpStatusCode.Forbidden;
             return true;
         }

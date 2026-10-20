@@ -119,8 +119,14 @@ namespace osWebRtcVoice.NonSpatial
     {
         public static readonly TimeSpan DefaultInterval = TimeSpan.FromMinutes(1);
 
+        private sealed class Entry
+        {
+            public DateTime Last;
+            public int Held;   // lines held back since the last one let through
+        }
+
         private readonly TimeSpan _interval;
-        private readonly Dictionary<UUID, DateTime> _last = new Dictionary<UUID, DateTime>();
+        private readonly Dictionary<(string Kind, UUID Key), Entry> _last = new Dictionary<(string, UUID), Entry>();
 
         public RefusalLogGate(TimeSpan? interval = null)
         {
@@ -128,13 +134,31 @@ namespace osWebRtcVoice.NonSpatial
         }
 
         /// <summary>True the first time a key is seen and again once the interval has passed since the last true.</summary>
-        public bool ShouldLog(UUID key, DateTime nowUtc)
+        public bool ShouldLog(UUID key, DateTime nowUtc) => ShouldLog(string.Empty, key, nowUtc, out _);
+
+        /// <summary>
+        /// As <see cref="ShouldLog(UUID, DateTime)"/>, with a separate allowance for each <paramref name="kind"/> of refusal.
+        /// <paramref name="held"/> is how many lines were held back since the last one let through, for the line to say.
+        /// </summary>
+        public bool ShouldLog(string kind, UUID key, DateTime nowUtc, out int held)
         {
             lock (_last)
             {
-                if (_last.TryGetValue(key, out DateTime prior) && nowUtc - prior < _interval)
-                    return false;
-                _last[key] = nowUtc;
+                if (_last.TryGetValue((kind, key), out Entry e))
+                {
+                    if (nowUtc - e.Last < _interval)
+                    {
+                        e.Held++;
+                        held = 0;
+                        return false;
+                    }
+                    held = e.Held;
+                    e.Held = 0;
+                    e.Last = nowUtc;
+                    return true;
+                }
+                _last[(kind, key)] = new Entry { Last = nowUtc };
+                held = 0;
                 return true;
             }
         }
@@ -144,11 +168,11 @@ namespace osWebRtcVoice.NonSpatial
         {
             lock (_last)
             {
-                List<UUID> stale = new List<UUID>();
-                foreach (KeyValuePair<UUID, DateTime> kv in _last)
-                    if (nowUtc - kv.Value > maxAge)
+                List<(string, UUID)> stale = new List<(string, UUID)>();
+                foreach (KeyValuePair<(string Kind, UUID Key), Entry> kv in _last)
+                    if (nowUtc - kv.Value.Last > maxAge)
                         stale.Add(kv.Key);
-                foreach (UUID k in stale)
+                foreach ((string, UUID) k in stale)
                     _last.Remove(k);
                 return stale.Count;
             }
