@@ -680,6 +680,7 @@ public partial class WebRtcVoiceRegionModule
         m_gridRenewer?.Stop();
         m_gridOutbox?.Stop();
         StopCallModerationTick();
+        StopCallMuteSink();
     }
 
     // Tracks the scenes this shared module serves, for callee resolution on THIS instance (the group

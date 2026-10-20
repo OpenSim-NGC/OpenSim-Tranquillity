@@ -138,7 +138,7 @@ public partial class WebRtcVoiceRegionModule
             TellCallMemberLeft(recorded.Session ?? before, target);
             lock (m_callFlagsSent)
                 m_callFlagsSent.Remove((before.SessionId, target));
-            if (dropped == 0 && !m_callStockPlugin && m_gridSessions is null)
+            if (dropped == 0 && !m_stockPlugin && m_gridSessions is null)
                 note = "remove-local-only: the member has no participant in this process; one that joined through another "
                        + "region server stays in the room until that server tears it down, which needs the grid session store";
             m_log.LogInformation("{LogHeader} [CALL REMOVAL] session={Session} by={By} target={Target} reason=\"{Reason}\" dropped={Dropped} lasts={Lasts}",

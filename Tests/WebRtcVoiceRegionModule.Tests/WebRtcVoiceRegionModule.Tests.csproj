@@ -103,6 +103,7 @@
     <Compile Include="VisibilityArmingDefaultsTests.cs" />
     <Compile Include="VoiceFeatureSwitchTests.cs" />
     <Compile Include="StockModerationTests.cs" />
+    <Compile Include="CallMuteEnforcementTests.cs" />
     <Compile Include="StockPluginSwitchTests.cs" />
     <Compile Include="StockJanus\StockRegion.cs" />
     <Compile Include="StockJanus\DefaultsProbe.cs" />

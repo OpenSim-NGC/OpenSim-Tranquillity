@@ -26,13 +26,15 @@ namespace osWebRtcVoice;
 
 // Call moderation: a group call's moderators mute a member's voice or text, or the whole call's voice.
 // [WebRtcVoice] CallModerationEnabled (off by default) switches it on; with it off every request is answered as it
-// was before the feature existed.
+// was before the feature existed. It is not the parcel voice moderation ([WebRtcVoice] VoiceModerationEnabled, the
+// SpatialVoiceModerationRequest capability), which moderates the voice of a parcel and is switched separately.
 public partial class WebRtcVoiceRegionModule
 {
     private CallModerationPolicy m_callModeration = new CallModerationPolicy();
     private CallGroupChatGate m_callChatGate;
     private string m_callGridId = string.Empty;
-    private bool m_callStockPlugin;
+    private JanusPeerCtlBatchSink m_callMuteSink;
+    private readonly object m_callMuteLock = new object();
     private Timer m_callModerationTick;
 
     // The moderator flag last sent to each member of a call, so a stable call generates no traffic.
@@ -53,19 +55,14 @@ public partial class WebRtcVoiceRegionModule
         }
 
         m_callGridId = JanusAudioBridge.ReadGridId(config);
-        IConfig janusConfig = config.Configs["JanusWebRtcVoice"];
-        m_callStockPlugin = janusConfig is null
-            || string.Equals(WebRtcJanusService.ReadPluginName(janusConfig), WebRtcJanusService.DefaultPluginName,
-                StringComparison.OrdinalIgnoreCase);
         InitialiseCallRemovalCache();
         m_callModeration = new CallModerationPolicy { Settings = settings, IsMember = GroupIsMember, Powers = GroupPowersOf };
         m_callChatGate = new CallGroupChatGate(m_nonSpatial, cache: m_gridSessions is not null);
         RegisterCallConsole();
         m_log.LogInformation("{LogHeader} CALL MODERATION enabled ([WebRtcVoice] CallModerationEnabled): moderators of a group call "
-            + "(Moderate Group Chat) can mute a member's voice or text, or the whole call's voice. {VoiceMutes}. "
+            + "(Moderate Group Chat) can mute a member's voice or text, or the whole call's voice. Voice mutes use {Path}. "
             + "Roster flags are re-checked every {Seconds} s. A removal lasts {Lasts}", logHeader,
-            m_callStockPlugin ? "Voice mutes use the stock AudioBridge's own per-participant mute"
-                              : "The configured Janus plugin has no call voice mute here, so a voice mute is refused with 501",
+            m_stockPlugin ? "the stock AudioBridge's own per-participant mute" : "the slvoice mixer's mute channel",
             settings.RevalidateSeconds,
             settings.RemovalMinutes > 0 ? settings.RemovalMinutes + " minutes" : "until the call ends");
     }
@@ -121,43 +118,91 @@ public partial class WebRtcVoiceRegionModule
         return null;
     }
 
-    private bool CanEnforceCallVoice()
-        => m_callStockPlugin && StockCallMute() is not null;
-
-    // Make the record's voice mutes true in the call's room: one mute request for each member who is in the room.
-    // Only the stock AudioBridge's participant mute is carried out; any other plugin answers Unsupported.
-    private ParticipantMuteResult EnforceCallVoice(NonSpatialVoiceSession session, UUID target = default)
+    private JanusPeerCtlBatchSink CallMuteSink()
     {
-        if (!m_callStockPlugin)
-            return ParticipantMuteResult.Unsupported;
-        INonSpatialParticipantMute mute = StockCallMute();
-        if (mute is null)
-            return ParticipantMuteResult.Unsupported;
-        Func<UUID, bool> moderator = a => IsCallModerator(session.Owner, a);
-        int room = CallRoomNumber(session);
-        ParticipantMuteResult worst = ParticipantMuteResult.NotInRoom;
-        foreach (NonSpatialMember m in session.Members)
+        if (string.IsNullOrEmpty(m_JanusAdminUri) || string.IsNullOrEmpty(m_JanusAdminToken))
+            return null;
+        lock (m_callMuteLock)
         {
-            if (!m.HoldsSeat || string.IsNullOrEmpty(m.ViewerSession))
-                continue;   // not in the room yet: it is muted when it joins
-            bool muted = session.IsVoiceMuted(m.AgentId) && !moderator(m.AgentId);
-            ParticipantMuteResult r = mute.SetCallMute(m.AgentId, room, muted);
-            if (r == ParticipantMuteResult.Unsupported || r == ParticipantMuteResult.Failed)
-                return r;
-            if (r == ParticipantMuteResult.NotInRoom && m.AgentId == target)
-                return r;   // the one agent a mute names has no participant: that is not a mute
-            if (r == ParticipantMuteResult.Applied)
-                worst = ParticipantMuteResult.Applied;
+            if (m_callMuteSink is null)
+            {
+                Scene any = CallScenes().Count > 0 ? CallScenes()[0] : null;
+                if (any is null)
+                    return null;
+                m_callMuteSink = new JanusPeerCtlBatchSink(m_JanusAdminUri, m_JanusAdminToken, TimeSpan.FromMilliseconds(m_AdminTimeoutMs),
+                    any.RegionInfo.RegionID, any.RegionInfo.RegionName, 1, sendOne: null, caCertificateFile: m_JanusCaCertificateFile);
+            }
+            return m_callMuteSink;
         }
-        return worst == ParticipantMuteResult.NotInRoom ? ParticipantMuteResult.Applied : worst;
     }
 
-    // Whether a voice mute of this one agent can reach a participant: the stock AudioBridge is asked for the agent's
-    // participant (found by the agent id the region set at join).
+    private void StopCallMuteSink()
+    {
+        JanusPeerCtlBatchSink sink;
+        lock (m_callMuteLock)
+        {
+            sink = m_callMuteSink;
+            m_callMuteSink = null;
+        }
+        sink?.Dispose();
+    }
+
+    private bool CanEnforceCallVoice()
+        => m_stockPlugin ? StockCallMute() is not null
+                         : !string.IsNullOrEmpty(m_JanusAdminUri) && !string.IsNullOrEmpty(m_JanusAdminToken);
+
+    // Make the record's voice mutes true in the call's room. Mixer: one send for the whole room. Stock plugin: one
+    // mute request for each member who is in the room.
+    private ParticipantMuteResult EnforceCallVoice(NonSpatialVoiceSession session, UUID target = default)
+    {
+        Func<UUID, bool> moderator = a => IsCallModerator(session.Owner, a);
+        int room = CallRoomNumber(session);
+        if (m_stockPlugin)
+        {
+            INonSpatialParticipantMute mute = StockCallMute();
+            if (mute is null)
+                return ParticipantMuteResult.Unsupported;
+            ParticipantMuteResult worst = ParticipantMuteResult.NotInRoom;
+            foreach (NonSpatialMember m in session.Members)
+            {
+                if (!m.HoldsSeat || string.IsNullOrEmpty(m.ViewerSession))
+                    continue;   // not in the room yet: it is muted when it joins
+                bool muted = session.IsVoiceMuted(m.AgentId) && !moderator(m.AgentId);
+                ParticipantMuteResult r = mute.SetCallMute(m.AgentId, room, muted);
+                if (r == ParticipantMuteResult.Unsupported || r == ParticipantMuteResult.Failed)
+                    return r;
+                if (r == ParticipantMuteResult.NotInRoom && m.AgentId == target)
+                    return r;   // the one agent a mute names has no participant: that is not a mute
+                if (r == ParticipantMuteResult.Applied)
+                    worst = ParticipantMuteResult.Applied;
+            }
+            return worst == ParticipantMuteResult.NotInRoom ? ParticipantMuteResult.Applied : worst;
+        }
+
+        JanusPeerCtlBatchSink sink = CallMuteSink();
+        if (sink is null)
+            return ParticipantMuteResult.Unsupported;
+        Dictionary<UUID, IReadOnlyCollection<UUID>> columns = CallMuteColumns.Build(session, moderator);
+        try
+        {
+            (PeerCtlSendResult sent, JanusPeerCtlBatchSink.SlvoiceReply reply) =
+                sink.SendToRoomAsync(room, VisOp.Replace, null, columns).GetAwaiter().GetResult();
+            return CallMuteColumns.Classify(sent, reply, columns.Count);
+        }
+        catch (Exception e)
+        {
+            m_log.LogWarning(e, "{LogHeader} call voice mute send failed for room {Room}", logHeader, room);
+            return ParticipantMuteResult.Failed;
+        }
+    }
+
+    // Whether a voice mute of this one agent can reach a participant. The stock AudioBridge is asked for the agent's
+    // participant (found by the agent id the region set at join); the mixer is told the agent id and applies it when
+    // the agent is in the room, so there the call's record of the seat is what there is.
     private bool CanResolveCallVoiceTarget(NonSpatialVoiceSession session, UUID target)
     {
-        if (!m_callStockPlugin)
-            return false;
+        if (!m_stockPlugin)
+            return session.Find(target)?.HoldsSeat == true;
         INonSpatialParticipantMute mute = StockCallMute();
         return mute is not null && mute.HasCallParticipant(target, CallRoomNumber(session));
     }
