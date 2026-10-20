@@ -70,5 +70,33 @@ namespace osWebRtcVoice.Tests
             Assert.That(gate.MaySend(Group, Bob), Is.True, "after the time it reads the service again");
             Assert.That(gate.MaySend(UUID.Random(), Bob), Is.True, "a group with no call");
         }
+
+        [Test]
+        public void TheGroupChatGateKeepsAGridCopyForTenSeconds_SoOneReadServesTheLinesInBetween()
+        {
+            NonSpatialIdentityTests.FakeClock clock = new();
+            VoiceSessionService service = VoiceSessionServiceTests.NewService(clock);
+            GridNonSpatialSessions a = VoiceSessionServiceTests.NewRegion(service);
+            GridNonSpatialSessions b = VoiceSessionServiceTests.NewRegion(service);
+            a.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionA);
+            CallRemovalModuleTests.CountingSessions counting =
+                (CallRemovalModuleTests.CountingSessions)(object)System.Reflection.DispatchProxy.Create<INonSpatialSessions, CallRemovalModuleTests.CountingSessions>();
+            counting.Inner = b;
+            CallGroupChatGate gate = new CallGroupChatGate((INonSpatialSessions)(object)counting, cache: true, clock.Get);
+
+            DateTime t0 = clock.Now;
+            gate.MaySend(Group, Bob);
+            foreach (int second in new[] { 3, 4, 6, 9 })
+            {
+                clock.Now = t0 + TimeSpan.FromSeconds(second);
+                gate.MaySend(Group, Bob);
+            }
+            Assert.That(counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.Get)), Is.EqualTo(1), "five lines in nine seconds: one read");
+
+            clock.Now = t0 + TimeSpan.FromSeconds(11);
+            gate.MaySend(Group, Bob);
+            Assert.That(counting.Calls.GetValueOrDefault(nameof(INonSpatialSessions.Get)), Is.EqualTo(2), "and the next one after ten seconds reads again");
+            Assert.That(CallGroupChatGate.Kept, Is.EqualTo(TimeSpan.FromSeconds(10)));
+        }
     }
 }

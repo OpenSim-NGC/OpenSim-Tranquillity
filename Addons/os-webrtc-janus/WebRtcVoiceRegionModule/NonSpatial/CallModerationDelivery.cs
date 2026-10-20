@@ -78,7 +78,11 @@ namespace osWebRtcVoice.NonSpatial
     /// </summary>
     public sealed class CallGroupChatGate : IGroupChatGate
     {
-        public static readonly TimeSpan Kept = TimeSpan.FromSeconds(3);
+        /// <summary>
+        /// How long a copy of a call record is kept for the lines sent in between. A mute made in this process drops it at once
+        /// (<see cref="Forget"/>); only a mute made through another region server takes this long to show.
+        /// </summary>
+        public static readonly TimeSpan Kept = TimeSpan.FromSeconds(10);
 
         private readonly INonSpatialSessions _sessions;
         private readonly bool _cache;
