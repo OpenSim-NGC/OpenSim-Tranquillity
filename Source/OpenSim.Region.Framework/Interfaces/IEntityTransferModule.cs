@@ -30,6 +30,7 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Services.Interfaces;
 
 namespace OpenSim.Region.Framework.Interfaces;
 
@@ -100,6 +101,19 @@ public interface IEntityTransferModule
     bool checkAgentAccessToRegion(ScenePresence agent, GridRegion destiny, Vector3 position, EntityTransferContext ctx, out string reason);
 
     bool CrossPrimGroupIntoNewRegion(GridRegion destination, Vector3 newPosition, SceneObjectGroup grp, bool silent, bool removeScripts);
+
+    /// <summary>True when the region at <paramref name="destination"/> can hold a crossing object until its riders arrive.</summary>
+    bool SupportsHeldCrossing(GridRegion destination);
+
+    /// <summary>
+    /// Sends the object like <see cref="CrossPrimGroupIntoNewRegion"/> but held (see ISimulationService.CreateObject),
+    /// and does NOT delete it here: the caller keeps it until the destination reports the crossing complete, or
+    /// takes it back with <see cref="RecallCrossingObject"/>.
+    /// </summary>
+    bool CrossPrimGroupIntoNewRegionHeld(GridRegion destination, Vector3 newPosition, SceneObjectGroup grp, CrossingHoldRequest hold);
+
+    /// <summary>Asks the destination to give back a held object no rider has arrived in. True when it is gone there.</summary>
+    bool RecallCrossingObject(GridRegion destination, SceneObjectGroup grp);
 
     ScenePresence CrossAgentToNewRegionAsync(ScenePresence agent, Vector3 pos, GridRegion neighbourRegion, bool isFlying, EntityTransferContext ctx);
 

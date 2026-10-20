@@ -122,6 +122,34 @@ public interface ISimulationService
     /// <returns></returns>
     bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall);
 
+    /// <summary>
+    /// True when <paramref name="destination"/> understands a crossing object that is held until its riders arrive
+    /// (<see cref="CreateObject(GridRegion, Vector3, ISceneObject, bool, CrossingHoldRequest)"/>,
+    /// <see cref="RecallObject"/> and <see cref="CrossingCompleted"/>). A region that does not is sent the object
+    /// the ordinary way.
+    /// </summary>
+    bool SupportsHeldCrossing(GridRegion destination);
+
+    /// <summary>
+    /// Create an object in the destination region as <see cref="CreateObject(GridRegion, Vector3, ISceneObject, bool)"/>
+    /// does, but held: see <see cref="CrossingHoldRequest"/>.
+    /// </summary>
+    bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall, CrossingHoldRequest hold);
+
+    /// <summary>
+    /// Sending region to receiving region: take back a held object that has not been released and in which no rider
+    /// has arrived. True when the object is gone from the destination (also when it was never there or was recalled
+    /// before); false when it cannot be taken back.
+    /// </summary>
+    bool RecallObject(GridRegion destination, UUID objectID);
+
+    /// <summary>
+    /// Receiving region to sending region: the held object was released, because its riders arrived or the hold ran
+    /// out. <paramref name="missingRiders"/> lists the ones that did not arrive. The sending region then lets go of
+    /// its copy. Sent again, or for an object not known, it does nothing.
+    /// </summary>
+    bool CrossingCompleted(GridRegion source, UUID objectID, IList<UUID> missingRiders);
+
     #endregion Objects
 
 }
