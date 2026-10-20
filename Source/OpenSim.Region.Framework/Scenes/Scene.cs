@@ -4896,8 +4896,8 @@ Label_GroupsDone:
         else
         {
             m_log.LogWarning(
-                "[SCENE]: Request to close agent {0} with invalid authorization token {1} in {2}",
-                agentID, auth_token, Name);
+                "[SCENE]: Request to close agent {0} with invalid authorization token in {1}",
+                agentID, Name);
         }
 
         return false;
