@@ -30,6 +30,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Addons\os-webrtc-janus\Janus\WebRtcJanusService.csproj" />
     <ProjectReference Include="..\..\Addons\os-webrtc-janus\WebRtcVoiceServiceModule\WebRtcVoiceServiceModule.csproj" />
+    <ProjectReference Include="..\..\Addons\os-webrtc-janus\Visibility\Visibility.csproj" />
   </ItemGroup>
 
   <ItemGroup>

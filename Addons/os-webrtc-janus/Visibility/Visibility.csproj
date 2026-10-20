@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Pure, Scene-free producer of the per-listener voice visibility matrix.
+    Depends ONLY on OpenMetaverse (UUID/Vector3, supplied by the root Directory.Build.props);
+    all Scene access is behind IFeederWorld, so this assembly unit-tests without a Scene -
+    matching the room-race house pattern.
+
+    Build discipline: EnableDefaultItems=false + one <Compile Include> per file. A new .cs that
+    is not listed here will silently NOT compile - that is deliberate (the silent-absence
+    footgun is made loud). Add every new source file below.
+  -->
+  <PropertyGroup>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <AssemblyName>VoiceVisibility</AssemblyName>
+    <RootNamespace>osWebRtcVoice</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="FeederWorld.cs" />
+    <Compile Include="VisibilityRules.cs" />
+    <Compile Include="VisibilityMatrix.cs" />
+    <Compile Include="VisibilityBatch.cs" />
+    <Compile Include="DeltaComputer.cs" />
+    <Compile Include="IVisibilityFeed.cs" />
+    <Compile Include="VoiceStateFeeder.cs" />
+    <Compile Include="PeerCtlBatchSink.cs" />
+    <Compile Include="PeerCtlBatchSerializer.cs" />
+    <Compile Include="PeerCtlBatchPartitioner.cs" />
+  </ItemGroup>
+
+</Project>
