@@ -57,6 +57,7 @@ namespace osWebRtcVoice.Tests
 
         // ---- avatar-to-avatar -------------------------------------------------------------------
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task A2A_CallRoomCreateJoinLeave()
         {
@@ -124,6 +125,7 @@ namespace osWebRtcVoice.Tests
             return taken;
         }
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task A2A_CrossProcess_CallerAndCalleeJoinOneRoom()
         {
@@ -167,6 +169,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True, "the caller left the room");
         }
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task A2A_AStrangerWithTheRightChannelIsRefused_AndNoRoomIsCreated()
         {
@@ -188,6 +191,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(await _janus.RoomsAsync(), Is.EquivalentTo(before), "the refusal never reached the gateway");
         }
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task A2A_Audio_BothPartiesHearEachOther()
         {
@@ -238,6 +242,7 @@ namespace osWebRtcVoice.Tests
             return (policy, engine);
         }
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task Group_CallRoomCreateJoinLeave()
         {
@@ -275,6 +280,7 @@ namespace osWebRtcVoice.Tests
 
         // ---- ad-hoc conference ------------------------------------------------------------------
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task Adhoc_ConferenceRoomCreateJoinLeave()
         {
@@ -314,6 +320,7 @@ namespace osWebRtcVoice.Tests
 
         // ---- every switch off ------------------------------------------------------------------
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task EverySwitchOff_NonSpatialRequestsAreAnsweredAsBeforeTheFeatures()
         {
@@ -346,6 +353,7 @@ namespace osWebRtcVoice.Tests
             await region.LogoutAsync(spatial);
         }
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task EverySwitchOff_TheAnswersAreTheShippedDefaults()
         {
@@ -380,6 +388,7 @@ namespace osWebRtcVoice.Tests
 
         // ---- recovery --------------------------------------------------------------------------
 
+        [NeedsPlugin(JanusPluginKind.Any)]
         [Test]
         public async Task GatewayRestartMidSession_TheServiceHealsAndNewProvisionsWork()
         {

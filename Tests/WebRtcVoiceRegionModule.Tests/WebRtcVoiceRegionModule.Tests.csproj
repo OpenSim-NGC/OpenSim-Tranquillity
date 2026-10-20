@@ -94,6 +94,9 @@
     <Compile Include="StockJanus\DefaultsParityTests.cs" />
     <Compile Include="StockJanus\StockJanusRegionTests.cs" />
     <Compile Include="StockJanus\StockJanusNonSpatialTests.cs" />
+    <Compile Include="StockJanus\StockJanusCallModerationTests.cs" />
+    <Compile Include="StockJanus\OptInTestsDeclarePluginTests.cs" />
+    <Compile Include="StockJanus\StockJanusCallRemovalTests.cs" />
     <Compile Include="..\WebRtcJanusService.Tests\StockJanus\StockJanusSupport.cs" Link="StockJanus\StockJanusSupport.cs" />
     <None Include="..\WebRtcJanusService.Tests\StockJanus\aiortc_peer.py" Link="StockJanus\aiortc_peer.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>

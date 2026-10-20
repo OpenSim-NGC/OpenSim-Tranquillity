@@ -37,6 +37,47 @@ using Nini.Config;
 
 namespace osWebRtcVoice.Tests.StockJanus
 {
+    /// <summary>Which Janus plugin a test needs the run to be driving.</summary>
+    public enum JanusPluginKind
+    {
+        /// <summary>Either: the test says what must hold on both, so a failure on one is a fault.</summary>
+        Any,
+        /// <summary>Janus's stock AudioBridge only: the test is about something the mixer does not do or does otherwise.</summary>
+        Stock,
+        /// <summary>The slvoice mixer only: the test is about a feature the stock plugin does not have.</summary>
+        Mixer,
+    }
+
+    /// <summary>
+    /// Declares the plugin an opt-in test needs. When the run is configured for a gateway (WEBRTC_JANUS_TEST_URL) driving
+    /// the other plugin, the test is skipped with the reason, so a pass or a skip in a run always says why. Without a
+    /// gateway the attribute does nothing and the fixture's own opt-in skip applies.
+    /// </summary>
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false)]
+    public sealed class NeedsPluginAttribute : NUnit.Framework.NUnitAttribute, NUnit.Framework.Interfaces.IApplyToTest
+    {
+        public JanusPluginKind Needs { get; }
+
+        public NeedsPluginAttribute(JanusPluginKind needs) { Needs = needs; }
+
+        public void ApplyToTest(NUnit.Framework.Internal.Test test)
+        {
+            if (!StockJanusEnvironment.Configured)
+                return;
+            bool fits = Needs switch
+            {
+                JanusPluginKind.Stock => StockJanusEnvironment.IsStockPlugin,
+                JanusPluginKind.Mixer => StockJanusEnvironment.IsMixerPlugin,
+                _ => true,
+            };
+            if (fits)
+                return;
+            test.RunState = NUnit.Framework.Interfaces.RunState.Ignored;
+            test.Properties.Set(NUnit.Framework.Internal.PropertyNames.SkipReason,
+                $"needs the {(Needs == JanusPluginKind.Stock ? "stock AudioBridge" : "slvoice mixer")} plugin; this run drives {StockJanusEnvironment.PluginName}");
+        }
+    }
+
     public static class StockJanusEnvironment
     {
         public const string UrlVariable = "WEBRTC_JANUS_TEST_URL";
@@ -50,6 +91,12 @@ namespace osWebRtcVoice.Tests.StockJanus
         public static string AdminUrl => Get("WEBRTC_JANUS_TEST_ADMIN_URL") ?? string.Empty;
         public static string AdminSecret => Get("WEBRTC_JANUS_TEST_ADMIN_SECRET") ?? string.Empty;
         public static string PluginName => Get("WEBRTC_JANUS_TEST_PLUGIN") ?? "janus.plugin.audiobridge";
+        /// <summary>True when the run drives Janus's stock AudioBridge plugin.</summary>
+        public static bool IsStockPlugin => PluginName == "janus.plugin.audiobridge";
+
+        /// <summary>True when the run drives the slvoice mixer.</summary>
+        public static bool IsMixerPlugin => PluginName == "janus.plugin.slvoice";
+
         public static string Python => Get("WEBRTC_JANUS_TEST_PYTHON");
         public static string Container => Get("WEBRTC_JANUS_TEST_CONTAINER");
 
@@ -283,7 +330,11 @@ namespace osWebRtcVoice.Tests.StockJanus
             return JsonNode.Parse(await r.Content.ReadAsStringAsync()) as JsonObject;
         }
 
-        /// <summary>One plugin request on a short-lived session; the plugin answers synchronously for list-type requests.</summary>
+        /// <summary>
+        /// One plugin request on a short-lived session. The stock AudioBridge answers list-type requests in the reply to the
+        /// request; the slvoice mixer acknowledges the request and sends its answer as an event on the session's long poll,
+        /// so an acknowledgement is followed by reading that event.
+        /// </summary>
         public async Task<JsonObject> PluginRequestAsync(JsonObject pluginBody)
         {
             string api = StockJanusEnvironment.Url.TrimEnd('/');
@@ -294,6 +345,17 @@ namespace osWebRtcVoice.Tests.StockJanus
                 JsonObject h = await PostAsync($"{api}/{sid}", new JsonObject { ["janus"] = "attach", ["plugin"] = StockJanusEnvironment.PluginName });
                 string hid = h["data"]["id"].ToString();
                 JsonObject r = await PostAsync($"{api}/{sid}/{hid}", new JsonObject { ["janus"] = "message", ["body"] = pluginBody });
+                if (r["janus"]?.ToString() == "ack" && r["transaction"] is JsonNode txn)
+                {
+                    string poll = $"{api}/{sid}?maxev=1&apisecret={Uri.EscapeDataString(StockJanusEnvironment.ApiSecret)}";
+                    DateTime until = DateTime.UtcNow.AddSeconds(10);
+                    while (DateTime.UtcNow < until)
+                    {
+                        JsonObject ev = JsonNode.Parse(await _http.GetStringAsync(poll)) as JsonObject;
+                        if (ev?["transaction"]?.ToString() == txn.ToString() && ev["plugindata"]?["data"] is JsonObject answered)
+                            return answered;
+                    }
+                }
                 return r["plugindata"]?["data"] as JsonObject ?? r;
             }
             finally

@@ -69,6 +69,7 @@ namespace osWebRtcVoice.Tests
     {
         public readonly List<(string Name, OSD Body, UUID To)> Sent = new();
         public readonly List<(UUID SessionId, UUID TempSessionId, UUID To)> StartReplies = new();
+        public readonly List<(UUID To, UUID Session, string Reason)> Closes = new();
         private string _lastName;
         private OSD _lastBody;
 
@@ -86,7 +87,7 @@ namespace osWebRtcVoice.Tests
             lock (StartReplies) StartReplies.Add((sessionID, tmpSessionID, toAgent));
         }
         public void ChatterBoxSessionAgentListUpdates(UUID sessionID, UUID toAgent, List<GroupChatListAgentUpdateData> updates) { }
-        public void ChatterBoxForceClose(UUID toAgent, UUID sessionID, string reason) { }
+        public void ChatterBoxForceClose(UUID toAgent, UUID sessionID, string reason) { lock (Closes) Closes.Add((toAgent, sessionID, reason)); }
         public void GroupMembershipData(UUID receiverAgent, GroupMembershipData[] data) { }
         public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID) { }
         public void partPhysicsProperties(uint localID, byte physhapetype, float density, float friction, float bounce, float gravmod, UUID avatarID) { }
