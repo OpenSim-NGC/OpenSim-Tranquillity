@@ -1,0 +1,3 @@
+scenario,slope_deg,rate_hz,steps,top_speed,release_t,release_speed,steady_speed,steady_hspeed,dist_before_release,dist_after_release,time_to_rest,peak_height,peak_rise,z_range,max_tilt_deg,end_x,end_y,end_z,left_region_t,nonfinite,sleep_after,active_at_end,impact_t,arrival_speed,leaving_speed,penetration,tunneled,push_range_early,push_range_late,push_penetration,crash_rise,ray_casts,ray_us_per_cast,ray_refused,ray_cut_short
+car-down,15,11,181,8.660,1000.000,7.946,7.964,7.692,120.324,0.000,-,0.581,0.000,16.096,15.5,128.502,-0.329,25.233,16.455,0,-,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+car-down,15,45,736,8.706,1000.000,7.962,7.977,7.705,120.101,0.000,-,0.587,0.000,16.097,15.9,128.651,-0.100,25.230,16.356,0,-,0,-,-,-,-,0,-,-,-,-,0,-,0,0
