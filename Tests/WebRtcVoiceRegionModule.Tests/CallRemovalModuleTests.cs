@@ -31,14 +31,14 @@ namespace osWebRtcVoice.Tests
     [TestFixture]
     public class CallRemovalModuleTests
     {
-        private static readonly UUID GroupId = new UUID("5e0c9a41-7b2d-4f86-a3c1-92d84b6e0f17");
-        private static readonly UUID Officer = new UUID("11111111-1111-4111-8111-111111111111");
-        private static readonly UUID Member = new UUID("22222222-2222-4222-8222-222222222222");
+        internal static readonly UUID GroupId = new UUID("5e0c9a41-7b2d-4f86-a3c1-92d84b6e0f17");
+        internal static readonly UUID Officer = new UUID("11111111-1111-4111-8111-111111111111");
+        internal static readonly UUID Member = new UUID("22222222-2222-4222-8222-222222222222");
         private static readonly UUID Other = new UUID("33333333-3333-4333-8333-333333333333");
 
         private static void Moderation(Nini.Config.IConfig v) => v.Set("CallModerationEnabled", "true");
 
-        private sealed class ProvisionPost : IOSHttpRequest
+        internal sealed class ProvisionPost : IOSHttpRequest
         {
             public ProvisionPost(OSDMap body)
             {
@@ -69,7 +69,7 @@ namespace osWebRtcVoice.Tests
         }
 
         /// <summary>The provision a viewer posts for a call it has been given: the channel, its credentials and an offer.</summary>
-        private static int Provision(Region r, UUID agent, out TestOSHttpResponse response)
+        internal static int Provision(Region r, UUID agent, out TestOSHttpResponse response)
         {
             NonSpatialVoiceSession s = r.Sessions.Get(GroupId, agent);
             OSDMap body = new OSDMap
@@ -86,7 +86,7 @@ namespace osWebRtcVoice.Tests
         }
 
         /// <summary>The module in a call of two: an officer and a member, both with a seat and a participant.</summary>
-        private static Region InACall(Action<Nini.Config.IConfig> extra = null)
+        internal static Region InACall(Action<Nini.Config.IConfig> extra = null)
         {
             Region r = Region.Create(v =>
             {

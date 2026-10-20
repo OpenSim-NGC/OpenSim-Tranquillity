@@ -45,8 +45,10 @@ namespace osWebRtcVoice;
 // Close-time voice teardown, the refusal throttle and viewer session ownership checks.
 public partial class WebRtcVoiceServiceModule
 {
-    // Replays a failed provision's answer to the viewer's immediate retries (RefusalCacheSeconds).
-    private ProvisionRefusalCache m_refusalCache = new ProvisionRefusalCache(TimeSpan.FromSeconds(ProvisionRefusalCache.DefaultSeconds));
+    // Replays a failed provision's answer to the viewer's immediate retries (RefusalCacheSeconds), and logs a run of
+    // refusals for one viewer as one episode.
+    private readonly RefusalEpisodeLog m_refusalLog = new RefusalEpisodeLog(m_log, LogHeader + " ProvisionVoiceAccountRequest:");
+    private ProvisionRefusalCache m_refusalCache => m_refusalLog.Cache;
 
     // Scenes this shared module serves, for resolving a Scene from the pSceneID the provision
     // path carries — needed to read the provisioning client's SessionId (the generation token).

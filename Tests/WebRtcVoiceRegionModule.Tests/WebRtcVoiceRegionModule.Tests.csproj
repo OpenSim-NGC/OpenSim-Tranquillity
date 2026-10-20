@@ -99,6 +99,8 @@
     <Compile Include="StockJanus\OptInTestsDeclarePluginTests.cs" />
     <Compile Include="StockJanus\StockJanusCallRemovalTests.cs" />
     <Compile Include="..\WebRtcJanusService.Tests\StockJanus\StockJanusSupport.cs" Link="StockJanus\StockJanusSupport.cs" />
+    <Compile Include="..\WebRtcJanusService.Tests\LogCapture.cs" Link="LogCapture.cs" />
+    <Compile Include="CallRemovalLogTests.cs" />
     <None Include="..\WebRtcJanusService.Tests\StockJanus\aiortc_peer.py" Link="StockJanus\aiortc_peer.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
