@@ -8,7 +8,7 @@
 /*
  * Live evidence for the visibility arming knob-on path: the real VisibilityBatchSender, JanusPeerCtlBatchSink with
  * its real JanusAdminClient, and VisAuthority, talking to a real mixer. VisibilityArmingTests proves the same logic
- * against a scripted transport; this proves it on the wire against a mixer that advertises vis_protocol 2.
+ * against a scripted transport; this proves it on the wire against a mixer that advertises vis_protocol 2 or later.
  *
  * EXPLICIT and opt-in: it never runs in a normal test run, and does nothing unless LVM_LIVE_ADMIN_URL is set. It
  * RESTARTS the container named in LVM_LIVE_CONTAINER, so point it only at a scratch mixer, never at a grid's.
@@ -86,7 +86,7 @@ namespace osWebRtcVoice.Tests
 
                 public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
 
-                public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Information;
+                public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Debug;
 
                 public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception,
                     Func<TState, Exception, string> formatter)
@@ -154,7 +154,7 @@ namespace osWebRtcVoice.Tests
 
             var collector = new LineCollector();
             ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(collector).SetMinimumLevel(LogLevel.Information));
+            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(collector).SetMinimumLevel(LogLevel.Debug));
             try
             {
                 UUID a = new UUID("0a000000-0000-4000-8000-00000000000a"), b = new UUID("0b000000-0000-4000-8000-00000000000b");
@@ -173,10 +173,10 @@ namespace osWebRtcVoice.Tests
                 // Arming: the first tick sends a replace for both listeners, empty columns included.
                 await sender.PumpAsync(feed.Tick(world));
                 Assert.That(auth.IsArmed(room, a) && auth.IsArmed(room, b), Is.True, "both listeners armed by the mixer's applied reply");
-                Assert.That(auth.HeartbeatCapable, Is.True, "the mixer's reply advertised vis_protocol 2");
+                Assert.That(auth.HeartbeatCapable, Is.True, "the mixer's reply advertised vis_protocol 2 or later");
                 string firstInstance = auth.MixerInstance;
                 Assert.That(firstInstance, Is.Not.Null.And.Length.EqualTo(16), "the mixer's reply carried a mixer_instance");
-                Assert.That(Logged(collector, "advertises vis_protocol 2"), Is.True);
+                Assert.That(Logged(collector, "advertises vis_protocol"), Is.True);
                 Assert.That(Logged(collector, "arming replace sent for 2 listener(s)"), Is.True);
 
                 // Heartbeat: the sender sends one now and acknowledges it.
