@@ -131,12 +131,20 @@ namespace osWebRtcVoice.NonSpatial
                 return new TextIntake { Claimed = true, Authenticated = true, OriginRegion = new UUID(msg.RegionID), Decision = SessionOutcome.NoSuchSession, Target = target, SessionId = sessionId };
             if (string.IsNullOrEmpty(roomKey) || !string.Equals(roomKey, session.RoomKey, StringComparison.Ordinal))
                 return new TextIntake { Claimed = true, Authenticated = true, OriginRegion = new UUID(msg.RegionID), Decision = DecisionRoomKeyMismatch, Target = target, SessionId = sessionId };
-            NonSpatialMember from = session.Find(sender);
-            NonSpatialMember to = session.Find(target);
-            if (from is null || !from.HoldsSeat || to is null || !to.HoldsSeat)
+            // The sender must be a participant of this process's copy of the record. It may still be marked as
+            // invited here, because it answered in the sender's own process, which this one has not heard from.
+            if (!AdhocTextSession.IsParticipant(session, sender))
                 return new TextIntake
                 {
                     Claimed = true, Authenticated = true, OriginRegion = new UUID(msg.RegionID), Decision = AdhocTextSession.DecisionNotMember, Target = target,
+                    SessionId = sessionId, Sender = sender,
+                };
+            // The addressee must be in the conversation according to THIS process's record: it answered the
+            // invitation here and has not declined or left. The sending process could only guess.
+            if (!AdhocTextSession.IsInChat(session, target))
+                return new TextIntake
+                {
+                    Claimed = true, Authenticated = true, OriginRegion = new UUID(msg.RegionID), Decision = AdhocTextSession.DecisionRecipientNotInChat, Target = target,
                     SessionId = sessionId, Sender = sender,
                 };
 

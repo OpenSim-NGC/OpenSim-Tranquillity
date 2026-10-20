@@ -21,6 +21,8 @@
 
   <ItemGroup>
     <Compile Include="AssemblyInfo.cs" />
+    <Compile Include="AdhocRingRootOnlyTests.cs" />
+    <Compile Include="AdhocTextCrossProcessTests.cs" />
     <Compile Include="GroupRingRootOnlyTests.cs" />
     <Compile Include="CrossProcessHarness.cs" />
     <Compile Include="A2ARingRootOnlyTests.cs" />

@@ -150,8 +150,10 @@ public partial class WebRtcVoiceRegionModule
     }
 
     /// <summary>
-    /// Deliver one conference line to every other seat holder: local clients directly, everyone else
-    /// over the carrier with the text magic. The SENDER IS NEVER IN Recipients, so
+    /// Deliver one conference line to every other member: a member with a ROOT presence in this process directly,
+    /// everyone else over the carrier with the text magic, which reaches the process that holds their root
+    /// presence. That process delivers only to a root presence recorded as in the conversation in its own copy
+    /// of the record, so a member who declined or left there gets nothing. The SENDER IS NEVER IN the plan, so
     /// there is no echo -- a deliberate divergence from the group path, which does echo; see
     /// AdhocTextSession's header for why.
     /// </summary>
@@ -166,17 +168,17 @@ public partial class WebRtcVoiceRegionModule
 
         m_log.LogDebug("{LogHeader} {Line}", logHeader,
             AdhocTextSession.Line(plan.Sender, plan.Session.SessionId, decision,
-                $"recipients={plan.Recipients.Count}"));
-        if (plan.Recipients.Count == 0)
+                $"recipients={plan.Recipients.Count} elsewhere={plan.Elsewhere.Count}"));
+        if (plan.Recipients.Count == 0 && plan.Elsewhere.Count == 0)
             return;
 
-        // Local vs remote by the same presence test the ring fan-out uses, so text and ring agree
+        // Local vs remote by the same root-presence test the ring fan-out uses, so text and ring agree
         // about who is reachable in this process.
-        HashSet<UUID> presentHere = new HashSet<UUID>(GroupVoiceInvite.PresentAgents(scenes));
+        HashSet<UUID> rootHere = new HashSet<UUID>(GroupVoiceInvite.RootAgents(scenes));
         List<UUID> remote = new List<UUID>();
         foreach (UUID target in plan.Recipients)
         {
-            if (!presentHere.Contains(target))
+            if (!rootHere.Contains(target))
             {
                 remote.Add(target);
                 continue;
@@ -184,6 +186,11 @@ public partial class WebRtcVoiceRegionModule
             DeliverConferenceTextLocally(scenes, target, plan.Sender, fromName, plan.Session.SessionId,
                                          originRegion, plan.Message);
         }
+        // Members this process cannot rule in or out: only ever carried. One who has a root presence here and
+        // is not recorded as in the conversation here is not in it, and gets nothing.
+        foreach (UUID target in plan.Elsewhere)
+            if (!rootHere.Contains(target))
+                remote.Add(target);
 
         SendRemoteConferenceText(plan, fromName, originRegion, scenes, remote);
     }
@@ -192,8 +199,9 @@ public partial class WebRtcVoiceRegionModule
     private void DeliverConferenceTextLocally(List<Scene> scenes, UUID target, UUID sender, string fromName,
                                               UUID sessionId, UUID originRegion, string message)
     {
-        Scene scene = A2AInviteDelivery.ResolveCalleeScene(scenes, target, out _);
-        IClientAPI to = scene?.GetScenePresence(target)?.ControllingClient;
+        // Root presence only: a child presence here answers from another process.
+        Scene scene = A2AInviteDelivery.ResolveCalleeScene(scenes, target, out bool childOnly);
+        IClientAPI to = childOnly ? null : scene?.GetScenePresence(target)?.ControllingClient;
         if (to is null)
         {
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
@@ -301,7 +309,7 @@ public partial class WebRtcVoiceRegionModule
         }
         if (!text.Ok)
         {
-            if (text.Decision == SessionOutcome.NoSuchSession)
+            if (text.Decision == SessionOutcome.NoSuchSession || text.Decision == AdhocTextSession.DecisionRecipientNotInChat)
                 m_log.LogDebug("{LogHeader} {Line}", logHeader,
                     AdhocTextTransport.Line(text.Target, text.SessionId, text.Decision));
             else
@@ -379,8 +387,9 @@ public partial class WebRtcVoiceRegionModule
 
         OSDMap body = AdhocVoiceInvite.BuildBody(session, token, initiator, initiatorName);
 
-        // (a) anyone with a presence in THIS process, exactly as a group ring reaches them
-        HashSet<UUID> presentHere = new HashSet<UUID>(GroupVoiceInvite.PresentAgents(scenes));
+        // (a) anyone with a ROOT presence in THIS process, exactly as a group ring reaches them. An invitee
+        // who is only a child presence here is rung through the carrier like one on another process.
+        HashSet<UUID> presentHere = new HashSet<UUID>(GroupVoiceInvite.RootAgents(scenes));
         List<UUID> local = new List<UUID>();
         List<UUID> remote = new List<UUID>();
         foreach (UUID t in targets)
