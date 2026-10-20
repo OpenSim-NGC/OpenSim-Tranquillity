@@ -58,7 +58,7 @@ public class GroupsServiceRobustConnector : ServiceConnector
         if (groupsConfig != null)
         {
             key = groupsConfig.GetString("SecretKey", string.Empty);
-            m_log.LogDebug("[Groups.RobustConnector]: Starting with secret key {0}", key);
+            m_log.LogDebug("[Groups.RobustConnector]: Starting with secret key {0}", key.Length > 0 ? "set" : "not set");
         }
 //            else
 //                m_log.LogDebug("[Groups.RobustConnector]: Unable to find {0} section in configuration", m_ConfigName);
