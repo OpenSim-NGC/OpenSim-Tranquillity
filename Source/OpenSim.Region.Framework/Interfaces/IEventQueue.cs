@@ -95,6 +95,14 @@ public interface IEventQueue
                             bool sucess, string error,
                             UUID toAgent);
     void ChatterBoxSessionAgentListUpdates(UUID sessionID, UUID toAgent, List<GroupChatListAgentUpdateData> updates);
+
+    /// <summary>
+    /// Tell one agent that a chat session's moderated mode changed (the viewer's "mute all" and "unmute all" for
+    /// a call). Sent as ChatterBoxSessionUpdate with info.moderated_mode.voice; the viewer reads it to know whether
+    /// the session is in moderated mode.
+    /// The default does nothing, so an implementation written before this member existed keeps working.
+    /// </summary>
+    void ChatterBoxSessionUpdate(UUID sessionID, UUID toAgent, bool voiceModerated) { }
     void ChatterBoxForceClose(UUID toAgent, UUID sessionID, string reason);
     //void ParcelProperties(ParcelPropertiesMessage parcelPropertiesMessage, UUID avatarID);
     void GroupMembershipData(UUID receiverAgent, GroupMembershipData[] data);

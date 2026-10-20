@@ -256,6 +256,19 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
         Enqueue(EndEventToBytes(sb), toAgent);
     }
 
+    public void ChatterBoxSessionUpdate(UUID sessionID, UUID toAgent, bool voiceModerated)
+    {
+        osUTF8 sb = StartEvent("ChatterBoxSessionUpdate");
+        LLSDxmlEncode2.AddMap("info", sb);
+            LLSDxmlEncode2.AddMap("moderated_mode", sb);
+                LLSDxmlEncode2.AddElem("voice", voiceModerated, sb);
+            LLSDxmlEncode2.AddEndMap(sb); // moderated_mode
+        LLSDxmlEncode2.AddEndMap(sb); // info
+        LLSDxmlEncode2.AddElem("session_id", sessionID, sb);
+
+        Enqueue(EndEventToBytes(sb), toAgent);
+    }
+
     public void ChatterBoxSessionStartReply(UUID sessionID, string sessionName, int type,
                             bool voiceEnabled, bool voiceModerated, UUID tmpSessionID,
                             bool sucess, string error,

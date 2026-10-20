@@ -474,6 +474,11 @@ public sealed class BSScene : PhysicsScene, IPhysicsParameters, INonSharedRegion
         return ret;
     }
 
+    public override float MaximumLinearVelocity
+    {
+        get { return BSParam.MaxLinearVelocity; }
+    }
+
     public override void Dispose()
     {
         // m_log.LogDebug("{0}: Dispose()", LogHeader);
