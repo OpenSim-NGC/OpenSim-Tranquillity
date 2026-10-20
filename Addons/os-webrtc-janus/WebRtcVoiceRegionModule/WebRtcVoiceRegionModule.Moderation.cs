@@ -62,9 +62,10 @@ public partial class WebRtcVoiceRegionModule
 
     /// <summary>
     /// Handles the viewer's SpatialVoiceModerationRequest CAP (parity with SL viewer 26.1 parcel
-    /// voice moderation). First half: authorise and record sticky per-parcel moderation
-    /// state in memory. NOTHING consumes the store yet — the matrix enforcement rule is a separate
-    /// commit. The body shape is fixed by the viewer (llnearbyvoicemoderation.cpp):
+    /// voice moderation). Authorises the request and records sticky per-parcel moderation state in
+    /// memory. With a mixer the visibility matrix reads that state (FeederWorldFromScene), so a mute takes
+    /// effect on the next feeder tick; on the stock plugin it is applied as the plugin's own mute of the
+    /// participant (ApplyStockSpatialMute). The body shape is fixed by the viewer (llnearbyvoicemoderation.cpp):
     ///   individual: { "operand": "mute" | "unmute", "agent_id": &lt;uuid&gt; }
     ///   everyone:   { "operand": "mute_all" | "unmute_all" }
     /// The body carries NO parcel id, so scope is resolved from the requester's position — this is
