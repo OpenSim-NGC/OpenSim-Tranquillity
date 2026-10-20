@@ -206,7 +206,7 @@ internal class ChannelState
         cs.PingDelay = Convert.ToInt32(Substitute(rs, config.GetString("ping_delay", Convert.ToString(cs.PingDelay))));
         m_log.LogDebug("[IRC-Channel-{0}] PingDelay : <{1}>", cs.idn, cs.PingDelay);
         cs.AccessPassword = Substitute(rs, config.GetString("access_password", cs.AccessPassword));
-        m_log.LogDebug("[IRC-Channel-{0}] AccessPassword : <{1}>", cs.idn, cs.AccessPassword);
+        m_log.LogDebug("[IRC-Channel-{0}] AccessPassword : {1}", cs.idn, string.IsNullOrEmpty(cs.AccessPassword) ? "not set" : "set");
         string[] excludes = config.GetString("exclude_list", "").Trim().Split(new Char[] { ',' });
         cs.ExcludeList = new List<string>(excludes.Length);
         foreach (string name in excludes)

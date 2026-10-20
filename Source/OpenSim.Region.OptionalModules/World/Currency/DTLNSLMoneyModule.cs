@@ -756,8 +756,8 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
         // currencyBuy:viewerMinorVersion:secureSessionId:viewerBuildVersion:estimatedCost:confirm:agentId:viewerPatchVersion:viewerMajorVersion:viewerChannel:language
         // m_log.LogInformation("[MONEYMODULE] buy_func params {0}", String.Join(":", requestData.Keys.Cast<String>()));
-        m_log.LogInformation("[MONEYMODULE] buy_func agentId {0} confirm {1} currencyBuy {2} estimatedCost {3} secureSessionId {4}",
-            agentId, confirm, currencyBuy, estimatedCost, secureSessionId);
+        m_log.LogInformation("[MONEYMODULE] buy_func agentId {0} confirm {1} currencyBuy {2} estimatedCost {3}",
+            agentId, confirm, currencyBuy, estimatedCost);
 
         XmlRpcResponse returnval = new XmlRpcResponse();
         Hashtable returnresp = new Hashtable();
@@ -1610,7 +1610,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                         MD5 md5 = MD5.Create();
                         byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(secretCode + "_" + scriptIP));
                         string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
-                        if (m_debug) m_log.LogInformation("[MONEY]: SendMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
+                        if (m_debug) m_log.LogInformation("[MONEY]: SendMoneyHandler: access code received from script at {0}", scriptIP);
                         ret = SendMoneyTo(agentUUID, amount, type, hash);
                     }
                 }
@@ -1674,7 +1674,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
                     MD5 md5 = MD5.Create();
                     byte[] code = md5.ComputeHash(ASCIIEncoding.Default.GetBytes(secretCode + "_" + scriptIP));
                     string hash = BitConverter.ToString(code).ToLower().Replace("-", "");
-                    if (m_debug) m_log.LogInformation("[MONEY]: MoveMoneyHandler: SecretCode: {0} + {1} = {2}", secretCode, scriptIP, hash);
+                    if (m_debug) m_log.LogInformation("[MONEY]: MoveMoneyHandler: access code received from script at {0}", scriptIP);
                     ret = MoveMoneyFromTo(fromUUID, toUUID, amount, hash);
                 }
                 else
