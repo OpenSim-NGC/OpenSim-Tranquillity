@@ -83,7 +83,14 @@ namespace osWebRtcVoice.NonSpatial
                 return false;
             // Ours only if this names a live GROUP session the agent belongs to; an accept for an
             // ad-hoc or an unknown session falls through untouched.
-            NonSpatialVoiceSession s = engine.Get(groupID);
+            NonSpatialVoiceSession s = engine.Get(groupID, agentID, out bool unavailable);
+            if (s == null && unavailable && policy.IsMember(agentID, groupID))
+            {
+                // The service could not say whether this session exists, so the viewer is told to try again.
+                outcome = Refuse((HttpStatusCode)NonSpatialCaps.StoreUnavailableHttpStatus, agentID, groupID,
+                                 "group-refused-" + SessionOutcome.StoreUnavailable, SessionOutcome.StoreUnavailable);
+                return true;
+            }
             if (s == null || s.Type != NonSpatialSessionType.Group || !policy.IsMember(agentID, s.Owner))
                 return false;
 
@@ -100,9 +107,7 @@ namespace osWebRtcVoice.NonSpatial
             SessionOutcome seat = engine.Accept(s.SessionId, agentID, UUID.Zero);
             if (!seat.Ok)
             {
-                HttpStatusCode code = seat.Decision == SessionOutcome.Capacity
-                    ? (HttpStatusCode)NonSpatialCaps.CapacityHttpStatus
-                    : HttpStatusCode.Forbidden;
+                HttpStatusCode code = (HttpStatusCode)NonSpatialCaps.RefusalStatus(seat.Decision);
                 string word = seat.Decision == SessionOutcome.Capacity ? DecisionFull : "group-refused-" + seat.Decision;
                 outcome = Refuse(code, agentID, s.Owner, word, seat.Decision);
                 return true;
@@ -154,7 +159,7 @@ namespace osWebRtcVoice.NonSpatial
             // opens the room and every later one finds it.
             SessionOutcome start = engine.Start(NonSpatialSessionType.Group, agentID, groupID, groupID, originRegion, policy.Cap);
             if (!start.Ok)
-                return Refuse(HttpStatusCode.Forbidden, agentID, groupID, "group-refused-" + start.Decision, start.Decision);
+                return Refuse((HttpStatusCode)NonSpatialCaps.RefusalStatus(start.Decision), agentID, groupID, "group-refused-" + start.Decision, start.Decision);
 
             // Take the seat HERE, at "call", not at provision: with no invitation step this is the
             // first moment the grid knows this agent intends to be in the room, and refusing here
@@ -164,9 +169,7 @@ namespace osWebRtcVoice.NonSpatial
             {
                 // Capacity is the one refusal with a required status: 409 Conflict, which the viewer
                 // maps to ERROR_CHANNEL_FULL, the same thing the mixer's own 495 produces.
-                HttpStatusCode code = seat.Decision == SessionOutcome.Capacity
-                    ? (HttpStatusCode)NonSpatialCaps.CapacityHttpStatus
-                    : HttpStatusCode.Forbidden;
+                HttpStatusCode code = (HttpStatusCode)NonSpatialCaps.RefusalStatus(seat.Decision);
                 string word = seat.Decision == SessionOutcome.Capacity ? DecisionFull : "group-refused-" + seat.Decision;
                 return Refuse(code, agentID, groupID, word, seat.Decision);
             }

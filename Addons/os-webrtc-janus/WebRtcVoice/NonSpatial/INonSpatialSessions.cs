@@ -34,6 +34,16 @@ namespace osWebRtcVoice.NonSpatial
 
         NonSpatialVoiceSession GetByRoomKey(string roomKey, UUID agent = default);
 
+        /// <summary>
+        /// As <see cref="GetByRoomKey(string, UUID)"/>, and says whether a null result is because the store could not
+        /// be reached rather than because it holds no such session.
+        /// </summary>
+        NonSpatialVoiceSession GetByRoomKey(string roomKey, UUID agent, out bool unavailable)
+        {
+            unavailable = false;
+            return GetByRoomKey(roomKey, agent);
+        }
+
         SessionOutcome Start(NonSpatialSessionType type, UUID creator, UUID otherOrOwner,
                              UUID tempSessionId, UUID originRegion, int requestedCap = 0);
 
@@ -96,5 +106,15 @@ namespace osWebRtcVoice.NonSpatial
         void MarkInvited(UUID sessionId, IEnumerable<UUID> agents);
 
         bool TryTakeConferenceRequest(UUID agent);
+
+        /// <summary>
+        /// As <see cref="TryTakeConferenceRequest(UUID)"/>; when it answers false, <paramref name="unavailable"/> says
+        /// the store could not be reached rather than that the agent's bucket is empty.
+        /// </summary>
+        bool TryTakeConferenceRequest(UUID agent, out bool unavailable)
+        {
+            unavailable = false;
+            return TryTakeConferenceRequest(agent);
+        }
     }
 }

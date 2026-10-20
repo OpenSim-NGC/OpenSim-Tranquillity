@@ -59,6 +59,18 @@ namespace osWebRtcVoice.NonSpatial
         /// <summary>The HTTP status a capacity refusal must answer with, matching the mixer's chain.</summary>
         public const int CapacityHttpStatus = 409;
 
+        /// <summary>The HTTP status a join refused because the grid session service could not be reached answers with.</summary>
+        public const int StoreUnavailableHttpStatus = 503;
+
+        /// <summary>
+        /// The HTTP status a refused join answers with, by the engine's decision word: 409 when the room is full, 503
+        /// when the session service could not be reached (the viewer can try again), otherwise 403.
+        /// </summary>
+        public static int RefusalStatus(string decision)
+            => decision == SessionOutcome.Capacity ? CapacityHttpStatus
+             : decision == SessionOutcome.StoreUnavailable ? StoreUnavailableHttpStatus
+             : 403;
+
         /// <summary>
         /// The cap actually in force. Never above <see cref="MixerRoomCap"/> (rule 1); never below 2,
         /// since a one-seat voice session is not a voice session.

@@ -71,6 +71,13 @@ namespace osWebRtcVoice.NonSpatial
             return r != null && r.Ok ? SessionWire.FromData(r.Session) : null;
         }
 
+        public NonSpatialVoiceSession GetByRoomKey(string roomKey, UUID agent, out bool unavailable)
+        {
+            SessionReply r = Reached(_service.GetByRoomKey(roomKey, agent), "getbyroomkey");
+            unavailable = r == null;
+            return r != null && r.Ok ? SessionWire.FromData(r.Session) : null;
+        }
+
         public SessionOutcome Start(NonSpatialSessionType type, UUID creator, UUID otherOrOwner,
                                     UUID tempSessionId, UUID originRegion, int requestedCap = 0)
         {
@@ -237,8 +244,12 @@ namespace osWebRtcVoice.NonSpatial
 
         /// <summary>False when the agent's bucket is empty, and also when the service did not answer.</summary>
         public bool TryTakeConferenceRequest(UUID agent)
+            => TryTakeConferenceRequest(agent, out _);
+
+        public bool TryTakeConferenceRequest(UUID agent, out bool unavailable)
         {
             SessionReply r = Reached(_service.TakeConferenceRequest(agent), "takeconferencerequest");
+            unavailable = r == null;
             return r != null && r.Flag;
         }
 

@@ -110,12 +110,13 @@ namespace osWebRtcVoice.NonSpatial
 
             // Every start counts against the agent's request bucket, a retry included. Checked before the
             // list is read, so a refused request costs the sim almost nothing.
-            if (!engine.TryTakeConferenceRequest(agentID))
+            if (!engine.TryTakeConferenceRequest(agentID, out bool unavailable))
             {
+                string why = unavailable ? SessionOutcome.StoreUnavailable : SessionOutcome.RateLimited;
                 outcome = new ChatSessionOutcome
                 {
-                    Status = HttpStatusCode.Forbidden,
-                    Instrument = Line(agentID, tempSessionId, "adhoc-refused-" + SessionOutcome.RateLimited, null),
+                    Status = (HttpStatusCode)NonSpatialCaps.RefusalStatus(why),
+                    Instrument = Line(agentID, tempSessionId, "adhoc-refused-" + why, null),
                 };
                 return true;
             }
@@ -127,7 +128,7 @@ namespace osWebRtcVoice.NonSpatial
             {
                 outcome = new ChatSessionOutcome
                 {
-                    Status = HttpStatusCode.Forbidden,
+                    Status = (HttpStatusCode)NonSpatialCaps.RefusalStatus(start.Decision),
                     Instrument = Line(agentID, tempSessionId, "adhoc-refused-" + start.Decision, null),
                 };
                 return true;
@@ -203,15 +204,26 @@ namespace osWebRtcVoice.NonSpatial
         {
             outcome = null;
             newlyInvited = new List<UUID>();
-            if (!Ours(reqmap, engine, enabled, MethodInvite, out UUID sessionId, out NonSpatialVoiceSession session))
-                return false;
-
-            if (!engine.TryTakeConferenceRequest(agentID))
+            if (!Ours(reqmap, engine, enabled, MethodInvite, out UUID sessionId, out NonSpatialVoiceSession session, out bool storeDown))
             {
+                // The service could not say whether this is a conference, so the viewer is told to try again.
+                if (!storeDown)
+                    return false;
                 outcome = new ChatSessionOutcome
                 {
-                    Status = HttpStatusCode.Forbidden,
-                    Instrument = Line(agentID, sessionId, "adhoc-refused-" + SessionOutcome.RateLimited, null),
+                    Status = (HttpStatusCode)NonSpatialCaps.StoreUnavailableHttpStatus,
+                    Instrument = Line(agentID, sessionId, "adhoc-refused-" + SessionOutcome.StoreUnavailable, null),
+                };
+                return true;
+            }
+
+            if (!engine.TryTakeConferenceRequest(agentID, out bool unavailable))
+            {
+                string why = unavailable ? SessionOutcome.StoreUnavailable : SessionOutcome.RateLimited;
+                outcome = new ChatSessionOutcome
+                {
+                    Status = (HttpStatusCode)NonSpatialCaps.RefusalStatus(why),
+                    Instrument = Line(agentID, sessionId, "adhoc-refused-" + why, null),
                 };
                 return true;
             }
@@ -222,7 +234,7 @@ namespace osWebRtcVoice.NonSpatial
             {
                 outcome = new ChatSessionOutcome
                 {
-                    Status = HttpStatusCode.Forbidden,
+                    Status = (HttpStatusCode)NonSpatialCaps.RefusalStatus(fits.Decision),
                     Instrument = Line(agentID, sessionId, "adhoc-refused-" + fits.Decision,
                                       $"session={sessionId} asked={asked.Count}"),
                 };
@@ -308,8 +320,18 @@ namespace osWebRtcVoice.NonSpatial
                                          UUID originRegion, bool enabled, out ChatSessionOutcome outcome)
         {
             outcome = null;
-            if (!Ours(reqmap, engine, enabled, MethodCall, out UUID sessionId, out NonSpatialVoiceSession session))
-                return false;
+            if (!Ours(reqmap, engine, enabled, MethodCall, out UUID sessionId, out NonSpatialVoiceSession session, out bool unavailable))
+            {
+                // The service could not say whether this is a conference, so the viewer is told to try again.
+                if (!unavailable)
+                    return false;
+                outcome = new ChatSessionOutcome
+                {
+                    Status = (HttpStatusCode)NonSpatialCaps.StoreUnavailableHttpStatus,
+                    Instrument = Line(agentID, sessionId, "adhoc-refused-" + SessionOutcome.StoreUnavailable, null),
+                };
+                return true;
+            }
             // The discriminator, mirroring the group arm's membership test: someone with no record in
             // this conference is not ours and must fall through untouched.
             if (session.Find(agentID) is null)
@@ -332,8 +354,18 @@ namespace osWebRtcVoice.NonSpatial
                                                      UUID originRegion, bool enabled, out ChatSessionOutcome outcome)
         {
             outcome = null;
-            if (!Ours(reqmap, engine, enabled, MethodAcceptInvitation, out UUID sessionId, out NonSpatialVoiceSession session))
-                return false;
+            if (!Ours(reqmap, engine, enabled, MethodAcceptInvitation, out UUID sessionId, out NonSpatialVoiceSession session, out bool unavailable))
+            {
+                // The service could not say whether this is a conference, so the viewer is told to try again.
+                if (!unavailable)
+                    return false;
+                outcome = new ChatSessionOutcome
+                {
+                    Status = (HttpStatusCode)NonSpatialCaps.StoreUnavailableHttpStatus,
+                    Instrument = Line(agentID, sessionId, "adhoc-refused-" + SessionOutcome.StoreUnavailable, null),
+                };
+                return true;
+            }
             if (session.Find(agentID) is null)
                 return false;      // uninvited: not ours, and AdhocAdmission would refuse anyway
 
@@ -355,9 +387,7 @@ namespace osWebRtcVoice.NonSpatial
             {
                 // Capacity is the one refusal with a required status: 409, which the viewer maps to
                 // ERROR_CHANNEL_FULL -- the same thing the mixer's own 495 produces.
-                HttpStatusCode code = seat.Decision == SessionOutcome.Capacity
-                    ? (HttpStatusCode)NonSpatialCaps.CapacityHttpStatus
-                    : HttpStatusCode.Forbidden;
+                HttpStatusCode code = (HttpStatusCode)NonSpatialCaps.RefusalStatus(seat.Decision);
                 string word = seat.Decision == SessionOutcome.Capacity ? DecisionFull : "adhoc-refused-" + seat.Decision;
                 return new ChatSessionOutcome
                 {
@@ -401,9 +431,18 @@ namespace osWebRtcVoice.NonSpatial
         /// </summary>
         private static bool Ours(OSDMap reqmap, INonSpatialSessions engine, bool enabled, string wanted,
                                  out UUID sessionId, out NonSpatialVoiceSession session)
+            => Ours(reqmap, engine, enabled, wanted, out sessionId, out session, out _);
+
+        /// <summary>
+        /// As above, and <paramref name="unavailable"/> says the store could not be reached, so a false answer does not
+        /// mean the session is not a conference.
+        /// </summary>
+        private static bool Ours(OSDMap reqmap, INonSpatialSessions engine, bool enabled, string wanted,
+                                 out UUID sessionId, out NonSpatialVoiceSession session, out bool unavailable)
         {
             sessionId = UUID.Zero;
             session = null;
+            unavailable = false;
             if (!enabled || engine is null || reqmap is null)
                 return false;
             if (!reqmap.TryGetString("method", out string method)
@@ -411,7 +450,7 @@ namespace osWebRtcVoice.NonSpatial
                 return false;
             if (!reqmap.TryGetUUID("session-id", out sessionId) || sessionId == UUID.Zero)
                 return false;
-            session = engine.Get(sessionId);
+            session = engine.Get(sessionId, default, out unavailable);
             return session is not null && session.Type == NonSpatialSessionType.Adhoc;
         }
 
