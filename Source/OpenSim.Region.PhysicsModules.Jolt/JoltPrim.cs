@@ -676,7 +676,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // would become the object's position.
             if (!(float.IsFinite(newPos.X) && float.IsFinite(newPos.Y) && float.IsFinite(newPos.Z)))
             {
-                JoltScene.m_log.LogWarning($"{JoltScene.LogHeader} [physglitch] body {LocalID} implausible pos {newPos} vel {s.LinearVelocity} - update dropped (no crossing)");
+                if (RepeatingWarnings.NonFinitePosition.ShouldLog(out long occurrence))
+                    JoltScene.m_log.LogWarning($"{JoltScene.LogHeader} [physglitch] body {LocalID} implausible pos {newPos} vel {s.LinearVelocity} - update dropped (no crossing){RepeatLimiter.Suffix(occurrence)}");
                 return;
             }
             SQuaternion prim = SQuaternion.Multiply(SQuaternion.Conjugate(_axisCorrection), s.Orientation);

@@ -402,6 +402,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     m_Enabled = true;
                     m_Config = source;
                     _joltConfig = joltConfig;
+                    JoltMetrics.Configure(joltConfig.MetricsLogIntervalSeconds);
                     VehicleSettings = joltConfig.ToVehicleSettings();
                     if (VehicleSettings.Behaviour != VehicleBehaviour.SecondLife)
                         m_log.LogInformation($"{LogHeader} vehicle behaviour: {VehicleSettings.Behaviour} (preset values: {VehicleSettings.Presets}).");
@@ -689,7 +690,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             if (cmd.Length >= 2 && cmd[1] == "metrics")   // step-time / RSS instrumentation, and the last interval's timing
             {
                 MainConsole.Instance.Output(JoltMetrics.Report());
-                MainConsole.Instance.Output(JoltMetrics.LastIntervalLine() ?? "[JOLT METRICS] no interval has finished yet (the log closes one about every 30 s)");
+                MainConsole.Instance.Output(JoltMetrics.LastIntervalLine() ?? $"[JOLT METRICS] no interval has finished yet (one closes about every {JoltMetrics.IntervalSeconds} s)");
                 return;
             }
 
@@ -1099,7 +1100,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             AvatarCreatedHook?.Invoke(jc);
 
             string lifted = centreZ != position.Z ? " (lifted onto the terrain)" : "";
-            m_log.LogInformation($"{LogHeader} avatar '{avName}' id={localID} placed at ({position.X:0},{position.Y:0}) askedZ={position.Z:0.000} centreZ={spawn.Z:0.000}{lifted} terrainZ={terrainZ:0.00} standHalf={standHalf:0.000} feetOffset={feetOffset:0.000} flying={isFlying}.");
+            m_log.LogDebug($"{LogHeader} avatar '{avName}' id={localID} placed at ({position.X:0},{position.Y:0}) askedZ={position.Z:0.000} centreZ={spawn.Z:0.000}{lifted} terrainZ={terrainZ:0.00} standHalf={standHalf:0.000} feetOffset={feetOffset:0.000} flying={isFlying}.");
             return jc;
         }
 
@@ -1127,7 +1128,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             lock (_avatars)
                 _avatars.Remove(jc.CharacterHandle.Value);
             jc.Destroy();   // RemoveCharacter also tears down the query marker
-            m_log.LogInformation($"{LogHeader} avatar '{jc.Name}' id={jc.LocalID} removed.");
+            m_log.LogDebug($"{LogHeader} avatar '{jc.Name}' id={jc.LocalID} removed.");
         }
 
         public override void RemovePrim(PhysicsActor prim)
@@ -1171,7 +1172,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             }
             catch (Exception e)
             {
-                m_log.LogWarning($"{LogHeader} AddPrimShape failed for '{primName}' (localid {localid}): {e.GetType().Name}: {e.Message}; prim has no physics.");
+                if (RepeatingWarnings.AddPrimShapeFailed.ShouldLog(out long occurrence))
+                    m_log.LogWarning($"{LogHeader} AddPrimShape failed for '{primName}' (localid {localid}): {e.GetType().Name}: {e.Message}; prim has no physics.{RepeatLimiter.Suffix(occurrence)}");
                 return PhysicsActor.Null;
             }
             lock (_prims)
@@ -1520,7 +1522,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             }
             catch (Exception e)
             {
-                m_log.LogWarning($"{LogHeader} scaling the shape of a mesh asset threw ({e.GetType().Name}: {e.Message}); cooked at its own size.");
+                if (RepeatingWarnings.MeshScaleThrew.ShouldLog(out long occurrence))
+                    m_log.LogWarning($"{LogHeader} scaling the shape of a mesh asset threw ({e.GetType().Name}: {e.Message}); cooked at its own size.{RepeatLimiter.Suffix(occurrence)}");
                 return ShapeId.Invalid;
             }
         }
@@ -1555,7 +1558,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             }
             if (m_mesher == null)
             {
-                m_log.LogWarning($"{LogHeader} no IMesher - cannot cook mesh; bounding-box fallback.");
+                if (RepeatingWarnings.NoMesher.ShouldLog(out long occurrence))
+                    m_log.LogWarning($"{LogHeader} no IMesher - cannot cook mesh; bounding-box fallback.{RepeatLimiter.Suffix(occurrence)}");
                 return ShapeId.Invalid;
             }
 
@@ -1608,7 +1612,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 float[] verts = mesh.getVertexListAsFloat(); // fresh copy (flattened x,y,z,...)
                 if (verts == null || indices == null || verts.Length < 12 || indices.Length < 3 || (indices.Length % 3) != 0)
                 {
-                    m_log.LogWarning($"{LogHeader} mesher geometry unusable (verts={verts?.Length ?? 0}, indices={indices?.Length ?? 0}); bounding-box fallback.");
+                    if (RepeatingWarnings.MesherGeometryUnusable.ShouldLog(out long occurrence))
+                        m_log.LogWarning($"{LogHeader} mesher geometry unusable (verts={verts?.Length ?? 0}, indices={indices?.Length ?? 0}); bounding-box fallback.{RepeatLimiter.Suffix(occurrence)}");
                     return ShapeId.Invalid;
                 }
 
@@ -1645,7 +1650,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             }
             catch (Exception e)
             {
-                m_log.LogWarning($"{LogHeader} mesher geometry extraction threw ({e.GetType().Name}: {e.Message}); bounding-box fallback.");
+                if (RepeatingWarnings.MesherExtractionThrew.ShouldLog(out long occurrence))
+                    m_log.LogWarning($"{LogHeader} mesher geometry extraction threw ({e.GetType().Name}: {e.Message}); bounding-box fallback.{RepeatLimiter.Suffix(occurrence)}");
                 return ShapeId.Invalid;
             }
 
@@ -1655,7 +1661,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // backend rejects it too). Name the counts once and take the bbox fallback.
             if (_lastMeshStats.OutOfRangeIndices > 0)
             {
-                m_log.LogWarning($"{LogHeader} mesher output has {_lastMeshStats.OutOfRangeIndices} out-of-range indices (verts={_lastMeshStats.Verts}, tris={_lastMeshStats.Tris}); bounding-box fallback.");
+                if (RepeatingWarnings.MesherIndicesOutOfRange.ShouldLog(out long occurrence))
+                    m_log.LogWarning($"{LogHeader} mesher output has {_lastMeshStats.OutOfRangeIndices} out-of-range indices (verts={_lastMeshStats.Verts}, tris={_lastMeshStats.Tris}); bounding-box fallback.{RepeatLimiter.Suffix(occurrence)}");
                 return ShapeId.Invalid;
             }
 
@@ -1704,7 +1711,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             }
             catch (Exception e)
             {
-                m_log.LogWarning($"{LogHeader} backend cook of mesher output threw ({e.GetType().Name}: {e.Message}); bounding-box fallback.");
+                if (RepeatingWarnings.CookThrew.ShouldLog(out long occurrence))
+                    m_log.LogWarning($"{LogHeader} backend cook of mesher output threw ({e.GetType().Name}: {e.Message}); bounding-box fallback.{RepeatLimiter.Suffix(occurrence)}");
                 return ShapeId.Invalid;   // kind stays "bbox(fallback)"
             }
         }
@@ -2152,7 +2160,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 }
                 catch (Exception e)
                 {
-                    m_log.LogWarning($"{LogHeader} cooking mesh asset {assetId} for prim {prim.LocalID} threw ({e.GetType().Name}: {e.Message}); it stays a bounding box.");
+                    if (RepeatingWarnings.MeshAssetCookThrew.ShouldLog(out long occurrence))
+                        m_log.LogWarning($"{LogHeader} cooking mesh asset {assetId} for prim {prim.LocalID} threw ({e.GetType().Name}: {e.Message}); it stays a bounding box.{RepeatLimiter.Suffix(occurrence)}");
                 }
             }
             if (anyBox && !anyCooked)
@@ -3326,7 +3335,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             int sx = _regionSizeX, sy = _regionSizeY;
             if (sx <= 0 || sy <= 0 || heightMap.Length < sx * sy)
             {
-                m_log.LogWarning($"{LogHeader} SetTerrain: heightMap length {heightMap?.Length ?? 0} < {sx}x{sy}; ignoring.");
+                if (RepeatingWarnings.TerrainTooShort.ShouldLog(out long occurrence))
+                    m_log.LogWarning($"{LogHeader} SetTerrain: heightMap length {heightMap?.Length ?? 0} < {sx}x{sy}; ignoring.{RepeatLimiter.Suffix(occurrence)}");
                 return;
             }
 
@@ -3377,8 +3387,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // Step-stamp + a couple of height samples so a [charframe] session can see whether SetTerrain
             // is re-firing during a walk (it should NOT - TerrainModule only ticks it every ~5 s when the
             // heightmap is tainted) and whether the heights it re-cooks are drifting downward.
-            m_log.LogInformation($"{LogHeader} terrain set: step={_stepCount} {sx}x{sy} region -> {m}x{m} heightfield " +
-                                 $"(spans {m - 1} m/side; sample[centre]={heightMap[(sy / 2) * sx + (sx / 2)]:0.000} sample[0]={heightMap[0]:0.000}).");
+            m_log.LogDebug($"{LogHeader} terrain set: step={_stepCount} {sx}x{sy} region -> {m}x{m} heightfield " +
+                           $"(spans {m - 1} m/side; sample[centre]={heightMap[(sy / 2) * sx + (sx / 2)]:0.000} sample[0]={heightMap[0]:0.000}).");
         }
 
         // Distance (m) a capsule centre must be below its seat before we treat it as buried and lift it.
@@ -3450,8 +3460,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 if (TryComputeUnbury(p.Z, terrainZ, a.StandHalf, a.FeetOffset, TerrainUnburyEps, out float seatZ))
                 {
                     a.ReGround(new Vector3(p.X, p.Y, seatZ));
-                    m_log.LogInformation($"{LogHeader} terrain-unbury: avatar {a.LocalID} lifted z={p.Z:0.000} -> seatZ={seatZ:0.000} " +
-                                         $"(terrain now {terrainZ:0.000}, flying={a.Flying}).");
+                    m_log.LogDebug($"{LogHeader} terrain-unbury: avatar {a.LocalID} lifted z={p.Z:0.000} -> seatZ={seatZ:0.000} " +
+                                   $"(terrain now {terrainZ:0.000}, flying={a.Flying}).");
                 }
             }
         }

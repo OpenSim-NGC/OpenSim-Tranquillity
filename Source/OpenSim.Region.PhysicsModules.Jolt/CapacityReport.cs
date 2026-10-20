@@ -121,7 +121,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             sb.AppendLine($"  this region       pool={s.PoolIndex} waits={s.UpdateGateWaits} waitMs total={s.UpdateGateWaitMsTotal:0.0} max={s.UpdateGateWaitMsMax:0.0}; pool peakInside={s.PoolPeakInside}");
             sb.AppendLine($"  pool handoff      {(s.JobPoolFairHandoff ? "first come, first served ([Jolt] JobPoolFairHandoff = true)" : "default lock ([Jolt] JobPoolFairHandoff = false)")}");
             sb.AppendLine($"  region lock       waits={s.RegionLockWaits} waitMs total={s.RegionLockWaitMsTotal:0.0} max={s.RegionLockWaitMsMax:0.0} (steps that waited for this region's own lock, cumulative)");
-            sb.AppendLine($"  last interval     {lastInterval ?? "none finished yet (the metrics log closes one about every 30 s)"}");
+            sb.AppendLine($"  last interval     {lastInterval ?? $"none finished yet (one closes about every {JoltMetrics.IntervalSeconds} s)"}");
             sb.AppendLine($"  rejected non-finite  {s.RejectedNonFinite}");
             sb.AppendLine($"  script ray casts  {RayBudget(in s.ScriptRayCasts)} ([Jolt] RayCastBudgetMs)");
             sb.AppendLine($"  other ray casts   {RayBudget(in s.SimulatorRayCasts)} ([Jolt] RayCastSimulatorBudgetMs: rez placement, landing, YEngine llCastRay)");

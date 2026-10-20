@@ -54,6 +54,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         public float AvatarFlySpeedFactor = DefaultAvatarFlySpeedFactor;     // the same, flying
         public float AvatarFlyDownSpeedFactor = DefaultAvatarFlyDownSpeedFactor;   // the same, the downward part of a flight
         public float CapacityLogIntervalSeconds = 10f;
+        public float MetricsLogIntervalSeconds = 30f;   // seconds between the [JOLT METRICS] summary lines (Debug); 0 = not logged
         public int JobPools = 1;                   // job pools, one physics update at a time each; splits ThreadCount
         public bool JobPoolFairHandoff = false;    // true: a job pool is granted first come, first served (per physics step)
         public float PhysicsStepRate = DefaultPhysicsStepRate; // Hz; 0 = one physics step per heartbeat
@@ -221,6 +222,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             c.AvatarFlySpeedFactor = F(cfg, "AvatarFlySpeedFactor", c.AvatarFlySpeedFactor, MinAvatarSpeedFactor, MaxAvatarSpeedFactor, warnings);
             c.AvatarFlyDownSpeedFactor = F(cfg, "AvatarFlyDownSpeedFactor", c.AvatarFlyDownSpeedFactor, MinAvatarSpeedFactor, MaxAvatarSpeedFactor, warnings);
             c.CapacityLogIntervalSeconds = F(cfg, "CapacityLogIntervalSeconds", c.CapacityLogIntervalSeconds, 0.1f, 86400f, warnings);
+            c.MetricsLogIntervalSeconds = F(cfg, "MetricsLogIntervalSeconds", c.MetricsLogIntervalSeconds, 0f, 86400f, warnings);
             c.JobPools = I(cfg, "JobPools", c.JobPools, 1, JoltPhysicsBackend.MaxJobPools, warnings);
             c.JobPoolFairHandoff = B(cfg, "JobPoolFairHandoff", c.JobPoolFairHandoff, warnings);
             // An invalid PhysicsStepRate warns and gives the default, as every other key does; it does not count as set.
