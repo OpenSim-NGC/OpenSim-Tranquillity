@@ -26,10 +26,16 @@ namespace osWebRtcVoice.Tests
         private readonly ILoggerFactory _previous;
         private readonly ILoggerFactory _ours;
 
-        public LogCapture(LogLevel minimum = LogLevel.Trace)
+        /// <param name="minimum">The lowest level the factory lets through.</param>
+        /// <param name="configure">More logging configuration, such as a Logging section read from configuration.</param>
+        public LogCapture(LogLevel minimum = LogLevel.Trace, Action<ILoggingBuilder> configure = null)
         {
             _previous = LoggerProvider.LoggerFactory;
-            _ours = LoggerFactory.Create(b => b.AddProvider(this).SetMinimumLevel(minimum));
+            _ours = LoggerFactory.Create(b =>
+            {
+                b.AddProvider(this).SetMinimumLevel(minimum);
+                configure?.Invoke(b);
+            });
             LoggerProvider.LoggerFactory = _ours;
         }
 

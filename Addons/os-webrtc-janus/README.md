@@ -317,6 +317,35 @@ This is a growing section and will be added to over time.
 **show voice sessions** -- show where this region keeps its call sessions (in this process, or in the grid
 voice session service) and, for the service, whether it is answering
 
+<a id="Quieting_Voice_In_The_Log"></a>
+## Quieting voice in the log
+
+Every voice class logs under the one category prefix `osWebRtcVoice`, so one line of logging configuration sets the
+level for all of them. At the default level (`Information`) the voice code writes its start-up lines, a line for each call
+removal, and, for a viewer that keeps being refused a provision, one line for the first refusal and one with the count
+when the run ends. To raise voice to warnings and errors only, add this line to the `Logging:LogLevel`
+section of the region server's `appsettings.json` (the file in the folder the region server is started from):
+
+```json
+"osWebRtcVoice": "Warning"
+```
+
+so that the section reads:
+
+```json
+"Logging": {
+  "LogLevel": {
+    "Default": "Information",
+    "osWebRtcVoice": "Warning",
+    "Microsoft": "Warning",
+    "System": "Warning"
+  }
+}
+```
+
+The other categories keep their levels. The region server reads `appsettings.json` when it starts, so restart it for
+the change to apply. To see everything the voice code does while chasing a fault, set the same line to `"Debug"`.
+
 [SecondLife WebRTC Voice]: https://wiki.secondlife.com/wiki/WebRTC_Voice
 [OpenSimulator]: http://opensimulator.org
 [OpenSimulator Community Conference]: https://conference.opensimulator.org
