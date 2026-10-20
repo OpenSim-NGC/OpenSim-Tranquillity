@@ -266,26 +266,99 @@ public class SculptFlagsTests
         Assert.Equal(a.GetMeshKey(Size, Lod), b.GetMeshKey(Size, Lod));
     }
 
-    // Vertex count, triangle count, signed volume and bounds: the values the mesher gave for these maps before the
-    // flags were read, so a change to the unflagged path shows up here.
-    private static string Fingerprint(IMesh mesh)
+    // What the mesher gives for an unflagged sculpt: vertex count, triangle count, six times the enclosed volume, and
+    // the bounds as min x, max x, min y, max y, min z, max z. The values pin the unflagged mesher path. The sculpt
+    // map is a JPEG2000 image, and an image decoder may round a reconstructed sample one level (1 in 255) up or down
+    // between versions, which moves vertices by up to one level of the prim size without any change to the mesher. So
+    // the counts must match exactly and the volume and the bounds only within a tolerance of that size.
+    private sealed record Print(int Vertices, int Triangles, double Volume, double[] Bounds);
+
+    private static readonly System.Globalization.CultureInfo Ic = System.Globalization.CultureInfo.InvariantCulture;
+
+    // Volume: the largest difference seen between two decoders (CoreJ2K 2.3.3.91 and 2.4.1.108, both rounding the same
+    // encoded maps) is 0.7, plus 0.05 for the recorded value being rounded to one decimal, so 0.75. Moving every
+    // vertex by one level in the worst direction changes it by about 2 x surface area x level, near 1.1 for these
+    // shapes (an estimate, not measured). The tolerance is 1.5, which covers that estimate plus the 0.05 for rounding
+    // with about 30% to spare. An inverted shape differs by twice the volume, at least 34.8 here.
+    private const double VolumeTolerance = 1.5;
+
+    // Bounds: one level of the prim size on that axis (size / 255: x 0.0078, y 0.0118, z 0.0157), plus 0.01 for the
+    // recorded value being rounded to two decimals (0.005) with the same again as margin. That is 0.018, 0.022 and
+    // 0.026 for x, y and z, against 0.02 at most seen between the two decoders. A mirrored shape's x bounds differ
+    // from the unmirrored ones by at least 0.25 here.
+    private static double BoundsTolerance(int index)
+    {
+        float[] size = { Size.X, Size.X, Size.Y, Size.Y, Size.Z, Size.Z };
+        return size[index] / 255.0 + 0.01;
+    }
+
+    private static Print Fingerprint(IMesh mesh)
     {
         List<Vector3> v = mesh.getVertexList();
-        var ic = System.Globalization.CultureInfo.InvariantCulture;
-        return string.Join(" ", v.Count, mesh.getIndexListAsInt().Length / 3, SignedVolume(mesh).ToString("F1", ic),
-            v.Min(p => p.X).ToString("F2", ic), v.Max(p => p.X).ToString("F2", ic),
-            v.Min(p => p.Y).ToString("F2", ic), v.Max(p => p.Y).ToString("F2", ic),
-            v.Min(p => p.Z).ToString("F2", ic), v.Max(p => p.Z).ToString("F2", ic));
+        return new Print(v.Count, mesh.getIndexListAsInt().Length / 3, SignedVolume(mesh), new double[]
+        {
+            v.Min(p => p.X), v.Max(p => p.X), v.Min(p => p.Y), v.Max(p => p.Y), v.Min(p => p.Z), v.Max(p => p.Z),
+        });
+    }
+
+    private static string Format(Print p) =>
+        string.Join(" ", p.Vertices, p.Triangles, p.Volume.ToString("F1", Ic),
+            string.Join(" ", p.Bounds.Select(b => b.ToString("F2", Ic))));
+
+    private static Print Parse(string text)
+    {
+        string[] f = text.Split(' ');
+        return new Print(int.Parse(f[0], Ic), int.Parse(f[1], Ic), double.Parse(f[2], Ic),
+            f.Skip(3).Select(b => double.Parse(b, Ic)).ToArray());
+    }
+
+    private static List<string> Differences(Print expected, Print actual)
+    {
+        var problems = new List<string>();
+        if (expected.Vertices != actual.Vertices)
+            problems.Add("vertex count");
+        if (expected.Triangles != actual.Triangles)
+            problems.Add("triangle count");
+        if (Math.Abs(expected.Volume - actual.Volume) > VolumeTolerance)
+            problems.Add("volume");
+        string[] names = { "min x", "max x", "min y", "max y", "min z", "max z" };
+        for (int i = 0; i < names.Length; i++)
+            if (Math.Abs(expected.Bounds[i] - actual.Bounds[i]) > BoundsTolerance(i))
+                problems.Add(names[i]);
+        return problems;
     }
 
     [Theory]
-    [InlineData(SculptType.Sphere, "989 1976 24.5 -0.45 0.94 -0.89 0.90 -1.61 1.61")]
-    [InlineData(SculptType.Torus, "1053 2106 16.9 -0.62 1.00 -1.29 1.30 -0.60 0.62")]
-    [InlineData(SculptType.Plane, "1067 2010 -20.6 -0.74 1.00 -1.49 1.50 0.35 1.59")]
-    [InlineData(SculptType.Cylinder, "1054 2044 -34.5 -0.55 1.00 -0.90 0.91 -1.98 1.97")]
+    [InlineData(SculptType.Sphere, "989 1976 25.1 -0.46 0.94 -0.90 0.90 -1.62 1.61")]
+    [InlineData(SculptType.Torus, "1053 2106 17.4 -0.62 1.00 -1.30 1.30 -0.62 0.62")]
+    [InlineData(SculptType.Plane, "1067 2010 -20.8 -0.75 1.00 -1.50 1.50 0.35 1.59")]
+    [InlineData(SculptType.Cylinder, "1054 2044 -35.2 -0.56 1.00 -0.91 0.91 -2.00 1.97")]
     public void Sculpts_without_flags_give_the_shapes_the_mesher_gave_before(SculptType type, string expected)
     {
-        string actual = Fingerprint(Mesh(NewMesher(), Map(type), (byte)type));
-        Assert.True(expected == actual, "expected " + expected + " but the mesh is " + actual);
+        Print actual = Fingerprint(Mesh(NewMesher(), Map(type), (byte)type));
+        List<string> problems = Differences(Parse(expected), actual);
+        Assert.True(problems.Count == 0,
+            "expected " + expected + " but the mesh is " + Format(actual) + " (differs in " + string.Join(", ", problems) + ")");
+    }
+
+    [Theory]
+    [InlineData("989 1976 25.1 -0.46 0.94 -0.90 0.90 -1.62 1.61")]
+    [InlineData("1053 2106 17.4 -0.62 1.00 -1.30 1.30 -0.62 0.62")]
+    [InlineData("1067 2010 -20.8 -0.75 1.00 -1.50 1.50 0.35 1.59")]
+    [InlineData("1054 2044 -35.2 -0.56 1.00 -0.91 0.91 -2.00 1.97")]
+    public void The_fingerprint_comparison_tells_a_mirrored_or_inverted_shape_from_the_unflagged_one(string text)
+    {
+        Print plain = Parse(text);
+        double[] b = plain.Bounds;
+        Print mirrored = plain with { Bounds = new[] { -b[1], -b[0], b[2], b[3], b[4], b[5] } };
+        Print inverted = plain with { Volume = -plain.Volume };
+        Print both = mirrored with { Volume = -plain.Volume };
+
+        Assert.Empty(Differences(plain, plain));
+        Assert.Contains("min x", Differences(plain, mirrored));
+        Assert.Contains("max x", Differences(plain, mirrored));
+        Assert.Equal(new[] { "volume" }, Differences(plain, inverted));
+        Assert.Contains("volume", Differences(plain, both));
+        Assert.Contains("min x", Differences(plain, both));
     }
 }
