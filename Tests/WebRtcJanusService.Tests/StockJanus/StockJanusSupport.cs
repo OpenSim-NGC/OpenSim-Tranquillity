@@ -390,6 +390,48 @@ namespace osWebRtcVoice.Tests.StockJanus
             return null;
         }
 
+        /// <summary>The plugin's answer to a join made straight on the gateway.</summary>
+        public sealed record DirectJoinResult(string AnswerSdp, int ErrorCode, string Reason);
+
+        /// <summary>Joins a room straight on the gateway, as <see cref="JoinDirectAsync"/> does, carrying the given join
+        /// capability and viewer session id when they are not null. Returns the answer SDP, or the plugin's error code and
+        /// the machine-readable reason it gave.</summary>
+        public async Task<DirectJoinResult> JoinDirectWithCapabilityAsync(int room, string display, string offerSdp,
+            string capability, string viewerSession)
+        {
+            string api = StockJanusEnvironment.Url.TrimEnd('/');
+            JsonObject s = await PostAsync(api, new JsonObject { ["janus"] = "create" });
+            string sid = s["data"]["id"].ToString();
+            try
+            {
+                JsonObject h = await PostAsync($"{api}/{sid}", new JsonObject { ["janus"] = "attach", ["plugin"] = StockJanusEnvironment.PluginName });
+                string hid = h["data"]["id"].ToString();
+                var body = new JsonObject { ["request"] = "join", ["room"] = room, ["display"] = display };
+                if (capability is not null) body["join_cap"] = capability;
+                if (viewerSession is not null) body["session_id"] = viewerSession;
+                await PostAsync($"{api}/{sid}/{hid}", new JsonObject
+                {
+                    ["janus"] = "message",
+                    ["body"] = body,
+                    ["jsep"] = new JsonObject { ["type"] = "offer", ["sdp"] = offerSdp },
+                });
+                string poll = $"{api}/{sid}?maxev=1&apisecret={Uri.EscapeDataString(StockJanusEnvironment.ApiSecret)}";
+                DateTime until = DateTime.UtcNow.AddSeconds(15);
+                while (DateTime.UtcNow < until)
+                {
+                    JsonObject ev = JsonNode.Parse(await _http.GetStringAsync(poll)) as JsonObject;
+                    if (ev?["jsep"]?["sdp"] is JsonNode sdp) return new DirectJoinResult(sdp.GetValue<string>(), 0, null);
+                    if (ev?["plugindata"]?["data"] is JsonObject data && data["error_code"] is not null)
+                        return new DirectJoinResult(null, data["error_code"].GetValue<int>(), data["reason"]?.ToString());
+                }
+                return new DirectJoinResult(null, -1, "no answer");
+            }
+            finally
+            {
+                try { await PostAsync($"{api}/{sid}", new JsonObject { ["janus"] = "destroy" }); } catch (Exception) { }
+            }
+        }
+
         public async Task<bool> IsUpAsync()
         {
             try
