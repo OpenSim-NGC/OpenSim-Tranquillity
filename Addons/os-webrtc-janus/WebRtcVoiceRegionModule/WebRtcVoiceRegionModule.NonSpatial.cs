@@ -355,6 +355,11 @@ public partial class WebRtcVoiceRegionModule
             logHeader, ChatSessionRequestLogic.InstrumentTag, agentID, scene.RegionInfo.RegionName,
             OSDParser.SerializeJsonString(reqmap));
 
+        // Call moderation first: a "mute update" or "session update" is not a call, an accept or a start, and with
+        // the feature off this declines and the request goes the way it always went.
+        if (TryHandleCallModeration(reqmap, agentID, response))
+            return true;
+
         if (TryHandleGroupChatSession(reqmap, agentID, sp, scene, response))
             return true;
 
@@ -558,7 +563,7 @@ public partial class WebRtcVoiceRegionModule
         m_nonSpatial = grid;
         m_gridRenewer = new GridSeatRenewer(grid, PresentAgents,
             (message, e) => m_log.LogWarning(e, "{LogHeader} {Message}", logHeader, message),
-            TimeSpan.FromSeconds(store.RenewSeconds));
+            TimeSpan.FromSeconds(store.RenewSeconds), seatRemoved: OnGridSeatRemoved);
         m_log.LogInformation("{LogHeader} non-spatial sessions are kept by the grid session store at {Uri} "
             + "(timeout {Timeout} ms, seats renewed every {Renew} s, up to {Queue} departures queued for {Age} s, "
             + "refusing calls for {Open} s after {Failures} failures in {Window} s)", logHeader, store.ServerUri, store.TimeoutMs,
@@ -651,6 +656,7 @@ public partial class WebRtcVoiceRegionModule
         m_nonSpatialMaintenance?.Stop();
         m_gridRenewer?.Stop();
         m_gridOutbox?.Stop();
+        StopCallModerationTick();
     }
 
     // Tracks the scenes this shared module serves, for callee resolution on THIS instance (the group
@@ -664,6 +670,7 @@ public partial class WebRtcVoiceRegionModule
         m_gridRenewer?.Start();
         m_gridOutbox?.Start(GridOutboxInterval);
         ReleaseSeatsOfStartedRegion(scene);
+        RegisterCallModerationScene(scene);
     }
 
     // A region that has just started holds no viewers, so any seat the grid store still has for it is stale (the
@@ -693,6 +700,7 @@ public partial class WebRtcVoiceRegionModule
             m_scenes.Remove(scene);
             noScenesLeft = m_scenes.Count == 0;
         }
+        UnregisterCallModerationScene(scene, noScenesLeft);
         if (noScenesLeft)
             StopNonSpatialMaintenance();
     }

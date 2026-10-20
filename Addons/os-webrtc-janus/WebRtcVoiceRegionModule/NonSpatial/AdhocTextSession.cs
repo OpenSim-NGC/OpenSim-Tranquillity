@@ -115,6 +115,9 @@ namespace osWebRtcVoice.NonSpatial
         public const string DecisionEmpty = "adhoc-text-refused-empty";
         public const string DecisionDisabled = "adhoc-text-refused-disabled";
 
+        /// <summary>A moderator muted the sender's text in this conference.</summary>
+        public const string DecisionMuted = "adhoc-text-refused-muted";
+
         /// <summary>
         /// Decide what to do with one SessionSend. Returns FALSE -- untouched, nothing logged, no
         /// refusal -- when this is not an ad-hoc conference message, so every other claimant
@@ -155,6 +158,13 @@ namespace osWebRtcVoice.NonSpatial
                 // membership, and a wrong one in both directions -- it would silence someone who hung up voice but was
                 // still typing, and kept someone who closed the chat window in the conversation.
                 decision = DecisionNotMember;
+                return true;
+            }
+
+            if (session.IsTextMuted(sender))
+            {
+                // A moderator muted this member's text in the conference. The line goes to nobody.
+                decision = DecisionMuted;
                 return true;
             }
 

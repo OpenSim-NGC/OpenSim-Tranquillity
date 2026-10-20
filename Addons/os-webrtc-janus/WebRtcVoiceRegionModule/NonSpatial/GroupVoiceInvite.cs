@@ -100,6 +100,8 @@ namespace osWebRtcVoice.NonSpatial
                     continue;                         // already in the call; ringing it would be noise
                 if (session.WasInvited(a))
                     continue;                         // one ring per member per ring cycle
+                if (session.IsRemoved(a, DateTime.UtcNow))
+                    continue;                         // removed from this call: not rung back in
                 if (!policy.IsMember(a, session.Owner) || !policy.HasRequiredPowers(a, session.Owner))
                     continue;
                 targets.Add(a);

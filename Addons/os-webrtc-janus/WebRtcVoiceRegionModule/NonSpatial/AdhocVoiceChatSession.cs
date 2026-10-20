@@ -388,7 +388,8 @@ namespace osWebRtcVoice.NonSpatial
                 // Capacity is the one refusal with a required status: 409, which the viewer maps to
                 // ERROR_CHANNEL_FULL -- the same thing the mixer's own 495 produces.
                 HttpStatusCode code = (HttpStatusCode)NonSpatialCaps.RefusalStatus(seat.Decision);
-                string word = seat.Decision == SessionOutcome.Capacity ? DecisionFull : "adhoc-refused-" + seat.Decision;
+                string word = seat.Decision == SessionOutcome.Capacity ? DecisionFull
+                    : seat.Decision == SessionOutcome.Removed ? NonSpatialProvisionAdmission.DecisionAdhocRemoved : "adhoc-refused-" + seat.Decision;
                 return new ChatSessionOutcome
                 {
                     Status = code,

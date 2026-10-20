@@ -83,6 +83,7 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
                 InitialiseRefusalCache();
                 InitialiseStunServers();
                 InitialiseNonSpatial(config);
+                InitialiseCallModeration(config);
 
                 m_log.LogInformation($"{logHeader}: enabled");
             }

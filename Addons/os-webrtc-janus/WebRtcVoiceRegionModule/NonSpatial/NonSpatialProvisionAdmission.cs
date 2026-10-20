@@ -57,6 +57,7 @@ namespace osWebRtcVoice.NonSpatial
         public const string DecisionNoPower = "group-refused-no-power";
         public const string DecisionBadToken = "group-refused-bad-token";
         public const string DecisionCapacity = "group-refused-capacity";
+        public const string DecisionRemoved = "group-refused-removed";
 
         // The ad-hoc arm's own words. Separate from the group ones so a grep for a conference
         // refusal cannot pick up a group one, and so the two paths can never be confused in a log.
@@ -66,6 +67,7 @@ namespace osWebRtcVoice.NonSpatial
         public const string DecisionAdhocBadToken = "adhoc-refused-bad-token";
         public const string DecisionAdhocCapacity = "adhoc-refused-capacity";
         public const string DecisionAdhocDisabled = "adhoc-refused-disabled";
+        public const string DecisionAdhocRemoved = "adhoc-refused-removed";
 
         /// <summary>
         /// True when this provision body is addressed to a non-spatial room key rather than an A2A
@@ -114,6 +116,11 @@ namespace osWebRtcVoice.NonSpatial
             if (s == null || s.Type != NonSpatialSessionType.Group)
                 return Refuse(DecisionNoSession, 403);
 
+            // A removal comes first: it needs no groups service and no token, and it is the answer the viewer's retry
+            // loop gets every time, so it is the cheapest check there is.
+            if (engine.IsRemoved(s, agentID))
+                return Refuse(DecisionRemoved, 403, s);
+
             // Re-checked, not inherited from "call": powers can be revoked between the two, and the
             // token is shared so it cannot be the only thing standing here.
             if (!policy.IsMember(agentID, s.Owner))
@@ -133,7 +140,7 @@ namespace osWebRtcVoice.NonSpatial
             if (!seat.Ok)
                 return seat.Decision == SessionOutcome.Capacity
                     ? Refuse(DecisionCapacity, NonSpatialCaps.CapacityHttpStatus, s)
-                    : Refuse("group-refused-" + seat.Decision, NonSpatialCaps.RefusalStatus(seat.Decision), s);
+                    : Refuse(seat.Decision == SessionOutcome.Removed ? DecisionRemoved : "group-refused-" + seat.Decision, NonSpatialCaps.RefusalStatus(seat.Decision), s);
 
             return new NonSpatialProvisionResult { Session = s, Admitted = true, Decision = DecisionAdmitted, Status = 200 };
         }
@@ -158,6 +165,10 @@ namespace osWebRtcVoice.NonSpatial
             if (!adhocEnabled)
                 return Refuse(DecisionAdhocDisabled, 403, s);
 
+            // A member who was removed has no seat, but is still in the record as departed, so removal is asked first.
+            if (engine.IsRemoved(s, agentID))
+                return Refuse(DecisionAdhocRemoved, 403, s);
+
             if (s.Find(agentID) is null)
                 return Refuse(DecisionAdhocNotMember, 403, s);
 
@@ -171,7 +182,7 @@ namespace osWebRtcVoice.NonSpatial
             if (!seat.Ok)
                 return seat.Decision == SessionOutcome.Capacity
                     ? Refuse(DecisionAdhocCapacity, NonSpatialCaps.CapacityHttpStatus, s)
-                    : Refuse("adhoc-refused-" + seat.Decision, NonSpatialCaps.RefusalStatus(seat.Decision), s);
+                    : Refuse(seat.Decision == SessionOutcome.Removed ? DecisionAdhocRemoved : "adhoc-refused-" + seat.Decision, NonSpatialCaps.RefusalStatus(seat.Decision), s);
 
             return new NonSpatialProvisionResult { Session = s, Admitted = true, Decision = DecisionAdhocAdmitted, Status = 200 };
         }

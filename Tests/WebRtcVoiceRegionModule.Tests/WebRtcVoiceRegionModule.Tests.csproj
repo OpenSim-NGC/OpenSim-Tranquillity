@@ -80,6 +80,11 @@
     <Compile Include="VoiceSessionWireTests.cs" />
     <Compile Include="CallModerationStateTests.cs" />
     <Compile Include="CallRemovalStateTests.cs" />
+    <Compile Include="CallRemovalModuleTests.cs" />
+    <Compile Include="CallModerationCommandsTests.cs" />
+    <Compile Include="CallModerationHandlerTests.cs" />
+    <Compile Include="CallModerationModuleTests.cs" />
+    <Compile Include="CallTextMuteTests.cs" />
     <Compile Include="GridStoreResilienceTests.cs" />
     <Compile Include="GridStoreProcessTests.cs" />
     <Compile Include="AdhocTextGridModeTests.cs" />
