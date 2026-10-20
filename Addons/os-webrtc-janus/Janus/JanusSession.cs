@@ -662,7 +662,7 @@ public partial class JanusSession : IDisposable
                     m_log.LogError("{0} EventLongPoll: exception {1}", LogHeader, e);
                 }
             }
-            m_log.LogInformation("{0} EventLongPoll: Exiting long poll loop", LogHeader);
+            m_log.LogDebug("{0} EventLongPoll: Exiting long poll loop", LogHeader);
         });
     }
 }
