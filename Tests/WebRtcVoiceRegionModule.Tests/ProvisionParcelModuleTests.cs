@@ -52,6 +52,7 @@ namespace osWebRtcVoice.Tests
             public OSDMap ProvisionVoiceAccountRequest(IVoiceViewerSession s, OSDMap r, UUID u, UUID sc) => new OSDMap();
             public OSDMap VoiceSignalingRequest(IVoiceViewerSession s, OSDMap r, UUID u, UUID sc) => new OSDMap();
             public IVoiceViewerSession CreateViewerSession(OSDMap r, UUID u, UUID sc) => null;
+            public int? EnsureSpatialRoom(UUID sc, int parcel) => null;
         }
 
         private sealed class Rig

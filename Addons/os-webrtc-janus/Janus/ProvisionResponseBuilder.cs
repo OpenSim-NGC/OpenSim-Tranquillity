@@ -22,13 +22,15 @@ namespace osWebRtcVoice;
 
 public static class ProvisionResponseBuilder
 {
-    /// <summary>The JSEP-offer success map: the answer and the viewer session id.</summary>
-    public static OSDMap BuildSuccess(OSDMap jsepAnswer, string viewerSessionId)
+    /// <summary>The JSEP-offer success map: the answer, the viewer session id, and, as an additive
+    /// field, the mixer room the Janus session actually joined. Success path only.</summary>
+    public static OSDMap BuildSuccess(OSDMap jsepAnswer, string viewerSessionId, int room)
     {
         return new OSDMap
         {
             { "jsep", jsepAnswer },
-            { "viewer_session", viewerSessionId }
+            { "viewer_session", viewerSessionId },
+            { "room", room }
         };
     }
 

@@ -59,7 +59,7 @@ public partial class WebRtcJanusService : INonSpatialParticipantRemoval
 
         // The stock AudioBridge can kick a participant this process did not join. The mixer has no such request, so
         // there a participant another region server joined is dropped by that server.
-        if (!string.Equals(_JanusPluginName, DefaultPluginName, StringComparison.OrdinalIgnoreCase))
+        if (!MixerOnlySwitches.IsStockPlugin(_JanusPluginName))
             return dropped;
 
         (List<long> others, ParticipantMuteResult read) = await ParticipantsOfAsync(pAgentID, pRoomNumber).ConfigureAwait(false);

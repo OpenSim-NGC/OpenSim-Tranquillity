@@ -14,6 +14,7 @@ using System.IO;
 using System.Net;
 using System.Security.Cryptography.X509Certificates;
 using Microsoft.Extensions.Logging;
+using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 
 namespace osWebRtcVoice.Tests
@@ -43,6 +44,41 @@ namespace osWebRtcVoice.Tests
             if (created)
                 await session.DestroySession();
             return created;
+        }
+
+        private static async Task<AdminSendResult> SendAdminMessage(TlsTestServer server, string caFile)
+        {
+            using var client = new JanusAdminClient(server.AdminUri, "admin-secret", TimeSpan.FromSeconds(5), JanusTls.CreateHandler(caFile));
+            return await client.SendPluginMessageAsync("janus.plugin.slvoice", new OSDMap { ["request"] = new OSDString("ping") });
+        }
+
+        [Test]
+        public async Task TheAdminClientReachesAnHttpsAdminApiWhenTheKeyNamesTheCa()
+        {
+            using X509Certificate2 ca = TlsTestCerts.NewCa("Example Private CA");
+            string caFile = TlsTestCerts.WritePem(ca, _dir, "ca.pem");
+            using var server = new TlsTestServer(TlsTestCerts.NewServer("127.0.0.1", ca));
+
+            Assert.That(await SendAdminMessage(server, caFile), Is.EqualTo(AdminSendResult.Ok));
+            Assert.That(server.Requests, Is.EqualTo(1));
+        }
+
+        [Test]
+        public async Task TheAdminClientRefusesAnHttpsAdminApiWhoseCertificateNobodyTrusts()
+        {
+            using X509Certificate2 ca = TlsTestCerts.NewCa("Example Private CA");
+            using var server = new TlsTestServer(TlsTestCerts.NewServer("127.0.0.1", ca));
+
+            Assert.That(await SendAdminMessage(server, caFile: null), Is.EqualTo(AdminSendResult.TransportError));
+            Assert.That(server.Requests, Is.EqualTo(0), "no admin secret was sent to an untrusted server");
+        }
+
+        [Test]
+        public async Task TheAdminClientStillWorksOverPlainHttp()
+        {
+            using var server = new TlsTestServer(null);
+
+            Assert.That(await SendAdminMessage(server, caFile: null), Is.EqualTo(AdminSendResult.Ok));
         }
 
         [Test]

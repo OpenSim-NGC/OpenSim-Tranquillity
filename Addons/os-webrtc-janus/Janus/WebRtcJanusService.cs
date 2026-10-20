@@ -88,7 +88,9 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 WarnOnShortJanusSecrets();
                 ReadTlsConfig(janusConfig);
                 ReadPluginNameConfig(janusConfig);
+                MixerOnlySwitches.DisableOnStockPlugin(_Config, _log);
                 ReadGridIdConfig();
+                ReadArmingConfig(webRtcVoiceConfig);
                 ReadRoomReaperConfig(janusConfig);
                 // Debugging options
                 _MessageDetails = janusConfig.GetBoolean("MessageDetails", false);
@@ -148,7 +150,7 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             _log.LogDebug("{0} JanusSession created", LogHeader);
 
             // Once the session is created, create a handle to the plugin for rooms
-            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName, _GridId)
+            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName, _GridId, _DeclareVisAuthority)
             {
                 // Rooms this bridge creates are watched by the empty-room reaper (null when it is off).
                 RoomCreated = _roomReaper is null ? null : _roomReaper.NoteCreated,
@@ -310,7 +312,9 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                         var joinResult = await viewerSession.Room.JoinRoom(viewerSession).ConfigureAwait(false);
                         if (joinResult.Joined)
                         {
-                            ret = ProvisionResponseBuilder.BuildSuccess(viewerSession.Answer, viewerSession.ViewerSessionID);
+                            // Additive: the joined room number, so the region can record which mixer room this agent is actually in.
+                            // Success branch only; failure maps carry no room.
+                            ret = ProvisionResponseBuilder.BuildSuccess(viewerSession.Answer, viewerSession.ViewerSessionID, viewerSession.Room.RoomId);
                         }
                         else if (joinResult.ErrorCode == JANUS_ROOM_FULL_ERROR_CODE)
                         {

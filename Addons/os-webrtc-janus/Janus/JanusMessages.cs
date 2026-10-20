@@ -528,7 +528,12 @@ public class AudioBridgeCreateRoomReq : PluginMsgReq
     public AudioBridgeCreateRoomReq(int pRoomId) : this(pRoomId, false, null)
     {
     }
-    public AudioBridgeCreateRoomReq(int pRoomId, bool pSpatial, string pDesc) : base(new OSDMap() {
+    public AudioBridgeCreateRoomReq(int pRoomId, bool pSpatial, string pDesc) : this(pRoomId, pSpatial, pDesc, false)
+    {
+    }
+    /// <param name="pVisAuthority">Declare that a sim authority arms
+    /// this room's listeners, adding "vis_authority": true after every other key. False omits the field.</param>
+    public AudioBridgeCreateRoomReq(int pRoomId, bool pSpatial, string pDesc, bool pVisAuthority) : base(new OSDMap() {
                                             { "room", pRoomId },
                                             { "request", "create" },
                                             { "is_private", false },
@@ -541,6 +546,8 @@ public class AudioBridgeCreateRoomReq : PluginMsgReq
     {
         if (!String.IsNullOrEmpty(pDesc))
             AddStringToBody("description", pDesc);
+        if (pVisAuthority)
+            AddBoolToBody("vis_authority", true);
     }
 }
 // ==============================================================

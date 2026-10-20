@@ -55,12 +55,12 @@ public partial class JanusAudioBridge
     // A single create attempt. Returns a JanusRoom on "created" or 486 (already exists
     // -> reuse); null on any other error / unexpected return / exception (the caller
     // may re-check for a cross-process create).
-    private async Task<JanusRoom> TryCreateRoomOnce(int pRoomId, bool pSpatial, string pRoomDesc)
+    private async Task<JanusRoom> TryCreateRoomOnce(int pRoomId, bool pSpatial, string pRoomDesc, bool pVisAuthority)
     {
         JanusRoom ret = null;
         try
         {
-            JanusMessageResp resp = await SendPluginMsg(new AudioBridgeCreateRoomReq(pRoomId, pSpatial, pRoomDesc));
+            JanusMessageResp resp = await SendPluginMsg(new AudioBridgeCreateRoomReq(pRoomId, pSpatial, pRoomDesc, pVisAuthority));
             AudioBridgeResp abResp = new AudioBridgeResp(resp);
 
             m_log.LogDebug("{0} CreateRoom. ReturnCode: {1}", LogHeader, abResp.AudioBridgeReturnCode);
@@ -126,6 +126,11 @@ public partial class JanusAudioBridge
     // (int.MinValue cannot yield a room through Math.Abs -- it throws). Extracted so the guard is unit-testable.
     public static int FoldHashToRoom(int hashCode)
         => hashCode == int.MinValue ? int.MaxValue : Math.Abs(hashCode);
+
+    /// <summary>Ensure that a room exists without a viewer provisioning it. It is exactly SelectRoom: every select asks
+    /// the mixer. Kept as a name so the ensure's call site says what it is for.</summary>
+    public Task<JanusRoom> EnsureRoom(string pRegionId, string pChannelType, bool pSpatial, int pParcelLocalID, string pChannelID)
+        => SelectRoom(pRegionId, pChannelType, pSpatial, pParcelLocalID, pChannelID);
 
     /// <summary>Send the create for <paramref name="pRoomNumber"/> under its per-room gate: creates of one room number
     /// from this process go one at a time, so concurrent provisions produce one "created" and 486s. Always creates -
