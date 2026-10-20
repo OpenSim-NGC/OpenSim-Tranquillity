@@ -73,7 +73,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void P8_AnyOtherError_OrNoAnswer_IsAFailure()
         {
-            Assert.That(JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"event\",\"error_code\":487,\"error\":\"Unauthorized\"}")),
+            Assert.That(JanusAudioBridge.ClassifyMuteReply(Reply("{\"audiobridge\":\"event\",\"error_code\":487,\"error\":\"Not joined\"}")),
                 Is.EqualTo(ParticipantMuteResult.Failed));
             Assert.That(JanusAudioBridge.ClassifyMuteReply(null), Is.EqualTo(ParticipantMuteResult.Failed));
         }

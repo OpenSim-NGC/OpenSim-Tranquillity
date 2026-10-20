@@ -49,6 +49,10 @@ namespace osWebRtcVoice.Tests
         //            JSEP-bearing request on that SAME handle is refused by core with a top-level 490 "Error setting
         //            ICE locally", which never reaches the plugin; a fresh handle joins.
         public bool ModelRooms;
+
+        /// A test's own answer to a plugin request: given the request body, the plugindata.data JSON to answer with, or
+        /// null to leave the request to the model above. The answer comes back in the HTTP response, as list and destroy do.
+        public Func<OSDMap, string> PluginAnswer;
         public readonly ConcurrentDictionary<int, bool> Rooms = new();
         public readonly ConcurrentDictionary<string, bool> IceAgents = new();
         private int _roomCreates, _roomJoins, _roomCreated;
@@ -105,6 +109,9 @@ namespace osWebRtcVoice.Tests
                     return Json(HttpStatusCode.OK, "{\"janus\":\"ack\",\"transaction\":\"" + txn + "\"}");
                 case "message":
                     string req = (msg["body"] as OSDMap)?["request"].AsString();
+                    if (PluginAnswer is not null && msg["body"] is OSDMap asked && PluginAnswer(asked) is string answer)
+                        return Json(HttpStatusCode.OK, "{\"janus\":\"success\",\"transaction\":\"" + txn +
+                            "\",\"plugindata\":{\"plugin\":\"janus.plugin.audiobridge\",\"data\":" + answer + "}}");
                     if (ModelRooms && (req == "create" || req == "join"))
                         return ModelRoomRequest(req, msg, sid, segs.Length > 2 ? segs[2] : null, txn);
                     if (ModelRoomLifecycle && (req == "list" || req == "destroy"))
