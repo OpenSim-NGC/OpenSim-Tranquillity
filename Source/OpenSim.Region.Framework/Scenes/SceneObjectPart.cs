@@ -2755,9 +2755,9 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// <param name="height">Height to hover.  Height of zero disables hover.</param>
     /// <param name="hoverType">Determines what the height is relative to </param>
     /// <param name="tau">Number of seconds over which to reach target</param>
-    public void SetHoverHeight(float height, PIDHoverType hoverType, float tau)
+    public void SetHoverHeight(float height, PIDHoverType hoverType, float tau, bool repel = false)
     {
-        ParentGroup.SetHoverHeight(height, hoverType, tau);
+        ParentGroup.SetHoverHeight(height, hoverType, tau, repel);
     }
 
     public void StopHover()
