@@ -165,19 +165,26 @@ These keys are optional. The shipped `os-webrtc-janus.ini` lists them commented 
 | `RemoveEmptyRooms`, `EmptyRoomGraceSeconds` | `[JanusWebRtcVoice]` | `true`, `60` | Remove a room this service created once it has stood empty for the grace period. The stock AudioBridge never removes an emptied room. Rooms the service did not create are never removed, and a plugin other than the stock AudioBridge is expected to remove its own. |
 | `RefusalCacheSeconds` | `[WebRtcVoice]` | `5` | Seconds a refused voice provision is remembered, so the viewer's immediate retries are answered without repeating the estate and parcel checks. `0` turns it off. |
 | `StunServers` | `[WebRtcVoice]` | empty | Comma-separated STUN server URIs (full ICE URIs, for example `stun:stun.example.org:3478`) advertised to viewers as the `stun-servers` simulator feature. Stock viewers need a valid entry to connect from outside the grid's network. When empty the entry is not advertised. Works with either plugin. |
-| `A2AVoiceEnabled` | `[WebRtcVoice]` | `false` | Avatar-to-avatar calls (the `call` and `start p2p voice` chat session requests). With it off the chat session handler answers as before. A call rings only an avatar whose region runs in the same region-server process as the caller's. |
+| `A2AVoiceEnabled` | `[WebRtcVoice]` | `false` | Avatar-to-avatar calls (the `call` and `start p2p voice` chat session requests). With it off the chat session handler answers as before. A callee whose region runs in another region-server process is rung by a message that crosses between the processes: signed with `CarrierSecret`, or, with `SessionStoreMode = grid`, checked through the call session service. |
 
 A call, group call or conference gets its own room, numbered from the grid's identity (`GatekeeperURI`, read from
 `[Const]`, `[Startup]` or `[Hypergrid]`), the call's channel and its type, so two grids that share one mixer do not
 share rooms. Without a `GatekeeperURI` the number is derived without the grid part, and a warning is logged at
 startup when a call feature is on.
-| `MaxNonSpatialSessions`, `MaxSessionsPerAgent` | `[WebRtcVoice]` | `5000`, `20` | The most non-spatial sessions this region server holds at once, and the most live ones a single agent may have started. A start beyond either is refused. An unanswered invitation expires after 2 minutes and an idle session after 8 hours. |
+| `MaxNonSpatialSessions`, `MaxSessionsPerAgent` | `[WebRtcVoice]` | `5000`, `20` | The most non-spatial sessions this region server holds at once, and the most live ones a single agent may have started. A start beyond either is refused. An unanswered invitation expires after 2 minutes and an idle session after 8 hours. With `SessionStoreMode = grid` the call session service enforces its own limits, set in `[WebRtcVoiceSessionService]`. |
 | `GroupVoiceEnabled` | `[WebRtcVoice]` | `false` | Group voice. Needs the Groups module. |
 | `GroupVoiceRequireVoicePower` | `[WebRtcVoice]` | `true` | Require the group role power to speak (`GP_SESSION_VOICE`) as well as to join. `false` requires only the power to join. |
 | `GroupVoiceCap` | `[WebRtcVoice]` | `50` | The most seats in one group voice session. |
-| `CarrierSecret` | `[WebRtcVoice]` | empty | Signs the grid instant messages that ring a group or conference member whose region runs in another process, and the conference text lines that cross the same way. A grid with regions in more than one process must set the same value, at least 32 characters, on every region server for group and conference calls to ring across them. Unset, nothing is sent across processes and every such message that arrives is refused; regions of one process are not affected. |
+| `CarrierSecret` | `[WebRtcVoice]` | empty | Signs the grid instant messages that ring a group or conference member whose region runs in another process, and the conference text lines that cross the same way. A grid with regions in more than one process must set the same value, at least 32 characters, on every region server for group and conference calls to ring across them. Unset, nothing is sent across processes and every such message that arrives is refused; regions of one process are not affected. With `SessionStoreMode = grid` it is not needed: the receiving region asks the call session service, and conference text lines are signed with a key the service keeps for the conference. |
 | `AdhocVoiceEnabled` | `[WebRtcVoice]` | `false` | Ad-hoc voice and conference text (`start conference`). Needs the Groups module for the conference text session. |
 | `ConferenceRequestBurst`, `ConferenceRequestRefillSeconds` | `[WebRtcVoice]` | `5`, `10` | A per-agent rate limit shared by `start conference` and `invite`: how many requests may come back to back, and the seconds for one more to become available. |
+| `SessionStoreMode` | `[WebRtcVoice]` | `local` | `local` keeps call sessions in each region-server process. `grid` keeps them in the call session service that the grid server hosts (see [Sharing call sessions between region servers](#Configure_Session_Store)). |
+| `SessionStoreServerURI` | `[WebRtcVoice]` | empty | Required with `grid`: the base address of the grid server that hosts the service, for example `http://robust.example.org:8003`. |
+| `AuthType`, `HttpAuthUsername`, `HttpAuthPassword` | `[WebRtcVoice]` or `[Network]` | none | Required with `grid`: `BasicHttpAuthentication` and the user and password of `[WebRtcVoiceSessionService]`. |
+| `SessionStoreTimeoutMs` | `[WebRtcVoice]` | `3000` | Milliseconds to wait for the service before a request is refused. Values under 100 read as the default. |
+| `SessionSeatRenewSeconds` | `[WebRtcVoice]` | `60` | Seconds between a region telling the service which seats it still holds. Values under 5 read as the default. |
+| `SessionStoreOutboxMax`, `SessionStoreOutboxSeconds` | `[WebRtcVoice]` | `256`, `60` | Departures the service could not be told about are kept and sent when it answers: the most kept, and the seconds each is kept before it is given up. |
+| `SessionStoreBreakerFailures`, `SessionStoreBreakerWindowSeconds`, `SessionStoreBreakerOpenSeconds` | `[WebRtcVoice]` | `5`, `10`, `5` | After this many requests get no answer within the window, further requests are refused at once for the open period, then one is tried to see whether the service is back. |
 
 <a id="Configure_Robust"></a>
 ## Configure Robust Server for WebRTC Voice
@@ -210,6 +217,62 @@ using the Janus server, and the configuration for the Janus server itself.
 
 One can configure multiple Robust services to distribute the load of services
 and a Robust server with only `VoiceServiceConnector` in its ServiceList is possible.
+
+<a id="Configure_Session_Store"></a>
+## Sharing call sessions between region servers
+
+Group, conference and avatar-to-avatar calls are sessions kept by the region server. A grid with
+more than one region server process has one record of each call per process unless the processes
+share a store: each process counts its own seat limit, each rings the group itself, and a call
+between people on different processes depends on `CarrierSecret`. The grid voice session service
+keeps one record of every call instead. It is off by default and nothing changes until both sides
+are configured.
+
+In `Robust.ini` (or `GridServer.ini`), add the connector to `[ServiceList]` and enable the service.
+The service refuses to load without HTTP basic authentication and a password of at least 32 characters:
+
+```
+[ServiceList]
+    VoiceSessionConnector = "${Const|PrivatePort}/WebRtcVoice.dll:VoiceSessionServerConnector"
+
+[WebRtcVoiceSessionService]
+    Enabled = true
+    AuthType = "BasicHttpAuthentication"
+    HttpAuthUsername = "voice-sessions"
+    HttpAuthPassword = "a-password-of-at-least-32-characters-kept-out-of-version-control"
+```
+
+In the voice settings of every region server, with the same user and password:
+
+```
+[WebRtcVoice]
+    SessionStoreMode = grid
+    SessionStoreServerURI = http://robust.example.org:8003
+    AuthType = "BasicHttpAuthentication"
+    HttpAuthUsername = "voice-sessions"
+    HttpAuthPassword = "a-password-of-at-least-32-characters-kept-out-of-version-control"
+```
+
+Set it on all region servers or none: a call started on a server that keeps its own record is not
+seen by the others. Calls are kept in the service's memory and end when Robust restarts.
+
+- A region that cannot reach the service refuses new calls rather than keeping its own record. A
+  viewer asking to start or join an avatar-to-avatar call while the service is unreachable is answered
+  "service unavailable" (503) and may try again, and only a service that says the call does not exist
+  gives "not found". A group or conference join is refused.
+- A region checks the service once when it starts and logs whether it answered. A wrong address, a
+  Robust without the service and a wrong password are all reported there.
+- Seats are renewed by the region that holds them and released by the service when the region stops
+  renewing them, or when it restarts.
+- Group and conference rings are checked by the service, and conference text lines are signed with a key the
+  service keeps for each conference and gives only to its members, so neither needs `CarrierSecret`. An
+  avatar-to-avatar ring, join, decline or hang-up that arrives from another region server is acted on
+  only when the service says it is true.
+- A call is not ended for being idle while a region is still renewing a seat in it.
+
+The console command `show voice sessions` prints where the region keeps its sessions, the service
+address, whether it answered, the circuit breaker state, and the seats and queued departures this
+region holds.
 
 <a id="Configure_Standalone"></a>
 ## Configure Standalone Region
@@ -250,6 +313,9 @@ This is a growing section and will be added to over time.
 **janus info** -- list many details of the Janus-Gateway configuration. Very ugly, non-formated JSON.
 
 **janus list rooms** -- list the rooms that have been allocated in the `AudioBridge` Janus plugin
+
+**show voice sessions** -- show where this region keeps its call sessions (in this process, or in the grid
+voice session service) and, for the service, whether it is answering
 
 [SecondLife WebRTC Voice]: https://wiki.secondlife.com/wiki/WebRTC_Voice
 [OpenSimulator]: http://opensimulator.org

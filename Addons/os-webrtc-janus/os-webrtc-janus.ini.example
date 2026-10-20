@@ -47,8 +47,53 @@
     ; in more than one process must set the SAME secret, at least 32 characters, on every region server for
     ; these calls to ring across them. Unset (the default), nothing is sent across processes and every such
     ; message that arrives is refused; calls between regions of one process are not affected.
+    ; With SessionStoreMode = grid (below), no secret is needed: the receiving region asks the voice session
+    ; service whether a ring or an answer is genuine, and conference text lines are signed with a key the
+    ; service keeps for each conference and gives only to its members. A region that sets a secret anyway also
+    ; signs and requires the signature on rings.
     ; Keep it out of version control.
     ;CarrierSecret =
+
+    ; Where group, conference and avatar-to-avatar call sessions are kept. Default: local, each region
+    ; process keeps its own (calls across region processes then depend on CarrierSecret above, the seat
+    ; limit is counted per process and each process rings the group itself). Set grid to keep them in
+    ; the voice session service that Robust hosts, so every process shares one record of each call: one
+    ; seat count, one ring, and seats released when a region restarts. Needs the Robust side configured
+    ; ([WebRtcVoiceSessionService] in the grid server settings) and all region processes set the same way.
+    ; With grid set, a call that cannot reach the service is refused; it never falls back to a local record.
+    ;SessionStoreMode = local
+
+    ; Required when SessionStoreMode is grid: the base address of the Robust server that hosts the service,
+    ; for example http://robust.example.org:8003. Use the private port.
+    ;SessionStoreServerURI =
+
+    ; Also required for grid: the service accepts only HTTP basic authentication. Set these here, or in
+    ; [Network], to the user and password of [WebRtcVoiceSessionService] on the Robust side
+    ; (password at least 32 characters). Keep the password out of version control.
+    ;AuthType = "BasicHttpAuthentication"
+    ;HttpAuthUsername =
+    ;HttpAuthPassword =
+
+    ; Grid only: milliseconds to wait for the service before the request is refused. Default 3000.
+    ;SessionStoreTimeoutMs = 3000
+
+    ; Grid only: seconds between a region telling the service which seats it still holds (the seats of agents
+    ; that are still in the region and in the call). The service releases a seat its region has not renewed for
+    ; SeatLeaseSeconds (180 by default) on its side, so keep this at a third of that or less. Default 60.
+    ;SessionSeatRenewSeconds = 60
+
+    ; Grid only: when the service cannot be reached, a departure (a viewer leaving a call) is kept and sent
+    ; when it answers again. The most departures kept, and the seconds each is kept before it is given up.
+    ; A seat given up is returned by the seat lease. Defaults 256 and 60.
+    ;SessionStoreOutboxMax = 256
+    ;SessionStoreOutboxSeconds = 60
+
+    ; Grid only: after this many calls get no answer within SessionStoreBreakerWindowSeconds, further calls
+    ; are refused at once for SessionStoreBreakerOpenSeconds instead of each waiting out
+    ; SessionStoreTimeoutMs; then one call is tried to see whether the service is back. Defaults 5, 10 and 5.
+    ;SessionStoreBreakerFailures = 5
+    ;SessionStoreBreakerWindowSeconds = 10
+    ;SessionStoreBreakerOpenSeconds = 5
 
     ; Ad-hoc voice and conference text ("start conference"). Default: false. Needs the Groups module for
     ; the conference text session.
