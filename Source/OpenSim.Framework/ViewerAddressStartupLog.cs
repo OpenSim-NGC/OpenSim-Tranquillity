@@ -66,8 +66,11 @@ public sealed class ViewerAddressStartupLog
                 lookup = $"first lookup failed: {e.Message}";
             }
 
-            log.LogInformation("[VIEWER ADDRESS]: [{0}] section is active; keys set: {1}; entries: {2}; {3}",
-                ViewerAddressConfig.SectionName, string.Join(", ", config.SetKeys), config.LocalNetworks.Count, lookup);
+            string servers = config.DnsServers.Count > 0
+                ? $"DNS servers: {string.Join(", ", config.DnsServers)}; "
+                : string.Empty;
+            log.LogInformation("[VIEWER ADDRESS]: [{0}] section is active; keys set: {1}; entries: {2}; {3}{4}",
+                ViewerAddressConfig.SectionName, string.Join(", ", config.SetKeys), config.LocalNetworks.Count, servers, lookup);
         });
     }
 

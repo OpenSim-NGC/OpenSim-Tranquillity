@@ -16,6 +16,11 @@
   <ItemGroup>
     <ProjectReference Include="../../Addons/OpenSim.Addons.Groups/OpenSim.Addons.Groups.csproj" />
     <ProjectReference Include="../../Addons/OpenSim.Addons.OfflineIM/OpenSim.Addons.OfflineIM.csproj" />
+    <!-- The Robust-hosted voice service: VoiceServiceConnector loads WebRtcVoice.dll, which loads WebRtcVoiceServiceModule.dll,
+         which loads the voice server named in [WebRtcVoice] (WebRtcJanusService.dll for Janus). Each is loaded by file name. -->
+    <ProjectReference Include="../../Addons/os-webrtc-janus/WebRtcVoice/WebRtcVoice.csproj" />
+    <ProjectReference Include="../../Addons/os-webrtc-janus/WebRtcVoiceServiceModule/WebRtcVoiceServiceModule.csproj" />
+    <ProjectReference Include="../../Addons/os-webrtc-janus/Janus/WebRtcJanusService.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Capabilities.Handlers/OpenSim.Capabilities.Handlers.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Capabilities/OpenSim.Capabilities.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Data/OpenSim.Data.csproj" />

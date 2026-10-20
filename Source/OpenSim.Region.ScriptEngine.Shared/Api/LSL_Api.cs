@@ -2763,7 +2763,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
             if (local != 0)
                 force *= llGetRot();
 
-            m_host.ParentGroup.RootPart.SetForce(force);
+            m_host.ParentGroup.RootPart.SetForce(force, local != 0);
         }
     }
 
@@ -8300,23 +8300,11 @@ public void llDetachFromAvatar()
     {
         if (m_host.PhysActor != null)
         {
-            float ground = (float)llGround(new LSL_Types.Vector3(0, 0, 0));
-            float waterLevel = (float)llWater(new LSL_Types.Vector3(0, 0, 0));
-            PIDHoverType hoverType = PIDHoverType.Ground;
-            if (water != 0)
-            {
-                hoverType = PIDHoverType.GroundAndWater;
-                if (ground < waterLevel)
-                    height += waterLevel;
-                else
-                    height += ground;
-            }
-            else
-            {
-                height += ground;
-            }
+            // The height is above the ground, or above the higher of the ground and the water when water is TRUE
+            // (SL wiki llGroundRepel). The physics engine adds the ground or water itself, as it does for llSetHoverHeight.
+            PIDHoverType hoverType = water != 0 ? PIDHoverType.GroundAndWater : PIDHoverType.Ground;
 
-            m_host.SetHoverHeight((float)height, hoverType, (float)tau);
+            m_host.SetHoverHeight((float)height, hoverType, (float)tau, repel: true);
         }
     }
 
