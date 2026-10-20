@@ -204,6 +204,14 @@ namespace osWebRtcVoice
         /// are ever removed here, so every returned session was a formed call.
         /// </summary>
         public List<A2ASession> MarkGoneSessions(UUID agent, string viewerSession)
+            => MarkGoneSessions(agent, viewerSession, null);
+
+        /// <summary>
+        /// As above, and every Active record the agent was present in (removed or not) is added to
+        /// <paramref name="departed"/>, so the caller can tell a party in another process that this agent left even
+        /// while the record stays because that party is still in the call.
+        /// </summary>
+        public List<A2ASession> MarkGoneSessions(UUID agent, string viewerSession, List<A2ASession> departed)
         {
             DateTime now = _clock();
             List<A2ASession> removed = new List<A2ASession>();
@@ -218,9 +226,12 @@ namespace osWebRtcVoice
                     string vs = isCaller ? s.CallerViewerSession : s.CalleeViewerSession;
                     if (viewerSession != null && !string.Equals(vs, viewerSession, StringComparison.Ordinal))
                         continue;
+                    bool wasPresent = isCaller ? s.CallerProvisioned : s.CalleeProvisioned;
                     if (isCaller) { s.CallerProvisioned = false; s.CallerViewerSession = null; }
                     else { s.CalleeProvisioned = false; s.CalleeViewerSession = null; }
                     s.LastSeenUtc = now;
+                    if (wasPresent && s.State == A2ASessionState.Active)
+                        departed?.Add(s);
                     if (s.State == A2ASessionState.Active && !s.CallerProvisioned && !s.CalleeProvisioned)
                     {
                         _sessions.Remove(s.SessionId);
@@ -334,6 +345,109 @@ namespace osWebRtcVoice
                 return s;
             }
         }
+
+        /// <summary>
+        /// A call placed in another region-server process arrived by its signed ring. Records it here, as the
+        /// sender's process holds it: the sender is the caller, the token is the one the caller's process minted,
+        /// and the invitation counts as delivered (this process is about to deliver it). The callee's own
+        /// "call" and its provision then find the same record and the same token as a call placed here.
+        ///
+        /// Refused when this process already holds an answered call for the pair, or an unanswered one whose
+        /// token it has already handed to a viewer: replacing that token would turn a viewer that holds it
+        /// away. Two people calling each other at the same moment from two processes is that case; neither
+        /// ring is delivered and each caller's own call rings out.
+        /// </summary>
+        public A2ASession AdoptRemote(UUID caller, UUID callee, string token, out string refusal)
+        {
+            refusal = null;
+            if (string.IsNullOrEmpty(token))
+            {
+                refusal = "no-token";
+                return null;
+            }
+            UUID sessionId = ComputeSessionId(caller, callee);
+            DateTime now = _clock();
+            lock (_lock)
+            {
+                SweepExpiredLocked(now);
+                if (_sessions.TryGetValue(sessionId, out A2ASession existing))
+                {
+                    if (existing.State == A2ASessionState.Active)
+                    {
+                        refusal = "already-active";
+                        return null;
+                    }
+                    if (!string.IsNullOrEmpty(existing.Token) && !string.Equals(existing.Token, token, StringComparison.Ordinal))
+                    {
+                        refusal = "call-in-progress";
+                        return null;
+                    }
+                }
+                A2ASession s = new A2ASession(sessionId, caller, callee, now) { Token = token, InviteSent = true };
+                _sessions[sessionId] = s;
+                return s;
+            }
+        }
+
+        /// <summary>
+        /// The callee joined in its own process and said so. The call is Active here too, and the callee counts as
+        /// present, so a repeat "call" does not ring again and the callee's leaving is noticed. Null when this
+        /// process holds no such call.
+        /// </summary>
+        public A2ASession MarkRemoteJoined(UUID sessionId, UUID joined)
+        {
+            DateTime now = _clock();
+            lock (_lock)
+            {
+                SweepExpiredLocked(now);
+                if (!_sessions.TryGetValue(sessionId, out A2ASession s) || !s.IsParty(joined))
+                    return null;
+                if (joined == s.Callee)
+                {
+                    s.CalleeProvisioned = true;
+                    s.CalleeViewerSession = RemoteViewerSession;
+                    s.State = A2ASessionState.Active;
+                }
+                else
+                {
+                    s.CallerProvisioned = true;
+                    s.CallerViewerSession = RemoteViewerSession;
+                }
+                s.LastSeenUtc = now;
+                return s;
+            }
+        }
+
+        /// <summary>
+        /// The far party left. When the local party is gone too, an Active call is removed and returned as
+        /// <paramref name="removed"/>. Null when this process holds no such call.
+        /// </summary>
+        public A2ASession MarkRemoteGone(UUID sessionId, UUID departed, out bool removed)
+        {
+            removed = false;
+            DateTime now = _clock();
+            lock (_lock)
+            {
+                SweepExpiredLocked(now);
+                if (!_sessions.TryGetValue(sessionId, out A2ASession s) || !s.IsParty(departed))
+                    return null;
+                if (departed == s.Caller) { s.CallerProvisioned = false; s.CallerViewerSession = null; }
+                else { s.CalleeProvisioned = false; s.CalleeViewerSession = null; }
+                s.LastSeenUtc = now;
+                if (s.State == A2ASessionState.Active && !s.CallerProvisioned && !s.CalleeProvisioned)
+                {
+                    _sessions.Remove(sessionId);
+                    removed = true;
+                }
+                return s;
+            }
+        }
+
+        /// <summary>
+        /// Stands in for the viewer session of a party who joined in another process: this process never sees that
+        /// party's viewer session, only that the party is present.
+        /// </summary>
+        public const string RemoteViewerSession = "remote";
 
         /// <summary>Lookup by the provision's <c>channel</c> string (the session id). Null when unknown or expired.</summary>
         public A2ASession TryGetByChannel(string channel)

@@ -24,6 +24,7 @@
     <Compile Include="GroupRingRootOnlyTests.cs" />
     <Compile Include="CrossProcessHarness.cs" />
     <Compile Include="A2ARingRootOnlyTests.cs" />
+    <Compile Include="A2ACrossProcessTests.cs" />
     <Compile Include="StunServersTests.cs" />
     <Compile Include="ProvisionAnswerTests.cs" />
     <Compile Include="VoiceMembershipIndexTests.cs" />

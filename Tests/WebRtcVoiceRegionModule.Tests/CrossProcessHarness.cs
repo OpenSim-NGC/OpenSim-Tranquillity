@@ -123,11 +123,14 @@ namespace osWebRtcVoice.Tests
         internal sealed class RecordingTransfer : IMessageTransferModule
         {
             public readonly List<GridInstantMessage> Sent = new();
+            /// <summary>The ToRootOnly flag each message in <see cref="Sent"/> was sent with, in the same order.</summary>
+            public readonly List<bool> SentRootOnly = new();
             public event UndeliveredMessage OnUndeliveredMessage { add { } remove { } }
 
             public void SendInstantMessage(GridInstantMessage im, MessageResultNotification result, bool ToRootOnly = false)
             {
                 Sent.Add(im);
+                SentRootOnly.Add(ToRootOnly);
                 result?.Invoke(true);
             }
 
@@ -140,9 +143,13 @@ namespace osWebRtcVoice.Tests
             public readonly List<UUID> Enqueued = new();
             /// <summary>Each agent-list update sent: the session, the agent it went to and the entries.</summary>
             public readonly List<(UUID Session, UUID To, List<GroupChatListAgentUpdateData> Updates)> AgentLists = new();
+            /// <summary>The body of the last event built, per recipient of each Enqueue.</summary>
+            public readonly List<(string Name, OSD Body, UUID To)> Events = new();
+            private string _lastName;
+            private OSD _lastBody;
 
-            public byte[] BuildEvent(string eventName, OSD eventBody) => new byte[] { 1 };
-            public bool Enqueue(byte[] o, UUID avatarID) { Enqueued.Add(avatarID); return true; }
+            public byte[] BuildEvent(string eventName, OSD eventBody) { _lastName = eventName; _lastBody = eventBody; return new byte[] { 1 }; }
+            public bool Enqueue(byte[] o, UUID avatarID) { Enqueued.Add(avatarID); Events.Add((_lastName, _lastBody, avatarID)); return true; }
             public bool Enqueue(OSD o, UUID avatarID) => throw new NotSupportedException();
             public bool Enqueue(osUTF8 o, UUID avatarID) => throw new NotSupportedException();
             public void EnableSimulator(ulong handle, IPEndPoint endPoint, UUID avatarID, int regionSizeX, int regionSizeY) => throw new NotSupportedException();

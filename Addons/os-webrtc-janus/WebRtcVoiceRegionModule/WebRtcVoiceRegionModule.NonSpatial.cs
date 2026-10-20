@@ -56,9 +56,10 @@ public partial class WebRtcVoiceRegionModule
     public static bool ReadA2AVoiceEnabled(IConfig pConfig)
         => pConfig.GetBoolean("A2AVoiceEnabled", DefaultA2AVoiceEnabled);
 
-    // Avatar-to-avatar invitation registry. One per module instance (one per region-server process), shared by
-    // every scene this shared module serves; thread-safe because ChatSessionRequest arrives on cap HTTP threads.
-    // A callee in another process is not rung and finds no record if it provisions.
+    // Avatar-to-avatar invitation registry. One per module
+    // instance (one per region-server process), shared by every scene this shared module serves; thread-safe
+    // because ChatSessionRequest arrives on cap HTTP threads. A callee in another process is rung through the
+    // signed carrier (WebRtcVoiceRegionModule.A2ACarrier.cs), which gives that process its own copy of the record.
     private readonly A2ASessionRegistry m_a2aSessions = new();
 
     // The non-spatial engine and the group policy. The engine is constructed unconditionally and costs nothing
@@ -83,8 +84,8 @@ public partial class WebRtcVoiceRegionModule
         if (problem is null)
         {
             m_carrierAuth = new CarrierAuth(secret);
-            m_log.LogInformation("{LogHeader} cross-process voice carriers on: group rings "
-                + "are signed with [WebRtcVoice] CarrierSecret", logHeader);
+            m_log.LogInformation("{LogHeader} cross-process voice carriers on: group rings and "
+                + "avatar-to-avatar calls are signed with [WebRtcVoice] CarrierSecret", logHeader);
             return;
         }
         m_carrierAuth = CarrierAuth.Off();
@@ -94,8 +95,8 @@ public partial class WebRtcVoiceRegionModule
         else
             m_log.LogInformation("{LogHeader} cross-process voice carriers are off: [WebRtcVoice] CarrierSecret is not set. "
                 + "None is sent and every incoming one is refused. A grid that runs regions in more than one process "
-                + "sets the same CarrierSecret (at least {Min} characters) on every region server for group "
-                + "calls to ring across them", logHeader, CarrierAuth.MinSecretLength);
+                + "sets the same CarrierSecret (at least {Min} characters) on every region server for group and "
+                + "avatar-to-avatar calls to ring across them", logHeader, CarrierAuth.MinSecretLength);
     }
 
     private void LogCarrierOff(UUID session)
@@ -138,7 +139,7 @@ public partial class WebRtcVoiceRegionModule
     private bool m_a2aVoiceEnabled = DefaultA2AVoiceEnabled;
 
     // Scenes this shared module serves, for callee resolution on THIS instance (the group
-    // module's m_sceneList / GetActiveClient pattern).
+    // module's m_sceneList / GetActiveClient pattern). A callee in another process is reached by the carrier.
     private readonly List<Scene> m_scenes = new();
 
     /// <summary>Write a ChatSessionRequest outcome's body and status.</summary>
@@ -167,6 +168,8 @@ public partial class WebRtcVoiceRegionModule
         // party gone from every record it is in; the record is removed only when the other party is gone too
         // (both-logout semantics), and a later admitted provision re-marks the party present, so this is reversible.
         scene.EventManager.OnClientClosed += (clientID, s) => OnVoiceClientClosed(scene, clientID, s);
+        // Steps of a call placed in or answered in another region-server process.
+        scene.EventManager.OnIncomingInstantMessage += OnIncomingA2ACarrier;
     }
 
     // A client closed: drop its avatar-to-avatar records, then release its group seats.
@@ -179,18 +182,15 @@ public partial class WebRtcVoiceRegionModule
         ScenePresence sp = closedIn.GetScenePresence(clientID);
         if (!A2ASessionRegistry.ShouldMarkGone(sp != null, sp != null && sp.IsChildAgent))
             return;   // child teardown (border crossing / draw distance) — the agent's voice lives in its root region
-        foreach (A2ASession gone in m_a2aSessions.MarkGoneSessions(clientID, null))
+        List<A2ASession> departed = new();
+        foreach (A2ASession gone in m_a2aSessions.MarkGoneSessions(clientID, null, departed))
         {
             m_log.LogDebug("{LogHeader} [A2A PROVISION] agent={AgentId} session-id={SessionId} region={RegionName} decision=removed-client-closed",
                 logHeader, clientID, gone.SessionId, s?.Name ?? scene.Name);
-            // Tell the remaining party the departed one LEFT (if reachable here).
-            List<Scene> scenesSnap;
-            lock (m_scenes)
-                scenesSnap = new List<Scene>(m_scenes);
-            string line = A2AAgentListDelivery.SendLeave(scenesSnap, gone, clientID, null);
-            if (line != null)
-                m_log.LogDebug("{LogHeader} {Line}", logHeader, line);
+            // Tell the remaining party the departed one LEFT, here or in the process where it is root.
+            SendA2ALeave(gone, clientID, closedIn);
         }
+        SendA2ALeaveAcrossProcesses(departed, clientID, closedIn);
         ReleaseSeatsOnClientClosed(scene, clientID, s);
     }
 
@@ -214,14 +214,9 @@ public partial class WebRtcVoiceRegionModule
             // llimview.cpp:4366-4382). Not re-sent on a reconnect re-provision of an already-
             // Active record. This is the participant/moderation surface only; the caller's
             // connected state comes from mixer presence.
+            // The caller may be root in another process; its update then travels as a signed join.
             if (becameActive)
-            {
-                List<Scene> scenes;
-                lock (m_scenes)
-                    scenes = new List<Scene>(m_scenes);
-                foreach (string line in A2AAgentListDelivery.SendActivePair(scenes, s, null))
-                    m_log.LogDebug("{LogHeader} {Line}", logHeader, line);
-            }
+                SendA2AActivePair(s, scene);
         }
         else if (admission.Kind == ProvisionKind.Group
                  && resp.TryGetString("viewer_session", out string groupVs) && !string.IsNullOrEmpty(groupVs))
@@ -234,17 +229,14 @@ public partial class WebRtcVoiceRegionModule
             // affected; a spatial logout matches nothing and is a no-op here. Both parties gone
             // removes the Active record (both-logout). The remaining party (if still on
             // this instance) gets the departed party's LEAVE.
-            foreach (A2ASession gone in m_a2aSessions.MarkGoneSessions(agentID, a2aVs))
+            List<A2ASession> departed = new();
+            foreach (A2ASession gone in m_a2aSessions.MarkGoneSessions(agentID, a2aVs, departed))
             {
                 m_log.LogDebug("{LogHeader} [A2A PROVISION] agent={AgentId} session-id={SessionId} viewer_session={ViewerSession} decision=removed-both-logout",
                     logHeader, agentID, gone.SessionId, a2aVs);
-                List<Scene> scenes;
-                lock (m_scenes)
-                    scenes = new List<Scene>(m_scenes);
-                string line = A2AAgentListDelivery.SendLeave(scenes, gone, agentID, null);
-                if (line != null)
-                    m_log.LogDebug("{LogHeader} {Line}", logHeader, line);
+                SendA2ALeave(gone, agentID, scene);
             }
+            SendA2ALeaveAcrossProcesses(departed, agentID, scene);
 
             ReleaseGroupSeatsOnLogout(agentID, a2aVs);
         }
@@ -350,7 +342,8 @@ public partial class WebRtcVoiceRegionModule
 
         // "call" produced an invitation for the other party. Deliver it as a generic
         // ChatterBoxInvitation event (BuildEvent + Enqueue) to the callee on THIS instance; an
-        // unreachable callee (offline / another region server) gets nothing and the caller rings out.
+        // unreachable callee (offline, or in another region server with no carrier secret set) gets nothing and the
+        // caller rings out. A callee whose root presence is in another process is rung through the signed carrier.
         // Never affects this request's outcome: the caller's credentials are returned regardless.
         if (outcome.Invite is not null)
         {
@@ -358,6 +351,7 @@ public partial class WebRtcVoiceRegionModule
             lock (m_scenes)
                 scenes = new List<Scene>(m_scenes);
             string decision = A2AInviteDelivery.Deliver(scenes, outcome.Invite.Callee, outcome.Invite.Body, null, out string calleeRegion);
+            decision = RingA2ACalleeAcrossProcesses(outcome.Invite, sp.Name, scene, decision);
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
                 A2AInviteDelivery.Line(outcome.Invite.Callee, outcome.Invite.Caller, outcome.Invite.SessionId, calleeRegion, decision));
             // One ring per Invited record. Marked only on a confirmed enqueue, so a
@@ -366,19 +360,9 @@ public partial class WebRtcVoiceRegionModule
                 m_a2aSessions.MarkInviteSent(outcome.Invite.SessionId);
         }
 
-        // The callee turned the call down: the caller's viewer is told, so the call ends on its screen instead of
-        // ringing out. Delivered to a caller who is in this process; the caller cancelling its own call is not a decline.
+        // The callee turned the call down: the caller's viewer is told, so the call ends on its screen.
         if (outcome.Declined is not null && outcome.Declined.Callee == agentID)
-        {
-            List<Scene> declineScenes;
-            lock (m_scenes)
-                declineScenes = new List<Scene>(m_scenes);
-            string declineDecision = A2AAgentListDelivery.Deliver(declineScenes, outcome.Declined.Caller, outcome.Declined.SessionId,
-                                                                  A2AAgentListDelivery.DeclinedUpdates(outcome.Declined.Callee), null);
-            m_log.LogDebug("{LogHeader} {Line}", logHeader,
-                A2AAgentListDelivery.Line(outcome.Declined.Caller, outcome.Declined.SessionId, "DECLINED",
-                                          outcome.Declined.Callee, declineDecision));
-        }
+            SendA2ADeclined(outcome.Declined, scene);
 
         if (outcome.Reply is not null)
         {

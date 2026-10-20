@@ -6,8 +6,8 @@
  */
 
 /*
- * Authentication for the two cross-process voice carriers (the ring, LGVRING1, and the conference
- * text line, LGVTEXT1).
+ * Authentication for the cross-process voice carriers: the group and conference ring (LGVRING1), the
+ * conference text line (LGVTEXT1) and the avatar-to-avatar carriers (LGVA2A1).
  *
  * Both travel as grid instant messages. The grid IM endpoint sits on the region's public HTTP port and
  * does not authenticate its callers, so on its own a carrier proves nothing about who sent it. Each
@@ -74,6 +74,12 @@ namespace osWebRtcVoice.NonSpatial
 
         public const string KindRing = "ring";
         public const string KindText = "text";
+
+        /// <summary>
+        /// The kinds of the avatar-to-avatar carriers: a ring, the callee's join, a leave and a decline. Each
+        /// is its own kind, so the MAC of one can never be replayed as another.
+        /// </summary>
+        public const string KindA2APrefix = "a2a-";
 
         public const string NoSecret = "no-secret";
         public const string MissingMac = "missing-mac";

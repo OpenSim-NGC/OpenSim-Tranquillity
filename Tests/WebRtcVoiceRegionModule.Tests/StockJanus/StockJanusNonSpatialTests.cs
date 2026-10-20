@@ -88,6 +88,85 @@ namespace osWebRtcVoice.Tests
             Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True, "callee left");
         }
 
+        // Two region modules, each over its own scene and its own stock-Janus service, stand in for two region-server
+        // processes; they share the carrier secret and the gateway, and nothing else. Each one's grid message transfer
+        // is a recorder, and the test hands what one sends to the other's scene as the grid would.
+        private static readonly string CarrierSecret = "0123456789abcdef0123456789abcdef-example";
+
+        private static StockRegion CrossProcessRegion()
+        {
+            StockRegion r = StockRegion.Create((voice, _) =>
+            {
+                voice.Set("A2AVoiceEnabled", "true");
+                voice.Set("CarrierSecret", CarrierSecret);
+            });
+            r.Scene.RegisterModuleInterface<OpenSim.Region.Framework.Interfaces.IMessageTransferModule>(new CrossProcessHarness.RecordingTransfer());
+            return r;
+        }
+
+        private static void SetOnline(StockRegion r, params UUID[] agents)
+        {
+            var presence = new CrossProcessHarness.FakePresence();
+            presence.SetOnline(agents);
+            for (Type t = r.Scene.GetType(); t != null; t = t.BaseType)
+            {
+                var f = t.GetField("m_PresenceService", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                if (f != null) { f.SetValue(r.Scene, presence); return; }
+            }
+            throw new MissingFieldException("Scene", "m_PresenceService");
+        }
+
+        private static List<OpenSim.Framework.GridInstantMessage> TakeCarriers(StockRegion r)
+        {
+            var transfer = (CrossProcessHarness.RecordingTransfer)r.Scene.RequestModuleInterface<OpenSim.Region.Framework.Interfaces.IMessageTransferModule>();
+            var taken = new List<OpenSim.Framework.GridInstantMessage>(transfer.Sent);
+            transfer.Sent.Clear();
+            return taken;
+        }
+
+        [Test]
+        public async Task A2A_CrossProcess_CallerAndCalleeJoinOneRoom()
+        {
+            using StockRegion one = CrossProcessRegion();
+            using StockRegion two = CrossProcessRegion();
+            one.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
+            two.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
+            SetOnline(one, Alice, Bob);
+            SetOnline(two, Alice, Bob);
+            UUID session = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+
+            Assert.That((await one.ChatSessionAsync(Alice, ChatBody("start p2p voice", session, OSD.FromUUID(Bob)))).Status, Is.EqualTo((int)HttpStatusCode.OK));
+            CapAnswer call = await one.ChatSessionAsync(Alice, ChatBody("call", session));
+            Assert.That(call.Status, Is.EqualTo((int)HttpStatusCode.OK), "caller's call: " + call.Body);
+            (string channel, string token) = CredentialsOf(call);
+            Assert.That(one.Queue.Sent.Exists(s => s.To == Bob), Is.False, "Bob is not in the caller's process");
+
+            List<OpenSim.Framework.GridInstantMessage> rings = TakeCarriers(one);
+            Assert.That(rings, Has.Count.EqualTo(1), "one ring, signed, for the process where Bob is");
+            two.Scene.EventManager.TriggerIncomingInstantMessage(rings[0]);
+            var invitation = two.Queue.Sent.Find(s => s.To == Bob && s.Name == "ChatterBoxInvitation");
+            Assert.That(invitation.Body, Is.Not.Null, "the callee's process delivered the invitation");
+            Assert.That(((OSDMap)((OSDMap)invitation.Body)["voice"])["channel_credentials"].AsString(), Is.EqualTo(token));
+
+            using Joined a = await one.JoinAsync(Alice, o => StockRegion.MultiagentBody(o, channel, token));
+            Assert.That(a.Answer.Provisioned, Is.True, "caller joined: " + a.Answer.Body);
+            using Joined b = await two.JoinAsync(Bob, o => StockRegion.MultiagentBody(o, channel, token));
+            Assert.That(b.Answer.Provisioned, Is.True, "the callee's accept was admitted in its own process: " + b.Answer.Body);
+
+            Assert.That(b.Answer.Room, Is.EqualTo(a.Answer.Room), "both parties, joined through two services, are in one room");
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+
+            // The callee joining reaches the caller's process as a signed join carrier.
+            List<OpenSim.Framework.GridInstantMessage> joins = TakeCarriers(two);
+            Assert.That(joins, Has.Count.EqualTo(1));
+            one.Scene.EventManager.TriggerIncomingInstantMessage(joins[0]);
+
+            await two.LogoutAsync(b);
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 1, Settle), Is.True, "the callee left the room");
+            await one.LogoutAsync(a);
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 0, Settle), Is.True, "the caller left the room");
+        }
+
         [Test]
         public async Task A2A_AStrangerWithTheRightChannelIsRefused_AndNoRoomIsCreated()
         {

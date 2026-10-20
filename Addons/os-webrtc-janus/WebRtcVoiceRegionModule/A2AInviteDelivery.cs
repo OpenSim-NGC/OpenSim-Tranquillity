@@ -19,9 +19,10 @@
  * method itself): every scene this shared module serves, root presence preferred. The invitation is
  * delivered ONLY to a root presence. A callee whose viewer stands in a neighbouring region holds a
  * child presence here, and the viewer's answer goes to the region it stands in -- which may be another
- * server process that has no record of the call. A callee with no root presence here gets nothing:
- * cross-instance A2A is out of scope for v1; the caller still receives its credentials and rings out,
- * and the Invited TTL cleans up.
+ * server process that has no record of the call. A callee with no root presence here gets nothing from
+ * this function. The region module then rings such a callee through the signed carrier, which lands in the
+ * process that holds the callee's root presence (A2ACarrierTransport); without a carrier secret the
+ * caller still receives its credentials and rings out, and the Invited TTL cleans up.
  */
 using System;
 using System.Collections.Generic;
