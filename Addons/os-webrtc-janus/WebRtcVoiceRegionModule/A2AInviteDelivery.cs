@@ -6,7 +6,8 @@
  */
 
 /*
- * Delivery of the avatar-to-avatar voice invitation to the callee.
+ * Delivery of the avatar-to-avatar voice invitation to the callee, and of any other invitation that goes
+ * through the same function.
  *
  * The event is a generic ChatterBoxInvitation built with IEventQueue.BuildEvent + Enqueue -- the same path
  * GroupsMessagingModule uses for its ChatterBoxSessionStartReply (GroupsMessagingModule.cs). The
@@ -15,10 +16,12 @@
  * voice branch (llimview.cpp:5196-5214) needs a `voice` map, which only a hand-built body can carry.
  *
  * Callee resolution follows the group module's GetActiveClient (GroupsMessagingModule.cs and the
- * method itself): every scene this shared module serves, root presence preferred, child presence as a
- * fallback (a child agent still owns an event queue in that region). A callee that is on no scene here
- * -- offline, or on another region server -- gets nothing: cross-instance A2A is out of scope for v1;
- * the caller still receives its credentials and rings out, and the Invited TTL cleans up.
+ * method itself): every scene this shared module serves, root presence preferred. The invitation is
+ * delivered ONLY to a root presence. A callee whose viewer stands in a neighbouring region holds a
+ * child presence here, and the viewer's answer goes to the region it stands in -- which may be another
+ * server process that has no record of the call. A callee with no root presence here gets nothing:
+ * cross-instance A2A is out of scope for v1; the caller still receives its credentials and rings out,
+ * and the Invited TTL cleans up.
  */
 using System;
 using System.Collections.Generic;
@@ -36,12 +39,14 @@ namespace osWebRtcVoice
 
         public const string DecisionSent = "sent";
         public const string DecisionNoPresence = "callee-unreachable(no-presence)";
+        public const string DecisionChildOnly = "callee-unreachable(child-presence-only)";
         public const string DecisionNoQueue = "callee-unreachable(no-event-queue)";
         public const string DecisionEnqueueFailed = "callee-unreachable(enqueue-failed)";
 
         /// <summary>
         /// Find the callee on this instance: the first scene holding a ROOT presence for the agent, else the
-        /// first holding a child presence, else null. Mirrors GroupsMessagingModule.GetActiveClient.
+        /// first holding a child presence (reported through <paramref name="isChild"/>), else null. Mirrors
+        /// GroupsMessagingModule.GetActiveClient. Delivery of an invitation uses only the root answer.
         /// </summary>
         public static Scene ResolveCalleeScene(IEnumerable<Scene> scenes, UUID callee, out bool isChild)
         {
@@ -65,16 +70,20 @@ namespace osWebRtcVoice
 
         /// <summary>
         /// Deliver <paramref name="body"/> to <paramref name="callee"/> as a ChatterBoxInvitation event and
-        /// return the decision string for the instrument. Never throws into the caller's request.
+        /// return the decision string for the instrument. Only a root presence is rung: a callee who is just
+        /// a child presence here answers <see cref="DecisionChildOnly"/> and nothing is enqueued. Never throws
+        /// into the caller's request.
         /// </summary>
         /// <param name="queueOf">Resolves a scene's event queue; defaults to RequestModuleInterface. Injectable for tests.</param>
         public static string Deliver(IEnumerable<Scene> scenes, UUID callee, OSDMap body, Func<Scene, IEventQueue> queueOf, out string regionName)
         {
             regionName = "-";
-            Scene scene = ResolveCalleeScene(scenes, callee, out _);
+            Scene scene = ResolveCalleeScene(scenes, callee, out bool isChild);
             if (scene == null)
                 return DecisionNoPresence;
             regionName = scene.RegionInfo?.RegionName ?? "-";
+            if (isChild)
+                return DecisionChildOnly;
 
             IEventQueue queue;
             try
