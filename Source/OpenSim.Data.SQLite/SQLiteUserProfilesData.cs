@@ -67,7 +67,7 @@ public class SQLiteUserProfilesData: IProfilesData
 
         m_connectionString = connectionString;
 
-        m_log.LogInformation("[PROFILES_DATA]: Sqlite - connecting: "+m_connectionString);
+        m_log.LogInformation("[PROFILES_DATA]: Sqlite - connecting: " + Util.GetDisplayConnectionString(m_connectionString));
 
         m_connection = new SQLiteConnection(m_connectionString);
         m_connection.Open();

@@ -2580,9 +2580,14 @@ public static class Util
         if (passPosition == -1)
             return connectionString;
         passPosition = connectionString.IndexOf('=', passPosition);
-        if (passPosition < connectionString.Length)
-            passPosition += 1;
+        if (passPosition < 0)
+            return connectionString;
+        passPosition += 1;
         passEndPosition = connectionString.IndexOf(';', passPosition);
+
+        // A password written last has no terminating ';'.
+        if (passEndPosition < 0)
+            return $"{connectionString[..passPosition]}***";
 
         return $"{connectionString[..passPosition]}***{connectionString[passEndPosition..]}";
     }
