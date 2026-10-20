@@ -646,5 +646,16 @@ namespace osWebRtcVoice.Tests
             Assert.That(new A2ARegistry().ActiveIdleTtl, Is.EqualTo(TimeSpan.FromHours(8)));
             Assert.That(new A2ARegistry(TimeSpan.FromMinutes(1), null).ActiveIdleTtl, Is.EqualTo(TimeSpan.FromHours(8)), "the two-arg ctor keeps the default backstop");
         }
+
+        // ---- room model ------------------------------------------------------------
+
+        [TestCase(ProvisionKind.Local, true)]
+        [TestCase(ProvisionKind.Multiagent, false)]
+        [TestCase(ProvisionKind.Logout, false)]
+        [TestCase(ProvisionKind.Refused, false)]
+        public void OnlyASpatialProvision_RecordsTheListenerRoom(ProvisionKind kind, bool records)
+        {
+            Assert.That(A2AProvisionAdmission.RecordsListenerRoom(kind), Is.EqualTo(records));
+        }
     }
 }

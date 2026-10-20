@@ -82,8 +82,12 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
                 _MessageDetails = m_Config.GetBoolean("MessageDetails", false);
                 InitialiseRefusalCache();
                 InitialiseStunServers();
+                MixerOnlySwitches.DisableOnStockPlugin(config, m_log);
+                m_stockPlugin = MixerOnlySwitches.IsStockPlugin(MixerOnlySwitches.PluginNameOf(config));
+                InitialiseVisibility(config);
                 InitialiseNonSpatial(config);
                 InitialiseCallModeration(config);
+                InitialiseModeration();
 
                 m_log.LogInformation($"{logHeader}: enabled");
             }
@@ -106,6 +110,7 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
     public void RemoveRegion(Scene scene)
     {
         UnregisterSceneForVoiceSessions(scene);
+        StopVisibilityService(scene);
     }
 
     // ISharedRegionModule.RegionLoaded
@@ -123,6 +128,8 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
             simFeatures?.AddFeature("VoiceServerType", OSD.FromString("webrtc"));
 
             AdvertiseStunServers(simFeatures);
+
+            StartVisibilityService(scene);
         }
     }
 
@@ -132,6 +139,7 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
         StopNonSpatialMaintenance();
         m_refusalLog.Dispose();
         m_removalLog.Dispose();
+        StopAllVisibilityServices();
     }
 
     // ISharedRegionModule.Name
@@ -186,6 +194,8 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
                 {
                     ChatSessionRequest(httpRequest, httpResponse, agentID, scene);
                 }));
+
+        RegisterModerationCapability(scene, agentID, caps);
     }
 
     /// <summary>

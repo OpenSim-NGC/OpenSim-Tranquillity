@@ -95,6 +95,15 @@
     <Compile Include="GridStoreProcessTests.cs" />
     <Compile Include="AdhocTextGridModeTests.cs" />
     <!-- Opt-in integration tests against a real Janus gateway (skipped unless WEBRTC_JANUS_TEST_URL is set). -->
+    <Compile Include="FeederWorldFromSceneTests.cs" />
+    <Compile Include="AgentRoomTableTests.cs" />
+    <Compile Include="VoiceModerationConsoleTests.cs" />
+    <Compile Include="VoiceModerationMuteConsoleTests.cs" />
+    <Compile Include="VisibilityDefaultsTests.cs" />
+    <Compile Include="VisibilityArmingDefaultsTests.cs" />
+    <Compile Include="VoiceFeatureSwitchTests.cs" />
+    <Compile Include="StockModerationTests.cs" />
+    <Compile Include="StockPluginSwitchTests.cs" />
     <Compile Include="StockJanus\StockRegion.cs" />
     <Compile Include="StockJanus\DefaultsProbe.cs" />
     <Compile Include="StockJanus\DefaultsParityTests.cs" />
@@ -103,6 +112,7 @@
     <Compile Include="StockJanus\StockJanusCallModerationTests.cs" />
     <Compile Include="StockJanus\OptInTestsDeclarePluginTests.cs" />
     <Compile Include="StockJanus\StockJanusCallRemovalTests.cs" />
+    <Compile Include="StockJanus\StockJanusMixerOnlyFeatureTests.cs" />
     <Compile Include="..\WebRtcJanusService.Tests\StockJanus\StockJanusSupport.cs" Link="StockJanus\StockJanusSupport.cs" />
     <Compile Include="..\WebRtcJanusService.Tests\LogCapture.cs" Link="LogCapture.cs" />
     <Compile Include="CallRemovalLogTests.cs" />
@@ -138,6 +148,7 @@
     <ProjectReference Include="..\..\Source\OpenSim.Services.UserAccountService\OpenSim.Services.UserAccountService.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services.PresenceService\OpenSim.Services.PresenceService.csproj" />
     <ProjectReference Include="..\..\Addons\os-webrtc-janus\WebRtcVoiceRegionModule\WebRtcVoiceRegionModule.csproj" />
+    <ProjectReference Include="..\..\Addons\os-webrtc-janus\Visibility\Visibility.csproj" />
     <ProjectReference Include="..\..\Addons\os-webrtc-janus\Janus\WebRtcJanusService.csproj" />
     <ProjectReference Include="..\..\Addons\os-webrtc-janus\WebRtcVoiceServiceModule\WebRtcVoiceServiceModule.csproj" />
   </ItemGroup>

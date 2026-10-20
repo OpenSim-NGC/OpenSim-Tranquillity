@@ -238,7 +238,13 @@ public partial class WebRtcVoiceRegionModule
     // What a provision answer changes in the non-spatial records, by the kind admission decided.
     private void OnProvisionAnswered(OSDMap resp, ProvisionAdmission admission, string a2aVs, UUID agentID, Scene scene)
     {
-        if (A2AProvisionAdmission.RecordsA2ASession(admission) && resp.TryGetString("viewer_session", out string provVs) && !string.IsNullOrEmpty(provVs))
+        if (A2AProvisionAdmission.RecordsListenerRoom(admission.Kind))
+        {
+            RecordListenerRoom(resp, agentID, scene);
+            if (resp.ContainsKey("viewer_session"))
+                ApplyStockMuteOnJoin(agentID, scene);
+        }
+        else if (A2AProvisionAdmission.RecordsA2ASession(admission) && resp.TryGetString("viewer_session", out string provVs) && !string.IsNullOrEmpty(provVs))
         {
             // Admitted AND joined -- only the service's success map carries viewer_session
             // (ProvisionResponseBuilder.BuildSuccess); a failure map ({response:"failed"}, with or

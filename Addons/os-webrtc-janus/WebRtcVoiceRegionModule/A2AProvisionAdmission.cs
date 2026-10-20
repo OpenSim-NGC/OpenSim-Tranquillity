@@ -84,6 +84,13 @@ namespace osWebRtcVoice
         public const string DecisionBadToken = "refused-bad-token";
         public const string DecisionOtherChannelType = "refused-channel-type";
 
+        /// <summary>
+        /// Only a spatial ("local") provision records the agent's mixer room in the visibility service's
+        /// AgentRoomTable. A call's room is not the agent's spatial room and must never be recorded (the exclusion
+        /// batches would be sent to the wrong room); a logout carries no room; a refusal never reaches the service.
+        /// </summary>
+        public static bool RecordsListenerRoom(ProvisionKind kind) => kind == ProvisionKind.Local;
+
         public static bool IsLogout(OSDMap map)
             => map != null && map.TryGetBool("logout", out bool lg) && lg;
 

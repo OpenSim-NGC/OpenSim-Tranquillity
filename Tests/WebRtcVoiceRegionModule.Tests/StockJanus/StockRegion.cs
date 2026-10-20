@@ -194,6 +194,13 @@ namespace osWebRtcVoice.Tests
             return Answer(resp);
         });
 
+        public Task<CapAnswer> ModerateAsync(UUID agent, OSDMap body) => Task.Run(() =>
+        {
+            var resp = new TestOSHttpResponse();
+            Region.SpatialVoiceModerationRequest(new LlsdPost(body), resp, agent, Scene);
+            return Answer(resp);
+        });
+
         public Task<CapAnswer> ChatSessionAsync(UUID agent, OSDMap body) => Task.Run(() =>
         {
             var resp = new TestOSHttpResponse();

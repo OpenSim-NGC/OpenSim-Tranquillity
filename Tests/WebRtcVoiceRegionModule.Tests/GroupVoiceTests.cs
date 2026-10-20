@@ -571,6 +571,13 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
+        public void AGroupAdmissionNeverRecordsTheListenerRoom()
+        {
+            // A group room is not the agent's spatial room; recording it would send exclusion batches to the wrong room.
+            Assert.That(A2AProvisionAdmission.RecordsListenerRoom(ProvisionKind.Group), Is.False);
+        }
+
+        [Test]
         public void AGroupRoomKeyIsNeverResolvableByTheA2ARegistry()
         {
             (_, _, _, _, string room, _) = Called();
