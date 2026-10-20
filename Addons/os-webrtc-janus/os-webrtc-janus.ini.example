@@ -127,6 +127,30 @@
     ; call's record for as long. Only used when CallModerationEnabled is true. Default: 0.
     ;CallRemovalMinutes = 0
 
+    ; Per-listener visibility: the region computes who may hear whom (estate and parcel bans, parcel
+    ; "see avatars", voice moderation) and sends it to the mixer as peer_ctl batches. Default: false for
+    ; both keys. Needs the slvoice mixer and JanusGatewayAdminURI and AdminAPIToken below. With the
+    ; feeder on and emission off the feeder runs matrix-only (diagnostics). With the stock AudioBridge a
+    ; switch that is on logs one warning at start and stays off.
+    ;VisibilityFeederEnabled = false
+    ;VisibilityEmitEnabled = false
+    ; Milliseconds between visibility recomputations. Default: 250.
+    ;VisibilityTickMs = 250
+    ; Rooms addressed concurrently within one peer_ctl send. Default: 4.
+    ;VisibilityRoomSendConcurrency = 4
+
+    ; Declare the visibility authority when creating a room, with epochs and heartbeats; the mixer
+    ; withholds audio from a room whose authority goes silent. Default: false. Needs the slvoice mixer and
+    ; both visibility keys above.
+    ;VisibilityArmingEnabled = false
+
+    ; Parcel voice moderation (the SpatialVoiceModerationRequest capability and the voice moderation
+    ; console commands). Default: false. With the slvoice mixer it needs VisibilityFeederEnabled. With the stock
+    ; AudioBridge a mute is the plugin's own mute of that participant in its room (a mute-all is remembered per
+    ; parcel and also applies to whoever joins afterwards), and a request the plugin cannot carry out is
+    ; answered 501 rather than 200.
+    ;VoiceModerationEnabled = false
+
     ; Seconds a refused voice provision is remembered, so a viewer's immediate retries are answered without
     ; repeating the estate and parcel checks. 0 turns the cache off. Default: 5.
     ;RefusalCacheSeconds = 5
@@ -156,6 +180,8 @@
     ; Milliseconds a Janus request that is answered with "ack" waits for its result before it fails.
     ; Default: 5000.
     ;RequestTimeoutMs = 5000
+    ; Milliseconds a request to the Janus admin API waits for its answer. Default: 5000.
+    ;AdminTimeoutMs = 5000
     ; Remove a room this service created once nobody has been in it for EmptyRoomGraceSeconds. Janus's stock
     ; AudioBridge never removes an emptied room, so without this every estate, parcel, call and conference room
     ; stays on the gateway until Janus restarts. Rooms the service did not create are never removed. Does nothing

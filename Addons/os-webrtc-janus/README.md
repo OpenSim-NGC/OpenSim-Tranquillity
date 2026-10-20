@@ -194,6 +194,17 @@ startup when a call feature is on.
 | `SessionStoreOutboxMax`, `SessionStoreOutboxSeconds` | `[WebRtcVoice]` | `256`, `60` | Departures the service could not be told about are kept and sent when it answers: the most kept, and the seconds each is kept before it is given up. |
 | `SessionStoreBreakerFailures`, `SessionStoreBreakerWindowSeconds`, `SessionStoreBreakerOpenSeconds` | `[WebRtcVoice]` | `5`, `10`, `5` | After this many requests get no answer within the window, further requests are refused at once for the open period, then one is tried to see whether the service is back. |
 
+| `AdminTimeoutMs` | `[JanusWebRtcVoice]` | `5000` | Milliseconds a request to the Janus admin API waits for its answer. |
+| `VisibilityFeederEnabled`, `VisibilityEmitEnabled` | `[WebRtcVoice]` | `false`, `false` | Send per-listener visibility (who may hear whom: estate and parcel bans, a parcel's "see avatars" setting, voice moderation) to a mixer that understands it. They need `JanusGatewayAdminURI` and `AdminAPIToken`. Mixer only. |
+| `VisibilityTickMs`, `VisibilityRoomSendConcurrency` | `[WebRtcVoice]` | `250`, `4` | Milliseconds between recomputations, and how many rooms one send addresses at once. |
+| `VisibilityArmingEnabled` | `[WebRtcVoice]` | `false` | Declare the sim as the visibility authority when a room is created, with epochs and heartbeats; the mixer withholds audio from a room whose authority goes silent. Needs both visibility keys above. Mixer only. |
+| `VoiceModerationEnabled` | `[WebRtcVoice]` | `false` | Parcel voice moderation: the `SpatialVoiceModerationRequest` capability and the `voice moderation` console commands. On the stock AudioBridge a mute is that plugin's own mute of the participant in its room (a mute-all is remembered for the parcel and also applies to whoever joins afterwards). With the mixer it needs `VisibilityFeederEnabled`. |
+
+**Mixer-only switches.** The visibility switches and call voice mutes in a group call need a Janus plugin that
+implements the `janus.plugin.slvoice` protocol (the slvoice mixer, release 1.2.0 or later). With the stock
+AudioBridge, which is the default, a mixer-only switch that is on logs one warning at start naming the switch and the
+plugin, and is turned off. Parcel voice moderation and call voice mutes work on the stock AudioBridge.
+
 #### Which parcel a voice request is checked against
 
 A stock viewer sends `parcel_local_id` only when the avatar stands on a parcel that has its own voice channel (the
@@ -341,6 +352,14 @@ This is a growing section and will be added to over time.
 **janus info** -- list many details of the Janus-Gateway configuration. Very ugly, non-formated JSON.
 
 **janus list rooms** -- list the rooms that have been allocated in the `AudioBridge` Janus plugin
+
+**show voice visibility** -- show the visibility feeder: whether it runs, its rooms, and what it last sent to the mixer
+
+**show voice moderation** -- list the parcel voice mutes held by the regions that run the visibility feeder
+
+**voice moderation mute** `<agent-uuid-or-name> [parcel-local-id]` and **voice moderation unmute** `<agent-uuid-or-name>` --
+mute or unmute one avatar's voice on a parcel of the selected region, from the console. Both need
+`VisibilityFeederEnabled` and so the mixer; on the stock AudioBridge moderation is done from the viewer
 
 **show voice sessions** -- show where this region keeps its call sessions (in this process, or in the grid
 voice session service) and, for the service, whether it is answering
