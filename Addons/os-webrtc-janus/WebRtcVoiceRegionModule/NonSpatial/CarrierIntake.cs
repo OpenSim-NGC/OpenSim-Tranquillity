@@ -74,8 +74,9 @@ namespace osWebRtcVoice.NonSpatial
         public const string DecisionFeatureOff = "feature-off";
         public const string DecisionCarrierOff = "carrier-off-no-secret";
         public const string DecisionRoomKeyMismatch = "refused-room-key-mismatch";
+        public const string DecisionNoCarrierKey = "refused-no-carrier-key";
 
-        public static RingIntake AcceptRing(GridInstantMessage msg, CarrierAuth auth, NonSpatialVoiceSessionEngine engine,
+        public static RingIntake AcceptRing(GridInstantMessage msg, CarrierAuth auth, INonSpatialSessions engine,
                                             bool groupUsable, int groupCap, bool adhocEnabled)
         {
             if (!GroupVoiceRingTransport.TryParse(msg, out UUID target, out UUID groupId, out OSDMap body, out OSDMap authBlock))
@@ -87,13 +88,39 @@ namespace osWebRtcVoice.NonSpatial
                 return new RingIntake { Claimed = true, Decision = DecisionFeatureOff, Target = target, GroupId = groupId };
 
             auth ??= CarrierAuth.Off();
-            string reason = auth.Verify(GroupVoiceRingTransport.Fields(target, groupId, body), authBlock);
+            // A store that judges rings itself does not need the carrier's MAC, so a grid that keeps its sessions in
+            // the grid service rings across regions without a shared secret. A region that does have a secret still
+            // requires the MAC, which also covers the names the invitation shows, since the store holds no names.
+            bool storeVerifies = engine.StoreVerifiesRings;
+            string reason = storeVerifies && !auth.Enabled
+                ? null
+                : auth.Verify(GroupVoiceRingTransport.Fields(target, groupId, body), authBlock);
             if (reason != null)
                 return new RingIntake
                 {
                     Claimed = true, Decision = DecisionCarrierRefused, Reason = reason,
                     RefusalCount = auth.RecordRefusal(reason), Target = target, GroupId = groupId,
                 };
+
+            if (storeVerifies)
+            {
+                // Nothing is adopted from the wire: the store says whether this ring is genuine, and the room and
+                // credential the viewer is shown are the store's, not the carrier's.
+                SessionOutcome verified = engine.VerifyRing(groupId, target, caller, type);
+                if (!verified.Ok)
+                    return new RingIntake { Claimed = true, Decision = verified.Decision, Target = target, GroupId = groupId };
+                if (string.IsNullOrEmpty(verified.Session?.Token))
+                    return new RingIntake { Claimed = true, Decision = "refused-no-credential", Target = target, GroupId = groupId };
+                OSDMap voice = body.TryGetOSDMap("voice", out OSDMap v) ? v : new OSDMap();
+                voice["channel_uri"] = OSD.FromString(verified.Session.RoomKey);
+                voice["channel_credentials"] = OSD.FromString(verified.Session.Token);
+                body["voice"] = voice;
+                return new RingIntake
+                {
+                    Claimed = true, Ok = true, Decision = verified.Decision, Target = target, GroupId = groupId,
+                    Body = body, Adopted = verified,
+                };
+            }
 
             SessionOutcome adopted = engine.AdoptRemoteRing(groupId, roomKey, credential,
                                                             type == NonSpatialSessionType.Adhoc
@@ -107,7 +134,7 @@ namespace osWebRtcVoice.NonSpatial
             };
         }
 
-        public static TextIntake AcceptText(GridInstantMessage msg, CarrierAuth auth, NonSpatialVoiceSessionEngine engine)
+        public static TextIntake AcceptText(GridInstantMessage msg, CarrierAuth auth, INonSpatialSessions engine)
         {
             if (!AdhocTextTransport.TryParse(msg, out UUID target, out UUID sessionId, out string message,
                                              out string fromName, out _, out string roomKey, out OSDMap authBlock))
@@ -115,7 +142,16 @@ namespace osWebRtcVoice.NonSpatial
 
             UUID sender = new UUID(msg.fromAgentID);
             auth ??= CarrierAuth.Off();
-            string reason = auth.Verify(AdhocTextTransport.Fields(target, sessionId, sender, roomKey, message), authBlock);
+            // A store that keys conferences gives a seated member the key the line was signed with, so the line needs
+            // no shared secret; someone who is not in the conference is given none, and nothing they send checks out.
+            string sessionKey = null;
+            if (engine.StoreIssuesCarrierKeys)
+            {
+                sessionKey = engine.CarrierKey(sessionId, target);
+                if (string.IsNullOrEmpty(sessionKey))
+                    return new TextIntake { Claimed = true, Decision = DecisionNoCarrierKey, Target = target, SessionId = sessionId };
+            }
+            string reason = auth.Verify(AdhocTextTransport.Fields(target, sessionId, sender, roomKey, message), authBlock, sessionKey);
             if (reason != null)
                 return new TextIntake
                 {
@@ -126,7 +162,7 @@ namespace osWebRtcVoice.NonSpatial
             // Authentic. The sender's instance decided the sender is a member; this instance holds its own
             // copy of the session and checks again, and the room key the sender signed must be the one this
             // instance derives for the session.
-            NonSpatialVoiceSession session = engine.Store.Get(sessionId);
+            NonSpatialVoiceSession session = engine.Get(sessionId);
             if (session is null || session.Type != NonSpatialSessionType.Adhoc)
                 return new TextIntake { Claimed = true, Authenticated = true, OriginRegion = new UUID(msg.RegionID), Decision = SessionOutcome.NoSuchSession, Target = target, SessionId = sessionId };
             if (string.IsNullOrEmpty(roomKey) || !string.Equals(roomKey, session.RoomKey, StringComparison.Ordinal))

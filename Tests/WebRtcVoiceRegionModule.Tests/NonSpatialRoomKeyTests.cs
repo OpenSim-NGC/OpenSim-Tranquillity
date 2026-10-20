@@ -10,7 +10,7 @@
  * argument in NonSpatialRoomKey's header is asserted rather than asserted-about.
  *
  * Layer (1) -- structural, against A2A rooms -- is the one that matters most, because A2A
- * admission resolves a room with UUID.TryParse (A2ASessionRegistry.cs). The test below
+ * admission resolves a room with UUID.TryParse (A2ACalls.TryGetByChannel). The test below
  * runs the ACTUAL live predicate against a room key, so if anyone ever drops the prefix the test
  * fails rather than the grid.
  */
@@ -86,7 +86,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void RoomKey_CanNeverBeMistakenForAnA2AChannel_TheLivePredicateRefusesIt()
         {
-            A2ASessionRegistry live = new A2ASessionRegistry();
+            A2ARegistry live = new A2ARegistry();
             live.Record(NonSpatialIdentityTests.Alice, NonSpatialIdentityTests.Bob, out _);
 
             foreach (NonSpatialSessionType t in Enum.GetValues(typeof(NonSpatialSessionType)))
@@ -100,7 +100,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void AnA2AChannel_IsNeverMistakenForARoomKey()
         {
-            A2ASessionRegistry live = new A2ASessionRegistry();
+            A2ARegistry live = new A2ARegistry();
             A2ASession s = live.Record(NonSpatialIdentityTests.Alice, NonSpatialIdentityTests.Bob, out _);
             Assert.That(NonSpatialRoomKey.IsRoomKey(s.ChannelUri), Is.False);
         }

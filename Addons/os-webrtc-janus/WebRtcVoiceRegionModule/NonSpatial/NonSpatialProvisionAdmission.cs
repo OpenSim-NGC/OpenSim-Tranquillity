@@ -14,7 +14,7 @@
  * (llvoicewebrtc.cpp, startAdHocSession and the multiagent provision body). The discriminator is therefore the CHANNEL STRING, and that is
  * precisely what NonSpatialRoomKey's prefix was built to provide: a group room key is
  * "nsv1:group:<uuid>", which can never parse as a bare UUID and so can never be an A2A channel
- * (A2ASessionRegistry.TryGetByChannel is UUID.TryParse).
+ * (A2ACalls.TryGetByChannel is UUID.TryParse).
  *
  * THE A2A PATH IS NOT EDITED. This is a wrapper: it takes the group arm only when group voice
  * is enabled AND the channel is one of our room keys, and otherwise calls
@@ -91,7 +91,7 @@ namespace osWebRtcVoice.NonSpatial
         /// other body belongs to <see cref="A2AProvisionAdmission.Decide"/>, untouched.
         /// </summary>
         public static NonSpatialProvisionResult Decide(OSDMap map, UUID agentID, GroupVoicePolicy policy,
-                                                       NonSpatialVoiceSessionEngine engine, UUID originRegion,
+                                                       INonSpatialSessions engine, UUID originRegion,
                                                        bool adhocEnabled = false)
         {
             map.TryGetString("channel", out string channel);
@@ -99,7 +99,7 @@ namespace osWebRtcVoice.NonSpatial
             if (engine == null)
                 return Refuse(DecisionNoSession, 403);
 
-            NonSpatialVoiceSession s = engine.Store.GetByRoomKey(channel);
+            NonSpatialVoiceSession s = engine.GetByRoomKey(channel, agentID);
 
             // Dispatch on the OWN type of the voice session rather than assuming group. The room key tag
             // and the stored type must agree -- they are both derived from the same Start -- so this
@@ -150,7 +150,7 @@ namespace osWebRtcVoice.NonSpatial
         /// greppable word.
         /// </summary>
         private static NonSpatialProvisionResult DecideAdhoc(OSDMap map, UUID agentID,
-                                                             NonSpatialVoiceSessionEngine engine, UUID originRegion,
+                                                             INonSpatialSessions engine, UUID originRegion,
                                                              bool adhocEnabled, NonSpatialVoiceSession s)
         {
             if (!adhocEnabled)

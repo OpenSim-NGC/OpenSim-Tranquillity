@@ -120,7 +120,7 @@ namespace osWebRtcVoice
                 Channel = map != null && map.TryGetString("channel", out string ch) && !string.IsNullOrEmpty(ch) ? ch : "-",
             };
 
-        public static ProvisionAdmission Decide(OSDMap map, UUID agentID, A2ASessionRegistry registry)
+        public static ProvisionAdmission Decide(OSDMap map, UUID agentID, A2ACalls calls)
         {
             string channelType = map != null && map.TryGetString("channel_type", out string ct) ? ct : string.Empty;
             string channel = map != null && map.TryGetString("channel", out string ch) && !string.IsNullOrEmpty(ch) ? ch : "-";
@@ -134,7 +134,7 @@ namespace osWebRtcVoice
 
             if (channelType == ChannelTypeMultiagent)
             {
-                A2ASession s = registry?.TryGetByChannel(channel);
+                A2ASession s = calls?.TryGetByChannel(channel, agentID);
                 if (s == null)
                     return Refuse(DecisionNoSession, channelType, channel);
                 if (!s.IsParty(agentID))

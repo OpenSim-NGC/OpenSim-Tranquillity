@@ -36,8 +36,20 @@
     <Compile Include="A2AInvitationTests.cs" />
     <Compile Include="A2ALifecycleTests.cs" />
     <Compile Include="A2ADeclineTests.cs" />
-    <Compile Include="A2ASessionRegistryTests.cs" />
+    <Compile Include="A2ACallsTests.cs" />
     <Compile Include="A2ASessionConcurrencyTests.cs" />
+    <Compile Include="A2ACharacterisationTests.cs" />
+    <Compile Include="A2ARegistry.cs" />
+    <Compile Include="A2AGridCallTests.cs" />
+    <Compile Include="A2AActivationRaceTests.cs" />
+    <Compile Include="A2AStoreUnavailableTests.cs" />
+    <Compile Include="RingVerificationTests.cs" />
+    <Compile Include="SessionStoreReportTests.cs" />
+    <Compile Include="CarrierKeyTests.cs" />
+    <Compile Include="CarrierStartupLineTests.cs" />
+    <Compile Include="RegionStartSeatReleaseTests.cs" />
+    <Compile Include="P2PCallRulesTests.cs" />
+    <Compile Include="SeatRenewalTests.cs" />
     <Compile Include="ProvisionPassthroughTests.cs" />
     <Compile Include="DefaultsChatSessionTests.cs" />
     <Compile Include="NonSpatialInviteeBoundTests.cs" />
@@ -63,6 +75,11 @@
     <Compile Include="GroupVoiceInviteTests.cs" />
     <Compile Include="GroupVoiceCrossHostTests.cs" />
     <Compile Include="CarrierAuthTests.cs" />
+    <Compile Include="VoiceSessionServiceTests.cs" />
+    <Compile Include="VoiceSessionWireTests.cs" />
+    <Compile Include="GridStoreResilienceTests.cs" />
+    <Compile Include="GridStoreProcessTests.cs" />
+    <Compile Include="AdhocTextGridModeTests.cs" />
     <!-- Opt-in integration tests against a real Janus gateway (skipped unless WEBRTC_JANUS_TEST_URL is set). -->
     <Compile Include="StockJanus\StockRegion.cs" />
     <Compile Include="StockJanus\DefaultsProbe.cs" />

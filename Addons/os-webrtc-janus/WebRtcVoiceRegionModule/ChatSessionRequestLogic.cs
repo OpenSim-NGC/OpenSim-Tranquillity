@@ -149,16 +149,18 @@ namespace osWebRtcVoice
         public const string InstrumentTag = "[A2A CHATSESSION]";
 
         /// <summary>
-        /// Decide the outcome for a parsed ChatSessionRequest body. Pure apart from the registry.
+        /// Decide the outcome for a parsed ChatSessionRequest body. Pure apart from the call store.
         /// </summary>
         /// <param name="reqmap">The parsed LLSD body (already known to be a map).</param>
         /// <param name="agentID">The cap-bound requesting agent.</param>
-        /// <param name="registry">The instance's invitation registry.</param>
-        public static ChatSessionOutcome Decide(OSDMap reqmap, UUID agentID, A2ASessionRegistry registry)
-            => Decide(reqmap, agentID, string.Empty, registry);
+        /// <param name="calls">The calls this region serves, kept in the call session store.</param>
+        public static ChatSessionOutcome Decide(OSDMap reqmap, UUID agentID, A2ACalls calls)
+            => Decide(reqmap, agentID, string.Empty, calls);
 
         /// <param name="callerName">The requesting agent's display name; labels the callee's incoming-call UI.</param>
-        public static ChatSessionOutcome Decide(OSDMap reqmap, UUID agentID, string callerName, A2ASessionRegistry registry)
+        /// <param name="originRegion">The region the request arrived in; the seat a started call takes is recorded against it.</param>
+        public static ChatSessionOutcome Decide(OSDMap reqmap, UUID agentID, string callerName, A2ACalls calls,
+                                                UUID originRegion = default)
         {
             if (reqmap == null)
                 return Fail(HttpStatusCode.NoContent, agentID, "-", UUID.Zero, "no body");
@@ -174,19 +176,19 @@ namespace osWebRtcVoice
             switch (method)
             {
                 case MethodStartP2PVoice:
-                    return StartP2PVoice(reqmap, agentID, sessionID, registry);
+                    return StartP2PVoice(reqmap, agentID, sessionID, calls, originRegion);
 
                 case MethodCall:
-                    return Call(reqmap, agentID, callerName, sessionID, registry);
+                    return Call(reqmap, agentID, callerName, sessionID, calls);
 
                 // The callee's (or caller's) decline removes the invitation. The viewer sends this
                 // string for a P2P voice invite (llimview.cpp:3419-3425); a non-party's decline is ignored.
                 case MethodDeclineP2PVoice:
                 {
-                    A2ASession before = registry.TryGet(sessionID);
-                    bool removed = registry.Decline(sessionID, agentID, out bool wasParty);
+                    A2ASession before = calls.TryGet(sessionID, UUID.Zero);
+                    bool removed = calls.Decline(sessionID, agentID, out bool wasParty);
                     // Brief words: removed | refused-not-party | stub-ok (no such session: the old stub behaviour).
-                    string decision = removed ? "removed" : wasParty ? "stub-ok" : registry.TryGet(sessionID) == null ? "stub-ok" : "refused-not-party";
+                    string decision = removed ? "removed" : wasParty ? "stub-ok" : calls.TryGet(sessionID, UUID.Zero) == null ? "stub-ok" : "refused-not-party";
                     return new ChatSessionOutcome
                     {
                         Status = HttpStatusCode.OK,
@@ -235,7 +237,7 @@ namespace osWebRtcVoice
             }
         }
 
-        private static ChatSessionOutcome StartP2PVoice(OSDMap reqmap, UUID agentID, UUID sessionID, A2ASessionRegistry registry)
+        private static ChatSessionOutcome StartP2PVoice(OSDMap reqmap, UUID agentID, UUID sessionID, A2ACalls calls, UUID originRegion)
         {
             // Params = the other participant. Absent or not a UUID -> malformed -> 400. The
             // viewer maps 400 on this POST to session_does_not_exist_error (llimview.cpp:658-662).
@@ -244,8 +246,10 @@ namespace osWebRtcVoice
             if (otherID == agentID)
                 return Fail(HttpStatusCode.BadRequest, agentID, MethodStartP2PVoice, sessionID, "params is the caller");
 
-            UUID derived = A2ASessionRegistry.ComputeSessionId(agentID, otherID);
-            A2ASession s = registry.Record(agentID, otherID, out bool created);
+            UUID derived = A2ACalls.ComputeSessionId(agentID, otherID);
+            A2ASession s = calls.Record(agentID, otherID, originRegion, out bool created);
+            if (s == null)
+                return Fail(HttpStatusCode.ServiceUnavailable, agentID, MethodStartP2PVoice, sessionID, "the call session store did not take the call");
 
             string altVst = reqmap.TryGetOSDMap("alt_params", out OSDMap alt) && alt.TryGetString("voice_server_type", out string v) ? v : "-";
             string detail = $"callee={otherID} derived={derived} viewer-session-id={sessionID} match={(derived == sessionID).ToString().ToLowerInvariant()} " +
@@ -261,16 +265,22 @@ namespace osWebRtcVoice
             };
         }
 
-        private static ChatSessionOutcome Call(OSDMap reqmap, UUID agentID, string callerName, UUID sessionID, A2ASessionRegistry registry)
+        private static ChatSessionOutcome Call(OSDMap reqmap, UUID agentID, string callerName, UUID sessionID, A2ACalls calls)
         {
             string vst = reqmap.TryGetOSDMap("alt_params", out OSDMap alt) && alt.TryGetString("preferred_voice_server_type", out string v) ? v : "-";
-            A2ASession s = registry.IssueToken(sessionID, agentID);
+            A2ASession s = calls.IssueToken(sessionID, agentID, out bool unavailable);
             if (s == null)
             {
+                // A store that could not be reached has not said the call is gone, so answer as "start p2p voice"
+                // does when the store does not take a call: 503, and the viewer can try again.
+                if (unavailable)
+                    return Fail(HttpStatusCode.ServiceUnavailable, agentID, MethodCall, sessionID, $"the call session store did not answer alt.preferred_voice_server_type={vst}");
                 // Policy is real now. A live session whose parties do not include this agent is
                 // 403 -> the viewer shows VoiceNotAllowed (llvoicechannel.cpp:660-666). An unknown or
                 // expired session stays 404 -> VoiceCallGenericError (:668-673).
-                A2ASession live = registry.TryGet(sessionID);
+                A2ASession live = calls.TryGet(sessionID, UUID.Zero, out unavailable);
+                if (unavailable)
+                    return Fail(HttpStatusCode.ServiceUnavailable, agentID, MethodCall, sessionID, $"the call session store did not answer alt.preferred_voice_server_type={vst}");
                 if (live != null && !live.IsParty(agentID))
                     return Fail(HttpStatusCode.Forbidden, agentID, MethodCall, sessionID, $"not a party of this session alt.preferred_voice_server_type={vst}");
                 return Fail(HttpStatusCode.NotFound, agentID, MethodCall, sessionID, $"no live invitation for this agent alt.preferred_voice_server_type={vst}");

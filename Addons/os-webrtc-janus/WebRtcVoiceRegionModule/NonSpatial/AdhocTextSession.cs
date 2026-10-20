@@ -123,7 +123,7 @@ namespace osWebRtcVoice.NonSpatial
         /// Returns TRUE with a null <paramref name="plan"/> for a message that IS ours and is
         /// refused; <paramref name="decision"/> then carries the greppable word.
         /// </summary>
-        public static bool TryPlan(NonSpatialVoiceSessionEngine engine, bool enabled, UUID sessionId,
+        public static bool TryPlan(INonSpatialSessions engine, bool enabled, UUID sessionId,
                                    UUID sender, string message, out AdhocTextPlan plan, out string decision)
         {
             plan = null;
@@ -131,7 +131,7 @@ namespace osWebRtcVoice.NonSpatial
             if (engine is null || sessionId == UUID.Zero)
                 return false;
 
-            NonSpatialVoiceSession session = engine.Store.Get(sessionId);
+            NonSpatialVoiceSession session = engine.Get(sessionId);
             // Not a voice session we hold, or not a conference: not ours. A GROUP id lands here and is
             // handed straight back, which is what keeps group text working untouched.
             if (session is null || session.Type != NonSpatialSessionType.Adhoc)

@@ -75,7 +75,7 @@ namespace osWebRtcVoice.NonSpatial
         /// kept a voice seat, because that is the fact the instrument line has to record: it is the
         /// visible proof that the two lifecycles did not get conflated.
         /// </summary>
-        public static bool TryHandleLeave(NonSpatialVoiceSessionEngine engine, bool enabled,
+        public static bool TryHandleLeave(INonSpatialSessions engine, bool enabled,
                                           UUID sessionId, UUID agent,
                                           out string decision, out bool stillSeated)
         {
@@ -84,7 +84,7 @@ namespace osWebRtcVoice.NonSpatial
             if (engine is null || sessionId == UUID.Zero)
                 return false;
 
-            NonSpatialVoiceSession session = engine.Store.Get(sessionId);
+            NonSpatialVoiceSession session = engine.Get(sessionId);
             if (session is null || session.Type != NonSpatialSessionType.Adhoc)
                 return false;
 
@@ -103,7 +103,7 @@ namespace osWebRtcVoice.NonSpatial
                 return true;
             }
 
-            NonSpatialMember m = engine.Store.Get(sessionId)?.Find(agent);
+            NonSpatialMember m = engine.Get(sessionId)?.Find(agent);
             stillSeated = m is not null && m.HoldsSeat;
             decision = outcome.Decision == "chat-left" ? DecisionLeft : DecisionIdempotent;
             return true;

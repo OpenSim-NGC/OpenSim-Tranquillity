@@ -38,7 +38,7 @@ namespace osWebRtcVoice.Tests
             int tooMany = 0, none = 0;
             for (int round = 0; round < Rounds; round++)
             {
-                A2ASessionRegistry reg = new A2ASessionRegistry();
+                A2ARegistry reg = new A2ARegistry();
                 A2ASession s = reg.Record(Caller, Callee, out _);
                 int winners = 0;
                 using Barrier gate = new Barrier(Joiners);
@@ -59,7 +59,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void ARejoinOfAnActiveCall_IsNotATransition()
         {
-            A2ASessionRegistry reg = new A2ASessionRegistry();
+            A2ARegistry reg = new A2ARegistry();
             A2ASession s = reg.Record(Caller, Callee, out _);
             reg.MarkProvisioned(s.SessionId, Callee, "vs-1", out bool first);
             reg.MarkProvisioned(s.SessionId, Callee, "vs-2", out bool again);
@@ -72,7 +72,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void ReadingARecordWhileItChanges_NeverFails()
         {
-            A2ASessionRegistry reg = new A2ASessionRegistry();
+            A2ARegistry reg = new A2ARegistry();
             A2ASession s = reg.Record(Caller, Callee, out _);
             ConcurrentQueue<Exception> failures = new ConcurrentQueue<Exception>();
             using CancellationTokenSource stop = new CancellationTokenSource();

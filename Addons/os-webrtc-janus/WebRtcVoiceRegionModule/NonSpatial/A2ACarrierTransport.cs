@@ -14,6 +14,7 @@
  * binaryBucket. The four steps of a call each travel as their own carrier kind:
  *
  *   ring     caller's process -> callee's process   a call is being placed; carries the call's credential
+                                                        (not with SessionStoreMode grid: the credential is in the store)
  *   join     callee's process -> caller's process   the callee accepted and joined the voice room
  *   decline  callee's process -> caller's process   the callee declined
  *   leave    either process   -> the other          a party hung up or left
@@ -35,6 +36,11 @@
  * Every carrier is authenticated with CarrierAuth, with the step as part of the kind, so a ring cannot be
  * replayed as a decline and a carrier for one target cannot be redirected to another. The payload holds
  * only the fields the MAC covers.
+ *
+ * With SessionStoreMode grid the carriers need no secret. The receiver asks the grid session service for the
+ * facts the carrier claims (the call exists and the target is its callee; the callee has declined, joined or
+ * left) and acts only on what the service says, so a forged carrier can do no more than repeat a fact the
+ * service already holds. A region that does have a CarrierSecret signs and checks the MAC as well.
  */
 using System;
 using System.Text;
@@ -89,6 +95,7 @@ namespace osWebRtcVoice.NonSpatial
         public const string DecisionNotRootHere = "refused-target-not-root-here";
         public const string DecisionGlare = "refused-call-in-progress";
         public const string DecisionAlreadyActive = "refused-already-active";
+        public const string DecisionNotTrue = "refused-store-does-not-say-so";
 
         public static bool IsStep(string step)
             => step == StepRing || step == StepJoin || step == StepDecline || step == StepLeave;
@@ -114,13 +121,13 @@ namespace osWebRtcVoice.NonSpatial
         /// is built unsigned and every receiver refuses it, so callers check <see cref="CarrierAuth.Enabled"/> first.
         /// </summary>
         public static GridInstantMessage Build(string step, UUID target, UUID about, string aboutName, UUID sessionId,
-                                               string token, UUID originRegion, CarrierAuth auth)
+                                               string roomKey, string token, UUID originRegion, CarrierAuth auth)
         {
             if (!IsStep(step)) throw new ArgumentException("not an avatar-to-avatar step", nameof(step));
             A2ACarrier c = new A2ACarrier
             {
                 Step = step, Target = target, SessionId = sessionId, About = about,
-                AboutName = aboutName ?? string.Empty, Room = sessionId.ToString(), Token = token ?? string.Empty,
+                AboutName = aboutName ?? string.Empty, Room = roomKey ?? string.Empty, Token = token ?? string.Empty,
             };
             OSDMap payload = new OSDMap
             {
@@ -194,7 +201,7 @@ namespace osWebRtcVoice.NonSpatial
         /// the two agent ids. A carrier whose session is not the pair's is refused whatever its MAC says.
         /// </summary>
         public static bool SessionIsThePair(in A2ACarrier c)
-            => c.SessionId == A2ASessionRegistry.ComputeSessionId(c.About, c.Target)
+            => c.SessionId == A2ACalls.ComputeSessionId(c.About, c.Target)
                && c.About != UUID.Zero && c.Target != UUID.Zero && c.About != c.Target;
 
         public static string Line(string step, UUID target, UUID about, UUID sessionId, string decision, string detail = null)

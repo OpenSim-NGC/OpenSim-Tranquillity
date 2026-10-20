@@ -138,7 +138,7 @@ public partial class WebRtcVoiceRegionModule
                                                 out string decision, out bool stillSeated))
             return;   // a group or P2P leave -- not ours, and every other subscriber still sees it
 
-        NonSpatialVoiceSession session = m_nonSpatial.Store.Get(sessionId);
+        NonSpatialVoiceSession session = m_nonSpatial.Get(sessionId);
         m_log.LogDebug("{LogHeader} {Line}", logHeader,
             AdhocChatMembership.Line(agent, sessionId, decision, stillSeated,
                 $"region=\"{client?.Scene?.RegionInfo?.RegionName ?? string.Empty}\" "
@@ -187,10 +187,13 @@ public partial class WebRtcVoiceRegionModule
                                          originRegion, plan.Message);
         }
         // Members this process cannot rule in or out: only ever carried. One who has a root presence here and
-        // is not recorded as in the conversation here is not in it, and gets nothing.
-        foreach (UUID target in plan.Elsewhere)
-            if (!rootHere.Contains(target))
-                remote.Add(target);
+        // is not recorded as in the conversation here is not in it, and gets nothing. A store shared by every
+        // process (the one that keys the conference) records an answer wherever it is given, so there is nobody
+        // to guess about there: an invitee it records as invited has not answered, and is not written to.
+        if (m_nonSpatial is not { StoreIssuesCarrierKeys: true })
+            foreach (UUID target in plan.Elsewhere)
+                if (!rootHere.Contains(target))
+                    remote.Add(target);
 
         SendRemoteConferenceText(plan, fromName, originRegion, scenes, remote);
     }
@@ -234,9 +237,19 @@ public partial class WebRtcVoiceRegionModule
     {
         if (candidates is null || candidates.Count == 0)
             return;
-        if (!m_carrierAuth.Enabled)
+        bool storeKeys = m_nonSpatial is { StoreIssuesCarrierKeys: true };
+        if (!m_carrierAuth.Enabled && !storeKeys)
         {
             LogCarrierOff(plan.Session.SessionId);
+            return;
+        }
+        // A store that keys conferences gives the sender's region the key to sign with; a sender who is not seated
+        // in the conference is given none and sends nothing across.
+        string sessionKey = storeKeys ? m_nonSpatial.CarrierKey(plan.Session.SessionId, plan.Sender) : null;
+        if (storeKeys && string.IsNullOrEmpty(sessionKey))
+        {
+            m_log.LogDebug("{LogHeader} {Line}", logHeader,
+                AdhocTextTransport.Line(UUID.Zero, plan.Session.SessionId, CarrierIntake.DecisionNoCarrierKey));
             return;
         }
 
@@ -274,7 +287,7 @@ public partial class WebRtcVoiceRegionModule
                 // carrier to that viewer as an instant message; it is meant for the process where they are root.
                 transfer.SendInstantMessage(
                     AdhocTextTransport.Build(target, plan.Sender, fromName, plan.Session.SessionId,
-                                             originRegion, plan.Message, null, plan.Session.RoomKey, m_carrierAuth),
+                                             originRegion, plan.Message, null, plan.Session.RoomKey, m_carrierAuth, sessionKey),
                     _ => { }, true);
                 m_log.LogDebug("{LogHeader} {Line}", logHeader,
                     AdhocTextTransport.Line(target, plan.Session.SessionId, AdhocTextTransport.DecisionSent));
@@ -425,7 +438,7 @@ public partial class WebRtcVoiceRegionModule
     {
         if (candidates is null || candidates.Count == 0 || body is null)
             return;
-        if (!m_carrierAuth.Enabled)
+        if (!m_carrierAuth.Enabled && !RingsAreVerifiedByTheStore)
         {
             LogCarrierOff(session.SessionId);
             return;
@@ -466,6 +479,8 @@ public partial class WebRtcVoiceRegionModule
             return;
 
         UUID originRegion = originScene?.RegionInfo?.RegionID ?? UUID.Zero;
+        // Marked before the rings go out, so a store that verifies rings finds the target marked (see the group ring).
+        m_nonSpatial?.MarkInvited(session.SessionId, online);
         foreach (UUID target in online)
         {
             try
@@ -483,7 +498,6 @@ public partial class WebRtcVoiceRegionModule
                 m_log.LogWarning(e, "{LogHeader} cross-instance conference ring to {Target} failed", logHeader, target);
             }
         }
-        m_nonSpatial?.MarkInvited(session.SessionId, online);
     }
 
     private void SubscribeConferenceEvents(Scene scene)
@@ -509,12 +523,12 @@ public partial class WebRtcVoiceRegionModule
             m_log.LogDebug("{LogHeader} {Line}", logHeader, adhocCall.Instrument);
             ApplyChatSessionOutcome(adhocCall, response);
             if (adhocCall.StartedRinging)
-                RingAdhocMembers(m_nonSpatial.Store.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, null);
+                RingAdhocMembers(m_nonSpatial.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, null);
             // This arm seats the caller, so the roster moved. AFTER the response is
             // applied, for the same reason the ring is: a roster send must never cost the caller
             // the answer it is blocked on.
             if (adhocCall.Status == HttpStatusCode.OK)
-                SendConferenceRoster(m_nonSpatial.Store.Get(GroupSessionIdOf(reqmap)), agentID, joined: true);
+                SendConferenceRoster(m_nonSpatial.Get(GroupSessionIdOf(reqmap)), agentID, joined: true);
             return true;
         }
 
@@ -524,11 +538,11 @@ public partial class WebRtcVoiceRegionModule
             m_log.LogDebug("{LogHeader} {Line}", logHeader, adhocAccept.Instrument);
             ApplyChatSessionOutcome(adhocAccept, response);
             if (adhocAccept.StartedRinging)
-                RingAdhocMembers(m_nonSpatial.Store.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, null);
+                RingAdhocMembers(m_nonSpatial.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, null);
             // Accepting IS the join (llimview.cpp:3382-3385), so this is the roster's
             // main event -- the invitee's panel gets the whole room and the room gets the invitee.
             if (adhocAccept.Status == HttpStatusCode.OK)
-                SendConferenceRoster(m_nonSpatial.Store.Get(GroupSessionIdOf(reqmap)), agentID, joined: true);
+                SendConferenceRoster(m_nonSpatial.Get(GroupSessionIdOf(reqmap)), agentID, joined: true);
             return true;
         }
 
@@ -541,7 +555,7 @@ public partial class WebRtcVoiceRegionModule
             m_log.LogDebug("{LogHeader} {Line}", logHeader, inviteOutcome.Instrument);
             ApplyChatSessionOutcome(inviteOutcome, response);
             if (addedToCall.Count > 0)
-                RingAdhocMembers(m_nonSpatial.Store.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, addedToCall);
+                RingAdhocMembers(m_nonSpatial.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, addedToCall);
             return true;
         }
 

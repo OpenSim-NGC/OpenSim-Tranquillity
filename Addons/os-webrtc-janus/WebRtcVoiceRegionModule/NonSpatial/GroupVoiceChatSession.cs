@@ -70,7 +70,7 @@ namespace osWebRtcVoice.NonSpatial
         /// any failure makes the coroutine clear the invitation and never call startCall.
         /// </summary>
         public static bool TryHandleAcceptInvitation(OSDMap reqmap, UUID agentID, GroupVoicePolicy policy,
-                                                     NonSpatialVoiceSessionEngine engine,
+                                                     INonSpatialSessions engine,
                                                      out ChatSessionOutcome outcome)
         {
             outcome = null;
@@ -83,7 +83,7 @@ namespace osWebRtcVoice.NonSpatial
                 return false;
             // Ours only if this names a live GROUP session the agent belongs to; an accept for an
             // ad-hoc or an unknown session falls through untouched.
-            NonSpatialVoiceSession s = engine.Store.Get(groupID);
+            NonSpatialVoiceSession s = engine.Get(groupID);
             if (s == null || s.Type != NonSpatialSessionType.Group || !policy.IsMember(agentID, s.Owner))
                 return false;
 
@@ -113,7 +113,7 @@ namespace osWebRtcVoice.NonSpatial
                 Status = HttpStatusCode.OK,
                 StartedRinging = seat.StartedRinging,
                 Instrument = Line(agentID, s.Owner, DecisionAcceptAdmitted,
-                                  "room=" + s.RoomKey + " seats=" + (engine.Store.Get(s.SessionId)?.SeatsHeld) + "/" + s.Cap),
+                                  "room=" + s.RoomKey + " seats=" + (engine.Get(s.SessionId)?.SeatsHeld) + "/" + s.Cap),
             };
             return true;
         }
@@ -123,7 +123,7 @@ namespace osWebRtcVoice.NonSpatial
         /// NOTHING -- when this is not one, so the caller falls through to the A2A path unchanged.
         /// </summary>
         public static bool TryHandleCall(OSDMap reqmap, UUID agentID, GroupVoicePolicy policy,
-                                         NonSpatialVoiceSessionEngine engine, UUID originRegion,
+                                         INonSpatialSessions engine, UUID originRegion,
                                          out ChatSessionOutcome outcome)
         {
             outcome = null;
@@ -143,7 +143,7 @@ namespace osWebRtcVoice.NonSpatial
         }
 
         private static ChatSessionOutcome Call(UUID agentID, UUID groupID, GroupVoicePolicy policy,
-                                               NonSpatialVoiceSessionEngine engine, UUID originRegion)
+                                               INonSpatialSessions engine, UUID originRegion)
         {
             // The power gate. A member without it is a 403, which the viewer shows as VoiceNotAllowed
             // (llvoicechannel.cpp:658-663) -- the correct, survivable answer for "you may not".
@@ -186,7 +186,7 @@ namespace osWebRtcVoice.NonSpatial
                 StartedRinging = start.StartedRinging || seat.StartedRinging,
                 Body = new OSDMap { ["voice_credentials"] = creds },
                 Instrument = Line(agentID, groupID, DecisionCallAdmitted,
-                                  $"room={start.Session.RoomKey} seats={engine.Store.Get(start.Session.SessionId)?.SeatsHeld}/{start.Session.Cap}"),
+                                  $"room={start.Session.RoomKey} seats={engine.Get(start.Session.SessionId)?.SeatsHeld}/{start.Session.Cap}"),
             };
         }
 

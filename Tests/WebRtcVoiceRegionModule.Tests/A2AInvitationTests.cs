@@ -32,7 +32,7 @@ namespace osWebRtcVoice.Tests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
         private static readonly UUID Bob = new UUID("22222222-2222-2222-2222-222222222222");
-        private static readonly UUID Xor = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+        private static readonly UUID Xor = A2ARegistry.ComputeSessionId(Alice, Bob);
 
         private static OSDMap StartBody() => new OSDMap
         {
@@ -53,9 +53,9 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void BuildBody_HasExactlyTheViewerVoiceBranchShape()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
-            reg.IssueToken(s.SessionId, Alice);
+            s = reg.IssueToken(s.SessionId, Alice);
 
             OSDMap body = A2AInvitation.BuildBody(s, Alice, "Alice Caller");
 
@@ -89,7 +89,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void BuildBody_RequiresAMintedToken()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
             Assert.That(() => A2AInvitation.BuildBody(s, Alice, "x"), Throws.InvalidOperationException);
         }
@@ -99,7 +99,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void StartP2PVoice_NeverProducesAnInvitation()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(), Alice, "Alice Caller", reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(o.Invite, Is.Null, "the viewer sends start p2p voice on every P2P IM window open (Firestorm llimview.cpp:634, SL llimview.cpp:485); it must not ring");
@@ -108,7 +108,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Call_ProducesTheInvitation_ForTheOtherParty_WithTheSameToken()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionRequestLogic.Decide(StartBody(), Alice, "Alice Caller", reg);
 
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Alice, "Alice Caller", reg);
@@ -131,7 +131,7 @@ namespace osWebRtcVoice.Tests
             // The viewer retries "call" up to 3x on ERROR_NOT_AVAILABLE (llvoicechannel.cpp:571-579). The
             // callee viewer ignores a duplicate while the first invitation is pending
             // (mPendingInvitations, llimview.cpp:4257-4281), so re-sending is safe.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionRequestLogic.Decide(StartBody(), Alice, "Alice Caller", reg);
             ChatSessionOutcome first = ChatSessionRequestLogic.Decide(CallBody(), Alice, "Alice Caller", reg);
             ChatSessionOutcome second = ChatSessionRequestLogic.Decide(CallBody(), Alice, "Alice Caller", reg);
@@ -144,7 +144,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Call_WithoutInvitation_ProducesNoInvite()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Alice, "Alice Caller", reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound));
             Assert.That(o.Invite, Is.Null);
@@ -227,9 +227,9 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void InviteLine_NamesBothParties_AndNeverTheToken()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
-            reg.IssueToken(s.SessionId, Alice);
+            s = reg.IssueToken(s.SessionId, Alice);
             string line = A2AInviteDelivery.Line(Bob, Alice, s.SessionId, "Elm", A2AInviteDelivery.DecisionSent);
             Assert.That(line, Does.StartWith("[A2A INVITE] agent=" + Bob).And.Contain("from=" + Alice).And.Contain("session-id=" + s.SessionId).And.Contain("region=Elm").And.Contain("decision=sent"));
             Assert.That(line, Does.Not.Contain(s.Token));

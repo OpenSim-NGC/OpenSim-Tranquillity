@@ -8,8 +8,9 @@
 /*
  * The engine. Start / Invite / Accept / Decline / Depart, plus the sweep.
  *
- * Avatar-to-avatar calls do not use this engine: they keep their own registry (ChatSessionRequestLogic +
- * A2ASessionRegistry + A2AProvisionAdmission). Group voice sessions live here.
+ * Person-to-person calls run on this engine too (A2ACalls). A call between two people keeps the
+ * lifecycle it has always had, which differs from a conference or a group in a few places; those
+ * rules are gathered under "person-to-person calls" below.
  *
  * IDEMPOTENCY is not sprinkled through the methods -- it falls out of two rules:
  *   - identity is DERIVED, never generated, everywhere it can be (DeriveSessionId), so the same
@@ -53,6 +54,10 @@ namespace osWebRtcVoice.NonSpatial
 
         public static SessionOutcome Fail(string decision, NonSpatialVoiceSession s = null) => new SessionOutcome(false, decision, s);
 
+        /// <summary>Accept took a seat the agent did not hold. A repeat accept by a seated agent answers <see cref="AcceptRepeated"/>.</summary>
+        public const string Accepted = "accepted";
+        public const string AcceptRepeated = "accept-idempotent";
+
         public const string NoSuchSession = "refused-no-session";
         public const string Capacity = "refused-capacity";
         public const string AlreadyDeparted = "refused-departed";
@@ -68,14 +73,17 @@ namespace osWebRtcVoice.NonSpatial
 
         /// <summary>The agent has made too many conference requests too quickly.</summary>
         public const string RateLimited = "rate-limited";
+
+        /// <summary>The grid session service did not answer, so nothing was started, joined or changed.</summary>
+        public const string StoreUnavailable = "refused-store-unavailable";
     }
 
-    public sealed class NonSpatialVoiceSessionEngine
+    public sealed class NonSpatialVoiceSessionEngine : INonSpatialSessions
     {
         /// <summary>An unanswered invitation's lifetime. Matches the A2A invite TTL for consistency.</summary>
         public static readonly TimeSpan DefaultInviteTtl = TimeSpan.FromMinutes(2);
 
-        /// <summary>Idle backstop for a formed session; the same reasoning as A2ASessionRegistry.DefaultActiveIdleTtl.</summary>
+        /// <summary>Idle backstop for a formed session; the same reasoning as the idle backstop the avatar-to-avatar calls have always had.</summary>
         public static readonly TimeSpan DefaultIdleTtl = TimeSpan.FromHours(8);
 
         private readonly INonSpatialSessionStore _store;
@@ -143,6 +151,26 @@ namespace osWebRtcVoice.NonSpatial
         public Func<UUID, bool> IsAgentPresent { get; set; }
 
         public INonSpatialSessionStore Store => _store;
+
+        public NonSpatialVoiceSession Get(UUID sessionId, UUID agent = default)
+        {
+            NonSpatialVoiceSession s = _store.Get(sessionId);
+            if (s != null && s.Type == NonSpatialSessionType.P2P)
+            {
+                // A call whose time ran out is over before anyone looks at it. The session returned may now be dead.
+                DateTime now = _clock();
+                _store.Mutate<object>(sessionId, sess => { LapseIfExpired(sess, now); return null; });
+            }
+            return s;
+        }
+
+        public NonSpatialVoiceSession Get(UUID sessionId, UUID agent, out bool unavailable)
+        {
+            unavailable = false;
+            return Get(sessionId, agent);
+        }
+
+        public NonSpatialVoiceSession GetByRoomKey(string roomKey, UUID agent = default) => _store.GetByRoomKey(roomKey);
         public TimeSpan InviteTtl => _inviteTtl;
         public TimeSpan IdleTtl => _idleTtl;
 
@@ -152,7 +180,7 @@ namespace osWebRtcVoice.NonSpatial
         /// The AUTHORITATIVE session id. Derived wherever the viewer already agrees, so the start
         /// reply is a no-op re-key and a repeat addresses the same session:
         ///   P2P   the XOR of the two agents -- what the viewer computed (llimview.cpp:2551-2570)
-        ///         and what the live path already re-derives (A2ASessionRegistry.ComputeSessionId).
+        ///         and what the live path already re-derives (A2ACalls.ComputeSessionId).
         ///   GROUP the group id -- the viewer slams it (llimview.cpp:2535-2538).
         ///   ADHOC server-owned and RANDOM, because the viewer's id is itself random
         ///         (llimview.cpp:2542) and means nothing to anyone else. This is the only type that
@@ -295,9 +323,17 @@ namespace osWebRtcVoice.NonSpatial
             bool created;
             lock (_startGate)
             {
+                if (type == NonSpatialSessionType.P2P)
+                {
+                    // A call that has ended is not found again: a start naming the same two people begins a new
+                    // one, with a credential of its own.
+                    if (_store.Mutate(sessionId, sess => LapseIfExpired(sess, now), false))
+                        _store.Remove(sessionId);
+                }
+
                 // A start that finds its session already there creates nothing, so only a genuinely
-                // new session is counted against the caps.
-                if (_store.Get(sessionId) == null)
+                // new session is counted against the caps. Calls between two people are outside them.
+                if (type != NonSpatialSessionType.P2P && _store.Get(sessionId) == null)
                 {
                     SessionOutcome refused = CheckSessionCaps(creator);
                     if (!refused.Ok) return refused;
@@ -360,7 +396,10 @@ namespace osWebRtcVoice.NonSpatial
         /// </summary>
         private SessionOutcome CheckSessionCaps(UUID creator)
         {
-            IReadOnlyList<NonSpatialVoiceSession> all = _store.All();
+            List<NonSpatialVoiceSession> all = new List<NonSpatialVoiceSession>();
+            foreach (NonSpatialVoiceSession counted in _store.All())
+                if (counted.Type != NonSpatialSessionType.P2P)
+                    all.Add(counted);
             if (all.Count >= _limits.MaxNonSpatialSessions)
             {
                 NoteRefusal(creator, SessionOutcome.GlobalSessionCap, $"sessions={all.Count} limit={_limits.MaxNonSpatialSessions}");
@@ -451,6 +490,8 @@ namespace osWebRtcVoice.NonSpatial
 
             return _store.Mutate(sessionId, sess =>
             {
+                if (LapseIfExpired(sess, now))
+                    return SessionOutcome.Fail(SessionOutcome.NoSuchSession);
                 NonSpatialMember m = sess.Find(agent);
                 if (m != null && m.HoldsSeat)
                 {
@@ -465,7 +506,7 @@ namespace osWebRtcVoice.NonSpatial
                     // they could see.
                     m.InChat = true;
                     sess.LastSeenUtc = now;
-                    return new SessionOutcome(true, "accept-idempotent", sess);
+                    return new SessionOutcome(true, SessionOutcome.AcceptRepeated, sess);
                 }
                 if (sess.IsFull)
                     return SessionOutcome.Fail(SessionOutcome.Capacity, sess);
@@ -479,7 +520,7 @@ namespace osWebRtcVoice.NonSpatial
                 // latched by RingSent, so two simultaneous first-joiners cannot both ring the group.
                 bool ring = wasEmpty && sess.SeatsHeld == 1 && !sess.RingSent;
                 if (ring) sess.RingSent = true;
-                return new SessionOutcome(true, "accepted", sess, created: false, startedRinging: ring);
+                return new SessionOutcome(true, SessionOutcome.Accepted, sess, created: false, startedRinging: ring);
 
             }, SessionOutcome.Fail(SessionOutcome.NoSuchSession));
         }
@@ -490,6 +531,8 @@ namespace osWebRtcVoice.NonSpatial
             DateTime now = _clock();
             return _store.Mutate(sessionId, sess =>
             {
+                if (LapseIfExpired(sess, now))
+                    return SessionOutcome.Fail(SessionOutcome.NoSuchSession);
                 NonSpatialMember m = sess.Find(agent);
                 if (m == null || m.State == MemberState.Departed || m.State == MemberState.Declined)
                     return SessionOutcome.Fail(SessionOutcome.AlreadyDeparted, sess);
@@ -557,10 +600,19 @@ namespace osWebRtcVoice.NonSpatial
             DateTime now = _clock();
             return _store.Mutate(sessionId, sess =>
             {
+                if (LapseIfExpired(sess, now))
+                    return SessionOutcome.Fail(SessionOutcome.NoSuchSession);
                 NonSpatialMember m = sess.Find(agent);
                 if (m == null) return SessionOutcome.Fail(SessionOutcome.NoSuchSession, sess);
                 if (m.State == terminal)
                 {
+                    sess.LastSeenUtc = now;
+                    return new SessionOutcome(true, "depart-idempotent", sess);
+                }
+                if (sess.Type == NonSpatialSessionType.P2P && terminal == MemberState.Departed && m.State == MemberState.Invited)
+                {
+                    // The invited party leaving before it answered changes nothing: the invitation stays until it lapses.
+                    m.LastSeenUtc = now;
                     sess.LastSeenUtc = now;
                     return new SessionOutcome(true, "depart-idempotent", sess);
                 }
@@ -579,6 +631,14 @@ namespace osWebRtcVoice.NonSpatial
                 if (reason != DepartureReason.VoiceTeardown)
                     m.InChat = false;
                 sess.LastSeenUtc = now;
+                if (sess.Type == NonSpatialSessionType.P2P)
+                {
+                    // A decline ends the call. So does the last joined party leaving a call the callee had answered.
+                    // The ring record is kept for the life of the call, so it is not cleared with the seats.
+                    if (terminal == MemberState.Declined || (sess.CalleeAnswered && !AnyJoined(sess)))
+                        EndP2P(sess, reason, now);
+                    return new SessionOutcome(true, terminal == MemberState.Declined ? "declined" : "departed", sess);
+                }
                 // The room emptied, so the ring cycle is over. Clearing it is what makes a
                 // LATER start ring the group again; without it a group is rung once per process.
                 if (sess.SeatsHeld == 0) sess.EndRingCycle();
@@ -610,6 +670,8 @@ namespace osWebRtcVoice.NonSpatial
                 return touched;
             foreach (NonSpatialVoiceSession s in _store.All())
             {
+                if (s.Type == NonSpatialSessionType.P2P && P2PIsOver(s))
+                    continue;
                 NonSpatialMember m = s.Find(agent);
                 if (m == null || !m.HoldsSeat || !string.Equals(m.ViewerSession, viewerSession, StringComparison.Ordinal))
                     continue;
@@ -628,6 +690,8 @@ namespace osWebRtcVoice.NonSpatial
             List<NonSpatialVoiceSession> touched = new List<NonSpatialVoiceSession>();
             foreach (NonSpatialVoiceSession s in _store.All())
             {
+                if (s.Type == NonSpatialSessionType.P2P && P2PIsOver(s))
+                    continue;
                 NonSpatialMember m = s.Find(agent);
                 if (m == null || m.State == MemberState.Departed || m.State == MemberState.Declined) continue;
                 SessionOutcome o = Depart(s.SessionId, agent, reason);
@@ -679,6 +743,10 @@ namespace osWebRtcVoice.NonSpatial
             int effective = NonSpatialCaps.Effective(type, cap);
             // Owner is the group for a group session; an ad-hoc conference has no owning object.
             UUID owner = type == NonSpatialSessionType.Group ? groupId : UUID.Zero;
+            // A call between two people that has ended is not found again: the ring begins a new one.
+            if (type == NonSpatialSessionType.P2P
+                && _store.Mutate(groupId, sess => LapseIfExpired(sess, now), false))
+                _store.Remove(groupId);
             NonSpatialVoiceSession s = _store.StartOrGet(groupId, () =>
             {
                 NonSpatialVoiceSession made = new NonSpatialVoiceSession(type, groupId, groupId,
@@ -688,6 +756,8 @@ namespace osWebRtcVoice.NonSpatial
                 made.AdoptedFromRing = true;
                 if (alreadyRung != null)
                     foreach (UUID a2 in alreadyRung) made.MarkInvited(a2);
+                if (type == NonSpatialSessionType.P2P)
+                    SeedAdoptedCall(made, creator, alreadyRung, now);
                 SeedAdoptedMembership(made, type, alreadyRung, now);
                 return made;
             }, out bool created);
@@ -698,6 +768,16 @@ namespace osWebRtcVoice.NonSpatial
                 decision = _store.Mutate(groupId, sess =>
                 {
                     if (sess.Type != type) return "refused-session-type-mismatch";
+                    if (type == NonSpatialSessionType.P2P)
+                    {
+                        // The ring of a call this instance already holds. A call started here (two people calling each
+                        // other at the same moment) is not replaced, an answered call is under way, and a call whose
+                        // credential differs is a different one: replacing that credential would turn away a viewer
+                        // that already holds it.
+                        if (sess.CalleeAnswered) return "refused-already-active";
+                        if (!sess.AdoptedFromRing || !string.Equals(sess.Token, token, StringComparison.Ordinal))
+                            return "refused-call-in-progress";
+                    }
                     if (!sess.AdoptedFromRing) return "ring-session-held";   // started here: a ring adds nothing
                     if (alreadyRung != null)
                         foreach (UUID a2 in alreadyRung) sess.MarkInvited(a2);
@@ -708,6 +788,19 @@ namespace osWebRtcVoice.NonSpatial
                     return SessionOutcome.Fail(decision);
             }
             return new SessionOutcome(true, decision, s, created);
+        }
+
+        /// <summary>
+        /// A call between two people adopted from a ring is recorded as the ringing instance holds it: the caller
+        /// seated (not yet joined here) and the callee invited.
+        /// </summary>
+        private static void SeedAdoptedCall(NonSpatialVoiceSession sess, UUID caller, IEnumerable<UUID> rung, DateTime now)
+        {
+            sess.Upsert(caller, MemberState.Accepted, UUID.Zero, now).InChat = true;
+            if (rung == null) return;
+            foreach (UUID a in rung)
+                if (a != UUID.Zero && a != caller && sess.Find(a) == null)
+                    sess.Upsert(a, MemberState.Invited, UUID.Zero, now);
         }
 
         /// <summary>
@@ -733,7 +826,7 @@ namespace osWebRtcVoice.NonSpatial
 
         // ---- credentials -----------------------------------------------------------------------
 
-        /// <summary>Token size in bytes, rendered as lowercase hex. Matches A2ASessionRegistry.TokenBytes.</summary>
+        /// <summary>Token size in bytes, rendered as lowercase hex. The avatar-to-avatar calls have always used the same size.</summary>
         public const int TokenBytes = 32;
 
         /// <summary>
@@ -741,13 +834,86 @@ namespace osWebRtcVoice.NonSpatial
         /// does not invalidate credentials already in a viewer's hands. Returns null when the agent
         /// is not a member of the voice session, so a token can never be handed to a stranger.
         /// </summary>
+        public bool StoreVerifiesRings => false;
+
+        public bool StoreIssuesCarrierKeys => false;
+
+        /// <summary>
+        /// The key a conference's members sign the text lines they send across region servers with, minted on the first
+        /// request. Given only to an agent who holds a seat in a live conference; null for anyone else, so a forger who is
+        /// not in the conference never has it. It is not part of any copy of the session.
+        /// </summary>
+        public string CarrierKey(UUID sessionId, UUID agent)
+            => _store.Mutate<string>(sessionId, sess =>
+            {
+                if (sess.IsDead || sess.Type != NonSpatialSessionType.Adhoc)
+                    return null;
+                NonSpatialMember m = sess.Find(agent);
+                if (m == null || !m.HoldsSeat)
+                    return null;
+                return sess.CarrierKey ??= NewToken();
+            }, null);
+
+        /// <summary>
+        /// Whether a ring received for <paramref name="target"/> is genuine, judged from this engine's own record and
+        /// nothing the ring carried. Group, conference and avatar-to-avatar rings. Nothing is created or changed except that a
+        /// genuine ring is used up, so a replay of it is refused.
+        /// </summary>
+        public SessionOutcome VerifyRing(UUID sessionId, UUID target, UUID claimedCaller, NonSpatialSessionType type)
+        {
+            if (type != NonSpatialSessionType.Group && type != NonSpatialSessionType.Adhoc && type != NonSpatialSessionType.P2P)
+                return SessionOutcome.Fail("refused-session-type-mismatch");
+            DateTime now = _clock();
+            return _store.Mutate(sessionId, sess =>
+            {
+                if (LapseIfExpired(sess, now) || sess.IsDead) return SessionOutcome.Fail(SessionOutcome.NoSuchSession);
+                if (type == NonSpatialSessionType.P2P && sess.Type == NonSpatialSessionType.P2P)
+                    return VerifyCallRing(sess, target, claimedCaller);
+                if (sess.Type != type) return SessionOutcome.Fail("refused-session-type-mismatch");
+                if (!sess.RingSent) return SessionOutcome.Fail("refused-ring-not-sent");
+                NonSpatialMember caller = sess.Find(claimedCaller);
+                if (caller == null || !caller.HoldsSeat) return SessionOutcome.Fail("refused-caller-not-seated");
+                if (!sess.WasInvited(target)) return SessionOutcome.Fail("refused-target-not-invited");
+                if (!sess.TakeRing(target)) return SessionOutcome.Fail("refused-ring-used");
+                return new SessionOutcome(true, "ring-verified", sess);
+            }, SessionOutcome.Fail(SessionOutcome.NoSuchSession));
+        }
+
+        /// <summary>
+        /// Whether a ring for a call between two people is genuine, judged from the record alone: the call is live,
+        /// the claimed caller is the one who started it and holds its seat, and the target is the callee, who has not
+        /// answered. The ring is used up, so a replay is refused.
+        /// </summary>
+        private static SessionOutcome VerifyCallRing(NonSpatialVoiceSession sess, UUID target, UUID claimedCaller)
+        {
+            if (sess.Creator != claimedCaller) return SessionOutcome.Fail("refused-caller-not-seated");
+            NonSpatialMember caller = sess.Find(claimedCaller);
+            if (caller == null || !caller.HoldsSeat) return SessionOutcome.Fail("refused-caller-not-seated");
+            NonSpatialMember callee = sess.Callee;
+            if (callee == null || callee.AgentId != target) return SessionOutcome.Fail("refused-target-not-invited");
+            if (sess.CalleeAnswered) return SessionOutcome.Fail("refused-already-active");
+            if (!sess.TakeCallRing(target)) return SessionOutcome.Fail("refused-ring-used");
+            return new SessionOutcome(true, "ring-verified", sess);
+        }
+
+        public string IssueToken(UUID sessionId, UUID agent, out bool unavailable)
+        {
+            unavailable = false;
+            return IssueToken(sessionId, agent);
+        }
+
         public string IssueToken(UUID sessionId, UUID agent)
         {
             DateTime now = _clock();
             return _store.Mutate<string>(sessionId, sess =>
             {
+                if (LapseIfExpired(sess, now))
+                    return null;
                 NonSpatialMember m = sess.Find(agent);
-                if (m == null || m.State == MemberState.Departed || m.State == MemberState.Declined)
+                // Either party of a call between two people can ask again after hanging up: the call is still theirs
+                // until it ends. For the other session types a departed member is a stranger.
+                if (m == null || m.State == MemberState.Declined
+                    || (m.State == MemberState.Departed && sess.Type != NonSpatialSessionType.P2P))
                     return null;
                 if (string.IsNullOrEmpty(sess.Token))
                     sess.Token = NewToken();
@@ -816,6 +982,22 @@ namespace osWebRtcVoice.NonSpatial
             int seatsReleased = 0;
             foreach (NonSpatialVoiceSession s in _store.All())
             {
+                if (s.Type == NonSpatialSessionType.P2P)
+                {
+                    int[] over = _store.Mutate(s.SessionId, sess =>
+                    {
+                        if (sess.IsDead || !P2PHasLapsed(sess, now)) return new[] { 0, 0 };
+                        bool unanswered = !sess.CalleeAnswered;
+                        return new[] { unanswered ? 1 : 0, EndP2P(sess, DepartureReason.Expired, now) };
+                    }, null);
+                    if (over == null) continue;
+                    invitationsExpired += over[0];
+                    seatsReleased += over[1];
+                    NonSpatialVoiceSession ended = _store.Get(s.SessionId);
+                    if (ended != null && ended.IsDead && _store.Remove(ended.SessionId)) removed.Add(ended.SessionId);
+                    continue;
+                }
+
                 // A session is idle only when nobody who holds a seat in it is still here. A present seat
                 // holder is activity, so a long quiet call is not ended under the people in it.
                 if (now - s.LastSeenUtc >= _idleTtl && SeatHolderIsPresent(s.SessionId))
@@ -862,6 +1044,103 @@ namespace osWebRtcVoice.NonSpatial
                 }
             }
             return new SweepSummary(removed, invitationsExpired, seatsReleased);
+        }
+
+        // ---- person-to-person calls ------------------------------------------------------------
+
+        // A call between two people keeps the rules the avatar-to-avatar invitation registry gave it, because a
+        // viewer starts one for every instant-message window it opens and only some of them ever ring:
+        //   - an invitation nobody has answered ends InviteTtl after the last activity on it; a call that has been
+        //     answered ends IdleTtl after the last activity, unless a party holding a seat is still present;
+        //   - a call ends when either party declines, and when the callee has answered and neither party is joined
+        //     (holds a seat the voice service has answered) any longer;
+        //   - an ended call is gone for every purpose, and the next start naming the same two people makes a new one
+        //     with a new credential;
+        //   - the credential is given to either party for as long as the call lives, including one who hung up;
+        //   - the invited party leaving before it answered changes nothing, and the record that the callee was rung
+        //     is kept for the life of the call;
+        //   - calls are outside the session caps: they are many, short and cheap, and ending them is what the
+        //     lapse above is for.
+
+        /// <summary>
+        /// Whether the call's time has run out. An answered call whose idle time is up is kept, and its clock
+        /// restarted, while either party holding a seat is still present, the same rule a group or conference
+        /// follows. Call inside a store mutation: it restarts the clock on the session it is given.
+        /// </summary>
+        private bool P2PHasLapsed(NonSpatialVoiceSession sess, DateTime now)
+        {
+            if (!sess.CalleeAnswered)
+                return now - sess.LastSeenUtc > _inviteTtl;
+            if (now - sess.LastSeenUtc <= _idleTtl)
+                return false;
+            if (!SeatedMemberIsPresent(sess))
+                return true;
+            sess.LastSeenUtc = now;
+            return false;
+        }
+
+        /// <summary>
+        /// True when any member of the session who holds a seat is present. A presence check that throws counts
+        /// as present, so a failing lookup never ends a call under its parties. Unset, nobody counts as present.
+        /// </summary>
+        private bool SeatedMemberIsPresent(NonSpatialVoiceSession sess)
+        {
+            Func<UUID, bool> present = IsAgentPresent;
+            if (present == null) return false;
+            foreach (NonSpatialMember m in sess.Members)
+            {
+                if (!m.HoldsSeat) continue;
+                try { if (present(m.AgentId)) return true; }
+                catch { return true; }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// True when the session is a call that is over, ending it first if its time ran out. Call inside a store
+        /// mutation. Always false for the other session types.
+        /// </summary>
+        private bool LapseIfExpired(NonSpatialVoiceSession sess, DateTime now)
+        {
+            if (sess.Type != NonSpatialSessionType.P2P) return false;
+            if (sess.IsDead) return true;
+            if (!P2PHasLapsed(sess, now)) return false;
+            EndP2P(sess, DepartureReason.Expired, now);
+            return true;
+        }
+
+        private bool P2PIsOver(NonSpatialVoiceSession s)
+        {
+            DateTime now = _clock();
+            return _store.Mutate(s.SessionId, sess => LapseIfExpired(sess, now), true);
+        }
+
+        /// <summary>Everyone leaves, the credential dies, and the seats come back. Returns the seats released.</summary>
+        private static int EndP2P(NonSpatialVoiceSession sess, DepartureReason reason, DateTime now)
+        {
+            int seats = 0;
+            foreach (NonSpatialMember m in sess.Members)
+            {
+                if (m.HoldsSeat) seats++;
+                if (m.State != MemberState.Departed && m.State != MemberState.Declined)
+                {
+                    m.State = MemberState.Departed;
+                    m.Departure = reason;
+                }
+                m.InChat = false;
+                m.ViewerSession = null;
+                m.LastSeenUtc = now;
+            }
+            sess.Token = null;
+            sess.EndRingCycle();
+            return seats;
+        }
+
+        private static bool AnyJoined(NonSpatialVoiceSession sess)
+        {
+            foreach (NonSpatialMember m in sess.Members)
+                if (NonSpatialVoiceSession.IsJoined(m)) return true;
+            return false;
         }
 
         // ---- helpers -------------------------------------------------------------------------

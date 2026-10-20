@@ -121,19 +121,52 @@ namespace osWebRtcVoice.NonSpatial
         }
 
         /// <summary>
+        /// The start-up line about <c>[WebRtcVoice] CarrierSecret</c>. <paramref name="problem"/> is the result of
+        /// <see cref="CheckSecret"/>; <paramref name="gridStore"/> is true when SessionStoreMode is grid. With the
+        /// grid session service the receiving region asks the service whether a ring is genuine and the service keeps
+        /// each conference's text key, so rings, avatar-to-avatar calls and conference text cross processes without a CarrierSecret. With the
+        /// in-process store a carrier needs the secret. The secret itself is never part of the line.
+        /// </summary>
+        public static (bool IsError, string Text) StartupLine(string problem, bool gridStore)
+        {
+            if (problem == null)
+                return (false, "cross-process voice carriers on: group and conference rings, "
+                    + "conference text and avatar-to-avatar calls are signed with [WebRtcVoice] CarrierSecret");
+            if (gridStore)
+                return problem == "too-short"
+                    ? (true, "[WebRtcVoice] CarrierSecret is shorter than " + MinSecretLength + " characters and is refused; "
+                        + "it is not needed with SessionStoreMode grid")
+                    : (false, "cross-process voice carriers: [WebRtcVoice] CarrierSecret is not set and is not needed "
+                        + "with SessionStoreMode grid. Rings, avatar-to-avatar calls and conference text cross processes, "
+                        + "and the grid session service verifies them");
+            return problem == "too-short"
+                ? (true, "[WebRtcVoice] CarrierSecret is shorter than " + MinSecretLength + " characters and is refused; "
+                    + "cross-process voice carriers are off")
+                : (false, "cross-process voice carriers are off: [WebRtcVoice] CarrierSecret is not set. "
+                    + "None is sent and every incoming one is refused. A grid that runs regions in more than one process "
+                    + "sets the same CarrierSecret (at least " + MinSecretLength + " characters) on every region server for group, "
+                    + "conference and avatar-to-avatar calls to ring across them");
+        }
+
+        /// <summary>
         /// The auth block for one outgoing carrier, or null when the signer is off. The caller adds it to
         /// the carrier's payload under <see cref="AuthKey"/>. Every call draws a fresh nonce.
         /// </summary>
-        public OSDMap Seal(in CarrierFields fields)
+        /// <param name="sessionKey">
+        /// A key for this one carrier instead of the grid-shared secret: the per-session key the grid session
+        /// service gives the members of a call. With it the signer works whether or not a secret is set.
+        /// </param>
+        public OSDMap Seal(in CarrierFields fields, string sessionKey = null)
         {
-            if (_key == null) return null;
+            byte[] key = KeyFor(sessionKey);
+            if (key == null) return null;
             long iat = _unixNow();
             string nonce = Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
             return new OSDMap
             {
                 ["iat"] = OSD.FromString(iat.ToString(CultureInfo.InvariantCulture)),
                 ["n"] = OSD.FromString(nonce),
-                ["mac"] = OSD.FromString(Mac(fields, iat, nonce)),
+                ["mac"] = OSD.FromString(Mac(key, fields, iat, nonce)),
             };
         }
 
@@ -142,9 +175,11 @@ namespace osWebRtcVoice.NonSpatial
         /// is then recorded); otherwise the reason it is refused. The order is deliberate: the MAC is checked
         /// before anything else is learned from the carrier, and a nonce is stored only for a valid MAC.
         /// </summary>
-        public string Verify(in CarrierFields fields, OSDMap auth)
+        /// <param name="sessionKey">The per-session key to check against instead of the grid-shared secret (see <see cref="Seal"/>).</param>
+        public string Verify(in CarrierFields fields, OSDMap auth, string sessionKey = null)
         {
-            if (_key == null) return NoSecret;
+            byte[] key = KeyFor(sessionKey);
+            if (key == null) return NoSecret;
             if (auth == null) return MissingMac;
             if (!auth.TryGetString("iat", out string iatText) || !auth.TryGetString("n", out string nonce)
                 || !auth.TryGetString("mac", out string macText))
@@ -157,7 +192,7 @@ namespace osWebRtcVoice.NonSpatial
             try { given = Convert.FromHexString(macText); }
             catch (FormatException) { return MalformedMac; }
 
-            byte[] expected = MacBytes(fields, iat, nonce);
+            byte[] expected = MacBytes(key, fields, iat, nonce);
             if (!CryptographicOperations.FixedTimeEquals(given, expected))
                 return BadMac;
 
@@ -209,12 +244,16 @@ namespace osWebRtcVoice.NonSpatial
             foreach (string n in gone) _seen.Remove(n);
         }
 
-        private string Mac(in CarrierFields f, long iat, string nonce)
-            => Convert.ToHexString(MacBytes(f, iat, nonce)).ToLowerInvariant();
+        // The key a carrier is made or checked with: a per-session key when one is given, else the grid-shared secret.
+        private byte[] KeyFor(string sessionKey)
+            => string.IsNullOrEmpty(sessionKey) ? _key : Encoding.UTF8.GetBytes(sessionKey);
 
-        private byte[] MacBytes(in CarrierFields f, long iat, string nonce)
+        private static string Mac(byte[] key, in CarrierFields f, long iat, string nonce)
+            => Convert.ToHexString(MacBytes(key, f, iat, nonce)).ToLowerInvariant();
+
+        private static byte[] MacBytes(byte[] key, in CarrierFields f, long iat, string nonce)
         {
-            using HMACSHA256 mac = new HMACSHA256(_key);
+            using HMACSHA256 mac = new HMACSHA256(key);
             return mac.ComputeHash(Encoding.UTF8.GetBytes(Canonical(f, iat, nonce)));
         }
 

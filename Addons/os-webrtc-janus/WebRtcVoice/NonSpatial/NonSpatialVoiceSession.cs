@@ -9,8 +9,7 @@
  * The NonSpatialVoiceSession engine -- the record types.
  *
  * A "non-spatial" voice session is any voice session whose room is NOT derived from region+parcel:
- * P2P, ADHOC (conference) and GROUP. The engine exists ALONGSIDE the existing agent-to-agent (A2A)
- * path; the A2A path can later be migrated onto it.
+ * P2P, ADHOC (conference) and GROUP. Avatar-to-avatar (A2A) calls are the P2P type (see A2ACalls).
  *
  * TWO IDENTITIES, DELIBERATELY DISTINCT:
  *   TempSessionId  what the VIEWER minted and is waiting on. For a conference it is
@@ -25,7 +24,7 @@
  *
  * ROOM IDENTITY IS A THIRD THING (see NonSpatialRoomKey): the viewer treats channel_uri as opaque,
  * so the media room is NOT the session id. The A2A path chose ChannelUri => SessionId.ToString()
- * (A2ASessionRegistry.cs); this engine deliberately does not repeat that.
+ * (A2ASession.ChannelUri); this engine deliberately does not repeat that.
  */
 using System;
 using System.Collections.Generic;
@@ -70,7 +69,7 @@ namespace osWebRtcVoice.NonSpatial
     ///   InvitationDeclined  the cap methods decline invitation / decline p2p voice (:3437, :3422).
     ///   VoiceTeardown       the provision teardown body {logout, viewer_session}, no channel_type.
     /// The last two are backstops so departure NEVER waits on a POST that does not come:
-    ///   PresenceLost        the root presence closed (A2ASessionRegistry.ShouldMarkGone's rule).
+    ///   PresenceLost        the root presence closed (A2ACalls.ShouldMarkGone's rule).
     ///   Expired             the TTL swept it.
     /// </summary>
     public enum DepartureReason
@@ -176,6 +175,12 @@ namespace osWebRtcVoice.NonSpatial
         /// </summary>
         public string Token { get; internal set; }
 
+        /// <summary>
+        /// The key a conference's members sign the text lines they send across region servers with. Minted on
+        /// first request by a member, and never part of a copy of the session.
+        /// </summary>
+        internal string CarrierKey { get; set; }
+
         // The store's lock covers every change, but callers also read a session they got from Store.Get
         // without holding it (a log line's seat count, a ring walking the members). This lock makes
         // those reads see the table either before or after a change. It is only ever taken inside the
@@ -203,7 +208,28 @@ namespace osWebRtcVoice.NonSpatial
 
         public bool WasInvited(UUID agent) { lock (_sync) return _invited.Contains(agent); }
 
-        internal void MarkInvited(UUID agent) { lock (_sync) _invited.Add(agent); }
+        /// <summary>
+        /// Who has already used the ring they were marked invited for (see the engine's VerifyRing). A ring is
+        /// one-shot: a fresh invitation entitles the agent to one ring, and a second claim to the same ring is a replay.
+        /// </summary>
+        private readonly HashSet<UUID> _ringsUsed = new HashSet<UUID>();
+
+        internal void MarkInvited(UUID agent)
+        {
+            lock (_sync)
+                if (_invited.Add(agent) && Type != NonSpatialSessionType.P2P)
+                    _ringsUsed.Remove(agent);
+        }
+
+        /// <summary>
+        /// True the first time it is asked for the callee of a call between two people, false after that. A call is
+        /// rung once, so unlike a group ring this does not wait for the callee to be marked invited and is not
+        /// given back when they are.
+        /// </summary>
+        internal bool TakeCallRing(UUID agent) { lock (_sync) return _ringsUsed.Add(agent); }
+
+        /// <summary>True the first time it is asked for an invited agent, false after that.</summary>
+        internal bool TakeRing(UUID agent) { lock (_sync) return _invited.Contains(agent) && _ringsUsed.Add(agent); }
 
         /// <summary>
         /// Forget that ONE agent was rung, without ending the cycle for everyone else.
@@ -212,12 +238,23 @@ namespace osWebRtcVoice.NonSpatial
         /// against a re-ring storm because only an explicit invite puts them back in Invited, and
         /// AdhocVoiceInvite.Targets rings Invited members only.
         /// </summary>
-        internal void ClearInvited(UUID agent) { lock (_sync) _invited.Remove(agent); }
+        internal void ClearInvited(UUID agent)
+        {
+            lock (_sync)
+            {
+                _invited.Remove(agent);
+                _ringsUsed.Remove(agent);
+            }
+        }
 
         /// <summary>The room emptied: forget the ring so a later start rings the group again.</summary>
         internal void EndRingCycle()
         {
-            lock (_sync) _invited.Clear();
+            lock (_sync)
+            {
+                _invited.Clear();
+                _ringsUsed.Clear();
+            }
             RingSent = false;
         }
 
@@ -262,6 +299,10 @@ namespace osWebRtcVoice.NonSpatial
         /// The chat clause matters: without it a conference whose members had all hung up voice
         /// but were still typing would be swept out from under them, because "holds a
         /// seat" would be the only sign of life this could see.
+        ///
+        /// A person-to-person call has no chat of its own in this store (the viewer keeps the
+        /// instant-message conversation), so for it only a seat or an unanswered invitation
+        /// keeps the session alive.
         /// </summary>
         public bool IsDead
         {
@@ -269,10 +310,46 @@ namespace osWebRtcVoice.NonSpatial
             {
                 lock (_sync)
                     foreach (NonSpatialMember m in _members.Values)
-                        if (m.State == MemberState.Invited || m.HoldsSeat || m.InChat) return false;
+                        if (m.State == MemberState.Invited || m.HoldsSeat || (m.InChat && Type != NonSpatialSessionType.P2P)) return false;
                 return true;
             }
         }
+
+        /// <summary>
+        /// For a person-to-person call, the party who did not start it: the one invited. Null for the other
+        /// session types, and for a call that has no second party yet.
+        /// </summary>
+        public NonSpatialMember Callee
+        {
+            get
+            {
+                if (Type != NonSpatialSessionType.P2P) return null;
+                lock (_sync)
+                    foreach (NonSpatialMember m in _members.Values)
+                        if (m.AgentId != Creator) return m;
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// For a person-to-person call: the callee has taken the call at least once, so the call is under way.
+        /// It stays true after the callee hangs up, until the whole call ends.
+        /// </summary>
+        public bool CalleeAnswered
+        {
+            get
+            {
+                NonSpatialMember callee = Callee;
+                return callee != null && callee.State != MemberState.Invited && callee.State != MemberState.Declined;
+            }
+        }
+
+        /// <summary>
+        /// A member whose provision was admitted and answered by the voice service: it holds a seat and was
+        /// tagged with the service's viewer session. A seat taken at start, before any provision, is not this.
+        /// </summary>
+        public static bool IsJoined(NonSpatialMember m)
+            => m != null && m.HoldsSeat && !string.IsNullOrEmpty(m.ViewerSession);
 
         /// <summary>
         /// Everyone currently in the CHAT conversation. This -- not the seat list -- is the roster

@@ -84,7 +84,7 @@ namespace osWebRtcVoice.NonSpatial
         /// </summary>
         public static GridInstantMessage Build(UUID target, UUID fromAgent, string fromName, UUID sessionId,
                                                UUID originRegion, string message, string sessionName = null,
-                                               string roomKey = null, CarrierAuth auth = null)
+                                               string roomKey = null, CarrierAuth auth = null, string sessionKey = null)
         {
             OSDMap payload = new OSDMap
             {
@@ -93,8 +93,8 @@ namespace osWebRtcVoice.NonSpatial
                 [KeySessionName] = OSD.FromString(sessionName ?? string.Empty),
                 [KeyRoomKey] = OSD.FromString(roomKey ?? string.Empty),
             };
-            if (auth is { Enabled: true })
-                payload[CarrierAuth.AuthKey] = auth.Seal(Fields(target, sessionId, fromAgent, roomKey, message));
+            if (!string.IsNullOrEmpty(sessionKey) || auth is { Enabled: true })
+                payload[CarrierAuth.AuthKey] = (auth ?? CarrierAuth.Off()).Seal(Fields(target, sessionId, fromAgent, roomKey, message), sessionKey);
             byte[] bucket = Encoding.UTF8.GetBytes(BucketMagic + OSDParser.SerializeJsonString(payload));
             return new GridInstantMessage
             {

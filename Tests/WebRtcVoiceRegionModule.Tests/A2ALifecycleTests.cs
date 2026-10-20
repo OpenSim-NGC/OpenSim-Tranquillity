@@ -29,7 +29,7 @@ namespace osWebRtcVoice.Tests
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
         private static readonly UUID Bob = new UUID("22222222-2222-2222-2222-222222222222");
         private static readonly UUID Mallory = new UUID("33333333-3333-3333-3333-333333333333");
-        private static readonly UUID Xor = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+        private static readonly UUID Xor = A2ARegistry.ComputeSessionId(Alice, Bob);
 
         private static OSDMap Multiagent(string channel, string credentials)
         {
@@ -70,14 +70,14 @@ namespace osWebRtcVoice.Tests
         };
 
         /// <summary>Record + mint: the state after the caller's "start p2p voice" and "call".</summary>
-        private static A2ASession Invited(A2ASessionRegistry reg)
+        private static A2ASession Invited(A2ARegistry reg)
         {
             A2ASession s = reg.Record(Alice, Bob, out _);
             return reg.IssueToken(s.SessionId, Alice);
         }
 
         /// <summary>Both parties admitted and joined: the state of a live call.</summary>
-        private static A2ASession Live(A2ASessionRegistry reg)
+        private static A2ASession Live(A2ARegistry reg)
         {
             A2ASession s = Invited(reg);
             reg.MarkProvisioned(s.SessionId, Alice, "vs-alice");
@@ -90,7 +90,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Logout_IsRecognisedBeforeChannelType()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ProvisionAdmission a = A2AProvisionAdmission.Decide(Logout("vs-1"), Alice, reg);
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Logout));
             Assert.That(a.Admitted, Is.True, "a logout body (channel_type absent) must be admitted so the service can see `logout`");
@@ -103,7 +103,7 @@ namespace osWebRtcVoice.Tests
         {
             OSDMap m = Logout("vs-1");
             m["logout"] = OSD.FromBoolean(false);
-            ProvisionAdmission a = A2AProvisionAdmission.Decide(m, Alice, new A2ASessionRegistry());
+            ProvisionAdmission a = A2AProvisionAdmission.Decide(m, Alice, new A2ARegistry());
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Refused));
             Assert.That(a.Decision, Is.EqualTo(A2AProvisionAdmission.DecisionOtherChannelType));
         }
@@ -111,7 +111,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Local_IsAdmittedToTheParcelChecks()
         {
-            ProvisionAdmission a = A2AProvisionAdmission.Decide(Local(), Alice, new A2ASessionRegistry());
+            ProvisionAdmission a = A2AProvisionAdmission.Decide(Local(), Alice, new A2ARegistry());
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Local));
             Assert.That(a.Decision, Is.EqualTo(A2AProvisionAdmission.DecisionLocal));
             Assert.That(a.Session, Is.Null);
@@ -125,7 +125,7 @@ namespace osWebRtcVoice.Tests
         {
             var m = new OSDMap { ["voice_server_type"] = OSD.FromString("webrtc") };
             if (channelType != null) m["channel_type"] = OSD.FromString(channelType);
-            ProvisionAdmission a = A2AProvisionAdmission.Decide(m, Alice, new A2ASessionRegistry());
+            ProvisionAdmission a = A2AProvisionAdmission.Decide(m, Alice, new A2ARegistry());
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Refused));
             Assert.That(a.Admitted, Is.False);
             Assert.That(a.Decision, Is.EqualTo(A2AProvisionAdmission.DecisionOtherChannelType));
@@ -134,7 +134,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void NullMap_IsRefused()
         {
-            ProvisionAdmission a = A2AProvisionAdmission.Decide(null, Alice, new A2ASessionRegistry());
+            ProvisionAdmission a = A2AProvisionAdmission.Decide(null, Alice, new A2ARegistry());
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Refused));
         }
 
@@ -143,7 +143,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Multiagent_UnknownChannel_RefusedNoSession()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ProvisionAdmission a = A2AProvisionAdmission.Decide(Multiagent(Xor.ToString(), "anything"), Alice, reg);
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Refused));
             Assert.That(a.Decision, Is.EqualTo(A2AProvisionAdmission.DecisionNoSession));
@@ -154,7 +154,7 @@ namespace osWebRtcVoice.Tests
         [TestCase("not-a-uuid")]
         public void Multiagent_MissingOrMalformedChannel_RefusedNoSession(string channel)
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ProvisionAdmission a = A2AProvisionAdmission.Decide(Multiagent(channel, "anything"), Alice, reg);
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Refused));
@@ -166,7 +166,7 @@ namespace osWebRtcVoice.Tests
         public void Multiagent_ChannelIdOnly_IsNotTheChannel()
         {
             // The viewer sends `channel`; a body carrying only channel_id names no session.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             var m = Multiagent(null, s.Token);
             m["channel_id"] = OSD.FromString(Xor.ToString());
@@ -177,7 +177,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Multiagent_Stranger_RefusedNotParty()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             ProvisionAdmission a = A2AProvisionAdmission.Decide(Multiagent(Xor.ToString(), s.Token), Mallory, reg);
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Refused));
@@ -189,7 +189,7 @@ namespace osWebRtcVoice.Tests
         [TestCase(null)]
         public void Multiagent_WrongToken_RefusedBadToken(string creds)
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ProvisionAdmission a = A2AProvisionAdmission.Decide(Multiagent(Xor.ToString(), creds), Bob, reg);
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Refused));
@@ -199,7 +199,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Multiagent_TokenDiffersOnlyInCase_RefusedBadToken()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             ProvisionAdmission a = A2AProvisionAdmission.Decide(Multiagent(Xor.ToString(), s.Token.ToUpperInvariant()), Bob, reg);
             Assert.That(a.Decision, Is.EqualTo(A2AProvisionAdmission.DecisionBadToken));
@@ -209,7 +209,7 @@ namespace osWebRtcVoice.Tests
         public void Multiagent_BeforeCall_NoTokenMinted_RefusedBadToken()
         {
             // "start p2p voice" recorded the pair but no "call" has minted a token: nothing can match.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             reg.Record(Alice, Bob, out _);
             ProvisionAdmission a = A2AProvisionAdmission.Decide(Multiagent(Xor.ToString(), ""), Bob, reg);
             Assert.That(a.Decision, Is.EqualTo(A2AProvisionAdmission.DecisionBadToken));
@@ -220,7 +220,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Multiagent_PartyWithToken_Admitted_BothDirections()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             foreach (UUID party in new[] { Alice, Bob })
             {
@@ -228,7 +228,7 @@ namespace osWebRtcVoice.Tests
                 Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Multiagent), party.ToString());
                 Assert.That(a.Admitted, Is.True);
                 Assert.That(a.Decision, Is.EqualTo(A2AProvisionAdmission.DecisionMultiagent));
-                Assert.That(a.Session, Is.SameAs(s));
+                Assert.That(a.Session, Has.Property("SessionId").EqualTo(s.SessionId));
                 Assert.That(a.Channel, Is.EqualTo(Xor.ToString()));
             }
         }
@@ -237,11 +237,12 @@ namespace osWebRtcVoice.Tests
         public void Admission_DoesNotChangeState()
         {
             // Deciding is not joining: only the handler's MarkProvisioned (after the service said yes) moves state.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             A2AProvisionAdmission.Decide(Multiagent(Xor.ToString(), s.Token), Bob, reg);
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Invited));
-            Assert.That(s.CalleeProvisioned, Is.False);
+            A2ASession after = reg.TryGet(Xor);
+            Assert.That(after.State, Is.EqualTo(A2ASessionState.Invited));
+            Assert.That(after.CalleeProvisioned, Is.False);
         }
 
         // ---- accept transition ---------------------------------------------------------------------
@@ -249,48 +250,47 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void CallerProvision_StaysInvited_CalleeProvision_IsTheAccept()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
 
             A2ASession r1 = reg.MarkProvisioned(s.SessionId, Alice, "vs-alice");
-            Assert.That(r1, Is.SameAs(s));
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Invited), "the caller joining the room is not the accept");
-            Assert.That(s.CallerProvisioned, Is.True);
-            Assert.That(s.CallerViewerSession, Is.EqualTo("vs-alice"));
-            Assert.That(s.IsProvisioned(Bob), Is.False);
+            Assert.That(r1, Has.Property("SessionId").EqualTo(s.SessionId));
+            Assert.That(r1.State, Is.EqualTo(A2ASessionState.Invited), "the caller joining the room is not the accept");
+            Assert.That(r1.CallerProvisioned, Is.True);
+            Assert.That(r1.CallerViewerSession, Is.EqualTo("vs-alice"));
+            Assert.That(r1.IsProvisioned(Bob), Is.False);
 
-            reg.MarkProvisioned(s.SessionId, Bob, "vs-bob");
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Active));
-            Assert.That(s.CalleeProvisioned, Is.True);
-            Assert.That(s.CalleeViewerSession, Is.EqualTo("vs-bob"));
+            A2ASession r2 = reg.MarkProvisioned(s.SessionId, Bob, "vs-bob");
+            Assert.That(r2.State, Is.EqualTo(A2ASessionState.Active));
+            Assert.That(r2.CalleeProvisioned, Is.True);
+            Assert.That(r2.CalleeViewerSession, Is.EqualTo("vs-bob"));
         }
 
         [Test]
         public void CalleeFirst_AlsoAccepts()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
-            reg.MarkProvisioned(s.SessionId, Bob, "vs-bob");
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Active));
+            Assert.That(reg.MarkProvisioned(s.SessionId, Bob, "vs-bob").State, Is.EqualTo(A2ASessionState.Active));
         }
 
         [Test]
         public void MarkProvisioned_UnknownOrStranger_ReturnsNull()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Assert.That(reg.MarkProvisioned(Xor, Alice, "vs"), Is.Null);
             A2ASession s = Invited(reg);
             Assert.That(reg.MarkProvisioned(s.SessionId, Mallory, "vs"), Is.Null);
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Invited));
+            Assert.That(reg.TryGet(Xor).State, Is.EqualTo(A2ASessionState.Invited));
         }
 
         [Test]
         public void FindByViewerSession_ResolvesTheJoinedRecord()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Live(reg);
-            Assert.That(reg.FindByViewerSession(Alice, "vs-alice"), Is.SameAs(s));
-            Assert.That(reg.FindByViewerSession(Bob, "vs-bob"), Is.SameAs(s));
+            Assert.That(reg.FindByViewerSession(Alice, "vs-alice"), Has.Property("SessionId").EqualTo(s.SessionId));
+            Assert.That(reg.FindByViewerSession(Bob, "vs-bob"), Has.Property("SessionId").EqualTo(s.SessionId));
             Assert.That(reg.FindByViewerSession(Alice, "vs-bob"), Is.Null, "a viewer session is per party");
             Assert.That(reg.FindByViewerSession(Alice, null), Is.Null);
             Assert.That(reg.FindByViewerSession(Mallory, "vs-alice"), Is.Null);
@@ -301,7 +301,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Call_WhileInvited_StillInvites()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Alice, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
@@ -312,7 +312,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Call_WhileActive_ReturnsCredentials_ButDoesNotRing()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Live(reg);
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Alice, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
@@ -325,7 +325,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Call_ByStrangerOnLiveSession_403()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Mallory, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.Forbidden));
@@ -335,7 +335,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Call_OnUnknownSession_404()
         {
-            ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Alice, new A2ASessionRegistry());
+            ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Alice, new A2ARegistry());
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound));
         }
 
@@ -346,7 +346,7 @@ namespace osWebRtcVoice.Tests
         {
             // The viewer answers a received ChatterBoxInvitation with its own bare "call", which would
             // re-invite the caller, whose viewer would call again, without bound.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(), Bob, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
@@ -358,7 +358,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void SecondCallerCall_AfterDeliveredInvite_DoesNotReRing()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             ChatSessionOutcome first = ChatSessionRequestLogic.Decide(CallBody(), Alice, reg);
             Assert.That(first.Invite, Is.Not.Null);
@@ -376,7 +376,7 @@ namespace osWebRtcVoice.Tests
         {
             // The module marks InviteSent only on a confirmed enqueue; a callee-unreachable delivery
             // must not burn the one ring.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             Assert.That(ChatSessionRequestLogic.Decide(CallBody(), Alice, reg).Invite, Is.Not.Null);
             // no MarkInviteSent -> the retry still carries an invitation
@@ -386,7 +386,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void FreshRecordAfterRemoval_InvitesAgain()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             reg.MarkInviteSent(s.SessionId);
             ChatSessionRequestLogic.Decide(DeclineBody(), Bob, reg);          // removed
@@ -400,7 +400,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void MarkInviteSent_UnknownSession_IsANoOp()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             reg.MarkInviteSent(Xor);                                           // nothing recorded
             Invited(reg);
             Assert.That(ChatSessionRequestLogic.Decide(CallBody(), Alice, reg).Invite, Is.Not.Null);
@@ -411,7 +411,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Decline_ByCallee_RemovesTheRecord()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(DeclineBody(), Bob, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
@@ -425,7 +425,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Decline_ByCallee_CarriesTheRemovedCall_SoTheCallerCanBeTold()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(DeclineBody(), Bob, reg);
             Assert.That(o.Declined, Is.Not.Null);
@@ -437,7 +437,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Decline_ByCaller_CarriesTheRemovedCall_ButTheCallerIsNotTheCallee()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(DeclineBody(), Alice, reg);
             Assert.That(o.Declined, Is.Not.Null);
@@ -447,17 +447,17 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Decline_ByStrangerOrForNoCall_CarriesNothing()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             Assert.That(ChatSessionRequestLogic.Decide(DeclineBody(), Mallory, reg).Declined, Is.Null);
-            Assert.That(ChatSessionRequestLogic.Decide(DeclineBody(), Bob, new A2ASessionRegistry()).Declined, Is.Null);
+            Assert.That(ChatSessionRequestLogic.Decide(DeclineBody(), Bob, new A2ARegistry()).Declined, Is.Null);
         }
 
         [Test]
         public void Decline_ByCaller_AlsoRemoves()
         {
             // The caller cancelling its own outgoing call is a decline on the same session id.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             ChatSessionRequestLogic.Decide(DeclineBody(), Alice, reg);
             Assert.That(reg.TryGet(Xor), Is.Null);
@@ -466,18 +466,18 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Decline_ByStranger_IsIgnored()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(DeclineBody(), Mallory, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK), "still the stub's 200: a stranger learns nothing");
             Assert.That(o.Instrument, Does.Contain("decision=refused-not-party"));
-            Assert.That(reg.TryGet(Xor), Is.SameAs(s));
+            Assert.That(reg.TryGet(Xor), Has.Property("SessionId").EqualTo(s.SessionId));
         }
 
         [Test]
         public void Decline_NoSession_IsTheOldStub()
         {
-            ChatSessionOutcome o = ChatSessionRequestLogic.Decide(DeclineBody(), Bob, new A2ASessionRegistry());
+            ChatSessionOutcome o = ChatSessionRequestLogic.Decide(DeclineBody(), Bob, new A2ARegistry());
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
             Assert.That(o.Body, Is.Null);
             Assert.That(o.Instrument, Does.Contain("decision=stub-ok"));
@@ -486,7 +486,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Decline_Registry_ReportsParty()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Invited(reg);
             Assert.That(reg.Decline(Xor, Mallory, out bool p1), Is.False);
             Assert.That(p1, Is.False);
@@ -499,7 +499,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Decline_AfterDecline_ProvisionIsRefusedNoSession()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             string token = s.Token;
             ChatSessionRequestLogic.Decide(DeclineBody(), Bob, reg);
@@ -512,16 +512,17 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void OneLogout_KeepsTheRecord_BothLogout_RemovesIt()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Live(reg);
 
             List<UUID> r1 = reg.MarkGone(Alice, "vs-alice");
             Assert.That(r1, Is.Empty, "the other party is still in the room");
-            Assert.That(reg.TryGet(Xor), Is.SameAs(s));
-            Assert.That(s.CallerProvisioned, Is.False);
-            Assert.That(s.CallerViewerSession, Is.Null);
-            Assert.That(s.CalleeProvisioned, Is.True);
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Active));
+            A2ASession after = reg.TryGet(Xor);
+            Assert.That(after, Has.Property("SessionId").EqualTo(s.SessionId));
+            Assert.That(after.CallerProvisioned, Is.False);
+            Assert.That(after.CallerViewerSession, Is.Null);
+            Assert.That(after.CalleeProvisioned, Is.True);
+            Assert.That(after.State, Is.EqualTo(A2ASessionState.Active));
 
             List<UUID> r2 = reg.MarkGone(Bob, "vs-bob");
             Assert.That(r2, Is.EqualTo(new[] { Xor }));
@@ -532,24 +533,24 @@ namespace osWebRtcVoice.Tests
         public void Logout_WithAnotherViewerSession_TouchesNothing()
         {
             // A spatial logout (its own viewer_session) must not count as leaving the A2A room.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Live(reg);
             Assert.That(reg.MarkGone(Alice, "vs-spatial"), Is.Empty);
-            Assert.That(s.CallerProvisioned, Is.True);
+            Assert.That(reg.TryGet(Xor).CallerProvisioned, Is.True);
             Assert.That(reg.MarkGone(Alice, "vs-alice"), Is.Empty);
             Assert.That(reg.MarkGone(Bob, "vs-spatial"), Is.Empty);
-            Assert.That(reg.TryGet(Xor), Is.SameAs(s));
+            Assert.That(reg.TryGet(Xor), Has.Property("SessionId").EqualTo(s.SessionId));
         }
 
         [Test]
         public void ClientClosed_IsThatPartyGoneFromEveryRecord()
         {
             // OnClientClosed -> MarkGone(agent, null): no viewer session to match on.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Live(reg);
             Assert.That(reg.MarkGone(Alice, null), Is.Empty);
-            Assert.That(s.CallerProvisioned, Is.False);
-            Assert.That(reg.TryGet(Xor), Is.SameAs(s), "Bob is still in the room");
+            Assert.That(reg.TryGet(Xor).CallerProvisioned, Is.False);
+            Assert.That(reg.TryGet(Xor), Has.Property("SessionId").EqualTo(s.SessionId), "Bob is still in the room");
             Assert.That(reg.MarkGone(Bob, null), Is.EqualTo(new[] { Xor }));
             Assert.That(reg.TryGet(Xor), Is.Null);
         }
@@ -557,33 +558,33 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void ClientClosed_OnInvited_LeavesItToTheTtl()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Invited(reg);
             reg.MarkProvisioned(s.SessionId, Alice, "vs-alice");     // caller joined, callee not yet
             Assert.That(reg.MarkGone(Alice, null), Is.Empty);
-            Assert.That(reg.TryGet(Xor), Is.SameAs(s), "an unanswered invitation is not removed by the caller dropping; the invite TTL ends it");
-            Assert.That(s.State, Is.EqualTo(A2ASessionState.Invited));
+            Assert.That(reg.TryGet(Xor), Has.Property("SessionId").EqualTo(s.SessionId), "an unanswered invitation is not removed by the caller dropping; the invite TTL ends it");
+            Assert.That(reg.TryGet(Xor).State, Is.EqualTo(A2ASessionState.Invited));
         }
 
         [Test]
         public void Gone_IsReversible_ByALaterAdmittedProvision()
         {
             // Crash then reconnect: the party re-provisions (same token) and is present again.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = Live(reg);
             reg.MarkGone(Alice, null);
             ProvisionAdmission a = A2AProvisionAdmission.Decide(Multiagent(Xor.ToString(), s.Token), Alice, reg);
             Assert.That(a.Kind, Is.EqualTo(ProvisionKind.Multiagent));
-            reg.MarkProvisioned(s.SessionId, Alice, "vs-alice-2");
-            Assert.That(s.CallerProvisioned, Is.True);
-            Assert.That(s.CallerViewerSession, Is.EqualTo("vs-alice-2"));
+            A2ASession back = reg.MarkProvisioned(s.SessionId, Alice, "vs-alice-2");
+            Assert.That(back.CallerProvisioned, Is.True);
+            Assert.That(back.CallerViewerSession, Is.EqualTo("vs-alice-2"));
             Assert.That(reg.FindByViewerSession(Alice, "vs-alice"), Is.Null, "the old viewer session is forgotten");
         }
 
         [Test]
         public void AfterBothLogout_ACallRingsAgain()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Live(reg);
             reg.MarkGone(Alice, "vs-alice");
             reg.MarkGone(Bob, "vs-bob");
@@ -599,14 +600,14 @@ namespace osWebRtcVoice.Tests
         public void ActiveSession_ExpiresOnlyBeyondTheIdleBackstop()
         {
             DateTime now = new DateTime(2026, 8, 30, 12, 0, 0, DateTimeKind.Utc);
-            var reg = new A2ASessionRegistry(TimeSpan.FromMinutes(2), TimeSpan.FromHours(1), () => now);
+            var reg = new A2ARegistry(TimeSpan.FromMinutes(2), TimeSpan.FromHours(1), () => now);
             A2ASession s = Live(reg);
 
             now = now.AddMinutes(30);
-            Assert.That(reg.TryGet(Xor), Is.SameAs(s), "well past the invite TTL, but Active is measured against the idle backstop");
+            Assert.That(reg.TryGet(Xor), Has.Property("SessionId").EqualTo(s.SessionId), "well past the invite TTL, but Active is measured against the idle backstop");
 
             now = now.AddMinutes(29);
-            Assert.That(reg.TryGet(Xor), Is.SameAs(s));
+            Assert.That(reg.TryGet(Xor), Has.Property("SessionId").EqualTo(s.SessionId));
 
             now = now.AddMinutes(2);
             Assert.That(reg.TryGet(Xor), Is.Null);
@@ -617,12 +618,12 @@ namespace osWebRtcVoice.Tests
         public void Activity_RefreshesTheIdleBackstop()
         {
             DateTime now = new DateTime(2026, 8, 30, 12, 0, 0, DateTimeKind.Utc);
-            var reg = new A2ASessionRegistry(TimeSpan.FromMinutes(2), TimeSpan.FromHours(1), () => now);
+            var reg = new A2ARegistry(TimeSpan.FromMinutes(2), TimeSpan.FromHours(1), () => now);
             A2ASession s = Live(reg);
             now = now.AddMinutes(50);
             reg.MarkGone(Alice, "vs-alice");                        // activity at +50
             now = now.AddMinutes(50);                               // +100: 50 since last activity
-            Assert.That(reg.TryGet(Xor), Is.SameAs(s));
+            Assert.That(reg.TryGet(Xor), Has.Property("SessionId").EqualTo(s.SessionId));
             now = now.AddMinutes(11);                               // +111: 61 since last activity
             Assert.That(reg.TryGet(Xor), Is.Null);
         }
@@ -631,7 +632,7 @@ namespace osWebRtcVoice.Tests
         public void InvitedSession_StillExpiresOnTheInviteTtl()
         {
             DateTime now = new DateTime(2026, 8, 30, 12, 0, 0, DateTimeKind.Utc);
-            var reg = new A2ASessionRegistry(TimeSpan.FromMinutes(2), TimeSpan.FromHours(1), () => now);
+            var reg = new A2ARegistry(TimeSpan.FromMinutes(2), TimeSpan.FromHours(1), () => now);
             A2ASession s = Invited(reg);
             reg.MarkProvisioned(s.SessionId, Alice, "vs-alice");    // caller in the room, still Invited
             now = now.AddMinutes(3);
@@ -641,9 +642,9 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void DefaultBackstop_IsEightHours()
         {
-            Assert.That(A2ASessionRegistry.DefaultActiveIdleTtl, Is.EqualTo(TimeSpan.FromHours(8)));
-            Assert.That(new A2ASessionRegistry().ActiveIdleTtl, Is.EqualTo(TimeSpan.FromHours(8)));
-            Assert.That(new A2ASessionRegistry(TimeSpan.FromMinutes(1), null).ActiveIdleTtl, Is.EqualTo(TimeSpan.FromHours(8)), "the two-arg ctor keeps the default backstop");
+            Assert.That(A2ARegistry.DefaultActiveIdleTtl, Is.EqualTo(TimeSpan.FromHours(8)));
+            Assert.That(new A2ARegistry().ActiveIdleTtl, Is.EqualTo(TimeSpan.FromHours(8)));
+            Assert.That(new A2ARegistry(TimeSpan.FromMinutes(1), null).ActiveIdleTtl, Is.EqualTo(TimeSpan.FromHours(8)), "the two-arg ctor keeps the default backstop");
         }
     }
 }

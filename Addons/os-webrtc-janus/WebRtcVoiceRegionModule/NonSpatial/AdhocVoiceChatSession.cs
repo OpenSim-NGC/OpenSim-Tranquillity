@@ -96,7 +96,7 @@ namespace osWebRtcVoice.NonSpatial
         /// than opening a second room and sending a second reply. The viewer mints its temp id once,
         /// at session creation, so a retry carries the same one.
         /// </summary>
-        public static bool TryHandleStartConference(OSDMap reqmap, UUID agentID, NonSpatialVoiceSessionEngine engine,
+        public static bool TryHandleStartConference(OSDMap reqmap, UUID agentID, INonSpatialSessions engine,
                                                     UUID originRegion, bool enabled, out ChatSessionOutcome outcome)
         {
             outcome = null;
@@ -198,7 +198,7 @@ namespace osWebRtcVoice.NonSpatial
         /// an A2A session, or an id we have never seen returns false and falls through untouched, so
         /// this arm cannot capture a method that today reaches the A2A path.
         /// </summary>
-        public static bool TryHandleInvite(OSDMap reqmap, UUID agentID, NonSpatialVoiceSessionEngine engine,
+        public static bool TryHandleInvite(OSDMap reqmap, UUID agentID, INonSpatialSessions engine,
                                            bool enabled, out ChatSessionOutcome outcome, out List<UUID> newlyInvited)
         {
             outcome = null;
@@ -267,7 +267,7 @@ namespace osWebRtcVoice.NonSpatial
         /// invitation (llimview.cpp:3429-3438), and that path is not handled here; letting it fall
         /// through keeps today's behaviour for everything that is not a conference.
         /// </summary>
-        public static bool TryHandleDeclineInvitation(OSDMap reqmap, UUID agentID, NonSpatialVoiceSessionEngine engine,
+        public static bool TryHandleDeclineInvitation(OSDMap reqmap, UUID agentID, INonSpatialSessions engine,
                                                       bool enabled, out ChatSessionOutcome outcome)
         {
             outcome = null;
@@ -284,7 +284,7 @@ namespace osWebRtcVoice.NonSpatial
                 Status = HttpStatusCode.OK,
                 Instrument = Line(agentID, sessionId, DecisionDeclined,
                                   $"session={sessionId} engine={r.Decision} "
-                                  + $"seats={engine.Store.Get(sessionId)?.SeatsHeld}"),
+                                  + $"seats={engine.Get(sessionId)?.SeatsHeld}"),
             };
             return true;
         }
@@ -304,7 +304,7 @@ namespace osWebRtcVoice.NonSpatial
         /// Admission is the engine's: AdhocAdmission.CanJoin admits on a member record, so the
         /// creator and the invitees get in and nobody else does. The same rule the ring list uses.
         /// </summary>
-        public static bool TryHandleCall(OSDMap reqmap, UUID agentID, NonSpatialVoiceSessionEngine engine,
+        public static bool TryHandleCall(OSDMap reqmap, UUID agentID, INonSpatialSessions engine,
                                          UUID originRegion, bool enabled, out ChatSessionOutcome outcome)
         {
             outcome = null;
@@ -328,7 +328,7 @@ namespace osWebRtcVoice.NonSpatial
         /// LLIMSpeakerMgr::setSpeakers, which tolerates an empty map, and what actually matters is the
         /// STATUS, because any failure makes it clear the invitation and never call startCall.
         /// </summary>
-        public static bool TryHandleAcceptInvitation(OSDMap reqmap, UUID agentID, NonSpatialVoiceSessionEngine engine,
+        public static bool TryHandleAcceptInvitation(OSDMap reqmap, UUID agentID, INonSpatialSessions engine,
                                                      UUID originRegion, bool enabled, out ChatSessionOutcome outcome)
         {
             outcome = null;
@@ -347,7 +347,7 @@ namespace osWebRtcVoice.NonSpatial
         /// voice_credentials differs, since the accept path already has them from the ring.
         /// </summary>
         private static ChatSessionOutcome Seat(UUID agentID, NonSpatialVoiceSession session,
-                                               NonSpatialVoiceSessionEngine engine, UUID originRegion,
+                                               INonSpatialSessions engine, UUID originRegion,
                                                string decision, bool withCredentials)
         {
             SessionOutcome seat = engine.Accept(session.SessionId, agentID, originRegion);
@@ -391,7 +391,7 @@ namespace osWebRtcVoice.NonSpatial
                 Body = body,
                 Instrument = Line(agentID, session.SessionId, decision,
                                   $"room={session.RoomKey} "
-                                  + $"seats={engine.Store.Get(session.SessionId)?.SeatsHeld}/{session.Cap}"),
+                                  + $"seats={engine.Get(session.SessionId)?.SeatsHeld}/{session.Cap}"),
             };
         }
 
@@ -399,7 +399,7 @@ namespace osWebRtcVoice.NonSpatial
         /// The shared "is this ours?" gate for the post-start ad-hoc methods: enabled, the right
         /// method, a session id, and a voice session this store holds that is genuinely AD-HOC.
         /// </summary>
-        private static bool Ours(OSDMap reqmap, NonSpatialVoiceSessionEngine engine, bool enabled, string wanted,
+        private static bool Ours(OSDMap reqmap, INonSpatialSessions engine, bool enabled, string wanted,
                                  out UUID sessionId, out NonSpatialVoiceSession session)
         {
             sessionId = UUID.Zero;
@@ -411,7 +411,7 @@ namespace osWebRtcVoice.NonSpatial
                 return false;
             if (!reqmap.TryGetUUID("session-id", out sessionId) || sessionId == UUID.Zero)
                 return false;
-            session = engine.Store.Get(sessionId);
+            session = engine.Get(sessionId);
             return session is not null && session.Type == NonSpatialSessionType.Adhoc;
         }
 

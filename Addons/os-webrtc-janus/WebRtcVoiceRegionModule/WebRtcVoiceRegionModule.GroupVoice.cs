@@ -89,7 +89,7 @@ public partial class WebRtcVoiceRegionModule
     {
         if (session is null || !m_groupVoice.IsUsable || body is null)
             return;
-        if (!m_carrierAuth.Enabled)
+        if (!m_carrierAuth.Enabled && !RingsAreVerifiedByTheStore)
         {
             LogCarrierOff(session.Owner);
             return;
@@ -170,6 +170,10 @@ public partial class WebRtcVoiceRegionModule
             return;
 
         UUID originRegion = originScene?.RegionInfo?.RegionID ?? UUID.Zero;
+        // Marked before the rings go out, because a region that keeps its sessions in the grid service asks the
+        // service whether a ring it received was one the sender sent, and the answer is yes only for a target
+        // already marked. Marked whatever delivery says, as before.
+        m_nonSpatial?.MarkInvited(session.SessionId, remote);
         foreach (UUID target in remote)
         {
             try
@@ -187,7 +191,6 @@ public partial class WebRtcVoiceRegionModule
                 m_log.LogWarning(e, "{LogHeader} cross-instance ring to {Target} failed", logHeader, target);
             }
         }
-        m_nonSpatial?.MarkInvited(session.SessionId, remote);
     }
 
     /// <summary>
@@ -355,17 +358,18 @@ public partial class WebRtcVoiceRegionModule
         scene.EventManager.OnIncomingInstantMessage += OnIncomingGroupRing;
     }
 
-    // The presence backstop for seats: a root close releases the agent's group and conference seats.
-    private void ReleaseSeatsOnClientClosed(Scene scene, UUID clientID, Scene s)
+    // The presence backstop for seats: a root close releases the agent's group and conference seats. `left` is what the
+    // departure of the agent from every session returned; the avatar-to-avatar calls in it are the caller's to handle.
+    private void ReleaseSeatsOnClientClosed(Scene scene, UUID clientID, Scene s, IReadOnlyList<NonSpatialVoiceSession> left)
     {
         // A ROOT presence closing releases the agent's group seats too. Same guard as
         // above (ShouldMarkGone): a child teardown is a border crossing, not a departure, and
         // must not free a seat the agent still holds from its root region. This is the
         // presence backstop -- departure never waits on a POST that may never come.
-        foreach (NonSpatialVoiceSession gone in
-                 m_nonSpatial?.DepartAll(clientID, DepartureReason.PresenceLost)
-                 ?? (IReadOnlyList<NonSpatialVoiceSession>)Array.Empty<NonSpatialVoiceSession>())
+        foreach (NonSpatialVoiceSession gone in left)
         {
+            if (gone.Type == NonSpatialSessionType.P2P)
+                continue;
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
                 GroupVoiceChatSession.Line(clientID, gone.Owner, "group-seat-released-client-closed",
                     $"room={gone.RoomKey} region={s?.Name ?? scene.Name} seats={gone.SeatsHeld}/{gone.Cap}"));
@@ -423,12 +427,12 @@ public partial class WebRtcVoiceRegionModule
         // Ad-hoc takes this SAME arm, and it has to. Leaving conferences out would
         // repeat the exact defect found for groups -- a hang-up holding its seat until
         // the 8 h idle TTL, with the cap load-bearing.
-        NonSpatialVoiceSession gsess = m_nonSpatial?.Store.GetByRoomKey(admission.Channel);
+        NonSpatialVoiceSession gsess = m_nonSpatial?.GetByRoomKey(admission.Channel);
         if (gsess is not null)
         {
             SessionOutcome pres = m_nonSpatial.MarkPresent(gsess.SessionId, agentID, scene.RegionInfo.RegionID, groupVs);
             bool conf = gsess.Type == NonSpatialSessionType.Adhoc;
-            string detail = $"room={admission.Channel} seats={m_nonSpatial.Store.Get(gsess.SessionId)?.SeatsHeld}/{gsess.Cap}";
+            string detail = $"room={admission.Channel} seats={m_nonSpatial.Get(gsess.SessionId)?.SeatsHeld}/{gsess.Cap}";
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
                 conf ? AdhocVoiceChatSession.Line(agentID, gsess.SessionId, "adhoc-present-" + pres.Decision, detail)
                      : GroupVoiceChatSession.Line(agentID, gsess.Owner, "group-present-" + pres.Decision, detail));
@@ -436,17 +440,17 @@ public partial class WebRtcVoiceRegionModule
     }
 
     // A voice teardown releases the group and conference seats held under that viewer session.
-    private void ReleaseGroupSeatsOnLogout(UUID agentID, string a2aVs)
+    private void ReleaseGroupSeatsOnLogout(UUID agentID, string a2aVs, IReadOnlyList<NonSpatialVoiceSession> left)
     {
         // The SAME teardown releases a group seat. Before this, the logout arm knew
         // only about A2A records, so a group member who hung up held their seat until the
         // 8 h idle TTL -- with the 50 cap load-bearing, enough hang-ups would lock a group
         // out of its own room. Keyed by viewer session, so it frees exactly the seat this
         // logout is for and never another region's.
-        foreach (NonSpatialVoiceSession gone in
-                 m_nonSpatial?.DepartByViewerSession(agentID, a2aVs, DepartureReason.VoiceTeardown)
-                 ?? (IReadOnlyList<NonSpatialVoiceSession>)Array.Empty<NonSpatialVoiceSession>())
+        foreach (NonSpatialVoiceSession gone in left)
         {
+            if (gone.Type == NonSpatialSessionType.P2P)
+                continue;
             // The same teardown already covered conferences -- DepartByViewerSession is
             // type-blind and always was -- but it logged every release as a group one. The
             // line now names what actually ended.
@@ -478,7 +482,7 @@ public partial class WebRtcVoiceRegionModule
             m_log.LogDebug("{LogHeader} {Line}", logHeader, groupOutcome.Instrument);
             ApplyChatSessionOutcome(groupOutcome, response);
             if (groupOutcome.StartedRinging)
-                RingGroupMembers(m_nonSpatial.Store.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, GroupNameOf(GroupSessionIdOf(reqmap)));
+                RingGroupMembers(m_nonSpatial.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, GroupNameOf(GroupSessionIdOf(reqmap)));
             return true;
         }
 
@@ -492,7 +496,7 @@ public partial class WebRtcVoiceRegionModule
             m_log.LogDebug("{LogHeader} {Line}", logHeader, acceptOutcome.Instrument);
             ApplyChatSessionOutcome(acceptOutcome, response);
             if (acceptOutcome.StartedRinging)
-                RingGroupMembers(m_nonSpatial.Store.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, GroupNameOf(GroupSessionIdOf(reqmap)));
+                RingGroupMembers(m_nonSpatial.Get(GroupSessionIdOf(reqmap)), agentID, sp.Name, GroupNameOf(GroupSessionIdOf(reqmap)));
             return true;
         }
         return false;

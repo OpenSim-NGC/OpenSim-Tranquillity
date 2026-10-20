@@ -33,7 +33,7 @@ namespace osWebRtcVoice.Tests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
         private static readonly UUID Bob = new UUID("22222222-2222-2222-2222-222222222222");
-        private static readonly UUID Xor = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+        private static readonly UUID Xor = A2ARegistry.ComputeSessionId(Alice, Bob);
 
         /// <summary>Records ChatterBoxSessionAgentListUpdates calls; everything else unsupported.</summary>
         private sealed class CapturingAgentListQueue : IEventQueue
@@ -73,7 +73,7 @@ namespace osWebRtcVoice.Tests
 
         private static A2ASession LiveSession()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
             reg.IssueToken(s.SessionId, Alice);
             reg.MarkProvisioned(s.SessionId, Alice, "vs-a");
@@ -191,7 +191,7 @@ namespace osWebRtcVoice.Tests
         {
             // Decline / TTL / client-close of an unanswered invitation: MarkGoneSessions removes only
             // Active records, so the handler's LEAVE loop has nothing to send -- by construction.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
             reg.IssueToken(s.SessionId, Alice);
             reg.MarkProvisioned(s.SessionId, Alice, "vs-a");     // caller joined, still Invited
@@ -203,7 +203,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void BothLogout_ReturnsTheSessionWithItsParties()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             A2ASession s = reg.Record(Alice, Bob, out _);
             reg.IssueToken(s.SessionId, Alice);
             reg.MarkProvisioned(s.SessionId, Alice, "vs-a");

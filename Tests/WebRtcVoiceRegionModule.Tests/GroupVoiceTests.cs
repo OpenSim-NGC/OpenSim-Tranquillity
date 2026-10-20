@@ -400,7 +400,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void AnA2AProvisionBehavesIdentically_WithGroupVoiceEnabled()
         {
-            A2ASessionRegistry live = new A2ASessionRegistry();
+            A2ARegistry live = new A2ARegistry();
             A2ASession s = live.Record(Alice, Bob, out _);
             string a2aToken = live.IssueToken(s.SessionId, Alice)?.Token;
             OSDMap body = ProvisionBody(s.ChannelUri, a2aToken);
@@ -560,7 +560,7 @@ namespace osWebRtcVoice.Tests
             }
             Assert.That(A2AProvisionAdmission.RecordsA2ASession(null), Is.False);
 
-            A2ASessionRegistry live = new A2ASessionRegistry();
+            A2ARegistry live = new A2ARegistry();
             A2ASession s = live.Record(Alice, Bob, out _);
             ProvisionAdmission real = new ProvisionAdmission
             {
@@ -574,7 +574,7 @@ namespace osWebRtcVoice.Tests
         public void AGroupRoomKeyIsNeverResolvableByTheA2ARegistry()
         {
             (_, _, _, _, string room, _) = Called();
-            Assert.That(new A2ASessionRegistry().TryGetByChannel(room), Is.Null);
+            Assert.That(new A2ARegistry().TryGetByChannel(room), Is.Null);
             Assert.That(UUID.TryParse(room, out _), Is.False);
         }
     }

@@ -23,7 +23,7 @@ using osWebRtcVoice;
 namespace osWebRtcVoice.Tests
 {
     [TestFixture]
-    public class A2ASessionRegistryTests
+    public class A2ACallsTests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
         private static readonly UUID Bob = new UUID("22222222-2222-2222-2222-222222222222");
@@ -35,16 +35,16 @@ namespace osWebRtcVoice.Tests
             public DateTime Get() => Now;
         }
 
-        private static A2ASessionRegistry NewRegistry(FakeClock clock, TimeSpan? ttl = null)
-            => new A2ASessionRegistry(ttl ?? TimeSpan.FromMinutes(2), clock.Get);
+        private static A2ARegistry NewRegistry(FakeClock clock, TimeSpan? ttl = null)
+            => new A2ARegistry(ttl ?? TimeSpan.FromMinutes(2), clock.Get);
 
         // ---- session id ------------------------------------------------------------------------
 
         [Test]
         public void ComputeSessionId_IsTheViewerXor_AndSymmetric()
         {
-            UUID ab = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
-            UUID ba = A2ASessionRegistry.ComputeSessionId(Bob, Alice);
+            UUID ab = A2ARegistry.ComputeSessionId(Alice, Bob);
+            UUID ba = A2ARegistry.ComputeSessionId(Bob, Alice);
             Assert.That(ab, Is.EqualTo(ba), "XOR is commutative: both parties derive the same id");
             Assert.That(ab, Is.EqualTo(new UUID(Alice.ulonga ^ Bob.ulonga, Alice.ulongb ^ Bob.ulongb)),
                 "must match the viewer's computeSessionID (llimview.cpp:2561) and the old handler's formula");
@@ -62,7 +62,7 @@ namespace osWebRtcVoice.Tests
             A2ASession s = reg.Record(Alice, Bob, out bool created);
 
             Assert.That(created, Is.True);
-            Assert.That(s.SessionId, Is.EqualTo(A2ASessionRegistry.ComputeSessionId(Alice, Bob)));
+            Assert.That(s.SessionId, Is.EqualTo(A2ARegistry.ComputeSessionId(Alice, Bob)));
             Assert.That(s.Caller, Is.EqualTo(Alice));
             Assert.That(s.Callee, Is.EqualTo(Bob));
             Assert.That(s.State, Is.EqualTo(A2ASessionState.Invited));
@@ -71,8 +71,8 @@ namespace osWebRtcVoice.Tests
             Assert.That(s.LastSeenUtc, Is.EqualTo(clock.Now));
             Assert.That(s.ChannelUri, Is.EqualTo(s.SessionId.ToString()));
             Assert.That(reg.Count, Is.EqualTo(1));
-            Assert.That(reg.TryGet(s.SessionId), Is.SameAs(s));
-            Assert.That(reg.TryGetByChannel(s.ChannelUri), Is.SameAs(s), "lookup by the provision's channel string");
+            Assert.That(reg.TryGet(s.SessionId), Has.Property("SessionId").EqualTo(s.SessionId));
+            Assert.That(reg.TryGetByChannel(s.ChannelUri), Has.Property("SessionId").EqualTo(s.SessionId), "lookup by the provision's channel string");
         }
 
         [Test]
@@ -87,7 +87,7 @@ namespace osWebRtcVoice.Tests
             A2ASession again = reg.Record(Alice, Bob, out bool created);
 
             Assert.That(created, Is.False);
-            Assert.That(again, Is.SameAs(first));
+            Assert.That(again, Has.Property("SessionId").EqualTo(first.SessionId));
             Assert.That(again.LastSeenUtc, Is.EqualTo(clock.Now), "a retry refreshes the TTL");
             Assert.That(again.Token, Is.EqualTo(token), "a retry must not invalidate credentials already handed out");
             Assert.That(reg.Count, Is.EqualTo(1));
@@ -102,7 +102,7 @@ namespace osWebRtcVoice.Tests
             A2ASession ba = reg.Record(Bob, Alice, out bool created);
 
             Assert.That(created, Is.False);
-            Assert.That(ba, Is.SameAs(ab));
+            Assert.That(ba, Has.Property("SessionId").EqualTo(ab.SessionId));
             Assert.That(ab.IsParty(Alice) && ab.IsParty(Bob), Is.True);
             Assert.That(ab.OtherParty(Alice), Is.EqualTo(Bob));
             Assert.That(ab.OtherParty(Bob), Is.EqualTo(Alice));
@@ -119,8 +119,8 @@ namespace osWebRtcVoice.Tests
             A2ASession s = reg.Record(Alice, Bob, out _);
 
             A2ASession byAlice = reg.IssueToken(s.SessionId, Alice);
-            Assert.That(byAlice, Is.SameAs(s));
-            Assert.That(byAlice.Token, Is.Not.Null.And.Length.EqualTo(A2ASessionRegistry.TokenBytes * 2), "32 random bytes as lowercase hex");
+            Assert.That(byAlice, Has.Property("SessionId").EqualTo(s.SessionId));
+            Assert.That(byAlice.Token, Is.Not.Null.And.Length.EqualTo(A2ARegistry.TokenBytes * 2), "32 random bytes as lowercase hex");
             Assert.That(byAlice.Token, Does.Match("^[0-9a-f]+$"));
 
             A2ASession byBob = reg.IssueToken(s.SessionId, Bob);
@@ -190,7 +190,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Registry_IsSafeUnderConcurrentUse()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             var threads = new System.Threading.Thread[8];
             Exception failure = null;
             for (int i = 0; i < threads.Length; i++)
@@ -223,7 +223,7 @@ namespace osWebRtcVoice.Tests
     {
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
         private static readonly UUID Bob = new UUID("22222222-2222-2222-2222-222222222222");
-        private static readonly UUID Xor = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+        private static readonly UUID Xor = A2ARegistry.ComputeSessionId(Alice, Bob);
 
         private static OSDMap StartBody(UUID sessionId, OSD @params = null)
         {
@@ -249,7 +249,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void StartP2PVoice_WithParams_RecordsPair_AndEchoesTheViewerSessionId()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(Xor, OSD.FromUUID(Bob)), Alice, reg);
 
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
@@ -267,7 +267,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void StartP2PVoice_ParamsAbsent_Is400_NothingRecorded()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(Xor), Alice, reg);
 
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.BadRequest), "replaces the UUID.Random() fallback");
@@ -280,7 +280,7 @@ namespace osWebRtcVoice.Tests
         [TestCase("")]
         public void StartP2PVoice_ParamsUnparseable_Is400(string bad)
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(Xor, OSD.FromString(bad)), Alice, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.BadRequest));
             Assert.That(reg.Count, Is.EqualTo(0));
@@ -289,7 +289,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void StartP2PVoice_ParamsIsSelf_Is400()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(Alice, OSD.FromUUID(Alice)), Alice, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.BadRequest));
             Assert.That(reg.Count, Is.EqualTo(0));
@@ -300,7 +300,7 @@ namespace osWebRtcVoice.Tests
         {
             // The sim derives the id itself; a viewer sending a different session-id still gets its echo
             // (temp_session_id) so it can re-key (llimview.cpp:1712-1716), and the instrument flags it.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             UUID odd = UUID.Random();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(StartBody(odd, OSD.FromUUID(Bob)), Alice, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
@@ -314,7 +314,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Call_ByAParty_Returns200_WithVoiceCredentialsInTheBody()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionRequestLogic.Decide(StartBody(Xor, OSD.FromUUID(Bob)), Alice, reg);
 
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(Xor), Alice, reg);
@@ -345,7 +345,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Call_WithoutInvitation_Is404_NoBody()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(Xor), Alice, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.NotFound));
             Assert.That(o.Body, Is.Null);
@@ -356,7 +356,7 @@ namespace osWebRtcVoice.Tests
         public void Call_ByAStranger_Is403()
         {
             // A live invitation session that the caller is not a party of is 403, distinct from 404 unknown.
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             ChatSessionRequestLogic.Decide(StartBody(Xor, OSD.FromUUID(Bob)), Alice, reg);
             UUID carol = UUID.Random();
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(CallBody(Xor), carol, reg);
@@ -371,7 +371,7 @@ namespace osWebRtcVoice.Tests
         [TestCase("start conference")]
         public void Stubs_Return200_NoBody(string method)
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             var m = new OSDMap { ["method"] = OSD.FromString(method), ["session-id"] = OSD.FromUUID(Xor) };
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(m, Alice, reg);
             Assert.That(o.Status, Is.EqualTo(HttpStatusCode.OK));
@@ -394,7 +394,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void FetchHistory_AnswersAnEmptyArray_NotAnEmptyBody()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             var m = new OSDMap { ["method"] = OSD.FromString("fetch history"), ["session-id"] = OSD.FromUUID(Xor) };
             ChatSessionOutcome o = ChatSessionRequestLogic.Decide(m, Alice, reg);
 
@@ -409,7 +409,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void UnknownMethod_Is400_MissingFields_Are404_NoBody_Is204()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             Assert.That(ChatSessionRequestLogic.Decide(new OSDMap { ["method"] = OSD.FromString("nope"), ["session-id"] = OSD.FromUUID(Xor) }, Alice, reg).Status, Is.EqualTo(HttpStatusCode.BadRequest));
             Assert.That(ChatSessionRequestLogic.Decide(new OSDMap { ["session-id"] = OSD.FromUUID(Xor) }, Alice, reg).Status, Is.EqualTo(HttpStatusCode.NotFound));
             Assert.That(ChatSessionRequestLogic.Decide(new OSDMap { ["method"] = OSD.FromString("call") }, Alice, reg).Status, Is.EqualTo(HttpStatusCode.NotFound));
@@ -419,7 +419,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void MethodMatching_IsCaseInsensitive_LikeTheOldSwitch()
         {
-            var reg = new A2ASessionRegistry();
+            var reg = new A2ARegistry();
             var m = new OSDMap { ["method"] = OSD.FromString("Start P2P Voice"), ["session-id"] = OSD.FromUUID(Xor), ["params"] = OSD.FromUUID(Bob) };
             Assert.That(ChatSessionRequestLogic.Decide(m, Alice, reg).Status, Is.EqualTo(HttpStatusCode.OK));
         }

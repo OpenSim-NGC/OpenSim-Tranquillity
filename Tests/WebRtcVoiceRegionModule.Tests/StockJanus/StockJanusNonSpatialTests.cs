@@ -63,7 +63,7 @@ namespace osWebRtcVoice.Tests
             using var region = StockRegion.Create((voice, _) => voice.Set("A2AVoiceEnabled", "true"));
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
-            UUID session = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+            UUID session = A2ACalls.ComputeSessionId(Alice, Bob);
 
             CapAnswer start = await region.ChatSessionAsync(Alice, ChatBody("start p2p voice", session, OSD.FromUUID(Bob)));
             Assert.That(start.Status, Is.EqualTo((int)HttpStatusCode.OK), "start p2p voice");
@@ -133,7 +133,7 @@ namespace osWebRtcVoice.Tests
             two.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
             SetOnline(one, Alice, Bob);
             SetOnline(two, Alice, Bob);
-            UUID session = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+            UUID session = A2ACalls.ComputeSessionId(Alice, Bob);
 
             Assert.That((await one.ChatSessionAsync(Alice, ChatBody("start p2p voice", session, OSD.FromUUID(Bob)))).Status, Is.EqualTo((int)HttpStatusCode.OK));
             CapAnswer call = await one.ChatSessionAsync(Alice, ChatBody("call", session));
@@ -175,7 +175,7 @@ namespace osWebRtcVoice.Tests
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
             UUID mallory = UUID.Random();
             region.AddAvatar(mallory, StockRegion.InEstateChannelParcel);
-            UUID session = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+            UUID session = A2ACalls.ComputeSessionId(Alice, Bob);
             await region.ChatSessionAsync(Alice, ChatBody("start p2p voice", session, OSD.FromUUID(Bob)));
             CapAnswer call = await region.ChatSessionAsync(Alice, ChatBody("call", session));
             (string channel, string token) = CredentialsOf(call);
@@ -195,7 +195,7 @@ namespace osWebRtcVoice.Tests
             using var region = StockRegion.Create((voice, _) => voice.Set("A2AVoiceEnabled", "true"));
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
-            UUID session = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+            UUID session = A2ACalls.ComputeSessionId(Alice, Bob);
             await region.ChatSessionAsync(Alice, ChatBody("start p2p voice", session, OSD.FromUUID(Bob)));
             CapAnswer call = await region.ChatSessionAsync(Alice, ChatBody("call", session));
             CapAnswer bobCall = await region.ChatSessionAsync(Bob, ChatBody("call", session));
@@ -321,7 +321,7 @@ namespace osWebRtcVoice.Tests
             region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
             region.AddAvatar(Bob, StockRegion.InEstateChannelParcel);
             List<int> before = await _janus.RoomsAsync();
-            UUID session = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+            UUID session = A2ACalls.ComputeSessionId(Alice, Bob);
 
             Assert.That((await region.ChatSessionAsync(Alice, ChatBody("call", session))).Status,
                 Is.EqualTo((int)HttpStatusCode.BadRequest), "call: unhandled method");

@@ -19,12 +19,11 @@
  * in-process store takes its lock; a future service implementation sends the intent and applies it
  * server-side. Every idempotency and cap race is therefore decided in one place.
  *
- * WHERE A GRID-WIDE SERVICE GOES. WebRtcVoiceServerConnector is the existing region->service hop for
- * voice, so the grid-wide store is an INonSpatialSessionStore implementation that calls through it,
- * swapped in at module construction. The engine, the admission policies, the room-key derivation
- * and every test are untouched by that swap -- that is the point of the seam. What
- * that implementation must additionally carry, and this one does not, is written on each member of
- * the interface.
+ * WHERE A GRID-WIDE SERVICE GOES. Mutate and StartOrGet take delegates, which cannot be sent to another
+ * process, so a grid-wide store is not an implementation of this interface. It is VoiceSessionService:
+ * the engine itself, running over this in-memory store inside Robust, reached by a region through
+ * GridNonSpatialSessions (INonSpatialSessions) and VoiceSessionServicesConnector. The engine's logic does
+ * not change; only where it runs does.
  */
 using System;
 using System.Collections.Generic;

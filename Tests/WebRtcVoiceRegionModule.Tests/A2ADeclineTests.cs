@@ -23,6 +23,7 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
+using osWebRtcVoice.NonSpatial;
 using static osWebRtcVoice.Tests.CrossProcessHarness;
 
 namespace osWebRtcVoice.Tests
@@ -33,7 +34,7 @@ namespace osWebRtcVoice.Tests
         private static readonly UUID Alice = new UUID("11111111-1111-1111-1111-111111111111");
         private static readonly UUID Bob = new UUID("22222222-2222-2222-2222-222222222222");
         private static readonly UUID Carol = new UUID("33333333-3333-3333-3333-333333333333");
-        private static readonly UUID Session = A2ASessionRegistry.ComputeSessionId(Alice, Bob);
+        private static readonly UUID Session = A2ACalls.ComputeSessionId(Alice, Bob);
 
         private static (WebRtcVoiceRegionModule Module, Process Process) Region()
         {
@@ -41,6 +42,9 @@ namespace osWebRtcVoice.Tests
             WebRtcVoiceRegionModule module = new WebRtcVoiceRegionModule();
             SetPrivate(module, "m_Enabled", true);
             SetPrivate(module, "m_a2aVoiceEnabled", true);
+            SetPrivate(module, "m_nonSpatial", new NonSpatialVoiceSessionEngine(
+                new InMemoryNonSpatialSessionStore(),
+                new INonSpatialAdmission[] { new P2PAdmission(), new AdhocAdmission() }, "example-grid"));
             ((List<Scene>)GetPrivate(module, "m_scenes")).Add(p.Scene);
             p.AddRoot(Alice);
             p.AddRoot(Bob);
