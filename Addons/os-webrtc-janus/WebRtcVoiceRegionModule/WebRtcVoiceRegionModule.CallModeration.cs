@@ -248,7 +248,8 @@ public partial class WebRtcVoiceRegionModule
     }
 
     // Re-ask the groups service who moderates, for the members of group calls who are here, and send an entry only
-    // where the flag differs from what that member was last sent.
+    // where the flag differs from what that member was last sent. One pass reads each call once and asks the groups
+    // service about each member once, whatever the number of members and of decisions made about each.
     private void RevalidateCallFlags()
     {
         try
@@ -260,9 +261,12 @@ public partial class WebRtcVoiceRegionModule
             List<(UUID Session, UUID Agent)> tracked;
             lock (m_callFlagsSent)
                 tracked = new List<(UUID, UUID)>(m_callFlagsSent.Keys);
+            Dictionary<UUID, NonSpatialVoiceSession> calls = new();
+            GroupStandingMemo standing = new GroupStandingMemo(m_callModeration.IsMember, m_callModeration.Powers);
             foreach ((UUID sessionId, UUID agent) in tracked)
             {
-                NonSpatialVoiceSession session = m_nonSpatial.Get(sessionId, agent);
+                if (!calls.TryGetValue(sessionId, out NonSpatialVoiceSession session))
+                    calls[sessionId] = session = m_nonSpatial.Get(sessionId);
                 NonSpatialMember member = session?.Find(agent);
                 if (session is null || member is null || !member.HoldsSeat || !here.Contains(agent))
                 {
@@ -271,13 +275,13 @@ public partial class WebRtcVoiceRegionModule
                     continue;
                 }
                 // A member who no longer holds the powers the call needs is let go of first.
-                if (DropIfCallPowerLost(session, agent))
+                if (DropIfCallPowerLost(session, agent, standing))
                 {
                     lock (m_callFlagsSent)
                         m_callFlagsSent.Remove((sessionId, agent));
                     continue;
                 }
-                bool now = m_callModeration.MayModerate(agent, session.Owner);
+                bool now = m_callModeration.MayModerate(agent, session.Owner, standing.IsMember, standing.Powers);
                 bool last;
                 lock (m_callFlagsSent)
                     last = m_callFlagsSent.TryGetValue((sessionId, agent), out bool sent) && sent;

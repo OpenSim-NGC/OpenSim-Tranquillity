@@ -91,8 +91,11 @@ namespace osWebRtcVoice.NonSpatial
         public bool IsUsable => Settings.Enabled && IsMember != null && Powers != null;
 
         /// <summary>A member of the group who holds Moderate Group Chat. Asked each time; never kept.</summary>
-        public bool MayModerate(UUID agent, UUID group)
-            => agent != UUID.Zero && IsMember(agent, group) && (Powers(agent, group) & PowerModerateChat) != 0;
+        public bool MayModerate(UUID agent, UUID group) => MayModerate(agent, group, IsMember, Powers);
+
+        /// <summary>As <see cref="MayModerate(UUID, UUID)"/>, asking the given lookups (a pass over many members shares one memo).</summary>
+        public bool MayModerate(UUID agent, UUID group, Func<UUID, UUID, bool> isMember, Func<UUID, UUID, ulong> powers)
+            => agent != UUID.Zero && isMember(agent, group) && (powers(agent, group) & PowerModerateChat) != 0;
     }
 
     /// <summary>What the module does for a moderation request, beside recording it.</summary>

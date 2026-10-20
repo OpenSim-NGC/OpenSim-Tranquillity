@@ -40,8 +40,13 @@ namespace osWebRtcVoice.Tests
         public class FakeGroups : DispatchProxy
         {
             public static readonly Dictionary<UUID, ulong> Powers = new();
+
+            /// <summary>How many times each method was called since the last <see cref="Region.Create"/>.</summary>
+            public static readonly Dictionary<string, int> Calls = new();
+
             protected override object Invoke(MethodInfo method, object[] args)
             {
+                lock (Calls) Calls[method.Name] = Calls.GetValueOrDefault(method.Name) + 1;
                 switch (method.Name)
                 {
                     case nameof(IGroupsModule.GetMembershipData) when args.Length == 2:
@@ -150,6 +155,7 @@ namespace osWebRtcVoice.Tests
             public static Region Create(Action<IConfig> voice = null, Action<IConfig> janus = null)
             {
                 FakeGroups.Powers.Clear();
+                lock (FakeGroups.Calls) FakeGroups.Calls.Clear();
                 FakeGroups.Powers[Officer] = CallModerationPolicy.PowerModerateChat | GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice;
                 FakeGroups.Powers[Member] = GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice;
                 FakeGroups.Powers[Other] = GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice;

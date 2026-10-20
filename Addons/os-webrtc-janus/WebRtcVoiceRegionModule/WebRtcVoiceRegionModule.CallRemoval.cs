@@ -186,11 +186,14 @@ public partial class WebRtcVoiceRegionModule
 
     // A group member who no longer holds the powers to be in the call (or is no longer in the group) is dropped from it.
     // This is not a removal: it leaves no record, and the member can come back when the powers do.
-    private bool DropIfCallPowerLost(NonSpatialVoiceSession session, UUID agent)
+    // A pass over many members passes one memo's lookups so the groups service is asked once for each member.
+    private bool DropIfCallPowerLost(NonSpatialVoiceSession session, UUID agent, GroupStandingMemo standing = null)
     {
         if (!m_groupVoice.IsUsable || session.Type != NonSpatialSessionType.Group)
             return false;
-        if (m_groupVoice.IsMember(agent, session.Owner) && m_groupVoice.HasRequiredPowers(agent, session.Owner))
+        Func<UUID, UUID, bool> isMember = standing is null ? m_groupVoice.IsMember : standing.IsMember;
+        Func<UUID, UUID, ulong> powers = standing is null ? m_groupVoice.Powers : standing.Powers;
+        if (isMember(agent, session.Owner) && (powers(agent, session.Owner) & m_groupVoice.RequiredMask) == m_groupVoice.RequiredMask)
             return false;
         m_nonSpatial.Depart(session.SessionId, agent, DepartureReason.PowerLost);
         int dropped = DropMemberFromCallMedia(session, agent, ForceCloseReasonKey);
