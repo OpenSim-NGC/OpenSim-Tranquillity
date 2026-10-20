@@ -280,44 +280,105 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
                     return;
                 }
 
-                if(map.TryGetInt("parcel_local_id", out int parcelID))
+                // For a ROOT agent the parcel is derived from the avatar's position, as
+                // Vivox/FreeSwitch do (scene.GetLandData(avatar.AbsolutePosition)). It used to be looked up
+                // by the viewer's parcel_local_id: the parcel was taken from what the viewer sent, rather than
+                // from where the avatar is. The client id is now a hint: logged on mismatch, never refused (a
+                // viewer mid-crossing can be stale).
+                // A CHILD agent (the viewer's neighbour-region provision) is positioned outside this
+                // region, so position finds no parcel. It keeps the earlier path: a client id selects the
+                // parcel and every check runs against it; no id (the stock viewer, estate channel) means no
+                // parcel checks and the service's -999 estate room. ProvisionParcelResolver decides; a hinted
+                // parcel that is not near the child's known position is dropped below.
+                int? clientParcelId = map.TryGetInt("parcel_local_id", out int c) ? c : null;
+                ParcelResolveInput resolveInput = new ParcelResolveInput(clientParcelId, sp.IsChildAgent);
+
+                ILandObject parcel = null;
+                if (ProvisionParcelResolver.DerivesFromPosition(resolveInput))
+                    parcel = scene.LandChannel.GetLandObject(sp.AbsolutePosition.X, sp.AbsolutePosition.Y);
+                ParcelResolution res = ProvisionParcelResolver.Resolve(resolveInput, parcel?.LandData?.LocalID);
+                if (res.Source == ParcelSource.ClientHint)
                 {
-                    ILandObject parcel = scene.LandChannel.GetLandObject(parcelID);
-                    if (parcel == null)
+                    // The id comes from the viewer, and this region only knows the child agent's position
+                    // coarsely (the root region sends it after about 10 m of movement, at most every 2 s).
+                    // Accept the named parcel only if it lies within that slack of the child's position;
+                    // otherwise treat the request as sent without an id (estate room). Never a refusal.
+                    parcel = scene.LandChannel.GetLandObject(res.LocalId.Value);
+                    LandData hinted = parcel?.LandData;
+                    if (hinted is null || !ChildParcelProximity.IsNear(sp.AbsolutePosition, hinted.AABBMin, hinted.AABBMax))
                     {
-                        response.RawBuffer = llsdUndefAnswerBytes;
-                        response.StatusCode = (int)HttpStatusCode.NotFound;
-                        return;
+                        res = ProvisionParcelResolver.RejectHint(res);
+                        parcel = null;
+                        map.Remove("parcel_local_id"); // the service must not room by the dropped id
                     }
-                    
-                    LandData land = parcel.LandData;
+                }
+
+                LandData land = parcel?.LandData;
+                bool estateChan = land != null && (land.Flags & (uint)ParcelFlags.UseEstateVoiceChan) != 0;
+
+                // Every path logs this line, including the refusals below and the child/no-hint estate path,
+                // so no provision outcome is silent, the NotFound arm included.
+                m_log.LogDebug("{LogHeader} [PARCEL RESOLVE] agent={AgentId} region={RegionName} child={Child} source={Source} client={ClientId} server={ServerLocalId} parcel={ParcelId} estate_chan={EstateChan} mismatch={Mismatch} hint_rejected={HintRejected}",
+                    logHeader, agentID, scene.Name, sp.IsChildAgent, res.Source, clientParcelId?.ToString() ?? "-",
+                    res.ServerLocalId?.ToString() ?? "-", land?.LocalID.ToString() ?? "-",
+                    land == null ? "-" : estateChan.ToString(), res.ClientMismatch, res.HintRejected);
+
+                // ParcelSource.None: child agent, no client id -- no parcel checks, parcel_local_id stays
+                // absent, the service defaults to the estate room. The normal neighbour-region path.
+                if (res.Source != ParcelSource.None)
+                {
                     if (land == null)
                     {
+                        if (res.Source == ParcelSource.ServerPosition)
+                            m_log.LogWarning("{LogHeader}[ProvisionVoice]: no parcel at position for root agent {AgentId} in \"{RegionName}\" — refusing",
+                                logHeader, agentID, scene.Name);
                         response.RawBuffer = llsdUndefAnswerBytes;
                         response.StatusCode = (int)HttpStatusCode.NotFound;
                         return;
                     }
 
-                    if (!scene.RegionInfo.EstateSettings.TaxFree && (land.Flags & (uint)ParcelFlags.AllowVoiceChat) == 0)
+                    if (res.ClientMismatch)
+                        m_log.LogWarning("{LogHeader}[ProvisionVoice]: parcel_local_id {ClientId} from agent {AgentId} does not match the avatar's parcel {ServerLocalId} in \"{RegionName}\" — using the server parcel",
+                            logHeader, clientParcelId, agentID, res.ServerLocalId, scene.Name);
+
+                    // Voice applies the parcel's voice-off setting and ban list itself, on every estate,
+                    // including TaxFree estates (ProvisionParcelAccess). Done before any parcel_local_id
+                    // rewrite below.
+                    EstateSettings estateSettings = scene.RegionInfo.EstateSettings;
+                    ProvisionAccess access = ProvisionParcelAccess.Check(
+                        land,
+                        parcel.IsRestrictedFromLand(agentID) || parcel.IsBannedFromLand(agentID),
+                        a => scene.Permissions.IsAdministrator(a),
+                        a => estateSettings.IsEstateManagerOrOwner(a),
+                        agentID,
+                        Util.UnixTimeSinceEpoch());
+                    if (access == ProvisionAccess.VoiceOff)
                     {
                         m_log.LogDebug($"{logHeader}[ProvisionVoice]:parcel voice not allowed");
                         response.RawBuffer = llsdUndefAnswerBytes;
                         response.StatusCode = (int)HttpStatusCode.Forbidden;
                         return;
                     }
-
-                    if ((land.Flags & (uint)ParcelFlags.UseEstateVoiceChan) != 0)
+                    if (access == ProvisionAccess.Barred)
                     {
-                        map.Remove("parcel_local_id"); // estate channel
-                    }
-                    else if(parcel.IsRestrictedFromLand(agentID) || parcel.IsBannedFromLand(agentID))
-                    {
-                        // check Z distance?
                         m_log.LogDebug($"{logHeader}[ProvisionVoice]:agent not allowed on parcel");
                         response.RawBuffer = llsdUndefAnswerBytes;
                         response.StatusCode = (int)HttpStatusCode.Forbidden;
                         return;
                     }
+
+                    if (estateChan)
+                    {
+                        map.Remove("parcel_local_id"); // estate channel
+                    }
+                    else if (res.Source == ParcelSource.ServerPosition)
+                    {
+                        // The service hashes this into the mixer room (CalcRoomNumber). An honest viewer sends
+                        // the same number, so no live room renumbers.
+                        map["parcel_local_id"] = OSD.FromInteger(land.LocalID);
+                    }
+                    // else ParcelSource.ClientHint: the client's parcel_local_id is forwarded unchanged (previous behaviour).
+
                 }
             }
         }

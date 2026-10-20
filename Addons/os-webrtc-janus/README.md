@@ -194,6 +194,26 @@ startup when a call feature is on.
 | `SessionStoreOutboxMax`, `SessionStoreOutboxSeconds` | `[WebRtcVoice]` | `256`, `60` | Departures the service could not be told about are kept and sent when it answers: the most kept, and the seconds each is kept before it is given up. |
 | `SessionStoreBreakerFailures`, `SessionStoreBreakerWindowSeconds`, `SessionStoreBreakerOpenSeconds` | `[WebRtcVoice]` | `5`, `10`, `5` | After this many requests get no answer within the window, further requests are refused at once for the open period, then one is tried to see whether the service is back. |
 
+#### Which parcel a voice request is checked against
+
+A stock viewer sends `parcel_local_id` only when the avatar stands on a parcel that has its own voice channel (the
+parcel's "use estate voice channel" option is off). On a parcel that uses the estate voice channel it sends none,
+and it sends none on the connection it opens to each neighbouring region.
+
+For an avatar that is in the region, the parcel is the one the avatar is standing on. The viewer's
+`parcel_local_id` is not used to choose it: a different id is logged and ignored. Voice applies the parcel's
+voice-off setting and ban list itself, on every estate, including TaxFree estates: a parcel with voice turned off
+refuses voice (HTTP 403), and an avatar on the parcel's ban list is refused (HTTP 403), whether or not the parcel
+uses the estate voice channel. The parcel's owner, the region's estate managers and owner, and administrators are
+not refused by the ban list.
+
+The avatar's room follows from that parcel. A parcel on the estate voice channel gets the region-wide room; a
+parcel with its own voice channel gets that parcel's room.
+
+For the viewer of an avatar that is in a neighbouring region, the named parcel is used only if it is near where
+that avatar is known to be; otherwise the request is treated as one that named no parcel and gets the region-wide
+room.
+
 <a id="Configure_Robust"></a>
 ## Configure Robust Server for WebRTC Voice
 
