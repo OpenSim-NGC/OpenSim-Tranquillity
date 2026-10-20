@@ -3482,8 +3482,8 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
 
         // currencyBuy:viewerMinorVersion:secureSessionId:viewerBuildVersion:estimatedCost:confirm:agentId:viewerPatchVersion:viewerMajorVersion:viewerChannel:language
         // m_log.LogInformation("[GLOEBITMONEYMODULE] buy_func params {0}", String.Join(":", requestData.Keys.Cast<String>()));
-        m_log.LogInformation("[GLOEBITMONEYMODULE] buy_func agentId {0} confirm {1} currencyBuy {2} estimatedCost {3} secureSessionId {4}",
-            agentId, confirm, currencyBuy, estimatedCost, secureSessionId);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] buy_func agentId {0} confirm {1} currencyBuy {2} estimatedCost {3}",
+            agentId, confirm, currencyBuy, estimatedCost);
 
         GloebitUser u = GloebitUser.Get(m_key, agentId);
         Uri url = m_apiW.BuildPurchaseURI(BaseURI, u);
