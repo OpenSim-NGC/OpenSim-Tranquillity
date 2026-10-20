@@ -36,6 +36,7 @@
   <ItemGroup>
     <PackageReference Include="MailKit" Version="4.18.1" />
     <PackageReference Include="MimeKit" Version="4.18.1" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
     <PackageReference Include="MySqlConnector" Version="2.6.2" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.13" />
     <PackageReference Include="CoreJ2K.Skia" Version="2.4.1.108" />
