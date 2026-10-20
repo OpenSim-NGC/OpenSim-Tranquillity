@@ -72,6 +72,17 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
+        public void TheCarrierRing_IsSentToRootOnly_SoAChildPresenceHereIsNotHandedTheCarrier()
+        {
+            var (mod, p, session) = Starting(x => x.AddChild(Bob));
+
+            Ring(mod, session);
+
+            Assert.That(p.Transfer.Sent, Has.Count.EqualTo(1));
+            Assert.That(p.Transfer.SentRootOnly, Is.EqualTo(new[] { true }));
+        }
+
+        [Test]
         public void InviteeWithARootPresenceHere_IsRungLocally_AndNothingIsCarried()
         {
             var (mod, p, session) = Starting(x => x.AddRoot(Bob));

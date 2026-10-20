@@ -159,6 +159,18 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
+        public void TheTextCarrier_IsSentToRootOnly()
+        {
+            var (one, two, session) = Start(false, Bob);
+            two.Engine.Accept(session, Bob, RegionB, "vs-bob");
+
+            Type(one, Alice, session, "hello");
+
+            Assert.That(one.Process.Transfer.Sent.Where(m => AdhocTextTransport.TryParse(m, out _, out _, out _, out _, out _)).Count(), Is.EqualTo(1));
+            Assert.That(one.Process.Transfer.SentRootOnly, Is.All.True, "a child presence here must not be handed the carrier as an instant message");
+        }
+
+        [Test]
         public void AMemberWhoDeclinedInTheOtherProcess_DoesNotReceive_AndTheAcceptingMemberDoes()
         {
             var (one, two, session) = Start(false, Bob, Carol);

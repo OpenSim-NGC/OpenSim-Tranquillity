@@ -270,10 +270,12 @@ public partial class WebRtcVoiceRegionModule
         {
             try
             {
+                // Root only: if the member is a child presence in this process the transfer module would hand the
+                // carrier to that viewer as an instant message; it is meant for the process where they are root.
                 transfer.SendInstantMessage(
                     AdhocTextTransport.Build(target, plan.Sender, fromName, plan.Session.SessionId,
                                              originRegion, plan.Message, null, plan.Session.RoomKey, m_carrierAuth),
-                    _ => { });
+                    _ => { }, true);
                 m_log.LogDebug("{LogHeader} {Line}", logHeader,
                     AdhocTextTransport.Line(target, plan.Session.SessionId, AdhocTextTransport.DecisionSent));
             }
@@ -470,7 +472,9 @@ public partial class WebRtcVoiceRegionModule
             {
                 GridInstantMessage im = GroupVoiceRingTransport.Build(target, initiator, initiatorName,
                                                                       session.SessionId, originRegion, body, m_carrierAuth);
-                transfer.SendInstantMessage(im, _ => { });
+                // Root only: if the member is a child presence in this process the transfer module would hand the
+                // carrier to that viewer as an instant message; it is meant for the process where they are root.
+                transfer.SendInstantMessage(im, _ => { }, true);
                 m_log.LogDebug("{LogHeader} {Line}", logHeader,
                     GroupVoiceRingTransport.Line(target, session.SessionId, GroupVoiceRingTransport.DecisionSent));
             }
