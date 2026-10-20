@@ -151,7 +151,8 @@ public partial class WebRtcVoiceRegionModule
         => m_stockPlugin ? StockCallMute() is not null
                          : !string.IsNullOrEmpty(m_JanusAdminUri) && !string.IsNullOrEmpty(m_JanusAdminToken);
 
-    // Make the record's voice mutes true in the call's room. Mixer: one send for the whole room. Stock plugin: one
+    // Make the record's voice mutes true in the call's room. Mixer: the whole room in one send (the sink cuts it into a few
+    // requests when it is over the mixer's size limit). Stock plugin: one
     // mute request for each member who is in the room.
     private ParticipantMuteResult EnforceCallVoice(NonSpatialVoiceSession session, UUID target = default)
     {

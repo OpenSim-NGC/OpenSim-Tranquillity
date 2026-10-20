@@ -27,6 +27,7 @@
     <Compile Include="PeerCtlBatchSink.cs" />
     <Compile Include="PeerCtlBatchSerializer.cs" />
     <Compile Include="PeerCtlBatchPartitioner.cs" />
+    <Compile Include="PeerCtlBatchSplitter.cs" />
   </ItemGroup>
 
 </Project>

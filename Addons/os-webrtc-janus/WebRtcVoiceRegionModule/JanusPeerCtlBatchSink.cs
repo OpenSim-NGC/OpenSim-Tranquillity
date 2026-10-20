@@ -17,6 +17,8 @@
  *   - PeerCtlBatchPartitioner splits the map by roomOf(listener), keeping for each listener
  *     only the sources in that same room (inert cross-room sources cost cap and nothing else);
  *   - one admin message goes to each room, issued in parallel under a small cap;
+ *   - a room's message that would be over the mixer's size limit (65,536 bytes of compact JSON) is cut between
+ *     listeners into parts, sent one after another (PeerCtlBatchSplitter); a message under the limit is sent whole;
  *   - the per-room results aggregate into ONE PeerCtlSendResult in severity order, so the
  *     sender's contract - and its consecutive-ProtocolError latch arithmetic - is unchanged.
  *
@@ -70,6 +72,7 @@ namespace osWebRtcVoice
         private readonly string _region;
 
         private volatile int _lastSendRooms;
+        private volatile int _lastSendRequests;                 // requests built: one for each room unless a room was cut into parts
         private volatile int[] _lastSendRoomNumbers = Array.Empty<int>();   // which ones, for the console
         private volatile int _lastSendFallbackListeners;
         private volatile int _lastSendFallbackSources;
@@ -165,6 +168,10 @@ namespace osWebRtcVoice
         /// <summary>Rooms addressed by the most recent send (the "rooms addressed per tick" figure).</summary>
         public int LastSendRooms => _lastSendRooms;
 
+        /// <summary>Requests the most recent send built. The same as <see cref="LastSendRooms"/> unless a room's request
+        /// was over the mixer's size limit and was cut into parts.</summary>
+        public int LastSendRequests => _lastSendRequests;
+
         /// <summary>Distinct listeners in the most recent send with no room record.</summary>
         public int LastSendFallbackListeners => _lastSendFallbackListeners;
 
@@ -237,63 +244,99 @@ namespace osWebRtcVoice
             // Build EVERY body BEFORE sending any of them. The serializer's invariant throw stays
             // all-or-nothing as it was when there was one message: a zero UUID in any room aborts the
             // whole tick with nothing on the wire, rather than leaving some rooms updated and others not.
+            // A room's request is cut into parts when it would be over the mixer's limit (see PeerCtlBatchSplitter);
+            // nearly always a room is one part, and that part is the request this method always sent.
             VisAuthority authority = Authority;
-            var requests = new List<OSDMap>(roomKeys.Count);
-            var stamps = authority != null ? new List<(int Room, uint Generation, List<UUID> Named)>(roomKeys.Count) : null;
+            var roomSends = new List<RoomSend>(roomKeys.Count);
+            int requestCount = 0;
             foreach (int roomKey in roomKeys)
             {
                 IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> exclSlice =
                     part.Rooms.TryGetValue(roomKey, out var es) ? es : EmptyChannel;
                 IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> muteSlice =
                     (muteRooms != null && muteRooms.TryGetValue(roomKey, out var ms)) ? ms : null;
-                OSDMap request = PeerCtlBatchSerializer.BuildRequest(op, exclSlice, muteSlice);
-                request["room"] = new OSDInteger(roomKey);   // the sink stamps the room, per room
-                if (authority != null)
-                    stamps.Add(StampAuthority(authority, request, op, roomKey, exclSlice, muteSlice));
-                requests.Add(request);
+                var send = new RoomSend(roomKey);
+                foreach (PeerCtlBatchPart piece in PeerCtlBatchSplitter.Split(op, exclSlice, muteSlice, roomKey, authority != null))
+                {
+                    OSDMap request = PeerCtlBatchSerializer.BuildRequest(op, piece.Excl, piece.Mute);
+                    request["room"] = new OSDInteger(roomKey);   // the sink stamps the room, per room
+                    send.Requests.Add(request);
+                    if (authority != null)
+                        send.Stamps.Add(StampAuthority(authority, request, op, roomKey, piece.Excl, piece.Mute));
+                }
+                requestCount += send.Requests.Count;
+                roomSends.Add(send);
             }
+            _lastSendRequests = requestCount;
 
-            LogRoomsAddressed(op, part, mutePart, roomKeys.Count);
+            LogRoomsAddressed(op, part, mutePart, roomKeys.Count, requestCount);
 
-            if (requests.Count == 0)
+            if (roomSends.Count == 0)
             {
                 RecordStats(Array.Empty<SlvoiceReply>());    // an empty send resets last stats
                 return PeerCtlSendResult.Ok;                 // nothing to address is not a failure
             }
 
-            // One room: no gate, one round-trip - the same single message as an unpartitioned send (plus the reply parse).
-            if (requests.Count == 1)
-            {
-                (PeerCtlSendResult only, SlvoiceReply onlyReply) = await SendAndReadAsync(requests[0]).ConfigureAwait(false);
-                RecordStats(new[] { onlyReply });
-                if (authority != null)
-                    authority.OnBatchOutcome(stamps[0].Room, op, stamps[0].Generation, stamps[0].Named,
-                        only == PeerCtlSendResult.Ok, in onlyReply);
-                return only;
-            }
-
-            var sends = new Task<(PeerCtlSendResult Result, SlvoiceReply Reply)>[requests.Count];
-            for (int i = 0; i < requests.Count; i++)
-                sends[i] = SendGatedAsync(requests[i]);
-            (PeerCtlSendResult Result, SlvoiceReply Reply)[] results = await Task.WhenAll(sends).ConfigureAwait(false);
+            // One room: no gate, one round-trip for each part - a single message as an unpartitioned send (plus the reply parse).
+            var sends = new Task<List<(PeerCtlSendResult Result, SlvoiceReply Reply)>>[roomSends.Count];
+            if (roomSends.Count == 1)
+                sends[0] = SendPartsAsync(roomSends[0]);
+            else
+                for (int i = 0; i < roomSends.Count; i++)
+                    sends[i] = SendGatedAsync(roomSends[i]);
+            List<(PeerCtlSendResult Result, SlvoiceReply Reply)>[] results = await Task.WhenAll(sends).ConfigureAwait(false);
 
             // Aggregate in severity order, most severe wins. Every room is attempted - a failure
             // in one must not suppress the others, because rooms are independent and `replace` is
             // per-listener idempotent, so the sender's re-snapshot repairs a partial send safely.
             PeerCtlSendResult worst = PeerCtlSendResult.Ok;
-            var replies = new SlvoiceReply[results.Length];
+            var replies = new List<SlvoiceReply>(requestCount);
             for (int i = 0; i < results.Length; i++)
             {
-                replies[i] = results[i].Reply;
-                if (Severity(results[i].Result) > Severity(worst))
-                    worst = results[i].Result;
-                if (authority != null)
-                    authority.OnBatchOutcome(stamps[i].Room, op, stamps[i].Generation, stamps[i].Named,
-                        results[i].Result == PeerCtlSendResult.Ok, in replies[i]);
+                for (int j = 0; j < results[i].Count; j++)
+                {
+                    (PeerCtlSendResult result, SlvoiceReply reply) = results[i][j];
+                    replies.Add(reply);
+                    if (Severity(result) > Severity(worst))
+                        worst = result;
+                    if (authority != null)
+                        authority.OnBatchOutcome(roomSends[i].Room, op, roomSends[i].Stamps[j].Generation, roomSends[i].Stamps[j].Named,
+                            result == PeerCtlSendResult.Ok, in reply);
+                }
             }
             RecordStats(replies);
             return worst;
         }
+
+        // One room's requests, in the order they are sent, with the arming stamp each was given.
+        private sealed class RoomSend
+        {
+            public RoomSend(int room) { Room = room; }
+            public readonly int Room;
+            public readonly List<OSDMap> Requests = new List<OSDMap>();
+            public readonly List<(int Room, uint Generation, List<UUID> Named)> Stamps = new List<(int Room, uint Generation, List<UUID> Named)>();
+        }
+
+        // Send a room's parts one after another: the mixer takes a room's policy generations in rising order, and a
+        // listener's part must not overtake another's. A part that did not go through, or that the mixer answered
+        // without applying (an unknown room, a stale epoch), ends the room's send; the parts after it would meet the same
+        // answer. The parts not sent are repaired as a failed single request is: by the sender's next snapshot.
+        private async Task<List<(PeerCtlSendResult Result, SlvoiceReply Reply)>> SendPartsAsync(RoomSend send)
+        {
+            var results = new List<(PeerCtlSendResult Result, SlvoiceReply Reply)>(send.Requests.Count);
+            foreach (OSDMap request in send.Requests)
+            {
+                (PeerCtlSendResult result, SlvoiceReply reply) = await SendAndReadAsync(request).ConfigureAwait(false);
+                results.Add((result, reply));
+                if (result != PeerCtlSendResult.Ok || NotApplied(in reply))
+                    break;
+            }
+            return results;
+        }
+
+        // The mixer answered, and the answer says it did not apply the request.
+        private static bool NotApplied(in SlvoiceReply reply)
+            => reply.Present && !string.Equals(reply.Status, "applied", StringComparison.Ordinal);
 
         /// <summary>
         /// Send one batch to ONE named room, as it is: no partitioning by where the sim thinks each agent is, nothing
@@ -306,11 +349,38 @@ namespace osWebRtcVoice
             IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> excl,
             IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> mute)
         {
-            OSDMap request = PeerCtlBatchSerializer.BuildRequest(op, excl ?? EmptyChannel, mute);
-            request["room"] = new OSDInteger(roomNumber);
-            (PeerCtlSendResult result, SlvoiceReply reply) = await SendAndReadAsync(request).ConfigureAwait(false);
-            RecordStats(new[] { reply });
-            return (result, reply);
+            // A room's whole picture can be over the mixer's size limit (a mute of everyone in a full room is), so it goes
+            // in as many requests as it takes, one after another. The answer is the last part's, with the counts of the parts
+            // added up; a part that fails, or that the mixer does not apply, is the answer and the rest are not sent.
+            var replies = new List<SlvoiceReply>();
+            PeerCtlSendResult result = PeerCtlSendResult.Ok;
+            SlvoiceReply answer = default;
+            foreach (PeerCtlBatchPart piece in PeerCtlBatchSplitter.Split(op, excl ?? EmptyChannel, mute, roomNumber, false))
+            {
+                OSDMap request = PeerCtlBatchSerializer.BuildRequest(op, piece.Excl, piece.Mute);
+                request["room"] = new OSDInteger(roomNumber);
+                (result, SlvoiceReply reply) = await SendAndReadAsync(request).ConfigureAwait(false);
+                answer = replies.Count == 0 ? reply : Accumulate(answer, reply);
+                replies.Add(reply);
+                if (result != PeerCtlSendResult.Ok || NotApplied(in reply))
+                {
+                    answer = reply;
+                    break;
+                }
+            }
+            RecordStats(replies);
+            return (result, answer);
+        }
+
+        // The reply to a room sent in several parts: the latest part's answer, with the counts of all the parts so far.
+        private static SlvoiceReply Accumulate(in SlvoiceReply earlier, in SlvoiceReply latest)
+        {
+            SlvoiceReply sum = latest;
+            sum.Entries += earlier.Entries;
+            sum.MuteEntries += earlier.MuteEntries;
+            sum.Skipped += earlier.Skipped;
+            sum.DeferredListeners += earlier.DeferredListeners;
+            return sum;
         }
 
         // Stamp the room's epoch and next generation, and on add/remove the base generation the
@@ -371,12 +441,12 @@ namespace osWebRtcVoice
             return list.ToArray();
         }
 
-        private async Task<(PeerCtlSendResult Result, SlvoiceReply Reply)> SendGatedAsync(OSDMap request)
+        private async Task<List<(PeerCtlSendResult Result, SlvoiceReply Reply)>> SendGatedAsync(RoomSend send)
         {
             await _roomGate.WaitAsync().ConfigureAwait(false);
             try
             {
-                return await SendAndReadAsync(request).ConfigureAwait(false);
+                return await SendPartsAsync(send).ConfigureAwait(false);
             }
             finally
             {
@@ -569,7 +639,7 @@ namespace osWebRtcVoice
         // per-room breakdown shows excl+mute listener counts, and both channels' fallback counts are
         // logged. Otherwise a mute-only op would log "addressed 0 rooms / fallback 0" while the mute
         // was delivered to its room.
-        private void LogRoomsAddressed(VisOp op, PeerCtlBatchPartition part, PeerCtlBatchPartition mutePart, int roomsAddressed)
+        private void LogRoomsAddressed(VisOp op, PeerCtlBatchPartition part, PeerCtlBatchPartition mutePart, int roomsAddressed, int requests)
         {
             if (!m_log.IsEnabled(LogLevel.Debug))
                 return;
@@ -590,9 +660,9 @@ namespace osWebRtcVoice
             if (sb.Length == 0)
                 sb.Append("none");
 
-            m_log.LogDebug("{LogHeader} region {RegionName}: {Op} addressed {RoomCount} room(s) [room:excl+mute {Rooms}]; " +
+            m_log.LogDebug("{LogHeader} region {RegionName}: {Op} addressed {RoomCount} room(s) in {Requests} request(s) [room:excl+mute {Rooms}]; " +
                 "unplaced excl listeners {FbExclL}/sources {FbExclS}, mute listeners {FbMuteL}/sources {FbMuteS} (estate room {EstateRoom})",
-                LogHeader, _region, PeerCtlBatchSerializer.OpString(op), roomsAddressed, sb.ToString(),
+                LogHeader, _region, PeerCtlBatchSerializer.OpString(op), roomsAddressed, requests, sb.ToString(),
                 part.FallbackListeners, part.FallbackSources, mutePart.FallbackListeners, mutePart.FallbackSources, _fallbackRoom);
         }
     }
