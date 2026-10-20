@@ -137,6 +137,19 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
+        public void TheCarrierRing_IsSentToRootOnly_SoAChildPresenceHereIsNotHandedTheCarrier()
+        {
+            // Without the flag the transfer module delivers a message for an agent who is only a child presence in this
+            // process to that agent's viewer as an instant message, and it never reaches the process where they are root.
+            var (mod, p, session) = Calling(x => x.AddChild(Bob));
+
+            Ring(mod, session);
+
+            Assert.That(p.Transfer.Sent, Has.Count.EqualTo(1));
+            Assert.That(p.Transfer.SentRootOnly, Is.EqualTo(new[] { true }));
+        }
+
+        [Test]
         public void RootAgents_ListsRootPresencesOnly()
         {
             Process p = new Process();

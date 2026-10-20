@@ -176,7 +176,9 @@ public partial class WebRtcVoiceRegionModule
             {
                 GridInstantMessage im = GroupVoiceRingTransport.Build(target, initiator, initiatorName,
                                                                       session.Owner, originRegion, body, m_carrierAuth);
-                transfer.SendInstantMessage(im, _ => { });
+                // Root only: if the member is a child presence in this process the transfer module would hand the
+                // carrier to that viewer as an instant message; it is meant for the process where they are root.
+                transfer.SendInstantMessage(im, _ => { }, true);
                 m_log.LogDebug("{LogHeader} {Line}", logHeader,
                     GroupVoiceRingTransport.Line(target, session.Owner, GroupVoiceRingTransport.DecisionSent));
             }
