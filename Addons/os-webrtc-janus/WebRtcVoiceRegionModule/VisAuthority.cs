@@ -66,8 +66,12 @@ namespace osWebRtcVoice
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private const string LogHeader = "[VISIBILITY AUTHORITY]";
 
-        /// <summary>The heartbeat interval, a sim constant (4 feeder ticks at 250 ms).</summary>
-        public const int HeartbeatIntervalMs = 1000;
+        /// <summary>The default heartbeat interval: 4 feeder ticks at 250 ms. [WebRtcVoice] VisibilityHeartbeatMs
+        /// changes it for a region server that runs many regions.</summary>
+        public const int DefaultHeartbeatIntervalMs = 1000;
+
+        /// <summary>The interval between heartbeats this authority sends, and tells the mixer to expect.</summary>
+        public int HeartbeatIntervalMs { get; }
 
         /// <summary>How long a listener whose room the mixer does not know (or refuses as stale_epoch) waits before
         /// the sender arms it again, the FIRST time. One heartbeat interval; a provision of that listener clears it at
@@ -102,11 +106,13 @@ namespace osWebRtcVoice
         private readonly Dictionary<UUID, int> _roomOfListener = new Dictionary<UUID, int>();   // where a backoff came from
         private readonly Dictionary<UUID, long> _rearm = new Dictionary<UUID, long>();   // listener -> requested at
         private bool _rearmAll;
+        private int _staleReports;   // listeners the mixer reported stale or unarmed since the last TakeStaleReports
         private string _mixerInstance;
         private bool _heartbeatCapable;
 
-        public VisAuthority(ulong epoch, string region = null, Func<long> nowMs = null)
+        public VisAuthority(ulong epoch, string region = null, Func<long> nowMs = null, int heartbeatIntervalMs = DefaultHeartbeatIntervalMs)
         {
+            HeartbeatIntervalMs = heartbeatIntervalMs;
             Epoch = epoch;
             EpochString = FormatEpoch(epoch);
             _region = region ?? "?";
@@ -176,6 +182,18 @@ namespace osWebRtcVoice
 
         public bool IsArmed(int room, UUID listener) => ListenerGeneration(room, listener) != 0;
 
+        /// <summary>How many stale or unarmed listeners the mixer has reported since the last call, and resets the
+        /// count. The sender folds it into its one-minute summary.</summary>
+        public int TakeStaleReports()
+        {
+            lock (_lock)
+            {
+                int n = _staleReports;
+                _staleReports = 0;
+                return n;
+            }
+        }
+
         // ---- re-arm requests --------------------------------------------------------------------
 
         /// <summary>A provisioned listener is armed at its recorded room, even if already armed, and any
@@ -230,8 +248,15 @@ namespace osWebRtcVoice
                                                                                    // unplaced agent is forgotten too
                             (gone ??= new List<UUID>()).Add(l);
                     if (gone != null)
+                    {
                         foreach (UUID l in gone)
                             room.Value.Remove(l);
+                        // The room's last listener left. The mixer removes an empty room after a grace period, so the
+                        // next listener to be addressed at it may meet a room that is not there: that first
+                        // unknown_room is expected, as it is for a room that never answered.
+                        if (room.Value.Count == 0)
+                            MarkRoomIdleLocked(room.Key);
+                    }
                 }
                 long now = _nowMs();
                 List<UUID> stale = null;
@@ -440,6 +465,21 @@ namespace osWebRtcVoice
             _roomsFirstMiss.Remove(room);
         }
 
+        private void MarkRoomIdleLocked(int room)
+        {
+            _roomsKnown.Remove(room);
+            _roomsFirstMiss.Remove(room);
+        }
+
+        /// <summary>True when an unknown_room reply for this room would be the expected first one (the room never
+        /// answered, or its last listener left since it did). A look only: it does not use the expectation up, so
+        /// the sink can ask before the authority is told the outcome.</summary>
+        public bool ExpectsUnknownRoom(int room)
+        {
+            lock (_lock)
+                return !_roomsKnown.Contains(room) && !_roomsFirstMiss.Contains(room);
+        }
+
         /// <summary>Note that a room answered again, so the next failure logs afresh. Called on any applied
         /// outcome for the room.</summary>
         private void ClearRoomBackoffLocked(int room)
@@ -462,7 +502,8 @@ namespace osWebRtcVoice
                 _rearm[l] = now;
                 _retryAt.Remove(l);
             }
-            m_log.LogInformation("{LogHeader} region {Region} room {Room}: the mixer reported {Count} stale/unarmed listener(s) " +
+            _staleReports += flagged.Count;
+            m_log.LogDebug("{LogHeader} region {Region} room {Room}: the mixer reported {Count} stale/unarmed listener(s) " +
                 "(via {Via}); re-arming them", LogHeader, _region, room, flagged.Count, via);
         }
 

@@ -186,7 +186,7 @@ namespace osWebRtcVoice.Tests
                 // Mixer restart: the next heartbeat's reply carries a new mixer_instance (and unknown_room).
                 Assert.That(Run("docker", $"restart {container}"), Is.EqualTo(0));
                 await WaitForAdmin(url, secret);
-                clock += VisAuthority.HeartbeatIntervalMs + 1;
+                clock += VisAuthority.DefaultHeartbeatIntervalMs + 1;
                 await sender.PumpHeartbeatAsync();
                 Assert.That(auth.MixerInstance, Is.Not.EqualTo(firstInstance), "the sim saw the new mixer_instance");
                 Assert.That(Logged(collector, "mixer_instance changed"), Is.True, "and logged it as a restart");
@@ -197,7 +197,7 @@ namespace osWebRtcVoice.Tests
                 clock += VisAuthority.UnknownRoomRetryMs + 1;
                 await sender.PumpAsync(feed.Tick(world));
                 Assert.That(auth.IsArmed(room, a) && auth.IsArmed(room, b), Is.True, "re-armed after the restart");
-                clock += VisAuthority.HeartbeatIntervalMs + 1;
+                clock += VisAuthority.DefaultHeartbeatIntervalMs + 1;
                 await sender.PumpHeartbeatAsync();
                 Assert.That(auth.IsArmed(room, a), Is.True, "the heartbeat after re-arming leaves them armed");
             }

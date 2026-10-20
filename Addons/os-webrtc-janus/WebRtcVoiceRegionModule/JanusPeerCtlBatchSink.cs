@@ -446,11 +446,22 @@ namespace osWebRtcVoice
         {
             (bool warn, bool info) = ClassifyReply(in reply);
             if (warn)
-                m_log.LogWarning("{LogHeader} region {RegionName} room {Room}: peer_ctl_batch inner-reply anomaly " +
-                    "(status={Status}, skipped={Skipped}, malformed={Malformed}) [{Raw}]",
-                    LogHeader, _region, room, reply.Status ?? "(none)", reply.Skipped, reply.Malformed, reply.RawSummary);
+            {
+                // The first unknown_room for a room that never answered, or whose last listener left, is expected: the
+                // mixer removes an empty room and the room comes back with the next provision. The authority knows
+                // which that is; without one every reply is reported as before.
+                bool unknownRoom = reply.Reason == "unknown_room" || reply.StatusField == "unknown_room";
+                if (unknownRoom && Authority?.ExpectsUnknownRoom(room) == true)
+                    m_log.LogDebug("{LogHeader} region {RegionName} room {Room}: peer_ctl_batch reply unknown_room; the mixer " +
+                        "has not created this room yet, or removed it once it stood empty [{Raw}]",
+                        LogHeader, _region, room, reply.RawSummary);
+                else
+                    m_log.LogWarning("{LogHeader} region {RegionName} room {Room}: peer_ctl_batch inner-reply anomaly " +
+                        "(status={Status}, skipped={Skipped}, malformed={Malformed}) [{Raw}]",
+                        LogHeader, _region, room, reply.Status ?? "(none)", reply.Skipped, reply.Malformed, reply.RawSummary);
+            }
             if (info)
-                m_log.LogInformation("{LogHeader} region {RegionName} room {Room}: mixer deferred {Deferred} listener " +
+                m_log.LogDebug("{LogHeader} region {RegionName} room {Room}: mixer deferred {Deferred} listener " +
                     "entr(y/ies) for not-yet-joined listener(s) (join-window self-heal; replays on join, not a fault)",
                     LogHeader, _region, room, reply.DeferredListeners);
         }

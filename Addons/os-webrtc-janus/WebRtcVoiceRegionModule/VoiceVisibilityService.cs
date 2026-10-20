@@ -65,6 +65,7 @@ namespace osWebRtcVoice
         private VisibilityBatchSender m_sender;   // built in StartLoop from the injected sink
         private readonly AgentRoomTable m_rooms = new AgentRoomTable();   // agent -> joined mixer room (newest wins)
         private readonly FeederWorldFromScene m_world;                   // the snapshot's parcel-local-ids
+        private readonly int m_heartbeatIntervalMs;   // [WebRtcVoice] VisibilityHeartbeatMs (default 1000)
         private readonly bool m_armingEnabled;    // [WebRtcVoice] VisibilityArmingEnabled (default false)
         private VisAuthority m_authority;         // one per StartLoop, so a new epoch per feeder start
 
@@ -74,9 +75,11 @@ namespace osWebRtcVoice
         // with a non-shared type (VoiceVisibility.dll) and the two Types never matched. A null sink
         // is tolerated — the sender runs matrix-only and logs once.
         public VoiceVisibilityService(Scene scene, int cadenceMs, bool emitEnabled = false,
-            IPeerCtlBatchSink sink = null, TimeSpan? adminTimeout = null, bool armingEnabled = false)
+            IPeerCtlBatchSink sink = null, TimeSpan? adminTimeout = null, bool armingEnabled = false,
+            int heartbeatIntervalMs = VisAuthority.DefaultHeartbeatIntervalMs)
         {
             m_armingEnabled = armingEnabled;
+            m_heartbeatIntervalMs = heartbeatIntervalMs;
             m_scene = scene;
             m_cadenceMs = cadenceMs;
             m_emitEnabled = emitEnabled;
@@ -170,7 +173,7 @@ namespace osWebRtcVoice
             Func<UUID, int?> resolveRoom = null;
             if (m_armingEnabled && m_emitEnabled && m_sink is JanusPeerCtlBatchSink armingSink)
             {
-                authority = new VisAuthority(VisAuthority.NewEpoch(), m_scene.RegionInfo.RegionName);
+                authority = new VisAuthority(VisAuthority.NewEpoch(), m_scene.RegionInfo.RegionName, null, m_heartbeatIntervalMs);
                 armingSink.Authority = authority;
                 resolveRoom = ResolveRoom;
                 m_authority = authority;
@@ -202,12 +205,12 @@ namespace osWebRtcVoice
             {
                 authority.FeedAgeMs = () => Environment.TickCount64 - Volatile.Read(ref m_lastTickMs);
                 m_heartbeatTimer = new Timer(OnHeartbeatTimer, null,
-                    VisAuthority.HeartbeatIntervalMs, VisAuthority.HeartbeatIntervalMs);
+                    authority.HeartbeatIntervalMs, authority.HeartbeatIntervalMs);
             }
             m_log.LogInformation($"{logHeader} feeder started for {m_scene.RegionInfo.RegionName} @ {m_cadenceMs}ms (emit={m_emitEnabled})");
             if (authority != null)
                 m_log.LogInformation($"{logHeader} arming ENABLED for {m_scene.RegionInfo.RegionName} ([WebRtcVoice] VisibilityArmingEnabled): " +
-                    $"room_epoch {authority.EpochString}; heartbeats every {VisAuthority.HeartbeatIntervalMs} ms once the mixer advertises " +
+                    $"room_epoch {authority.EpochString}; heartbeats every {authority.HeartbeatIntervalMs} ms once the mixer advertises " +
                     $"vis_protocol {VisAuthority.HeartbeatProtocol}");
             else if (m_armingEnabled)
                 m_log.LogWarning($"{logHeader} [WebRtcVoice] VisibilityArmingEnabled is true but {m_scene.RegionInfo.RegionName} has no Janus " +

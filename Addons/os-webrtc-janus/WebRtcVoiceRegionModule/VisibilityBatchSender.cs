@@ -39,6 +39,7 @@ using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
+using osWebRtcVoice.NonSpatial;   // RefusalLogGate
 
 namespace osWebRtcVoice
 {
@@ -113,6 +114,18 @@ namespace osWebRtcVoice
         private long _hbWindowStartMs;
         private int _hbSends;
         private int _hbNonOk;
+        private bool _hbIdle;                 // the last heartbeat found no rooms and no listeners
+
+        // What the one-minute summary reports on top of the sends, so the lines that used to be written for each
+        // arming replace and each deferral can be Debug lines. Written from the tick and heartbeat threads.
+        private int _hbReplaces;
+        private int _hbReplaceListeners;
+        private int _hbDeferred;
+
+        // The emit-failed error is written at most once a minute, with the count of the ones held back, so a
+        // gateway that is down does not write one every tick.
+        private readonly RefusalLogGate _emitFailGate = new RefusalLogGate();
+        private static readonly DateTime s_gateEpoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         /// <param name="authority">Non-null only when arming is enabled; requires <paramref name="resolveRoom"/>.</param>
         /// <param name="resolveRoom">The room each agent is addressed at (its record, else the fallback room).</param>
@@ -201,7 +214,9 @@ namespace osWebRtcVoice
             {
                 // Never throw into the tick. EnsureDisjoint's feeder-bug throw lands here too — its
                 // message names the offending (listener, source).
-                m_log.LogError(e, $"{LogHeader} emit failed (matrix kept, will re-derive)");
+                if (_emitFailGate.ShouldLog("emit failed", UUID.Zero, s_gateEpoch.AddMilliseconds(_nowMs()), out int held))
+                    m_log.LogError(e, $"{LogHeader} emit failed (matrix kept, will re-derive)"
+                        + (held > 0 ? $"; {held} more failure(s) since the last one logged" : string.Empty));
             }
             finally
             {
@@ -296,13 +311,15 @@ namespace osWebRtcVoice
                     excl[l] = e;
                     mute[l] = m;
                 }
-                PeerCtlSendResult r = await _sink.SendAsync(VisOp.Replace, excl, mute).ConfigureAwait(false);
+                PeerCtlSendResult r = await SendCountedAsync(VisOp.Replace, excl, mute).ConfigureAwait(false);
                 switch (r)
                 {
                     case PeerCtlSendResult.Ok:
                         NoteOk();
                         _synced = true;
-                        m_log.LogInformation("{LogHeader} region {RegionName}: arming replace sent for {Count} listener(s), " +
+                        Interlocked.Increment(ref _hbReplaces);
+                        Interlocked.Add(ref _hbReplaceListeners, arm.Count);
+                        m_log.LogDebug("{LogHeader} region {RegionName}: arming replace sent for {Count} listener(s), " +
                             "{EmptyCount} with empty columns, epoch {Epoch} ({Reason})", LogHeader, _region, arm.Count, emptyColumns,
                             _authority.EpochString, mixerRestarted ? "mixer restarted" : snapshot ? "snapshot" : "new, moved, provisioned or reported by the mixer");
                         break;
@@ -410,7 +427,7 @@ namespace osWebRtcVoice
                     _loggedHeartbeatStart = true;
                     m_log.LogInformation("{LogHeader} region {RegionName}: first peer_ctl_heartbeat acknowledged: {Rooms} room(s), " +
                         "{Listeners} listener(s), epoch {Epoch}, every {Interval} ms", LogHeader, _region, rooms, listeners,
-                        _authority.EpochString, VisAuthority.HeartbeatIntervalMs);
+                        _authority.EpochString, _authority.HeartbeatIntervalMs);
                 }
                 // A steady-state heartbeat is one line a MINUTE, not one a second. Three cases, and
                 // the middle one is the point: every NON-OK reply still logs at its old volume, because a
@@ -418,13 +435,38 @@ namespace osWebRtcVoice
                 // logs as it happens. Everything else -- the steady state -- is folded into one summary a
                 // minute carrying the counts, so a soak leaves a readable log instead of ~10,800 lines/hour.
                 bool changed = rooms != _hbLastRooms || listeners != _hbLastListeners || ok != _hbLastOk;
+                bool idle = rooms == 0 && listeners == 0;
                 long hbNow = _nowMs();
                 if (_hbWindowStartMs == 0)
                     _hbWindowStartMs = hbNow;
                 _hbSends++;
                 if (!ok)
                     _hbNonOk++;
-                if (!ok || changed)
+                // A region with no rooms and no listeners has nothing to summarise: the sends are all the same empty
+                // heartbeat. One line says it went idle and one says it woke; a failed send is still written.
+                if (idle && !_hbIdle)
+                {
+                    _hbIdle = true;
+                    m_log.LogDebug("{LogHeader} region {RegionName}: peer_ctl_heartbeat went idle, no rooms and no listeners; " +
+                        "no summary is written while it stays idle. Since the last summary: {Sends} send(s) over {WindowS} s, " +
+                        "{NonOk} not ok{Counts}",
+                        LogHeader, _region, _hbSends, (hbNow - _hbWindowStartMs) / 1000, _hbNonOk, TakeSummaryCounts());
+                    ResetHeartbeatWindow(hbNow);
+                    _hbLastRooms = rooms;
+                    _hbLastListeners = listeners;
+                    _hbLastOk = ok;
+                }
+                else if (!idle && _hbIdle)
+                {
+                    _hbIdle = false;
+                    m_log.LogDebug("{LogHeader} region {RegionName}: peer_ctl_heartbeat woke, {Rooms} room(s), {Listeners} listener(s)",
+                        LogHeader, _region, rooms, listeners);
+                    ResetHeartbeatWindow(hbNow);
+                    _hbLastRooms = rooms;
+                    _hbLastListeners = listeners;
+                    _hbLastOk = ok;
+                }
+                else if (!ok || (changed && !idle))
                 {
                     m_log.LogDebug("{LogHeader} region {RegionName}: peer_ctl_heartbeat {Rooms} room(s), {Listeners} listener(s): {Result}",
                         LogHeader, _region, rooms, listeners, ok ? "ok" : "transport failed");
@@ -432,15 +474,13 @@ namespace osWebRtcVoice
                     _hbLastListeners = listeners;
                     _hbLastOk = ok;
                 }
-                if (hbNow - _hbWindowStartMs >= HeartbeatSummaryMs)
+                if (!_hbIdle && hbNow - _hbWindowStartMs >= HeartbeatSummaryMs)
                 {
                     m_log.LogDebug("{LogHeader} region {RegionName}: peer_ctl_heartbeat summary: {Sends} send(s) over {WindowS} s, " +
-                        "{NonOk} not ok; now {Rooms} room(s), {Listeners} listener(s), epoch {Epoch}",
+                        "{NonOk} not ok; now {Rooms} room(s), {Listeners} listener(s), epoch {Epoch}{Counts}",
                         LogHeader, _region, _hbSends, (hbNow - _hbWindowStartMs) / 1000, _hbNonOk, rooms, listeners,
-                        _authority.EpochString);
-                    _hbWindowStartMs = hbNow;
-                    _hbSends = 0;
-                    _hbNonOk = 0;
+                        _authority.EpochString, TakeSummaryCounts());
+                    ResetHeartbeatWindow(hbNow);
                 }
             }
             catch (Exception e)
@@ -452,6 +492,25 @@ namespace osWebRtcVoice
                 if (!stopping)
                     Interlocked.Exchange(ref _heartbeatInFlight, 0L);
             }
+        }
+
+        private void ResetHeartbeatWindow(long now)
+        {
+            _hbWindowStartMs = now;
+            _hbSends = 0;
+            _hbNonOk = 0;
+        }
+
+        // The counts the summary adds to the sends: arming replaces, the entries the mixer deferred for listeners that
+        // had not joined yet, and the listeners it reported stale or unarmed. Each is taken (and reset) with the line.
+        private string TakeSummaryCounts()
+        {
+            int replaces = Interlocked.Exchange(ref _hbReplaces, 0);
+            int armed = Interlocked.Exchange(ref _hbReplaceListeners, 0);
+            int deferred = Interlocked.Exchange(ref _hbDeferred, 0);
+            int stale = _authority.TakeStaleReports();
+            return $"; {replaces} arming replace(s) for {armed} listener(s), {deferred} deferred entr(y/ies), " +
+                   $"mixer reported {stale} stale or unarmed listener(s)";
         }
 
         // ---- per-listener JOIN path (bounded blind re-send; distinct from _synced/_knownListeners) ----
@@ -488,7 +547,7 @@ namespace osWebRtcVoice
                 var oneMute = muteCol.Count > 0
                     ? new Dictionary<UUID, IReadOnlyCollection<UUID>> { [listener] = muteCol }
                     : null;
-                PeerCtlSendResult r = await _sink.SendAsync(VisOp.Replace, one, oneMute).ConfigureAwait(false);
+                PeerCtlSendResult r = await SendCountedAsync(VisOp.Replace, one, oneMute).ConfigureAwait(false);
                 if (r == PeerCtlSendResult.ProtocolError)
                 {
                     NoteProtocolError("per-listener join replace");   // may or may not latch (K consecutive)
@@ -589,7 +648,7 @@ namespace osWebRtcVoice
                 return;
             }
 
-            PeerCtlSendResult r = await _sink.SendAsync(VisOp.Replace, excl, mute).ConfigureAwait(false);
+            PeerCtlSendResult r = await SendCountedAsync(VisOp.Replace, excl, mute).ConfigureAwait(false);
             switch (r)
             {
                 case PeerCtlSendResult.Ok:
@@ -614,11 +673,23 @@ namespace osWebRtcVoice
         }
 
         // Ok -> true. TransportError -> _synced=false (snapshot next), false. ProtocolError -> latch+stop, false.
-        private async Task<bool> SendMappedAsync(VisOp op,
+        // Every send to the sink goes through here so the mixer's deferrals can be counted for the summary.
+        private async Task<PeerCtlSendResult> SendCountedAsync(VisOp op,
             IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> excl,
             IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> mute = null)
         {
             PeerCtlSendResult r = await _sink.SendAsync(op, excl, mute).ConfigureAwait(false);
+            int deferred = _sink.LastSendStats.DeferredListeners;
+            if (deferred > 0)
+                Interlocked.Add(ref _hbDeferred, deferred);
+            return r;
+        }
+
+        private async Task<bool> SendMappedAsync(VisOp op,
+            IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> excl,
+            IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> mute = null)
+        {
+            PeerCtlSendResult r = await SendCountedAsync(op, excl, mute).ConfigureAwait(false);
             switch (r)
             {
                 case PeerCtlSendResult.Ok:

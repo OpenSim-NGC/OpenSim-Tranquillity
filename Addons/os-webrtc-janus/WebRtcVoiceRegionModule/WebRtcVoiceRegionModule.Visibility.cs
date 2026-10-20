@@ -69,6 +69,25 @@ public partial class WebRtcVoiceRegionModule
     // grids, so riding it would have changed the wire on deploy.
     public const bool DefaultVisibilityArmingEnabled = false;
 
+    // [WebRtcVoice] VisibilityHeartbeatMs: milliseconds between the heartbeats an armed region sends to the mixer.
+    // The default is the interval the code always used. A region server that runs many regions sends one heartbeat
+    // per region per interval and can lengthen it, but the mixer treats a region that has been silent for its
+    // staleness window (JS_VIS_STALE_MS in the mixer, 8000 ms by default) as gone, so the ceiling keeps two beats inside
+    // that window and the floor is the feeder's tick. A value outside the range is refused and the default is used.
+    public const int MinVisibilityHeartbeatMs = 250;
+
+    public const int MaxVisibilityHeartbeatMs = 4000;
+
+    public static int ReadVisibilityHeartbeatMs(IConfig pConfig, ILogger pLog = null)
+    {
+        int ms = pConfig.GetInt("VisibilityHeartbeatMs", VisAuthority.DefaultHeartbeatIntervalMs);
+        if (ms >= MinVisibilityHeartbeatMs && ms <= MaxVisibilityHeartbeatMs)
+            return ms;
+        pLog?.LogWarning("[WebRtcVoice] VisibilityHeartbeatMs = {Value} is outside {Min} to {Max}; using {Default}",
+            ms, MinVisibilityHeartbeatMs, MaxVisibilityHeartbeatMs, VisAuthority.DefaultHeartbeatIntervalMs);
+        return VisAuthority.DefaultHeartbeatIntervalMs;
+    }
+
     public static bool ReadVisibilityArmingEnabled(IConfig pConfig)
         => pConfig.GetBoolean("VisibilityArmingEnabled", DefaultVisibilityArmingEnabled);
 
@@ -76,6 +95,8 @@ public partial class WebRtcVoiceRegionModule
     private bool m_VisibilityFeederEnabled = DefaultVisibilityFeederEnabled;
 
     private int m_VisibilityTickMs = 250;
+
+    private int m_VisibilityHeartbeatMs = VisAuthority.DefaultHeartbeatIntervalMs;
 
     // Emit the matrix to the mixer (peer_ctl_batch), separate from running the matrix. Off by default;
     // false runs the feeder matrix-only for diagnostics.
@@ -142,7 +163,7 @@ public partial class WebRtcVoiceRegionModule
             // the service/sender then runs matrix-only and logs once.
             IPeerCtlBatchSink sink = BuildPeerCtlSinkOrNull(scene);
             VoiceVisibilityService svc = new VoiceVisibilityService(scene, m_VisibilityTickMs, m_VisibilityEmitEnabled, sink,
-                TimeSpan.FromMilliseconds(m_AdminTimeoutMs), m_VisibilityArmingEnabled);
+                TimeSpan.FromMilliseconds(m_AdminTimeoutMs), m_VisibilityArmingEnabled, m_VisibilityHeartbeatMs);
             svc.Start();
             lock (m_visibilityServices)
                 m_visibilityServices[scene] = svc;
@@ -206,6 +227,7 @@ public partial class WebRtcVoiceRegionModule
     {
         m_VisibilityFeederEnabled = ReadVisibilityFeederEnabled(m_Config);
         m_VisibilityTickMs = m_Config.GetInt("VisibilityTickMs", 250);
+        m_VisibilityHeartbeatMs = ReadVisibilityHeartbeatMs(m_Config, m_log);
         m_VisibilityEmitEnabled = ReadVisibilityEmitEnabled(m_Config);
         m_VisibilityArmingEnabled = ReadVisibilityArmingEnabled(m_Config);
 
