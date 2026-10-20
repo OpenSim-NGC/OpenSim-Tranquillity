@@ -26,14 +26,20 @@ namespace osWebRtcVoice.NonSpatial
         private readonly GridNonSpatialSessions _sessions;
         private readonly Func<IReadOnlyList<UUID>> _presentAgents;
         private readonly Action<string, Exception> _error;
+        private readonly Action<SeatKey> _seatRemoved;
         private readonly TimeSpan _interval;
         private readonly object _timerLock = new object();
         private Timer _timer;
         private int _reentry;
 
+        /// <param name="seatRemoved">
+        /// Called for each seat this region holds whose member the service reports as removed from the call, so the
+        /// region can take the member out of its room. Optional.
+        /// </param>
         public GridSeatRenewer(GridNonSpatialSessions sessions, Func<IReadOnlyList<UUID>> presentAgents,
-                               Action<string, Exception> error, TimeSpan? interval = null)
+                               Action<string, Exception> error, TimeSpan? interval = null, Action<SeatKey> seatRemoved = null)
         {
+            _seatRemoved = seatRemoved;
             _sessions = sessions ?? throw new ArgumentNullException(nameof(sessions));
             _presentAgents = presentAgents ?? throw new ArgumentNullException(nameof(presentAgents));
             _error = error;
@@ -78,7 +84,19 @@ namespace osWebRtcVoice.NonSpatial
                 foreach (SeatKey seat in held)
                     if (here.Contains(seat.Agent))
                         renew.Add(seat);
-                return renew.Count == 0 || _sessions.RenewSeats(renew);
+                if (renew.Count == 0)
+                    return true;
+                bool reached = _sessions.RenewSeats(renew, out IReadOnlyList<SeatKey> removed);
+                foreach (SeatKey seat in removed)
+                {
+                    try { _seatRemoved?.Invoke(seat); }
+                    catch (Exception e)
+                    {
+                        try { _error?.Invoke("grid seat removal teardown failed", e); }
+                        catch { /* the log sink must not break the timer */ }
+                    }
+                }
+                return reached;
             }
             catch (Exception e)
             {

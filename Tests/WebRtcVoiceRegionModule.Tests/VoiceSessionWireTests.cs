@@ -199,6 +199,8 @@ namespace osWebRtcVoice.Tests
             Assert.That(region.VerifyRing(id, dave, Alice, NonSpatialSessionType.Adhoc).Decision, Is.EqualTo("refused-ring-used"), "over the wire too");
             Assert.That(region.CarrierKey(id, Alice), Has.Length.GreaterThanOrEqualTo(CarrierAuth.MinSecretLength), "a seated member is given the key");
             Assert.That(region.CarrierKey(id, UUID.Random()), Is.Null, "a stranger is not");
+            Assert.That(region.Moderate(id, Alice, ModerationOp.TextMute, Bob, true).Decision, Is.EqualTo("moderation-changed"));
+            Assert.That(region.Get(id).IsTextMuted(Bob), Is.True, "the record crossed the wire");
             Assert.That(region.TryTakeConferenceRequest(Alice), Is.True);
             Assert.That(region.DepartByViewerSession(Bob, "v", DepartureReason.VoiceTeardown), Has.Count.EqualTo(1));
             Assert.That(region.Depart(id, Alice, DepartureReason.VoiceTeardown).Ok, Is.True);
@@ -206,6 +208,55 @@ namespace osWebRtcVoice.Tests
             Assert.That(region.DepartRegion(RegionA), Is.GreaterThanOrEqualTo(0));
             Assert.That(region.RenewSeats(new List<SeatKey> { new SeatKey(id, Alice) }), Is.True);
             Assert.That(region.GetByRoomKey(region.Get(id).RoomKey)?.SessionId, Is.EqualTo(id));
+        }
+
+        [Test]
+        public void ARemovalCrossesTheWire_WithItsReasonAndLifetime_AndTheRenewalSaysWhichSeatsWereRemoved()
+        {
+            VoiceSessionService service = VoiceSessionServiceTests.NewService();
+            using TestServer server = new TestServer(NewHandler(service));
+            GridNonSpatialSessions region = VoiceSessionServiceTests.NewRegion(NewClient(server));
+            region.Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
+            region.Accept(GroupId, Bob, RegionA, "v");
+
+            SessionOutcome removed = region.Moderate(GroupId, Alice, ModerationOp.Remove, Bob, true, "too loud", TimeSpan.FromMinutes(30));
+
+            Assert.That(removed.Decision, Is.EqualTo("moderation-changed"));
+            CallRemoval r = region.Get(GroupId).RemovalOf(Bob);
+            Assert.That(r.Reason, Is.EqualTo("too loud"));
+            Assert.That(r.By, Is.EqualTo(Alice));
+            Assert.That(r.ExpiresUtc - r.AtUtc, Is.EqualTo(TimeSpan.FromMinutes(30)));
+            Assert.That(region.Get(GroupId).Find(Bob).HoldsSeat, Is.False);
+            Assert.That(region.RenewSeats(new List<SeatKey> { new SeatKey(GroupId, Alice), new SeatKey(GroupId, Bob) },
+                                          out IReadOnlyList<SeatKey> told), Is.True);
+            Assert.That(told, Is.EqualTo(new[] { new SeatKey(GroupId, Bob) }), "only the removed member's seat is named");
+            Assert.That(region.Moderate(GroupId, Alice, ModerationOp.Remove, Bob, false).Decision, Is.EqualTo("moderation-changed"));
+        }
+
+        [Test]
+        public void AnOldRegionsModerateRequestIsStillRead_AndAReasonIsBoundedAndCleaned()
+        {
+            VoiceSessionService service = VoiceSessionServiceTests.NewService();
+            VoiceSessionPostHandler handler = NewHandler(service);
+            VoiceSessionServiceTests.NewRegion(service).Start(NonSpatialSessionType.Group, Alice, GroupId, GroupId, RegionA);
+            Dictionary<string, object> old = new()
+            {
+                ["session"] = GroupId.ToString(), ["by"] = Alice.ToString(), ["target"] = Bob.ToString(), ["op"] = "0", ["on"] = "1",
+            };
+            Assert.That(handler.Dispatch("moderate", old)?.Ok, Is.True, "no reason and no minutes: an old region's request");
+
+            Dictionary<string, object> removal = new(old) { ["op"] = "3", ["reason"] = "ab\u0007\ncd" + new string('x', 500),["minutes"] = "99999999" };
+            SessionReply r = handler.Dispatch("moderate", removal);
+
+            Assert.That(r.Ok, Is.True);
+            CallRemoval stored = SessionWire.FromData(r.Session).RemovalOf(Bob);
+            Assert.That(stored.Reason.Length, Is.LessThanOrEqualTo(200));
+            Assert.That(stored.Reason, Does.StartWith("abcdxxx"), "control characters are dropped");
+            Assert.That(stored.ExpiresUtc - stored.AtUtc, Is.EqualTo(TimeSpan.FromMinutes(VoiceSessionService.MaxRemovalMinutes)), "bounded");
+
+            old["minutes"] = "not a number";
+            old["op"] = "3";
+            Assert.That(handler.Dispatch("moderate", old)?.Ok, Is.True, "an unreadable lifetime is taken as none");
         }
 
         // ---- protection ---------------------------------------------------------------------------------
@@ -377,6 +428,10 @@ namespace osWebRtcVoice.Tests
             c.MarkInvited(s, new List<UUID> { a, b });
             c.VerifyRing(s, b, a, 3);
             c.CarrierKey(s, a);
+            c.Moderate(s, a, 0, b, true);
+            c.Moderate(s, a, 2, UUID.Zero, false);
+            c.Moderate(s, a, 3, b, true, "too loud", 30);
+            c.Moderate(s, a, 3, b, false);
             c.IssueToken(s, a);
             c.TakeConferenceRequest(a);
             c.Get(s, a);
@@ -400,6 +455,10 @@ namespace osWebRtcVoice.Tests
                 $"METHOD=markinvited&session={s}&agents={a}%2c{b}",
                 $"METHOD=verifyring&session={s}&target={b}&caller={a}&type=3",
                 $"METHOD=carrierkey&session={s}&agent={a}",
+                $"METHOD=moderate&session={s}&by={a}&target={b}&op=0&on=1",
+                $"METHOD=moderate&session={s}&by={a}&target={UUID.Zero}&op=2&on=0",
+                $"METHOD=moderate&session={s}&by={a}&target={b}&op=3&on=1&reason=too+loud&minutes=30",
+                $"METHOD=moderate&session={s}&by={a}&target={b}&op=3&on=0",
                 $"METHOD=issuetoken&session={s}&agent={a}",
                 $"METHOD=takeconferencerequest&agent={a}",
                 $"METHOD=get&session={s}&agent={a}",

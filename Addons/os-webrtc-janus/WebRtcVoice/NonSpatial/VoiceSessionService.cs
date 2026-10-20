@@ -143,7 +143,23 @@ namespace osWebRtcVoice.NonSpatial
                         _renewedAgent[seat.Agent] = now;
                         n++;
                     }
-            return new SessionReply { Ok = true, Decision = "renewed", Count = n };
+            return new SessionReply { Ok = true, Decision = "renewed", Count = n, RemovedSeats = RemovedAmong(seats, now) };
+        }
+
+        // Of the seats a region just renewed, the ones whose member has been removed from the call. The region that holds
+        // such a seat takes the member out of its room; the record already refuses them every way back.
+        private List<string> RemovedAmong(IReadOnlyList<SeatKey> seats, DateTime now)
+        {
+            if (seats == null) return null;
+            List<string> removed = null;
+            int checkedSeats = 0;
+            foreach (SeatKey seat in seats)
+            {
+                if (++checkedSeats > MaxRenewSeats) break;
+                if (_store.Mutate(seat.Session, sess => sess.Type != NonSpatialSessionType.P2P && sess.IsRemoved(seat.Agent, now), false))
+                    (removed ??= new List<string>()).Add(seat.Session + ":" + seat.Agent);
+            }
+            return removed;
         }
 
         public SessionReply MarkInvited(UUID sessionId, IReadOnlyList<UUID> agents)
@@ -163,6 +179,15 @@ namespace osWebRtcVoice.NonSpatial
             string key = _engine.CarrierKey(sessionId, agent);
             return new SessionReply { Ok = key != null, Decision = key != null ? "carrier-key" : SessionOutcome.NoSuchSession, Text = key };
         }
+
+        public SessionReply Moderate(UUID sessionId, UUID by, int op, UUID target, bool on, string reason = null, int minutes = 0)
+            => Enum.IsDefined(typeof(ModerationOp), op)
+                ? Reply(_engine.Moderate(sessionId, by, (ModerationOp)op, target, on, reason,
+                                         minutes > 0 ? TimeSpan.FromMinutes(Math.Min(minutes, MaxRemovalMinutes)) : (TimeSpan?)null), by)
+                : SessionReply.Fail("refused-bad-request");
+
+        /// <summary>The longest a removal can be asked to last: a year.</summary>
+        public const int MaxRemovalMinutes = 525600;
 
         public SessionReply IssueToken(UUID sessionId, UUID agent)
         {

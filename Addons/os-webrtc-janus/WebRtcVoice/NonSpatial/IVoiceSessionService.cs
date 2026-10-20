@@ -61,6 +61,9 @@ namespace osWebRtcVoice.NonSpatial
         /// </summary>
         SessionReply CarrierKey(UUID sessionId, UUID agent);
 
+        /// <summary>Record a moderator's decision; <paramref name="op"/> is a <see cref="ModerationOp"/>. The region decides who may ask.</summary>
+        SessionReply Moderate(UUID sessionId, UUID by, int op, UUID target, bool on, string reason = null, int minutes = 0);
+
         SessionReply IssueToken(UUID sessionId, UUID agent);
         SessionReply TakeConferenceRequest(UUID agent);
         /// <summary>

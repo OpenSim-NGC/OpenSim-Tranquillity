@@ -227,6 +227,26 @@ namespace osWebRtcVoice.NonSpatial
         public SessionOutcome VerifyRing(UUID sessionId, UUID target, UUID claimedCaller, NonSpatialSessionType type)
             => Outcome(_service.VerifyRing(sessionId, target, claimedCaller, (int)type), "verifyring");
 
+        public SessionOutcome Moderate(UUID sessionId, UUID by, ModerationOp op, UUID target, bool on,
+                                       string reason = null, TimeSpan? lifetime = null)
+        {
+            // Whole minutes, rounded up, so a removal never ends sooner than asked.
+            int minutes = lifetime is TimeSpan l && l > TimeSpan.Zero ? (int)Math.Min(int.MaxValue, Math.Ceiling(l.TotalMinutes)) : 0;
+            return Outcome(_service.Moderate(sessionId, by, (int)op, target, on, reason, minutes), "moderate");
+        }
+
+        public bool IsRemoved(NonSpatialVoiceSession session, UUID agent) => session != null && session.IsRemoved(agent, _clock());
+
+        public IReadOnlyList<NonSpatialVoiceSession> Listing()
+        {
+            List<NonSpatialVoiceSession> calls = new List<NonSpatialVoiceSession>();
+            HashSet<UUID> seen = new HashSet<UUID>();
+            foreach (SeatKey seat in HeldSeats())
+                if (seen.Add(seat.Session) && Get(seat.Session) is NonSpatialVoiceSession s)
+                    calls.Add(s);
+            return calls;
+        }
+
         public string IssueToken(UUID sessionId, UUID agent) => IssueToken(sessionId, agent, out _);
 
         public string IssueToken(UUID sessionId, UUID agent, out bool unavailable)
@@ -276,8 +296,16 @@ namespace osWebRtcVoice.NonSpatial
         /// Tell the service these seats are still held, so their leases restart. The service is asked in batches no
         /// larger than it reads. False when it did not answer.
         /// </summary>
-        public bool RenewSeats(IReadOnlyList<SeatKey> seats)
+        public bool RenewSeats(IReadOnlyList<SeatKey> seats) => RenewSeats(seats, out _);
+
+        /// <summary>
+        /// As <see cref="RenewSeats(IReadOnlyList{SeatKey})"/>, and says which of the seats the service reports as
+        /// belonging to a member removed from the call. Those seats are no longer held here.
+        /// </summary>
+        public bool RenewSeats(IReadOnlyList<SeatKey> seats, out IReadOnlyList<SeatKey> removed)
         {
+            List<SeatKey> gone = new List<SeatKey>();
+            removed = gone;
             if (seats == null) return true;
             bool all = true;
             for (int from = 0; from < seats.Count; from += VoiceSessionService.MaxRenewSeats)
@@ -287,6 +315,17 @@ namespace osWebRtcVoice.NonSpatial
                     batch.Add(seats[i]);
                 SessionReply r = Reached(_service.RenewSeats(batch), "renewseats");
                 all &= r != null && r.Ok;
+                if (r?.RemovedSeats != null)
+                    foreach (string pair in r.RemovedSeats)
+                    {
+                        string[] ids = (pair ?? string.Empty).Split(':');
+                        if (ids.Length == 2 && UUID.TryParse(ids[0], out UUID session) && UUID.TryParse(ids[1], out UUID agent)
+                            && batch.Contains(new SeatKey(session, agent)))
+                        {
+                            gone.Add(new SeatKey(session, agent));
+                            Forget(session, agent);
+                        }
+                    }
             }
             return all;
         }

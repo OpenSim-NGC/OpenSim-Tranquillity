@@ -68,6 +68,7 @@ namespace osWebRtcVoice.Tests
             public SessionReply MarkInvited(UUID sessionId, IReadOnlyList<UUID> agents) => Pass("markinvited", () => Inner.MarkInvited(sessionId, agents));
             public SessionReply VerifyRing(UUID sessionId, UUID target, UUID claimedCaller, int type) => Pass("verifyring", () => Inner.VerifyRing(sessionId, target, claimedCaller, type));
             public SessionReply CarrierKey(UUID sessionId, UUID agent) => Pass("carrierkey", () => Inner.CarrierKey(sessionId, agent));
+            public SessionReply Moderate(UUID sessionId, UUID by, int op, UUID target, bool on, string reason = null, int minutes = 0) => Pass("moderate", () => Inner.Moderate(sessionId, by, op, target, on, reason, minutes));
             public SessionReply IssueToken(UUID sessionId, UUID agent) => Pass("issuetoken", () => Inner.IssueToken(sessionId, agent));
             public SessionReply TakeConferenceRequest(UUID agent) => Pass("takeconferencerequest", () => Inner.TakeConferenceRequest(agent));
             public SessionReply Get(UUID sessionId, UUID agent = default) => Pass("get", () => Inner.Get(sessionId, agent));

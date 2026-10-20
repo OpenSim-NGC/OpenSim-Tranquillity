@@ -31,6 +31,16 @@ namespace osWebRtcVoice.NonSpatial
         public bool InChat { get; set; }
     }
 
+    /// <summary>One removal. ExpiresTicks is 0 for a removal that lasts until the call ends.</summary>
+    public sealed class RemovalData
+    {
+        public string Agent { get; set; }
+        public string By { get; set; }
+        public long AtTicks { get; set; }
+        public long ExpiresTicks { get; set; }
+        public string Reason { get; set; }
+    }
+
     public sealed class SessionData
     {
         public int Type { get; set; }
@@ -45,6 +55,16 @@ namespace osWebRtcVoice.NonSpatial
         public string Token { get; set; }
         public bool RingSent { get; set; }
         public List<string> Invited { get; set; } = new List<string>();
+
+        // Moderation. Absent from a copy a service without it made, which reads as no moderation.
+        public bool VoiceModerated { get; set; }
+        public int ModerationGeneration { get; set; }
+        public List<string> VoiceMuted { get; set; } = new List<string>();
+        public List<string> VoiceAllowed { get; set; } = new List<string>();
+        public List<string> TextMuted { get; set; } = new List<string>();
+
+        // Removals. Absent from a copy a service without them made, which reads as nobody removed.
+        public List<RemovalData> Removed { get; set; } = new List<RemovalData>();
         public List<MemberData> Members { get; set; } = new List<MemberData>();
     }
 
@@ -66,6 +86,13 @@ namespace osWebRtcVoice.NonSpatial
 
         /// <summary>A count result (seats released, seats renewed).</summary>
         public int Count { get; set; }
+
+        /// <summary>
+        /// For RenewSeats: the seats named in the call that the service no longer holds because the member was removed from
+        /// the call (written "session:agent"). The region that holds the seat takes the member out of its room.
+        /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public List<string> RemovedSeats { get; set; }
 
         public static SessionReply Fail(string decision) => new SessionReply { Ok = false, Decision = decision };
 
@@ -113,6 +140,20 @@ namespace osWebRtcVoice.NonSpatial
                 });
                 if (s.WasInvited(m.AgentId)) d.Invited.Add(m.AgentId.ToString());
             }
+            d.VoiceModerated = s.VoiceModerated;
+            d.ModerationGeneration = s.ModerationGeneration;
+            foreach (UUID a in s.VoiceMuted) d.VoiceMuted.Add(a.ToString());
+            foreach (UUID a in s.VoiceAllowed) d.VoiceAllowed.Add(a.ToString());
+            foreach (UUID a in s.TextMuted) d.TextMuted.Add(a.ToString());
+            foreach (KeyValuePair<UUID, CallRemoval> r in s.Removed)
+                d.Removed.Add(new RemovalData
+                {
+                    Agent = r.Key.ToString(),
+                    By = r.Value.By.ToString(),
+                    AtTicks = r.Value.AtUtc.Ticks,
+                    ExpiresTicks = r.Value.ExpiresUtc?.Ticks ?? 0,
+                    Reason = r.Value.Reason,
+                });
             return d;
         }
 
@@ -143,7 +184,25 @@ namespace osWebRtcVoice.NonSpatial
             if (d.Invited != null)
                 foreach (string a in d.Invited)
                     if (UUID.TryParse(a, out UUID invited)) s.MarkInvited(invited);
+            s.RestoreModeration(d.VoiceModerated, d.ModerationGeneration, Ids(d.VoiceMuted), Ids(d.VoiceAllowed), Ids(d.TextMuted));
+            if (d.Removed != null)
+                foreach (RemovalData rd in d.Removed)
+                    if (UUID.TryParse(rd.Agent, out UUID removedAgent))
+                    {
+                        UUID.TryParse(rd.By, out UUID by);
+                        s.RestoreRemoval(removedAgent, new CallRemoval(by, new DateTime(rd.AtTicks, DateTimeKind.Utc), rd.Reason,
+                            rd.ExpiresTicks == 0 ? null : new DateTime(rd.ExpiresTicks, DateTimeKind.Utc)));
+                    }
             return s;
+        }
+
+        private static List<UUID> Ids(List<string> text)
+        {
+            List<UUID> ids = new List<UUID>();
+            if (text != null)
+                foreach (string t in text)
+                    if (UUID.TryParse(t, out UUID id)) ids.Add(id);
+            return ids;
         }
 
         public static SessionOutcome ToOutcome(SessionReply r)

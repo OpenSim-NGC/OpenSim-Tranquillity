@@ -78,6 +78,8 @@
     <Compile Include="CarrierAuthTests.cs" />
     <Compile Include="VoiceSessionServiceTests.cs" />
     <Compile Include="VoiceSessionWireTests.cs" />
+    <Compile Include="CallModerationStateTests.cs" />
+    <Compile Include="CallRemovalStateTests.cs" />
     <Compile Include="GridStoreResilienceTests.cs" />
     <Compile Include="GridStoreProcessTests.cs" />
     <Compile Include="AdhocTextGridModeTests.cs" />

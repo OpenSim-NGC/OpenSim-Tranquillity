@@ -98,6 +98,25 @@ namespace osWebRtcVoice.NonSpatial
         /// </summary>
         string CarrierKey(UUID sessionId, UUID agent);
 
+        /// <summary>
+        /// Record a moderator's decision (a mute of one agent's voice or text, or of the whole call's voice). Whether the
+        /// asker may moderate is decided by the caller. The outcome says whether the record changed.
+        /// </summary>
+        SessionOutcome Moderate(UUID sessionId, UUID by, ModerationOp op, UUID target, bool on,
+                                string reason = null, System.TimeSpan? lifetime = null);
+
+        /// <summary>
+        /// Whether the agent has been removed from this call and is still barred, as the session stands now. Asked of a
+        /// copy a region just read, so it costs no extra trip to the store.
+        /// </summary>
+        bool IsRemoved(NonSpatialVoiceSession session, UUID agent);
+
+        /// <summary>
+        /// The calls this region can list: every call when the record is held in the process, and the calls with a seat
+        /// this region holds when it lives in the grid service. Copies, for reading.
+        /// </summary>
+        IReadOnlyList<NonSpatialVoiceSession> Listing();
+
         string IssueToken(UUID sessionId, UUID agent);
 
         /// <summary>As <see cref="IssueToken(UUID, UUID)"/>, and says whether a null result is because the store could not be reached.</summary>

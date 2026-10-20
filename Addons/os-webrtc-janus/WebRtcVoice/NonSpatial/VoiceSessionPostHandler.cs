@@ -112,6 +112,10 @@ namespace osWebRtcVoice.NonSpatial
                         ? m_service.VerifyRing(s[0], s[1], s[2], ringType) : null;
                 case "carrierkey":
                     return Ids(r, out s, "session", "agent") ? m_service.CarrierKey(s[0], s[1]) : null;
+                case "moderate":
+                    return Ids(r, out s, "session", "by") && OptionalId(r, "target", out UUID modTarget) && Int(r, "op", out int modOp)
+                           && Int(r, "on", out int modOn)
+                        ? m_service.Moderate(s[0], s[1], modOp, modTarget, modOn != 0, Reason(r), OptionalInt(r, "minutes")) : null;
                 case "issuetoken":
                     return Ids(r, out s, "session", "agent") ? m_service.IssueToken(s[0], s[1]) : null;
                 case "takeconferencerequest":
@@ -130,6 +134,24 @@ namespace osWebRtcVoice.NonSpatial
 
         private static string Str(Dictionary<string, object> r, string key)
             => r.TryGetValue(key, out object v) ? v?.ToString() : null;
+
+        /// <summary>The words a moderator gave a removal: bounded, and with control characters dropped.</summary>
+        private static string Reason(Dictionary<string, object> r)
+        {
+            string text = Str(r, "reason");
+            if (string.IsNullOrEmpty(text)) return null;
+            System.Text.StringBuilder clean = new System.Text.StringBuilder();
+            foreach (char c in text)
+            {
+                if (clean.Length >= 200) break;
+                if (!char.IsControl(c)) clean.Append(c);
+            }
+            return clean.ToString();
+        }
+
+        /// <summary>A whole number that may be absent (then 0); a negative or unreadable one is taken as 0.</summary>
+        private static int OptionalInt(Dictionary<string, object> r, string key)
+            => Int(r, key, out int value) && value > 0 ? value : 0;
 
         private static bool Int(Dictionary<string, object> r, string key, out int value)
         {
