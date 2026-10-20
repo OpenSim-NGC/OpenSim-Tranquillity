@@ -110,6 +110,27 @@ namespace osWebRtcVoice.NonSpatial
         }
 
         /// <summary>
+        /// As <see cref="Targets(IEnumerable{UUID}, NonSpatialVoiceSession, UUID, GroupVoicePolicy)"/>, taking membership and
+        /// powers from the group's roster (member to the powers they hold) instead of asking the groups service about each
+        /// agent. The roster is fetched anyway to ring the members on other region servers.
+        /// </summary>
+        public static List<UUID> Targets(IEnumerable<UUID> presentAgents, NonSpatialVoiceSession session,
+                                         UUID initiator, GroupVoicePolicy policy, IReadOnlyDictionary<UUID, ulong> roster)
+        {
+            if (roster == null)
+                return Targets(presentAgents, session, initiator, policy);
+            GroupVoicePolicy fromRoster = new GroupVoicePolicy
+            {
+                Enabled = policy?.Enabled ?? false,
+                RequireVoicePower = policy?.RequireVoicePower ?? true,
+                Cap = policy?.Cap ?? NonSpatialCaps.DefaultConferenceCap,
+                IsMember = (a, g) => roster.ContainsKey(a),
+                Powers = (a, g) => roster.TryGetValue(a, out ulong held) ? held : 0UL,
+            };
+            return Targets(presentAgents, session, initiator, fromRoster);
+        }
+
+        /// <summary>
         /// Every agent with a ROOT presence in these scenes, deduplicated. This, not
         /// <see cref="PresentAgents"/>, is who a ring can be delivered to in this process: an agent who is only
         /// a child presence here answers from the process that holds their root presence.
@@ -175,6 +196,38 @@ namespace osWebRtcVoice.NonSpatial
                 catch { continue; }            // a presence lookup that throws is treated as offline
                 if (region != UUID.Zero)
                     online.Add(a);
+            }
+            return online;
+        }
+
+        /// <summary>The most agents one presence request names.</summary>
+        public const int PresenceBatchSize = 1000;
+
+        /// <summary>
+        /// As <see cref="OnlineOnly"/>, asking the presence service about the whole list in one request (in requests of at
+        /// most <see cref="PresenceBatchSize"/> for a very large one) instead of one request for each candidate.
+        /// <paramref name="onlineRegionsOf"/> returns, for the agents it is given, the region of each one that is online;
+        /// an agent missing from the answer is offline. A request that throws leaves its agents offline.
+        /// </summary>
+        public static List<UUID> OnlineOnlyBatch(IReadOnlyList<UUID> candidates,
+                                                 Func<IReadOnlyList<UUID>, IReadOnlyDictionary<UUID, UUID>> onlineRegionsOf)
+        {
+            List<UUID> online = new List<UUID>();
+            if (candidates == null || onlineRegionsOf == null)
+                return online;
+            for (int from = 0; from < candidates.Count; from += PresenceBatchSize)
+            {
+                List<UUID> batch = new List<UUID>();
+                for (int i = from; i < Math.Min(candidates.Count, from + PresenceBatchSize); i++)
+                    batch.Add(candidates[i]);
+                IReadOnlyDictionary<UUID, UUID> regions;
+                try { regions = onlineRegionsOf(batch); }
+                catch { continue; }            // a presence lookup that throws is treated as offline
+                if (regions == null)
+                    continue;
+                foreach (UUID a in batch)
+                    if (regions.TryGetValue(a, out UUID region) && region != UUID.Zero)
+                        online.Add(a);
             }
             return online;
         }

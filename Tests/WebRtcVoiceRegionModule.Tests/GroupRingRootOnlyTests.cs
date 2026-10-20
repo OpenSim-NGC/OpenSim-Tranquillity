@@ -42,7 +42,17 @@ namespace osWebRtcVoice.Tests
             public FakeGroups(params UUID[] members) { _members = members; }
             public event NewGroupNotice OnNewGroupNotice { add { } remove { } }
 
+            /// <summary>How many times the roster was asked for, and whether it is unavailable.</summary>
+            public int RosterCalls;
+            public bool NoRoster;
+
             public List<GroupMembersData> GroupMembersRequest(IClientAPI remoteClient, UUID groupID)
+            {
+                RosterCalls++;
+                return NoRoster ? null : Roster();
+            }
+
+            private List<GroupMembersData> Roster()
                 => _members.Select(m => new GroupMembersData
                 {
                     AgentID = m,
@@ -84,21 +94,24 @@ namespace osWebRtcVoice.Tests
 
         /// <summary>One calling process: Alice (the caller) is root here; Bob is whatever the test makes him.</summary>
         private static (WebRtcVoiceRegionModule Module, Process Process, NonSpatialVoiceSession Session) Calling(
-            System.Action<Process> arrange)
+            System.Action<Process> arrange, UUID[] members = null, Counts counts = null, bool noRoster = false)
         {
+            members ??= new[] { Alice, Bob };
+            counts ??= new Counts();
             Process p = new Process();
             p.AddRoot(Alice);
             p.Presence.SetOnline(Bob);
             arrange(p);
-            p.Scene.RegisterModuleInterface<IGroupsModule>(new FakeGroups(Alice, Bob));
+            counts.Groups = new FakeGroups(members) { NoRoster = noRoster };
+            p.Scene.RegisterModuleInterface<IGroupsModule>(counts.Groups);
 
             GroupVoicePolicy policy = new GroupVoicePolicy
             {
                 Enabled = true,
                 RequireVoicePower = true,
                 Cap = NonSpatialCaps.DefaultConferenceCap,
-                IsMember = (a, g) => g == Group && (a == Alice || a == Bob),
-                Powers = (a, g) => GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice,
+                IsMember = (a, g) => { counts.IsMember++; return g == Group && members.Contains(a); },
+                Powers = (a, g) => { counts.Powers++; return GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice; },
             };
             NonSpatialVoiceSessionEngine engine = new NonSpatialVoiceSessionEngine(
                 new InMemoryNonSpatialSessionStore(),
@@ -116,6 +129,14 @@ namespace osWebRtcVoice.Tests
                 new OSDMap { ["method"] = OSD.FromString("call"), ["session-id"] = OSD.FromUUID(Group) },
                 Alice, policy, engine, RegionA, out _);
             return (mod, p, engine.Store.Get(Group));
+        }
+
+        /// <summary>What the policy and the groups service were asked.</summary>
+        private sealed class Counts
+        {
+            public int IsMember;
+            public int Powers;
+            public FakeGroups Groups;
         }
 
         private static void Ring(WebRtcVoiceRegionModule mod, NonSpatialVoiceSession session)
@@ -147,6 +168,72 @@ namespace osWebRtcVoice.Tests
 
             Assert.That(p.Transfer.Sent, Has.Count.EqualTo(1));
             Assert.That(p.Transfer.SentRootOnly, Is.EqualTo(new[] { true }));
+        }
+
+        // A busy region server: forty avatars here, twelve of them in the group, and thirty-five more members of the
+        // group who are on other region servers, some or all of them online.
+        private static (WebRtcVoiceRegionModule Module, Process Process, NonSpatialVoiceSession Session, Counts Counts,
+            List<UUID> Local, List<UUID> Remote) Busy(bool noRoster = false, int remoteOnline = 35)
+        {
+            List<UUID> local = Enumerable.Range(0, 12).Select(_ => UUID.Random()).ToList();
+            List<UUID> bystanders = Enumerable.Range(0, 27).Select(_ => UUID.Random()).ToList();
+            List<UUID> remote = Enumerable.Range(0, 35).Select(_ => UUID.Random()).ToList();
+            Counts counts = new Counts();
+            var (mod, p, session) = Calling(x =>
+            {
+                foreach (UUID a in local.Concat(bystanders)) x.AddRoot(a);
+                x.Presence.SetOnline(remote.Take(remoteOnline).ToArray());
+            }, new[] { Alice }.Concat(local).Concat(remote).ToArray(), counts, noRoster);
+            counts.IsMember = counts.Powers = 0;   // what it took to start the call is not the ring's
+            counts.Groups.RosterCalls = 0;
+            p.Presence.GetAgentsCalls = p.Presence.AgentsAsked = 0;
+            return (mod, p, session, counts, local, remote);
+        }
+
+        [Test]
+        public void ARing_TakesMembershipFromTheRosterItAlreadyFetches_NotFromTheGroupsServiceForEveryAvatar()
+        {
+            var (mod, p, session, counts, local, remote) = Busy();
+
+            Ring(mod, session);
+
+            Assert.That(counts.Groups.RosterCalls, Is.EqualTo(1), "one roster for the whole ring");
+            Assert.That(counts.IsMember, Is.EqualTo(0), "no membership lookup for any of the forty avatars");
+            Assert.That(counts.Powers, Is.EqualTo(0), "and no powers lookup");
+            Assert.That(p.Queue.Enqueued, Is.EquivalentTo(local), "the twelve members here are rung, and no one else here");
+            Assert.That(p.Transfer.Sent.Count, Is.EqualTo(remote.Count), "and each of the thirty-five elsewhere gets a carrier");
+        }
+
+        [Test]
+        public void ARing_AsksThePresenceServiceOnce_ForTheWholeRemoteRoster()
+        {
+            var (mod, p, session, _, _, remote) = Busy();
+
+            Ring(mod, session);
+
+            Assert.That(p.Presence.GetAgentsCalls, Is.EqualTo(1), "one call, not one for each remote member");
+            Assert.That(p.Presence.AgentsAsked, Is.EqualTo(remote.Count));
+        }
+
+        [Test]
+        public void ARing_StillRingsOnlyTheMembersThePresenceServiceReportsOnline()
+        {
+            var (mod, p, session, _, _, _) = Busy(remoteOnline: 20);
+
+            Ring(mod, session);
+
+            Assert.That(p.Transfer.Sent.Count, Is.EqualTo(20), "fifteen of the thirty-five are offline and are not rung");
+        }
+
+        [Test]
+        public void WithoutARoster_TheLocalWalkAsksTheGroupsServiceAsItDid()
+        {
+            var (mod, p, session, counts, local, _) = Busy(noRoster: true);
+
+            Ring(mod, session);
+
+            Assert.That(counts.IsMember, Is.GreaterThanOrEqualTo(39), "every avatar here is asked about");
+            Assert.That(p.Queue.Enqueued, Is.EquivalentTo(local), "and the members here are rung");
         }
 
         [Test]

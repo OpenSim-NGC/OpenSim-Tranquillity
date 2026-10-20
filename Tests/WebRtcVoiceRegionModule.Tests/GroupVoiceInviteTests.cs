@@ -336,5 +336,77 @@ namespace osWebRtcVoice.Tests
                 Assert.That(GroupVoiceChatSession.TryHandleAcceptInvitation(body, Alice, p, e, out _), Is.False, m);
             }
         }
+
+        // ---- the presence filter, one request for the whole list ------------------------------------------
+
+        [Test]
+        public void OnlineOnlyBatch_AsksOnceForAShortList_AndKeepsTheOnesReportedOnline()
+        {
+            List<UUID> candidates = Enumerable.Range(0, 35).Select(_ => UUID.Random()).ToList();
+            int requests = 0;
+
+            List<UUID> online = GroupVoiceInvite.OnlineOnlyBatch(candidates, ids =>
+            {
+                requests++;
+                return ids.Take(20).ToDictionary(i => i, _ => UUID.Random());   // the first twenty are online
+            });
+
+            Assert.That(requests, Is.EqualTo(1));
+            Assert.That(online, Is.EqualTo(candidates.Take(20)));
+        }
+
+        [Test]
+        public void OnlineOnlyBatch_SplitsAVeryLongListIntoRequestsOfABoundedSize()
+        {
+            List<UUID> candidates = Enumerable.Range(0, GroupVoiceInvite.PresenceBatchSize * 2 + 5).Select(_ => UUID.Random()).ToList();
+            List<int> sizes = new();
+
+            GroupVoiceInvite.OnlineOnlyBatch(candidates, ids => { sizes.Add(ids.Count); return new Dictionary<UUID, UUID>(); });
+
+            Assert.That(sizes, Is.EqualTo(new[] { GroupVoiceInvite.PresenceBatchSize, GroupVoiceInvite.PresenceBatchSize, 5 }));
+        }
+
+        [Test]
+        public void OnlineOnlyBatch_TreatsARequestThatThrowsAsOffline_AndAMissingOrZeroRegionAsOffline()
+        {
+            UUID a = UUID.Random(), b = UUID.Random();
+
+            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => throw new InvalidOperationException("presence service down")), Is.Empty);
+            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => new Dictionary<UUID, UUID> { [a] = UUID.Zero }), Is.Empty);
+            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(new[] { a, b }, _ => null), Is.Empty);
+            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(new[] { a }, null), Is.Empty);
+            Assert.That(GroupVoiceInvite.OnlineOnlyBatch(null, _ => new Dictionary<UUID, UUID>()), Is.Empty);
+        }
+
+        [Test]
+        public void TargetsFromARoster_AreTheSameAsTargetsFromThePolicy()
+        {
+            UUID group = UUID.Random();
+            UUID member = UUID.Random(), noPower = UUID.Random(), outsider = UUID.Random();
+            GroupVoicePolicy policy = new GroupVoicePolicy
+            {
+                Enabled = true,
+                RequireVoicePower = true,
+                Cap = NonSpatialCaps.DefaultConferenceCap,
+                IsMember = (a, g) => a == member || a == noPower,
+                Powers = (a, g) => a == member ? GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice : GroupVoicePolicy.PowerJoinSession,
+            };
+            NonSpatialVoiceSessionEngine e = new NonSpatialVoiceSessionEngine(new InMemoryNonSpatialSessionStore(),
+                new INonSpatialAdmission[] { new P2PAdmission(), new AdhocAdmission(), policy.ToAdmissionOrNull() }, "example-grid");
+            e.Start(NonSpatialSessionType.Group, member, group, group, RegionA);
+            NonSpatialVoiceSession session = e.Get(group);
+            Dictionary<UUID, ulong> roster = new()
+            {
+                [member] = GroupVoicePolicy.PowerJoinSession | GroupVoicePolicy.PowerVoice,
+                [noPower] = GroupVoicePolicy.PowerJoinSession,
+            };
+            UUID[] present = { member, noPower, outsider };
+
+            List<UUID> fromRoster = GroupVoiceInvite.Targets(present, session, UUID.Zero, policy, roster);
+            List<UUID> fromPolicy = GroupVoiceInvite.Targets(present, session, UUID.Zero, policy);
+
+            Assert.That(fromRoster, Is.EqualTo(fromPolicy));
+            Assert.That(GroupVoiceInvite.Targets(present, session, UUID.Zero, policy, null), Is.EqualTo(fromPolicy), "no roster: the policy is asked");
+        }
     }
 }

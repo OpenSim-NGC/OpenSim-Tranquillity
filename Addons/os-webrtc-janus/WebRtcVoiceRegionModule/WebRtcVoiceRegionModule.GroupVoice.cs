@@ -85,7 +85,7 @@ public partial class WebRtcVoiceRegionModule
     /// this list are disjoint by construction, and both are marked invited in the same cycle.
     /// </summary>
     private void RingRemoteGroupMembers(NonSpatialVoiceSession session, UUID initiator, string initiatorName,
-                                        OSDMap body, List<UUID> alreadyRungLocally)
+                                        OSDMap body, List<UUID> alreadyRungLocally, List<GroupMembersData> roster = null)
     {
         if (session is null || !m_groupVoice.IsUsable || body is null)
             return;
@@ -113,19 +113,8 @@ public partial class WebRtcVoiceRegionModule
             return;
         }
 
-        List<GroupMembersData> roster;
-        try
-        {
-            IClientAPI client = originScene?.GetScenePresence(initiator)?.ControllingClient;
-            if (client is null) return;
-            roster = GroupsModule()?.GroupMembersRequest(client, session.Owner);
-        }
-        catch (Exception e)
-        {
-            m_log.LogWarning(e, "{LogHeader} group roster lookup failed for {GroupId}; no cross-instance ring",
-                logHeader, session.Owner);
-            return;
-        }
+        // The roster the local walk already fetched, or one fetched now.
+        roster ??= FetchGroupRoster(scenes, initiator, session.Owner);
         if (roster is null) return;
 
         HashSet<UUID> local = new HashSet<UUID>(alreadyRungLocally ?? new List<UUID>());
@@ -156,12 +145,7 @@ public partial class WebRtcVoiceRegionModule
             if (presence is not null) break;
         }
         int before = remote.Count;
-        remote = GroupVoiceInvite.OnlineOnly(remote, agent =>
-        {
-            if (presence is null) return UUID.Zero;          // no presence service: send nothing
-            OpenSim.Services.Interfaces.PresenceInfo[] found = presence.GetAgents(new[] { agent.ToString() });
-            return found is { Length: > 0 } ? found[0].RegionID : UUID.Zero;
-        });
+        remote = OnlineMembers(presence, remote);
         if (remote.Count != before)
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
                 GroupVoiceRingTransport.Line(UUID.Zero, session.Owner, GroupVoiceInvite.DecisionOffline,
@@ -273,8 +257,19 @@ public partial class WebRtcVoiceRegionModule
         lock (m_scenes)
             scenes = new List<Scene>(m_scenes);
 
+        // One roster serves both halves of the ring: who here is a member with the powers, and who is a member elsewhere.
+        // Without one (the initiator has no client here, or the groups service did not answer) the groups service is asked
+        // about each avatar here instead.
+        List<GroupMembersData> roster = FetchGroupRoster(scenes, initiator, session.Owner);
+        Dictionary<UUID, ulong> held = null;
+        if (roster is not null)
+        {
+            held = new Dictionary<UUID, ulong>();
+            foreach (GroupMembersData m in roster)
+                held[m.AgentID] = m.AgentPowers;
+        }
         List<UUID> targets = GroupVoiceInvite.Targets(GroupVoiceInvite.RootAgents(scenes), session,
-                                                      initiator, m_groupVoice);
+                                                      initiator, m_groupVoice, held);
         bool noLocalTargets = targets.Count == 0;
         if (noLocalTargets)
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
@@ -299,8 +294,49 @@ public partial class WebRtcVoiceRegionModule
         m_nonSpatial.MarkInvited(session.SessionId, targets);
 
         // Everyone the local walk could not reach -- i.e. on another region server.
-        RingRemoteGroupMembers(session, initiator, initiatorName, body, targets);
+        RingRemoteGroupMembers(session, initiator, initiatorName, body, targets, roster);
     }
+
+    // The group's roster, through the initiator's client; null when there is no client here or the groups service did not
+    // answer.
+    private List<GroupMembersData> FetchGroupRoster(List<Scene> scenes, UUID initiator, UUID groupId)
+    {
+        try
+        {
+            IClientAPI client = null;
+            foreach (Scene sc in scenes)
+                if (sc.GetScenePresence(initiator) is ScenePresence sp)
+                    client = sp.ControllingClient;
+            return client is null ? null : GroupsModule()?.GroupMembersRequest(client, groupId);
+        }
+        catch (Exception e)
+        {
+            m_log.LogWarning(e, "{LogHeader} group roster lookup failed for {GroupId}; no cross-instance ring",
+                logHeader, groupId);
+            return null;
+        }
+    }
+
+    // Of the candidates, those the presence service reports online, from one request for the whole list. No presence
+    // service means nobody is reported online, so no ring goes out.
+    private static List<UUID> OnlineMembers(IPresenceService presence, IReadOnlyList<UUID> candidates)
+        => GroupVoiceInvite.OnlineOnlyBatch(candidates, ids =>
+        {
+            Dictionary<UUID, UUID> regions = new Dictionary<UUID, UUID>();
+            if (presence is null)
+                return regions;
+            OpenSim.Services.Interfaces.PresenceInfo[] found = presence.GetAgents(ids.Select(i => i.ToString()).ToArray());
+            if (found is null)
+                return regions;
+            foreach (OpenSim.Services.Interfaces.PresenceInfo info in found)
+            {
+                // A visitor's presence can carry "uuid;home;name"; the agent id is the first 36 characters.
+                string user = info?.UserID;
+                if (!string.IsNullOrEmpty(user) && UUID.TryParse(user.Length > 36 ? user[..36] : user, out UUID agent))
+                    regions[agent] = info.RegionID;
+            }
+            return regions;
+        });
 
     // ---- group membership and powers, resolved as GRID state ------------------------------
     //

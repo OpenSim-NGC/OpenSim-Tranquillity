@@ -272,12 +272,7 @@ public partial class WebRtcVoiceRegionModule
             presence = sc.PresenceService;
             if (presence is not null) break;
         }
-        List<UUID> online = GroupVoiceInvite.OnlineOnly(candidates, agent =>
-        {
-            if (presence is null) return UUID.Zero;
-            OpenSim.Services.Interfaces.PresenceInfo[] found = presence.GetAgents(new[] { agent.ToString() });
-            return found is { Length: > 0 } ? found[0].RegionID : UUID.Zero;
-        });
+        List<UUID> online = OnlineMembers(presence, candidates);
 
         foreach (UUID target in online)
         {
@@ -465,12 +460,7 @@ public partial class WebRtcVoiceRegionModule
             if (presence is not null) break;
         }
         int before = candidates.Count;
-        List<UUID> online = GroupVoiceInvite.OnlineOnly(candidates, agent =>
-        {
-            if (presence is null) return UUID.Zero;          // no presence service: send nothing
-            OpenSim.Services.Interfaces.PresenceInfo[] found = presence.GetAgents(new[] { agent.ToString() });
-            return found is { Length: > 0 } ? found[0].RegionID : UUID.Zero;
-        });
+        List<UUID> online = OnlineMembers(presence, candidates);
         if (online.Count != before)
             m_log.LogDebug("{LogHeader} {Line}", logHeader,
                 AdhocVoiceInvite.Line(UUID.Zero, session.SessionId, GroupVoiceInvite.DecisionOffline,

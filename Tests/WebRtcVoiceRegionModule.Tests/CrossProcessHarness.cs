@@ -104,8 +104,14 @@ namespace osWebRtcVoice.Tests
             private readonly HashSet<UUID> _online = new();
             public void SetOnline(params UUID[] agents) { foreach (UUID a in agents) _online.Add(a); }
 
+            /// <summary>How many times GetAgents was called, and how many agents were asked about in all.</summary>
+            public int GetAgentsCalls;
+            public int AgentsAsked;
+
             public PresenceInfo[] GetAgents(string[] userIDs)
             {
+                GetAgentsCalls++;
+                AgentsAsked += userIDs.Length;
                 List<PresenceInfo> found = new();
                 foreach (string id in userIDs)
                     if (UUID.TryParse(id, out UUID u) && _online.Contains(u))
