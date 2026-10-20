@@ -122,8 +122,7 @@ public partial class WebRtcVoiceRegionModule
             // without error_code) leaves the record as it was. The callee's admitted provision is
             // the accept (Invited -> Active).
             string vs = provVs;
-            bool wasActive = admission.Session.State == A2ASessionState.Active;
-            A2ASession s = m_a2aSessions.MarkProvisioned(admission.Session.SessionId, agentID, vs);
+            A2ASession s = m_a2aSessions.MarkProvisioned(admission.Session.SessionId, agentID, vs, out bool becameActive);
             m_log.LogDebug("{LogHeader} [A2A PROVISION] agent={AgentId} session-id={SessionId} viewer_session={ViewerSession} state={State} decision=provisioned",
                 logHeader, agentID, admission.Session.SessionId, vs ?? "-",
                 s?.State.ToString() ?? "gone");
@@ -133,7 +132,7 @@ public partial class WebRtcVoiceRegionModule
             // llimview.cpp:4366-4382). Not re-sent on a reconnect re-provision of an already-
             // Active record. This is the participant/moderation surface only; the caller's
             // connected state comes from mixer presence.
-            if (!wasActive && s != null && s.State == A2ASessionState.Active)
+            if (becameActive)
             {
                 List<Scene> scenes;
                 lock (m_scenes)

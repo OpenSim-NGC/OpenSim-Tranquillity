@@ -33,6 +33,7 @@
     <Compile Include="A2ALifecycleTests.cs" />
     <Compile Include="A2ADeclineTests.cs" />
     <Compile Include="A2ASessionRegistryTests.cs" />
+    <Compile Include="A2ASessionConcurrencyTests.cs" />
     <Compile Include="ProvisionPassthroughTests.cs" />
     <Compile Include="DefaultsChatSessionTests.cs" />
     <!-- Opt-in integration tests against a real Janus gateway (skipped unless WEBRTC_JANUS_TEST_URL is set). -->

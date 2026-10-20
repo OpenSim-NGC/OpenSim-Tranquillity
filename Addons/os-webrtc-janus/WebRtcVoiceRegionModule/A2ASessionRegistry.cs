@@ -139,7 +139,16 @@ namespace osWebRtcVoice
         /// Returns null when the voice session is unknown/expired or the agent is not a party.
         /// </summary>
         public A2ASession MarkProvisioned(UUID sessionId, UUID agent, string viewerSession)
+            => MarkProvisioned(sessionId, agent, viewerSession, out _);
+
+        /// <summary>
+        /// As above. <paramref name="becameActive"/> is true for the one join that moved the record from
+        /// Invited to Active, decided inside the lock. A caller that read the state before and after the
+        /// call could see several joins that arrive together all claim the change.
+        /// </summary>
+        public A2ASession MarkProvisioned(UUID sessionId, UUID agent, string viewerSession, out bool becameActive)
         {
+            becameActive = false;
             DateTime now = _clock();
             lock (_lock)
             {
@@ -155,6 +164,7 @@ namespace osWebRtcVoice
                 {
                     s.CalleeProvisioned = true;
                     s.CalleeViewerSession = viewerSession;
+                    becameActive = s.State != A2ASessionState.Active;
                     s.State = A2ASessionState.Active;          // the accept
                 }
                 s.LastSeenUtc = now;
