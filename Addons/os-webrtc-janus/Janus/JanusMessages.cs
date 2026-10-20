@@ -121,6 +121,26 @@ public class JanusMessage
     {
         return m_message.ToString();
     }
+    /// <summary>Top-level request fields that authenticate the sender and so must never reach a log.</summary>
+    private static readonly string[] LogRedactedFields = { "apisecret", "admin_secret" };
+
+    /// <summary>How a request is serialized for a LOG line, as opposed to for the wire. It is the wire
+    /// form with the API secret and the admin secret replaced.
+    /// Every other field (the transaction and session ids included) is left as it is: those are not
+    /// secrets and are what an operator correlates on.</summary>
+    public virtual string ToJsonForLog()
+    {
+        ToJson();   // a subclass may assemble m_message here (PluginMsgReq adds its body)
+        OSDMap copy = new OSDMap();
+        foreach (KeyValuePair<string, OSD> field in m_message)
+            copy[field.Key] = field.Value;
+        foreach (string secret in LogRedactedFields)
+        {
+            if (copy.TryGetValue(secret, out OSD value) && !string.IsNullOrEmpty(value.AsString()))
+                copy[secret] = "<redacted " + secret + ">";
+        }
+        return copy.ToString();
+    }
     public override string ToString()
     {
         return m_message.ToString();

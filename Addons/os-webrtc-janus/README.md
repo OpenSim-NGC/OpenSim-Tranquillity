@@ -154,6 +154,13 @@ here needs to specify the URI to address the Janus server and the API keys
 to allow this simulator access to its interfaces. The example above
 contains just sample entries.
 
+`APIToken` and `AdminAPIToken` are sent with every request to the gateway. Use random values of at least 32 characters;
+a shorter one is logged as a warning at startup (the key is named, the value is not). When the gateway is on another
+host, use `https://` URLs or a private network: over plain `http://` the secrets cross the network in clear.
+`https://` URLs are validated as before: the certificate must chain to a trusted root and name the host contacted.
+`JanusGatewayCACertificateFile` adds a private CA (PEM or DER), trusted alongside the system roots. No setting turns
+validation off.
+
 #### Optional settings
 
 These keys are optional. The shipped `os-webrtc-janus.ini` lists them commented out with their defaults.
@@ -164,6 +171,7 @@ These keys are optional. The shipped `os-webrtc-janus.ini` lists them commented 
 | `RequestTimeoutMs` | `[JanusWebRtcVoice]` | `5000` | Milliseconds a Janus request that is answered with `ack` waits for its result before it fails. Before this setting such a request waited without limit. |
 | `RemoveEmptyRooms`, `EmptyRoomGraceSeconds` | `[JanusWebRtcVoice]` | `true`, `60` | Remove a room this service created once it has stood empty for the grace period. The stock AudioBridge never removes an emptied room. Rooms the service did not create are never removed, and a plugin other than the stock AudioBridge is expected to remove its own. |
 | `RefusalCacheSeconds` | `[WebRtcVoice]` | `5` | Seconds a refused voice provision is remembered, so the viewer's immediate retries are answered without repeating the estate and parcel checks. `0` turns it off. |
+| `JanusGatewayCACertificateFile` | `[JanusWebRtcVoice]` | unset | A PEM or DER file with a private CA certificate, trusted alongside the system roots for an `https://` gateway URL. The host name must still match, and no setting turns validation off. |
 | `StunServers` | `[WebRtcVoice]` | empty | Comma-separated STUN server URIs (full ICE URIs, for example `stun:stun.example.org:3478`) advertised to viewers as the `stun-servers` simulator feature. Stock viewers need a valid entry to connect from outside the grid's network. When empty the entry is not advertised. Works with either plugin. |
 | `A2AVoiceEnabled` | `[WebRtcVoice]` | `false` | Avatar-to-avatar calls (the `call` and `start p2p voice` chat session requests). With it off the chat session handler answers as before. A callee whose region runs in another region-server process is rung by a message that crosses between the processes: signed with `CarrierSecret`, or, with `SessionStoreMode = grid`, checked through the call session service. |
 

@@ -85,6 +85,8 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 _JanusAPIToken = janusConfig.GetString("APIToken", string.Empty);
                 _JanusAdminURI = janusConfig.GetString("JanusGatewayAdminURI", string.Empty);
                 _JanusAdminToken = janusConfig.GetString("AdminAPIToken", string.Empty);
+                WarnOnShortJanusSecrets();
+                ReadTlsConfig(janusConfig);
                 ReadPluginNameConfig(janusConfig);
                 ReadGridIdConfig();
                 ReadRoomReaperConfig(janusConfig);
