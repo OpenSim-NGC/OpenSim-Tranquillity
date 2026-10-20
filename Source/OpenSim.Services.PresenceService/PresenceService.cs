@@ -93,8 +93,8 @@ public class PresenceService : PresenceServiceBase, IPresenceService
         if (prevUser != null)
             prevUserStr = string.Format(". This user was already logged-in: session {0}, region {1}", prevUser.SessionID, prevUser.RegionID);
 
-        m_log.LogDebug("[PRESENCE SERVICE]: LoginAgent: session {0}, user {1}, region {2}, secure session {3}{4}",
-            data.SessionID, data.UserID, data.RegionID, secureSessionID, prevUserStr);
+        m_log.LogDebug("[PRESENCE SERVICE]: LoginAgent: session {0}, user {1}, region {2}{3}",
+            data.SessionID, data.UserID, data.RegionID, prevUserStr);
 
         return true;
     }
