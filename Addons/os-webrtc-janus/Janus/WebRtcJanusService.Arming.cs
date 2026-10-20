@@ -38,7 +38,7 @@ using Microsoft.Extensions.Logging;
 
 namespace osWebRtcVoice;
 
-// Room visibility authority, off unless configured.
+// Room visibility authority and the join capability, both off unless configured.
 public partial class WebRtcJanusService
 {
     // Create spatial "local" rooms with vis_authority=true. True only when the sim arms: [WebRtcVoice]
@@ -46,13 +46,37 @@ public partial class WebRtcJanusService
     // exactly as WebRtcVoiceRegionModule resolves them.
     private bool _DeclareVisAuthority = false;
 
-    // Reads whether rooms are declared with a visibility authority.
-    private void ReadArmingConfig(IConfig webRtcVoiceConfig)
+    // Mint a join capability for every join. Off by default; the key lives beside the other mixer credentials in
+    // [JanusWebRtcVoice] and is never logged.
+    private bool _JoinCapabilityEnabled = false;
+
+    private string _JoinCapabilitySecret = string.Empty;
+
+    // Reads whether rooms are declared with a visibility authority and whether joins carry a capability.
+    private void ReadArmingConfig(IConfig webRtcVoiceConfig, IConfig janusConfig)
     {
         _DeclareVisAuthority = webRtcVoiceConfig.GetBoolean("VisibilityArmingEnabled", false)
             && webRtcVoiceConfig.GetBoolean("VisibilityFeederEnabled", false)
             && webRtcVoiceConfig.GetBoolean("VisibilityEmitEnabled", false);
         if (_DeclareVisAuthority)
             _log.LogInformation($"{LogHeader} spatial \"local\" rooms are created with vis_authority=true ([WebRtcVoice] VisibilityArmingEnabled)");
+        // Enabling the capability without a secret mints nothing, so say so and stay off rather than sending half a
+        // capability on every join.
+        _JoinCapabilityEnabled = webRtcVoiceConfig.GetBoolean("JoinCapabilityEnabled", false);
+        _JoinCapabilitySecret = janusConfig.GetString("JoinCapabilitySecret", string.Empty);
+        if (_JoinCapabilityEnabled && string.IsNullOrEmpty(_JoinCapabilitySecret))
+        {
+            _log.LogError($"{LogHeader} [WebRtcVoice] JoinCapabilityEnabled is true but [JanusWebRtcVoice] JoinCapabilitySecret is empty: no capability can be minted, so joins carry none");
+            _JoinCapabilityEnabled = false;
+        }
+        else if (_JoinCapabilityEnabled && _JoinCapabilitySecret.Length < MinSecretLength)
+        {
+            // A capability is an HMAC over a known structure: anyone who sees one can test candidate keys offline,
+            // so a short key must not be used. Named by key only; the value and its length are not logged.
+            _log.LogError($"{LogHeader} [JanusWebRtcVoice] JoinCapabilitySecret is shorter than {MinSecretLength} characters: refusing to mint capabilities with it, so joins carry none");
+            _JoinCapabilityEnabled = false;
+        }
+        else if (_JoinCapabilityEnabled)
+            _log.LogInformation($"{LogHeader} join capability enabled: every join carries one, {JoinCapability.LifetimeSeconds} s lifetime ([WebRtcVoice] JoinCapabilityEnabled)");
     }
 }

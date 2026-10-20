@@ -166,15 +166,18 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
-        public void ThePluginMessageLogFormHidesBothSecrets()
+        public void ThePluginMessageLogFormHidesBothSecretsAndTheJoinCapability()
         {
+            const string capability = "join-capability-token-value";
             var req = new PluginMsgReq(new OSDMap());
+            req.AddStringToBody("join_cap", capability);
             req.AddAPIToken(ApiSecret);
             req.RawBody["admin_secret"] = AdminSecret;
 
             string forLog = req.ToJsonForLog();
 
             AssertNoSecrets(forLog, "the log form of a plugin message");
+            Assert.That(forLog, Does.Not.Contain(capability), "the join capability stays hidden");
             Assert.That(req.ToJson(), Does.Contain(ApiSecret), "the wire form still carries the API secret");
         }
 

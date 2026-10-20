@@ -159,12 +159,18 @@ namespace osWebRtcVoice
         /// <summary>The next policy_generation for a room (the first is 1).</summary>
         public uint NextGeneration(int room)
         {
+            uint next;
             lock (_lock)
             {
                 _roomGen.TryGetValue(room, out uint g);
                 _roomGen[room] = ++g;
-                return g;
+                next = g;
             }
+            // Publish the arming state this room has reached, so a join capability minted for it carries the same
+            // epoch and generation and stops being valid with this authority. The join happens in another assembly,
+            // which is why this goes through a process-wide table rather than a reference.
+            JoinCapabilityAuthority.Publish(room, EpochString, next);
+            return next;
         }
 
         public uint CurrentGeneration(int room)

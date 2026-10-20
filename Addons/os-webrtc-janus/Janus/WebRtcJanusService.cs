@@ -90,7 +90,7 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 ReadPluginNameConfig(janusConfig);
                 MixerOnlySwitches.DisableOnStockPlugin(_Config, _log);
                 ReadGridIdConfig();
-                ReadArmingConfig(webRtcVoiceConfig);
+                ReadArmingConfig(webRtcVoiceConfig, janusConfig);
                 ReadRoomReaperConfig(janusConfig);
                 // Debugging options
                 _MessageDetails = janusConfig.GetBoolean("MessageDetails", false);
@@ -152,6 +152,9 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             // Once the session is created, create a handle to the plugin for rooms
             JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName, _GridId, _DeclareVisAuthority)
             {
+                // What JanusRoom.JoinRoom mints with. Both stay at their defaults with the switch off.
+                JoinCapabilityEnabled = _JoinCapabilityEnabled,
+                JoinCapabilitySecret = _JoinCapabilitySecret,
                 // Rooms this bridge creates are watched by the empty-room reaper (null when it is off).
                 RoomCreated = _roomReaper is null ? null : _roomReaper.NoteCreated,
             };

@@ -34,11 +34,19 @@ using OpenSim.Framework;
 
 namespace osWebRtcVoice;
 
-// Room visibility authority.
+// Room visibility authority and the join capability.
 public partial class JanusAudioBridge
 {
     /// <summary>Whether spatial "local" rooms are declared as having a sim authority.</summary>
     public bool DeclareVisAuthority { get; }
+
+    /// <summary>([WebRtcVoice] JoinCapabilityEnabled, default false): mint a join capability for every join
+    /// this bridge performs. False sends the join body without one.</summary>
+    public bool JoinCapabilityEnabled { get; set; }
+
+    /// <summary>([JanusWebRtcVoice] JoinCapabilitySecret): the HMAC key shared with the mixer's
+    /// JS_JOIN_CAP_SECRET, and never the same value as the API token. Never logged; empty mints nothing.</summary>
+    public string JoinCapabilitySecret { get; set; } = string.Empty;
 
     /// <summary>Only spatial "local" rooms are declared. Agent-to-agent "multiagent" rooms get no visibility batches,
     /// so declaring them would silence every call once fail-closed is enabled.</summary>

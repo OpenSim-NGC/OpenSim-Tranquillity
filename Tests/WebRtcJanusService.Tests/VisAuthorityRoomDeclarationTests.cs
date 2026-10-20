@@ -42,6 +42,32 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
+        public void CreateBody_IsNotMarkedSimCreated_UnlessAskedTo()
+        {
+            Assert.That(Body(new AudioBridgeCreateRoomReq(7)).ContainsKey("sim_created"), Is.False);
+            Assert.That(Body(new AudioBridgeCreateRoomReq(7, true, "d", true)).ContainsKey("sim_created"), Is.False);
+        }
+
+        [Test]
+        public void CreateBody_MarkedSimCreated_IsIndependentOfTheDeclaration()
+        {
+            // A room can be marked and undeclared (a call), or marked and declared (a spatial parcel room). The two
+            // keys answer different questions: who arms the room, and who owns it. A mixer that requires join
+            // capabilities keys on the second, so a call's room is gated too.
+            var undeclared = new AudioBridgeCreateRoomReq(7, false, "call", false);
+            undeclared.SetSimCreated();
+            OSDMap body = Body(undeclared);
+            Assert.That(body.ContainsKey("vis_authority"), Is.False);
+            Assert.That(body["sim_created"].AsBoolean(), Is.True);
+
+            var declared = new AudioBridgeCreateRoomReq(7, true, "local", true);
+            declared.SetSimCreated();
+            body = Body(declared);
+            Assert.That(body["vis_authority"].AsBoolean(), Is.True);
+            Assert.That(body["sim_created"].AsBoolean(), Is.True);
+        }
+
+        [Test]
         public void OnlySpatialLocalRooms_AreDeclared_AndOnlyWhenArming()
         {
             Assert.That(JanusAudioBridge.ShouldDeclareVisAuthority(true, "local"), Is.True);

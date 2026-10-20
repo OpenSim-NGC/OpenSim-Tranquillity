@@ -125,7 +125,7 @@ public class JanusMessage
     private static readonly string[] LogRedactedFields = { "apisecret", "admin_secret" };
 
     /// <summary>How a request is serialized for a LOG line, as opposed to for the wire. It is the wire
-    /// form with the API secret and the admin secret replaced.
+    /// form with the API secret and the admin secret replaced; PluginMsgReq also hides a join capability.
     /// Every other field (the transaction and session ids included) is left as it is: those are not
     /// secrets and are what an operator correlates on.</summary>
     public virtual string ToJsonForLog()
@@ -436,6 +436,18 @@ public class PluginMsgReq : JanusMessageReq
         m_message["body"] = m_body;
         return base.ToJson();
     }
+
+    /// <summary>The log form of the base request (secrets hidden) with the join capability replaced as well, for
+    /// the [JanusWebRtcVoice] MessageDetails debug line, the one place a request body is logged. It replaces the
+    /// exact minted string, so no part of a capability can survive into a log.</summary>
+    public override string ToJsonForLog()
+    {
+        string json = base.ToJsonForLog();
+        if (!m_body.ContainsKey("join_cap"))
+            return json;
+        string capability = m_body["join_cap"].AsString();
+        return string.IsNullOrEmpty(capability) ? json : json.Replace(capability, "<redacted join_cap>");
+    }
 }
 // A plugin response is formatted like:
 //    {
@@ -549,6 +561,11 @@ public class AudioBridgeCreateRoomReq : PluginMsgReq
         if (pVisAuthority)
             AddBoolToBody("vis_authority", true);
     }
+
+    /// <summary>Say that the region created this room, spatial or not, so a mixer that requires join capabilities
+    /// also gates the rooms that carry no visibility authority (a call or a conference). Added after every other
+    /// key, and only when the join capability is on, so a create without it is unchanged.</summary>
+    public void SetSimCreated() => AddBoolToBody("sim_created", true);
 }
 // ==============================================================
 public class AudioBridgeDestroyRoomReq : PluginMsgReq
@@ -574,6 +591,17 @@ public class AudioBridgeJoinRoomReq : PluginMsgReq
                                             { "display", pAgentName }
                                         })
     {
+    }
+
+    /// <summary>Carry the region-issued join capability and the viewer session it is bound to. Added after every
+    /// other key, so a join body without a capability is unchanged and an older mixer ignores both keys. Never
+    /// logged.</summary>
+    public void SetJoinCapability(string pCapability, string pViewerSessionId)
+    {
+        if (string.IsNullOrEmpty(pCapability) || string.IsNullOrEmpty(pViewerSessionId))
+            return;
+        AddStringToBody("join_cap", pCapability);
+        AddStringToBody("session_id", pViewerSessionId);
     }
 }
 // A successful response contains the participant ID and the SDP

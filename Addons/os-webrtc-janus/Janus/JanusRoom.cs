@@ -71,6 +71,20 @@ public class JanusRoom : IDisposable
             //    out of order. Not "cleaning" (removing the data section) seems to work.
             // string cleanSdp = CleanupSdp(pSdp);
             var joinReq = new AudioBridgeJoinRoomReq(RoomId, pVSession.AgentId.ToString());
+            // Mint the capability for this join, bound to the agent, the viewer session, the room and the arming
+            // state the sim believes current. Off by default, and then this request is unchanged. The capability
+            // is never logged, and the viewer never sees it: this request goes from the region to the mixer.
+            if (_AudioBridge is JanusAudioBridge capBridge && capBridge.JoinCapabilityEnabled)
+            {
+                (string epoch, uint generation) = JoinCapabilityAuthority.Resolve(RoomId);
+                string capability = JoinCapability.Mint(capBridge.JoinCapabilitySecret, pVSession.AgentId.ToString(),
+                    pVSession.ViewerSessionID, RoomId, epoch, generation, JoinCapability.NowUnix());
+                if (capability is not null)
+                    joinReq.SetJoinCapability(capability, pVSession.ViewerSessionID);
+                else
+                    m_log.LogWarning("{LogHeader} JoinRoom. JoinCapabilityEnabled but nothing was minted for room {RoomId} " +
+                        "(is [JanusWebRtcVoice] JoinCapabilitySecret set?); joining without one", LogHeader, RoomId);
+            }
             // joinReq.SetJsep("offer", cleanSdp);
             joinReq.SetJsep("offer", pVSession.Offer);
 
@@ -89,6 +103,13 @@ public class JanusRoom : IDisposable
                 // Surface the mixer's error_code (0 if absent; ROOM_FULL=495 on a capacity
                 // rejection). AudioBridgeErrorCode already parses it — it was just discarded.
                 errorCode = joinResp?.AudioBridgeErrorCode ?? 0;
+                // A capability refusal answers 496 with a machine-readable `reason` (cap_expired, cap_replayed, ...).
+                // Named on its own line so an operator sees which check failed; the capability itself is never
+                // logged, and the mixer never echoes it.
+                string capReason = joinResp?.PluginRespDataString("reason");
+                if (!string.IsNullOrEmpty(capReason))
+                    m_log.LogError("{LogHeader} JoinRoom. Room {RoomId} refused the join: {JoinRefusalReason} (error_code={JoinErrorCode})",
+                        LogHeader, RoomId, capReason, errorCode);
                 // A 485 means the room vanished between the create and this join; the caller logs it
                 // ONCE at WARN and fails the provision back to the viewer, so here it is only DEBUG. Every other
                 // failure is still an ERROR.

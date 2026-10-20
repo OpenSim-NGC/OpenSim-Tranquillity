@@ -66,7 +66,9 @@ namespace osWebRtcVoice.Tests
             voice.Set("VisibilityFeederEnabled", "true");
             voice.Set("VisibilityEmitEnabled", "true");
             voice.Set("VisibilityArmingEnabled", "true");
+            voice.Set("JoinCapabilityEnabled", "true");
             voice.Set("VoiceModerationEnabled", "true");
+            janus.Set("JoinCapabilitySecret", "0123456789abcdef0123456789abcdef0123456789abcdef");
         }
 
         [Test]
@@ -133,7 +135,7 @@ namespace osWebRtcVoice.Tests
                 Assert.That(Measurement.MedianShare(heard, 880), Is.GreaterThan(0.8), "audio is unaffected by the switches");
                 // Each switch the stock plugin cannot honour says so at start, naming the switch and the plugin, and stays off
                 // (so the sender never meets a plugin that rejects its batches).
-                foreach (string name in new[] { "VisibilityFeederEnabled", "VisibilityEmitEnabled", "VisibilityArmingEnabled" })
+                foreach (string name in new[] { "JoinCapabilityEnabled", "VisibilityFeederEnabled", "VisibilityEmitEnabled", "VisibilityArmingEnabled" })
                     Assert.That(lines.Any(l => l.StartsWith("Warning") && l.Contains(name) && l.Contains("janus.plugin.audiobridge")), Is.True,
                         $"a warning names {name} and the plugin");
                 Assert.That(lines.Any(l => l.Contains("rejected as ProtocolError")), Is.False,
@@ -213,6 +215,26 @@ namespace osWebRtcVoice.Tests
             Assert.That(Measurement.MedianRms(heard), Is.LessThan(0.005), "Bob joined after mute_all and is not heard");
             await region.LogoutAsync(a);
             await region.LogoutAsync(b);
+        }
+
+        [Test]
+        public async Task JoinCapability_OnTheStockPlugin_IsNotEnforced()
+        {
+            StockJanusEnvironment.IgnoreUnlessPeerAvailable();
+            using var region = StockRegion.Create(MixerOnlySwitchesOn);
+            region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
+            using Joined a = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o));
+            Assert.That(a.Answer.Provisioned, Is.True, "the join is accepted: " + a.Answer.Body);
+
+            // The stock plugin has nothing that checks a capability, so the switch is reported and stays off (the
+            // unit tests show no capability is minted). Anything holding the gateway's API secret can join the same
+            // room with none; the secret is the only protection the stock gateway has.
+            using var stranger = await AiortcPeer.StartAsync();
+            string answer = await _janus.JoinDirectAsync(a.Answer.Room, "stranger", stranger.Offer);
+
+            Assert.That(answer, Is.Not.Null, "a join with no capability is accepted by the stock plugin");
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+            await region.LogoutAsync(a);
         }
     }
 }

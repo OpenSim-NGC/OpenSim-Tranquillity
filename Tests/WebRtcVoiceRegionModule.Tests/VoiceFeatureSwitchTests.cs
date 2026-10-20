@@ -14,6 +14,7 @@
  *   GroupVoiceEnabled      - the group policy is not usable
  *   AdhocVoiceEnabled      - "start conference" is not acted on
  *   VisibilityArmingEnabled, VisibilityFeederEnabled, VisibilityEmitEnabled - read as false
+ *   JoinCapabilityEnabled  - read as false (the Janus service tests cover the room payloads)
  *   VoiceModerationEnabled - the SpatialVoiceModerationRequest capability is not advertised
  */
 
@@ -108,6 +109,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(WebRtcVoiceRegionModule.ReadVisibilityArmingEnabled(cfg), Is.False, "VisibilityArmingEnabled");
             Assert.That(WebRtcVoiceRegionModule.ReadVisibilityFeederEnabled(cfg), Is.False, "VisibilityFeederEnabled");
             Assert.That(WebRtcVoiceRegionModule.ReadVisibilityEmitEnabled(cfg), Is.False, "VisibilityEmitEnabled");
+            Assert.That(cfg.GetBoolean("JoinCapabilityEnabled", false), Is.False, "JoinCapabilityEnabled");
         }
 
         [Test]

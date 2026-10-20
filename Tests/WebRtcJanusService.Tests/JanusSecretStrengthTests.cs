@@ -6,9 +6,13 @@
  */
 
 /*
- * Secret strength at startup. A short secret is easy to guess. The rule is 32 characters:
+ * Secret strength at startup. A join capability is an HMAC over a known structure, so anyone who sees
+ * one can test candidate keys offline; a short key falls. The rule is 32 characters, the same as the
+ * connector secret's:
  *   - [JanusWebRtcVoice] APIToken and AdminAPIToken already exist, so a short one only logs a WARNING
- *     that names the key (never its value or its length) and the service starts as before.
+ *     that names the key (never its value or its length) and the service starts as before;
+ *   - [JanusWebRtcVoice] JoinCapabilitySecret is new, so when JoinCapabilityEnabled is on a short one is
+ *     refused: an ERROR names the key and the capability stays off, as it already does for an empty one.
  * An empty value is not a strength problem; it keeps its own existing handling and message.
  *
  * Each test builds a real WebRtcJanusService against the in-memory fake gateway and reads its log.
@@ -67,17 +71,21 @@ namespace osWebRtcVoice.Tests
             _log.Dispose();
         }
 
-        private void StartService(string apiToken, string adminToken)
+        private void StartService(string apiToken, string adminToken, bool joinCapEnabled = false, string joinCapSecret = null)
         {
             var config = new IniConfigSource();
             IConfig voice = config.AddConfig("WebRtcVoice");
             voice.Set("Enabled", "true");
+            if (joinCapEnabled)
+                voice.Set("JoinCapabilityEnabled", "true");
             IConfig janus = config.AddConfig("JanusWebRtcVoice");
             janus.Set("JanusGatewayURI", "http://janus.test/voice");
             janus.Set("APIToken", apiToken);
             janus.Set("JanusGatewayAdminURI", "http://janus.test/admin");
             janus.Set("AdminAPIToken", adminToken);
             janus.Set("PluginName", "janus.plugin.slvoice");
+            if (joinCapSecret is not null)
+                janus.Set("JoinCapabilitySecret", joinCapSecret);
             _ = new WebRtcJanusService(config, () => new FakeJanusHandler(new FakeJanusGateway()));
         }
 
@@ -127,6 +135,49 @@ namespace osWebRtcVoice.Tests
 
             Assert.That(StrengthLines("APIToken"), Is.Empty, "empty is not reported as short");
             Assert.That(_log.Snapshot().Any(l => l.Level == LogLevel.Error && l.Text.Contains("missing required fields")), Is.True);
+        }
+
+        [TestCase(31, false)]
+        [TestCase(32, true)]
+        public void TheJoinCapabilitySecretIsRefusedUnder32Characters(int length, bool accepted)
+        {
+            string secret = Secret(length);
+
+            StartService(Secret(40), Secret(40), joinCapEnabled: true, joinCapSecret: secret);
+
+            var lines = _log.Snapshot();
+            bool enabledLine = lines.Any(l => l.Text.Contains("join capability enabled"));
+            var refused = lines.Where(l => l.Level == LogLevel.Error && l.Text.Contains("JoinCapabilitySecret")
+                                           && l.Text.Contains("shorter than 32 characters")).ToList();
+            if (accepted)
+            {
+                Assert.That(enabledLine, Is.True, "a 32-character secret enables the capability");
+                Assert.That(refused, Is.Empty);
+            }
+            else
+            {
+                Assert.That(enabledLine, Is.False, "a short secret must not switch the capability on");
+                Assert.That(refused, Has.Count.EqualTo(1), "one error that names JoinCapabilitySecret");
+                Assert.That(refused[0].Text, Does.Not.Contain(length.ToString()), "the secret's length is not given away");
+            }
+            AssertNothingSecretLogged(secret);
+        }
+
+        [Test]
+        public void AnEmptyJoinCapabilitySecretKeepsItsExistingError()
+        {
+            StartService(Secret(40), Secret(40), joinCapEnabled: true, joinCapSecret: string.Empty);
+
+            Assert.That(StrengthLines("JoinCapabilitySecret"), Is.Empty, "empty is not reported as short");
+            Assert.That(_log.Snapshot().Any(l => l.Level == LogLevel.Error && l.Text.Contains("JoinCapabilitySecret is empty")), Is.True);
+        }
+
+        [Test]
+        public void AShortJoinCapabilitySecretIsIgnoredWhileTheCapabilityIsOff()
+        {
+            StartService(Secret(40), Secret(40), joinCapEnabled: false, joinCapSecret: Secret(8));
+
+            Assert.That(StrengthLines("JoinCapabilitySecret"), Is.Empty, "the knob is off, so the secret is not used or judged");
         }
     }
 }

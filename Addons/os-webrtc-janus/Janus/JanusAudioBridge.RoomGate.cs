@@ -60,7 +60,10 @@ public partial class JanusAudioBridge
         JanusRoom ret = null;
         try
         {
-            JanusMessageResp resp = await SendPluginMsg(new AudioBridgeCreateRoomReq(pRoomId, pSpatial, pRoomDesc, pVisAuthority));
+            var createReq = new AudioBridgeCreateRoomReq(pRoomId, pSpatial, pRoomDesc, pVisAuthority);
+            if (JoinCapabilityEnabled)
+                createReq.SetSimCreated();
+            JanusMessageResp resp = await SendPluginMsg(createReq);
             AudioBridgeResp abResp = new AudioBridgeResp(resp);
 
             m_log.LogDebug("{0} CreateRoom. ReturnCode: {1}", LogHeader, abResp.AudioBridgeReturnCode);

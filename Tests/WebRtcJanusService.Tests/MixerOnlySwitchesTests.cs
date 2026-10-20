@@ -57,6 +57,8 @@ namespace osWebRtcVoice.Tests
             return src;
         }
 
+        [TestCase("JoinCapabilityEnabled")]
+        [TestCase("JoinCapabilityEnabled")]
         [TestCase("VisibilityFeederEnabled")]
         [TestCase("VisibilityEmitEnabled")]
         [TestCase("VisibilityArmingEnabled")]
@@ -74,6 +76,8 @@ namespace osWebRtcVoice.Tests
             Assert.That(warnings[0], Does.Contain(name).And.Contain("janus.plugin.audiobridge"));
         }
 
+        [TestCase("JoinCapabilityEnabled")]
+        [TestCase("JoinCapabilityEnabled")]
         [TestCase("VisibilityFeederEnabled")]
         [TestCase("VisibilityEmitEnabled")]
         [TestCase("VisibilityArmingEnabled")]
@@ -141,7 +145,7 @@ namespace osWebRtcVoice.Tests
         public void CalledTwice_EachSwitchIsReportedOnce()
         {
             var log = new Capture();
-            IConfigSource cfg = Config("janus.plugin.audiobridge", "VisibilityFeederEnabled", "VisibilityEmitEnabled");
+            IConfigSource cfg = Config("janus.plugin.audiobridge", "JoinCapabilityEnabled", "VisibilityFeederEnabled");
 
             MixerOnlySwitches.DisableOnStockPlugin(cfg, log);
             MixerOnlySwitches.DisableOnStockPlugin(cfg, log);
@@ -158,6 +162,7 @@ namespace osWebRtcVoice.Tests
             janus.Set("APIToken", "tok");
             janus.Set("JanusGatewayAdminURI", "http://janus.test/admin");
             janus.Set("AdminAPIToken", "tok");
+            janus.Set("JoinCapabilitySecret", "0123456789abcdef0123456789abcdef0123456789abcdef");
             return new WebRtcJanusService(cfg, () => new FakeJanusHandler(new FakeJanusGateway()));
         }
 
@@ -202,6 +207,57 @@ namespace osWebRtcVoice.Tests
                 Assert.That(log.Warnings().Any(w => w.Contains("VisibilityArmingEnabled")), Is.False);
                 Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("VisibilityArmingEnabled", false), Is.True);
                 Assert.That(log.Lines.Any(l => l.Text.Contains("vis_authority=true")), Is.True);
+            }
+            finally
+            {
+                ILoggerFactory ours = LoggerProvider.LoggerFactory;
+                LoggerProvider.LoggerFactory = previous;
+                ours.Dispose();
+                log.Dispose();
+            }
+        }
+
+        [Test]
+        public void TheService_OnTheStockPlugin_WarnsAboutTheJoinCapability_AndDoesNotMintOne()
+        {
+            var log = new Capture();
+            ILoggerFactory previous = LoggerProvider.LoggerFactory;
+            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(log).SetMinimumLevel(LogLevel.Trace));
+            try
+            {
+                IConfigSource cfg = Config("janus.plugin.audiobridge", "JoinCapabilityEnabled");
+
+                StartService(cfg);
+
+                Assert.That(log.Warnings().Any(w => w.Contains("JoinCapabilityEnabled") && w.Contains("janus.plugin.audiobridge")), Is.True,
+                    string.Join(" | ", log.Warnings()));
+                Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("JoinCapabilityEnabled", true), Is.False);
+                Assert.That(log.Lines.Any(l => l.Text.Contains("join capability enabled")), Is.False, "no 'enabled' line");
+            }
+            finally
+            {
+                ILoggerFactory ours = LoggerProvider.LoggerFactory;
+                LoggerProvider.LoggerFactory = previous;
+                ours.Dispose();
+                log.Dispose();
+            }
+        }
+
+        [Test]
+        public void TheService_OnTheSlvoicePlugin_KeepsTheJoinCapability()
+        {
+            var log = new Capture();
+            ILoggerFactory previous = LoggerProvider.LoggerFactory;
+            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(log).SetMinimumLevel(LogLevel.Trace));
+            try
+            {
+                IConfigSource cfg = Config("janus.plugin.slvoice", "JoinCapabilityEnabled");
+
+                StartService(cfg);
+
+                Assert.That(log.Warnings().Any(w => w.Contains("JoinCapabilityEnabled")), Is.False);
+                Assert.That(cfg.Configs["WebRtcVoice"].GetBoolean("JoinCapabilityEnabled", false), Is.True);
+                Assert.That(log.Lines.Any(l => l.Text.Contains("join capability enabled")), Is.True);
             }
             finally
             {
