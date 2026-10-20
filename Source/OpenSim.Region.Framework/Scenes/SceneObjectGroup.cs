@@ -4166,7 +4166,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
             if (pa is not null && pa.IsPhysical)
             {
-                if (IsPhysicalDragRefused())
+                if (IsPhysicalDragRefused(pa.AllowsVehicleGrab))
                 {
                     EndGrab();
                     return;
@@ -4204,11 +4204,12 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
     /// <summary>
     /// Whether a drag or a turn of the physical root body is refused, for the mouse drag and the rotate-drag alike.
-    /// A drag moves the root's body, so the root's block applies whichever part was grabbed.
+    /// A drag moves the root's body, so the root's block applies whichever part was grabbed. A vehicle is refused unless the
+    /// engine says it runs a drag of a vehicle (<see cref="PhysicsActor.AllowsVehicleGrab"/>); the rotate-drag never does.
     /// </summary>
-    private bool IsPhysicalDragRefused()
+    private bool IsPhysicalDragRefused(bool allowVehicle = false)
         => m_rootPart.BlockGrab || IsSelected || IsAttachment
-            || m_rootPart.VehicleType != (int)Vehicle.TYPE_NONE || GetSittingAvatarsCount() > 0;
+            || (!allowVehicle && m_rootPart.VehicleType != (int)Vehicle.TYPE_NONE) || GetSittingAvatarsCount() > 0;
 
     /// <summary>
     /// Point the root actor's move-to-target at the dragged point. The first update of a drag also takes the target
@@ -4246,6 +4247,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             if (m_scriptMoveActive)
                 pa.PIDActive = false; // so an engine that reads tau when the target is switched on takes the drag's
 
+            pa.Grabbed = true; // before the target is switched on: the engine reads it when the target starts to act
             pa.PIDTau = GrabTau;
             pa.PIDTarget = target;
             pa.PIDActive = true;
@@ -4303,6 +4305,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             }
             else
                 pa.PIDActive = false;
+            pa.Grabbed = false;
 
             if (m_scriptHoverActive)
             {
