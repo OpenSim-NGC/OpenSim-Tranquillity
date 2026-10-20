@@ -2307,7 +2307,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         if (localGlobalTF)
             torque *= GetWorldRotation();
 
-        Torque = torque;
+        SetTorque(torque, localGlobalTF);
     }
 
     /// <summary>
@@ -3784,6 +3784,36 @@ public class SceneObjectPart : EntityBase, IDisposable
     public void SetForce(Vector3 force)
     {
         Force = force;
+    }
+
+    /// <summary>
+    /// llSetForce on the object: <paramref name="force"/> in region axes (a local force already turned by the caller), and
+    /// whether the script gave it as local. It is stored for llGetForce and handed to the physics actor, which may follow
+    /// the object's rotation with a local one (PhysicsActor.SetScriptForce).
+    /// </summary>
+    public void SetForce(Vector3 force, bool local)
+    {
+        if (ParentGroup != null && ParentGroup.RootPart != null && ParentGroup.RootPart != this)
+        {
+            ParentGroup.RootPart.SetForce(force, local);
+            return;
+        }
+        m_force = force;
+        PhysActor?.SetScriptForce(force, local);
+    }
+
+    /// <summary>
+    /// llSetTorque on the object, as <see cref="SetForce(Vector3, bool)"/> is for a force.
+    /// </summary>
+    public void SetTorque(Vector3 torque, bool local)
+    {
+        if (ParentGroup != null && ParentGroup.RootPart != null && ParentGroup.RootPart != this)
+        {
+            ParentGroup.RootPart.SetTorque(torque, local);
+            return;
+        }
+        m_torque = torque;
+        PhysActor?.SetScriptTorque(torque, local);
     }
 
     public PhysicsInertiaData PhysicsInertia
