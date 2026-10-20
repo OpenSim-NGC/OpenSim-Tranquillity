@@ -26,7 +26,7 @@
  * "accept invitation" and then calls startCall with this map, skipping method:"call" entirely
  * (llimview.cpp:3382-3385 -> chatterBoxInvitationCoro -> startCall).
  *
- * WHO GETS RUNG. This list is built within one simulator process, so the target list is "every agent with a presence
+ * WHO GETS RUNG. This list is built within one simulator process, so the target list is "every agent with a ROOT presence
  * in THIS process who is a member of the group holding both powers", minus the initiator and minus
  * anyone already seated. That is deliberately not the group roster: a roster query would list
  * offline and other-host members we cannot deliver to anyway. Members on other simulator processes are
@@ -77,7 +77,7 @@ namespace osWebRtcVoice.NonSpatial
         }
 
         /// <summary>
-        /// Everyone this process should ring for <paramref name="session"/>: present in some scene here,
+        /// Everyone this process should ring for <paramref name="session"/>: root-present in some scene here,
         /// a member of the group with both powers, not the initiator, not already seated, and not already
         /// rung for this ring (<see cref="NonSpatialVoiceSession.WasInvited"/>).
         ///
@@ -105,6 +105,29 @@ namespace osWebRtcVoice.NonSpatial
                 targets.Add(a);
             }
             return targets;
+        }
+
+        /// <summary>
+        /// Every agent with a ROOT presence in these scenes, deduplicated. This, not
+        /// <see cref="PresentAgents"/>, is who a ring can be delivered to in this process: an agent who is only
+        /// a child presence here answers from the process that holds their root presence.
+        /// </summary>
+        public static List<UUID> RootAgents(IEnumerable<Scene> scenes)
+        {
+            List<UUID> agents = new List<UUID>();
+            HashSet<UUID> seen = new HashSet<UUID>();
+            if (scenes == null)
+                return agents;
+            foreach (Scene s in scenes)
+            {
+                if (s == null) continue;
+                s.ForEachScenePresence(sp =>
+                {
+                    if (sp != null && !sp.IsDeleted && !sp.IsChildAgent && seen.Add(sp.UUID))
+                        agents.Add(sp.UUID);
+                });
+            }
+            return agents;
         }
 
         /// <summary>Every agent with a presence in these scenes, root or child, deduplicated.</summary>

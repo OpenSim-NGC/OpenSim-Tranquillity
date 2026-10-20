@@ -129,7 +129,9 @@ public partial class WebRtcVoiceRegionModule
         if (roster is null) return;
 
         HashSet<UUID> local = new HashSet<UUID>(alreadyRungLocally ?? new List<UUID>());
-        HashSet<UUID> presentHere = new HashSet<UUID>(GroupVoiceInvite.PresentAgents(scenes));
+        // Root presences only: a member who is just a child presence here is rung through the carrier,
+        // so the process that holds their root presence records the call before their accept arrives.
+        HashSet<UUID> presentHere = new HashSet<UUID>(GroupVoiceInvite.RootAgents(scenes));
         List<UUID> remote = new List<UUID>();
         foreach (GroupMembersData m in roster)
         {
@@ -266,7 +268,7 @@ public partial class WebRtcVoiceRegionModule
         lock (m_scenes)
             scenes = new List<Scene>(m_scenes);
 
-        List<UUID> targets = GroupVoiceInvite.Targets(GroupVoiceInvite.PresentAgents(scenes), session,
+        List<UUID> targets = GroupVoiceInvite.Targets(GroupVoiceInvite.RootAgents(scenes), session,
                                                       initiator, m_groupVoice);
         bool noLocalTargets = targets.Count == 0;
         if (noLocalTargets)
