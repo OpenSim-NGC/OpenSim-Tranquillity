@@ -64,6 +64,12 @@ namespace osWebRtcVoice
         /// </summary>
         public Invitation Invite { get; init; }
 
+        /// <summary>
+        /// Set by "decline p2p voice" when it removed a call: the removed record, so the module can tell the caller
+        /// when the callee was the one who declined. Null for every other outcome.
+        /// </summary>
+        public A2ASession Declined { get; init; }
+
         public sealed class StartReply
         {
             public UUID SessionId { get; init; }
@@ -177,6 +183,7 @@ namespace osWebRtcVoice
                 // string for a P2P voice invite (llimview.cpp:3419-3425); a non-party's decline is ignored.
                 case MethodDeclineP2PVoice:
                 {
+                    A2ASession before = registry.TryGet(sessionID);
                     bool removed = registry.Decline(sessionID, agentID, out bool wasParty);
                     // Brief words: removed | refused-not-party | stub-ok (no such session: the old stub behaviour).
                     string decision = removed ? "removed" : wasParty ? "stub-ok" : registry.TryGet(sessionID) == null ? "stub-ok" : "refused-not-party";
@@ -184,6 +191,7 @@ namespace osWebRtcVoice
                     {
                         Status = HttpStatusCode.OK,
                         Instrument = Line(agentID, MethodDeclineP2PVoice, sessionID, decision, null),
+                        Declined = removed ? before : null,
                     };
                 }
 

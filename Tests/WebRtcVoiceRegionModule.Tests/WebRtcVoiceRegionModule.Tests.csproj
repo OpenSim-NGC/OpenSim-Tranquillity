@@ -31,6 +31,7 @@
     <Compile Include="A2AClientCloseGuardTests.cs" />
     <Compile Include="A2AInvitationTests.cs" />
     <Compile Include="A2ALifecycleTests.cs" />
+    <Compile Include="A2ADeclineTests.cs" />
     <Compile Include="A2ASessionRegistryTests.cs" />
     <Compile Include="ProvisionPassthroughTests.cs" />
     <Compile Include="DefaultsChatSessionTests.cs" />

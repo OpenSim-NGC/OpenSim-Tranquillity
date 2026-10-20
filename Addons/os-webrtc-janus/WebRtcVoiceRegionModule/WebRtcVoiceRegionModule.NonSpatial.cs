@@ -267,6 +267,20 @@ public partial class WebRtcVoiceRegionModule
                 m_a2aSessions.MarkInviteSent(outcome.Invite.SessionId);
         }
 
+        // The callee turned the call down: the caller's viewer is told, so the call ends on its screen instead of
+        // ringing out. Delivered to a caller who is in this process; the caller cancelling its own call is not a decline.
+        if (outcome.Declined is not null && outcome.Declined.Callee == agentID)
+        {
+            List<Scene> declineScenes;
+            lock (m_scenes)
+                declineScenes = new List<Scene>(m_scenes);
+            string declineDecision = A2AAgentListDelivery.Deliver(declineScenes, outcome.Declined.Caller, outcome.Declined.SessionId,
+                                                                  A2AAgentListDelivery.DeclinedUpdates(outcome.Declined.Callee), null);
+            m_log.LogDebug("{LogHeader} {Line}", logHeader,
+                A2AAgentListDelivery.Line(outcome.Declined.Caller, outcome.Declined.SessionId, "DECLINED",
+                                          outcome.Declined.Callee, declineDecision));
+        }
+
         if (outcome.Reply is not null)
         {
             IEventQueue queue = scene.RequestModuleInterface<IEventQueue>();

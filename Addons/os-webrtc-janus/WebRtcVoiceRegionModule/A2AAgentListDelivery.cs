@@ -53,6 +53,15 @@ namespace osWebRtcVoice
         public static List<GroupChatListAgentUpdateData> EnterUpdates(UUID other, UUID self)
             => new List<GroupChatListAgentUpdateData> { Update(other, true), Update(self, true) };
 
+        /// <summary>
+        /// What the caller's viewer is sent when the callee declines: an entry for the callee that says it cannot voice
+        /// chat. The viewer reads that on a P2P channel as the peer having declined, shows the call as declined
+        /// and ends it (llimview.cpp:4366-4382). It is an ENTER, not a LEAVE, because the viewer skips a LEAVE
+        /// before it reads can_voice_chat (llimview.cpp:4364-4366).
+        /// </summary>
+        public static List<GroupChatListAgentUpdateData> DeclinedUpdates(UUID callee)
+            => new List<GroupChatListAgentUpdateData> { new GroupChatListAgentUpdateData(callee, /*cv*/false, /*isMod*/false, /*mtd*/false, /*eOrL*/true) };
+
         /// <summary>The LEAVE list the remaining party receives when an Active record is removed.</summary>
         public static List<GroupChatListAgentUpdateData> LeaveUpdates(UUID departed)
             => new List<GroupChatListAgentUpdateData> { Update(departed, false) };

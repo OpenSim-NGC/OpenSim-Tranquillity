@@ -423,6 +423,37 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
+        public void Decline_ByCallee_CarriesTheRemovedCall_SoTheCallerCanBeTold()
+        {
+            var reg = new A2ASessionRegistry();
+            Invited(reg);
+            ChatSessionOutcome o = ChatSessionRequestLogic.Decide(DeclineBody(), Bob, reg);
+            Assert.That(o.Declined, Is.Not.Null);
+            Assert.That(o.Declined.Caller, Is.EqualTo(Alice));
+            Assert.That(o.Declined.Callee, Is.EqualTo(Bob));
+            Assert.That(o.Declined.SessionId, Is.EqualTo(Xor));
+        }
+
+        [Test]
+        public void Decline_ByCaller_CarriesTheRemovedCall_ButTheCallerIsNotTheCallee()
+        {
+            var reg = new A2ASessionRegistry();
+            Invited(reg);
+            ChatSessionOutcome o = ChatSessionRequestLogic.Decide(DeclineBody(), Alice, reg);
+            Assert.That(o.Declined, Is.Not.Null);
+            Assert.That(o.Declined.Callee, Is.Not.EqualTo(Alice), "the module tells the caller only when the callee declined");
+        }
+
+        [Test]
+        public void Decline_ByStrangerOrForNoCall_CarriesNothing()
+        {
+            var reg = new A2ASessionRegistry();
+            Invited(reg);
+            Assert.That(ChatSessionRequestLogic.Decide(DeclineBody(), Mallory, reg).Declined, Is.Null);
+            Assert.That(ChatSessionRequestLogic.Decide(DeclineBody(), Bob, new A2ASessionRegistry()).Declined, Is.Null);
+        }
+
+        [Test]
         public void Decline_ByCaller_AlsoRemoves()
         {
             // The caller cancelling its own outgoing call is a decline on the same session id.
