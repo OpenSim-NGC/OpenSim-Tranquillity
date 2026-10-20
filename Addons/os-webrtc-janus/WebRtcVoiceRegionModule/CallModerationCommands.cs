@@ -102,8 +102,8 @@ namespace osWebRtcVoice
             MainConsole.Instance.Commands.AddCommand("Voice", false, "voice call mute-all",
                 "voice call mute-all <call-id>",
                 "Mute everyone's voice in a call, and whoever joins it later",
-                "Group moderators are never silenced. The mute stays until \"voice call unmute-all\", or until the call's\n"
-                    + "record is idle for eight hours.",
+                "Group moderators are never silenced. The mute ends with \"voice call unmute-all\", or when the last member\n"
+                    + "leaves the call; the next call starts unmuted.",
                 (module, args) => Execute(args));
 
             MainConsole.Instance.Commands.AddCommand("Voice", false, "voice call unmute-all",

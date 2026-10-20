@@ -110,8 +110,9 @@
     ; Default: false, and then these requests are answered as they were before this key existed.
     ; Needs GroupVoiceEnabled or AdhocVoiceEnabled.
     ; A voice mute needs a voice server that can carry it out: the stock AudioBridge's own participant mute. A
-    ; voice mute that cannot be carried out is answered 501 or 503 and is not recorded. A group call's mute-all
-    ; stays until someone unmutes all, or until the call's record is idle for eight hours. With
+    ; voice mute that cannot be carried out is answered 501 or 503 and is not recorded.
+    ; Mute-all and every voice and text mute end with the call: when the last member leaves, the next call of the
+    ; group or conference starts unmuted. A removal keeps its own lifetime (CallRemovalMinutes). With
     ; SessionStoreMode = local the record belongs to this region server only.
     ;CallModerationEnabled = false
     ; Seconds between checks that members' moderator flags in the participant list are still right. 0 = never.

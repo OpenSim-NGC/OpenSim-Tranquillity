@@ -85,23 +85,27 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
-        public void AGroupsMuteAllSurvivesAnEmptyRoom_AndAnAdhocConferenceDoesNotKeepIt()
+        public void AMuteAllEndsWithTheCall_AndTheNextCallOfTheGroupStartsUnmuted()
         {
             NonSpatialVoiceSessionEngine e = NewEngine();
             StartGroup(e);
             e.Moderate(Group, Alice, ModerationOp.VoiceModerated, UUID.Zero, true);
+            e.Moderate(Group, Alice, ModerationOp.TextMute, Bob, true);
 
             e.Depart(Group, Alice, DepartureReason.ChatLeave);
+            Assert.That(e.Get(Group).VoiceModerated, Is.True, "Bob is still in the call");
             e.Depart(Group, Bob, DepartureReason.ChatLeave);
+
+            NonSpatialVoiceSession ended = e.Get(Group);
+            Assert.That(ended.SeatsHeld, Is.EqualTo(0));
+            Assert.That(ended.VoiceModerated, Is.False, "the last seat was released");
+            Assert.That(ended.IsTextMuted(Bob), Is.False);
             e.Sweep();
+            Assert.That(e.Get(Group), Is.Null, "an emptied group call is collected like any other");
 
-            NonSpatialVoiceSession kept = e.Get(Group);
-            Assert.That(kept, Is.Not.Null, "the record stays so the decision stands");
-            Assert.That(kept.SeatsHeld, Is.EqualTo(0));
-            Assert.That(kept.VoiceModerated, Is.True);
-
+            e.Start(NonSpatialSessionType.Group, Alice, Group, Group, RegionA);
             e.Accept(Group, Carol, RegionA);
-            Assert.That(e.Get(Group).IsVoiceMuted(Carol), Is.True, "whoever joins afterwards is muted");
+            Assert.That(e.Get(Group).IsVoiceMuted(Carol), Is.False, "whoever joins the next call is not muted");
 
             SessionOutcome conf = e.StartAdhoc(Alice, UUID.Random(), RegionA);
             e.Moderate(conf.Session.SessionId, Alice, ModerationOp.VoiceModerated, UUID.Zero, true);
@@ -111,12 +115,12 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
-        public void AGroupRecordWithModerationIsCollectedWhenItGoesIdle()
+        public void AGroupRecordKeptForARemovalIsCollectedWhenItGoesIdle()
         {
             NonSpatialIdentityTests.FakeClock clock = new();
             NonSpatialVoiceSessionEngine e = NewEngine(clock, idleTtl: TimeSpan.FromHours(8));
             StartGroup(e);
-            e.Moderate(Group, Alice, ModerationOp.TextMute, Bob, true);
+            e.Moderate(Group, Alice, ModerationOp.Remove, Carol, true, "x", TimeSpan.FromHours(20));
             e.Depart(Group, Alice, DepartureReason.ChatLeave);
             e.Depart(Group, Bob, DepartureReason.ChatLeave);
 

@@ -909,6 +909,8 @@ namespace osWebRtcVoice.NonSpatial
                     m.LastSeenUtc = now;
                     if (sess.Type == NonSpatialSessionType.Adhoc) m.InChat = false;
                 }
+                // The seat that went may have been the last: the call is then over for its moderation too.
+                if (sess.SeatsHeld == 0) sess.EndModeration();
                 sess.ClearInvited(target);
                 sess.LastSeenUtc = now;
                 return new SessionOutcome(true, SessionOutcome.ModerationChanged, sess);

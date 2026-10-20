@@ -253,7 +253,9 @@ namespace osWebRtcVoice.NonSpatial
         //
         // What the call's moderators have decided, kept in the record so it follows the call wherever the record
         // lives. Authorisation is not here: the region decides who may ask, the record only holds the result.
-        // A mute-all outlives the room emptying (EndRingCycle leaves it alone); all of it goes with the record.
+        // Moderation belongs to the call: when the last seat is released (EndRingCycle, or a removal of the last member)
+        // the mute-all and every voice and text mute go, and the next call begins unmuted. A removal is not part of that;
+        // it keeps its own lifetime (see below).
 
         /// <summary>Most agents one of the moderation sets holds. A request past it is refused.</summary>
         public const int MaxModerationEntries = 1000;
@@ -446,7 +448,23 @@ namespace osWebRtcVoice.NonSpatial
             }
         }
 
-        /// <summary>The room emptied: forget the ring so a later start rings the group again.</summary>
+        /// <summary>
+        /// The call's moderators' decisions end with the call: mute-all, and every voice and text mute. True when
+        /// something was cleared (the generation moves, so a reader of a copy sees the change). Removals are left to
+        /// their own lifetime.
+        /// </summary>
+        internal bool EndModeration()
+        {
+            bool changed = VoiceModerated || _voiceMuted.Count > 0 || _voiceAllowed.Count > 0 || _textMuted.Count > 0;
+            VoiceModerated = false;
+            _voiceMuted.Clear();
+            _voiceAllowed.Clear();
+            _textMuted.Clear();
+            if (changed) ModerationGeneration++;
+            return changed;
+        }
+
+        /// <summary>The room emptied: forget the ring so a later start rings the group again, and end the moderation.</summary>
         internal void EndRingCycle()
         {
             lock (_sync)
@@ -455,6 +473,7 @@ namespace osWebRtcVoice.NonSpatial
                 _ringsUsed.Clear();
             }
             RingSent = false;
+            EndModeration();
             // The call is over, so removals that last as long as the call are over with it. One given a lifetime stands.
             List<UUID> callBound = null;
             foreach (KeyValuePair<UUID, CallRemoval> kv in _removed)
@@ -514,9 +533,6 @@ namespace osWebRtcVoice.NonSpatial
         {
             get
             {
-                // A group's mute-all (and the names muted) outlive an empty room: the group's session is made again
-                // when the room refills, and the moderators' decision has to still stand. It goes with the idle sweep.
-                if (Type == NonSpatialSessionType.Group && HasModeration) return false;
                 // A removal given a lifetime outlasts the call, whatever kind of call it was.
                 if (HasLongRemoval) return false;
                 lock (_sync)
