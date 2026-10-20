@@ -47,6 +47,7 @@
     <Compile Include="NonSpatialSessionLimitTests.cs" />
     <Compile Include="NonSpatialLimitSettingsTests.cs" />
     <Compile Include="NonSpatialStartRaceTests.cs" />
+    <Compile Include="NonSpatialSessionConcurrencyTests.cs" />
     <Compile Include="NonSpatialGridSeamTests.cs" />
     <Compile Include="GroupVoiceTests.cs" />
     <Compile Include="GroupProvisionHandlerTests.cs" />
