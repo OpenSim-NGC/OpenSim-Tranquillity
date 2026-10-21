@@ -63,7 +63,6 @@ namespace osWebRtcVoice.Tests
             Assert.That(rec.Scope, Is.EqualTo(VoiceConnectorScope.Estate));
             Assert.That(rec.MayInject, Is.False);
             Assert.That(rec.AuthorisedBy, Is.EqualTo("Operator"));
-            Assert.That(rec.InjectSourceUrl, Is.Null, "absent optional key stays null");
             Assert.That(rec.NpcId, Is.EqualTo(UUID.Zero), "no NPC exists until the record is registered");
         }
 

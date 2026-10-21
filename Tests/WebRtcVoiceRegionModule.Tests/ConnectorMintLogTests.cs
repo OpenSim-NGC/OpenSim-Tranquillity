@@ -50,7 +50,7 @@ namespace osWebRtcVoice.Tests
         private static VoiceConnectorRecord ActiveRecord()
         {
             var r = new VoiceConnectorRecord("Recorder", true, "Recorder", "NPC", new Vector3(128, 128, 25),
-                VoiceConnectorScope.Estate, false, "Operator", null, null, Secret);
+                VoiceConnectorScope.Estate, false, "Operator", null, Secret);
             r.NpcId = new UUID("0c0c0c0c-0000-4000-8000-00000000c0c0");
             r.ViewerSessionId = "5e551011-0000-4000-8000-000000005e55";
             r.Room = 226001844;

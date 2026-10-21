@@ -39,9 +39,6 @@ public sealed class VoiceConnectorRecord
     public bool MayInject { get; }
     /// <summary>The authorising principal, as the operator recorded it.</summary>
     public string AuthorisedBy { get; }
-    /// <summary>URL the sim POSTs the NPC's chat text to for TTS injection. Null when
-    /// the key is absent (optional).</summary>
-    public string InjectSourceUrl { get; }
     /// <summary>Optional region-name filter: a region server hosts several regions and
     /// each gets its own non-shared module instance, so without this an enabled record would
     /// spawn its NPC in EVERY region. Null = every region (single-region instances).</summary>
@@ -71,7 +68,7 @@ public sealed class VoiceConnectorRecord
     // still come only from VoiceConnectorRegistry.LoadFrom, which owns every refusal rule.
     public VoiceConnectorRecord(string pName, bool pEnabled, string pFirst, string pLast,
         Vector3 pPosition, VoiceConnectorScope pScope, bool pMayInject, string pAuthorisedBy,
-        string pInjectSourceUrl, string pRegion = null, string pCapabilitySecret = null)
+        string pRegion = null, string pCapabilitySecret = null)
     {
         Region = pRegion;
         CapabilitySecret = string.IsNullOrEmpty(pCapabilitySecret) ? null : pCapabilitySecret;
@@ -83,7 +80,6 @@ public sealed class VoiceConnectorRecord
         Scope = pScope;
         MayInject = pMayInject;
         AuthorisedBy = pAuthorisedBy;
-        InjectSourceUrl = pInjectSourceUrl;
         NpcId = UUID.Zero;
         ViewerSessionId = null;
     }

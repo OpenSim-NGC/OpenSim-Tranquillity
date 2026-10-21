@@ -182,7 +182,7 @@ namespace osWebRtcVoice.Tests
         private static VoiceConnectorRecord Record(string name, string capabilitySecret, int room)
         {
             var r = new VoiceConnectorRecord(name, true, name, "NPC", new Vector3(128, 128, 25),
-                VoiceConnectorScope.Estate, false, "Operator", null, null, capabilitySecret);
+                VoiceConnectorScope.Estate, false, "Operator", null, capabilitySecret);
             r.NpcId = UUID.Random();
             r.ViewerSessionId = Guid.NewGuid().ToString();
             r.Room = room;

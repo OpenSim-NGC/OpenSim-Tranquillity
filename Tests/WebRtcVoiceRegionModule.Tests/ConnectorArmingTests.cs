@@ -169,7 +169,7 @@ namespace osWebRtcVoice.Tests
 
         private static VoiceConnectorRecord NewRecord(string name, bool mayInject)
             => new VoiceConnectorRecord(name, true, name, "Connector", new Vector3(128, 128, 25),
-                VoiceConnectorScope.Estate, mayInject, "Operator", null);
+                VoiceConnectorScope.Estate, mayInject, "Operator");
 
         /// The registrar, wired with VoiceConnectorModule.StartRecord's delegate bodies.
         private static UUID Register(Rig rig, VoiceConnectorRecord record)

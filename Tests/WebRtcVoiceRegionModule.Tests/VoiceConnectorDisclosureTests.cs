@@ -31,7 +31,7 @@ namespace osWebRtcVoice.Tests
         private static VoiceConnectorRecord Voiced(string name = "Speaker")
         {
             VoiceConnectorRecord r = new VoiceConnectorRecord(name, true, name, "NPC",
-                new Vector3(128, 128, 25), VoiceConnectorScope.Estate, true, "Operator", null);
+                new Vector3(128, 128, 25), VoiceConnectorScope.Estate, true, "Operator");
             r.NpcId = UUID.Random();
             return r;
         }
@@ -39,7 +39,7 @@ namespace osWebRtcVoice.Tests
         private static VoiceConnectorRecord Recording(string name = "Recorder")
         {
             VoiceConnectorRecord r = new VoiceConnectorRecord(name, true, name, "NPC",
-                new Vector3(128, 128, 25), VoiceConnectorScope.Estate, false, "Operator", null);
+                new Vector3(128, 128, 25), VoiceConnectorScope.Estate, false, "Operator");
             r.NpcId = UUID.Random();
             return r;
         }
@@ -76,7 +76,7 @@ namespace osWebRtcVoice.Tests
         public void Registrar_CallsAttachOnSuccess_AndDetachOnTeardown()
         {
             VoiceConnectorRecord r = new VoiceConnectorRecord("Recorder", true, "Recorder", "NPC",
-                new Vector3(1, 2, 3), VoiceConnectorScope.Estate, false, "Operator", null);
+                new Vector3(1, 2, 3), VoiceConnectorScope.Estate, false, "Operator");
             UUID npc = UUID.Random();
             try
             {
@@ -105,7 +105,7 @@ namespace osWebRtcVoice.Tests
         public void Registrar_NpcFailure_NoAttachAlert()
         {
             VoiceConnectorRecord r = new VoiceConnectorRecord("Recorder", true, "Recorder", "NPC",
-                new Vector3(1, 2, 3), VoiceConnectorScope.Estate, false, "Operator", null);
+                new Vector3(1, 2, 3), VoiceConnectorScope.Estate, false, "Operator");
             VoiceConnectorRegistrar.Register(r, 1, _ => UUID.Zero,
                 id => new VoiceViewerSession(null, UUID.Random(), id),
                 (id, room) => { }, id => { }, null, m_disclosure);

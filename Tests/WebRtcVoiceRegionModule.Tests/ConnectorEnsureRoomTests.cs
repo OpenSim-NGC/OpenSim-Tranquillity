@@ -89,7 +89,7 @@ namespace osWebRtcVoice.Tests
 
         private static VoiceConnectorRecord Record()
             => new VoiceConnectorRecord("Recorder", true, "Recorder", "NPC", new Vector3(128, 128, 25),
-                VoiceConnectorScope.Estate, false, "Operator", null, null, null);
+                VoiceConnectorScope.Estate, false, "Operator", null, null);
 
         /// <summary>The room an avatar standing where the record stands is provisioned into.</summary>
         private static int ParcelRoom(Scene scene)

@@ -33,7 +33,7 @@ namespace osWebRtcVoice.Tests
         public void SetUp()
         {
             m_record = new VoiceConnectorRecord("Recorder", true, "Recorder", "NPC",
-                new Vector3(128, 128, 25), VoiceConnectorScope.Estate, false, "Operator", null);
+                new Vector3(128, 128, 25), VoiceConnectorScope.Estate, false, "Operator");
             m_npcId = UUID.Random();
             m_calls = new List<string>();
             m_recordedRoom = null;
@@ -78,7 +78,7 @@ namespace osWebRtcVoice.Tests
         public void Register_MayInjectTrue_DoesNotMute()
         {
             VoiceConnectorRecord record = new VoiceConnectorRecord("Speaker", true, "Speaker", "NPC",
-                new Vector3(1, 2, 3), VoiceConnectorScope.Estate, true, "Operator", null);
+                new Vector3(1, 2, 3), VoiceConnectorScope.Estate, true, "Operator");
             try
             {
                 bool ok = VoiceConnectorRegistrar.Register(record, EstateRoom,

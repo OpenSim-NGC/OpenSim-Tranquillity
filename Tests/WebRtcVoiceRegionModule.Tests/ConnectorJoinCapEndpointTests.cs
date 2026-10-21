@@ -99,7 +99,7 @@ namespace osWebRtcVoice.Tests
         private static VoiceConnectorRecord Record(string name = "Recorder", string secret = Secret, bool active = true)
         {
             var r = new VoiceConnectorRecord(name, true, name, "NPC", new Vector3(128, 128, 25),
-                VoiceConnectorScope.Estate, false, "Operator", null, null, secret);
+                VoiceConnectorScope.Estate, false, "Operator", null, secret);
             if (active)
             {
                 r.NpcId = Npc;
@@ -315,7 +315,7 @@ namespace osWebRtcVoice.Tests
             var ep = Endpoint(m_server);
             VoiceConnectorRecord unpinnedA = Record("Recorder");
             VoiceConnectorRecord pinned = new VoiceConnectorRecord("Pinned", true, "Pinned", "NPC", new Vector3(1, 1, 1),
-                VoiceConnectorScope.Estate, false, "Operator", null, "Example Region", Secret);
+                VoiceConnectorScope.Estate, false, "Operator", "Example Region", Secret);
             ep.Attach(new VoiceConnectorJoinCapEndpoint.Source(() => new[] { unpinnedA, pinned }, true, MintKey));
             List<string> Warnings() { lock (m_capture.Lines) return m_capture.Lines.Where(l => l.StartsWith("Warning:")).ToList(); }
             Assert.That(Warnings(), Is.Empty, "one region: nothing to warn about");
@@ -506,7 +506,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(p1["x"].Type, Is.EqualTo(OSDType.Integer), "integers, as the viewer sends");
 
             VoiceConnectorRecord moved = new VoiceConnectorRecord("Recorder", true, "Recorder", "NPC", new Vector3(140, 100, 30),
-                VoiceConnectorScope.Estate, false, "Operator", null, null, Secret)
+                VoiceConnectorScope.Estate, false, "Operator", null, Secret)
             {
                 NpcId = current.NpcId, ViewerSessionId = current.ViewerSessionId, Room = current.Room,
             };

@@ -222,8 +222,6 @@
 ;    ; Optional: pin the connector to one region of a multi-region instance (scene name).
 ;    ; Absent = the record starts in every region this instance hosts.
 ;    ; Region = Example Region
-;    ; Optional: URL the sim POSTs the NPC's chat text to for text-to-speech injection
-;    ; InjectSourceUrl = http://192.0.2.10:8090/say
 ;    ; Optional: secret for the connector's join-capability endpoint, at least 32 characters
 ;    ; CapabilitySecret =
 
