@@ -86,7 +86,7 @@ namespace osWebRtcVoice
                     continue;
                 }
 
-                foreach (string line in Format(region, sink, kv.Value.Unplaced))
+                foreach (string line in Format(region, sink, kv.Value.Unplaced, kv.Value.PositionFeedOn))
                     MainConsole.Instance.Output(line);
             }
         }
@@ -94,12 +94,12 @@ namespace osWebRtcVoice
         /// <summary>The report for one region, as lines. Pure and public so the contract is testable: the
         /// report must name the rooms the send RESOLVED, count what it could not place, and
         /// present the estate room as the region's own number rather than as anybody's address.</summary>
-        public static IReadOnlyList<string> Format(string region, JanusPeerCtlBatchSink sink, int unplaced)
+        public static IReadOnlyList<string> Format(string region, JanusPeerCtlBatchSink sink, int unplaced, bool positionFeed = false)
         {
             PeerCtlSendStats s = sink.LastSendStats;
             IReadOnlyList<int> rooms = sink.LastSendRoomNumbers;
             string roomList = rooms.Count == 0 ? "none" : string.Join(", ", rooms);
-            return new List<string>
+            var lines = new List<string>
             {
                 string.Format("Region \"{0}\": last send addressed {1} room(s): {2}; {3} agent(s) unplaced and "
                     + "omitted (estate room {4})",
@@ -112,6 +112,10 @@ namespace osWebRtcVoice
                     "  inner replies              parsed {0}, entries {1}, mute entries {2}, deferred {3} (normal), skipped {4} (loss), anomalies {5} (drift)",
                     s.RepliesParsed, s.Entries, s.MuteEntries, s.DeferredListeners, s.Skipped, s.Anomalies),
             };
+            if (positionFeed)
+                lines.Add("  position replies           the mixer answered peer_pos with " + sink.Replies.Counts
+                    + "; a refusal means it is not applying the positions of that room");
+            return lines;
         }
 
         // --- Helpers --------------------------------------------------------------------------

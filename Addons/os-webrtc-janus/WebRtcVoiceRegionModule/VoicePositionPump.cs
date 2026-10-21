@@ -39,6 +39,7 @@ namespace osWebRtcVoice
 
         // How often a persistent send failure is logged at Warn; in between it is Debug.
         private const long FailureLogIntervalMs = 60_000;
+        private const long SummaryIntervalMs = 60_000;
         private static readonly DateTime s_gateEpoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         private readonly IPositionWorld _world;
@@ -57,6 +58,11 @@ namespace osWebRtcVoice
         private int _knownProtocol = -1;   // the protocol last logged, so a change is logged once
         private long _sent;
         private long _failed;
+        // The one-minute summary: the window's start and the totals at that moment.
+        private long _summaryStartMs = long.MinValue;
+        private long _summarySent;
+        private long _summaryFailed;
+        private PositionReplyCounts _summaryReplies;
 
         /// <param name="roomOf">The mixer room a participant is in, or null when it cannot be placed.</param>
         /// <param name="engineMaxCmS">The physics engine's maximum speed in cm/s, or zero when it declares none.</param>
@@ -94,6 +100,7 @@ namespace osWebRtcVoice
                 if (_lastRunMs != long.MinValue && now - _lastRunMs < _settings.TickMs)
                     return Task.CompletedTask;
                 _lastRunMs = now;
+                LogSummaryIfDue(now);
 
                 int protocol = _sink.MixerVisProtocol;
                 LogProtocolChange(protocol);
@@ -155,6 +162,30 @@ namespace osWebRtcVoice
             {
                 Interlocked.Exchange(ref _inFlight, 0);
             }
+        }
+
+        // Once a minute, at Debug, what the feed did in that minute: the requests sent and failed, and what the mixer
+        // answered. A minute in which nothing was sent or answered writes nothing.
+        private void LogSummaryIfDue(long now)
+        {
+            if (_summaryStartMs == long.MinValue)
+            {
+                _summaryStartMs = now;
+                return;
+            }
+            if (now - _summaryStartMs < SummaryIntervalMs)
+                return;
+            long sent = MessagesSent, failed = MessagesFailed;
+            PositionReplyCounts replies = _sink.Replies?.Counts ?? default;
+            PositionReplyCounts delta = replies.Since(_summaryReplies);
+            if (sent != _summarySent || failed != _summaryFailed || delta.Total != 0)
+                m_log.LogDebug("{LogHeader} region {Region}: position summary: {Sent} request(s) sent and {Failed} failed over {WindowS} s; " +
+                    "the mixer answered {Replies}", LogHeader, _region, sent - _summarySent, failed - _summaryFailed,
+                    (now - _summaryStartMs) / 1000, delta.ToString());
+            _summaryStartMs = now;
+            _summarySent = sent;
+            _summaryFailed = failed;
+            _summaryReplies = replies;
         }
 
         // A failure that repeats every tick is one warning a minute, with the number held back; the rest are Debug lines.

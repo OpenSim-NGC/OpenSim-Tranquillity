@@ -45,6 +45,7 @@ using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
+using osWebRtcVoice.NonSpatial;   // RefusalLogGate
 
 namespace osWebRtcVoice
 {
@@ -86,6 +87,10 @@ namespace osWebRtcVoice
         // The vis_protocol last advertised by the mixer; see MixerVisProtocol.
         private volatile int _mixerVisProtocol;
 
+        private readonly Func<long> _nowMs;
+        private readonly RefusalLogGate _positionRefusalGate = new RefusalLogGate();   // one warning a minute for the mixer's refusals
+        private static readonly DateTime s_gateEpoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
         // Inner-reply stats for the most recent send, summed across rooms (see LastSendStats).
         // Volatile ints mirror the LastSend* pattern above; SendAsync is single-flight from the sender.
         private volatile int _statRepliesParsed;
@@ -110,9 +115,11 @@ namespace osWebRtcVoice
                                      UUID regionId, string regionName,
                                      int roomSendConcurrency = DefaultRoomSendConcurrency,
                                      Func<OSDMap, Task<(AdminSendResult Result, string Body)>> sendOne = null,
-                                     string caCertificateFile = null)
+                                     string caCertificateFile = null,
+                                     Func<long> nowMs = null)
         {
             _region = regionName;
+            _nowMs = nowMs ?? (() => Environment.TickCount64);
             if (sendOne == null)
             {
                 _admin = new JanusAdminClient(adminUri, adminToken, timeout, JanusTls.CreateHandler(caCertificateFile));
@@ -208,6 +215,9 @@ namespace osWebRtcVoice
         /// nothing until this reaches <see cref="VisAuthority.PositionProtocol"/>.</summary>
         public int MixerVisProtocol => _mixerVisProtocol;
 
+        /// <summary>What the mixer has answered to the peer_pos requests this sink has sent.</summary>
+        public PositionReplyStats Replies { get; } = new PositionReplyStats();
+
         /// <summary>Send one peer_pos body, stamped with the room epoch when the region runs with arming. True when the
         /// transport succeeded. Never throws.</summary>
         public async Task<bool> SendPositionsAsync(OSDMap body)
@@ -217,8 +227,11 @@ namespace osWebRtcVoice
                 body["room_epoch"] = OSD.FromString(authority.EpochString);
             try
             {
-                (AdminSendResult admin, string _) = await _sendOne(body).ConfigureAwait(false);
-                return admin == AdminSendResult.Ok;
+                (AdminSendResult admin, string replyBody) = await _sendOne(body).ConfigureAwait(false);
+                if (admin != AdminSendResult.Ok)
+                    return false;
+                CountPositionReply(body, replyBody);
+                return true;
             }
             catch (Exception e)
             {
@@ -226,6 +239,26 @@ namespace osWebRtcVoice
                 m_log.LogDebug(e, "{LogHeader} region {RegionName}: peer_pos send failed", LogHeader, _region);
                 return false;
             }
+        }
+
+        // The mixer answers a peer_pos it will not apply with an error reply inside a successful transport. Count what it
+        // answered, and write one warning a minute for the refusals, with the number held back.
+        private void CountPositionReply(OSDMap request, string replyBody)
+        {
+            SlvoiceReply reply = ParseInnerReply(replyBody);
+            PositionReplyKind kind = PositionReply.Classify(reply.Present, reply.Status, reply.Reason);
+            Replies.Record(kind);
+            if (kind == PositionReplyKind.None || kind == PositionReplyKind.Applied)
+                return;
+            int room = request.TryGetValue("room", out OSD ro) ? ro.AsInteger() : 0;
+            string what = PositionReply.WireName(kind);
+            if (_positionRefusalGate.ShouldLog("peer_pos refused", UUID.Zero, s_gateEpoch.AddMilliseconds(_nowMs()), out int held))
+                m_log.LogWarning("{LogHeader} region {RegionName}: the mixer refused a peer_pos request for room {Room} ({Reason}); " +
+                    "positions for it are not being applied{More}", LogHeader, _region, room, what,
+                    held > 0 ? $"; {held} more refused since the last one logged" : string.Empty);
+            else
+                m_log.LogDebug("{LogHeader} region {RegionName}: the mixer refused a peer_pos request for room {Room} ({Reason})",
+                    LogHeader, _region, room, what);
         }
 
         // Remember the protocol version a reply advertises. A successful reply with no version is an older

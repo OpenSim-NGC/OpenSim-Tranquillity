@@ -92,6 +92,7 @@ namespace osWebRtcVoice.Tests
             public bool ThrowOnProtocol;
             public bool ThrowOnSend;
             public int MixerVisProtocol => ThrowOnProtocol ? throw new InvalidOperationException("protocol read failed") : 3;
+            public PositionReplyStats Replies { get; } = new PositionReplyStats();
 
             public Task<bool> SendPositionsAsync(OSDMap body)
                 => ThrowOnSend ? throw new InvalidOperationException("send failed") : Task.FromResult(true);

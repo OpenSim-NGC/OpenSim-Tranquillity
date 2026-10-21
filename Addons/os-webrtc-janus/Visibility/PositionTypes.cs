@@ -168,7 +168,11 @@ namespace osWebRtcVoice
         /// The vis_protocol the mixer last advertised in a reply, or 0 when none has been seen.
         int MixerVisProtocol { get; }
 
-        /// Sends one peer_pos body. True when the transport succeeded. Never throws.
+        /// What the mixer has answered to the peer_pos requests sent so far.
+        PositionReplyStats Replies { get; }
+
+        /// Sends one peer_pos body. True when the transport succeeded, whatever the mixer answered (see <see cref="Replies"/>).
+        /// Never throws.
         Task<bool> SendPositionsAsync(OSDMap body);
     }
 }

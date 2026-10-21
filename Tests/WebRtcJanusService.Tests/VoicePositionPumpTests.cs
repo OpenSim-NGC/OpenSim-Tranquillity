@@ -40,6 +40,7 @@ namespace osWebRtcVoice.Tests
         private sealed class FakeSink : IPeerPosSink
         {
             public int MixerVisProtocol { get; set; }
+            public PositionReplyStats Replies { get; } = new PositionReplyStats();
             public readonly List<OSDMap> Sent = new List<OSDMap>();
             public bool Succeed = true;
             public TaskCompletionSource<bool> Hold;

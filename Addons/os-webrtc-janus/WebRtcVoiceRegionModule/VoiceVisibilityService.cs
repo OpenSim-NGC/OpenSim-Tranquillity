@@ -222,6 +222,9 @@ namespace osWebRtcVoice
                     $"peer_ctl sink (emission off or admin config missing): arming is inactive");
         }
 
+        /// <summary>True when the position feed was built for this region.</summary>
+        public bool PositionFeedOn => m_positions != null;
+
         // Builds the position feed when it is switched on and there is a Janus sink to send through. With the feed
         // off no pump exists, so nothing is read from the scene or posted for it.
         private void StartPositionFeed()
