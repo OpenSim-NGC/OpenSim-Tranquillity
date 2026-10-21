@@ -234,7 +234,7 @@ namespace osWebRtcVoice
             // The physics engine's own limit, in cm/s; zero when the engine declares none.
             Func<double> engineMaxCmS = () => (m_scene.PhysicsScene?.MaximumLinearVelocity ?? 0f) * 100.0;
             m_positions = new VoicePositionPump(m_world, positionSink, m_positionSettings, ResolveRoom, engineMaxCmS,
-                m_scene.RegionInfo.RegionName);
+                m_scene.RegionInfo.RegionName, refusals: m_refusals);
             m_log.LogInformation("{LogHeader} position feed started for {RegionName} every {TickMs} ms; " +
                 "positions are sent once the mixer advertises vis_protocol {Protocol}", logHeader, m_scene.RegionInfo.RegionName,
                 m_positionSettings.TickMs, VisAuthority.PositionProtocol);

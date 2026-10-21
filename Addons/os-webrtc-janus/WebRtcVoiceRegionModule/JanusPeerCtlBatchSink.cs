@@ -285,6 +285,7 @@ namespace osWebRtcVoice
             VisAuthority authority = Authority;
             if (authority != null)
                 body["room_epoch"] = OSD.FromString(authority.EpochString);
+            long stamp = Refusals?.Stamp() ?? 0;   // before the request goes out: see RoomRefusals
             try
             {
                 (AdminSendResult admin, string replyBody) = await _sendOne(body).ConfigureAwait(false);
@@ -301,7 +302,7 @@ namespace osWebRtcVoice
                     _mixerVisProtocol = reply.VisProtocol;
                     _mixerProtocolKnown = true;
                 }
-                CountPositionReply(body, reply);
+                CountPositionReply(body, reply, stamp);
                 return true;
             }
             catch (Exception e)
@@ -315,13 +316,15 @@ namespace osWebRtcVoice
 
         // The mixer answers a peer_pos it will not apply with an error reply inside a successful transport. Count what it
         // answered, and write one warning a minute for the refusals, with the number held back.
-        private void CountPositionReply(OSDMap request, in SlvoiceReply reply)
+        private void CountPositionReply(OSDMap request, in SlvoiceReply reply, long stamp)
         {
             PositionReplyKind kind = PositionReply.Classify(reply.Present, reply.Status, reply.Reason);
             Replies.Record(kind);
             if (kind == PositionReplyKind.None || kind == PositionReplyKind.Applied)
                 return;
             int room = request.TryGetValue("room", out OSD ro) ? ro.AsInteger() : 0;
+            if (kind == PositionReplyKind.UnknownRoom)
+                Refusals?.Refused(room, stamp);   // the pump sends nothing more to it until a join into it is recorded
             string what = PositionReply.WireName(kind);
             if (_positionRefusalGate.ShouldLog("peer_pos refused", UUID.Zero, s_gateEpoch.AddMilliseconds(_nowMs()), out int held))
                 m_log.LogWarning("{LogHeader} region {RegionName}: the mixer refused a peer_pos request for room {Room} ({Reason}); " +
