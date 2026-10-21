@@ -202,8 +202,9 @@ public partial class WebRtcVoiceRegionModule
     // A successful provision means this agent will join the mixer
     // room — hand it to the visibility sender's pending-join path so its full exclusion
     // column is (re)sent once it is present (the mixer silently drops a batch for a listener
-    // not yet in the room). Estate-channel scoped; harmless for a per-parcel-channel agent
-    // (its replace targets the estate room and the bounded re-send simply gives up loudly).
+    // not yet in the room). The replace is addressed at the room the provision joined, which is
+    // recorded just before the agent is queued, whatever kind of channel that room belongs to. If the
+    // agent never shows up in that room, the bounded re-send gives up loudly.
     // The success map also carries the mixer room the service actually joined.
     // Record it per agent so batches can be addressed per room. A failure or logout map has
     // no "room" -> null -> the service leaves any earlier record untouched.

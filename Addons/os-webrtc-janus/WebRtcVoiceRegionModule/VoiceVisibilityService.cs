@@ -65,7 +65,7 @@ namespace osWebRtcVoice
         private VisibilityBatchSender m_sender;   // built in StartLoop from the injected sink
         private readonly AgentRoomTable m_rooms = new AgentRoomTable();   // agent -> joined mixer room (newest wins)
         private readonly RoomRefusals m_refusals = new RoomRefusals();   // rooms the mixer answered unknown_room for
-        private readonly FeederWorldFromScene m_world;                   // the snapshot's parcel-local-ids
+        private readonly FeederWorldFromScene m_world;                   // the scene adapter the feeder reads
         private readonly int m_heartbeatIntervalMs;   // [WebRtcVoice] VisibilityHeartbeatMs (default 1000)
         private readonly bool m_armingEnabled;    // [WebRtcVoice] VisibilityArmingEnabled (default false)
         private VisAuthority m_authority;         // one per StartLoop, so a new epoch per feeder start
@@ -212,8 +212,8 @@ namespace osWebRtcVoice
         }
 
         /// The mixer room each agent's latest successful provision joined, as a resolver for
-        /// the sink. Null means no record here; the sink resolves null to the estate room
-        /// (one policy for a missing room record). Newest provision wins.
+        /// the sink. Null means no record here; such an agent is left out and counted, never
+        /// addressed at a guessed room. Newest provision wins.
         public Func<UUID, int?> RoomOf { get; }
 
         /// <summary>The room an agent is ADDRESSED at - the room its last provision joined, else null for "no
