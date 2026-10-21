@@ -10,9 +10,12 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
+using InWorldz.Phlox.Types;
 using Microsoft.Extensions.Logging;
+using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Region.ClientStack.LindenCaps;
 using OpenSim.Region.CoreModules.Framework.InventoryAccess;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -304,5 +307,98 @@ public class ScriptLogRateTests
             Assert.Matches(@"\(\d+ more like this in the last \d+ s\)$", late[1].Text);
         }
         finally { foreach (var g in gates) g.Dispose(); }
+    }
+
+    // ---- Experience scripts: the calls that only describe the script's own call, and the grant record ------------
+
+    /// <summary>A region with the core's ExperienceModule and one Experience X the estate allows and trusts.</summary>
+    private sealed class ExperienceRig : IDisposable
+    {
+        public readonly Rig R;
+        public readonly UUID X = UUID.Random();
+        public readonly ExperienceModule Module = new();
+
+        public ExperienceRig()
+        {
+            R = new Rig();
+            R.H.Scene.RegisterModuleInterface<IExperienceService>(ExperienceBlockedByAvatarTests.StubExperienceService.Create());
+            R.H.Scene.RegionInfo.EstateSettings.AllowedExperiences = new[] { X };
+            R.H.Scene.RegionInfo.EstateSettings.KeyExperiences = new[] { X };
+            var config = new IniConfigSource();
+            config.AddConfig("Experience").Set("Enabled", "true");
+            SceneHelpers.SetupSceneModules(R.H.Scene, config, Module);
+        }
+
+        public (UUID Item, UUID Asset) AddScript(string text)
+        {
+            UUID item = UUID.Random(), asset = UUID.Random();
+            var inv = TaskInventoryHelpers.AddScript(R.H.Scene.AssetService, R.H.Prim, item, asset, "xp", text);
+            inv.ExperienceID = X;
+            return (item, asset);
+        }
+
+        public void Dispose() => R.Dispose();
+    }
+
+    [Theory]
+    [InlineData("llSetAgentEnvironment")]
+    [InlineData("llReplaceAgentEnvironment")]
+    [InlineData("llMapBeacon")]
+    public void ACallThatOnlyDescribesTheScriptsOwnCallIsADebugLineNotAnInformationLine(string function)
+    {
+        using var xr = new ExperienceRig();
+        var h = xr.R.H;
+        UUID agent = UUID.Random();
+        SceneHelpers.AddScenePresence(h.Scene, agent);
+        Assert.True(xr.Module.SetExperiencePermissions(agent, xr.X, true));
+        var (item, _) = xr.AddScript("default { state_entry() { } }");
+        var api = new LSLSystemAPI(h.Engine, h.Prim, h.Prim.LocalId, item);
+
+        for (int i = 0; i < 25; i++)
+        {
+            switch (function)
+            {
+                case "llSetAgentEnvironment":
+                    Assert.Equal(0, api.llSetAgentEnvironment(agent.ToString(), 1f, new LSLList(new List<object>())));
+                    break;
+                case "llReplaceAgentEnvironment":
+                    Assert.Equal(0, api.llReplaceAgentEnvironment(agent.ToString(), 1f, "sunset"));
+                    break;
+                default:
+                    api.llMapBeacon(agent.ToString(), "here", Vector3.One);
+                    break;
+            }
+        }
+
+        var lines = xr.R.Log.With(function == "llMapBeacon" ? "llMapBeacon: beacon" : function + " called");
+        Assert.Equal(25, lines.Count);
+        Assert.All(lines, l => Assert.Equal(LogLevel.Debug, l.Level));
+    }
+
+    [Fact]
+    public void ExperiencePermissionsGrantedInALoopWriteOneLineAMinute()
+    {
+        using var xr = new ExperienceRig();
+        var h = xr.R.H;
+        const int agents = 6;
+        var ids = Enumerable.Range(0, agents).Select(_ => UUID.Random()).ToArray();
+        foreach (var id in ids) SceneHelpers.AddScenePresence(h.Scene, id);
+        long start = 6_000_000;
+        xr.R.GateClock = () => start + (h.Said.Count(s => s.StartsWith("rc=")) >= agents - 1 ? 60_000 : 0);
+
+        string list = string.Join(", ", ids.Select(id => Str(id.ToString())));
+        var (item, _) = xr.AddScript("default { state_entry() { list a = [" + list + "]; integer i; for (i = 0; i < " + agents
+            + "; ++i) { llRequestExperiencePermissions(llList2Key(a, i), \"\"); llSay(0, \"rc=\" + (string)i); } } }");
+        Assert.True(h.Prim.Inventory.CreateScriptInstance(item, 0, false, "InWorldz.Phlox", 0));
+        h.Prim.ParentGroup.ResumeScripts();
+        Assert.True(PumpUntil(h, () => h.Said.Count(s => s.StartsWith("rc=")) >= agents, TimeSpan.FromSeconds(60)),
+            string.Join(" | ", h.Said));
+
+        var lines = xr.R.Log.With("Experience permission granted");
+        Assert.Equal(2, lines.Count);
+        Assert.Equal(LogLevel.Information, lines[0].Level);
+        Assert.DoesNotContain("more like this", lines[0].Text);
+        Assert.Equal(LogLevel.Information, lines[1].Level);
+        Assert.EndsWith($"({agents - 2} more like this in the last 60 s)", lines[1].Text);
     }
 }
