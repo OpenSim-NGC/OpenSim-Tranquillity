@@ -19,9 +19,9 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// without writing anything above Debug; the one line it writes at start says it is off, and says so at Debug.
 ///
 /// <para>The process's logger factory is swapped for a capture, which is process-wide, so the class shares the
-/// "logger-factory" collection with the other class in this project that sets that factory.</para>
+/// "ssb-log-capture" collection with the other classes in this project that set that factory.</para>
 /// </summary>
-[Collection("logger-factory")]
+[Collection("ssb-log-capture")]
 public class MoneyModuleDisabledLogTests
 {
     private sealed class Capture : ILoggerFactory
@@ -75,6 +75,48 @@ public class MoneyModuleDisabledLogTests
         });
 
         Assert.Empty(lines.Where(l => l.Level > LogLevel.Debug));
+    }
+
+    [Fact]
+    public void ADisabledModuleWritesNothingAboveDebugOverItsWholeLife()
+    {
+        var module = new DTLNSLMoneyModule();
+
+        var lines = MoneyLines(() =>
+        {
+            module.Initialise(Config("SomeOtherMoneyModule"));
+            module.PostInitialise();
+            module.AddRegion(null);
+            module.RegionLoaded(null);
+            module.RemoveRegion(null);
+            module.Close();
+        });
+
+        Assert.Empty(lines.Where(l => l.Level > LogLevel.Debug));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void TheBareLifecycleLinesAreDebugWhetherOrNotTheModuleIsEnabled(bool enabled)
+    {
+        var module = new DTLNSLMoneyModule();
+
+        var lines = MoneyLines(() =>
+        {
+            module.Initialise(enabled
+                ? Config("DTLNSLMoneyModule", "https://money.example.org/")
+                : Config("SomeOtherMoneyModule"));
+            module.PostInitialise();
+            module.Close();
+        });
+
+        foreach (string text in new[] { "[MONEY]: Initialise:", "[MONEY]: PostInitialise:", "[MONEY]: Close:" })
+        {
+            var written = lines.Where(l => l.Text == text).ToList();
+            Assert.Single(written);
+            Assert.Equal(LogLevel.Debug, written[0].Level);
+        }
     }
 
     [Fact]

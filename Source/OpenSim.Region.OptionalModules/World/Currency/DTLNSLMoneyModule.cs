@@ -269,7 +269,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-        if (m_debug) m_log.LogInformation("[MONEY]: Initialise:");
+        if (m_debug) m_log.LogDebug("[MONEY]: Initialise:");
 
         m_enable_server = false;
         m_sellEnabled = false;
@@ -714,12 +714,12 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void PostInitialise()
     {
-        m_log.LogInformation("[MONEY]: PostInitialise:");
+        m_log.LogDebug("[MONEY]: PostInitialise:");
     }
 
     public void Close()
     {
-        m_log.LogInformation("[MONEY]: Close:");
+        m_log.LogDebug("[MONEY]: Close:");
     }
 
     #endregion ISharedRegionModule interface
