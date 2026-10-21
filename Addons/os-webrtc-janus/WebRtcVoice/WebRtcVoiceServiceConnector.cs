@@ -76,6 +76,10 @@ public class WebRtcVoiceServiceConnector : IWebRtcVoiceService
         }
     }
 
+    // This connector forwards provisioning to a grid service and owns no Janus rooms, so there is nothing
+    // to ensure here. Null says "not mine"; the caller logs it and carries on.
+    public int? EnsureSpatialRoom(UUID pSceneID, int pParcelLocalID) => null;
+
     // Create a local viewer session. This gets a local viewer session ID that is
     //    later changed when the ProvisionVoiceAccountRequest response is returned
     //    so that the viewer session ID is the same here as from the WebRTC service.

@@ -360,6 +360,11 @@ public partial class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoic
         throw new NotImplementedException();
     }
 
+    // Rooms are a spatial-service concern, so this goes to the spatial service whatever channel_type a
+    // request would have carried.
+    public int? EnsureSpatialRoom(UUID pSceneID, int pParcelLocalID)
+        => m_spatialVoiceService?.EnsureSpatialRoom(pSceneID, pParcelLocalID);
+
     public IVoiceViewerSession CreateViewerSession(OSDMap pRequest, UUID pUserID, UUID pSceneID)
     {
         throw new NotImplementedException();

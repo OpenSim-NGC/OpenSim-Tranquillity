@@ -130,6 +130,12 @@ public partial class JanusAudioBridge
     public static int FoldHashToRoom(int hashCode)
         => hashCode == int.MinValue ? int.MaxValue : Math.Abs(hashCode);
 
+    /// <summary>Make sure the room for a parcel exists. This is SelectRoom under a name that says what the caller
+    /// wants: a select asks the mixer every time, so a room that already exists is reused and one that does not is
+    /// created with the flags a viewer's provision would use.</summary>
+    public Task<JanusRoom> EnsureRoom(string pRegionId, string pChannelType, bool pSpatial, int pParcelLocalID, string pChannelID)
+        => SelectRoom(pRegionId, pChannelType, pSpatial, pParcelLocalID, pChannelID);
+
     /// <summary>Send the create for <paramref name="pRoomNumber"/> under its per-room gate: creates of one room number
     /// from this process go one at a time, so concurrent provisions produce one "created" and 486s. Always creates -
     /// there is nothing to skip on. Func-based and static so it is unit-testable without Janus.</summary>
