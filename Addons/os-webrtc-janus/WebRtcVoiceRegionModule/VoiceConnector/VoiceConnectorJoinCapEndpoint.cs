@@ -25,7 +25,8 @@
  * no secret configured, wrong or missing bearer, wrong method or path). The handler is registered for the whole
  * "/voice" prefix precisely so an unknown name gets this handler's empty 404 and not the server's HTML one. Only
  * after authentication: 503 (empty) when the sim cannot mint. The bearer, the secrets and the capability are never
- * logged; one INFO line per mint names the record, the room and the expiry.
+ * logged; one Debug line per mint names the record, the room and the expiry (a program fetches before every join, so an
+ * Information line would be written for every fetch of every connector).
  *
  * Registered only while at least one attached record carries a CapabilitySecret; with none (the default) no handler
  * exists and nothing here runs.
@@ -214,7 +215,7 @@ public sealed class VoiceConnectorJoinCapEndpoint
                 ["y"] = OSD.FromInteger(position.Value.Y),
                 ["z"] = OSD.FromInteger(position.Value.Z),
             };
-        m_log?.LogInformation("[CONNECTOR] {Name}: join capability minted for room {Room}, expires {Expires}",
+        m_log?.LogDebug("[CONNECTOR] {Name}: join capability minted for room {Room}, expires {Expires}",
             record.Name, room, expires);
         return new Response((int)HttpStatusCode.OK, Encoding.UTF8.GetBytes(OSDParser.SerializeJsonString(body)), "application/json");
     }

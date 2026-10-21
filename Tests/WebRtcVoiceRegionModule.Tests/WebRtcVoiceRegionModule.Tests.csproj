@@ -123,6 +123,7 @@
     <Compile Include="RefusalWarningLogTests.cs" />
     <Compile Include="VoiceLoggerNameTests.cs" />
     <Compile Include="CallModerationRecheckCostTests.cs" />
+    <Compile Include="ConnectorMintLogTests.cs" />
     <None Include="..\WebRtcJanusService.Tests\StockJanus\aiortc_peer.py" Link="StockJanus\aiortc_peer.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
