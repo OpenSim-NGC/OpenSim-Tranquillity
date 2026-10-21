@@ -118,7 +118,7 @@ public class AISv3Module : ISharedRegionModule
 
         // One line per region, naming which config decided - the same shape server-side baking logs, so one
         // console shows both.
-        m_log.LogInformation("[AIS]: region {Region}: AIS v3 {State} ({Source})",
+        m_log.LogDebug("[AIS]: region {Region}: AIS v3 {State} ({Source})",
             scene.Name, enabled ? "ON" : "off", EnabledSource(scene.Config, regionName));
 
         if (!enabled) return;
@@ -140,7 +140,7 @@ public class AISv3Module : ISharedRegionModule
         var caps = scene.LibraryService is null
             ? CapName
             : CapName + ", " + LibraryCapName;
-        m_log.LogInformation(
+        m_log.LogDebug(
             "[AIS]: region {Region} advertises {Caps} to every agent. All LL-viewer inventory traffic there - fetch, "
             + "delete, purge, slam and create - goes through AIS with no fallback (spec 1g).", scene.Name, caps);
     }

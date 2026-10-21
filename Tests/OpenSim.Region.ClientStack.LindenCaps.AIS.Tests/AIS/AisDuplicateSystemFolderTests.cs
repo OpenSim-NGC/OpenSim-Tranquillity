@@ -30,6 +30,10 @@ public class AisDuplicateSystemFolderTests
 {
     private static readonly UUID Agent = new("a7d2ff2e-dc32-44d8-aa61-3d22070a4964");
 
+    /// <summary>The warning is written once per agent for the life of the process, so each test starts with none written.</summary>
+    [SetUp]
+    public void ForgetEarlierWarnings() => AisInventory.ResetDuplicateWarnings();
+
     // The live ids, so the test reads as the incident it encodes.
     private static readonly UUID RealCof = new("71c3c184-410b-4dae-b20a-855741cf1faf");   // version 457, the one the viewer uses
     private static readonly UUID DupeCof = new("52c327c4-cb7d-4365-a7f0-62a6f7545265");   // version 1, the one we returned

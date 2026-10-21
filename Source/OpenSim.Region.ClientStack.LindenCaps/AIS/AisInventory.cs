@@ -5,6 +5,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
@@ -32,6 +33,16 @@ public sealed record AisOrphans(IReadOnlyList<InventoryFolderBase> Folders, IRea
 public static class AisInventory
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(AisInventory));
+
+    /// <summary>
+    /// The (agent, folder type) pairs already warned about in this process. The duplicate-folder warning is written
+    /// once for each pair; later lookups find the same duplicates and log at Debug, so a data fault that stays in
+    /// the inventory does not repeat on every login and every region the agent enters.
+    /// </summary>
+    private static readonly ConcurrentDictionary<(UUID Agent, short Type), byte> s_warnedDuplicates = new();
+
+    /// <summary>Forgets which agents have been warned about duplicate system folders, so the next lookup warns again.</summary>
+    public static void ResetDuplicateWarnings() => s_warnedDuplicates.Clear();
 
     /// <summary>A folder's contents with links separated from items; null when the folder is not the agent's.</summary>
     public static AisFolderContents GetContents(IAisInventoryBackend backend, UUID agentId, UUID folderId)
@@ -170,7 +181,8 @@ public static class AisInventory
 
         // An operator has to be able to see this without opening the database, because the visible symptom is an
         // outfit change that quietly does not stick.
-        m_log.LogWarning(
+        var level = s_warnedDuplicates.TryAdd((agentId, (short)type), 0) ? LogLevel.Warning : LogLevel.Debug;
+        m_log.Log(level,
             "[AIS]: agent {Agent} has {Count} folders of type {Type} ({Candidates}); using {Chosen} version {Version}. "
             + "Duplicate system folders DIRECTLY UNDER THE ROOT are a data fault, not an AIS one. A second "
             + "folder of this type inside My Suitcase is EXPECTED (HGSuitcaseInventoryService.CreateSystemFolders "
