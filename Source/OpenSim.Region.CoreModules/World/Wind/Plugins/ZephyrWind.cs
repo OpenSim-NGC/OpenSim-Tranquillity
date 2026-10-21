@@ -499,6 +499,9 @@ public class ZephyrWind : IWindModelPlugin
         return new Vector3(wind.X, wind.Y, 0f);
     }
 
+    /// <summary>The wind at the true position, bilinear between the cells, with no flooring.</summary>
+    public Vector3 WindSpeed(Vector3 position) => WindSpeed(position.X, position.Y, position.Z);
+
     /// <summary>
     /// Perform a bilinear interpolation of wind speeds between the four cells around the position (the caller has
     /// checked that the position is inside the region).

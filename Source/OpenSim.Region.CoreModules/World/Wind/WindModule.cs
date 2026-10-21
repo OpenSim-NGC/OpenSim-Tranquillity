@@ -172,8 +172,30 @@ public class WindModule : IWindModule
             }
         }
 
+        m_scene.AddCommand(
+            "Regions",
+            this,
+            "weather volumes",
+            "weather volumes",
+            "List the wind volumes in the region: handle, creating object, owner, shape, centre, size, wind and time left.",
+            "",
+            HandleConsoleWeatherVolumes);
+
+        m_scene.AddCommand(
+            "Regions",
+            this,
+            "weather clear",
+            "weather clear [<handle> | object <uuid>]",
+            "Remove wind volumes in the selected region: all of them, one by handle, or those made by one object.",
+            "",
+            HandleConsoleWeatherClear);
+
         // Register event handlers for when Avatars enter the region, and frame ticks
         m_scene.EventManager.OnFrame += WindUpdate;
+
+        // A volume goes with the object that made it. Nothing can be removed from a store that is off.
+        if (m_windVolumes.Enabled)
+            m_scene.EventManager.OnObjectBeingRemovedFromScene += OnObjectBeingRemovedFromScene;
 
         // Register the wind module
         m_scene.RegisterModuleInterface<IWindModule>(this);
@@ -207,6 +229,7 @@ public class WindModule : IWindModule
 
         //  Remove our hooks
         m_scene.EventManager.OnFrame -= WindUpdate;
+        m_scene.EventManager.OnObjectBeingRemovedFromScene -= OnObjectBeingRemovedFromScene;
 //            m_scene.EventManager.OnMakeRootAgent -= OnAgentEnteredRegion;
 
     }
@@ -398,6 +421,70 @@ public class WindModule : IWindModule
         return new WindVolumeStore(enabled, limits, clockMs);
     }
 
+    #region Weather volumes
+
+    /// <summary>
+    /// Ends the wind volumes of an object that has left the scene. The scene raises the event from DeleteSceneObject,
+    /// which every way an object goes passes through: delete, take (to inventory or a copy taken and the original
+    /// deleted), return, die, crossing out of the region (the sending region lets go of its copy), and an attachment
+    /// being detached or its wearer leaving.
+    /// A volume is keyed by the object's linkset (its root's UUID, which the script functions store from
+    /// SceneObjectPart.ParentGroup), so a volume made from a child prim ends with its linkset. A script that is reset or
+    /// removed does not end its volumes, as with a particle system: the object keeps them, a fresh script lists them
+    /// again, and their lifetime bounds them.
+    /// </summary>
+    private void OnObjectBeingRemovedFromScene(SceneObjectGroup group)
+    {
+        // Count reads the snapshot without a lock; most objects have no volume, and removing takes the write lock.
+        if (group == null || m_windVolumes.Count == 0)
+            return;
+
+        int removed = m_windVolumes.RemoveByCreator(group.UUID);
+        if (removed > 0)
+            m_log.LogDebug("[WEATHER] Removed {0} wind volume(s) of object {1}, which left {2}.", removed, group.UUID, m_scene.Name);
+    }
+
+    // True when this region is the one the console command is for: the selected region, or any region when none is.
+    private bool ConsoleRegionIsMine()
+    {
+        Scene selected = m_scene.ConsoleScene();
+        return selected == null || selected == m_scene;
+    }
+
+    private void HandleConsoleWeatherVolumes(string module, string[] cmdparams)
+    {
+        if (!ConsoleRegionIsMine())
+            return;
+
+        WindVolumeConsole.List(m_windVolumes, m_scene.Name, Environment.TickCount64, ConsoleLine);
+    }
+
+    // weather clear [<handle> | object <uuid>]. Handles are numbered per region, and a clear changes state, so a clear
+    // acts only in a region the operator has selected; "object <uuid>" is the exception, since a UUID names one object.
+    private void HandleConsoleWeatherClear(string module, string[] cmdparams)
+    {
+        string[] words = cmdparams.Skip(2).ToArray();
+        bool byObject = words.Length > 0 && words[0].Equals("object", StringComparison.OrdinalIgnoreCase);
+
+        if (!ConsoleRegionIsMine())
+            return;
+
+        if (m_scene.ConsoleScene() == null && !byObject)
+        {
+            // With no region selected every region's module sees the command, so this line appears once per region.
+            ConsoleLine("Please change to a specific region first (change region <name>); weather clear acts on one region.");
+            return;
+        }
+
+        int removed = WindVolumeConsole.Clear(m_windVolumes, m_scene.Name, words, ConsoleLine);
+        if (removed > 0)
+            m_log.LogInformation("[WEATHER] Console clear in {0}: removed {1} wind volume(s).", m_scene.Name, removed);
+    }
+
+    private static void ConsoleLine(string line) => MainConsole.Instance.Output("{0}", line);
+
+    #endregion
+
     #region IWindModule Methods
 
     /// <summary>
@@ -408,14 +495,38 @@ public class WindModule : IWindModule
     /// <param name="y">0...255</param>
     public Vector3 WindSpeed(int x, int y, int z)
     {
-        if (m_activeWindPlugin != null)
+        IWindModelPlugin plugin = m_activeWindPlugin;
+        Vector3 wind = plugin != null ? plugin.WindSpeed(x, y, z) : Vector3.Zero;
+        return WithVolumes(wind, new Vector3(x, y, z));
+    }
+
+    /// <summary>
+    /// The wind at a position that need not lie on the integer grid: the wind model's wind at the true position plus
+    /// the weather volumes' wind there. Takes no lock and allocates nothing; a position that is not finite gives zero.
+    /// </summary>
+    public Vector3 WindSpeedAt(Vector3 position)
+    {
+        if (!float.IsFinite(position.X) || !float.IsFinite(position.Y) || !float.IsFinite(position.Z))
+            return Vector3.Zero;
+
+        IWindModelPlugin plugin = m_activeWindPlugin;
+        Vector3 wind = plugin != null ? plugin.WindSpeed(position) : Vector3.Zero;
+        return WithVolumes(wind, position);
+    }
+
+    // The model's wind plus the volumes' sum. With weather off, or no volume at the point, the model's wind comes back
+    // untouched. The volumes' vertical part passes through; the model adds none.
+    private Vector3 WithVolumes(Vector3 wind, Vector3 point)
+    {
+        IWindVolumeStore store = m_windVolumes;
+        if (store.Enabled)
         {
-            return m_activeWindPlugin.WindSpeed(x, y, z);
+            Vector3 fromVolumes = store.Sample(point);
+            if (fromVolumes != Vector3.Zero)
+                wind += fromVolumes;
         }
-        else
-        {
-            return new Vector3(0.0f, 0.0f, 0.0f);
-        }
+
+        return float.IsFinite(wind.X) && float.IsFinite(wind.Y) && float.IsFinite(wind.Z) ? wind : Vector3.Zero;
     }
 
     /// <summary>

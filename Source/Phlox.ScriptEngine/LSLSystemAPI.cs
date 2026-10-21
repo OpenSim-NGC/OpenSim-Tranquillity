@@ -10036,7 +10036,8 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             IWindModule windMod = World.RequestModuleInterface<IWindModule>();
             if (windMod == null) return Vector3.Zero;
             // llWind has no vertical part (Halcyon :1426-1435 "llWind's legacy behavior is that is does not return
-            // any z-data"; YEngine LSL_Api.llWind); iwWind keeps it.
+            // any z-data"; YEngine LSL_Api.llWind); iwWind keeps it. The weather volumes' horizontal wind is in what
+            // WindSpeed returns, so it reaches this function too.
             Vector3 wind = windMod.WindSpeed((int)pos.X, (int)pos.Y, (int)pos.Z);
             wind.Z = 0f;
             return wind;
@@ -10159,8 +10160,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             if (module == null) return;
             module.WindSet(type, m_host.GetWorldPosition() + offset, speed);
         }
+        /// <summary>
+        /// The wind at the object's position plus offset: the wind model's wind plus the weather volumes' (when weather
+        /// is on), all three components. llWind adds the same volumes but keeps only X and Y.
+        /// </summary>
         public Vector3 iwWind(Vector3 offset)
         {
+            if (m_host == null) return Vector3.Zero;
             IWindModule module = World?.RequestModuleInterface<IWindModule>();
             if (module != null)
             {

@@ -1550,7 +1550,8 @@ public class LSL_Api : ILSL_Api, IScriptApi
             int y = (int)(pos.Y + offset.y);
             int z = (int)(pos.Z + offset.z);
 
-            // The height matters to a wind model that has layers (a current under the water, the wind aloft).
+            // The height matters to a wind model that has layers (a current under the water, the wind aloft), and to a
+            // weather volume's reach. The volumes' horizontal wind is in this sample; llWind never returns a vertical part.
             Vector3 windSpeed = module.WindSpeed(x, y, z);
 
             wind.x = windSpeed.X;

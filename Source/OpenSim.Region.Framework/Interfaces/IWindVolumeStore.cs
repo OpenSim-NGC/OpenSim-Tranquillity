@@ -177,8 +177,10 @@ public sealed class WindVolumeLimits
 
 /// <summary>
 /// A region's wind volumes: places where a script has added wind to the base field. They are held in memory only and
-/// are gone when the region restarts. This slice only stores them and answers queries; physics, the wind model's
-/// cells and the wind array sent to viewers do not read them yet.
+/// are gone when the region restarts. The region's wind module adds <see cref="Sample(Vector3)"/> to the wind it
+/// reports through <see cref="IWindModule.WindSpeed(int,int,int)"/> and <see cref="IWindModule.WindSpeedAt"/>, which is
+/// what llWind, iwWind and any physics engine that samples the wind read. The wind model's own cells and the wind
+/// array sent to viewers do not include them.
 /// </summary>
 public interface IWindVolumeStore
 {
