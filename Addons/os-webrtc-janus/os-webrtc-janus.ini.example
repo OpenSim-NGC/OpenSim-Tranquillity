@@ -164,8 +164,8 @@
     ; Position feed: the region tells the mixer where each voice participant really is (its position, a speed
     ; allowance and a tolerance), so a viewer's own claim of its position can be compared with it. Default:
     ; false, and nothing is computed or sent. Needs VisibilityFeederEnabled and VisibilityEmitEnabled, and a
-    ; mixer that advertises vis_protocol 3; an older mixer is sent nothing. The version is learned from the
-    ; mixer's replies, which VisibilityArmingEnabled's heartbeats provide. Mixer only: on the stock plugin
+    ; mixer that advertises vis_protocol 3; an older mixer is sent nothing. The region learns the version itself:
+    ; from the replies it already gets, or by asking once. Mixer only: on the stock plugin
     ; it logs one warning and is turned off.
     ;PositionFeedEnabled = false
     ; observe or enforce. Default: observe (the mixer counts what it would change and changes nothing).

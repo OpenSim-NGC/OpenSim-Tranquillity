@@ -227,10 +227,12 @@ counts what a correction would have changed (`visibility.positions` in the admin
 no audio and no roster. `PositionFeedMode = enforce` is accepted and sent as `observe`.
 
 With the switch off nothing is read from the scene and nothing is sent. The region sends nothing until a reply from
-the mixer has advertised `vis_protocol` 3. It learns that from the replies to the `peer_ctl_batch` and heartbeat
-requests it already sends, so use it with `VisibilityArmingEnabled` (whose heartbeats carry the reply); without
-arming the version is learned from the first `peer_ctl_batch` reply, and a room in which nobody is excluded or muted
-sends none.
+the mixer has advertised `vis_protocol` 3, and it learns that itself; the feed needs no other switch for it, with
+`VisibilityArmingEnabled` on or off. The version is read from the replies to the `peer_ctl_batch` and heartbeat
+requests the region already sends. When it has sent none (arming off, and nobody excluded or muted) the region asks
+once, with a `peer_ctl_heartbeat` that names no room: the mixer answers with its version and changes nothing in any
+room. A mixer older than 1.2.0 is sent nothing more after that. The region asks again after a request to the mixer
+fails (a restart), and a mixer that was replaced by a newer one is noticed from its next `peer_ctl` reply.
 
 Cost. One request names one room. At each look the region sends, for every occupied room, at most one request: a
 full set if `PositionFeedKeepAliveMs` has passed since the room's last full set, otherwise only the participants that
