@@ -236,7 +236,7 @@ docker exec voice-mixer-janus-1 legion-voice-selfcheck
 
 On a test with a private `JS_PUBLIC_IP` you should see `PASS` on the line for the RTP port range ("is bindable and
 matches Janus") and on the line for signalling ("HTTP transport answers"). `FAIL` on the first line, "advertised
-address is public", is expected there: the board is telling you that a viewer outside your network cannot reach a
+address is public", is expected there: the check is telling you that a viewer outside your network cannot reach a
 private address. The container's start-up log (`docker logs voice-mixer-janus-1`) prints
 the same finding as two `ERROR` lines for the same reason. Both go away when `JS_PUBLIC_IP` (or `JS_PUBLIC_HOST`)
 is an address viewers can reach; the mixer's `docs/recipe-home-hosted.md` and `docs/recipe-vps.md` cover that.
