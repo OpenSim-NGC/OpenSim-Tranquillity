@@ -8,6 +8,7 @@ operators first; the last three are reference for people who maintain the addon 
 
 | Document | What it covers |
 |---|---|
+| [quickstart.md](quickstart.md) | Setting up WebRTC voice for a test, step by step: a Janus gateway (the stock AudioBridge or the slvoice mixer) in Docker, the region server's settings, the firewall, and how to check it works |
 | [overview.md](overview.md) | What the addon does, the pull requests that add each feature, choosing a voice server (the stock Janus AudioBridge or the slvoice mixer), a minimal set-up, the defaults that change from develop, known limits |
 | [deployment.md](deployment.md) | Region layouts, the ports a viewer must reach, calls across region server processes, the call session service on the grid server, running the slvoice mixer, sizing |
 | [configuration.md](configuration.md) | Every setting with its default, grouped by the pull request that adds it |
@@ -21,13 +22,14 @@ operators first; the last three are reference for people who maintain the addon 
 
 ## Reading order for an operator
 
-1. [overview.md](overview.md): what you can switch on, which voice server each feature needs, and a minimal set-up.
-2. [deployment.md](deployment.md): how to lay out regions, the gateway or mixer and, for more than one region server process,
+1. [quickstart.md](quickstart.md): to see voice working once on a test grid, before you plan a layout.
+2. [overview.md](overview.md): what you can switch on, which voice server each feature needs, and a minimal set-up.
+3. [deployment.md](deployment.md): how to lay out regions, the gateway or mixer and, for more than one region server process,
    the call session service.
-3. [configuration.md](configuration.md): the settings, while you edit the ini file.
-4. [security.md](security.md): secrets and https, before the gateway is reachable from outside.
-5. [moderation.md](moderation.md) and [positions.md](positions.md), for the features you turn on.
-6. [troubleshooting.md](troubleshooting.md): when something does not work, and to know what a healthy start-up looks like.
+4. [configuration.md](configuration.md): the settings, while you edit the ini file.
+5. [security.md](security.md): secrets and https, before the gateway is reachable from outside.
+6. [moderation.md](moderation.md) and [positions.md](positions.md), for the features you turn on.
+7. [troubleshooting.md](troubleshooting.md): when something does not work, and to know what a healthy start-up looks like.
 
 [feature-spec.md](feature-spec.md), [architecture.md](architecture.md) and [mixer-feed-protocol.md](mixer-feed-protocol.md) are
 for reference.
