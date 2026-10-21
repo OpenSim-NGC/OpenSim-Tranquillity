@@ -46,8 +46,8 @@ are the ones in the pull requests' texts and the shipped ini.
 | #357 | `CallModerationEnabled` (`false`), `CallModerationRevalidateSeconds` (60), `CallRemovalMinutes` (0) |
 | #362 | `VisibilityFeederEnabled` (`false`), `VisibilityEmitEnabled` (`false`), `VisibilityTickMs` (250), `VisibilityRoomSendConcurrency` (4), `VisibilityArmingEnabled` (`false`), `VisibilityHeartbeatMs` (1000), `VoiceModerationEnabled` (`false`); `[JanusWebRtcVoice] AdminTimeoutMs` (5000) |
 | #363 | `JoinCapabilityEnabled` (`false`); `[JanusWebRtcVoice] JoinCapabilitySecret` (empty) |
-| #<V9 number> | `ConnectorsEnabled` (`false`), `AllowNpcVoice` (`false`), `NpcNameToken` (`NPC`), `VoiceRangeMetres` (20), and the `[VoiceConnector.<name>]` records |
-| #<V12 number> | `PositionFeedEnabled` (`false`), `PositionFeedMode` (`observe`), `PositionFeedTickMs` (500), `PositionFeedKeepAliveMs` (2000), `PositionFeedMoveThresholdCm` (100), `PositionFeedMarginCm` (500), `PositionFeedSpeedFloorCmS` (800), `PositionFeedSpeedMaxCmS` (10000) |
+| #365 | `ConnectorsEnabled` (`false`), `AllowNpcVoice` (`false`), `NpcNameToken` (`NPC`), `VoiceRangeMetres` (20), and the `[VoiceConnector.<name>]` records |
+| #364 | `PositionFeedEnabled` (`false`), `PositionFeedMode` (`observe`), `PositionFeedTickMs` (500), `PositionFeedKeepAliveMs` (2000), `PositionFeedMoveThresholdCm` (100), `PositionFeedMarginCm` (500), `PositionFeedSpeedFloorCmS` (800), `PositionFeedSpeedMaxCmS` (10000) |
 
 #345, #346, #350, #351, #352, #358 add no setting. Mixer-only keys also need a slvoice mixer of release 1.2.0 or later;
 see [overview.md](overview.md#the-slvoice-mixer).
@@ -143,10 +143,10 @@ choose.
 | Key | Default | Meaning | Needs |
 |---|---|---|---|
 | `ConnectorsEnabled` | `false` | Load the `[VoiceConnector.<name>]` records and start their NPCs. Off: no record is read. | Slvoice mixer; the NPC module. |
-| `NpcNameToken` | `NPC` | Word that the first or last name of every connector NPC must be exactly equal to (case-sensitive). A record whose NPC name lacks it is refused. | `ConnectorsEnabled`. |
+| `NpcNameToken` | `NPC` | A word that the NPC's first or last name must carry as a whole word (an exact, case-sensitive match of one word of the name). A record whose NPC name lacks it is refused. | `ConnectorsEnabled`. |
 | `VoiceRangeMetres` | `20` | Range, in metres, used for the notice that tells nearby avatars a voiced NPC is close. | `ConnectorsEnabled`. |
 
-`AllowNpcVoice` is also read by the connector module, but its default (`false`) is the same everywhere.
+`AllowNpcVoice` is read once, by the voice service module, and works the same on both plugins; the connector module does not read it. A registered connector is admitted whether it is on or off.
 
 ## [JanusWebRtcVoice]
 
@@ -246,7 +246,7 @@ names the reason) and does not load at all.
 | `MayInject` | `false` | `false`: recording only. The NPC is muted at registration so nothing it sends is heard. This mute is enforced through the visibility feeder, so with the feeder off a `MayInject = false` connector is not started. `true` lets it speak. |
 | `AuthorisedBy` | empty | Free text naming who authorised the record. Not validated. |
 | `Region` | empty | Optional scene name. Set: the record starts only in that region. Absent: it starts in every region the instance hosts. |
-| `InjectSourceUrl` | empty | Optional URL the region posts the NPC's chat text to for text-to-speech injection. |
+| `InjectSourceUrl` | empty | Optional URL, read and kept on the record. I could not find any code in the region server that uses it; it is not the way the injector program gets its audio. |
 | `CapabilitySecret` | empty | Optional. At least 32 characters; a shorter value is ignored with a warning. When set, the region serves `POST /voice/connector/<name>/join-cap`, which a connector program calls with `Authorization: Bearer <secret>` to obtain a join capability. Minting also needs `JoinCapabilityEnabled` and `JoinCapabilitySecret`. If the instance hosts more than one region, also set `Region`. Over a network, put the endpoint behind TLS or a private network. |
 
 The connector NPC's agent id is derived from the grid identity, the region name and the record name, so it is the
@@ -254,4 +254,6 @@ same after a restart. Renaming the section or the region gives the connector a n
 The id is a version 5 (name-based) UUID in the namespace derived from `urn:opensim:webrtc-voice:connector`.
 
 Connector disclosure cannot be turned off: connector NPCs always carry the name token, and the region always
-issues its entry and proximity notices.
+sends a region-wide alert when a connector attaches or detaches, an entry notice to each avatar that becomes a root
+agent in a region with a connector, and a local-chat notice, spoken as the NPC, to an avatar that comes within
+`VoiceRangeMetres` of it.

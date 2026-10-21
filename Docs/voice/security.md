@@ -62,13 +62,15 @@ What it does and does not protect:
   the mixer requires a capability.
 - A capability is never logged. The message log (`MessageDetails`) shows `<redacted join_cap>` in its place, and when the mixer
   refuses a join the region logs the mixer's reason and the error code, which do not contain the capability.
-- It does not compare where the viewer says it stands with anything. The position feed (#<V12 number>) sends the mixer where
+- It does not compare where the viewer says it stands with anything. The position feed (#364) sends the mixer where
   the region has each participant so the claim can be compared; in observe mode that only counts differences.
 
 A connector program, which joins the mixer from outside the region, fetches its capability from the region
 instead: `POST /voice/connector/<name>/join-cap` with `Authorization: Bearer <CapabilitySecret>`. Every failure before the
 bearer is accepted (unknown name, inactive record, no secret, wrong bearer, wrong method) is an empty 404; after it, an empty
-503 when the region cannot mint. The endpoint exists only while a record has a `CapabilitySecret`. Put it behind TLS or a
+503 when the region cannot mint, which is the case unless `JoinCapabilityEnabled` is on and `JoinCapabilitySecret` is set.
+The endpoint exists only while a record has a `CapabilitySecret`. On a server with several regions a record with a
+secret needs `Region=`, or the endpoint cannot choose a region and answers 404. Put it behind TLS or a
 private network.
 
 With the stock AudioBridge the switch is turned off at start with a warning; the plugin cannot check a capability, and a direct

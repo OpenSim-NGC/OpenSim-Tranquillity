@@ -2,7 +2,7 @@
 
 With a spatial mixer, a viewer tells the mixer where its avatar is, and the mixer places the avatar's voice there. A
 modified viewer could claim a false position. The position feed lets the region send the mixer where each voice participant
-really is, so the claim can be compared with it. The feed is added by #<V12 number>. This page describes what exists today:
+really is, so the claim can be compared with it. The feed is added by #364. This page describes what exists today:
 **observe mode**. Enforcement is not available yet: the `enforce` setting is accepted, and the feed still runs in observe
 mode.
 

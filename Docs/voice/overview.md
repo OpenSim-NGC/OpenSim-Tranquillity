@@ -28,8 +28,8 @@ documents describe it anyway.
 | #358 | Quieter logs and fewer background lookups |
 | #362 | Per-listener visibility for a slvoice mixer, and parcel voice moderation |
 | #363 | The join capability (`JoinCapabilityEnabled`) and the 32-character minimum on its secret |
-| #<V9 number> | NPC voice connectors (`ConnectorsEnabled`) |
-| #<V12 number> | The position feed, in observe mode (`PositionFeedEnabled`) |
+| #365 | NPC voice connectors (`ConnectorsEnabled`) |
+| #364 | The position feed, in observe mode (`PositionFeedEnabled`) |
 
 ## What the addon does
 
@@ -62,8 +62,8 @@ What each needs switched on (every optional switch is `false` unless the table s
 | Visibility | #362 | `VisibilityFeederEnabled`, `VisibilityEmitEnabled` | Slvoice mixer |
 | Visibility arming | #362 | `VisibilityArmingEnabled` | Slvoice mixer, feeder, emission |
 | Join capability | #363 | `JoinCapabilityEnabled`, `JoinCapabilitySecret` | Slvoice mixer |
-| Position feed | #<V12 number> | `PositionFeedEnabled` | Slvoice mixer 1.2.0 or later (`vis_protocol` 3), feeder, emission; #351 |
-| NPC voice connectors | #<V9 number> | `ConnectorsEnabled` | Slvoice mixer, the NPC module; #346 |
+| Position feed | #364 | `PositionFeedEnabled` | Slvoice mixer 1.2.0 or later (`vis_protocol` 3), feeder, emission; #351 |
+| NPC voice connectors | #365 | `ConnectorsEnabled` | Slvoice mixer, the NPC module; #346 |
 
 You must run Janus yourself. See the `os-webrtc-janus-docker` project for running the stock Janus.
 
@@ -116,7 +116,7 @@ region server depends on it:
 | A room admits **50 participants** by default (`JS_ROOM_SIZE`, 2 to 110; 0.7.0 allowed 64). A join beyond the limit is refused as room full | The region answers it as HTTP 409, the viewer's "channel full". `GroupVoiceCap` (#354) defaults to 50 to match, and is never above 110 |
 | The Opus encoder complexity is **5** (0.7.0 used 9). It is a build-time setting of the mixer | None. The mixer's release notes give the CPU cost of a tick for 50, 64 and 80 participants; check the mixer's tick histogram under real load before raising `JS_ROOM_SIZE` |
 | `peer_ctl_batch` is refused whole above 65,536 bytes (`too_big`) | The region sends a room's request in parts, cut between listeners, when it would be over that size (#362). A request that fits is sent as before |
-| `peer_pos` and `vis_protocol` 3 | The position feed sends nothing to a mixer that does not advertise 3. Its full snapshot is sent every **2000 ms** by default, so a point stays fresh in the mixer's 6000 ms stale window after one lost request (#<V12 number>, [positions.md](positions.md)). The feed learns the mixer's version without `VisibilityArmingEnabled`: when no `peer_ctl` request has told it, it asks once with a heartbeat that names no room, which arms nothing |
+| `peer_pos` and `vis_protocol` 3 | The position feed sends nothing to a mixer that does not advertise 3. Its full snapshot is sent every **2000 ms** by default, so a point stays fresh in the mixer's 6000 ms stale window after one lost request (#364, [positions.md](positions.md)). The feed learns the mixer's version without `VisibilityArmingEnabled`: when no `peer_ctl` request has told it, it asks once with a heartbeat that names no room, which arms nothing |
 | Accepts 128 `peer_pos` entries in a request | The region sends at most 120 |
 | Join capability and `JS_JOIN_CAP_REQUIRED` | The region signs the capability (#363). The mixer refuses a join without one only when started with `JS_JOIN_CAP_REQUIRED=1` |
 | Visibility staleness window `JS_VIS_STALE_MS`, 8000 ms by default | `VisibilityHeartbeatMs` (#362) may be 250 to 4000, half of that window |
@@ -253,7 +253,7 @@ All three need the slvoice mixer.
 `JoinCapabilityEnabled` (#363): the region signs a short-lived (60 seconds) capability for every join and the mixer can
 refuse joins that lack one. The secret must be at least 32 characters. See [security.md](security.md).
 
-`PositionFeedEnabled` (#<V12 number>): the region tells the mixer where it has each voice participant, in observe mode
+`PositionFeedEnabled` (#364): the region tells the mixer where it has each voice participant, in observe mode
 only. See [positions.md](positions.md). Both need the slvoice mixer 1.2.0 or later.
 
 ### Moderation
@@ -264,7 +264,7 @@ out on the stock AudioBridge only. See [moderation.md](moderation.md).
 
 ### NPC voice connectors
 
-`ConnectorsEnabled` (#<V9 number>). An operator-defined NPC can stand at a fixed position as a recorder (listen only)
+`ConnectorsEnabled` (#365). An operator-defined NPC can stand at a fixed position as a recorder (listen only)
 or injector (may speak, for example text to speech). Each connector is a `[VoiceConnector.<name>]` section; the
 section is the authorisation, so only someone with access to the configuration can create one. The recorder and
 injector programs are in the mixer's repository (`connectors/`); the region side creates the NPC, makes sure its room
@@ -272,7 +272,9 @@ exists and signs the programs' join. Related switches: `NpcNameToken` (the word 
 contain, default `NPC`), `VoiceRangeMetres` (default 20) and `AllowNpcVoice` (default `false`: an NPC is refused voice
 unless it is a registered connector). Disclosure cannot be disabled: connector NPCs carry the name token, and the
 region posts notices when they appear and when avatars come close. Needs the NPC module (#346 makes a create of an
-agent id already in use fail cleanly) and the slvoice mixer. See [configuration.md](configuration.md) for the record
+agent id already in use fail cleanly) and the slvoice mixer. The room is made to exist before anyone has joined it
+(`EnsureSpatialRoom`); the grid-service client (`WebRtcVoiceServiceConnector`) owns no rooms, so with it the room is
+created only when an avatar has joined that parcel, and a warning says so. Grid mode was not run with connectors. See [configuration.md](configuration.md) for the record
 keys.
 
 ### Log volume

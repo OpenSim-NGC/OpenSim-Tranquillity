@@ -9,7 +9,7 @@ against the mixer's source. Where the two disagree, the mixer's copy wins for wh
 sections below are the sender's side: read them to understand the region server's behaviour and its logs, and the
 mixer's document to build or check a mixer.
 
-The feed is added by #362 (visibility, arming, heartbeats), #363 (the join capability) and #<V12 number> (positions).
+The feed is added by #362 (visibility, arming, heartbeats), #363 (the join capability) and #364 (positions).
 It is written for people who maintain a mixer and for operators who need to read the logs when a mixer and a region
 disagree.
 
@@ -186,8 +186,11 @@ Authorization: Bearer <CapabilitySecret>
 A success returns `200` with `{"display","room","session_id","join_cap","expires","position"}`;
 `position` is `{"x","y","z"}` in integer centimetres. Every failure before authentication succeeds
 returns an empty `404`, so the endpoint does not reveal which connector names exist. When the region
-server cannot mint, it answers an empty `503` after authentication. No handler is registered at all
-unless some connector record has a `CapabilitySecret`.
+server cannot mint (`JoinCapabilityEnabled` is off or `JoinCapabilitySecret` is not set), it answers an empty `503` after
+authentication. No handler is registered at all unless some connector record has a `CapabilitySecret`. On a server with
+several regions a record with a secret needs `Region=`, otherwise the endpoint cannot choose a region and answers `404`.
+Before it mints, the region makes sure the room exists again (one extra room-create request to the mixer for each
+fetch), so a capability never names a room the mixer does not have.
 
 ## 4. `peer_ctl_batch`
 

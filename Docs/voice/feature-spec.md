@@ -36,8 +36,8 @@ is set.
 | Authority arming | #362 | `VisibilityArmingEnabled` | feeder and emit on |
 | Join capability | #363 | `JoinCapabilityEnabled` | spatial mixer, `JoinCapabilitySecret` (32 characters or more) |
 | Voice moderation | #362 | `VoiceModerationEnabled` | stock plugin: nothing more; spatial mixer: feeder on |
-| Position feed | #<V12 number> | `PositionFeedEnabled` | spatial mixer 1.2.0 or later (`vis_protocol` 3), feeder and emit on |
-| Voice connectors | #<V9 number> | `ConnectorsEnabled` | spatial mixer, NPC module |
+| Position feed | #364 | `PositionFeedEnabled` | spatial mixer 1.2.0 or later (`vis_protocol` 3), feeder and emit on |
+| Voice connectors | #365 | `ConnectorsEnabled` | spatial mixer, NPC module |
 
 The call logic for the non-spatial features does not depend on the plugin: avatar-to-avatar calls, group
 calls and conferences work with the stock AudioBridge and with a spatial mixer. With the stock AudioBridge, a
@@ -132,14 +132,14 @@ names no parcel; the region server uses the requester's position. Moderated sour
 listener's participant list but are silenced. Owners, managers and group moderators cannot be muted.
 State is in memory and cleared at restart. Operators can inspect and change it from the console.
 
-### 4.5 Voice connectors (#<V9 number>) (Implemented, off by default)
+### 4.5 Voice connectors (#365) (Implemented, off by default)
 
 An operator-written `[VoiceConnector.<name>]` record creates an NPC identity in the voice session for
 an external recorder or injector peer. The NPC's id is stable across restarts. The external peer
 joins the mixer itself, with a join capability it fetches from a small authenticated endpoint on the
 region server when that is configured.
 
-### 4.6 Position feed (#<V12 number>) (Implemented, off by default)
+### 4.6 Position feed (#364) (Implemented, off by default)
 
 With `PositionFeedEnabled` the region server tells the mixer where it has each voice participant, in global centimetres with
 a speed allowance and a tolerance, so that a viewer's own claim of its position can be compared with it. The mixer only

@@ -14,7 +14,7 @@ The addon lives in five projects:
 | `WebRtcVoiceServiceModule/` | The dispatcher: routes each request to a spatial or non-spatial service and tracks viewer sessions. |
 | `WebRtcVoice/` | Interfaces, the viewer-session registry, the region-to-Robust connector pair, the join capability, the refusal cache, and (since #356) the call session engine and the call session service that the grid server hosts. |
 | `Janus/` | Janus REST client, plugin handles, room handling and the Janus admin client (#362). |
-| `Visibility/` | The scene-independent part of the feed (#362): the visibility matrix and its rules, delta batches, the `peer_ctl` serializer, partitioner and splitter, the voice-state feeder, and (#<V12 number>) the position types, tolerance, serializer and feeder. |
+| `Visibility/` | The scene-independent part of the feed (#362): the visibility matrix and its rules, delta batches, the `peer_ctl` serializer, partitioner and splitter, the voice-state feeder, and (#364) the position types, tolerance, serializer and feeder. |
 
 ## 1. Modules and what they register
 
@@ -166,7 +166,7 @@ These need a mixer implementing `janus.plugin.slvoice` and are off by default.
   attach and detach, an entry notice, and a proximity notice from a voiced NPC) are always sent and
   cannot be switched off. Console commands: `voice connector start <name>` and
   `voice connector stop <name>`.
-- **Position feed** (`PositionFeedEnabled`, #<V12 number>): a pump on the visibility feeder's thread reads where the scene has each
+- **Position feed** (`PositionFeedEnabled`, #364): a pump on the visibility feeder's thread reads where the scene has each
   voice participant and sends the mixer one `peer_pos` request for each occupied room. It sends nothing until the mixer has
   advertised `vis_protocol` 3, which it learns from the replies to `peer_ctl` requests or, when none is sent, from a heartbeat
   that names no room. The mixer only observes in this release. See [positions.md](positions.md).

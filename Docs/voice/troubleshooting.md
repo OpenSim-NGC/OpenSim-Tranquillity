@@ -26,7 +26,7 @@ Look for these in the region server log after a start. The name in square bracke
 | `VisibilityArmingEnabled` | `spatial "local" rooms are created with vis_authority=true`; `[VOICE VISIBILITY] arming ENABLED for <region>`; warning `VisibilityArmingEnabled is true but <region> has no Janus peer_ctl sink` | |
 | `VisibilityFeederEnabled`, `VisibilityEmitEnabled` | `[VOICE VISIBILITY] feeder started for <region> @ 250ms (emit=True)`; warning `VisibilityEmitEnabled but [JanusWebRtcVoice] JanusGatewayAdminURI/AdminAPIToken missing; region "<name>" runs matrix-only (no emission)` | |
 | `VisibilityHeartbeatMs` | A warning naming the key | The value is outside 250 to 4000 and 1000 is used (#362) |
-| `PositionFeedKeepAliveMs` | A warning naming the key | The value is outside 1 to 2250 and 2000 is used (#<V12 number>) |
+| `PositionFeedKeepAliveMs` | A warning naming the key | The value is outside 1 to 2250 and 2000 is used (#364) |
 | `PositionFeedEnabled` | See [positions.md](positions.md) | |
 | `CarrierSecret` | `cross-process voice carriers on: group and conference rings and conference text are signed with [WebRtcVoice] CarrierSecret`; or `cross-process voice carriers are off: [WebRtcVoice] CarrierSecret is not set ...`; or error `CarrierSecret is shorter than 32 characters and is refused; cross-process voice carriers are off` | |
 | `GroupVoiceEnabled` | `GROUP VOICE enabled ([WebRtcVoice] GroupVoiceEnabled): cap <n>, required powers 0x... (GP_SESSION_JOIN + GP_SESSION_VOICE)` | The cap shown is the one in force after clamping |
@@ -60,7 +60,7 @@ Each of these is one line per decision, with the same words in every line, so yo
 | `[NONSPATIAL SWEEP]` | Expired invitations and idle sessions removed | Debug |
 | `non-spatial session limit: agent=... decision=session-cap-global\|session-cap-agent\|rate-limited\|too-many-invitees` | A start or invite was refused by a limit | Warning |
 | `[VOICE VISIBILITY]` | The visibility feeder and its sender (#362). A one-minute summary while the region has rooms or listeners (arming replaces, entries the mixer deferred and stale or unarmed reports are counted in it and written at Debug), one line when the region goes idle and one when it wakes. A failing emit (the admin API is down) is one Error a minute with the number held back. The first `unknown_room` for a room whose last listener left is Debug; a second one, or one for a room that still has listeners, is a Warning | Information, Warning and Error as described |
-| `[VOICE POSITIONS]` | The position feed (#<V12 number>); see [positions.md](positions.md) | Information, Warning and Debug |
+| `[VOICE POSITIONS]` | The position feed (#364); see [positions.md](positions.md) | Information, Warning and Debug |
 
 ## Console commands
 

@@ -222,7 +222,7 @@ gateway does not accumulate them.
 - The visibility feed (#362) sends a change when one occurs and a heartbeat for each region every `VisibilityHeartbeatMs`
   (1000 by default, 250 to 4000). A region server with many regions can lengthen the heartbeat. A room whose request would be
   over the mixer's limit of 65,536 bytes is sent in several parts.
-- The position feed (#<V12 number>) sends at most one request for each occupied room at each look, 500 to 750 ms apart by
+- The position feed (#364) sends at most one request for each occupied room at each look, 500 to 750 ms apart by
   default: 80 to 120 requests a minute for a room of 50 where someone is moving, 22 to 30 where nobody is. Four rooms of 50
   are 320 to 480 requests a minute when busy. The rooms of a look are sent one after another, so lengthen
   `PositionFeedTickMs` on a region server with many occupied rooms. See [positions.md](positions.md).
