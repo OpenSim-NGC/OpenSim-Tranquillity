@@ -25,6 +25,7 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// what a region produced when its flag was turned on before this service existed.
 /// </para>
 /// </summary>
+[Collection("logger-factory")]
 public class LoginResponseAdvertisementTests
 {
     private const string Key = "agent_appearance_service";
