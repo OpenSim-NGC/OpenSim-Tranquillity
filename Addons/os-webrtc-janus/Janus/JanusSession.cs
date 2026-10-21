@@ -135,12 +135,20 @@ public partial class JanusSession : IDisposable
         // Once the Janus session is destroyed Janus sends no more events, so complete every pending
         // request now rather than leaving its caller waiting.
         FailOutstanding(SessionDestroyedReason);
+        if (_SessionGone)
+        {
+            m_log.LogDebug("{0} DestroySession: session already destroyed", LogHeader);
+            IsConnected = false;
+            _CancelTokenSource.Cancel();
+            return false;
+        }
         try
         {
             JanusMessageResp resp = await SendToSession(new DestroySessionReq());
             if (resp is not null && resp.isSuccess)
             {
                 // Note that setting IsConnected to false will cause the long poll to exit
+                _SessionGone = true;
                 m_log.LogDebug("{0} DestroySession. Destroyed", LogHeader);
             }
             else
@@ -200,10 +208,17 @@ public partial class JanusSession : IDisposable
     }
     // ====================================================================
     // Post to the session
+    // A session request (attach, destroy) is about the session, so it does not name a handle: Janus looks up
+    //     any handle_id in the body first and refuses the request if that handle is already detached.
     public async Task<JanusMessageResp> SendToSession(JanusMessageReq pReq)
     {
-        return await SendToJanus(pReq, SessionUri);
+        return await SendToJanus(pReq, SessionUri, false);
     }
+
+    // Set once Janus has answered "no such session" (or this session was destroyed): its handles went with it,
+    //     so a later leave, detach or destroy could only be refused (and logged by Janus at ERROR).
+    private volatile bool _SessionGone;
+    public bool IsSessionGone => _SessionGone;
 
     private class OutstandingRequest
     {
@@ -229,9 +244,14 @@ public partial class JanusSession : IDisposable
     /// <param name="pReq"></param>
     /// <param name="pURI"></param>
     /// <returns></returns>
-    public async Task<JanusMessageResp> SendToJanus(JanusMessageReq pReq, string pURI)
+    public Task<JanusMessageResp> SendToJanus(JanusMessageReq pReq, string pURI)
     {
-        AddJanusHeaders(pReq);
+        return SendToJanus(pReq, pURI, true);
+    }
+
+    private async Task<JanusMessageResp> SendToJanus(JanusMessageReq pReq, string pURI, bool pNamesHandle)
+    {
+        AddJanusHeaders(pReq, pNamesHandle);
         // m_log.LogDebug("{0} SendToJanus", LogHeader);
         if (_MessageDetails) m_log.LogDebug("{0} SendToJanus. URI={1}, req={2}", LogHeader, pURI, pReq.ToJson());
 
@@ -291,6 +311,8 @@ public partial class JanusSession : IDisposable
                 {
                     // If the response is not an ack, that means a synchronous request/response so return the response
                     RemoveOutstanding(outReq);
+                    if (ret.isError && new ErrorResp(ret).errorCode == WebRtcJanusService.JANUS_NO_SUCH_SESSION_ERROR_CODE)
+                        _SessionGone = true;
                     if (_MessageDetails) m_log.LogDebug("{0} SendToJanus: response {1}", LogHeader, respStr);
                 }
             }
@@ -343,7 +365,7 @@ public partial class JanusSession : IDisposable
     }
 
     // There are various headers that are in most Janus requests. Add them here.
-    private void AddJanusHeaders(JanusMessageReq pReq)
+    private void AddJanusHeaders(JanusMessageReq pReq, bool pNamesHandle = true)
     {
         // Authentication token
         if (!String.IsNullOrEmpty(_JanusAPIToken))
@@ -363,7 +385,7 @@ public partial class JanusSession : IDisposable
             pReq.AddSessionId(SessionId);
         }
         // HandleId connects to the plugin
-        if (!pReq.hasHandleId && !String.IsNullOrEmpty(PluginId))
+        if (pNamesHandle && !pReq.hasHandleId && !String.IsNullOrEmpty(PluginId))
         {
             pReq.AddHandleId(PluginId);
         }

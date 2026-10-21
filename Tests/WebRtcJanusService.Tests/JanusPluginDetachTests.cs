@@ -135,7 +135,19 @@ namespace osWebRtcVoice.Tests
                 "the case is still recorded, at Debug");
         }
 
-        [TestCase("{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":459,\"reason\":\"No such handle 77\"}}")]
+        [Test]
+        public async Task ADetachForAHandleJanusAlreadyDroppedIsDebugNotAnError()
+        {
+            bool detached = await DetachAnswered(
+                "{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":459,\"reason\":\"No such handle 77\"}}");
+
+            Assert.That(detached, Is.False, "Janus did not confirm a detach");
+            var lines = _log.Detach();
+            Assert.That(lines.Where(l => l.Level >= LogLevel.Warning), Is.Empty, "a handle that is already gone is a race, not an error");
+            Assert.That(lines.Any(l => l.Level == LogLevel.Debug && l.Text.Contains("handle")), Is.True,
+                "the case is still recorded, at Debug");
+        }
+
         [TestCase("{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":403,\"reason\":\"Unauthorized request\"}}")]
         [TestCase("{\"janus\":\"error\",\"transaction\":\"TXN\",\"error\":{\"code\":490,\"reason\":\"Something else\"}}")]
         [TestCase(null)]

@@ -119,6 +119,13 @@ public class JanusPlugin : IDisposable
             m_log.LogWarning("{0} Detach. Not connected", LogHeader);
             return ret;
         }
+        if (_JanusSession.IsSessionGone)
+        {
+            // The handle went with its session, so there is nothing to detach.
+            m_log.LogDebug("{0} Detach: the Janus session no longer exists", LogHeader);
+            PluginId = null;
+            return ret;
+        }
         try
         {
             _JanusSession.OnEvent -= Handle_Event;
@@ -141,6 +148,12 @@ public class JanusPlugin : IDisposable
                 // The Janus session is gone (the mixer restarted), so the handle went with it and there is
                 // nothing left to detach: expected while tidying up a viewer session, not an error.
                 m_log.LogDebug("{0} Detach: the Janus session no longer exists", LogHeader);
+            }
+            else if (resp is not null && new ErrorResp(resp).errorCode == WebRtcJanusService.JANUS_NO_SUCH_HANDLE_ERROR_CODE)
+            {
+                // Janus dropped the handle first (its plugin asked for the detach): the race is harmless.
+                m_log.LogDebug("{0} Detach: the Janus handle no longer exists", LogHeader);
+                PluginId = null;
             }
             else
             {
