@@ -200,6 +200,11 @@ startup when a call feature is on.
 | `VisibilityHeartbeatMs` | `[WebRtcVoice]` | `1000` | Milliseconds between the heartbeats an armed region sends to the mixer, 250 to 4000. A region server that runs many regions can lengthen it; the mixer treats a region silent for its staleness window (`JS_VIS_STALE_MS`, 8000 by default) as gone. A value outside the range is refused with a warning. |
 | `VisibilityArmingEnabled` | `[WebRtcVoice]` | `false` | Declare the sim as the visibility authority when a room is created, with epochs and heartbeats; the mixer withholds audio from a room whose authority goes silent. Needs both visibility keys above. Mixer only. |
 | `VoiceModerationEnabled` | `[WebRtcVoice]` | `false` | Parcel voice moderation: the `SpatialVoiceModerationRequest` capability and the `voice moderation` console commands. On the stock AudioBridge a mute is that plugin's own mute of the participant in its room (a mute-all is remembered for the parcel and also applies to whoever joins afterwards). With the mixer it needs `VisibilityFeederEnabled`. |
+| `PositionFeedEnabled`, `PositionFeedMode` | `[WebRtcVoice]` | `false`, `observe` | Tell the mixer where the region has each voice participant (see "The position feed" below). Needs both visibility keys above and a mixer that speaks `vis_protocol` 3 (the slvoice mixer, release 1.2.0 or later). `enforce` is accepted and sent as `observe`. Mixer only. |
+| `PositionFeedTickMs` | `[WebRtcVoice]` | `500` | Milliseconds between looks at where the participants are (100 or more). The region checks every 250 ms, so a look comes 500 to 750 ms after the last one. |
+| `PositionFeedKeepAliveMs` | `[WebRtcVoice]` | `2000` | A room's full set of positions is sent at the first look at or after this age. 1 to 2250; a value outside that logs a warning and 2000 is used. The mixer drops a point 6000 ms after it received it, so a larger value would let one lost request make a standing participant stale. |
+| `PositionFeedMoveThresholdCm`, `PositionFeedMarginCm` | `[WebRtcVoice]` | `100`, `500` | Between full sets, a participant is sent again once it has moved this far; and the distance, in centimetres, a viewer's claimed position may differ from the region's before the mixer counts it as off. |
+| `PositionFeedSpeedFloorCmS`, `PositionFeedSpeedMaxCmS` | `[WebRtcVoice]` | `800`, `10000` | The smallest speed allowance sent, and the speed ceiling used when the physics engine declares no maximum (both in centimetres a second). |
 
 **Mixer-only switches.** The visibility switches and call voice mutes in a group call need a Janus plugin that
 implements the `janus.plugin.slvoice` protocol (the slvoice mixer, release 1.2.0 or later). The mixer is
@@ -207,6 +212,41 @@ legion-voice-mixer: its repository is https://github.com/JohnLegionH/legion-voic
 `ghcr.io/johnlegionh/legion-voice-mixer:1.2.0`. With the stock
 AudioBridge, which is the default, a mixer-only switch that is on logs one warning at start naming the switch and the
 plugin, and is turned off. Parcel voice moderation and call voice mutes work on the stock AudioBridge.
+
+#### The position feed
+
+A viewer reports its own position to the mixer, and nothing in the visibility feed says where the region has that
+avatar. With `PositionFeedEnabled` the region sends the mixer, for every voice participant, the position the region
+has for it, with a speed allowance and a tolerance, as a `peer_pos` request (mixer 1.2.0, `mixer-feed-protocol.md`
+section 7.6). In 1.2.0 the mixer only **observes**: it compares each point with the position the viewer claims,
+counts what a correction would have changed (`visibility.positions` in the admin API's `handle_info`) and changes
+no audio and no roster. `PositionFeedMode = enforce` is accepted and sent as `observe`.
+
+With the switch off nothing is read from the scene and nothing is sent. The region sends nothing until a reply from
+the mixer has advertised `vis_protocol` 3. It learns that from the replies to the `peer_ctl_batch` and heartbeat
+requests it already sends, so use it with `VisibilityArmingEnabled` (whose heartbeats carry the reply); without
+arming the version is learned from the first `peer_ctl_batch` reply, and a room in which nobody is excluded or muted
+sends none.
+
+Cost. One request names one room. At each look the region sends, for every occupied room, at most one request: a
+full set if `PositionFeedKeepAliveMs` has passed since the room's last full set, otherwise only the participants that
+are new or have moved `PositionFeedMoveThresholdCm`, and nothing if there are none. A request carries up to 120
+participants (the mixer accepts 128) at about 73 bytes each: 50 participants are 3,679 bytes and 110 are 7,999 bytes.
+A room of the mixer's largest size (110) is therefore always one request.
+
+| Room | Requests a minute for each occupied room |
+|---|---|
+| Someone moved 1 m or more since their last sent point (a room of 50 almost always) | 60,000 / 750 to 60,000 / 500 = 80 to 120 |
+| Nobody moves, `PositionFeedKeepAliveMs` 2000 (a full set at every 3rd or 4th look, 2,000 to 2,750 ms apart) | 60,000 / 2,750 to 60,000 / 2,000 = 22 to 30 |
+
+Four rooms of 50 are 320 to 480 requests a minute when busy and 87 to 120 when quiet. The rooms of one look are
+sent one after another, so a look takes the number of occupied rooms times the round trip to the mixer; when that
+is longer than `PositionFeedTickMs`, looks are skipped (one is in flight at a time) and the points age. On a region
+server with many occupied rooms, lengthen `PositionFeedTickMs`.
+
+What the mixer answered is counted: applied, and refused by reason (`stale_seq`, `unknown_room`, `too_big`, other).
+The counts are in `show voice visibility` and in the feed's one-minute summary (a Debug line), and a refusal writes
+one warning a minute.
 
 #### Which parcel a voice request is checked against
 
@@ -356,7 +396,7 @@ This is a growing section and will be added to over time.
 
 **janus list rooms** -- list the rooms that have been allocated in the `AudioBridge` Janus plugin
 
-**show voice visibility** -- show the visibility feeder: whether it runs, its rooms, and what it last sent to the mixer
+**show voice visibility** -- show the visibility feeder: whether it runs, its rooms, and what it last sent to the mixer; with the position feed on, also what the mixer has answered to the position requests
 
 **show voice moderation** -- list the parcel voice mutes held by the regions that run the visibility feeder
 

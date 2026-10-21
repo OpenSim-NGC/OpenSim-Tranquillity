@@ -89,6 +89,17 @@ namespace osWebRtcVoice.Tests
         }
 
         [Test]
+        public void ARoomOf50Participants_IsOneRequestOfAboutFourKilobytes()
+        {
+            OSDMap request = PositionBatchSerializer.BuildRequest(Message(50), PositionFeedMode.Observe);
+            int bytes = System.Text.Encoding.UTF8.GetByteCount(OSDParser.SerializeJsonString(request, true));
+
+            Assert.That(((OSDMap)request["pos"]).Count, Is.EqualTo(50));
+            Assert.That(bytes, Is.InRange(3000, 5000));
+            TestContext.Out.WriteLine($"50 participants: {bytes} bytes");
+        }
+
+        [Test]
         public void EnforceMode_IsSentAsObserveWhileNothingActsOnIt()
         {
             Assert.That(PositionFeedModes.Active(PositionFeedMode.Enforce), Is.EqualTo(PositionFeedMode.Observe));

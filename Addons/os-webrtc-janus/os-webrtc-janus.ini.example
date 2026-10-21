@@ -149,22 +149,38 @@
     ; both visibility keys above.
     ;VisibilityArmingEnabled = false
 
-    ; Position feed: the region tells the mixer where each voice participant really is (its position, a speed
-    ; allowance and a tolerance), so a viewer's own claim of its position can be compared with it. Default:
-    ; false, and nothing is computed or sent. Needs VisibilityFeederEnabled and VisibilityEmitEnabled, and a
-    ; mixer that advertises vis_protocol 3; an older mixer is sent nothing. Mixer only: on the stock plugin
-    ; it logs one warning and is turned off.
-    ;PositionFeedEnabled = false
-    ; observe or enforce. Default: observe (the mixer counts what it would change and changes nothing).
-    ; enforce is accepted but not active yet; positions are sent in observe mode.
-    ;PositionFeedMode = observe
-
     ; Parcel voice moderation (the SpatialVoiceModerationRequest capability and the voice moderation
     ; console commands). Default: false. With the slvoice mixer it needs VisibilityFeederEnabled. With the stock
     ; AudioBridge a mute is the plugin's own mute of that participant in its room (a mute-all is remembered per
     ; parcel and also applies to whoever joins afterwards), and a request the plugin cannot carry out is
     ; answered 501 rather than 200.
     ;VoiceModerationEnabled = false
+
+    ; Position feed: the region tells the mixer where each voice participant really is (its position, a speed
+    ; allowance and a tolerance), so a viewer's own claim of its position can be compared with it. Default:
+    ; false, and nothing is computed or sent. Needs VisibilityFeederEnabled and VisibilityEmitEnabled, and a
+    ; mixer that advertises vis_protocol 3; an older mixer is sent nothing. The version is learned from the
+    ; mixer's replies, which VisibilityArmingEnabled's heartbeats provide. Mixer only: on the stock plugin
+    ; it logs one warning and is turned off.
+    ;PositionFeedEnabled = false
+    ; observe or enforce. Default: observe (the mixer counts what it would change and changes nothing).
+    ; enforce is accepted but not active yet; positions are sent in observe mode.
+    ;PositionFeedMode = observe
+    ; Milliseconds between looks at the participants' positions, 100 or more. Default: 500.
+    ;PositionFeedTickMs = 500
+    ; A room's full set of positions is sent this often. 1 to 2250; outside that range a warning and the default.
+    ; The mixer drops a point 6000 ms after it received it, and the gap between two full sets is this plus up to
+    ; 750 ms, so a larger value would let one lost request make a standing participant stale. Default: 2000.
+    ;PositionFeedKeepAliveMs = 2000
+    ; Between full sets, a participant is sent again once it has moved this many centimetres. Default: 100.
+    ;PositionFeedMoveThresholdCm = 100
+    ; Centimetres a viewer's claimed position may differ from the region's before the mixer counts it as off.
+    ; Default: 500.
+    ;PositionFeedMarginCm = 500
+    ; The smallest speed allowance sent, and the ceiling used when the physics engine declares no maximum speed,
+    ; in centimetres a second. Defaults: 800 and 10000.
+    ;PositionFeedSpeedFloorCmS = 800
+    ;PositionFeedSpeedMaxCmS = 10000
 
     ; Seconds a refused voice provision is remembered, so a viewer's immediate retries are answered without
     ; repeating the estate and parcel checks. 0 turns the cache off. Default: 5.
