@@ -53,9 +53,12 @@ namespace osWebRtcVoice
                 "show voice visibility",
                 "Show the peer_ctl_batch sink's counters for the most recent send, per region",
                 "Every figure describes the MOST RECENT send only.\n"
-                    + "Unplaced listeners/sources > 0 means the sim could not place an agent -\n"
-                    + "no room record AND no parcel resolved for it - so it was LEFT OUT of the send rather than\n"
-                    + "addressed at the estate room. Persistent non-zero is a bug to chase, not a fallback working.\n"
+                    + "Unplaced listeners/sources > 0 means the sim has no record of a room the agent joined, so it\n"
+                    + "was LEFT OUT of the send rather than addressed at the estate room or a guessed one. It is\n"
+                    + "addressed once a provision for it is recorded. An agent only in a group or avatar-to-avatar\n"
+                    + "call has no such record, and reads here as unplaced.\n"
+                    + "Held back rooms > 0: the mixer answered unknown_room for those rooms, so nothing is sent to them\n"
+                    + "until a viewer is provisioned into them again.\n"
                     + "Of the inner-reply stats, skipped > 0 is real loss and anomalies > 0 is protocol drift;\n"
                     + "deferred > 0 is normal (the mixer replays those at join).\n"
                     + "Reports the region selected with \"change region\", or every region at the root prompt.",
@@ -111,6 +114,9 @@ namespace osWebRtcVoice
                 string.Format(
                     "  inner replies              parsed {0}, entries {1}, mute entries {2}, deferred {3} (normal), skipped {4} (loss), anomalies {5} (drift)",
                     s.RepliesParsed, s.Entries, s.MuteEntries, s.DeferredListeners, s.Skipped, s.Anomalies),
+                string.Format(
+                    "  held back (unknown room)   rooms {0} in the last send, {1} in all sends",
+                    sink.LastSendHeldBackRooms, sink.RoomsHeldBack),
             };
         }
 

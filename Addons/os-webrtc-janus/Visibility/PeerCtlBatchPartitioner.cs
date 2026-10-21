@@ -180,8 +180,8 @@ namespace osWebRtcVoice
         }
 
         /// <summary>What an agent with no answer from the resolver is bucketed as. The resolver
-        /// now answers with the agent's RECORD, else the room its parcel would provision it into, so a null means the
-        /// sim genuinely cannot place it - and an agent it cannot place is one whose room it must not guess.</summary>
+        /// now answers with the agent's RECORD, the room its last provision joined, so a null means the
+        /// sim has no evidence of a room it is in - and an agent it cannot place is one whose room it must not guess.</summary>
         internal const int Unplaced = int.MinValue;
 
         private static int Resolve(UUID agent, Func<UUID, int?> roomOf,
