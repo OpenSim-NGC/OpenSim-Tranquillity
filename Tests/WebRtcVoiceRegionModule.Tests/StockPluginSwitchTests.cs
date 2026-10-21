@@ -82,6 +82,19 @@ namespace osWebRtcVoice.Tests
         private static bool Field(WebRtcVoiceRegionModule module, string name)
             => (bool)typeof(WebRtcVoiceRegionModule).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(module);
 
+        [Test]
+        public void TheRegion_OnTheStockPlugin_RunsWithThePositionFeedOff_AndSaysSo()
+        {
+            var module = new WebRtcVoiceRegionModule();
+
+            module.Initialise(Config("janus.plugin.audiobridge", "VisibilityFeederEnabled", "VisibilityEmitEnabled", "PositionFeedEnabled"));
+
+            object settings = typeof(WebRtcVoiceRegionModule).GetField("m_PositionSettings", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(module);
+            Assert.That(settings, Is.Null, "the position feed stays off");
+            List<string> warnings = _log.Warnings();
+            Assert.That(warnings.Any(w => w.Contains("PositionFeedEnabled") && w.Contains("janus.plugin.audiobridge")), Is.True, string.Join(" | ", warnings));
+        }
+
         [TestCase("VisibilityFeederEnabled", "m_VisibilityFeederEnabled")]
         [TestCase("VisibilityEmitEnabled", "m_VisibilityEmitEnabled")]
         [TestCase("VisibilityArmingEnabled", "m_VisibilityArmingEnabled")]

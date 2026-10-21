@@ -62,6 +62,7 @@ namespace osWebRtcVoice.Tests
         [TestCase("VisibilityFeederEnabled")]
         [TestCase("VisibilityEmitEnabled")]
         [TestCase("VisibilityArmingEnabled")]
+        [TestCase("PositionFeedEnabled")]
         public void OnTheStockPlugin_ASwitchThatIsOn_WarnsNamingTheSwitchAndThePlugin_AndIsSwitchedOff(string name)
         {
             var log = new Capture();
@@ -81,6 +82,7 @@ namespace osWebRtcVoice.Tests
         [TestCase("VisibilityFeederEnabled")]
         [TestCase("VisibilityEmitEnabled")]
         [TestCase("VisibilityArmingEnabled")]
+        [TestCase("PositionFeedEnabled")]
         public void WithNoPluginNameSet_TheDefaultIsTheStockPlugin(string name)
         {
             var log = new Capture();
