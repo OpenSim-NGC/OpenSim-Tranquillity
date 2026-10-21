@@ -473,7 +473,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(sink.Calls.All(c => c.op == VisOp.Replace && c.excl.ContainsKey(listener)), Is.True);
         }
 
-        // ==== FIX 2: in-flight staleness self-heal ========================================
+        // ==== in-flight staleness self-heal ========================================
 
         // A sink whose SendAsync never completes until the test releases it — models a send stuck
         // in flight (the CTS + HttpClient backstop both failed) so _sendInFlight stays claimed.

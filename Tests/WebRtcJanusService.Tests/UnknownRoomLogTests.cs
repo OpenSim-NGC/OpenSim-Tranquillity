@@ -6,10 +6,9 @@
  */
 
 /*
- * The mixer answers unknown_room for a room it has not been asked to create yet. That happens on the first
- * arming pass after an avatar appears: the avatar is addressed at the room its parcel resolves to, and the room
- * is created by the avatar's own provision, which can come after that first pass. The first such reply is
- * expected and is logged at Debug. Every other unknown_room stays a Warning: a second reply for a room that
+ * The mixer answers unknown_room for a room it has not been asked to create yet. That can happen when a batch
+ * for a room reaches the mixer before the provision that creates the room has completed there. The first such
+ * reply is expected and is logged at Debug. Every other unknown_room stays a Warning: a second reply for a room that
  * has still never answered, a room that did answer before, and a room something has proved exists.
  */
 using System;

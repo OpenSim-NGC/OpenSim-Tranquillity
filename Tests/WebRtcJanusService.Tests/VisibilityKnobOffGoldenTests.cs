@@ -17,7 +17,7 @@
  * admin HTTP call:
  *   tick 1  snapshot; listener D has an empty column (today: skipped);
  *   join    OnListenerProvisioned for A (non-empty, re-sent) and D (empty, today: skipped);
- *   tick 2  C joins moderated: a multi-room add, including an unrecorded (fallback-room) listener;
+ *   tick 2  C joins moderated: a multi-room add, including a listener recorded in the estate room;
  *   tick 3  the ban is lifted: a remove;
  *   tick 4  C leaves, and the transport fails: nothing applied, unsynced;
  *   tick 5  the re-snapshot, with clear-tracking empty replaces;
@@ -133,15 +133,14 @@ namespace osWebRtcVoice.Tests
             world.Agents.Add(new AgentView(B, false, Vector3.Zero, ParcelP, false));   // B on P
             world.Agents.Add(new AgentView(D, false, Vector3.Zero, ParcelQ, false));   // D on Q: an empty column
 
-            var rooms = new Dictionary<UUID, int> { [A] = RoomAB, [B] = RoomAB, [D] = RoomD };   // C: no record
+            var rooms = new Dictionary<UUID, int> { [A] = RoomAB, [B] = RoomAB, [D] = RoomD };
             var transport = new Transport();
             var sink = new JanusPeerCtlBatchSink("http://unused", "unused", TimeSpan.FromSeconds(5), GoldenRegion, "golden",
                 sendOne: transport.SendAsync);
-            // The sink's resolver answers "record, else what this agent's parcel resolves to,
-            // else unplaced" - the service composes it. Every agent in this scenario stands on an estate-channel
-            // parcel, which resolves to the estate room number, which is exactly what the golden file recorded:
-            // the goldens are unchanged by construction.
-            sink.RoomOf = a => rooms.TryGetValue(a, out int r) ? r : (int?)sink.FallbackRoom;
+            // The sink's resolver answers from the record only, as the service's does. C's record is the estate room,
+            // as if it had been provisioned into it, which is the room the golden file recorded for it.
+            rooms[C] = sink.FallbackRoom;
+            sink.RoomOf = a => rooms.TryGetValue(a, out int r) ? r : (int?)null;
             var feed = new MatrixFeed();
             var sender = new VisibilityBatchSender(feed, sink, true, TimeSpan.FromSeconds(5), "golden");
 
@@ -164,7 +163,7 @@ namespace osWebRtcVoice.Tests
             world.ModerateC = true;
             world.Agents.Add(new AgentView(C, false, Vector3.Zero, ParcelP, false));
             await sender.PumpAsync(feed.Tick(world));
-            Record("tick 2: C joins moderated (multi-room add, C unrecorded)");
+            Record("tick 2: C joins moderated (multi-room add, C recorded in the estate room)");
 
             world.BanAOnP = false;
             await sender.PumpAsync(feed.Tick(world));
