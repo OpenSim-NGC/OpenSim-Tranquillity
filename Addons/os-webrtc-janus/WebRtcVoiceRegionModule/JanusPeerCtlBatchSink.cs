@@ -199,8 +199,8 @@ namespace osWebRtcVoice
         /// <summary>Distinct listeners in the most recent send with no room record.</summary>
         public int LastSendFallbackListeners => _lastSendFallbackListeners;
 
-        /// <summary>Distinct sources in the most recent send with no room record. Zero on a fully
-        /// upgraded deployment; non-zero says some voice service is not yet reporting its joined room.</summary>
+        /// <summary>Distinct sources in the most recent send with no room record. Non-zero says the sim
+        /// has no record of a room some agent joined (for example an agent only in a group call).</summary>
         public int LastSendFallbackSources => _lastSendFallbackSources;
 
         /// <summary>Distinct MUTE-channel listeners/sources in the most recent send with no room

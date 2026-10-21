@@ -14,9 +14,8 @@
  * Scene-free so the semantics unit-test without a region:
  *   - Record: add, or REPLACE — the newest provision wins (OQ7). A relog overlap's older
  *     session is therefore addressed at the new room until its teardown.
- *   - Resolve: null when there is no record. The caller (the sink) maps null to the estate
- *     room for listeners and sources alike ("one policy for a missing room record"); this
- *     table never guesses.
+ *   - Resolve: null when there is no record. An agent with no record is left out and
+ *     counted by the caller; nothing guesses a room for it, and this table never does.
  *   - Nothing here removes an entry. A departed agent is never a matrix listener (membership
  *     is gated by VoiceViewerSession.IsAgentInRegion), so a stale record is unreachable until
  *     the agent re-provisions and overwrites it. See the report for why close-time removal
