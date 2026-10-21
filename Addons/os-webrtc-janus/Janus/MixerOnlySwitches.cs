@@ -8,10 +8,10 @@
 /*
  * Switches that need the slvoice mixer, turned on against Janus's stock AudioBridge plugin.
  *
- * The stock plugin ignores what these switches send it: it does not enforce a join capability, and it rejects the
- * per-listener visibility requests. Left on, the region would carry on as if they worked and say nothing (a join
- * capability is minted and sent that nothing checks), or fail only on the first request. So at start each one that
- * is on logs one warning naming the switch and the plugin, and is switched off in
+ * The stock plugin ignores what these switches send it: it does not enforce a join capability, it rejects the
+ * per-listener visibility requests, and it has no voice connectors. Left on, the region would carry on as if they
+ * worked and say nothing (a join capability is minted and sent that nothing checks), or fail only on the first
+ * request. So at start each one that is on logs one warning naming the switch and the plugin, and is switched off in
  * the configuration the modules share. Calling it again, or from another module, is harmless: a switch that has been
  * turned off is not reported twice.
  */
@@ -36,6 +36,7 @@ namespace osWebRtcVoice
             "VisibilityFeederEnabled",
             "VisibilityEmitEnabled",
             "VisibilityArmingEnabled",
+            "ConnectorsEnabled",
             "PositionFeedEnabled",
         };
 

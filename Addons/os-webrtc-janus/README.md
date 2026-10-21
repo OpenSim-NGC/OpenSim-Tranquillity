@@ -207,8 +207,10 @@ startup when a call feature is on.
 | `PositionFeedKeepAliveMs` | `[WebRtcVoice]` | `2000` | A room's full set of positions is sent at the first look at or after this age. 1 to 2250; a value outside that logs a warning and 2000 is used. The mixer drops a point 6000 ms after it received it, so a larger value would let one lost request make a standing participant stale. |
 | `PositionFeedMoveThresholdCm`, `PositionFeedMarginCm` | `[WebRtcVoice]` | `100`, `500` | Between full sets, a participant is sent again once it has moved this far; and the distance, in centimetres, a viewer's claimed position may differ from the region's before the mixer counts it as off. |
 | `PositionFeedSpeedFloorCmS`, `PositionFeedSpeedMaxCmS` | `[WebRtcVoice]` | `800`, `10000` | The smallest speed allowance sent, and the speed ceiling used when the physics engine declares no maximum (both in centimetres a second). |
+| `ConnectorsEnabled`, `AllowNpcVoice` | `[WebRtcVoice]` | `false`, `false` | Voice connectors: NPC presences, configured by `[VoiceConnector.<name>]` records, that join a parcel's voice room for a recorder or an injector program (see "Voice connectors" below). `AllowNpcVoice` lets any NPC presence provision voice, not only a registered connector. `ConnectorsEnabled` needs the slvoice mixer and the NPC module. Mixer only. |
+| `NpcNameToken`, `VoiceRangeMetres` | `[WebRtcVoice]` | `NPC`, `20` | The word a connector NPC's first or last name must carry, and the range in metres within which an avatar is told, in local chat, that a connector is present. |
 
-**Mixer-only switches.** The visibility switches and call voice mutes in a group call need a Janus plugin that
+**Mixer-only switches.** The visibility switches, the join capability, the position feed, the voice connectors and call voice mutes in a group call need a Janus plugin that
 implements the `janus.plugin.slvoice` protocol (the slvoice mixer, release 1.2.0 or later). The mixer is
 legion-voice-mixer: its repository is https://github.com/JohnLegionH/legion-voice-mixer and its container image is
 `ghcr.io/johnlegionh/legion-voice-mixer:1.2.0`. With the stock
@@ -249,6 +251,52 @@ server with many occupied rooms, lengthen `PositionFeedTickMs`.
 What the mixer answered is counted: applied, and refused by reason (`stale_seq`, `unknown_room`, `too_big`, other).
 The counts are in `show voice visibility` and in the feed's one-minute summary (a Debug line), and a refusal writes
 one warning a minute.
+
+#### Voice connectors
+
+A voice connector is an NPC presence the region creates for an operator-written record, so that a program outside the
+region server can take part in a parcel's voice: a recorder that listens, or an injector that speaks. The programs are
+in the `connectors` directory of the mixer's repository (a Python recorder and injector); the region side
+described here creates the NPC, makes sure its room exists and signs the join for the program. Connectors need the
+slvoice mixer, release 1.2.0 or later. With the stock AudioBridge `ConnectorsEnabled` logs one warning at start and
+stays off.
+
+With `ConnectorsEnabled` off, which is the default, no `[VoiceConnector.*]` section is read, no NPC is created and no
+endpoint is registered. With it on, each enabled `[VoiceConnector.<name>]` record (see the shipped ini) creates one NPC
+at the record's `Position`. The NPC's agent id is derived from the grid id, the region name and the record name, so it
+is the same after a restart; renaming the section or the region gives the connector a new id. A record is the
+authorisation: only someone who can edit the ini can create one. `MayInject = false` records a connector that only
+listens; its NPC is muted at registration.
+
+The connector's room is the one an avatar standing at that position would be provisioned into: the parcel's own
+channel, or the estate channel when the parcel uses it. The region creates the room when the record is registered and
+again at every fetch below, the same way a viewer's provision creates it, so the connector's program has a room to join
+before any avatar arrives. That is one extra room-create request to the mixer for each connector each time its
+program fetches a capability.
+
+Disclosure cannot be switched off. The region sends a region-wide alert when a connector attaches or detaches, an
+entry notice to each avatar that becomes a root agent in a region with a connector, and a local-chat notice, spoken
+as the NPC, to an avatar that comes within `VoiceRangeMetres` of it. The NPC's name must carry `NpcNameToken`.
+
+**The join capability endpoint.** A connector's program joins the mixer from its own environment, so the capability
+the region signs for an avatar's join never reaches it. For a record that has a `CapabilitySecret`, the region answers
+
+    POST /voice/connector/<name>/join-cap
+    Authorization: Bearer <the record's CapabilitySecret>
+
+with `200` and a JSON object holding `display`, `room`, `session_id`, `join_cap`, `expires` and `position` (`x`, `y`, `z`
+in global centimetres, the frame a viewer reports). The program fetches one before every join. Every failure before
+the bearer is accepted (unknown name, a record with no secret, a wrong or missing bearer, any other method or path) is
+a `404` with an empty body, so the endpoint does not say which names exist. After that, `503` with an empty body means
+the region cannot mint a capability, which is the case unless `JoinCapabilityEnabled` is on and `JoinCapabilitySecret` is
+set. The capability is the one `JoinCapabilityEnabled` describes; the mixer enforces it when it runs with
+`JS_JOIN_CAP_REQUIRED=1`. A `CapabilitySecret` shorter than 32 characters is dropped with a warning. The handler is
+registered only while at least one record carries a secret. On a server that hosts several regions, a record with a
+secret needs `Region=` to pin it to one of them, otherwise the endpoint cannot tell which region to use and answers
+`404`. The secret, the bearer and the capability are never logged.
+
+The console commands `voice connector start <name>` and `voice connector stop <name>` start or stop one record without
+a region restart.
 
 #### Which parcel a voice request is checked against
 
