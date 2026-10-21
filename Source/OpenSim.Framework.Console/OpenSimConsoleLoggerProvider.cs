@@ -41,7 +41,8 @@ namespace OpenSim.Framework.Console;
 public static class OpenSimConsoleLogSink
 {
     private static volatile ConsoleBase _console;
-    private static volatile object _minimumLevel = LogLevel.Debug;
+    private static volatile object _minimumLevel = LogLevel.Information;
+    private static volatile CategoryLogLevels _categoryLevels = CategoryLogLevels.Empty;
 
     /// <summary>
     /// Console that log output is routed through. While null, output falls back to System.Console
@@ -55,11 +56,32 @@ public static class OpenSimConsoleLogSink
 
     /// <summary>
     /// Threshold applied to console output only; file sinks keep their own configured level.
+    /// Information until the logging settings or the "set log level" command change it.
     /// </summary>
     public static LogLevel MinimumLevel
     {
         get => (LogLevel)_minimumLevel;
         set => _minimumLevel = value;
+    }
+
+    /// <summary>
+    /// Per-category thresholds for console output. A category with an entry here uses it instead of
+    /// <see cref="MinimumLevel"/>, so "set log level" does not undo a deliberate per-category setting.
+    /// </summary>
+    public static CategoryLogLevels CategoryLevels
+    {
+        get => _categoryLevels;
+        set => _categoryLevels = value ?? CategoryLogLevels.Empty;
+    }
+
+    /// <summary>
+    /// Applies the console's logging settings: the category table, and its Default entry as the starting
+    /// <see cref="MinimumLevel"/>, or Information when the settings have none.
+    /// </summary>
+    public static void Configure(CategoryLogLevels levels)
+    {
+        CategoryLevels = levels;
+        MinimumLevel = levels?.Default ?? LogLevel.Information;
     }
 
     /// <summary>
@@ -111,7 +133,7 @@ public static class OpenSimConsoleLogSink
 [ProviderAlias("OpenSimConsole")]
 public sealed class OpenSimConsoleLoggerProvider : ILoggerProvider
 {
-    public ILogger CreateLogger(string categoryName) => new OpenSimConsoleLogger();
+    public ILogger CreateLogger(string categoryName) => new OpenSimConsoleLogger(categoryName);
 
     public void Dispose()
     {
@@ -120,12 +142,38 @@ public sealed class OpenSimConsoleLoggerProvider : ILoggerProvider
 
 internal sealed class OpenSimConsoleLogger : ILogger
 {
+    private readonly string _category;
+
+    // The category's entry is looked up again only when the table is replaced.
+    private sealed record Resolved(CategoryLogLevels Table, LogLevel? Level);
+
+    private volatile Resolved _resolved;
+
+    public OpenSimConsoleLogger(string category)
+    {
+        _category = category;
+    }
+
     public IDisposable BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
 
     public bool IsEnabled(LogLevel logLevel)
     {
-        LogLevel minimum = OpenSimConsoleLogSink.MinimumLevel;
+        LogLevel minimum = CategoryMinimum() ?? OpenSimConsoleLogSink.MinimumLevel;
         return logLevel != LogLevel.None && minimum != LogLevel.None && logLevel >= minimum;
+    }
+
+    private LogLevel? CategoryMinimum()
+    {
+        CategoryLogLevels table = OpenSimConsoleLogSink.CategoryLevels;
+        Resolved resolved = _resolved;
+
+        if (resolved is null || !ReferenceEquals(resolved.Table, table))
+        {
+            resolved = new Resolved(table, table.TryGetLevel(_category, out LogLevel level) ? level : null);
+            _resolved = resolved;
+        }
+
+        return resolved.Level;
     }
 
     public void Log<TState>(
@@ -198,9 +246,15 @@ internal sealed class OpenSimConsoleLogger : ILogger
 
 public static class OpenSimConsoleLoggerExtensions
 {
+    /// <summary>
+    /// Registers the console provider. The provider filters by level itself (see <see cref="OpenSimConsoleLogSink"/>),
+    /// so the host's own filter rules are told to let everything through to it; otherwise they would stop
+    /// "set log level debug" from showing anything below the host's default of Information.
+    /// </summary>
     public static ILoggingBuilder AddOpenSimConsole(this ILoggingBuilder builder)
     {
         builder.Services.AddSingleton<ILoggerProvider, OpenSimConsoleLoggerProvider>();
+        builder.AddFilter<OpenSimConsoleLoggerProvider>(null, LogLevel.Trace);
         return builder;
     }
 }
