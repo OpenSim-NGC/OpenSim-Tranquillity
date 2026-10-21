@@ -246,7 +246,6 @@ names the reason) and does not load at all.
 | `MayInject` | `false` | `false`: recording only. The NPC is muted at registration so nothing it sends is heard. This mute is enforced through the visibility feeder, so with the feeder off a `MayInject = false` connector is not started. `true` lets it speak. |
 | `AuthorisedBy` | empty | Free text naming who authorised the record. Not validated. |
 | `Region` | empty | Optional scene name. Set: the record starts only in that region. Absent: it starts in every region the instance hosts. |
-| `InjectSourceUrl` | empty | Optional URL, read and kept on the record. I could not find any code in the region server that uses it; it is not the way the injector program gets its audio. |
 | `CapabilitySecret` | empty | Optional. At least 32 characters; a shorter value is ignored with a warning. When set, the region serves `POST /voice/connector/<name>/join-cap`, which a connector program calls with `Authorization: Bearer <secret>` to obtain a join capability. Minting also needs `JoinCapabilityEnabled` and `JoinCapabilitySecret`. If the instance hosts more than one region, also set `Region`. Over a network, put the endpoint behind TLS or a private network. |
 
 The connector NPC's agent id is derived from the grid identity, the region name and the record name, so it is the
