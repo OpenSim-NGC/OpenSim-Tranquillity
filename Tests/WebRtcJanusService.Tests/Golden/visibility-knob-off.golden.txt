@@ -2,7 +2,7 @@
 {"request":"peer_ctl_batch","op":"replace","excl":{"00000000-0000-0000-0000-000000000001":["00000000-0000-0000-0000-000000000002"],"00000000-0000-0000-0000-000000000002":["00000000-0000-0000-0000-000000000001"]},"mute":{},"room":1001}
 == join: A and D provisioned (quiet tick)
 {"request":"peer_ctl_batch","op":"replace","excl":{"00000000-0000-0000-0000-000000000001":["00000000-0000-0000-0000-000000000002"]},"mute":{},"room":1001}
-== tick 2: C joins moderated (multi-room add, C unrecorded)
+== tick 2: C joins moderated (multi-room add, C recorded in the estate room)
 {"request":"peer_ctl_batch","op":"add","excl":{"00000000-0000-0000-0000-000000000001":[]},"mute":{"00000000-0000-0000-0000-000000000002":[]},"room":1001}
 {"request":"peer_ctl_batch","op":"add","excl":{"00000000-0000-0000-0000-000000000003":[]},"room":1221139639}
 {"request":"peer_ctl_batch","op":"add","excl":{},"mute":{"00000000-0000-0000-0000-000000000004":[]},"room":1002}

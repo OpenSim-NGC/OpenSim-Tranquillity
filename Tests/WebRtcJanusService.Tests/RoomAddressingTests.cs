@@ -8,15 +8,11 @@
 /*
  * An agent is addressed at the room it joined, and never at a guessed one.
  *
- * THE DEFECT. Until this change the sim had one rule for an agent with no AgentRoomTable record: address it at the
- * region's estate-channel room. That number is a real, live room in every region, so the "fallback" was not inert -
- * on a parcel with its own voice channel it wrote that agent's live exclusion and mute state into the WRONG room, and
- * on an empty region it created policy for a room no viewer had provisioned. It also looked healthy: the send
- * succeeded, the counters called it a fallback, and the operator saw a number.
- *
- * The first fix addressed an unrecorded agent at the room its parcel would put it in. That is still a guess: an agent
- * that is only in a group or avatar-to-avatar call never joined its parcel's room, so the mixer does not hold it, and
- * every batch to it was answered unknown_room.
+ * WHY NOT A DEFAULT. The estate-channel room is a real, live room in every region, so addressing an agent with no
+ * AgentRoomTable record there would write that agent's live exclusion and mute state into the WRONG room on a parcel
+ * with its own voice channel, and would create policy for a room no viewer had provisioned on an empty region. The
+ * room its parcel would give it is a guess as well: an agent that is only in a group or avatar-to-avatar call never
+ * joined its parcel's room, so the mixer does not hold it, and every batch to it would be answered unknown_room.
  *
  * THE RULE THIS FILE PINS. The resolver answers with the room the agent's last provision joined, and with nothing else:
  *   1. the agent's room RECORD, if it has one;
@@ -114,7 +110,7 @@ namespace osWebRtcVoice.Tests
                     Auth, Resolve, Refusals);
             }
 
-            /// <summary>VoiceVisibilityService.ResolveRoom, as it now reads: the record, else null.</summary>
+            /// <summary>VoiceVisibilityService.ResolveRoom: the record, else null.</summary>
             public int? Resolve(UUID agent) => Table.Resolve(agent);
 
             /// <summary>VoiceVisibilityService.OnListenerProvisioned for a successful provision: the viewer joined
@@ -300,7 +296,7 @@ namespace osWebRtcVoice.Tests
                 "and it reads after the resolved rooms, not before them");
             Assert.That(lines[0], Does.Contain("1 agent(s) unplaced and omitted"),
                 "B has no record, and the count of that is the headline, not a room number");
-            Assert.That(all, Does.Contain("unplaced in the send"), "the counters are named for what they now mean");
+            Assert.That(all, Does.Contain("unplaced in the send"), "the counters are named for what they count");
             Assert.That(all, Does.Contain("held back (unknown room)"), "and the rooms held back after unknown_room are named");
             Assert.That(all, Does.Not.Contain("fallback"), "nothing here calls an omission a fallback any more");
             Assert.That(rig.Sink.LastSendRoomNumbers, Is.EqualTo(new[] { OwnChannelRoom }));

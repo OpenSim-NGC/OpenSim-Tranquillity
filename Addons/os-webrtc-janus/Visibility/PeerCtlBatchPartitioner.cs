@@ -24,7 +24,7 @@
  * When every agent has a record and one room holds every listener and every source, the input map is
  * returned as it is: the same instance, unfiltered.
  *
- * Same-room filtering (OQ2(a)): a listener's column keeps only the sources in the LISTENER's room.
+ * Same-room filtering: a listener's column keeps only the sources in the LISTENER's room.
  * A cross-room source is inert at the mixer (room membership already prevents it being heard), so
  * this is lossless, and it puts a per-room column under SLV_MAX_MIX - 1 = 109 BY CONSTRUCTION rather
  * than under a guard that has to be maintained.
@@ -126,9 +126,8 @@ namespace osWebRtcVoice
                 }
             }
 
-            // Fast path: one room holds every listener AND every source, so no column can lose a
-            // source and the input map is already the answer. Hand it back as-is - no copy, and the
-            // all-unrecorded skew state is byte-for-byte what the original single-room sink sent.
+            // Fast path: every agent has a record and one room holds every listener AND every source, so no
+            // column can lose a source and the input map is already the answer. Hand it back as-is, with no copy.
             if (!manyRooms && noRecord.Count == 0 && haveSoleRoom)
             {
                 var one = new Dictionary<int, IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>>>(1)
@@ -144,7 +143,7 @@ namespace osWebRtcVoice
             {
                 int lr = resolved[kv.Key];
                 if (lr == Unplaced)
-                    continue;   // 0.8c2: omitted, and already counted in fallbackListeners
+                    continue;   // omitted, and already counted in fallbackListeners
                 if (!work.TryGetValue(lr, out Dictionary<UUID, IReadOnlyCollection<UUID>> bucket))
                 {
                     bucket = new Dictionary<UUID, IReadOnlyCollection<UUID>>();
@@ -192,7 +191,7 @@ namespace osWebRtcVoice
         private static void Track(int room, ref int soleRoom, ref bool haveSoleRoom, ref bool manyRooms)
         {
             if (room == Unplaced)
-                return;   // 0.8c2: an agent nobody can place is not a room, so it cannot be THE room either
+                return;   // an agent nobody can place is not a room, so it cannot be THE room either
             if (!haveSoleRoom)
             {
                 soleRoom = room;

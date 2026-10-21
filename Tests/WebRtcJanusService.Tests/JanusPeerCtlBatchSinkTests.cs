@@ -91,9 +91,8 @@ namespace osWebRtcVoice.Tests
             }
         }
 
-        /// <summary>"Every agent stands on an estate-channel parcel", which is what the resolver
-        /// answers for them - and the same number the earlier unplaced-agent default applied. Tests whose subject is NOT placement
-        /// use this so they keep testing what they test.</summary>
+        /// <summary>Every agent's record is the estate room, as if each had been provisioned into it. Tests whose
+        /// subject is NOT placement use this so they keep testing what they test.</summary>
         private static Func<UUID, int?> AllEstate(JanusPeerCtlBatchSink sink) => _ => sink.FallbackRoom;
 
         private static JanusPeerCtlBatchSink NewSink(Recorder rec, Func<UUID, int?> roomOf,
@@ -108,12 +107,12 @@ namespace osWebRtcVoice.Tests
         // ---- estate no-regression: one room in, one message out, same body ----
 
         [Test]
-        public async Task SendAsync_EveryAgentInTheFallbackRoom_SendsExactlyOneMessage_WithThePreS3bBody()
+        public async Task SendAsync_EveryAgentInTheFallbackRoom_SendsExactlyOneMessage_WithTheSingleRoomBody()
         {
             var rec = new Recorder();
             var excl = Excl((1, new[] { 2, 3 }), (2, new[] { 1 }));
             using var sink = NewSink(rec, null);
-            sink.RoomOf = AllEstate(sink);   // everyone resolves to the estate room (an estate-channel parcel)
+            sink.RoomOf = AllEstate(sink);   // every agent's record is the estate room
             int fallback = sink.FallbackRoom;
 
             PeerCtlSendResult r = await sink.SendAsync(VisOp.Replace, excl);
@@ -279,9 +278,10 @@ namespace osWebRtcVoice.Tests
             var excl = new Dictionary<UUID, IReadOnlyCollection<UUID>>
             {
                 [Id(1)] = new List<UUID> { Id(2) },
-                [Id(3)] = new List<UUID> { UUID.Zero },   // invariant violation, in the fallback room
+                [Id(3)] = new List<UUID> { UUID.Zero },   // invariant violation, in the estate room
             };
             using var sink = NewSink(rec, null);
+            // Agents 1 and 2 have records in room 100; every other agent's record is the estate room.
             sink.RoomOf = a => a == Id(1) || a == Id(2) ? 100 : sink.FallbackRoom;
 
             Assert.That(async () => await sink.SendAsync(VisOp.Add, excl),
