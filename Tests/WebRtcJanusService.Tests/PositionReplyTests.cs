@@ -190,6 +190,8 @@ namespace osWebRtcVoice.Tests
         {
             public int MixerVisProtocol => 3;
             public PositionReplyStats Replies { get; } = new PositionReplyStats();
+            public bool MixerProtocolKnown => true;
+            public Task<bool> CheckMixerProtocolAsync() => Task.FromResult(true);
             public Task<bool> SendPositionsAsync(OSDMap body) => Task.FromResult(true);
         }
 

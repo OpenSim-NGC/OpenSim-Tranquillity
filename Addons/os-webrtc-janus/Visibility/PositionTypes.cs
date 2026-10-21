@@ -165,8 +165,17 @@ namespace osWebRtcVoice
     /// The transport of the feed, and what it has learned about the mixer.
     public interface IPeerPosSink
     {
-        /// The vis_protocol the mixer last advertised in a reply, or 0 when none has been seen.
+        /// The vis_protocol the mixer last advertised in a reply, or 0 when none has been seen or the mixer advertises none.
         int MixerVisProtocol { get; }
+
+        /// True once the mixer has answered a request and <see cref="MixerVisProtocol"/> says what it speaks (0 for an older
+        /// mixer, which advertises no version). False at start, and again after a request failed in transport, because a mixer
+        /// that went away may come back as another version.
+        bool MixerProtocolKnown { get; }
+
+        /// Asks the mixer which vis_protocol it speaks, with a request that changes nothing in any room. True when the
+        /// transport succeeded, whatever the mixer answered. Never throws.
+        Task<bool> CheckMixerProtocolAsync();
 
         /// What the mixer has answered to the peer_pos requests sent so far.
         PositionReplyStats Replies { get; }
