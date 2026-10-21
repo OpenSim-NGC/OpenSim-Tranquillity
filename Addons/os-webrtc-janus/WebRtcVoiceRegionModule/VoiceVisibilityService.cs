@@ -64,6 +64,7 @@ namespace osWebRtcVoice
         private IEstateModule m_estateModule;
         private VisibilityBatchSender m_sender;   // built in StartLoop from the injected sink
         private readonly AgentRoomTable m_rooms = new AgentRoomTable();   // agent -> joined mixer room (newest wins)
+        private readonly RoomRefusals m_refusals = new RoomRefusals();   // rooms the mixer answered unknown_room for
         private readonly FeederWorldFromScene m_world;                   // the snapshot's parcel-local-ids
         private readonly int m_heartbeatIntervalMs;   // [WebRtcVoice] VisibilityHeartbeatMs (default 1000)
         private readonly bool m_armingEnabled;    // [WebRtcVoice] VisibilityArmingEnabled (default false)
@@ -94,32 +95,24 @@ namespace osWebRtcVoice
             m_world = new FeederWorldFromScene(scene, Moderation);
             m_feeder = new VoiceStateFeeder(m_world, EstateRoomPlaceholder, OnDerivationError);
             m_feeder.BatchProduced += OnBatch;
-            // The resolver the sink consumes. Null = no record; the SINK maps that to the
-            // estate room (one policy for listeners and sources) — this service never guesses.
+            // The resolver the sink consumes. Null = no record; such an agent is left out and counted -
+            // this service never guesses.
             RoomOf = m_rooms.Resolve;
-            // "Resolve, don't guess". The room an agent is ADDRESSED at is its recorded room, else
-            // the room an avatar at its current position would be provisioned into, else nothing at all - it is left
-            // out of the batch and the heartbeat and counted. The estate number is never used as an address merely
-            // because it is the default: on an estate-channel parcel the resolved number IS that number, and on a
-            // parcel with its own channel it is the parcel's, which is where that avatar actually is.
-            ResolveRoom = agent =>
-            {
-                int? recorded = m_rooms.Resolve(agent);
-                if (recorded.HasValue)
-                    return recorded;
-                int? localId = m_world.ParcelLocalIdOf(agent);
-                return localId.HasValue
-                    ? JanusAudioBridge.CalcRoomNumber(string.Empty, m_scene.RegionInfo.RegionID.ToString(), "local",
-                        localId.Value, string.Empty)
-                    : (int?)null;
-            };
+            // "Resolve, don't guess". The room an agent is ADDRESSED at is the room its last provision joined, and
+            // nothing else: without that record it is left out of the batch and the heartbeat and counted. The room
+            // its parcel would give it is not evidence that the mixer holds that room - an agent that is only in a
+            // group or avatar-to-avatar call never joined it - so a request for it only drew unknown_room on every tick.
+            ResolveRoom = m_rooms.Resolve;
             // Hand it to the sink HERE. The sink was constructed before this service
             // (WebRtcVoiceRegionModule.cs:174-176), so the resolver cannot be a ctor argument;
             // this assignment closes the window before Start() lets any tick emit. Concrete
             // type on purpose: IPeerCtlBatchSink stays a pure transport seam, so a sink that is
             // not the Janus one (a test double) needs no room knowledge at all.
             if (m_sink is JanusPeerCtlBatchSink janusSink)
+            {
                 janusSink.RoomOf = ResolveRoom;   // the sink addresses what is resolved, never a default
+                janusSink.Refusals = m_refusals;
+            }
         }
 
         /// The produced feed — the boundary the later Janus sender will consume.
@@ -182,7 +175,8 @@ namespace osWebRtcVoice
                 m_authority = authority;
             }
             m_sender = new VisibilityBatchSender(m_feeder, m_sink, m_emitEnabled,
-                m_adminTimeout, m_scene.RegionInfo.RegionName, authority: authority, resolveRoom: resolveRoom);
+                m_adminTimeout, m_scene.RegionInfo.RegionName, authority: authority, resolveRoom: resolveRoom,
+                refusals: m_refusals);
 
             StartPositionFeed();
 
@@ -251,8 +245,8 @@ namespace osWebRtcVoice
         /// (one policy for a missing room record). Newest provision wins.
         public Func<UUID, int?> RoomOf { get; }
 
-        /// <summary>The room an agent is ADDRESSED at - its record, else the room its current parcel
-        /// would provision it into, else null for "cannot be placed", which means omitted and counted.</summary>
+        /// <summary>The room an agent is ADDRESSED at - the room its last provision joined, else null for "no
+        /// record", which means omitted and counted.</summary>
         public Func<UUID, int?> ResolveRoom { get; }
 
         /// Forward a WebRTC provisioning result for a listener. If the result carried the joined
@@ -265,6 +259,8 @@ namespace osWebRtcVoice
             if (room.HasValue)
             {
                 m_rooms.Record(listener, room.Value);
+                // The mixer holds this room again: if it had answered unknown_room, send to it once more.
+                m_refusals.Joined(room.Value);
                 // A viewer provisioned INTO this room, which is proof it exists. Every
                 // listener backing off for it may arm on the next tick.
                 RoomExists(room.Value);

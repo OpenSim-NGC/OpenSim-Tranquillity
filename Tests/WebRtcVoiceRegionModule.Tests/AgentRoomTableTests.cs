@@ -101,5 +101,21 @@ namespace osWebRtcVoice.Tests
             svc.OnListenerProvisioned(a, 1578726032);                 // re-provision elsewhere
             Assert.That(svc.RoomOf(a), Is.EqualTo(1578726032), "newest provision wins (OQ7)");
         }
+
+        // The address of an agent is the room its last provision joined and nothing else: an agent that has only been
+        // in a group or avatar-to-avatar call has no record, so the service resolves no room for it.
+        [Test]
+        public void Service_ResolveRoom_IsTheRecordOnly()
+        {
+            Scene scene = new SceneHelpers().SetupScene();
+            var svc = new VoiceVisibilityService(scene, cadenceMs: 250);
+            UUID a = UUID.Random();
+
+            Assert.That(svc.ResolveRoom(a), Is.Null, "no provision, so no room");
+
+            svc.OnListenerProvisioned(a, 226001844);
+            Assert.That(svc.ResolveRoom(a), Is.EqualTo(226001844));
+            Assert.That(svc.ResolveRoom(a), Is.EqualTo(svc.RoomOf(a)), "the resolver the sender uses is the sink's");
+        }
     }
 }
