@@ -57,7 +57,7 @@ namespace osWebRtcVoice.Tests
             return src;
         }
 
-        [TestCase("JoinCapabilityEnabled")]
+        [TestCase("ConnectorsEnabled")]
         [TestCase("JoinCapabilityEnabled")]
         [TestCase("VisibilityFeederEnabled")]
         [TestCase("VisibilityEmitEnabled")]
@@ -77,7 +77,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(warnings[0], Does.Contain(name).And.Contain("janus.plugin.audiobridge"));
         }
 
-        [TestCase("JoinCapabilityEnabled")]
+        [TestCase("ConnectorsEnabled")]
         [TestCase("JoinCapabilityEnabled")]
         [TestCase("VisibilityFeederEnabled")]
         [TestCase("VisibilityEmitEnabled")]

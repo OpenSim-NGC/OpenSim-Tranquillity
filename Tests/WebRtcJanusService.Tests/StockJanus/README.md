@@ -26,6 +26,8 @@ code (`StockJanusSupport.cs`) and the peer script (`aiortc_peer.py`).
 | `WEBRTC_JANUS_TEST_PYTHON` | Path to a Python interpreter that has `aiortc`. Tests that need a peer are skipped without it. |
 | `WEBRTC_JANUS_TEST_CONTAINER` | Name of the gateway's Docker container. The restart test is skipped without it. |
 | `WEBRTC_JANUS_TEST_GRACE_SECONDS` | How long the room-lifetime test waits for an emptied room to disappear. Default 70. |
+| `WEBRTC_JANUS_TEST_JOIN_CAP_SECRET` | The mixer's `JS_JOIN_CAP_SECRET`. The join capability tests and the connector tests are skipped without it. |
+| `WEBRTC_JANUS_TEST_CONNECTORS_DIR` | The `connectors` directory of the mixer's repository (the Python recorder and injector). The connector tests are skipped without it, and need `WEBRTC_JANUS_TEST_PYTHON` to be a Python 3.12 with `aiortc` and `aiohttp`. The mixer must run with `JS_JOIN_CAP_REQUIRED=1`. |
 
 A gateway running in a container needs its media port range published, and `nat_1_1_mapping` set to
 an address the test machine can reach, so the peers can connect.

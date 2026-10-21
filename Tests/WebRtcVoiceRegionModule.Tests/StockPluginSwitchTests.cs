@@ -6,8 +6,9 @@
  */
 
 /*
- * On Janus's stock AudioBridge the visibility feeder and its emit and arming switches cannot work. A region started
- * with one of them on logs a warning naming the switch and the plugin, and runs with it off.
+ * On Janus's stock AudioBridge the visibility feeder, its emit and arming switches, and the voice connectors cannot
+ * work. A region started with one of them on logs a warning naming the switch and the plugin, and runs with it off.
+ * (The join capability switch is read by the Janus service and is covered in WebRtcJanusService.Tests.)
  */
 
 using System;
@@ -127,6 +128,26 @@ namespace osWebRtcVoice.Tests
             stock.Initialise(Config("janus.plugin.audiobridge"));
 
             Assert.That(Field(stock, "m_stockPlugin"), Is.True);
+        }
+
+        [Test]
+        public void TheConnectorModule_OnTheStockPlugin_RegistersNothing_AndSaysSo()
+        {
+            var cfg = Config("janus.plugin.audiobridge", "ConnectorsEnabled");
+            IConfig rec = cfg.AddConfig("VoiceConnector.Recorder");
+            rec.Set("Enabled", "true");
+            rec.Set("NpcFirstName", "Recorder");
+            rec.Set("NpcLastName", "NPC");
+            rec.Set("Position", "<128,128,25>");
+            Scene scene = new SceneHelpers().SetupScene();
+            var module = new VoiceConnectorModule();
+
+            module.Initialise(cfg);
+            module.AddRegion(scene);
+
+            Assert.That(scene.RequestModuleInterface<IVoiceConnectorRegistry>(), Is.Null);
+            Assert.That(_log.Warnings().Any(w => w.Contains("ConnectorsEnabled") && w.Contains("janus.plugin.audiobridge")), Is.True,
+                string.Join(" | ", _log.Warnings()));
         }
     }
 }

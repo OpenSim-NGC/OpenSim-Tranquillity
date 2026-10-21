@@ -16,6 +16,7 @@
  *   VisibilityArmingEnabled, VisibilityFeederEnabled, VisibilityEmitEnabled - read as false
  *   JoinCapabilityEnabled  - read as false (the Janus service tests cover the room payloads)
  *   VoiceModerationEnabled - the SpatialVoiceModerationRequest capability is not advertised
+ *   ConnectorsEnabled      - the connector module registers no registry for a configured record
  */
 
 using System;
@@ -110,6 +111,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(WebRtcVoiceRegionModule.ReadVisibilityFeederEnabled(cfg), Is.False, "VisibilityFeederEnabled");
             Assert.That(WebRtcVoiceRegionModule.ReadVisibilityEmitEnabled(cfg), Is.False, "VisibilityEmitEnabled");
             Assert.That(cfg.GetBoolean("JoinCapabilityEnabled", false), Is.False, "JoinCapabilityEnabled");
+            Assert.That(cfg.GetBoolean("ConnectorsEnabled", false), Is.False, "ConnectorsEnabled");
         }
 
         [Test]
@@ -185,6 +187,39 @@ namespace osWebRtcVoice.Tests
             SetPrivate(mod, "m_moderationEnabled", moderationEnabled);
             mod.OnRegisterCaps(scene, Alice, caps);
             return caps;
+        }
+
+        [Test]
+        public void ConnectorsOff_AConfiguredRecordRegistersNothing()
+        {
+            Assert.That(ConnectorRegistryAfterAddRegion(connectorsEnabled: false), Is.Null);
+        }
+
+        [Test]
+        public void ConnectorsOn_AConfiguredRecordIsRegistered()
+        {
+            Assert.That(ConnectorRegistryAfterAddRegion(connectorsEnabled: true)?.Snapshot(), Has.Count.EqualTo(1));
+        }
+
+        private static VoiceConnectorRegistry ConnectorRegistryAfterAddRegion(bool connectorsEnabled)
+        {
+            var cfg = new IniConfigSource();
+            IConfig voice = cfg.AddConfig("WebRtcVoice");
+            voice.Set("Enabled", "true");
+            if (connectorsEnabled)
+                voice.Set("ConnectorsEnabled", "true");
+            cfg.AddConfig("JanusWebRtcVoice").Set("PluginName", "janus.plugin.slvoice");   // connectors need the slvoice mixer
+            IConfig rec = cfg.AddConfig("VoiceConnector.Recorder");
+            rec.Set("Enabled", "true");
+            rec.Set("NpcFirstName", "Recorder");
+            rec.Set("NpcLastName", "NPC");
+            rec.Set("Position", "<128,128,25>");
+
+            Scene scene = new SceneHelpers().SetupScene();
+            var module = new VoiceConnectorModule();
+            module.Initialise(cfg);
+            module.AddRegion(scene);
+            return scene.RequestModuleInterface<IVoiceConnectorRegistry>() as VoiceConnectorRegistry;
         }
     }
 }

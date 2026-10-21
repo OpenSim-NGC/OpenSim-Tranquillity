@@ -115,6 +115,7 @@
     <Compile Include="StockJanus\OptInTestsDeclarePluginTests.cs" />
     <Compile Include="StockJanus\StockJanusCallRemovalTests.cs" />
     <Compile Include="StockJanus\StockJanusJoinCapabilityTests.cs" />
+    <Compile Include="StockJanus/StockJanusConnectorTests.cs" />
     <Compile Include="StockJanus\StockJanusMixerOnlyFeatureTests.cs" />
     <Compile Include="StockJanus\StockJanusPositionFeedTests.cs" />
     <Compile Include="..\WebRtcJanusService.Tests\StockJanus\StockJanusSupport.cs" Link="StockJanus\StockJanusSupport.cs" />
@@ -123,7 +124,15 @@
     <Compile Include="RefusalWarningLogTests.cs" />
     <Compile Include="VoiceLoggerNameTests.cs" />
     <Compile Include="CallModerationRecheckCostTests.cs" />
+    <Compile Include="ConnectorIdentityTests.cs" />
+    <Compile Include="VoiceConnectorRegistryTests.cs" />
+    <Compile Include="VoiceConnectorRegistrarTests.cs" />
+    <Compile Include="VoiceConnectorDisclosureTests.cs" />
+    <Compile Include="NpcCreateDuplicateIdTests.cs" />
+    <Compile Include="ConnectorArmingTests.cs" />
+    <Compile Include="ConnectorJoinCapEndpointTests.cs" />
     <Compile Include="ConnectorMintLogTests.cs" />
+    <Compile Include="ConnectorEnsureRoomTests.cs" />
     <None Include="..\WebRtcJanusService.Tests\StockJanus\aiortc_peer.py" Link="StockJanus\aiortc_peer.py" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
