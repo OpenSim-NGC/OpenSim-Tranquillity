@@ -76,10 +76,7 @@ namespace osWebRtcVoice.Tests
         {
             voice.Set("VisibilityFeederEnabled", "true");
             voice.Set("VisibilityEmitEnabled", "true");
-            // Arming makes the region send heartbeats, and a heartbeat reply is where it learns that the mixer speaks
-            // vis_protocol 3. Without arming the version is learned from the first peer_ctl_batch reply, which a room
-            // where nobody is excluded or muted never produces.
-            voice.Set("VisibilityArmingEnabled", "true");
+            // Arming is left off, and nobody is excluded or muted: the region learns the mixer's version by asking.
             voice.Set("PositionFeedEnabled", "true");
             voice.Set("PositionFeedMode", "observe");
         }
@@ -95,7 +92,11 @@ namespace osWebRtcVoice.Tests
 
         /// <summary>The mixer's visibility.positions block for the room, read from the handles of its participants, or null
         /// when no handle reports one (no participant yet, or the room has accepted no peer_pos).</summary>
-        private async Task<JsonObject> PositionsBlockAsync()
+        private async Task<JsonObject> PositionsBlockAsync() => (await VisibilityBlockAsync())?["positions"] as JsonObject;
+
+        /// <summary>The mixer's whole visibility block for the room (authority, heartbeats, join cap and positions), read from
+        /// the handles of its participants, or null when there is no participant.</summary>
+        private async Task<JsonObject> VisibilityBlockAsync()
         {
             JsonObject sessions = await AdminAsync(string.Empty, new JsonObject { ["janus"] = "list_sessions" });
             foreach (JsonNode sid in sessions?["sessions"] as JsonArray ?? new JsonArray())
@@ -104,11 +105,49 @@ namespace osWebRtcVoice.Tests
                 foreach (JsonNode hid in handles?["handles"] as JsonArray ?? new JsonArray())
                 {
                     JsonObject info = await AdminAsync($"/{sid}/{hid}", new JsonObject { ["janus"] = "handle_info" });
-                    if (info?["info"]?["plugin_specific"]?["visibility"]?["positions"] is JsonObject block)
+                    if (info?["info"]?["plugin_specific"]?["visibility"] is JsonObject block)
                         return block;
                 }
             }
             return null;
+        }
+
+        // The counters that move with time alone, not with anything a request does.
+        private static string WithoutAges(JsonObject visibility)
+        {
+            var copy = (JsonObject)visibility.DeepClone();
+            copy.Remove("authority_age_ms");
+            if (copy["positions"] is JsonObject positions)
+                positions.Remove("last_batch_age_ms");
+            return copy.ToJsonString();
+        }
+
+        [Test]
+        public async Task TheVersionCheck_ChangesNothingInTheRoomsVisibility()
+        {
+            StockJanusEnvironment.IgnoreUnlessPeerAvailable();
+            Assume.That(StockJanusEnvironment.AdminUrl, Is.Not.Empty, "WEBRTC_JANUS_TEST_ADMIN_URL is not set");
+            using var region = StockRegion.Create((voice, janus) => { });   // the position feed is off: the check is the only request
+            region.AddAvatar(Alice, StockRegion.InEstateChannelParcel);
+            region.AddAvatar(Bob, StockRegion.InEstateChannelParcel + new Vector3(3, 0, 0));
+            using Joined a = await region.JoinAsync(Alice, o => StockRegion.LocalBody(o));
+            using Joined b = await region.JoinAsync(Bob, o => StockRegion.LocalBody(o));
+            Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
+
+            JsonObject before = await VisibilityBlockAsync();
+            Assert.That(before, Is.Not.Null, "the mixer reported a visibility block for the room");
+
+            using var sink = new JanusPeerCtlBatchSink(StockJanusEnvironment.AdminUrl, StockJanusEnvironment.AdminSecret,
+                TimeSpan.FromSeconds(10), UUID.Random(), "Test Region");
+            Assert.That(await sink.CheckMixerProtocolAsync(), Is.True);
+            Assert.That(sink.MixerProtocolKnown, Is.True);
+            Assert.That(sink.MixerVisProtocol, Is.GreaterThanOrEqualTo(3), "the mixer answered with its version");
+
+            JsonObject after = await VisibilityBlockAsync();
+            TestContext.Out.WriteLine("before: " + WithoutAges(before));
+            TestContext.Out.WriteLine("after:  " + WithoutAges(after));
+            Assert.That(WithoutAges(after), Is.EqualTo(WithoutAges(before)),
+                "no epoch, generation, record, heartbeat or position counter moved");
         }
 
         private static long Counter(JsonObject block, string name) => block?[name] is JsonNode n ? n.GetValue<long>() : 0;
@@ -144,8 +183,8 @@ namespace osWebRtcVoice.Tests
                 using Joined b = await region.JoinAsync(Bob, o => StockRegion.LocalBody(o));
                 Assert.That(await _janus.WaitForParticipantsAsync(a.Answer.Room, 2, Settle), Is.True);
 
-                // The region learns the mixer speaks vis_protocol 3 from a reply to a peer_ctl request, then sends the
-                // room's first full snapshot at the next position tick.
+                // The region asks the mixer which vis_protocol it speaks, then sends the room's first full snapshot at the
+                // next position tick.
                 JsonObject first = await WaitForBatchesAsync(1, TimeSpan.FromSeconds(30));
                 Assert.That(first, Is.Not.Null, "the mixer reported no visibility.positions block for the room: it accepted no peer_pos");
                 long before = Counter(first, "batches");
