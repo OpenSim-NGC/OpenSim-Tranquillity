@@ -200,8 +200,11 @@ namespace osWebRtcVoice.Tests
             VoicePositionPump pump = Pump(world, sink);
 
             await pump.TickAsync();
-            _now += 500;
-            await pump.TickAsync();
+            for (int i = 0; i < 3; i++)
+            {
+                _now += 500;
+                await pump.TickAsync();
+            }
             Assert.That(sink.Sent, Has.Count.EqualTo(1), "standing still, under the keep-alive");
 
             _now += 500;

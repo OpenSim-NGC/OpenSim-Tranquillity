@@ -222,7 +222,8 @@ namespace osWebRtcVoice
             }
             catch (Exception e)
             {
-                m_log.LogWarning(e, "{LogHeader} region {RegionName}: peer_pos send failed", LogHeader, _region);
+                // The pump writes the once-a-minute line about a failing feed; this one is for tracing a single failure.
+                m_log.LogDebug(e, "{LogHeader} region {RegionName}: peer_pos send failed", LogHeader, _region);
                 return false;
             }
         }

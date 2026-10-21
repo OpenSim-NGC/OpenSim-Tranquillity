@@ -28,6 +28,7 @@ using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
+using osWebRtcVoice.NonSpatial;   // RefusalLogGate
 
 namespace osWebRtcVoice
 {
@@ -38,6 +39,7 @@ namespace osWebRtcVoice
 
         // How often a persistent send failure is logged at Warn; in between it is Debug.
         private const long FailureLogIntervalMs = 60_000;
+        private static readonly DateTime s_gateEpoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         private readonly IPositionWorld _world;
         private readonly IPeerPosSink _sink;
@@ -50,6 +52,7 @@ namespace osWebRtcVoice
 
         private long _lastRunMs = long.MinValue;
         private long _lastFailureLogMs = long.MinValue;
+        private readonly RefusalLogGate _failureGate = new RefusalLogGate();   // one warning a minute for each kind of failure
         private int _inFlight;
         private int _knownProtocol = -1;   // the protocol last logged, so a change is logged once
         private long _sent;
@@ -108,7 +111,7 @@ namespace osWebRtcVoice
                 catch (Exception e)
                 {
                     Interlocked.Exchange(ref _inFlight, 0);
-                    m_log.LogWarning(e, "{LogHeader} region {Region}: reading positions failed; trying again next tick", LogHeader, _region);
+                    LogGated("reading positions failed", e, "reading positions failed; trying again next tick");
                     return Task.CompletedTask;
                 }
                 if (messages.Count == 0)
@@ -121,7 +124,7 @@ namespace osWebRtcVoice
             catch (Exception e)
             {
                 Interlocked.Exchange(ref _inFlight, 0);
-                m_log.LogWarning(e, "{LogHeader} region {Region}: position tick failed", LogHeader, _region);
+                LogGated("position tick failed", e, "position tick failed");
                 return Task.CompletedTask;
             }
         }
@@ -146,12 +149,27 @@ namespace osWebRtcVoice
             catch (Exception e)
             {
                 Interlocked.Increment(ref _failed);
-                m_log.LogWarning(e, "{LogHeader} region {Region}: sending positions failed", LogHeader, _region);
+                LogGated("sending positions failed", e, "sending positions failed");
             }
             finally
             {
                 Interlocked.Exchange(ref _inFlight, 0);
             }
+        }
+
+        // A failure that repeats every tick is one warning a minute, with the number held back; the rest are Debug lines.
+        private void LogGated(string kind, Exception e, string what)
+        {
+            if (_failureGate.ShouldLog(kind, UUID.Zero, s_gateEpoch.AddMilliseconds(_nowMs()), out int held))
+            {
+                if (held > 0)
+                    m_log.LogWarning(e, "{LogHeader} region {Region}: {What}; {Held} more failure(s) since the last one logged",
+                        LogHeader, _region, what, held);
+                else
+                    m_log.LogWarning(e, "{LogHeader} region {Region}: {What}", LogHeader, _region, what);
+            }
+            else
+                m_log.LogDebug(e, "{LogHeader} region {Region}: {What}", LogHeader, _region, what);
         }
 
         private void LogFailure(int room, long now)

@@ -114,12 +114,26 @@ public partial class WebRtcVoiceRegionModule
         {
             Mode = mode,
             TickMs = pConfig.GetInt("PositionFeedTickMs", PositionSettings.DefaultTickMs),
-            KeepAliveMs = pConfig.GetInt("PositionFeedKeepAliveMs", PositionSettings.DefaultKeepAliveMs),
+            KeepAliveMs = ReadPositionKeepAliveMs(pConfig, pWarn),
             MoveThresholdCm = pConfig.GetInt("PositionFeedMoveThresholdCm", PositionSettings.DefaultMoveThresholdCm),
             MarginCm = pConfig.GetInt("PositionFeedMarginCm", PositionSettings.DefaultMarginCm),
             SpeedFloorCmS = pConfig.GetInt("PositionFeedSpeedFloorCmS", PositionSettings.DefaultSpeedFloorCmS),
             FallbackSpeedMaxCmS = pConfig.GetInt("PositionFeedSpeedMaxCmS", PositionSettings.DefaultFallbackSpeedMaxCmS),
         }.Normalised();
+    }
+
+    // [WebRtcVoice] PositionFeedKeepAliveMs: how often a full snapshot of a room is sent. The mixer drops a point it
+    // has not heard of for 6000 ms, and the gap between two snapshots is the keep-alive plus up to 750 ms, so a value
+    // above PositionSettings.MaxKeepAliveMs would let one lost request make every standing participant stale. Outside
+    // 1 to that maximum, a warning and the default.
+    private static int ReadPositionKeepAliveMs(IConfig pConfig, Action<string> pWarn)
+    {
+        int ms = pConfig.GetInt("PositionFeedKeepAliveMs", PositionSettings.DefaultKeepAliveMs);
+        if (ms >= 1 && ms <= PositionSettings.MaxKeepAliveMs)
+            return ms;
+        pWarn?.Invoke($"PositionFeedKeepAliveMs = {ms} is outside 1 to {PositionSettings.MaxKeepAliveMs}, which would let a single lost " +
+            $"request make the mixer treat a standing participant as gone; using {PositionSettings.DefaultKeepAliveMs}");
+        return PositionSettings.DefaultKeepAliveMs;
     }
 
     // The feed's settings for this module, or null when it is off or cannot run.
@@ -259,22 +273,23 @@ public partial class WebRtcVoiceRegionModule
     // through the peer_ctl sink, which exists only with the visibility feeder and emission both on.
     private void InitialisePositionFeed()
     {
-        m_PositionSettings = ReadPositionSettings(m_Config, message => m_log.LogWarning($"{logHeader}[Positions]: {message}"));
+        m_PositionSettings = ReadPositionSettings(m_Config, message => m_log.LogWarning("{LogHeader}[Positions]: {Message}", logHeader, message));
         if (m_PositionSettings is null)
             return;
 
         if (!m_VisibilityFeederEnabled || !m_VisibilityEmitEnabled)
         {
-            m_log.LogWarning($"{logHeader}[Positions]: PositionFeedEnabled is true but VisibilityFeederEnabled and VisibilityEmitEnabled are not " +
-                "both true; positions are sent through the same admin connection, so the position feed is inactive");
+            m_log.LogWarning("{LogHeader}[Positions]: PositionFeedEnabled is true but VisibilityFeederEnabled and VisibilityEmitEnabled are not " +
+                "both true; positions are sent through the same admin connection, so the position feed is inactive", logHeader);
             m_PositionSettings = null;
             return;
         }
 
-        m_log.LogInformation($"{logHeader}[Positions]: position feed enabled, mode {m_PositionSettings.Mode.ToString().ToLowerInvariant()}");
+        m_log.LogInformation("{LogHeader}[Positions]: position feed enabled, mode {Mode}", logHeader,
+            m_PositionSettings.Mode.ToString().ToLowerInvariant());
         if (m_PositionSettings.Mode == PositionFeedMode.Enforce)
-            m_log.LogInformation($"{logHeader}[Positions]: PositionFeedMode enforce is accepted but not active yet; " +
-                "positions are sent in observe mode");
+            m_log.LogInformation("{LogHeader}[Positions]: PositionFeedMode enforce is accepted but not active yet; " +
+                "positions are sent in observe mode", logHeader);
     }
 
     // Reads the visibility feeder settings and registers its console commands.

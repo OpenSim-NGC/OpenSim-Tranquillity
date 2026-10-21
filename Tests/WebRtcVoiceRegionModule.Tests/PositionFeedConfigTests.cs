@@ -58,7 +58,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(s, Is.Not.Null);
             Assert.That(s.Mode, Is.EqualTo(PositionFeedMode.Observe));
             Assert.That(s.TickMs, Is.EqualTo(500));
-            Assert.That(s.KeepAliveMs, Is.EqualTo(1000));
+            Assert.That(s.KeepAliveMs, Is.EqualTo(2000));
             Assert.That(s.MoveThresholdCm, Is.EqualTo(100));
             Assert.That(s.MarginCm, Is.EqualTo(500));
             Assert.That(s.SpeedFloorCmS, Is.EqualTo(800));
@@ -71,7 +71,7 @@ namespace osWebRtcVoice.Tests
             IConfig cfg = Section();
             cfg.Set("PositionFeedEnabled", "true");
             cfg.Set("PositionFeedTickMs", "400");
-            cfg.Set("PositionFeedKeepAliveMs", "2500");
+            cfg.Set("PositionFeedKeepAliveMs", "2200");
             cfg.Set("PositionFeedMoveThresholdCm", "250");
             cfg.Set("PositionFeedMarginCm", "700");
             cfg.Set("PositionFeedSpeedFloorCmS", "900");
@@ -80,7 +80,7 @@ namespace osWebRtcVoice.Tests
             PositionSettings s = WebRtcVoiceRegionModule.ReadPositionSettings(cfg);
 
             Assert.That(s.TickMs, Is.EqualTo(400));
-            Assert.That(s.KeepAliveMs, Is.EqualTo(2500));
+            Assert.That(s.KeepAliveMs, Is.EqualTo(2200));
             Assert.That(s.MoveThresholdCm, Is.EqualTo(250));
             Assert.That(s.MarginCm, Is.EqualTo(700));
             Assert.That(s.SpeedFloorCmS, Is.EqualTo(900));
@@ -125,6 +125,57 @@ namespace osWebRtcVoice.Tests
             Assert.That(s.Mode, Is.EqualTo(PositionFeedMode.Observe));
             Assert.That(warnings, Has.Count.EqualTo(1));
             Assert.That(warnings[0], Does.Contain("PositionFeedMode"));
+        }
+
+        /// <summary>The mixer treats a point as stale 6000 ms after it received it (SLV_POS_STALE_MS in the mixer's
+        /// possync.h). A full snapshot is sent at the first tick at or after the keep-alive, so the gap between two is at
+        /// most the keep-alive plus one tick and its 250 ms jitter. One lost request must leave the point fresh.</summary>
+        private const int MixerStaleMs = 6000;
+        private const int TickJitterMs = 250;
+
+        [Test]
+        public void TheDefaultKeepAlive_LeavesAPointFreshAfterOneLostRequest()
+        {
+            IConfig cfg = Section();
+            cfg.Set("PositionFeedEnabled", "true");
+
+            PositionSettings s = WebRtcVoiceRegionModule.ReadPositionSettings(cfg);
+
+            Assert.That(s.KeepAliveMs, Is.EqualTo(2000));
+            Assert.That((s.KeepAliveMs + s.TickMs + TickJitterMs) * 2, Is.LessThan(MixerStaleMs));
+        }
+
+        [Test]
+        public void TheLargestAcceptedKeepAlive_IsStillInsideTheMixersStaleWindow()
+        {
+            IConfig cfg = Section();
+            cfg.Set("PositionFeedEnabled", "true");
+            cfg.Set("PositionFeedKeepAliveMs", "2250");
+            var warnings = new List<string>();
+
+            PositionSettings s = WebRtcVoiceRegionModule.ReadPositionSettings(cfg, warnings.Add);
+
+            Assert.That(s.KeepAliveMs, Is.EqualTo(2250));
+            Assert.That(warnings, Is.Empty);
+            Assert.That((s.KeepAliveMs + s.TickMs + TickJitterMs) * 2, Is.LessThanOrEqualTo(MixerStaleMs + 2 * TickJitterMs));
+        }
+
+        [TestCase("2251")]
+        [TestCase("10000")]
+        [TestCase("0")]
+        [TestCase("-5")]
+        public void AKeepAliveOutsideTheRange_WarnsAndUsesTheDefault(string value)
+        {
+            IConfig cfg = Section();
+            cfg.Set("PositionFeedEnabled", "true");
+            cfg.Set("PositionFeedKeepAliveMs", value);
+            var warnings = new List<string>();
+
+            PositionSettings s = WebRtcVoiceRegionModule.ReadPositionSettings(cfg, warnings.Add);
+
+            Assert.That(s.KeepAliveMs, Is.EqualTo(2000));
+            Assert.That(warnings, Has.Count.EqualTo(1));
+            Assert.That(warnings[0], Does.Contain("PositionFeedKeepAliveMs").And.Contain(value).And.Contain("2250").And.Contain("2000"));
         }
     }
 

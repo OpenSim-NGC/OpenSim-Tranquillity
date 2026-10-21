@@ -59,7 +59,12 @@ namespace osWebRtcVoice
     public sealed class PositionSettings
     {
         public const int DefaultTickMs = 500;
-        public const int DefaultKeepAliveMs = 1000;
+        /// A full snapshot is sent at the first tick at or after this age, so two are at most this plus a tick apart.
+        /// The slvoice mixer treats a point as stale 6000 ms after it received it (SLV_POS_STALE_MS in the mixer's possync.h), so
+        /// the default leaves a point fresh after one lost request: (2000 + 750) x 2 = 5500.
+        public const int DefaultKeepAliveMs = 2000;
+        /// The largest keep-alive a configuration may ask for: (2250 + 750) x 2 = 6000 is the mixer's stale window.
+        public const int MaxKeepAliveMs = 2250;
         public const int DefaultMoveThresholdCm = 100;
         public const int DefaultMarginCm = 500;
         public const int DefaultSpeedFloorCmS = 800;

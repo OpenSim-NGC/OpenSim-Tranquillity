@@ -59,8 +59,8 @@ namespace osWebRtcVoice.Tests
             VoicePositionFeeder f = NewFeeder();
             Build(f, 0, AllIn(7), Root(A, 100));
 
-            Assert.That(Build(f, 999, AllIn(7), Root(A, 100)), Is.Empty);
-            IReadOnlyList<PositionMessage> keepAlive = Build(f, 1000, AllIn(7), Root(A, 100));
+            Assert.That(Build(f, 1999, AllIn(7), Root(A, 100)), Is.Empty);
+            IReadOnlyList<PositionMessage> keepAlive = Build(f, 2000, AllIn(7), Root(A, 100));
             Assert.That(keepAlive, Has.Count.EqualTo(1));
             Assert.That(keepAlive[0].Full, Is.True);
             Assert.That(keepAlive[0].Entries[0].Id, Is.EqualTo(A));
@@ -95,7 +95,7 @@ namespace osWebRtcVoice.Tests
             VoicePositionFeeder f = NewFeeder();
             Build(f, 0, AllIn(7), Root(A, 0), Root(B, 5000));
 
-            IReadOnlyList<PositionMessage> next = Build(f, 1000, AllIn(7), Root(A, 0));
+            IReadOnlyList<PositionMessage> next = Build(f, 2000, AllIn(7), Root(A, 0));
             Assert.That(next[0].Full, Is.True);
             Assert.That(next[0].Entries.Select(e => e.Id), Is.EqualTo(new[] { A }));
         }
@@ -141,8 +141,8 @@ namespace osWebRtcVoice.Tests
         {
             VoicePositionFeeder f = NewFeeder();
             long s1 = Build(f, 0, AllIn(7), Root(A, 0))[0].Seq;
-            long s2 = Build(f, 1000, AllIn(7), Root(A, 0))[0].Seq;
-            long s3 = Build(f, 1200, AllIn(7), Root(A, 500))[0].Seq;
+            long s2 = Build(f, 2000, AllIn(7), Root(A, 0))[0].Seq;
+            long s3 = Build(f, 2200, AllIn(7), Root(A, 500))[0].Seq;
 
             Assert.That(s1, Is.EqualTo(SeqBase + 1));
             Assert.That(s2, Is.GreaterThan(s1));
