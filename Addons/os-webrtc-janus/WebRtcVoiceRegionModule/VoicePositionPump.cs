@@ -15,8 +15,10 @@
  * tick would have sent is carried by the next one, or by the keep-alive snapshot.
  *
  * Nothing is computed or sent until the mixer has advertised vis_protocol 3. The sim learns that from the
- * replies to the peer_ctl requests it already sends (see JanusPeerCtlBatchSink.MixerVisProtocol), so a mixer
- * that does not know peer_pos is never sent one.
+ * replies to the peer_ctl requests it already sends (see JanusPeerCtlBatchSink.MixerVisProtocol). When it has
+ * sent none (arming off and nobody excluded or muted), the pump asks once, with a request that names no room
+ * (JanusPeerCtlBatchSink.BuildProtocolCheck). A mixer that does not know peer_pos is never sent one, and one
+ * that advertises no version is not asked again until a request to it fails.
  */
 
 using System;
@@ -55,7 +57,8 @@ namespace osWebRtcVoice
         private long _lastFailureLogMs = long.MinValue;
         private readonly RefusalLogGate _failureGate = new RefusalLogGate();   // one warning a minute for each kind of failure
         private int _inFlight;
-        private int _knownProtocol = -1;   // the protocol last logged, so a change is logged once
+        private const int NothingLogged = int.MinValue;
+        private int _knownProtocol = NothingLogged;   // the protocol last logged, so a change is logged once
         private long _sent;
         private long _failed;
         // The one-minute summary: the window's start and the totals at that moment.
@@ -102,13 +105,17 @@ namespace osWebRtcVoice
                 _lastRunMs = now;
                 LogSummaryIfDue(now);
 
-                int protocol = _sink.MixerVisProtocol;
+                bool known = _sink.MixerProtocolKnown;
+                int protocol = known ? _sink.MixerVisProtocol : -1;
                 LogProtocolChange(protocol);
-                if (protocol < VisAuthority.PositionProtocol)
+                if (known && protocol < VisAuthority.PositionProtocol)
                     return Task.CompletedTask;
 
                 if (Interlocked.CompareExchange(ref _inFlight, 1, 0) != 0)
                     return Task.CompletedTask;   // the previous send is still out
+
+                if (!known)
+                    return CheckProtocolAsync();
 
                 IReadOnlyList<PositionMessage> messages;
                 try
@@ -133,6 +140,24 @@ namespace osWebRtcVoice
                 Interlocked.Exchange(ref _inFlight, 0);
                 LogGated("position tick failed", e, "position tick failed");
                 return Task.CompletedTask;
+            }
+        }
+
+        // Asks the mixer which protocol it speaks. The next tick sends positions if it answered 3 or later.
+        private async Task CheckProtocolAsync()
+        {
+            try
+            {
+                if (!await _sink.CheckMixerProtocolAsync().ConfigureAwait(false))
+                    LogGated("the mixer version check failed", null, "the mixer did not answer the version check; trying again next tick");
+            }
+            catch (Exception e)
+            {
+                LogGated("the mixer version check failed", e, "the mixer version check failed");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _inFlight, 0);
             }
         }
 
@@ -217,25 +242,28 @@ namespace osWebRtcVoice
             }
         }
 
+        // protocol is -1 while the mixer's version is not known, 0 for a mixer that advertises none.
         private void LogProtocolChange(int protocol)
         {
             if (protocol == _knownProtocol)
                 return;
-            bool first = _knownProtocol < 0;
+            bool first = _knownProtocol == NothingLogged;
             _knownProtocol = protocol;
             if (protocol >= VisAuthority.PositionProtocol)
                 m_log.LogInformation("{LogHeader} region {Region}: the mixer advertises vis_protocol {Protocol}; sending positions in {Mode} mode",
                     LogHeader, _region, protocol, PositionFeedModes.WireName(PositionFeedModes.Active(_settings.Mode)));
-            else if (protocol == 0)
+            else if (protocol < 0)
             {
                 if (first)
-                    m_log.LogInformation("{LogHeader} region {Region}: waiting to learn the mixer's protocol version from its replies to " +
-                        "peer_ctl requests; no positions are sent until it advertises vis_protocol {Needed}",
-                        LogHeader, _region, VisAuthority.PositionProtocol);
+                    m_log.LogInformation("{LogHeader} region {Region}: asking the mixer which protocol version it speaks; no positions " +
+                        "are sent until it advertises vis_protocol {Needed}", LogHeader, _region, VisAuthority.PositionProtocol);
                 else
-                    m_log.LogWarning("{LogHeader} region {Region}: the mixer no longer advertises a protocol version; positions stop",
+                    m_log.LogDebug("{LogHeader} region {Region}: a request to the mixer failed; asking it again which protocol it speaks",
                         LogHeader, _region);
             }
+            else if (protocol == 0)
+                m_log.LogWarning("{LogHeader} region {Region}: the mixer advertises no protocol version, and peer_pos needs {Needed}: " +
+                    "no positions are sent", LogHeader, _region, VisAuthority.PositionProtocol);
             else
                 m_log.LogWarning("{LogHeader} region {Region}: the mixer advertises vis_protocol {Protocol}, and peer_pos needs {Needed}: " +
                     "no positions are sent", LogHeader, _region, protocol, VisAuthority.PositionProtocol);

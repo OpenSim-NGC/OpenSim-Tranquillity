@@ -86,6 +86,7 @@ namespace osWebRtcVoice
 
         // The vis_protocol last advertised by the mixer; see MixerVisProtocol.
         private volatile int _mixerVisProtocol;
+        private volatile bool _mixerProtocolKnown;
 
         private readonly Func<long> _nowMs;
         private readonly RefusalLogGate _positionRefusalGate = new RefusalLogGate();   // one warning a minute for the mixer's refusals
@@ -215,6 +216,52 @@ namespace osWebRtcVoice
         /// nothing until this reaches <see cref="VisAuthority.PositionProtocol"/>.</summary>
         public int MixerVisProtocol => _mixerVisProtocol;
 
+        /// <summary>True once a reply has told this sink what the mixer speaks (see <see cref="MixerVisProtocol"/>; 0 is an
+        /// older mixer that advertises no version). Reset when a peer_pos request or the version check fails in transport,
+        /// because a mixer that went away may come back as another version.</summary>
+        public bool MixerProtocolKnown => _mixerProtocolKnown;
+
+        // A mixer's epoch is only read per room, so this value is never adopted by a room: the check names none.
+        private const string CheckEpoch = "0000000000000001";
+
+        /// <summary>The request that asks for the mixer's version. A peer_ctl_heartbeat naming no room: the mixer parses it,
+        /// walks the (empty) rooms object, and answers with vis_protocol and mixer_instance. It adopts no epoch, marks no
+        /// record stale and arms or disarms no listener (janus_slvoice_handle_heartbeat, janus_slvoice.c, in the mixer
+        /// repository: the room loop at the "rooms" object is the only place a heartbeat touches room state).</summary>
+        public static OSDMap BuildProtocolCheck() => new OSDMap
+        {
+            ["request"] = OSD.FromString("peer_ctl_heartbeat"),
+            ["room_epoch"] = OSD.FromString(CheckEpoch),
+            ["interval_ms"] = OSD.FromInteger(VisAuthority.DefaultHeartbeatIntervalMs),
+            ["rooms"] = new OSDMap(),
+        };
+
+        /// <summary>Ask the mixer which vis_protocol it speaks, for a region that sends no peer_ctl request of its own (no
+        /// heartbeat, nobody excluded). An older mixer answers without a version, or with an error; either way the answer
+        /// is recorded and it is not asked again until a request fails. Never throws.</summary>
+        public async Task<bool> CheckMixerProtocolAsync()
+        {
+            try
+            {
+                (AdminSendResult admin, string replyBody) = await _sendOne(BuildProtocolCheck()).ConfigureAwait(false);
+                if (admin != AdminSendResult.Ok)
+                {
+                    _mixerProtocolKnown = false;
+                    return false;
+                }
+                SlvoiceReply reply = ParseInnerReply(replyBody);
+                _mixerVisProtocol = reply.Present ? reply.VisProtocol : 0;
+                _mixerProtocolKnown = true;
+                return true;
+            }
+            catch (Exception e)
+            {
+                m_log.LogDebug(e, "{LogHeader} region {RegionName}: the mixer version check failed", LogHeader, _region);
+                _mixerProtocolKnown = false;
+                return false;
+            }
+        }
+
         /// <summary>What the mixer has answered to the peer_pos requests this sink has sent.</summary>
         public PositionReplyStats Replies { get; } = new PositionReplyStats();
 
@@ -229,23 +276,34 @@ namespace osWebRtcVoice
             {
                 (AdminSendResult admin, string replyBody) = await _sendOne(body).ConfigureAwait(false);
                 if (admin != AdminSendResult.Ok)
+                {
+                    _mixerProtocolKnown = false;   // the mixer may be restarting: ask again when it answers
                     return false;
-                CountPositionReply(body, replyBody);
+                }
+                SlvoiceReply reply = ParseInnerReply(replyBody);
+                // Every reply the mixer builds for a peer_pos, applied or refused, carries vis_protocol; one without is
+                // an older mixer, so a mixer replaced by an older one stops the feed.
+                if (reply.Present)
+                {
+                    _mixerVisProtocol = reply.VisProtocol;
+                    _mixerProtocolKnown = true;
+                }
+                CountPositionReply(body, reply);
                 return true;
             }
             catch (Exception e)
             {
                 // The pump writes the once-a-minute line about a failing feed; this one is for tracing a single failure.
                 m_log.LogDebug(e, "{LogHeader} region {RegionName}: peer_pos send failed", LogHeader, _region);
+                _mixerProtocolKnown = false;
                 return false;
             }
         }
 
         // The mixer answers a peer_pos it will not apply with an error reply inside a successful transport. Count what it
         // answered, and write one warning a minute for the refusals, with the number held back.
-        private void CountPositionReply(OSDMap request, string replyBody)
+        private void CountPositionReply(OSDMap request, in SlvoiceReply reply)
         {
-            SlvoiceReply reply = ParseInnerReply(replyBody);
             PositionReplyKind kind = PositionReply.Classify(reply.Present, reply.Status, reply.Reason);
             Replies.Record(kind);
             if (kind == PositionReplyKind.None || kind == PositionReplyKind.Applied)
@@ -267,9 +325,15 @@ namespace osWebRtcVoice
         private void ObserveProtocol(in SlvoiceReply reply)
         {
             if (reply.Present && reply.VisProtocol > 0)
+            {
                 _mixerVisProtocol = reply.VisProtocol;
+                _mixerProtocolKnown = true;
+            }
             else if (reply.Present && string.Equals(reply.Status, "applied", StringComparison.Ordinal))
+            {
                 _mixerVisProtocol = 0;
+                _mixerProtocolKnown = true;
+            }
         }
 
         public void Dispose()
@@ -498,7 +562,10 @@ namespace osWebRtcVoice
             bool ok = admin == AdminSendResult.Ok;
             VisAuthority.HeartbeatReply parsed = ok ? VisAuthority.ParseHeartbeatReply(reply) : new VisAuthority.HeartbeatReply();
             if (parsed.IsHeartbeat && parsed.VisProtocol > 0)
+            {
                 _mixerVisProtocol = parsed.VisProtocol;
+                _mixerProtocolKnown = true;
+            }
             Authority?.OnHeartbeatOutcome(ok, parsed);
             return ok;
         }
