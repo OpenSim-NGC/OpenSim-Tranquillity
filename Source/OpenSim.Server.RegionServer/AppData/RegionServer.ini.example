@@ -1064,7 +1064,8 @@
     ;# {wind_update_rate} {enabled:true} {Wind update rate in frames?} {} 150
     ;; How often should wind be updated, counted in world frames, not seconds.
     ;; One frame lasts FrameTime ([Startup], 0.0909 s by default), so the
-    ;; default of 150 frames is about 13.6 seconds.
+    ;; default of 150 frames is about 13.6 seconds. A value below 1 is replaced
+    ;; by the default, with a warning in the log.
     ; wind_update_rate = 150
 
     ;; The Default Wind Plugin to load

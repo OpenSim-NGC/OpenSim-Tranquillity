@@ -43,7 +43,8 @@ public class WindModule : IWindModule
 
     private uint m_frame = 0;
     private int m_dataVersion = 0;
-    private int m_frameUpdateRate = 150;
+    private const int DefaultFrameUpdateRate = 150;
+    private int m_frameUpdateRate = DefaultFrameUpdateRate;
 
     private Scene m_scene = null;
     private bool m_ready = false;
@@ -74,7 +75,16 @@ public class WindModule : IWindModule
         {
             m_enabled = m_windConfig.GetBoolean("enabled", true);
 
-            m_frameUpdateRate = m_windConfig.GetInt("wind_update_rate", 150);
+            m_frameUpdateRate = m_windConfig.GetInt("wind_update_rate", DefaultFrameUpdateRate);
+
+            // WindUpdate takes the frame count modulo this value, so it must be at least 1.
+            if (m_frameUpdateRate < 1)
+            {
+                m_log.LogWarning(
+                    "[WIND] wind_update_rate = {0} is below 1; using the default of {1} frames.",
+                    m_frameUpdateRate, DefaultFrameUpdateRate);
+                m_frameUpdateRate = DefaultFrameUpdateRate;
+            }
 
             // Determine which wind model plugin is desired
             if (m_windConfig.Contains("wind_plugin"))
@@ -280,20 +290,7 @@ public class WindModule : IWindModule
         switch (cmdparams[2])
         {
             case "wind_update_rate":
-                int newRate = 1;
-
-                if (int.TryParse(cmdparams[3], out newRate))
-                {
-                    m_frameUpdateRate = newRate;
-                }
-                else
-                {
-                    MainConsole.Instance.Output(
-                        "Invalid value {0} specified for {1}", cmdparams[3], cmdparams[2]);
-
-                    return;
-                }
-
+                MainConsole.Instance.Output("{0}", SetUpdateRate(cmdparams[3]));
                 break;
             case "wind_plugin":
                 string desiredPlugin = cmdparams[3];
@@ -317,6 +314,22 @@ public class WindModule : IWindModule
                 }
                 break;
         }
+    }
+
+    /// <summary>
+    /// Sets the wind update rate (frames between wind updates) from console text. A value below 1, or text that is not
+    /// a whole number, is refused and the current rate is kept. Returns the message to show the operator.
+    /// </summary>
+    public string SetUpdateRate(string text)
+    {
+        if (!int.TryParse(text, out int newRate))
+            return string.Format("Invalid value {0} specified for wind_update_rate", text);
+
+        if (newRate < 1)
+            return string.Format("wind_update_rate must be at least 1 frame; the rate stays {0}.", m_frameUpdateRate);
+
+        m_frameUpdateRate = newRate;
+        return string.Format("wind_update_rate set to {0}", newRate);
     }
 
     /// <summary>
@@ -461,6 +474,9 @@ public class WindModule : IWindModule
     }
 
     public IWindVolumeStore WindVolumes => m_windVolumes;
+
+    /// <summary>Frames between wind updates; always at least 1.</summary>
+    public int WindUpdateRate => m_frameUpdateRate;
 
     public string WindActiveModelPluginName
     {
