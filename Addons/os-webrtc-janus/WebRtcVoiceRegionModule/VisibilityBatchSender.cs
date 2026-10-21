@@ -99,7 +99,7 @@ namespace osWebRtcVoice
         private readonly Dictionary<UUID, int> _pending = new Dictionary<UUID, int>();   // listener -> attempts left
 
         // Arming mode ([WebRtcVoice] VisibilityArmingEnabled). Null
-        // authority = the knob is off, and every method below takes its pre-0.2 path unchanged.
+        // authority = the knob is off, and every method below takes its knob-off path unchanged.
         private readonly VisAuthority _authority;
         private readonly Func<UUID, int?> _resolveRoom;  // the room the agent's last provision joined, else null
         private readonly RoomRefusals _refusals;         // rooms the mixer answered unknown_room for; null holds nothing back
@@ -192,7 +192,7 @@ namespace osWebRtcVoice
             if (Interlocked.CompareExchange(ref _sendInFlight, myEpoch, 0L) != 0L)
             {
                 // A send is already in flight. Self-heal if it has been stuck far longer than
-                // possible (FIX 2) — neither the per-call token nor the HttpClient backstop resolved it.
+                // possible — neither the per-call token nor the HttpClient backstop resolved it.
                 ForceClearStalledSend();
                 _synced = false;   // a skipped tick -> snapshot next
                 return Task.CompletedTask;
@@ -234,7 +234,7 @@ namespace osWebRtcVoice
             }
         }
 
-        // FIX 2: self-heal a send stuck in-flight far longer than possible. Called on a skipped Pump
+        // Self-heal a send stuck in-flight far longer than possible. Called on a skipped Pump
         // (a send is already in flight). Logs once per stall episode — the CAS-clear resolves the
         // stall, so the next detection is a fresh episode — never once per tick.
         private void ForceClearStalledSend()
@@ -266,7 +266,7 @@ namespace osWebRtcVoice
         // Every pass: arm whoever is not armed at their current room, then send deltas for listeners already armed.
         // "Arm" is a replace naming the listener with its full columns, empty ones included. A snapshot (first pass,
         // transport error, skipped tick, in-flight guard, or a detected mixer restart) arms the whole population, and
-        // replaces the pre-0.2 clear-tracking: a departed listener is left to the heartbeat's omission rule, because an
+        // replaces the clear-tracking: a departed listener is left to the heartbeat's omission rule, because an
         // empty replace for it would ARM it.
         private async Task EmitArmedAsync(VisibilityBatch batch)
         {
@@ -302,7 +302,7 @@ namespace osWebRtcVoice
                 // CanArmNow gates EVERY path, including a standing re-arm request and a
                 // snapshot. A presence that never leaves the population, an NPC for one, never had its re-arm request expire and the
                 // first clause re-armed it into a missing room on every tick — 8,933 unknown_room lines at ~3.8/s in
-                // the 0.8 soak, with the authority's own backoff sitting there unread.
+                // a soak run, with the authority's own backoff sitting there unread.
                 if ((snapshot || _authority.IsRearmRequested(l) || !_authority.IsArmed(room.Value, l))
                     && _authority.CanArmNow(l))
                     arm.Add(l);

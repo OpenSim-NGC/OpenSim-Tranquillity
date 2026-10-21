@@ -161,7 +161,7 @@ namespace osWebRtcVoice
             // a null sink makes the sender run matrix-only and log once. The sender's own
             // VisibilityEmitEnabled gate decides whether it emits at all.
             // With arming enabled, a NEW authority (and so a new room_epoch) for every feeder
-            // start. With it disabled, nothing below is built and the sender takes its pre-0.2 paths.
+            // start. With it disabled, nothing below is built and the sender takes its knob-off paths.
             VisAuthority authority = null;
             Func<UUID, int?> resolveRoom = null;
             if (m_armingEnabled && m_emitEnabled && m_sink is JanusPeerCtlBatchSink armingSink)

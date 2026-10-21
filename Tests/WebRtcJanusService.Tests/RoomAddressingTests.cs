@@ -168,14 +168,13 @@ namespace osWebRtcVoice.Tests
             return new HashSet<string>(((OSDMap)((OSDMap)rooms[room.ToString()])["listeners"]).Keys);
         }
 
-        // ---- O1: the recorded room, never the estate number ------------------------------------
+        // ---- the recorded room, never the estate number ------------------------------------
 
-        /// <summary>O1: an avatar that joined a room of its parcel's own voice channel. That is where it is armed and
+        /// <summary>An avatar that joined a room of its parcel's own voice channel. That is where it is armed and
         /// where the heartbeat names it. The estate number is not addressed at all - and, the sharper half, no
-        /// generation is ever ALLOCATED for it: the arming pass once called NextGeneration(estate) and burned a
-        /// generation on a room it then wrote to.</summary>
+        /// generation is ever ALLOCATED for it.</summary>
         [Test]
-        public async Task O1_AnAvatarThatJoinedAnOwnChannelRoom_IsAddressedAtThatRoom()
+        public async Task AnAvatarThatJoinedAnOwnChannelRoom_IsAddressedAtThatRoom()
         {
             using var rig = new Rig();
             rig.Place(A, ParcelOwn);
@@ -196,14 +195,14 @@ namespace osWebRtcVoice.Tests
                 "the heartbeat claims authority over the joined room only");
         }
 
-        // ---- O2: an avatar that joined the estate room is addressed there ----------------------
+        // ---- an avatar that joined the estate room is addressed there ----------------------
 
-        /// <summary>O2: an avatar on an estate-channel parcel that joined the estate room is addressed at it, with arming
+        /// <summary>An avatar on an estate-channel parcel that joined the estate room is addressed at it, with arming
         /// on; with the knob off nothing is sent at all, as the knob-off goldens pin. The goldens cover the off case
         /// against a file captured before; this covers the on case, which no golden file pins.</summary>
         [TestCase(true)]
         [TestCase(false)]
-        public async Task O2_AnAvatarThatJoinedTheEstateRoom_IsAddressedAtIt(bool arming)
+        public async Task AnAvatarThatJoinedTheEstateRoom_IsAddressedAtIt(bool arming)
         {
             using var rig = new Rig(arming);
             rig.Place(A, ParcelEstate);
@@ -219,13 +218,13 @@ namespace osWebRtcVoice.Tests
                 Assert.That(rig.Sent, Is.Empty, "with the knob off nothing is sent at all, as the goldens pin");
         }
 
-        // ---- O3: a record arrives ------------------------------------------------------------------
+        // ---- a record arrives ------------------------------------------------------------------
 
-        /// <summary>O3: the agent has no record, so it is armed nowhere, whatever parcel it stands on. A record then
+        /// <summary>The agent has no record, so it is armed nowhere, whatever parcel it stands on. A record then
         /// arrives - the viewer provisioned it - and from the next pass it is armed at that room and the heartbeat names it
         /// there and nowhere else.</summary>
         [Test]
-        public async Task O3_WhenARecordArrives_TheAgentIsArmedAtItAndNowhereElse()
+        public async Task WhenARecordArrives_TheAgentIsArmedAtItAndNowhereElse()
         {
             using var rig = new Rig();
             rig.Place(A, ParcelOwn);
@@ -243,13 +242,13 @@ namespace osWebRtcVoice.Tests
             Assert.That(ListenersOf(hb, OwnChannelRoom), Is.Empty, "and named nowhere at its parcel's room");
         }
 
-        // ---- O4: nowhere to put it ---------------------------------------------------------------
+        // ---- nowhere to put it ---------------------------------------------------------------
 
-        /// <summary>O4: no record - the sim has no evidence of a room this agent is in. It is left out of the batch and
-        /// the heartbeat, counted on the sender, and nothing is allocated for any room on its behalf. Before the
-        /// estate-room rule changed, this case silently became an estate-room write.</summary>
+        /// <summary>No record - the sim has no evidence of a room this agent is in. It is left out of the batch and
+        /// the heartbeat, counted on the sender, and nothing is allocated for any room on its behalf. It is never turned
+        /// into an estate-room write.</summary>
         [Test]
-        public async Task O4_AnAgentWithNoRecord_IsOmittedAndCounted_AndAllocatesNothing()
+        public async Task AnAgentWithNoRecord_IsOmittedAndCounted_AndAllocatesNothing()
         {
             using var rig = new Rig();
             rig.Place(A, ParcelOwn);
@@ -270,13 +269,13 @@ namespace osWebRtcVoice.Tests
             Assert.That(rig.Sender.Unplaced, Is.Zero);
         }
 
-        // ---- O5: what the operator reads ---------------------------------------------------------
+        // ---- what the operator reads ---------------------------------------------------------
 
-        /// <summary>O5: "show voice visibility" must report the rooms the last send RESOLVED and how many agents it
-        /// could not place. The old line printed "fallback room N" first, which read as an address and, during the 0.8
-        /// soak, is exactly what made a wrong room look like a working fallback.</summary>
+        /// <summary>"show voice visibility" must report the rooms the last send RESOLVED and how many agents it
+        /// could not place. A line that printed "fallback room N" first would read as an address, which is exactly
+        /// what makes a wrong room look like a working fallback.</summary>
         [Test]
-        public async Task O5_TheConsoleReader_NamesTheResolvedRooms_AndCountsTheUnplaced()
+        public async Task TheConsoleReader_NamesTheResolvedRooms_AndCountsTheUnplaced()
         {
             using var rig = new Rig();
             rig.Place(A, ParcelOwn);
