@@ -180,6 +180,21 @@ public abstract class PhysicsScene
     }
 
     /// <summary>
+    /// Add an avatar that may stand outside the region (<see cref="PhysicsActor.AllowOutsideRegion"/>: one carried in by
+    /// an object that crossed the border). An engine whose actor can be stepped as soon as it is made, on another
+    /// thread, overrides this so the actor is made with the flag already set; this default makes the actor and then
+    /// sets it.
+    /// </summary>
+    public virtual PhysicsActor AddAvatar(
+        uint localID, string avName, Vector3 position, Vector3 size, float feetOffset, bool isFlying, bool allowOutsideRegion)
+    {
+        PhysicsActor ret = AddAvatar(localID, avName, position, size, feetOffset, isFlying);
+        if (ret is not null)
+            ret.AllowOutsideRegion = allowOutsideRegion;
+        return ret;
+    }
+
+    /// <summary>
     /// Remove an avatar.
     /// </summary>
     /// <param name="actor"></param>

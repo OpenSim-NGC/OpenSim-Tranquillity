@@ -526,6 +526,18 @@
     ;; after its last use, so a value under 5 does not find a change any sooner. Default 30.
     ; RefreshMinutes = 30
 
+    ;; Names to ask directly: a comma separated list of DNS server IP addresses. Empty (the default) leaves every
+    ;; host name in Addresses to the operating system resolver, as described above. When set, a host name written
+    ;; after "=" in an Addresses entry is looked up by asking these servers for its A record, in the order
+    ;; given until one answers, at start and every RefreshMinutes. The hosts file is then not consulted for those
+    ;; names, so a name that this machine maps to a private address (so that traffic between your own servers
+    ;; stays inside your network) can still be given to outside viewers as its current public address. A server
+    ;; that does not answer within 2 seconds is skipped. If none answers, the last good address is kept; if there
+    ;; has never been one, the operating system answer is used, and a warning is logged on each refresh. Only the
+    ;; names written in Addresses are looked up this way. Servers are queried on UDP port 53.
+    ;; Example: DnsServers = "192.0.2.53, 198.51.100.53"
+    ; DnsServers = ""
+
 
 [LoginService]
     ; for the server connector

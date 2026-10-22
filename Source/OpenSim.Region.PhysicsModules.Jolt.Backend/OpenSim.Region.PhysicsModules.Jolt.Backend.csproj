@@ -1,0 +1,45 @@
+<!--
+  Copyright (c) 2026 Legion Builds
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The physics backend: the engine-agnostic IPhysicsBackend and its Jolt implementation,
+    JoltPhysicsBackend. It references no OpenSim assembly.
+  -->
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <AssemblyName>OpenSim.Region.PhysicsModules.Jolt.Backend</AssemblyName>
+    <RootNamespace>OpenSim.Region.PhysicsModules.Jolt.Backend</RootNamespace>
+    <AssemblyTitle>OpenSim.Region.PhysicsModules.Jolt.Backend</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>OpenSim</Product>
+    <Copyright>OpenSimulator developers</Copyright>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><!-- 2.19.x HeightFieldShapeSettings takes float* -->
+    <Deterministic>true</Deterministic>
+    <NoWarn>$(NoWarn);CS0168</NoWarn>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The managed Jolt binding. Pinned to the version that binds to
+         JoltPhysics.Native 1.0.4. Changing it means checking the native's record again (JoltNativePackageTests). -->
+    <PackageReference Include="JoltPhysicsSharp" Version="2.19.1" />
+    <!-- The native joltc, the one JoltPhysicsSharp 2.19.1 depends on, named here so its version is pinned in one
+         place. Its files flow to every application that reaches this project, under runtimes/<rid>/native/.
+         JoltNative.Known records the hash of each; a new version fails JoltNativePackageTests until the record is
+         checked again. -->
+    <PackageReference Include="JoltPhysics.Native" Version="1.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenSim.Region.PhysicsModules.Jolt.Backend.Tests" />
+  </ItemGroup>
+
+</Project>

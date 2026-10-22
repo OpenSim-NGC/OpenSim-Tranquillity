@@ -42,6 +42,33 @@ public class EntityTransferContext
     public float OutboundVersion { get; set; }
     public int WearablesCount { get; set; }
 
+    /// <summary>Key of the access answer that says the destination can take avatars standing on an object that crosses.</summary>
+    public const string CarriedRidersKey = "carried_riders";
+
+    /// <summary>
+    /// Set by the access question: the destination understands an avatar that arrives carried by an object
+    /// (<see cref="AgentData.CrossingCarried"/>). A destination that does not say so is never sent one.
+    /// </summary>
+    public bool CarriedRiders { get; set; }
+
+    /// <summary>
+    /// Adds the destination's side of the carried-rider capability to its access answer: true when the region has the
+    /// rider crossing feature switched on.
+    /// </summary>
+    public static void WriteAnswer(OSDMap answer, bool carriedRiders)
+    {
+        answer[CarriedRidersKey] = OSD.FromBoolean(carriedRiders);
+    }
+
+    /// <summary>Reads the destination's access answer; an answer without the capability (an older region) clears it.</summary>
+    public void ReadAnswer(OSDMap answer)
+    {
+        CarriedRiders = answer is not null
+            && answer.TryGetValue(CarriedRidersKey, out OSD value)
+            && value is not null
+            && value.AsBoolean();
+    }
+
     public OSD Pack()
     {
         OSDMap data = new OSDMap();

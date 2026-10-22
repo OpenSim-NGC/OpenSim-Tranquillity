@@ -506,6 +506,18 @@ public class SceneObjectSerializer
         {"PhysicsInertia", ProcessPhysicsInertia },
 
         {"RotationAxisLocks", ProcessRotationAxisLocks },
+        {"CTMoveTarget", ProcessCTMoveTarget },
+        {"CTMoveTau", ProcessCTMoveTau },
+        {"CTHoverHeight", ProcessCTHoverHeight },
+        {"CTHoverType", ProcessCTHoverType },
+        {"CTHoverTau", ProcessCTHoverTau },
+        {"CTHoverRepel", ProcessCTHoverRepel },
+        {"CTLookTarget", ProcessCTLookTarget },
+        {"CTLookStrength", ProcessCTLookStrength },
+        {"CTLookDamping", ProcessCTLookDamping },
+        {"CTDragAgent", ProcessCTDragAgent },
+        {"CTDragAnchor", ProcessCTDragAnchor },
+        {"CTDragTarget", ProcessCTDragTarget },
         {"PhysicsShapeType", ProcessPhysicsShapeType },
         {"Density", ProcessDensity },
         {"Friction", ProcessFriction },
@@ -755,6 +767,70 @@ public class SceneObjectSerializer
     private static void ProcessClickAction(SceneObjectPart obj, XmlReader reader)
     {
         obj.ClickAction = (byte)reader.ReadElementContentAsInt("ClickAction", string.Empty);
+    }
+
+    // The targets a crossing carries (CrossingTargets): optional elements of the root part, each one read into the record the
+    // part holds. An element a simulator does not know is skipped by its reader.
+    private static CrossingTargets TargetsOf(SceneObjectPart obj) => obj.CrossingTargets ??= new CrossingTargets();
+
+    private static void ProcessCTMoveTarget(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).MoveTarget = Util.ReadVector(reader, "CTMoveTarget");
+    }
+
+    private static void ProcessCTMoveTau(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).MoveTau = reader.ReadElementContentAsFloat("CTMoveTau", string.Empty);
+    }
+
+    private static void ProcessCTHoverHeight(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).HoverHeight = reader.ReadElementContentAsFloat("CTHoverHeight", string.Empty);
+    }
+
+    private static void ProcessCTHoverType(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).HoverType = reader.ReadElementContentAsInt("CTHoverType", string.Empty);
+    }
+
+    private static void ProcessCTHoverTau(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).HoverTau = reader.ReadElementContentAsFloat("CTHoverTau", string.Empty);
+    }
+
+    private static void ProcessCTHoverRepel(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).HoverRepel = reader.ReadElementContentAsBoolean("CTHoverRepel", string.Empty);
+    }
+
+    private static void ProcessCTLookTarget(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).LookTarget = Util.ReadQuaternion(reader, "CTLookTarget");
+    }
+
+    private static void ProcessCTLookStrength(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).LookStrength = reader.ReadElementContentAsFloat("CTLookStrength", string.Empty);
+    }
+
+    private static void ProcessCTLookDamping(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).LookDamping = reader.ReadElementContentAsFloat("CTLookDamping", string.Empty);
+    }
+
+    private static void ProcessCTDragAgent(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).DragAgent = Util.ReadUUID(reader, "CTDragAgent");
+    }
+
+    private static void ProcessCTDragAnchor(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).DragAnchor = Util.ReadVector(reader, "CTDragAnchor");
+    }
+
+    private static void ProcessCTDragTarget(SceneObjectPart obj, XmlReader reader)
+    {
+        TargetsOf(obj).DragTarget = Util.ReadVector(reader, "CTDragTarget");
     }
 
     private static void ProcessRotationAxisLocks(SceneObjectPart obj, XmlReader reader)
@@ -1689,6 +1765,34 @@ public class SceneObjectSerializer
 
         if(sop.IsRoot && sop.RotationAxisLocks != 0)
             writer.WriteElementString("RotationAxisLocks", sop.RotationAxisLocks.ToString().ToLower());
+        // What a crossing carries of the move-to, hover and look-at: written only by a crossing, and only for what is set
+        if (sop.IsRoot && sop.CrossingTargets is CrossingTargets ct)
+        {
+            if (ct.HasMove)
+            {
+                WriteVector(writer, "CTMoveTarget", ct.MoveTarget.Value);
+                writer.WriteElementString("CTMoveTau", ct.MoveTau.Value.ToString(Culture.FormatProvider));
+            }
+            if (ct.HasHover)
+            {
+                writer.WriteElementString("CTHoverHeight", ct.HoverHeight.Value.ToString(Culture.FormatProvider));
+                writer.WriteElementString("CTHoverType", ct.HoverType.Value.ToString(Culture.FormatProvider));
+                writer.WriteElementString("CTHoverTau", ct.HoverTau.Value.ToString(Culture.FormatProvider));
+                writer.WriteElementString("CTHoverRepel", (ct.HoverRepel ?? false).ToString().ToLower());
+            }
+            if (ct.HasLook)
+            {
+                WriteQuaternion(writer, "CTLookTarget", ct.LookTarget.Value);
+                writer.WriteElementString("CTLookStrength", ct.LookStrength.Value.ToString(Culture.FormatProvider));
+                writer.WriteElementString("CTLookDamping", ct.LookDamping.Value.ToString(Culture.FormatProvider));
+            }
+            if (ct.HasDrag)
+            {
+                WriteUUID(writer, "CTDragAgent", ct.DragAgent.Value, options);
+                WriteVector(writer, "CTDragAnchor", ct.DragAnchor.Value);
+                WriteVector(writer, "CTDragTarget", ct.DragTarget.Value);
+            }
+        }
         writer.WriteElementString("PhysicsShapeType", sop.PhysicsShapeType.ToString().ToLower());
         if (sop.Density != 1000.0f)
             writer.WriteElementString("Density", sop.Density.ToString(Culture.FormatProvider));
