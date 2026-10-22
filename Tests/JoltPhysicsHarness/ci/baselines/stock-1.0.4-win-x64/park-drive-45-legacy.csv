@@ -1,0 +1,2 @@
+scenario,slope_deg,rate_hz,steps,top_speed,release_t,release_speed,steady_speed,steady_hspeed,dist_before_release,dist_after_release,time_to_rest,peak_height,peak_rise,z_range,max_tilt_deg,end_x,end_y,end_z,left_region_t,nonfinite,sleep_after,active_at_end,impact_t,arrival_speed,leaving_speed,penetration,tunneled,push_range_early,push_range_late,push_penetration,crash_rise,ray_casts,ray_us_per_cast,ray_refused,ray_cut_short
+park-drive,0,45,1800,6.041,3.000,6.041,-,-,7.591,3.190,1.511,0.267,0.000,0.002,0.0,175.782,85.000,25.248,-,0,2.022,0,-,-,-,-,0,-,-,-,-,0,-,0,0

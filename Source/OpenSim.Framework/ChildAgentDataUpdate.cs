@@ -373,6 +373,16 @@ public class AgentData : IAgentData
     public byte CrossingFlags;
     public byte CrossExtraFlags;
 
+    /// <summary>
+    /// With <see cref="CrossingCarried"/> set in <see cref="CrossingFlags"/>: the object this standing avatar was
+    /// carried across with, and its position relative to that object's root. Not sent otherwise.
+    /// </summary>
+    public UUID CarriedByGroup;
+    public Vector3 CarriedOffset;
+
+    /// <summary>Bit of <see cref="CrossingFlags"/>: the avatar stood on the object and crosses with it.</summary>
+    public const byte CrossingCarried = 16;
+
     public Dictionary<ulong, string> ChildrenCapSeeds = null;
     public Animation[] Anims;
     public Animation DefaultAnim = null;
@@ -474,6 +484,11 @@ public class AgentData : IAgentData
         args["crossingflags"] = OSD.FromInteger(CrossingFlags);
         if(CrossingFlags != 0)
             args["crossExtraFlags"] = OSD.FromInteger(CrossExtraFlags);
+        if((CrossingFlags & CrossingCarried) != 0)
+        {
+            args["carried_by"] = OSD.FromUUID(CarriedByGroup);
+            args["carried_offset"] = OSD.FromVector3(CarriedOffset);
+        }
 
         args["active_group_id"] = OSD.FromUUID(ActiveGroupID);
         args["active_group_name"] = OSD.FromString(ActiveGroupName);
@@ -685,6 +700,14 @@ public class AgentData : IAgentData
         {
             if (args.TryGetValue("crossExtraFlags", out tmp) && tmp != null)
                 CrossExtraFlags = (byte)tmp.AsInteger();
+        }
+
+        if((CrossingFlags & CrossingCarried) != 0)
+        {
+            if (args.TryGetValue("carried_by", out tmp) && tmp != null)
+                CarriedByGroup = tmp.AsUUID();
+            if (args.TryGetValue("carried_offset", out tmp) && tmp != null)
+                CarriedOffset = tmp.AsVector3();
         }
 
         if (args.TryGetValue("active_group_id", out tmp) && tmp != null)

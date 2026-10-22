@@ -168,6 +168,14 @@ public class BasicScene : PhysicsScene, INonSharedRegionModule
             actorPosition.X += actor.Velocity.X * timeStep;
             actorPosition.Y += actor.Velocity.Y * timeStep;
 
+            // An avatar carried by an object may stand outside the region and its ground is the object, not the
+            // terrain: it only moves by its velocity.
+            if (actor.AllowOutsideRegion)
+            {
+                actor.Position = actorPosition;
+                continue;
+            }
+
             if (actor.Position.Y < 0)
             {
                 actorPosition.Y = 0.1F;
@@ -188,7 +196,12 @@ public class BasicScene : PhysicsScene, INonSharedRegionModule
 
             float terrainHeight = 0;
             if (_heightMap != null)
-                terrainHeight = _heightMap[(int)actor.Position.Y * (int)m_regionExtent.Y + (int)actor.Position.X];
+            {
+                // an avatar that was outside the region is pulled in above: its ground is the nearest terrain
+                float lookupX = Math.Clamp(actor.Position.X, 0f, m_regionExtent.X - 0.1f);
+                float lookupY = Math.Clamp(actor.Position.Y, 0f, m_regionExtent.Y - 0.1f);
+                terrainHeight = _heightMap[(int)lookupY * (int)m_regionExtent.Y + (int)lookupX];
+            }
 
             float height = terrainHeight + actor.Size.Z;
 //                Console.WriteLine("height {0}, actorPosition {1}", height, actorPosition);

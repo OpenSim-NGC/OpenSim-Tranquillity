@@ -1,0 +1,37 @@
+# Copyright (c) 2026 Legion Builds
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# Harness runs whose traces are kept, under traced/<name>/ of the --out folder, so the platforms can be set side by
+# side. Same format as runs.txt.
+# They are not compared with a baseline: runs.txt lists the runs that are.
+
+# Ten 0.5 m boxes stacked on the ground at [Jolt] VelocityIterations 10, 20 and 40, at every step rate: does the tower
+# stand and fall asleep, and when (the console's "part" lines; every box's trace in tower-10-*-parts.csv).
+tower-10-v10: --scenario tower-10 --rate 11 --physics-rate 0,22.5,45,90 --jolt VelocityIterations=10
+tower-10-v20: --scenario tower-10 --rate 11 --physics-rate 0,22.5,45,90 --jolt VelocityIterations=20
+tower-10-v40: --scenario tower-10 --rate 11 --physics-rate 0,22.5,45,90 --jolt VelocityIterations=40
+
+# The vehicle guard figures at [Jolt] VelocityIterations 10 and 20, at one physics step per heartbeat and at 45 Hz:
+# the test car on flat ground and up the 5, 15 and 33 degree ramps, and the parked car (its drift after it comes to
+# rest is read from the per-heartbeat trace).
+guard-testcar-v10: --scenario testcar --rate 11 --physics-rate 0,45 --jolt VelocityIterations=10
+guard-testcar-v20: --scenario testcar --rate 11 --physics-rate 0,45 --jolt VelocityIterations=20
+guard-park-drive-v10: --scenario park-drive --rate 11 --physics-rate 0,45 --jolt VelocityIterations=10
+guard-park-drive-v20: --scenario park-drive --rate 11 --physics-rate 0,45 --jolt VelocityIterations=20
+
+# The car held against a fixed wall with its key down: at 11 Hz for 15 s and for 45 s, and at 45 Hz for 45 s, the
+# length VehicleRestAndCrashTests' wall push test runs: how far it is pushed back out of the wall and when it settles
+# (the trace's x).
+wallpush-11: --scenario crash-wall --rate 11
+wallpush-11-long: --scenario crash-wall --rate 11 --duration 45
+wallpush-45-long: --scenario crash-wall --rate 45 --duration 45
+
+# Banking and mouselook steering, at one physics step per heartbeat and at 45 Hz: the airplane banking into a right turn
+# (its heading in the trace), the car steered by a camera looking north, and the airplane banking toward a camera 60
+# degrees to its right.
+bank-turn: --scenario bank-turn --rate 11 --physics-rate 0,45
+mouselook-turn: --scenario mouselook-turn --rate 11 --physics-rate 0,45
+mouselook-bank: --scenario mouselook-bank --rate 11 --physics-rate 0,45

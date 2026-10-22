@@ -1,0 +1,38 @@
+# Copyright (c) 2026 Legion Builds
+#
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at https://mozilla.org/MPL/2.0/.
+
+# The harness runs the baseline check covers (--check-baseline).
+# One run per line: a name (letters, digits, - and _), a colon, then the harness arguments. Each run writes its
+# per-heartbeat traces and summary.csv under <name>/ of the run's --out folder. Lines starting with # are skipped.
+
+# Scenarios whose results are set side by side between Linux and Windows; earlier joltc builds gave different
+# results on the two.
+crash-headon-11: --scenario crash-headon --rate 11
+crash-box-11: --scenario crash-box --rate 11
+crash-all: --scenario crash-wall,crash-box,crash-headon,crash-drop --rate 11,45
+park-drive-45-legacy: --scenario park-drive --rate 45 --jolt VehiclePresets=legacy
+testcar-down-5: --scenario testcar-down --slope 5 --rate all
+
+# Crash sweep: small changes in the arrival speed, sideways offset and angle, at 11 and 45 Hz. Penetration is the
+# boxes' depth into each other; crash_rise how far either object rose in the second after the impact.
+crash-sweep: --scenario crash-wall,crash-box,crash-headon,crash-drop --rate 11,45 --crash-speed 0.9,0.95,1,1.05,1.1 --crash-offset -0.2,0,0.2 --crash-angle -1,0,1
+
+# Script ray casts: what one costs with its cost bounded (raycast-cost) and made as before, every hit along the ray
+# (raycast-cost-all); the summary's ray_us_per_cast. Pushes on an avatar, a parked car and a sleeping box.
+raycast-cost: --scenario raycast-cost,raycast-cost-all --rate 11 --physics-rate 0,45
+push: --scenario push-avatar,push-flood,push-car,push-box --rate 11 --physics-rate 0,45
+
+# Arriving avatars: one arriving on a fixed platform 3 m above the ground stays on it; one arriving 3 m above the
+# platform, not flying, falls and lands on it. end_z is where each stands.
+avatar-arrive: --scenario avatar-platform,avatar-platform-drop --rate 11,45 --physics-rate 0,45
+
+# [Jolt] VehicleBehaviour = InWorldz (the six InWorldz vehicle behaviours and the InWorldz preset values): a car on
+# level ground, a car driven down a 15 degree ramp, an airplane, and a car turned through 90 degrees by the
+# mouselook camera.
+iw-car-pad: --scenario car --slope 0 --rate 11,45 --jolt VehicleBehaviour=InWorldz
+iw-car-ramp: --scenario car-down --slope 15 --rate 11,45 --jolt VehicleBehaviour=InWorldz
+iw-airplane: --scenario airplane --rate 11,45 --jolt VehicleBehaviour=InWorldz
+iw-mouselook-turn: --scenario mouselook-turn --rate 11 --physics-rate 0,45 --hold 16 --duration 20 --jolt VehicleBehaviour=InWorldz

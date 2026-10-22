@@ -711,6 +711,13 @@
     ; OutboundDisallowForUserScriptsExcept = 192.168.1.2/32
     ;
     ; See http://en.wikipedia.org/wiki/Classless_Inter-Domain_Routing#CIDR_notation for more information on CIDR notation
+    ;
+    ; A host name in OutboundDisallowForUserScriptsExcept is looked up when the region server starts and again
+    ; every OutboundDisallowForUserScriptsExceptRefreshMinutes minutes (default 30), so an exception for a host
+    ; whose address changes (dynamic DNS) keeps working. If a lookup fails the last good addresses are kept.
+    ; Address and network entries are not affected. 0 looks the names up only at start.
+    ;
+    ; OutboundDisallowForUserScriptsExceptRefreshMinutes = 30
 
     ;# {HttpBodyMaxLenMAX} {} {Maximum bytes allowed for HTTP_BODY_MAXLENGTH} {} 16384
     ;; By default, llHTTPRequest limits the response body to 2048 bytes.
@@ -898,6 +905,19 @@
     ;; after its last use, so a value under 5 does not find a change any sooner. Default 30.
     ; RefreshMinutes = 30
 
+    ;# {DnsServers} {} {DNS servers to ask for the host names in Addresses} {} ""
+    ;; Names to ask directly: a comma separated list of DNS server IP addresses. Empty (the default) leaves every
+    ;; host name in Addresses to the operating system resolver, as described above. When set, a host name written
+    ;; after "=" in an Addresses entry is looked up by asking these servers for its A record, in the order
+    ;; given until one answers, at start and every RefreshMinutes. The hosts file is then not consulted for those
+    ;; names, so a name that this machine maps to a private address (so that traffic between your own servers
+    ;; stays inside your network) can still be given to outside viewers as its current public address. A server
+    ;; that does not answer within 2 seconds is skipped. If none answers, the last good address is kept; if there
+    ;; has never been one, the operating system answer is used, and a warning is logged on each refresh. Only the
+    ;; names written in Addresses are looked up this way. Servers are queried on UDP port 53.
+    ;; Example: DnsServers = "192.0.2.53, 198.51.100.53"
+    ; DnsServers = ""
+
     ;# {LocalAddress} {} {Address of this machine that viewers on a local network use} {} ""
     ;; For regions that run on more than one machine: the IPv4 address of THIS machine that viewers on your
     ;; local network use to reach its regions. Each region registers it with the grid, and the other regions
@@ -929,6 +949,18 @@
     ;; and telehubs. Historically, there has been a difference: OpenSim (OS) has honored landing points and telehubs even for
     ;; avatars with god permissions; SL lets gods land wherever they want.
     ;LandingPointBehavior = LandingPointBehavior_OS
+
+    ;# {EnableStandingRiderCrossing} {} {Carry avatars standing on an object across a region border with it.} {false true} false
+    ;; Crossing of objects with the avatars on them: one setting for the whole feature, off by default.
+    ;; On: an avatar standing on an object (a ferry, a train, a platform) is carried across a region border with it,
+    ;; the object and its riders are frozen until the crossing is complete, the region that receives the object holds it
+    ;; at rest until its riders have arrived (10 seconds at most), the region that sends it hides its old copy from its
+    ;; viewers meanwhile, the riders' attachment scripts wait with the object, and a rider that the other region will not
+    ;; take stays behind with an alert. Tracking which object each avatar stands on starts with it.
+    ;; A region with this on tells its neighbours so; a neighbour without it (or with it off) is treated as an older
+    ;; region: a standing rider is not carried to it, and an object is sent to it as before.
+    ;; Off: objects cross as they did before this feature: avatars standing on one are left behind.
+    ;EnableStandingRiderCrossing = false
 
 [Messaging]
     ;# {OfflineMessageModule} {} {Module to use for offline message storage} {OfflineMessageModule "Offline Message Module V2" *}
