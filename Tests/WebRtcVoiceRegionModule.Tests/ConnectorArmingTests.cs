@@ -110,10 +110,8 @@ namespace osWebRtcVoice.Tests
             lo.SetLandBitmap(lo.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
             // These tests are about a connector on the ESTATE channel - every assertion below
             // names rig.EstateRoom - so the parcel has to say so. The sim resolves a connector's room from
-            // its parcel (ConnectorRoomResolver), and resolves an agent with no room record the same way;
-            // on a parcel WITHOUT this flag both answer with the parcel's own room, which is correct and is
-            // covered by ConnectorRoomResolverTests and RoomAddressingTests O1. Without the flag, the
-            // mixer-restart test's fresh-service case would be asserting the wrong room.
+            // its parcel (ConnectorRoomResolver); on a parcel WITHOUT this flag that is the parcel's own room,
+            // which is correct and is covered by ConnectorRoomResolverTests.
             lo.LandData.Flags |= (uint)ParcelFlags.UseEstateVoiceChan;
             rig.Parcel = lmm.AddLandObject(lo);
             rig.Scene.Permissions.OnIsAdministrator += _ => false;   // an empty test scene is otherwise god-mode for all
@@ -301,6 +299,9 @@ namespace osWebRtcVoice.Tests
             // A new feeder start is a new authority, so a new room_epoch: the first snapshot arms both again.
             rig.Svc.Stop();
             StartService(rig, armingEnabled: true);
+            // The new service starts with no room records; each agent is placed again by a provision into its room.
+            rig.Svc.OnListenerProvisioned(npc, rig.EstateRoom);
+            rig.Svc.OnListenerProvisioned(Avatar, rig.EstateRoom);
             OSDMap fresh = WaitFor(rig.Transport, 0, m => IsReplace(m) && Names(m, npc) && Names(m, Avatar),
                 "the new epoch's snapshot naming the NPC and the avatar");
             AssertArmingReplace(fresh, rig, npc);
