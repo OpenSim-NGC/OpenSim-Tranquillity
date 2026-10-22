@@ -173,6 +173,7 @@ public abstract class PhysicsActor
     public delegate void RequestTerseUpdate();
     public delegate void CollisionUpdate(EventArgs e);
     public delegate void OutOfBounds(Vector3 pos);
+    public delegate void ComplexityError(string detail);
     public delegate CameraData GetCameraData();
 
     // disable warning: public events
@@ -190,8 +191,23 @@ public abstract class PhysicsActor
     public event CollisionUpdate OnCollisionUpdate;
 
     public event OutOfBounds OnOutOfBounds;
+
+    /// <summary>
+    /// Raised by an engine that limits how complex a physical object may be, when the object this actor belongs to is
+    /// over that limit. The argument is the part of the owner's message after "Object was too complex to be made
+    /// physical: ", for example "(300 of 256 convex hulls)". The scene alerts the owner and makes the object
+    /// non-physical. Only the root part's actor is listened to, as for <see cref="OnOutOfBounds"/>.
+    /// </summary>
+    public event ComplexityError OnComplexityError;
 #pragma warning restore 67
 
+
+    /// <summary>
+    /// Set by the region for an avatar that an object carries across a border: the avatar may be outside the region's
+    /// bounds (it stands behind the object's centre, which has just crossed in) and the engine must not pull it inside.
+    /// Only avatar actors read it. Cleared as soon as the avatar is no longer carried.
+    /// </summary>
+    public bool AllowOutsideRegion { get; set; }
 
     public CameraData TryGetCameraData()
     {
@@ -271,6 +287,39 @@ public abstract class PhysicsActor
     public virtual void CrossingStart() { }
     public abstract void CrossingFailure();
 
+    /// <summary>
+    /// Holds a physical object still where it is, keeping the velocity it has: gravity, its own motion and what touches
+    /// it do not move it, and it still stops what runs into it. An object that crossed into the region together with
+    /// avatars is held like this until they have arrived. No effect on an actor that is not physical.
+    /// </summary>
+    public virtual void HoldStill() { }
+
+    /// <summary>Ends <see cref="HoldStill"/>: the object moves on from where it is with the velocity it was held with.</summary>
+    public virtual void ReleaseHold() { }
+
+    /// <summary>
+    /// Ends <see cref="HoldStill"/> for an object that was held for <paramref name="heldSeconds"/>. An engine that keeps the
+    /// object's travel across the wait moves it on by its velocity times that time (above the ground, and not into another
+    /// body) before it lets go; the default only lets go, so the object resumes from where it was held.
+    /// </summary>
+    public virtual void ReleaseHold(float heldSeconds) { ReleaseHold(); }
+
+    /// <summary>
+    /// Whether an object that has just crossed into the region with avatars is kept from crossing out again for a short
+    /// time (<c>RideOnLimits.RecrossWaitMs</c>), so that the avatars that are still arriving are not carried out again. The
+    /// default is false: such an object may cross at once.
+    /// </summary>
+    public virtual bool WaitsBeforeCrossingBack => false;
+
+    /// <summary>
+    /// Tells an actor whose <see cref="WaitsBeforeCrossingBack"/> is true that its wait before crossing out again has
+    /// begun (<paramref name="keep"/> true) or is over (false). While it runs, an engine that takes a body out of the
+    /// simulation at the region's border keeps this one inside instead: it is stopped at the border and the avatars
+    /// standing on it are moved back with it, so that they stay on it. Halcyon does the same, leaving the object
+    /// in its scene and setting it back inside the region (PhysxPrim.CrossingFailure). The default does nothing.
+    /// </summary>
+    public virtual void KeepInsideBorder(bool keep) { }
+
     public abstract void link(PhysicsActor obj);
 
     public abstract void delink();
@@ -286,6 +335,25 @@ public abstract class PhysicsActor
     {
         OnOutOfBounds?.Invoke(pos);
     }
+
+    public virtual void RaiseComplexityError(string detail)
+    {
+        OnComplexityError?.Invoke(detail);
+    }
+
+    /// <summary>
+    /// Whether the engine lets a physical vehicle (an object with a vehicle type set) be dragged with the mouse. When it
+    /// does, it runs the object's grab target in place of the vehicle's own controller while the drag lasts (see
+    /// <see cref="Grabbed"/>). The default is false, so core refuses the drag, as it does for an engine that never reads a
+    /// vehicle's targets.
+    /// </summary>
+    public virtual bool AllowsVehicleGrab => false;
+
+    /// <summary>
+    /// Whether setting a vehicle type from a script also stops the object's rotation look-at (llRotLookAt) and move-to
+    /// target (llMoveToTarget), as InWorldz did. The default is false: a type change leaves them as they are.
+    /// </summary>
+    public virtual bool VehicleTypeStopsTargets => false;
 
     public virtual void SendCollisionUpdate(EventArgs e)
     {
@@ -324,6 +392,12 @@ public abstract class PhysicsActor
     public virtual void CaptureVehicleRunningState(ref VehicleData vd)
     {
     }
+
+    // Whether this engine wants the move-to target, the hover and the look-at of a physical object to go on in the next region
+    // when core crosses the object. Core writes them into the saved object only for an actor that answers true, and hands
+    // them back through the usual setters once the neighbour has made the object's actor. The default is false: they stop at
+    // the border, as they always did.
+    public virtual bool CarriesTargetsAcrossCrossing => false;
 
     // This is an overridable version of SetVehicle() that works for all physics engines.
     // This is VERY inefficient. It behoves any physics engine to override this and
@@ -399,6 +473,13 @@ public abstract class PhysicsActor
         }
     }
 
+    /// <summary>
+    /// True when <see cref="PhysicsCost"/> is a count of collision shapes (the engine's own measure of how heavy the
+    /// object is to simulate) and is reported as it is. Otherwise it is a per-part weight that the scene scales up
+    /// by the part's size while the part is physical.
+    /// </summary>
+    public virtual bool PhysicsCostIsShapeCount => false;
+
     public virtual float StreamCost
     {
         get
@@ -456,6 +537,12 @@ public abstract class PhysicsActor
     public abstract PIDHoverType PIDHoverType { set;}
     public abstract float PIDHoverTau { set;}
 
+    /// <summary>
+    /// llGroundRepel: with a hover set, the hover only pushes the object up (it never pulls it down to its height). Set
+    /// before PIDHoverActive, as the hover's other members are. An engine that does not tell a repel from a hover ignores it.
+    /// </summary>
+    public virtual bool PIDHoverRepel { set { return; } }
+
     // For RotLookAt
     public abstract Quaternion APIDTarget { set;}
     public abstract bool APIDActive { set;}
@@ -482,6 +569,23 @@ public abstract class PhysicsActor
     /// The default does nothing, so an engine that does not support it leaves the avatar as it was.
     /// </remarks>
     public virtual void SetConstantForce(Vector3 force, bool local) { }
+
+    /// <summary>
+    /// The constant force of llSetForce on a physical object. <paramref name="force"/> is in region axes: for a call with
+    /// local = TRUE the script layer has already turned the vector by the calling prim's rotation at the moment of the call.
+    /// <paramref name="local"/> says the script gave it in the object's own axes, so an engine that integrates forces more
+    /// often than once per frame may keep the vector in the object's frame and turn it with the object on every step
+    /// (JoltPrim does). A new call replaces the previous force, and a zero force ends it. The default sets <see cref="Force"/>,
+    /// the region-axes vector, which is what every engine did before this call existed.
+    /// </summary>
+    public virtual void SetScriptForce(Vector3 force, bool local) { Force = force; }
+
+    /// <summary>
+    /// The constant torque of llSetTorque on a physical object, with the same contract as <see cref="SetScriptForce"/>:
+    /// region axes, <paramref name="local"/> only says that the script gave it in the object's own axes. The default sets
+    /// <see cref="Torque"/>.
+    /// </summary>
+    public virtual void SetScriptTorque(Vector3 torque, bool local) { Torque = torque; }
 
     public abstract void AvatarJump(float forceZ);
     public abstract void AddAngularForce(Vector3 force, bool pushforce);

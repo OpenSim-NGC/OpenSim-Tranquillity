@@ -1040,6 +1040,58 @@ public class OdePrim : PhysicsActor
         }
     }
 
+    // Held still (PhysicsActor.HoldStill): queued like every other change, so that it runs after the prim was made and its
+    // velocity set, which are queued too.
+    public override void HoldStill()
+    {
+        AddChange(Changes.HoldStill, null);
+    }
+
+    public override void ReleaseHold()
+    {
+        AddChange(Changes.ReleaseHold, null);
+    }
+
+    // The body is stopped and disabled, so that it is not stepped: gravity and what touches it do not move it. Unlike
+    // CrossingStart its geoms keep their collision bits, so an avatar still finds it solid. m_outbounds is set as for a
+    // crossing: velocity changes are then only remembered (changevelocity, the Velocity setter) and no force wakes the
+    // body (the checks of !m_outbounds), so the velocity the prim had is still there for ReleaseHold.
+    private void changeHoldStill()
+    {
+        if (m_held || m_outbounds || childPrim || !m_isphysical || Body == IntPtr.Zero)
+            return;
+
+        m_held = true;
+        m_outbounds = true;
+
+        _velocity = UBOdeNative.BodyGetLinearVelOMV(Body);
+        m_rotationalVelocity = UBOdeNative.BodyGetAngularVelOMV(Body);
+
+        UBOdeNative.BodySetLinearVel(Body, 0, 0, 0);
+        UBOdeNative.BodySetAngularVel(Body, 0, 0, 0);
+        UBOdeNative.BodyDisable(Body);
+    }
+
+    private void changeReleaseHold()
+    {
+        if (!m_held)
+            return;
+
+        m_held = false;
+        m_outbounds = false;
+
+        if (Body != IntPtr.Zero)
+        {
+            UBOdeNative.BodySetAutoDisableSteps(Body, m_body_autodisable_frames);
+            UBOdeNative.BodyEnable(Body);
+        }
+
+        changevelocity(_velocity);
+        changeangvelocity(m_rotationalVelocity);
+    }
+
+    private bool m_held;
+
     public override void SetMomentum(Vector3 momentum)
     {
     }
@@ -4202,6 +4254,14 @@ public class OdePrim : PhysicsActor
 
             case Changes.SetInertia:
                 changeInertia((PhysicsInertiaData) arg);
+                break;
+
+            case Changes.HoldStill:
+                changeHoldStill();
+                break;
+
+            case Changes.ReleaseHold:
+                changeReleaseHold();
                 break;
 
             case Changes.Null:

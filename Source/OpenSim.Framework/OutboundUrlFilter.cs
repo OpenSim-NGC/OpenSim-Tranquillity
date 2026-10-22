@@ -63,6 +63,36 @@ public class OutboundUrlFilter
     private List<IPEndPoint> m_blacklistExceptionEndPoints;
 
     /// <summary>
+    /// How often the host names in the exception list are looked up again, in minutes, when the config does not
+    /// say. Zero keeps the addresses found when the filter was built.
+    /// </summary>
+    public const int DefaultExceptionRefreshMinutes = 30;
+
+    /// <summary>
+    /// A host named in the exception list, with the IPv4 addresses it last answered. Replaced, never changed, so a
+    /// request reading it while a refresh runs sees either the old answer or the new one.
+    /// </summary>
+    private sealed class HostException
+    {
+        public HostException(string host, int port, IPAddress[] addresses)
+        {
+            Host = host;
+            Port = port;
+            Addresses = addresses;
+        }
+
+        public string Host { get; }
+        public int Port { get; }
+        public IPAddress[] Addresses { get; }
+    }
+
+    private volatile HostException[] m_hostExceptions = Array.Empty<HostException>();
+    private readonly TimeProvider m_time = TimeProvider.System;
+    private TimeSpan m_exceptionRefreshInterval = TimeSpan.Zero;
+    private long m_nextExceptionRefreshTicks;
+    private int m_exceptionRefreshRunning;
+
+    /// <summary>
     /// Resolves a host name to its addresses. Dns by default; replaceable so the address handling can be tested
     /// without a name server.
     /// </summary>
@@ -91,16 +121,21 @@ public class OutboundUrlFilter
     /// <param name="name">Name of the filter for logging purposes.</param>
     /// <param name="config">Filter configuration</param>
     /// <param name="resolver">Replaces the name lookup; Dns when null.</param>
+    /// <param name="timeProvider">Replaces the clock that times the refresh of host exceptions; the system clock when null.</param>
     public OutboundUrlFilter(
-        string name, IConfigSource config, Func<string, CancellationToken, ValueTask<IPAddress[]>> resolver = null)
+        string name, IConfigSource config, Func<string, CancellationToken, ValueTask<IPAddress[]>> resolver = null,
+        TimeProvider timeProvider = null)
     {
         Name = name;
         if (resolver is not null)
             m_resolver = resolver;
+        if (timeProvider is not null)
+            m_time = timeProvider;
 
         string configBlacklist
             = "0.0.0.0/8|10.0.0.0/8|100.64.0.0/10|127.0.0.0/8|169.254.0.0/16|172.16.0.0/12|192.0.0.0/24|192.0.2.0/24|192.88.99.0/24|192.168.0.0/16|198.18.0.0/15|198.51.100.0/24|203.0.113.0/24|224.0.0.0/4|240.0.0.0/4|255.255.255.255/32";
         string configBlacklistExceptions = "";
+        int refreshMinutes = DefaultExceptionRefreshMinutes;
 
         IConfig networkConfig = config.Configs["Network"];
 
@@ -109,6 +144,8 @@ public class OutboundUrlFilter
             configBlacklist = networkConfig.GetString("OutboundDisallowForUserScripts", configBlacklist);
             configBlacklistExceptions
                 = networkConfig.GetString("OutboundDisallowForUserScriptsExcept", configBlacklistExceptions);
+            refreshMinutes
+                = networkConfig.GetInt("OutboundDisallowForUserScriptsExceptRefreshMinutes", refreshMinutes);
         }
 
         m_log.LogDebug(
@@ -118,12 +155,45 @@ public class OutboundUrlFilter
 
         OutboundUrlFilter.ParseConfigList(
             configBlacklist, Name, out m_blacklistNetworks, out m_blacklistEndPoints);
+        // Host names in the exception list are kept as names, so a refresh can look them up again. Address and
+        // network entries are fixed.
+        List<(string Host, int Port)> exceptionHosts = new();
         OutboundUrlFilter.ParseConfigList(
-            configBlacklistExceptions, Name, out m_blacklistExceptionNetworks, out m_blacklistExceptionEndPoints);
+            configBlacklistExceptions, Name, out m_blacklistExceptionNetworks, out m_blacklistExceptionEndPoints,
+            (host, port) => exceptionHosts.Add((host, port)));
+
+        // Zero (or a negative number) keeps the start-time answers for good.
+        m_exceptionRefreshInterval = refreshMinutes > 0 ? TimeSpan.FromMinutes(refreshMinutes) : TimeSpan.Zero;
+        m_nextExceptionRefreshTicks = (m_time.GetUtcNow() + m_exceptionRefreshInterval).UtcTicks;
+
+        m_hostExceptions = exceptionHosts.Select(h =>
+        {
+            IPAddress[] addresses = LookUpIPv4(h.Host, CancellationToken.None).AsTask().GetAwaiter().GetResult();
+            if (addresses is null)
+            {
+                m_log.LogWarning(
+                    "[OUTBOUND URL FILTER]: Exception host {0}:{1} for {2} did not resolve to an IPv4 address{3}",
+                    h.Host, h.Port, Name, m_exceptionRefreshInterval > TimeSpan.Zero ? "; it will be tried again" : "");
+                addresses = Array.Empty<IPAddress>();
+            }
+            else
+            {
+                m_log.LogInformation(
+                    "[OUTBOUND URL FILTER]: Exception host {0}:{1} for {2} is {3}",
+                    h.Host, h.Port, Name, Describe(addresses));
+            }
+
+            return new HostException(h.Host, h.Port, addresses);
+        }).ToArray();
     }
 
+    /// <summary>
+    /// Parses a list of networks and endpoints. When <paramref name="onHostName"/> is given, an endpoint entry that
+    /// names a host (rather than an IP address) is passed to it instead of being looked up here.
+    /// </summary>
     private static void ParseConfigList(
-        string fullConfigEntry, string filterName, out List<IPNetwork> networks, out List<IPEndPoint> endPoints)
+        string fullConfigEntry, string filterName, out List<IPNetwork> networks, out List<IPEndPoint> endPoints,
+        Action<string, int> onHostName = null)
     {
         // Parse blacklist
         string[] configBlacklistEntries
@@ -160,6 +230,12 @@ public class OutboundUrlFilter
                         "[OUTBOUND URL FILTER]: EndPoint entry [{0}] is invalid endpoint for {1}",
                         configEntry, filterName);
 
+                    continue;
+                }
+
+                if (onHostName is not null && !IPAddress.TryParse(configEntryUri.Host, out _))
+                {
+                    onHostName(configEntryUri.IdnHost, configEntryUri.Port);
                     continue;
                 }
 
@@ -256,8 +332,96 @@ public class OutboundUrlFilter
         if (!OutboundUrlFilter.IsInNetwork(addr, port, m_blacklistNetworks, m_blacklistEndPoints, Name))
             return true;
 
-        return OutboundUrlFilter.IsInNetwork(addr, port, m_blacklistExceptionNetworks, m_blacklistExceptionEndPoints, Name);
+        if (OutboundUrlFilter.IsInNetwork(addr, port, m_blacklistExceptionNetworks, m_blacklistExceptionEndPoints, Name))
+            return true;
+
+        foreach (HostException exception in m_hostExceptions)
+        {
+            if (exception.Port == port && Array.Exists(exception.Addresses, a => a.Equals(addr)))
+                return true;
+        }
+
+        return false;
     }
+
+    private static string Describe(IPAddress[] addresses)
+        => string.Join(", ", addresses.Select(a => a.ToString()).OrderBy(a => a, StringComparer.Ordinal));
+
+    /// <summary>
+    /// Looks a host up and keeps its IPv4 addresses. Null when the lookup fails or gives no IPv4 address.
+    /// </summary>
+    private async ValueTask<IPAddress[]> LookUpIPv4(string host, CancellationToken cancellationToken)
+    {
+        try
+        {
+            IPAddress[] answer = await m_resolver(host, cancellationToken).ConfigureAwait(false);
+            IPAddress[] v4 = answer?.Where(a => a.AddressFamily == AddressFamily.InterNetwork).ToArray();
+            return v4 is { Length: > 0 } ? v4 : null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            m_log.LogWarning(
+                "[OUTBOUND URL FILTER]: Lookup of exception host {0} for {1} failed: {2}", host, Name, e.Message);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Looks the host names in the exception list up again once the refresh interval has passed. A host whose
+    /// lookup fails, or answers no IPv4 address, keeps its last good addresses. The answer is cached until the
+    /// interval passes again, and when a refresh is already running the caller does not wait for it or repeat it:
+    /// it is judged on the addresses held until now.
+    /// </summary>
+    private async ValueTask RefreshHostExceptions(CancellationToken cancellationToken)
+    {
+        if (!HostExceptionRefreshDue())
+            return;
+
+        if (Interlocked.CompareExchange(ref m_exceptionRefreshRunning, 1, 0) != 0)
+            return;
+
+        try
+        {
+            // A refresh that finished while this caller was getting here has already done the work.
+            if (!HostExceptionRefreshDue())
+                return;
+
+            HostException[] current = m_hostExceptions;
+            HostException[] next = new HostException[current.Length];
+            for (int i = 0; i < current.Length; i++)
+            {
+                HostException held = current[i];
+                IPAddress[] answer = await LookUpIPv4(held.Host, cancellationToken).ConfigureAwait(false);
+                if (answer is null || Describe(answer) == Describe(held.Addresses))
+                {
+                    next[i] = held;
+                    continue;
+                }
+
+                m_log.LogInformation(
+                    "[OUTBOUND URL FILTER]: Exception host {0}:{1} for {2} changed from [{3}] to [{4}]",
+                    held.Host, held.Port, Name, Describe(held.Addresses), Describe(answer));
+                next[i] = new HostException(held.Host, held.Port, answer);
+            }
+
+            m_hostExceptions = next;
+            Volatile.Write(
+                ref m_nextExceptionRefreshTicks, (m_time.GetUtcNow() + m_exceptionRefreshInterval).UtcTicks);
+        }
+        finally
+        {
+            Volatile.Write(ref m_exceptionRefreshRunning, 0);
+        }
+    }
+
+    private bool HostExceptionRefreshDue()
+        => m_exceptionRefreshInterval > TimeSpan.Zero
+            && m_hostExceptions.Length > 0
+            && m_time.GetUtcNow().UtcTicks >= Volatile.Read(ref m_nextExceptionRefreshTicks);
 
     /// <summary>
     /// Checks whether the given url is allowed by the filter. This looks the host up once and refuses early; it does
@@ -271,6 +435,8 @@ public class OutboundUrlFilter
         bool foundIpv4Address = false;
 
         IPAddress[] addresses = null;
+
+        RefreshHostExceptions(CancellationToken.None).AsTask().GetAwaiter().GetResult();
 
         try
         {
@@ -412,6 +578,8 @@ public class OutboundUrlFilter
         DnsEndPoint endPoint = context.DnsEndPoint;
         if (!GoesToTarget(context))
             return await (proxyConnector ?? ConnectProxy)(endPoint, cancellationToken).ConfigureAwait(false);
+
+        await RefreshHostExceptions(cancellationToken).ConfigureAwait(false);
 
         IPAddress[] addresses = await m_resolver(endPoint.Host, cancellationToken).ConfigureAwait(false);
 

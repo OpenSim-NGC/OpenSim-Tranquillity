@@ -1,0 +1,29 @@
+<!--
+  Copyright (c) 2026 Legion Builds
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<!--
+  Imported by the applications that carry the Jolt module (the region server, the Jolt tests and the Jolt harness).
+
+  The joltc native comes from the JoltPhysics.Native package, which JoltPhysicsSharp depends on: its files land in
+  the output under runtimes/<rid>/native/ (or, for a build or publish for one runtime identifier, beside the
+  application's assemblies). The package also carries files the module never loads: joltc_double.dll, a
+  double-precision build for win-x64 and win-arm64 (the module runs single precision, Foundation.Init(false)), and
+  builds for Android, which has no region server. This keeps those out of the output, so each platform folder holds
+  the one joltc the module checks and loads (JoltNative.cs).
+-->
+<Project>
+  <Target Name="JoltDropUnusedNatives" AfterTargets="ResolvePackageAssets">
+    <ItemGroup>
+      <_JoltUnusedNative Include="@(RuntimeTargetsCopyLocalItems)"
+                         Condition="'%(NuGetPackageId)' == 'JoltPhysics.Native' and ('%(Filename)' == 'joltc_double' or $([System.String]::Copy('%(RuntimeIdentifier)').StartsWith('android')))" />
+      <_JoltUnusedNative Include="@(NativeCopyLocalItems)"
+                         Condition="'%(NuGetPackageId)' == 'JoltPhysics.Native' and '%(Filename)' == 'joltc_double'" />
+      <RuntimeTargetsCopyLocalItems Remove="@(_JoltUnusedNative)" />
+      <NativeCopyLocalItems Remove="@(_JoltUnusedNative)" />
+    </ItemGroup>
+  </Target>
+</Project>

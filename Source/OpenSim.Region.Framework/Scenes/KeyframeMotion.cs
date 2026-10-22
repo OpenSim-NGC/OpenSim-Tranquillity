@@ -231,6 +231,10 @@ public class KeyframeMotion
 
     private bool m_running = false;
 
+    // set while the object waits for the avatars that crossed with it: the motion is set up but not started
+    [NonSerialized()]
+    private bool m_holdStart;
+
     [NonSerialized()]
     private bool m_selected = false;
 
@@ -526,6 +530,13 @@ public class KeyframeMotion
         m_waitingCrossing = false;
         if (m_keyframes != null && m_group != null && m_keyframes.Length > 0)
         {
+            if (m_holdStart)
+            {
+                StopTimer();
+                m_running = true;
+                return;
+            }
+
             StartTimer();
             m_running = true;
             UpdatePhysicsHint();
@@ -537,6 +548,25 @@ public class KeyframeMotion
             m_running = false;
             UpdatePhysicsHint();
         }
+    }
+
+    /// <summary>
+    /// Until <see cref="ReleaseHold"/>, <see cref="Start"/> sets the motion up without running it: used for an object
+    /// that arrived with avatars, which must be on it before it moves.
+    /// </summary>
+    public void HoldStart()
+    {
+        m_holdStart = true;
+    }
+
+    public void ReleaseHold()
+    {
+        if (!m_holdStart)
+            return;
+
+        m_holdStart = false;
+        if (m_running)
+            Start();
     }
 
     public void Stop()

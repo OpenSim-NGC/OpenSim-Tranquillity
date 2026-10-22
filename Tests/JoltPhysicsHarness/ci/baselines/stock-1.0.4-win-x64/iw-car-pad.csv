@@ -1,0 +1,3 @@
+scenario,slope_deg,rate_hz,steps,top_speed,release_t,release_speed,steady_speed,steady_hspeed,dist_before_release,dist_after_release,time_to_rest,peak_height,peak_rise,z_range,max_tilt_deg,end_x,end_y,end_z,left_region_t,nonfinite,sleep_after,active_at_end,impact_t,arrival_speed,leaving_speed,penetration,tunneled,push_range_early,push_range_late,push_penetration,crash_rise,ray_casts,ray_us_per_cast,ray_refused,ray_cut_short
+car,0,11,79,7.816,3.000,7.816,7.607,7.607,14.566,2.907,3.182,0.250,0.002,0.020,0.2,182.475,85.002,25.234,-,0,3.727,0,-,-,-,-,0,-,-,-,-,0,-,0,0
+car,0,45,325,7.876,3.000,7.876,7.623,7.623,14.692,3.084,3.222,0.267,0.000,0.004,0.1,182.776,85.000,25.246,-,0,3.733,0,-,-,-,-,0,-,-,-,-,0,-,0,0
