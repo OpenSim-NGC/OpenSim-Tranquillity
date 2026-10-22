@@ -75,6 +75,7 @@
     <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.POS/OpenSim.Region.PhysicsModules.POS.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.ubODE/OpenSim.Region.PhysicsModules.ubODE.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.ubODEMeshing/OpenSim.Region.PhysicsModules.ubODEMeshing.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Jolt/OpenSim.Region.PhysicsModules.Jolt.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.Shared/OpenSim.Region.ScriptEngine.Shared.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Region.ScriptEngine.YEngine/OpenSim.Region.ScriptEngine.YEngine.csproj" />
     <!-- Phlox flows to output like YEngine so its full dependency closure (InWorldz.Phlox,
@@ -96,6 +97,10 @@
     <PackageReference Include="Autofac" Version="9.3.4" />
     <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="11.0.2" />
   </ItemGroup>
+
+  <!-- The Jolt physics module's native joltc comes from the JoltPhysics.Native package, under runtimes/<rid>/native/
+       (see native/joltc/README.md); this keeps the package's unused double-precision build out of the output. -->
+  <Import Project="../../Source/OpenSim.Region.PhysicsModules.Jolt.Backend/JoltNative.targets" />
 
   <ItemGroup>
     <!-- Include all files within the 'AppData' folder and its subfolders. -->

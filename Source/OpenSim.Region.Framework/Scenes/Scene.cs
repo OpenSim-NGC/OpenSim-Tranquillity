@@ -222,6 +222,15 @@ public partial class Scene : SceneBase
     /// </summary>
     public bool AllowAvatarCrossing { get; set; }
 
+    /// <summary>
+    /// [EntityTransfer] EnableStandingRiderCrossing, default false: the whole of the rider crossing feature. On, avatars
+    /// standing on an object are tracked and carried across a border with it, the object and its riders are frozen until
+    /// the crossing is complete, the receiving region holds the object until they have arrived, the sending region hides
+    /// its old copy meanwhile, and the riders' attachment scripts wait with it; the region answers yes to the
+    /// carried-rider and held-crossing questions of its neighbours. Off, an object crosses as it did before.
+    /// </summary>
+    public bool EnableStandingRiderCrossing { get; set; }
+
     /// Max prims an Physical object will hold
     /// </summary>
     ///
@@ -1130,8 +1139,11 @@ public partial class Scene : SceneBase
         {
             AllowAvatarCrossing = entityTransferConfig.GetBoolean("AllowAvatarCrossing", AllowAvatarCrossing);
             DisableObjectTransfer = entityTransferConfig.GetBoolean("DisableObjectTransfer", false);
+            EnableStandingRiderCrossing = entityTransferConfig.GetBoolean("EnableStandingRiderCrossing", false);
             ScriptRezzedObjectsDieAtEdge = entityTransferConfig.GetBoolean("ScriptRezzedObjectsDieAtEdge", false);
         }
+
+        m_log.LogInformation($"[SCENE]: {Name}: [EntityTransfer] EnableStandingRiderCrossing is {(EnableStandingRiderCrossing ? "on" : "off")}");
 
         #region Interest Management
 
@@ -1728,6 +1740,7 @@ public partial class Scene : SceneBase
                 if (Frame % 4 == 0)
                 {
                     CheckTerrainUpdates();
+                    ReleaseExpiredCrossingHolds();
                 }
 
                 if (Frame % m_update_terrain == 0)
@@ -3051,13 +3064,46 @@ public partial class Scene : SceneBase
             return false;
         }
 
-        if (!EntityTransferModule.HandleIncomingSceneObject(newObject, newPosition))
+        // an object that came with no riders to wait for is not kept from crossing out again; the arrival with riders
+        // (IncomingCreateObject with a hold) sets the stamp after this
+        newObject.ArrivedWithRidersAtMs = double.NaN;
+
+        bool taken;
+        try
+        {
+            taken = EntityTransferModule.HandleIncomingSceneObject(newObject, newPosition);
+        }
+        catch (Exception e)
+        {
+            // The object may be in the region already, half taken in. The sending region keeps its original when this
+            // answers false, so the copy here goes: two copies of one object must not be left.
+            m_log.LogError(e, $"[INTERREGION]: Taking in {newObject.Name} {newObject.UUID} failed with {e.GetType().Name}: {e.Message}");
+            DiscardIncomingObject(newObject);
+            return false;
+        }
+
+        if (!taken)
             return false;
 
         // Do this as late as possible so that listeners have full access to the incoming object
         EventManager.TriggerOnIncomingSceneObject(newObject);
 
         return true;
+    }
+
+    /// <summary>Removes an incoming object whose arrival failed half way, if this region holds that very object.</summary>
+    private void DiscardIncomingObject(SceneObjectGroup newObject)
+    {
+        try
+        {
+            newObject.HeldForRiders = false;
+            if (ReferenceEquals(GetSceneObjectGroup(newObject.UUID), newObject))
+                DeleteSceneObject(newObject, false, true);
+        }
+        catch (Exception e)
+        {
+            m_log.LogError(e, $"[INTERREGION]: Removing the half-taken {newObject.Name} {newObject.UUID} failed with {e.GetType().Name}: {e.Message}");
+        }
     }
 
     public bool IncomingAttechments(ScenePresence sp, List<SceneObjectGroup> attachments)
@@ -3161,7 +3207,8 @@ public partial class Scene : SceneBase
                 m_log.LogError("[SCENE]: Owner ID for non-attachment {0} was zero", sceneObject.UUID);
                 return false;
             }
-            AddRestoredSceneObject(sceneObject, true, false);
+            // false when an object with this id is already here: the caller must not go on as if this one had been added
+            return AddRestoredSceneObject(sceneObject, true, false);
         }
 
         return true;

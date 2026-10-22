@@ -150,6 +150,9 @@ public enum Changes : int
     SetVehicle,
     SetInertia,
 
+    HoldStill,          // arg null. Stops a physical prim where it is, keeping its velocity, until ReleaseHold
+    ReleaseHold,        // arg null. Lets it move on with the velocity it was held with
+
     Null             //keep this last used do dim the methods array. does nothing but pulsing the prim
 }
 
@@ -1261,9 +1264,12 @@ public partial class ODEScene : PhysicsScene
     }
 
     public override PhysicsActor AddAvatar(uint localID, string avName, Vector3 position, Vector3 size, float feetOffset, bool isFlying)
+        => AddAvatar(localID, avName, position, size, feetOffset, isFlying, false);
+
+    public override PhysicsActor AddAvatar(uint localID, string avName, Vector3 position, Vector3 size, float feetOffset, bool isFlying, bool allowOutsideRegion)
     {
         OdeCharacter newAv = new(localID, avName, this, position,
-            size, feetOffset, avDensity, avMovementDivisorWalk, avMovementDivisorRun)
+            size, feetOffset, avDensity, avMovementDivisorWalk, avMovementDivisorRun, allowOutsideRegion)
         {
             Flying = isFlying,
             MinimumGroundFlightOffset = minimumGroundFlightOffset
