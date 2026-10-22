@@ -51,6 +51,7 @@ public partial class WebRtcJanusService
     /// <summary>Janus core's "No such session" (`janus: error`, code 458): the session id is gone, as it is for every
     /// session after the mixer restarts.</summary>
     public const int JANUS_NO_SUCH_SESSION_ERROR_CODE = 458;
+    public const int JANUS_NO_SUCH_HANDLE_ERROR_CODE = 459;
 
     /// <summary>: the mixer's "No such room" on a join (`Request error 485: No such room (n)`).</summary>
     public const int JANUS_NO_SUCH_ROOM_ERROR_CODE = 485;
