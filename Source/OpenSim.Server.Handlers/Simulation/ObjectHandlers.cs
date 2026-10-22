@@ -124,6 +124,28 @@ public class ObjectSimpleHandler : SimpleStreamHandler
         destination.RegionLocY = y;
         destination.RegionName = regionname;
 
+        // The messages of a crossing that is held until its riders arrive share this path with the object itself
+        string action = args.ContainsKey("action") && args["action"] != null ? args["action"].AsString() : string.Empty;
+        switch (action)
+        {
+            case "supports_held":
+                RespondWithBool(httpResponse, SupportsHeldCrossing(destination));
+                return;
+            case "recall":
+                RespondWithBool(httpResponse, RecallObject(destination, args["object_id"].AsUUID()));
+                return;
+            case "complete":
+                RespondWithBool(httpResponse, CrossingCompleted(destination, args["object_id"].AsUUID(), ReadIds(args["missing"])));
+                return;
+            case "":
+            case "create":
+                break;
+            default:
+                m_log.LogInformation("[OBJECT HANDLER]: unknown object action {0}", action);
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+        }
+
         string sogXmlStr = "", extraStr = "", stateXmlStr = "";
         if (args.ContainsKey("sog") && args["sog"] != null)
             sogXmlStr = args["sog"].AsString();
@@ -167,11 +189,27 @@ public class ObjectSimpleHandler : SimpleStreamHandler
             }
         }
 
+        // Riders listed: the object is to be held until they have arrived
+        CrossingHoldRequest hold = null;
+        if (args.ContainsKey("hold_riders") && args["hold_riders"] is OSDArray riders && riders.Count > 0)
+        {
+            GridRegion source = new GridRegion();
+            if (args.ContainsKey("hold_source_uuid") && args["hold_source_uuid"] != null)
+                source.RegionID = args["hold_source_uuid"].AsUUID();
+            source.RegionLocX = args["hold_source_x"].AsInteger();
+            source.RegionLocY = args["hold_source_y"].AsInteger();
+            source.RegionName = args["hold_source_name"].AsString();
+            source.ServerURI = args["hold_source_uri"].AsString();
+            hold = new CrossingHoldRequest { Source = source, ExpectedRiders = ReadIds(riders) };
+        }
+
         bool result = false;
         try
         {
             // This is the meaning of POST object
-            result = CreateObject(destination, newPosition, sog);
+            result = hold is null
+                ? CreateObject(destination, newPosition, sog)
+                : CreateObject(destination, newPosition, sog, hold);
         }
         catch (Exception e)
         {
@@ -179,13 +217,49 @@ public class ObjectSimpleHandler : SimpleStreamHandler
             result = false;
         }
 
+        RespondWithBool(httpResponse, result);
+    }
+
+    private static void RespondWithBool(IOSHttpResponse httpResponse, bool result)
+    {
         httpResponse.StatusCode = (int)HttpStatusCode.OK;
         httpResponse.RawBuffer = Util.UTF8.GetBytes(result.ToString());
     }
 
-    // subclasses can override this
+    private static List<UUID> ReadIds(OSD array)
+    {
+        List<UUID> ids = new();
+        if (array is OSDArray list)
+        {
+            foreach (OSD item in list)
+                ids.Add(item.AsUUID());
+        }
+        return ids;
+    }
+
+    // subclasses can override these
     protected virtual bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog)
     {
         return m_SimulationService.CreateObject(destination, newPosition, sog, false);
+    }
+
+    protected virtual bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, CrossingHoldRequest hold)
+    {
+        return m_SimulationService.CreateObject(destination, newPosition, sog, false, hold);
+    }
+
+    protected virtual bool SupportsHeldCrossing(GridRegion destination)
+    {
+        return m_SimulationService.SupportsHeldCrossing(destination);
+    }
+
+    protected virtual bool RecallObject(GridRegion destination, UUID objectID)
+    {
+        return m_SimulationService.RecallObject(destination, objectID);
+    }
+
+    protected virtual bool CrossingCompleted(GridRegion source, UUID objectID, IList<UUID> missingRiders)
+    {
+        return m_SimulationService.CrossingCompleted(source, objectID, missingRiders);
     }
 }

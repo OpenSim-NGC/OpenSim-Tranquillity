@@ -760,6 +760,21 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// The targets a crossing carried into this region in the saved object, until the new actor takes them up; null the rest
+    /// of the time. Only the root part holds it.
+    /// </summary>
+    public CrossingTargets CrossingTargets { get; set; }
+
+    /// <summary>The look-at a script has running on this root part (llRotLookAt), if any.</summary>
+    public bool TryGetLookAt(out Quaternion target, out float strength, out float damping)
+    {
+        target = m_APIDTarget;
+        strength = m_APIDStrength;
+        damping = m_APIDDamp;
+        return m_APIDActive;
+    }
+
     protected bool APIDActive
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1872,8 +1887,13 @@ public class SceneObjectPart : EntityBase, IDisposable
                 return 0;
 
             float cost;
-            if (PhysActor != null)
-                cost = PhysActor.PhysicsCost;
+            PhysicsActor pa = PhysActor;
+            if (pa != null)
+            {
+                cost = pa.PhysicsCost;
+                if (pa.PhysicsCostIsShapeCount)
+                    return cost;    // the engine's count of collision shapes, as it is
+            }
             else
                 cost = 0.1f;
 
@@ -2302,7 +2322,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         if (localGlobalTF)
             torque *= GetWorldRotation();
 
-        Torque = torque;
+        SetTorque(torque, localGlobalTF);
     }
 
     /// <summary>
@@ -2505,8 +2525,16 @@ public class SceneObjectPart : EntityBase, IDisposable
                         pa.IsPhysical = UsePhysics;
                         pa.OnRequestTerseUpdate -= PhysicsRequestingTerseUpdate;
                         pa.OnOutOfBounds -= PhysicsOutOfBounds;
+                        pa.OnComplexityError -= PhysicsComplexityError;
                         pa.delink();
                     }
+                }
+
+                if (UsePhysics)
+                {
+                    // before the actor is made physical: an engine that limits complexity says so as it is
+                    pa.OnComplexityError -= PhysicsComplexityError;
+                    pa.OnComplexityError += PhysicsComplexityError;
                 }
 
                 if (pa.IsPhysical != UsePhysics)
@@ -2742,9 +2770,9 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// <param name="height">Height to hover.  Height of zero disables hover.</param>
     /// <param name="hoverType">Determines what the height is relative to </param>
     /// <param name="tau">Number of seconds over which to reach target</param>
-    public void SetHoverHeight(float height, PIDHoverType hoverType, float tau)
+    public void SetHoverHeight(float height, PIDHoverType hoverType, float tau, bool repel = false)
     {
-        ParentGroup.SetHoverHeight(height, hoverType, tau);
+        ParentGroup.SetHoverHeight(height, hoverType, tau, repel);
     }
 
     public void StopHover()
@@ -3140,6 +3168,16 @@ public class SceneObjectPart : EntityBase, IDisposable
         // The whole object, as llSetStatus(STATUS_PHYSICS, FALSE) does: every part's flag, the region's
         // physical-prim count, and the parts' actor events
         ParentGroup.ScriptSetPhysicsStatus(false);
+    }
+
+    /// <summary>
+    /// The physics engine says the object is over its limit on how complex a physical object may be. The owner is told
+    /// and the object is made non-physical, as for <see cref="PhysicsOutOfBounds"/> (only the root part's actor is
+    /// listened to). <paramref name="detail"/> is what the engine counted, for example "(300 of 256 convex hulls)".
+    /// </summary>
+    public void PhysicsComplexityError(string detail)
+    {
+        ParentGroup?.PhysicsTooComplex(detail);
     }
 
     public void PhysicsRequestingTerseUpdate()
@@ -3763,6 +3801,36 @@ public class SceneObjectPart : EntityBase, IDisposable
         Force = force;
     }
 
+    /// <summary>
+    /// llSetForce on the object: <paramref name="force"/> in region axes (a local force already turned by the caller), and
+    /// whether the script gave it as local. It is stored for llGetForce and handed to the physics actor, which may follow
+    /// the object's rotation with a local one (PhysicsActor.SetScriptForce).
+    /// </summary>
+    public void SetForce(Vector3 force, bool local)
+    {
+        if (ParentGroup != null && ParentGroup.RootPart != null && ParentGroup.RootPart != this)
+        {
+            ParentGroup.RootPart.SetForce(force, local);
+            return;
+        }
+        m_force = force;
+        PhysActor?.SetScriptForce(force, local);
+    }
+
+    /// <summary>
+    /// llSetTorque on the object, as <see cref="SetForce(Vector3, bool)"/> is for a force.
+    /// </summary>
+    public void SetTorque(Vector3 torque, bool local)
+    {
+        if (ParentGroup != null && ParentGroup.RootPart != null && ParentGroup.RootPart != this)
+        {
+            ParentGroup.RootPart.SetTorque(torque, local);
+            return;
+        }
+        m_torque = torque;
+        PhysActor?.SetScriptTorque(torque, local);
+    }
+
     public PhysicsInertiaData PhysicsInertia
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -3810,15 +3878,34 @@ public class SceneObjectPart : EntityBase, IDisposable
         if (type == (int)Vehicle.TYPE_NONE)
         {
             if (_parentID == 0 && PhysActor != null)
+            {
                 PhysActor.VehicleType = (int)Vehicle.TYPE_NONE;
+                StopTargetsForVehicleType();
+            }
             return;
         }
         m_vehicleParams = new SOPVehicle();
         m_vehicleParams.ProcessTypeChange((Vehicle)type);
         {
             if (_parentID == 0 && PhysActor != null)
+            {
                 PhysActor.VehicleType = type;
+                StopTargetsForVehicleType();
+            }
             return;
+        }
+    }
+
+    /// <summary>
+    /// An engine that follows InWorldz (<see cref="PhysicsActor.VehicleTypeStopsTargets"/>) ends the object's llRotLookAt
+    /// and llMoveToTarget when a script sets its vehicle type, whatever the type.
+    /// </summary>
+    private void StopTargetsForVehicleType()
+    {
+        if (PhysActor is { VehicleTypeStopsTargets: true } && ParentGroup is not null)
+        {
+            ParentGroup.StopMoveToTarget();
+            ParentGroup.StopLookAt();
         }
     }
 
@@ -5018,6 +5105,10 @@ public class SceneObjectPart : EntityBase, IDisposable
             if (isroot)
                 KeyframeMotion?.UpdatePhysicsHint();
 
+            // A crossing may have brought the script's move-to, hover and look-at with the object: the new actor takes them up.
+            if (isroot && isPhysical)
+                ParentGroup.TakeUpCrossingTargets();
+
             //                DoPhysicsPropertyUpdate(isPhysical, true);
             // lets expand it here just with what it really needs to do
 
@@ -5029,6 +5120,7 @@ public class SceneObjectPart : EntityBase, IDisposable
 
                 pa.OnRequestTerseUpdate += PhysicsRequestingTerseUpdate;
                 pa.OnOutOfBounds += PhysicsOutOfBounds;
+                pa.OnComplexityError += PhysicsComplexityError;
 
                 if (_parentID != 0 && _parentID != LocalId)
                 {
@@ -5079,6 +5171,7 @@ public class SceneObjectPart : EntityBase, IDisposable
             pa.OnCollisionUpdate -= PhysicsCollision;
             pa.OnRequestTerseUpdate -= PhysicsRequestingTerseUpdate;
             pa.OnOutOfBounds -= PhysicsOutOfBounds;
+            pa.OnComplexityError -= PhysicsComplexityError;
 
             ParentGroup.Scene.PhysicsScene.RemovePrim(pa);
 

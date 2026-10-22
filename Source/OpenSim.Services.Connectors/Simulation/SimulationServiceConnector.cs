@@ -288,6 +288,9 @@ public class SimulationServiceConnector : ISimulationService
 
         reason = "Failed to contact destination";
 
+        // a destination has to say it can take carried riders; no answer is no
+        ctx.CarriedRiders = false;
+
         // m_log.LogDebug("[REMOTE SIMULATION CONNECTOR]: QueryAccess start, position={0}", position);
 
         // Eventually, we want to use a caps url instead of the agentID
@@ -324,10 +327,13 @@ public class SimulationServiceConnector : ISimulationService
             bool success = result["success"].AsBoolean();
 
             bool has_Result = false;
+            if (!result.ContainsKey("_Result"))
+                ctx.ReadAnswer(result);
             if (result.TryGetValue("_Result", out tmpOSD))
             {
                 has_Result = true;
                 OSDMap data = (OSDMap)tmpOSD;
+                ctx.ReadAnswer(data);
 
                 // FIXME: If there is a _Result map then it's the success key here that indicates the true success
                 // or failure, not the sibling result node.
@@ -488,7 +494,7 @@ public class SimulationServiceConnector : ISimulationService
             args["destination_name"] = OSD.FromString(destination.RegionName);
             args["destination_uuid"] = OSD.FromString(destination.RegionID.ToString());
 
-            OSDMap result = WebUtil.PostToService(uri, args, 40000, false);
+            OSDMap result = PostObjectMessage(uri, args, 40000);
 
             if (result == null)
                 return false;
@@ -503,6 +509,157 @@ public class SimulationServiceConnector : ISimulationService
         }
 
         return true;
+    }
+
+    /// <summary>Sends one object message to a region's object handler. A test replaces it to take the place of the network.</summary>
+    protected virtual OSDMap PostObjectMessage(string uri, OSDMap args, int timeout)
+    {
+        return WebUtil.PostToService(uri, args, timeout, false);
+    }
+
+    /// <summary>The clock (ms) the memory of a region's answer to <see cref="SupportsHeldCrossing"/> is measured on.</summary>
+    protected virtual double NowMs()
+    {
+        return Util.GetTimeStampMS();
+    }
+
+    // The held crossing's messages go to the same object path as CreateObject. Each is one POST whose "action" says
+    // which: none (or "create") is the object itself, "supports_held" asks whether the region knows the other messages,
+    // "recall" and "complete" are the messages of that name. The region the message is for is named in the
+    // destination_* fields, as in CreateObject. A handler that does not know these actions answers every one of them
+    // with an error, which is what "no" means for supports_held.
+    private const string ActionSupportsHeld = "supports_held";
+    private const string ActionRecall = "recall";
+    private const string ActionComplete = "complete";
+
+    /// <summary>How long a region's answer to "can you hold a crossing object" is remembered (ms).</summary>
+    private const double SupportYesMemoryMs = 10 * 60 * 1000;
+    private const double SupportNoMemoryMs = 5 * 60 * 1000;
+
+    private readonly Dictionary<string, (bool Supported, double AskedAtMs)> m_heldSupport = new();
+
+    /// <summary>
+    /// Asks the region at <paramref name="destination"/> whether it can take a crossing object held until its riders
+    /// arrive. A region that answers with an error (an older one) is sent the object the ordinary way; the answer is
+    /// remembered for a few minutes, so that an upgraded region is found again.
+    /// </summary>
+    public bool SupportsHeldCrossing(GridRegion destination)
+    {
+        if (destination is null)
+            return false;
+
+        string key = destination.ServerURI + destination.RegionID;
+        double now = NowMs();
+        lock (m_heldSupport)
+        {
+            if (m_heldSupport.TryGetValue(key, out var known)
+                && now - known.AskedAtMs < (known.Supported ? SupportYesMemoryMs : SupportNoMemoryMs))
+                return known.Supported;
+        }
+
+        bool supported = PostHeldMessage(destination, destination.RegionID, ActionSupportsHeld, null, 10000);
+
+        lock (m_heldSupport)
+            m_heldSupport[key] = (supported, now);
+        return supported;
+    }
+
+    public bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall, CrossingHoldRequest hold)
+    {
+        if (hold is null)
+            return CreateObject(destination, newPosition, sog, isLocalCall);
+
+        if (hold.Source is null)
+            return false;
+
+        string uri = destination.ServerURI + ObjectPath() + sog.UUID + "/";
+
+        try
+        {
+            OSDMap args = new OSDMap(24);
+
+            args["sog"] = OSD.FromString(sog.ToXml2());
+            args["extra"] = OSD.FromString(sog.ExtraToXmlString());
+            args["modified"] = OSD.FromBoolean(sog.HasGroupChanged);
+            args["new_position"] = newPosition.ToString();
+
+            string state = sog.GetStateSnapshot();
+            if (state.Length > 0)
+                args["state"] = OSD.FromString(state);
+
+            AddDestination(args, destination);
+
+            args["hold_source_uuid"] = OSD.FromUUID(hold.Source.RegionID);
+            args["hold_source_x"] = OSD.FromInteger(hold.Source.RegionLocX);
+            args["hold_source_y"] = OSD.FromInteger(hold.Source.RegionLocY);
+            args["hold_source_name"] = OSD.FromString(hold.Source.RegionName);
+            args["hold_source_uri"] = OSD.FromString(hold.Source.ServerURI);
+
+            OSDArray riders = new OSDArray(hold.ExpectedRiders.Count);
+            foreach (UUID rider in hold.ExpectedRiders)
+                riders.Add(OSD.FromUUID(rider));
+            args["hold_riders"] = riders;
+
+            OSDMap result = PostObjectMessage(uri, args, 40000);
+            return result is not null && result["success"].AsBoolean();
+        }
+        catch (Exception e)
+        {
+            m_log.LogWarning("[REMOTE SIMULATION CONNECTOR] CreateObject (held) failed with exception; {0}", e.ToString());
+            return false;
+        }
+    }
+
+    public bool RecallObject(GridRegion destination, UUID objectID)
+    {
+        return PostHeldMessage(destination, objectID, ActionRecall, null, 20000);
+    }
+
+    public bool CrossingCompleted(GridRegion source, UUID objectID, IList<UUID> missingRiders)
+    {
+        return PostHeldMessage(source, objectID, ActionComplete, args =>
+        {
+            OSDArray missing = new OSDArray(missingRiders?.Count ?? 0);
+            if (missingRiders is not null)
+            {
+                foreach (UUID rider in missingRiders)
+                    missing.Add(OSD.FromUUID(rider));
+            }
+            args["missing"] = missing;
+        }, 20000);
+    }
+
+    private static void AddDestination(OSDMap args, GridRegion destination)
+    {
+        args["destination_x"] = OSD.FromString(destination.RegionLocX.ToString());
+        args["destination_y"] = OSD.FromString(destination.RegionLocY.ToString());
+        args["destination_name"] = OSD.FromString(destination.RegionName);
+        args["destination_uuid"] = OSD.FromString(destination.RegionID.ToString());
+    }
+
+    private bool PostHeldMessage(GridRegion region, UUID objectID, string action, Action<OSDMap> addArguments, int timeout)
+    {
+        if (region is null)
+            return false;
+
+        string uri = region.ServerURI + ObjectPath() + objectID + "/";
+
+        try
+        {
+            OSDMap args = new OSDMap(8);
+            args["action"] = OSD.FromString(action);
+            args["object_id"] = OSD.FromUUID(objectID);
+            AddDestination(args, region);
+            addArguments?.Invoke(args);
+
+            OSDMap result = PostObjectMessage(uri, args, timeout);
+            return result is not null && result["success"].AsBoolean();
+        }
+        catch (Exception e)
+        {
+            m_log.LogWarning("[REMOTE SIMULATION CONNECTOR] {0} failed with exception; {1}", action, e.ToString());
+            return false;
+        }
     }
 
     /// <summary>

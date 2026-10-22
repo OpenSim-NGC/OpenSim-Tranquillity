@@ -1,0 +1,43 @@
+<!--
+  Copyright (c) 2026 Legion Builds
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Offline physics harness for the Jolt module: builds a Jolt scene with no region, steps it through the
+       module's own Simulate at a chosen heartbeat rate, and writes a CSV trace and a summary per scenario.
+       Console tool, not an NUnit/xunit suite; not part of the grid runtime. The Jolt test project drives the
+       same scenarios as regression tests. Needs the native joltc, which the JoltPhysics.Native package puts
+       into the output under runtimes/<rid>/native/. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>JoltPhysicsHarness</AssemblyName>
+    <RootNamespace>OpenSim.Region.PhysicsModules.Jolt.Harness</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.Jolt.Backend\OpenSim.Region.PhysicsModules.Jolt.Backend.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.Jolt\OpenSim.Region.PhysicsModules.Jolt.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- MaterialPins is shared with the test projects that do not reference the harness. -->
+    <Compile Include="..\JoltTestShared\MaterialPins.cs" Link="MaterialPins.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The [Jolt] section every simulator reads before its own ini; the harness starts from it. -->
+    <Content Include="..\..\Source\OpenSim.Server.RegionServer\AppData\RegionServerDefaults.ini" Link="RegionServerDefaults.ini" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <Import Project="..\..\Source\OpenSim.Region.PhysicsModules.Jolt.Backend\JoltNative.targets" />
+
+</Project>
