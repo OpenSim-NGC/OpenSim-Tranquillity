@@ -416,6 +416,68 @@ public class EnforcementTests : IDisposable
         Assert.Equal((int)TrustTier.Open, reg.Find(bad.Uri).Tier);
     }
 
+    private sealed class LineCapture : Microsoft.Extensions.Logging.ILoggerFactory
+    {
+        public readonly List<string> Lines = new();
+        public Microsoft.Extensions.Logging.ILogger CreateLogger(string category) => new L(this);
+        public void AddProvider(Microsoft.Extensions.Logging.ILoggerProvider provider) { }
+        public void Dispose() { }
+
+        private sealed class L : Microsoft.Extensions.Logging.ILogger
+        {
+            private readonly LineCapture m_c;
+            public L(LineCapture c) => m_c = c;
+            public IDisposable BeginScope<TState>(TState state) where TState : notnull => null;
+            public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+            public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId,
+                TState state, Exception exception, Func<TState, Exception, string> formatter)
+            { lock (m_c.Lines) m_c.Lines.Add(formatter(state, exception)); }
+        }
+    }
+
+    [Fact]
+    public void Handlers_ABlockedGridCallingInALoopWritesOneRefusalLineAMinute()
+    {
+        long ms = 7_000_000;
+        LineCapture capture = new();
+        var previous = OpenSim.Framework.LoggerProvider.LoggerFactory;
+        OpenSim.Framework.LoggerProvider.LoggerFactory = capture;
+        OpenSim.Framework.RateLimitedLog.UseClockForTesting(() => ms);
+        try
+        {
+            TrustedGridRegistryService reg = Arm();
+            HypergridHandlers armed = new(new FakeGatekeeper(), new TrustedGridAuthentication());
+            IPEndPoint ep = new(IPAddress.Parse("192.0.2.45"), 12345);
+            Remote bad = NewRemote("bad.example");
+            armed.LinkRegionRequest(Rpc("link_region", bad.Signed("link_region")), ep);
+            reg.Block(bad.Uri);
+
+            List<string> Refusals() { lock (capture.Lines) return capture.Lines.Where(l => l.Contains("is Blocked")).ToList(); }
+
+            for (int i = 0; i < 40; i++)
+            {
+                Hashtable r = (Hashtable)armed.LinkRegionRequest(Rpc("link_region", bad.Signed("link_region")), ep).Value;
+                Assert.Equal("False", r["result"]);      // every call is still refused
+                ms += 100;
+            }
+            List<string> inWindow = Refusals();
+            Assert.Single(inWindow);
+            Assert.Contains("refused link_region from 192.0.2.45", inWindow[0]);
+            Assert.DoesNotContain("more like this", inWindow[0]);
+
+            ms += 60_000;
+            armed.GetRegion(Rpc("get_region", bad.Signed("get_region")), ep);
+            List<string> all = Refusals();
+            Assert.Equal(2, all.Count);
+            Assert.EndsWith("(39 more like this in the last 64 s)", all[1]);
+        }
+        finally
+        {
+            OpenSim.Framework.RateLimitedLog.UseClockForTesting(null);
+            OpenSim.Framework.LoggerProvider.LoggerFactory = previous;
+        }
+    }
+
     [Fact]
     public void Handlers_Disabled_NeverRefuse_EvenWhenArmed_AndBlockedRowExists()
     {

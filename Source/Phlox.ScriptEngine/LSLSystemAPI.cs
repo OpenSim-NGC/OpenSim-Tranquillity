@@ -187,6 +187,11 @@ namespace Phlox.ScriptEngine
 
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
+        // A script decides how often it returns objects; an operator sees one line a minute for each function and a count of the rest.
+        private static readonly RateLimitedLog s_returnByOwnerLog = new();
+        private static readonly RateLimitedLog s_returnByIdLog = new();
+        private static readonly RateLimitedLog s_experienceGrantedLog = new();
+
         protected PhloxEngine m_ScriptEngine;
         protected SceneObjectPart m_host;
         protected uint m_localID;
@@ -3394,7 +3399,7 @@ namespace Phlox.ScriptEngine
         {
             if (World.GetSceneObjectPart(destId) != null) return false;
             if (!IsScriptMuted(destId)) return false;
-            m_log.LogInformation("[PhloxAPI]: Not offering {0} from muted {1} to {2}", what, m_host.ParentGroup.UUID, destId);
+            m_log.LogDebug("[PhloxAPI]: Not offering {0} from muted {1} to {2}", what, m_host.ParentGroup.UUID, destId);
             return true;
         }
 
@@ -14338,7 +14343,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
                 rc = ReturnGroupsToOwners(toReturn, "scripted parcel owner return");
                 if (rc > 0)
-                    m_log.LogInformation("[PhloxAPI]: llReturnObjectsByOwner returned {0} objects owned by {1}, granted by {2} for {3}",
+                    s_returnByOwnerLog.Log(m_log, LogLevel.Information, "[PhloxAPI]: llReturnObjectsByOwner returned {0} objects owned by {1}, granted by {2} for {3}",
                         rc, targetAgentID, item.PermsGranter, m_host.OwnerID);
                 return rc;
             }
@@ -14396,7 +14401,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
                 rc = ReturnGroupsToOwners(toReturn, "scripted parcel owner return by ID");
                 if (rc > 0)
-                    m_log.LogInformation("[PhloxAPI]: llReturnObjectsByID returned {0} objects, granted by {1} for {2}",
+                    s_returnByIdLog.Log(m_log, LogLevel.Information, "[PhloxAPI]: llReturnObjectsByID returned {0} objects, granted by {1} for {2}",
                         rc, item.PermsGranter, m_host.OwnerID);
                 return rc;
             }
@@ -20692,7 +20697,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // Per-agent EEP requires viewer/region support for GenericMessage or
             // EnvironmentUpdate per-agent caps. Most OpenSim builds don't support this yet.
             // Log the attempt and return success so scripts don't break.
-            m_log.LogInformation("[PhloxAPI]: llSetAgentEnvironment called for agent {0} with {1} params (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
+            m_log.LogDebug("[PhloxAPI]: llSetAgentEnvironment called for agent {0} with {1} params (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
                 targetAgent, paramList.Length, transition);
             return 0; // Report success so scripts proceed
         }
@@ -20713,7 +20718,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             if (sp == null || sp.IsChildAgent) return -1;
 
             // Per-agent EEP replace requires viewer protocol support.
-            m_log.LogInformation("[PhloxAPI]: llReplaceAgentEnvironment called for agent {0} environment='{1}' (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
+            m_log.LogDebug("[PhloxAPI]: llReplaceAgentEnvironment called for agent {0} environment='{1}' (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
                 targetAgent, environment, transition);
             return 0; // Report success so scripts proceed
         }
@@ -21087,7 +21092,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
             // Notify the agent about the beacon location via region say
             // Full viewer beacon rendering requires viewer-specific protocol support
             Vector3 pos = m_host.AbsolutePosition;
-            m_log.LogInformation("[PhloxAPI]: llMapBeacon: beacon for {0} at {1} text='{2}'",
+            m_log.LogDebug("[PhloxAPI]: llMapBeacon: beacon for {0} at {1} text='{2}'",
                 agentId, pos, text ?? "");
         }
 
@@ -21236,7 +21241,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                     sog.ScheduleGroupForFullUpdate();
                     return 1;
                 case DerezToInventory:
-                    m_log.LogInformation("[PhloxAPI]: llDerezObject DEREZ_TO_INVENTORY is not available server-side (needs a viewer session); {0} left in place", targetID);
+                    m_log.LogDebug("[PhloxAPI]: llDerezObject DEREZ_TO_INVENTORY is not available server-side (needs a viewer session); {0} left in place", targetID);
                     return 0;
                 default:
                     return 0;
@@ -21684,7 +21689,7 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
                 "experience_permissions", new object[] { agent }, new DetectParams[0]));
             var expInfo = expService.GetExperience(experienceId);
             if (expInfo != null) NoteExperienceState(experienceId, expInfo.Properties);
-            m_log.LogInformation("[PhloxAPI]: Experience permission granted: agent={0} experience={1}",
+            s_experienceGrantedLog.Log(m_log, LogLevel.Information, "[PhloxAPI]: Experience permission granted: agent={0} experience={1}",
                 agentId, expInfo?.Name ?? experienceId.ToString());
         }
 

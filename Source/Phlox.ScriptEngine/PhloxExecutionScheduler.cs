@@ -59,6 +59,10 @@ namespace Phlox.ScriptEngine
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
+        // A script decides how often it calls a slow service; an operator sees one line a minute for each kind and a count of the rest.
+        private static readonly RateLimitedLog s_lateAnswerLog = new();
+        private static readonly RateLimitedLog s_deadlineLog = new();
+
         // How many total Tick() calls per DoWork() pass
         private const int INSTRUCTION_FREQUENCY = 48;
         // Ticks per script per pass
@@ -1121,7 +1125,7 @@ namespace Phlox.ScriptEngine
 
             if (!call.TryFinish())
             {
-                m_log.LogInformation("[PhloxExe]: {0} for {1} answered after its {2} ms deadline; the late result is dropped",
+                s_lateAnswerLog.Log(m_log, LogLevel.Information, "[PhloxExe]: {0} for {1} answered after its {2} ms deadline; the late result is dropped",
                     call.FunctionName, ctx.ItemId, ServiceCallTimeoutMs);
                 return;
             }
@@ -1140,7 +1144,7 @@ namespace Phlox.ScriptEngine
                 if (now < call.Deadline) continue;
                 if (call.TryFinish())
                 {
-                    m_log.LogWarning("[PhloxExe]: {0} for {1} did not answer in {2} ms; the script resumes with the call's failure value and a late answer will be dropped",
+                    s_deadlineLog.Log(m_log, LogLevel.Warning, "[PhloxExe]: {0} for {1} did not answer in {2} ms; the script resumes with the call's failure value and a late answer will be dropped",
                         call.FunctionName, call.Context.ItemId, ServiceCallTimeoutMs);
                     PostSyscallReturn(call.Context.ItemId, call.FailureValue, 0, call.Context.Seq, null);
                 }

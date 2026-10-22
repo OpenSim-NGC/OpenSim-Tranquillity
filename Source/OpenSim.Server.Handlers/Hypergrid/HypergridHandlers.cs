@@ -46,6 +46,9 @@ public class HypergridHandlers
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
+    // A blocked grid chooses how often it calls; the refusal itself is unchanged, its log line is written once a minute.
+    private static readonly RateLimitedLog s_refusedLog = new();
+
     private IGatekeeperService m_GatekeeperService;
 
     /// <summary>
@@ -85,7 +88,7 @@ public class HypergridHandlers
             return false;
 
         GridTrustContext ctx = GridTrustContext.Current;
-        m_log.LogInformation("[TRUSTED HG]: refused {0} from {1}: grid {2} is Blocked",
+        s_refusedLog.Log(m_log, Microsoft.Extensions.Logging.LogLevel.Information, "[TRUSTED HG]: refused {0} from {1}: grid {2} is Blocked",
             method, remoteClient?.Address, ctx?.GridId);
         return true;
     }

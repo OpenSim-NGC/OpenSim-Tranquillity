@@ -58,6 +58,11 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
+    // A blocked owner can try as often as they like; each kind of refusal writes one line a minute and counts the rest.
+    private static readonly RateLimitedLog s_rezRefusedLog = new();
+    private static readonly RateLimitedLog s_duplicateRefusedLog = new();
+    private static readonly RateLimitedLog s_entryRefusedLog = new();
+
     private readonly object m_lock = new();
     private readonly HashSet<UUID> m_blocked = new();
     private Scene m_scene;
@@ -215,7 +220,7 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
         if (!IsBlocked(owner))
             return true;
 
-        m_log.LogInformation(
+        s_rezRefusedLog.Log(m_log, LogLevel.Information,
             "[BLOCKED OWNERS]: Refused a rez of {0} prim(s) by blocked owner {1} in {2}",
             objectCount, owner, m_scene?.Name);
         return false;
@@ -227,7 +232,7 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
         if (sp is null || !IsBlocked(sp.UUID))
             return true;
 
-        m_log.LogInformation(
+        s_duplicateRefusedLog.Log(m_log, LogLevel.Information,
             "[BLOCKED OWNERS]: Refused a duplicate of {0} by blocked owner {1} in {2}",
             sog?.UUID, sp.UUID, m_scene?.Name);
         return false;
@@ -240,7 +245,7 @@ public class BlockedOwnerModule : INonSharedRegionModule, IBlockedOwnerModule
         if (!enteringRegion || sog is null || !IsBlocked(sog.OwnerID))
             return true;
 
-        m_log.LogInformation(
+        s_entryRefusedLog.Log(m_log, LogLevel.Information,
             "[BLOCKED OWNERS]: Refused entry of {0} by blocked owner {1} into {2}",
             sog.UUID, sog.OwnerID, m_scene?.Name);
         return false;
