@@ -267,6 +267,12 @@ public partial class WebRtcVoiceRegionModule : ISharedRegionModule
             //do fully not trust viewers voice parcel requests
             if (channelType == "local")
             {
+                // A repeat of a refusal this agent got a moment ago is answered from the cache, before the
+                // estate and parcel checks run again.
+                ctx.IsLocal = true;
+                if (TryReplayCachedRefusal(agentID, scene, response, ctx))
+                    return;
+
                 if (!scene.RegionInfo.EstateSettings.AllowVoice)
                 {
                     m_log.LogDebug($"{logHeader}[ProvisionVoice]:region \"{scene.Name}\": voice not enabled in estate settings");

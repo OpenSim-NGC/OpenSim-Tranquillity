@@ -44,6 +44,15 @@ public sealed class GridSignatureVerifier
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
+    // The caller chooses what it sends, so each way a call can fail writes one line a minute and counts the rest.
+    private static readonly RateLimitedLog s_malformedLog = new();
+    private static readonly RateLimitedLog s_keyLengthLog = new();
+    private static readonly RateLimitedLog s_timestampLog = new();
+    private static readonly RateLimitedLog s_skewLog = new();
+    private static readonly RateLimitedLog s_signatureLog = new();
+    private static readonly RateLimitedLog s_replayLog = new();
+    private static readonly RateLimitedLog s_faultLog = new();
+
     private readonly IGridTrustLookup m_lookup;
     private readonly NonceCache m_nonces;
 
@@ -75,13 +84,13 @@ public sealed class GridSignatureVerifier
             }
             catch (FormatException)
             {
-                m_log.LogWarning("[TRUSTED HG]: signature material had malformed base64; classifying Open.");
+                s_malformedLog.Log(m_log, LogLevel.Warning, "[TRUSTED HG]: signature material had malformed base64; classifying Open.");
                 return GridTrustContext.Open;
             }
 
             if (publicKey.Length != Ed25519PublicKeyParameters.KeySize)
             {
-                m_log.LogWarning("[TRUSTED HG]: presented key was {0} bytes, not {1}; classifying Open.",
+                s_keyLengthLog.Log(m_log, LogLevel.Warning, "[TRUSTED HG]: presented key was {0} bytes, not {1}; classifying Open.",
                     publicKey.Length, Ed25519PublicKeyParameters.KeySize);
                 return GridTrustContext.Open;
             }
@@ -89,14 +98,14 @@ public sealed class GridSignatureVerifier
             // Freshness: timestamp must be within ±tolerance of now (§5).
             if (!HGSignatureEnvelope.TryParseTimestamp(material.Timestamp, out DateTime ts))
             {
-                m_log.LogWarning("[TRUSTED HG]: unparseable timestamp; classifying Open.");
+                s_timestampLog.Log(m_log, LogLevel.Warning, "[TRUSTED HG]: unparseable timestamp; classifying Open.");
                 return GridTrustContext.Open;
             }
 
             TimeSpan skew = nowUtc.ToUniversalTime() - ts;
             if (skew < -HGSignatureEnvelope.TimestampTolerance || skew > HGSignatureEnvelope.TimestampTolerance)
             {
-                m_log.LogInformation("[TRUSTED HG]: timestamp skew {0}s outside ±{1}s; classifying Open.",
+                s_skewLog.Log(m_log, LogLevel.Information, "[TRUSTED HG]: timestamp skew {0}s outside ±{1}s; classifying Open.",
                     (int)skew.TotalSeconds, (int)HGSignatureEnvelope.TimestampTolerance.TotalSeconds);
                 return GridTrustContext.Open;
             }
@@ -115,7 +124,7 @@ public sealed class GridSignatureVerifier
             verifier.BlockUpdate(payload, 0, payload.Length);
             if (!verifier.VerifySignature(signature))
             {
-                m_log.LogInformation("[TRUSTED HG]: signature did not verify; classifying Open.");
+                s_signatureLog.Log(m_log, LogLevel.Information, "[TRUSTED HG]: signature did not verify; classifying Open.");
                 return GridTrustContext.Open;
             }
 
@@ -123,7 +132,7 @@ public sealed class GridSignatureVerifier
             // signature is otherwise valid, so a bad request cannot burn a nonce.
             if (!m_nonces.TryRegister(material.Nonce, nowUtc))
             {
-                m_log.LogInformation("[TRUSTED HG]: nonce replay within window; classifying Open.");
+                s_replayLog.Log(m_log, LogLevel.Information, "[TRUSTED HG]: nonce replay within window; classifying Open.");
                 return GridTrustContext.Open;
             }
 
@@ -146,7 +155,7 @@ public sealed class GridSignatureVerifier
         catch (Exception e)
         {
             // ADR-005: verification never hard-fails. Any unexpected error is Open.
-            m_log.LogWarning(e, "[TRUSTED HG]: unexpected error during verification; classifying Open.");
+            s_faultLog.Log(m_log, LogLevel.Warning, e, "[TRUSTED HG]: unexpected error during verification; classifying Open.");
             return GridTrustContext.Open;
         }
     }

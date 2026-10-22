@@ -55,6 +55,14 @@ public interface IWindModelPlugin : IPlugin
     Vector3 WindSpeed(float x, float y, float z);
 
     /// <summary>
+    /// Returns the wind vector at a position in local region coordinates. A plugin that interpolates between its
+    /// cells overrides this to use the true position; the default floors the position and calls the form above, which
+    /// is right for a plugin whose wind is constant over a cell.
+    /// </summary>
+    Vector3 WindSpeed(Vector3 position)
+        => WindSpeed(MathF.Floor(position.X), MathF.Floor(position.Y), MathF.Floor(position.Z));
+
+    /// <summary>
     /// Sets (or unsets) the wind at the given local region coordinates. A plugin without wind setters ignores it.
     /// </summary>
     /// <param name="type">A <see cref="WindConstants"/> value</param>

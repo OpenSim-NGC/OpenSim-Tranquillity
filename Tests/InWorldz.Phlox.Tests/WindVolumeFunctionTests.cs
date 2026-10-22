@@ -10,6 +10,7 @@ using InWorldz.Phlox.Types;
 using OpenMetaverse;
 using OpenSim.Region.CoreModules.World.Wind;
 using OpenSim.Region.Framework.Interfaces;
+using Nini.Config;
 using Phlox.ScriptEngine;
 using Xunit;
 
@@ -262,6 +263,87 @@ public class WindVolumeFunctionTests
         wind.Store = null;
         Api(h).osSetWindParam("ZephyrWind", "avg_strength", 9f);
         Assert.Single(wind.ParamSets);
+    }
+
+    // ---- reading the wind with a volume in it ----
+
+    // The region's real wind module, so that llWind and iwWind read the model's wind plus the volumes'.
+    private static WindModule RealWind(SchedulerHarness h, bool weatherOn = true)
+    {
+        var config = new IniConfigSource();
+        config.AddConfig("Wind").Set("wind_plugin", "ConfigurableWind");
+        config.AddConfig("Weather").Set("enabled", weatherOn ? "true" : "false");
+        var module = new WindModule();
+        module.Initialise(config);
+        module.AddRegion(h.Scene);
+        return module;
+    }
+
+    private static int VolumeAtThePrim(SchedulerHarness h, WindModule wind, Vector3 velocity)
+        => wind.WindVolumes.Create(h.Prim.ParentGroup.UUID, UUID.Random(), new WindVolumeSpec
+        {
+            Shape = WindVolumeShape.Sphere, Center = h.Prim.GetWorldPosition(), Radius = 20f, FalloffStart = 1f,
+            LifetimeSeconds = 600f, Velocity = velocity,
+        });
+
+    [Fact]
+    public void LlWindSeesAVolumesHorizontalWindWithZeroZAndIwWindSeesTheWholeVector()
+    {
+        using var h = Harness();
+        var wind = RealWind(h);
+        var api = Api(h);
+        Vector3 llBefore = api.llWind(Vector3.Zero);
+        Vector3 iwBefore = api.iwWind(Vector3.Zero);
+        Assert.Equal(0f, llBefore.Z);
+        Assert.Equal(0f, iwBefore.Z);
+
+        Assert.True(VolumeAtThePrim(h, wind, new Vector3(5f, -2f, 3f)) >= 1);
+
+        Vector3 ll = api.llWind(Vector3.Zero);
+        Vector3 iw = api.iwWind(Vector3.Zero);
+        Assert.Equal(llBefore.X + 5f, ll.X, 3);
+        Assert.Equal(llBefore.Y - 2f, ll.Y, 3);
+        Assert.Equal(0f, ll.Z);
+        Assert.Equal(iwBefore.X + 5f, iw.X, 3);
+        Assert.Equal(iwBefore.Y - 2f, iw.Y, 3);
+        Assert.Equal(3f, iw.Z, 3);
+    }
+
+    [Fact]
+    public void AVolumeWithOnlyAVerticalWindShowsInIwWindAndNotInLlWind()
+    {
+        using var h = Harness();
+        var wind = RealWind(h);
+        var api = Api(h);
+        Vector3 llBefore = api.llWind(Vector3.Zero);
+
+        Assert.True(VolumeAtThePrim(h, wind, new Vector3(0f, 0f, 9f)) >= 1);
+
+        Assert.Equal(llBefore, api.llWind(Vector3.Zero));
+        Assert.Equal(9f, api.iwWind(Vector3.Zero).Z, 3);
+    }
+
+    [Fact]
+    public void WithWeatherOffBothFunctionsReadTheWindModelAlone()
+    {
+        using var h = Harness();
+        var wind = RealWind(h, weatherOn: false);
+        var api = Api(h);
+        Vector3 pos = h.Prim.GetWorldPosition();
+        Vector3 model = wind.WindSpeed((int)pos.X, (int)pos.Y, (int)pos.Z);
+
+        Vector3 iw = api.iwWind(Vector3.Zero);
+        Vector3 ll = api.llWind(Vector3.Zero);
+
+        Assert.Equal(model, iw);
+        Assert.Equal(new Vector3(model.X, model.Y, 0f), ll);
+    }
+
+    [Fact]
+    public void IwWindWithNoWindModuleIsZero()
+    {
+        using var h = Harness();
+        Assert.Equal(Vector3.Zero, Api(h).iwWind(new Vector3(1, 2, 3)));
     }
 
     // ---- the script table ----
