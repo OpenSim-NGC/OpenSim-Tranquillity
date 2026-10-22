@@ -44,7 +44,7 @@ using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.Meshing;
 
-public class Meshmerizer : IMesher, INonSharedRegionModule
+public class Meshmerizer : IMesher, IMesherShapeData, INonSharedRegionModule
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static string LogHeader = "[MESH]";
@@ -756,10 +756,71 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
     private bool GenerateCoordsAndFacesFromPrimShapeData(
         string primName, PrimitiveBaseShape primShape, Vector3 size, float lod, out List<Coord> coords, out List<Face> faces)
     {
-        PrimMesh primMesh;
         coords = new List<Coord>();
         faces = new List<Face>();
 
+        if (!ExtrudePrimShape(primName, primShape, lod, out PrimMesh primMesh))
+            return false;
+
+        primMesh.DumpRaw(baseDir, primName, "primMesh");
+
+        primMesh.Scale(size.X, size.Y, size.Z);
+
+        coords = primMesh.coords;
+        faces = primMesh.faces;
+
+        return true;
+    }
+
+    /// <summary>
+    /// The rings the mesher extrudes a prim from, for a prim that is made from its own profile and path (not a sculpt
+    /// or a mesh). The vertices are the ones the mesher itself builds the prim's mesh from, scaled by
+    /// <paramref name="size"/>; the other members describe how they are laid out. See <see cref="PrimProfileRings"/>.
+    /// </summary>
+    /// <param name="primName">The name used when the extrusion reports a problem.</param>
+    /// <param name="primShape">The prim's shape.</param>
+    /// <param name="size">The size the vertices are scaled to, as passed to CreateMesh.</param>
+    /// <param name="lod">The level of detail, as passed to CreateMesh.</param>
+    /// <param name="rings">The rings, or null when false is returned.</param>
+    /// <returns>false for a sculpt or mesh prim, or when the extrusion fails</returns>
+    public bool TryGetPrimProfileRings(
+        string primName, PrimitiveBaseShape primShape, Vector3 size, float lod, out PrimProfileRings rings)
+    {
+        rings = null;
+        if (primShape == null || primShape.SculptEntry)
+            return false;
+
+        if (!ExtrudePrimShape(primName, primShape, lod, out PrimMesh primMesh))
+            return false;
+
+        primMesh.Scale(size.X, size.Y, size.Z);
+
+        int layerCount = primMesh.LayerTurns.Count;
+        int layerSize = primMesh.ProfileVertexAngles.Count;
+        if (layerCount == 0 || layerSize == 0 || primMesh.coords.Count != layerCount * layerSize)
+            return false;
+
+        Vector3[] vertices = new Vector3[primMesh.coords.Count];
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            Coord c = primMesh.coords[i];
+            vertices[i] = new Vector3(c.X, c.Y, c.Z);
+        }
+
+        rings = new PrimProfileRings(
+            layerCount, layerSize, primMesh.ProfileHasCentreVertex, primMesh.ProfileOuterVertexCount,
+            primMesh.ProfileHollowVertexCount, primMesh.ProfileVertexAngles, primMesh.LayerTurns, primMesh.LayerTwists,
+            vertices);
+        return true;
+    }
+
+    /// <summary>
+    /// Extrudes the prim's profile along its path, unscaled.
+    /// </summary>
+    /// <returns>true if the prim was extruded, false if not</returns>
+    private bool ExtrudePrimShape(
+        string primName, PrimitiveBaseShape primShape, float lod, out PrimMesh primMesh)
+    {
         float pathShearX = primShape.PathShearX < 128 ? (float)primShape.PathShearX * 0.01f : (float)(primShape.PathShearX - 256) * 0.01f;
         float pathShearY = primShape.PathShearY < 128 ? (float)primShape.PathShearY * 0.01f : (float)(primShape.PathShearY - 256) * 0.01f;
         float pathBegin = (float)primShape.PathBegin * 2.0e-5f;
@@ -884,13 +945,6 @@ public class Meshmerizer : IMesher, INonSharedRegionModule
                 return false;
             }
         }
-
-        primMesh.DumpRaw(baseDir, primName, "primMesh");
-
-        primMesh.Scale(size.X, size.Y, size.Z);
-
-        coords = primMesh.coords;
-        faces = primMesh.faces;
 
         return true;
     }

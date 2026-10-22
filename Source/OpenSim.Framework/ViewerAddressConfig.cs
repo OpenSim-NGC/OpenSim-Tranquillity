@@ -42,8 +42,10 @@ namespace OpenSim.Framework;
 /// </summary>
 /// <remarks>
 /// Keys: Addresses ("CIDR=address" or "CIDR", comma separated; the address is an IPv4 address or a host
-/// name, looked up through the operating system resolver), RefreshMinutes (default 30, 0 = never) and
-/// LocalAddress (the address a region registers for viewers on a bare "CIDR" network). Nothing is
+/// name, looked up through the operating system resolver), RefreshMinutes (default 30, 0 = never),
+/// LocalAddress (the address a region registers for viewers on a bare "CIDR" network) and DnsServers
+/// (comma separated IP addresses; when set, the host names in Addresses are looked up by asking these DNS
+/// servers instead of the operating system resolver). Nothing is
 /// detected: every address handed out is one the operator wrote. The addresses are IPv4: the region's
 /// viewer protocol messages carry four address bytes.
 /// </remarks>
@@ -62,6 +64,9 @@ public sealed class ViewerAddressConfig
     /// <summary>The host names in the list, each once (the first spelling of a name that repeats).</summary>
     public IReadOnlyList<string> Hosts { get; private set; } = Array.Empty<string>();
 
+    /// <summary>The DNS servers that host names in the list are asked of, in order; empty means the operating system resolver.</summary>
+    public IReadOnlyList<IPAddress> DnsServers { get; private set; } = Array.Empty<IPAddress>();
+
     /// <summary>The address this machine's regions register with the grid for viewers on a local network, or null.</summary>
     public IPAddress LocalAddress { get; private set; }
 
@@ -74,7 +79,7 @@ public sealed class ViewerAddressConfig
     public static ViewerAddressConfig Disabled { get; } = new();
 
     public static ViewerAddressConfig Create(string addresses, int refreshMinutes, ILogger log,
-        string localAddress = null, bool refreshSet = false)
+        string localAddress = null, bool refreshSet = false, string dnsServers = null)
     {
         ViewerAddressConfig config = new()
         {
@@ -92,6 +97,10 @@ public sealed class ViewerAddressConfig
             config.LocalAddress = ParseLocalAddress(localAddress, log);
         }
 
+        dnsServers = dnsServers?.Trim();
+        if (!string.IsNullOrEmpty(dnsServers))
+            config.DnsServers = ParseDnsServers(dnsServers, log);
+
         List<string> keys = new();
         if (!string.IsNullOrWhiteSpace(addresses))
             keys.Add("Addresses");
@@ -99,8 +108,24 @@ public sealed class ViewerAddressConfig
             keys.Add("RefreshMinutes");
         if (!string.IsNullOrEmpty(localAddress))
             keys.Add("LocalAddress");
+        if (!string.IsNullOrEmpty(dnsServers))
+            keys.Add("DnsServers");
         config.SetKeys = keys;
         return config;
+    }
+
+    private static List<IPAddress> ParseDnsServers(string value, ILogger log)
+    {
+        List<IPAddress> servers = new();
+        foreach (string item in value.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (IPAddress.TryParse(item, out IPAddress server) && !server.Equals(IPAddress.Any) && !server.Equals(IPAddress.IPv6Any)
+                && !server.Equals(IPAddress.None))
+                servers.Add(server);
+            else
+                log?.LogWarning("[VIEWER ADDRESS]: DnsServers entry \"{0}\" ignored: it is not an IP address", item);
+        }
+        return servers;
     }
 
     /// <summary>True for a dotted IPv4 literal other than 0.0.0.0 (the form a region registers and a viewer can be given).</summary>
@@ -137,7 +162,8 @@ public sealed class ViewerAddressConfig
             section.GetInt("RefreshMinutes", (int)DefaultRefreshInterval.TotalMinutes),
             log,
             section.GetString("LocalAddress", string.Empty),
-            !string.IsNullOrWhiteSpace(section.GetString("RefreshMinutes", string.Empty)));
+            !string.IsNullOrWhiteSpace(section.GetString("RefreshMinutes", string.Empty)),
+            section.GetString("DnsServers", string.Empty));
     }
 
     /// <summary>

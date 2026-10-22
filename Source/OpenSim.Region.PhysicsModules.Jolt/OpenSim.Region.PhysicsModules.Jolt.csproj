@@ -1,0 +1,38 @@
+<!--
+  Copyright (c) 2026 Legion Builds
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Jolt physics region module. It is found through IPluginRegistryProvider (PluginRegistration.cs),
+    like the other physics modules, and enables itself only when [Startup] physics = Jolt.
+  -->
+  <PropertyGroup>
+    <AssemblyName>OpenSim.Region.PhysicsModules.Jolt</AssemblyName>
+    <RootNamespace>OpenSim.Region.PhysicsModules.Jolt</RootNamespace>
+    <AssemblyTitle>OpenSim.Region.PhysicsModules.Jolt</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>OpenSim</Product>
+    <Copyright>OpenSimulator developers</Copyright>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.SharedBase/OpenSim.Region.PhysicsModules.SharedBase.csproj" />
+    <!-- Meshmerizer: the module reads a mesh asset's hull list from the mesh the mesher returns (GetConvexHulls). -->
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Meshing/OpenSim.Region.PhysicsModules.Meshing.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Jolt.Backend/OpenSim.Region.PhysicsModules.Jolt.Backend.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Jolt.Vehicles/OpenSim.Region.PhysicsModules.Jolt.Vehicles.csproj" />
+  </ItemGroup>
+
+  <!-- The native joltc comes from the JoltPhysics.Native package through the backend's reference, and lands in an
+       application's output under runtimes/<rid>/native/; JoltNative (in the backend) picks the file for the running
+       platform, checks its hash and loads it. -->
+
+</Project>

@@ -2149,7 +2149,7 @@ namespace Phlox.ScriptEngine
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;
                 if (local != 0) force *= m_host.GetWorldRotation();
-                m_host.ParentGroup.RootPart.Force = force;   // stores it and passes it to the actor
+                m_host.ParentGroup.RootPart.SetForce(force, local != 0);   // stores it and passes it to the actor
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }
@@ -2173,7 +2173,7 @@ namespace Phlox.ScriptEngine
                 PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
                 if (pa == null) return;
                 if (local != 0) torque *= m_host.GetWorldRotation();
-                m_host.ParentGroup.RootPart.Torque = torque;   // stores it for llGetTorque and passes it to the actor
+                m_host.ParentGroup.RootPart.SetTorque(torque, local != 0);   // stores it for llGetTorque and passes it to the actor
             }
             finally { PhySleep(); }   // Halcyon sleeps on every path
         }
@@ -2278,7 +2278,9 @@ namespace Phlox.ScriptEngine
         public void llSetHoverHeight(float height, int water, float tau)
         {
             if (m_host?.PhysActor == null) return;
-            PIDHoverType hoverType = (water != 0) ? PIDHoverType.Water : PIDHoverType.Ground;
+            // Water TRUE hovers above the higher of the ground and the water (SL wiki llSetHoverHeight; Halcyon's
+            // Ground | Water); FALSE above the ground alone.
+            PIDHoverType hoverType = (water != 0) ? PIDHoverType.GroundAndWater : PIDHoverType.Ground;
             m_host.SetHoverHeight(height, hoverType, tau);
         }
 
@@ -2289,14 +2291,13 @@ namespace Phlox.ScriptEngine
         }
         public void llGroundRepel(float height, int water, float tau)
         {
-            // Halcyon used PIDHoverFlag.Ground|Repel; this port uses PIDHoverType which
-            // may not have a separate Repel flag. Use Ground (or Water) — SetHoverHeight
-            // with a positive height inherently repels from the ground.
+            // Halcyon's PIDHoverFlag.Ground|Repel: the hover type is the same as llSetHoverHeight's and the repel flag
+            // (PhysicsActor.PIDHoverRepel) tells an engine that the object is only pushed up.
             if (m_host?.PhysActor == null) return;
             PIDHoverType hoverType = PIDHoverType.Ground;
             if (water != 0)
-                hoverType = PIDHoverType.Water;
-            m_host.SetHoverHeight(height, hoverType, tau);
+                hoverType = PIDHoverType.GroundAndWater;
+            m_host.SetHoverHeight(height, hoverType, tau, repel: true);
         }
         // Base64 lookup tables for llIntegerToBase64 / llBase64ToInteger
         private static readonly char[] i2ctable =
