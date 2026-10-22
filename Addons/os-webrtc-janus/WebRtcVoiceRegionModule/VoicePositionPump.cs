@@ -49,6 +49,7 @@ namespace osWebRtcVoice
         private readonly PositionSettings _settings;
         private readonly VoicePositionFeeder _feeder;
         private readonly Func<UUID, int?> _roomOf;
+        private readonly RoomRefusals _refusals;   // rooms the mixer answered unknown_room for; null holds nothing back
         private readonly Func<double> _engineMaxCmS;
         private readonly string _region;
         private readonly Func<long> _nowMs;
@@ -61,22 +62,28 @@ namespace osWebRtcVoice
         private int _knownProtocol = NothingLogged;   // the protocol last logged, so a change is logged once
         private long _sent;
         private long _failed;
+        private long _heldBack;
         // The one-minute summary: the window's start and the totals at that moment.
         private long _summaryStartMs = long.MinValue;
         private long _summarySent;
         private long _summaryFailed;
+        private long _summaryHeldBack;
         private PositionReplyCounts _summaryReplies;
 
         /// <param name="roomOf">The mixer room a participant is in, or null when it cannot be placed.</param>
         /// <param name="engineMaxCmS">The physics engine's maximum speed in cm/s, or zero when it declares none.</param>
         /// <param name="nowMs">Clock in milliseconds; defaults to the process tick count. Injectable for tests.</param>
+        /// <param name="refusals">Rooms the mixer has refused as unknown. Nothing is sent to them until a join into them is
+        /// recorded.</param>
         public VoicePositionPump(IPositionWorld world, IPeerPosSink sink, PositionSettings settings,
-            Func<UUID, int?> roomOf, Func<double> engineMaxCmS, string region, Func<long> nowMs = null)
+            Func<UUID, int?> roomOf, Func<double> engineMaxCmS, string region, Func<long> nowMs = null,
+            RoomRefusals refusals = null)
         {
             _world = world;
             _sink = sink;
             _settings = (settings ?? new PositionSettings()).Normalised();
             _roomOf = roomOf;
+            _refusals = refusals;
             _engineMaxCmS = engineMaxCmS ?? (() => 0.0);
             _region = region ?? "?";
             _nowMs = nowMs ?? (() => Environment.TickCount64);
@@ -90,6 +97,10 @@ namespace osWebRtcVoice
 
         /// <summary>Requests that failed in transport.</summary>
         public long MessagesFailed => Interlocked.Read(ref _failed);
+
+        /// <summary>Requests not sent because the mixer had refused their room as unknown and no join into it has been
+        /// recorded since.</summary>
+        public long MessagesHeldBack => Interlocked.Read(ref _heldBack);
 
         /// <summary>Called on every feeder tick; does work only when the position interval has passed. Never throws.</summary>
         public void OnFeederTick() => _ = TickAsync();
@@ -168,10 +179,21 @@ namespace osWebRtcVoice
             {
                 foreach (PositionMessage message in messages)
                 {
+                    if (_refusals != null && _refusals.IsRefused(message.Room))
+                    {
+                        // The mixer holds no such room. What it will need once a viewer joins is a whole snapshot.
+                        _feeder.Forget(message.Room);
+                        Interlocked.Increment(ref _heldBack);
+                        continue;
+                    }
+                    long unknownBefore = _sink.Replies?.Counts.UnknownRoom ?? 0;
                     bool ok = await _sink.SendPositionsAsync(PositionBatchSerializer.BuildRequest(message, mode)).ConfigureAwait(false);
                     if (ok)
                     {
                         Interlocked.Increment(ref _sent);
+                        // The room did not take it: whatever the room holds once a viewer joins, it holds none of this.
+                        if ((_sink.Replies?.Counts.UnknownRoom ?? 0) > unknownBefore)
+                            _feeder.Forget(message.Room);
                         continue;
                     }
                     Interlocked.Increment(ref _failed);
@@ -200,16 +222,18 @@ namespace osWebRtcVoice
             }
             if (now - _summaryStartMs < SummaryIntervalMs)
                 return;
-            long sent = MessagesSent, failed = MessagesFailed;
+            long sent = MessagesSent, failed = MessagesFailed, heldBack = MessagesHeldBack;
             PositionReplyCounts replies = _sink.Replies?.Counts ?? default;
             PositionReplyCounts delta = replies.Since(_summaryReplies);
-            if (sent != _summarySent || failed != _summaryFailed || delta.Total != 0)
+            if (sent != _summarySent || failed != _summaryFailed || heldBack != _summaryHeldBack || delta.Total != 0)
                 m_log.LogDebug("{LogHeader} region {Region}: position summary: {Sent} request(s) sent and {Failed} failed over {WindowS} s; " +
-                    "the mixer answered {Replies}", LogHeader, _region, sent - _summarySent, failed - _summaryFailed,
-                    (now - _summaryStartMs) / 1000, delta.ToString());
+                    "the mixer answered {Replies}; {HeldBack} not sent because the mixer holds no such room", LogHeader, _region,
+                    sent - _summarySent, failed - _summaryFailed, (now - _summaryStartMs) / 1000, delta.ToString(),
+                    heldBack - _summaryHeldBack);
             _summaryStartMs = now;
             _summarySent = sent;
             _summaryFailed = failed;
+            _summaryHeldBack = heldBack;
             _summaryReplies = replies;
         }
 

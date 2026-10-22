@@ -60,6 +60,11 @@ namespace osWebRtcVoice
         /// Participants in the last call that could not be placed in a room and so were left out.
         public int Unplaced { get; private set; }
 
+        /// <summary>Forgets what was sent for a room, so that the next request for it is a full snapshot. Called when a
+        /// request for the room was not sent, because the mixer holds no such room: the room's contents are then
+        /// unknown to it, and a change on top of nothing would not be applied.</summary>
+        public void Forget(int room) => _rooms.Remove(room);
+
         /// <summary>Requests to send now, possibly none. Must be called from one thread.</summary>
         /// <param name="roomOf">The room a participant is in, or null when it cannot be placed.</param>
         /// <param name="engineMaxCmS">The physics engine's maximum speed in cm/s, or zero when it declares none.</param>

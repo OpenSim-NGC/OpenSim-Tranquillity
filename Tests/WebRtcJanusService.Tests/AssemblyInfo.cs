@@ -9,7 +9,8 @@
 // attribute only protects tests you thought to mark; the failure it guards against (an async test
 // wedged on a never-completing Task, with no runner timeout) is exactly the one you can't predict,
 // so the default lives at ASSEMBLY scope. Individual tests may override with a longer timeout only
-// if genuinely needed — none currently does (the whole suite runs in ~1s).
+// if genuinely needed — only the opt-in live-mixer arming test does, because it restarts a container
+// (the rest of the suite runs in ~1s).
 //
 // TimeoutAttribute is [Obsolete] in NUnit 4 (superseded by CancelAfter for cooperative cancellation),
 // but CancelAfter is class/method-only — Timeout is the only attribute valid at assembly scope, and

@@ -14,22 +14,17 @@
  * one room per request. Sibling of that serializer: dependency-free beyond OpenMetaverse - no Scene,
  * no Janus, no OSD, no I/O - and directly unit-testable.
  *
- * POLICY FOR A MISSING ANSWER. roomOf answers "the agent's record, else the room
- * the agent's own parcel would provision it into", so a null is no longer "not recorded yet" - it is "this sim cannot
- * place this agent". Such an agent is OMITTED from every column and every room, and counted. It is NOT addressed at
- * the estate room: that number is a real room in every region, so an earlier policy quietly wrote live exclusion and mute
- * state into a room nobody had asked for, and on an own-channel parcel into the WRONG one. What follows describes the
- * earlier policy where it says record ?? estateRoom; read it as record ?? resolved ?? omitted.
+ * POLICY FOR A MISSING RECORD. roomOf answers the room the agent's last provision joined, or null when
+ * the agent has no record. An agent with no record is OMITTED from every column and every room, and counted.
+ * Nothing guesses a room for it: the estate room is a real room in every region, so addressing the agent
+ * there would write live exclusion and mute state into a room nobody asked for, and the room its parcel
+ * would give it is not evidence that the mixer holds that room (an agent that is only in a group or
+ * avatar-to-avatar call never joined it).
  *
- * ONE policy for a missing record, both roles: roomOf(agent) = record ?? estateRoom. A source with
- * no record is NOT dropped; it is an estate-room source, kept for estate-room listeners and filtered
- * out for per-parcel listeners. The asymmetry OQ2 first drafted (drop unrecorded sources) is
- * superseded: when NOBODY has a record, dropping sources while
- * defaulting listeners would empty every column and silently collapse estate enforcement region-wide.
- * Symmetric fallback makes that state today's behaviour byte-for-byte - which is what the fast path
- * below returns literally, the same map instance, unfiltered.
+ * When every agent has a record and one room holds every listener and every source, the input map is
+ * returned as it is: the same instance, unfiltered.
  *
- * Same-room filtering (OQ2(a)): a listener's column keeps only the sources in the LISTENER's room.
+ * Same-room filtering: a listener's column keeps only the sources in the LISTENER's room.
  * A cross-room source is inert at the mixer (room membership already prevents it being heard), so
  * this is lossless, and it puts a per-room column under SLV_MAX_MIX - 1 = 109 BY CONSTRUCTION rather
  * than under a guard that has to be maintained.
@@ -68,13 +63,10 @@ namespace osWebRtcVoice
         /// that has at least one listener; empty only when the input was empty.</summary>
         public IReadOnlyDictionary<int, IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>>> Rooms { get; }
 
-        /// <summary>Distinct listeners in this batch with no room record, addressed at the estate room
-        /// instead (OQ4). Non-zero is the evidence that OQ4(b) - dropping them - is not safe yet.</summary>
+        /// <summary>Distinct listeners in this batch with no room record. They are left out of every room.</summary>
         public int FallbackListeners { get; }
 
-        /// <summary>Distinct sources in this batch with no room record, treated as estate-room sources.
-        /// Reads non-zero in exactly the version-skew and mid-deploy states; a fully upgraded
-        /// deployment reads ZERO here, which is the signal that revisiting OQ4(b) is on the table.</summary>
+        /// <summary>Distinct sources in this batch with no room record. They are left out of every column.</summary>
         public int FallbackSources { get; }
 
         /// <summary>How many rooms this send will address.</summary>
@@ -87,10 +79,9 @@ namespace osWebRtcVoice
         /// column to its own room and counting the missing records per role.</summary>
         /// <param name="excl">The orchestrator's listener -> excluded sources map. Never mutated.</param>
         /// <param name="roomOf">Recorded room per agent, or null for "no record". A NULL RESOLVER is
-        /// accepted and means no agent has a record: everything resolves to the estate room and both
-        /// counters read the full population, which is the honest reading of an unwired or
-        /// fully-skewed deployment and reproduces today's single-room behaviour rather than throwing
-        /// on the send path. The counters are what make that state loud.</param>
+        /// accepted and means no agent has a record: every agent is left out and both counters read the
+        /// full population, rather than throwing on the send path. The counters are what make that
+        /// state loud.</param>
         /// <param name="estateRoom">NO LONGER AN ADDRESS. Nothing is bucketed here any more; the
         /// parameter is kept because the sink passes its region room and the callers' shape is unchanged.</param>
         public static PeerCtlBatchPartition Partition(
@@ -135,9 +126,8 @@ namespace osWebRtcVoice
                 }
             }
 
-            // Fast path: one room holds every listener AND every source, so no column can lose a
-            // source and the input map is already the answer. Hand it back as-is - no copy, and the
-            // all-unrecorded skew state is byte-for-byte what the original single-room sink sent.
+            // Fast path: every agent has a record and one room holds every listener AND every source, so no
+            // column can lose a source and the input map is already the answer. Hand it back as-is, with no copy.
             if (!manyRooms && noRecord.Count == 0 && haveSoleRoom)
             {
                 var one = new Dictionary<int, IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>>>(1)
@@ -153,7 +143,7 @@ namespace osWebRtcVoice
             {
                 int lr = resolved[kv.Key];
                 if (lr == Unplaced)
-                    continue;   // 0.8c2: omitted, and already counted in fallbackListeners
+                    continue;   // omitted, and already counted in fallbackListeners
                 if (!work.TryGetValue(lr, out Dictionary<UUID, IReadOnlyCollection<UUID>> bucket))
                 {
                     bucket = new Dictionary<UUID, IReadOnlyCollection<UUID>>();
@@ -180,8 +170,8 @@ namespace osWebRtcVoice
         }
 
         /// <summary>What an agent with no answer from the resolver is bucketed as. The resolver
-        /// now answers with the agent's RECORD, else the room its parcel would provision it into, so a null means the
-        /// sim genuinely cannot place it - and an agent it cannot place is one whose room it must not guess.</summary>
+        /// now answers with the agent's RECORD, the room its last provision joined, so a null means the
+        /// sim has no evidence of a room it is in - and an agent it cannot place is one whose room it must not guess.</summary>
         internal const int Unplaced = int.MinValue;
 
         private static int Resolve(UUID agent, Func<UUID, int?> roomOf,
@@ -201,7 +191,7 @@ namespace osWebRtcVoice
         private static void Track(int room, ref int soleRoom, ref bool haveSoleRoom, ref bool manyRooms)
         {
             if (room == Unplaced)
-                return;   // 0.8c2: an agent nobody can place is not a room, so it cannot be THE room either
+                return;   // an agent nobody can place is not a room, so it cannot be THE room either
             if (!haveSoleRoom)
             {
                 soleRoom = room;

@@ -9,7 +9,7 @@
  * Unit tests for the agent -> room record (AgentRoomTable) and its wiring through
  * VoiceVisibilityService.OnListenerProvisioned.
  *
- * Table semantics the brief calls for: newest wins (OQ7), missing key resolves to null. Plus the
+ * Table semantics: newest wins, missing key resolves to null. Plus the
  * two guards the wiring relies on: a null room (failure / logout map) leaves an existing record
  * untouched, and a zero UUID is ignored (mirrors the sender's pending-join guard).
  *
@@ -46,7 +46,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(t.Count, Is.EqualTo(1));
         }
 
-        // OQ7: the newest provision wins; a relog overlap's older session is addressed at the new room.
+        // The newest provision wins; a relog overlap's older session is addressed at the new room.
         [Test]
         public void Record_Twice_NewestWins()
         {
@@ -99,7 +99,23 @@ namespace osWebRtcVoice.Tests
             Assert.That(svc.RoomOf(a), Is.EqualTo(226001844), "the old overload leaves the record untouched");
 
             svc.OnListenerProvisioned(a, 1578726032);                 // re-provision elsewhere
-            Assert.That(svc.RoomOf(a), Is.EqualTo(1578726032), "newest provision wins (OQ7)");
+            Assert.That(svc.RoomOf(a), Is.EqualTo(1578726032), "newest provision wins");
+        }
+
+        // The address of an agent is the room its last provision joined and nothing else: an agent that has only been
+        // in a group or avatar-to-avatar call has no record, so the service resolves no room for it.
+        [Test]
+        public void Service_ResolveRoom_IsTheRecordOnly()
+        {
+            Scene scene = new SceneHelpers().SetupScene();
+            var svc = new VoiceVisibilityService(scene, cadenceMs: 250);
+            UUID a = UUID.Random();
+
+            Assert.That(svc.ResolveRoom(a), Is.Null, "no provision, so no room");
+
+            svc.OnListenerProvisioned(a, 226001844);
+            Assert.That(svc.ResolveRoom(a), Is.EqualTo(226001844));
+            Assert.That(svc.ResolveRoom(a), Is.EqualTo(svc.RoomOf(a)), "the resolver the sender uses is the sink's");
         }
     }
 }

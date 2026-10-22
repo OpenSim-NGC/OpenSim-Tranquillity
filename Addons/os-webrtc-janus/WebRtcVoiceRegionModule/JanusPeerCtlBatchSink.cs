@@ -74,6 +74,8 @@ namespace osWebRtcVoice
 
         private volatile int _lastSendRooms;
         private volatile int _lastSendRequests;                 // requests built: one for each room unless a room was cut into parts
+        private volatile int _lastSendHeldBackRooms;           // rooms left out of the last send: the mixer refused them as unknown
+        private long _roomsHeldBack;                           // the same, summed over every send
         private volatile int[] _lastSendRoomNumbers = Array.Empty<int>();   // which ones, for the console
         private volatile int _lastSendFallbackListeners;
         private volatile int _lastSendFallbackSources;
@@ -148,11 +150,11 @@ namespace osWebRtcVoice
             _fallbackRoom = JanusAudioBridge.CalcRoomNumber(
                 string.Empty, regionId.ToString(), "local", JanusAudioBridge.REGION_ROOM_ID, string.Empty);
             // Nothing is addressed at this number merely because it is the default: an agent with no
-            // record is resolved from its parcel, else omitted. On a parcel-channel region this room
+            // record is omitted. On a parcel-channel region this room
             // may never have been created, so the log line below says exactly when it is used.
             m_log.LogInformation("{LogHeader} region {RegionName} ({RegionId}) -> estate room {RoomNumber} (the region's " +
-                "estate/local channel; compare vs handle_info). Each agent is addressed at its recorded room, else the room " +
-                "its parcel resolves to, else not at all; this number is addressed only where it IS that room. Room send " +
+                "estate/local channel; compare vs handle_info). Each agent is addressed at the room its last provision " +
+                "joined, else not at all; this number is addressed only where it IS that room. Room send " +
                 "concurrency {Concurrency}.",
                 LogHeader, regionName, regionId, _fallbackRoom, concurrency);
         }
@@ -179,6 +181,17 @@ namespace osWebRtcVoice
         /// <summary>Rooms addressed by the most recent send (the "rooms addressed per tick" figure).</summary>
         public int LastSendRooms => _lastSendRooms;
 
+        /// <summary>The rooms the mixer answered "unknown_room" for. Set by VoiceVisibilityService, like <see cref="RoomOf"/>;
+        /// null (the default) holds nothing back. A room in it is left out of every send until a join into it is recorded.</summary>
+        public RoomRefusals Refusals { get; set; }
+
+        /// <summary>Rooms the most recent send left out because the mixer had refused them as unknown and no join into them
+        /// has been recorded since.</summary>
+        public int LastSendHeldBackRooms => _lastSendHeldBackRooms;
+
+        /// <summary>Rooms left out for that reason, summed over every send.</summary>
+        public long RoomsHeldBack => Interlocked.Read(ref _roomsHeldBack);
+
         /// <summary>Requests the most recent send built. The same as <see cref="LastSendRooms"/> unless a room's request
         /// was over the mixer's size limit and was cut into parts.</summary>
         public int LastSendRequests => _lastSendRequests;
@@ -186,8 +199,8 @@ namespace osWebRtcVoice
         /// <summary>Distinct listeners in the most recent send with no room record.</summary>
         public int LastSendFallbackListeners => _lastSendFallbackListeners;
 
-        /// <summary>Distinct sources in the most recent send with no room record. Zero on a fully
-        /// upgraded deployment; non-zero says some voice service is not yet reporting its joined room.</summary>
+        /// <summary>Distinct sources in the most recent send with no room record. Non-zero says the sim
+        /// has no record of a room some agent joined (for example an agent only in a group call).</summary>
         public int LastSendFallbackSources => _lastSendFallbackSources;
 
         /// <summary>Distinct MUTE-channel listeners/sources in the most recent send with no room
@@ -272,6 +285,7 @@ namespace osWebRtcVoice
             VisAuthority authority = Authority;
             if (authority != null)
                 body["room_epoch"] = OSD.FromString(authority.EpochString);
+            long stamp = Refusals?.Stamp() ?? 0;   // before the request goes out: see RoomRefusals
             try
             {
                 (AdminSendResult admin, string replyBody) = await _sendOne(body).ConfigureAwait(false);
@@ -288,7 +302,7 @@ namespace osWebRtcVoice
                     _mixerVisProtocol = reply.VisProtocol;
                     _mixerProtocolKnown = true;
                 }
-                CountPositionReply(body, reply);
+                CountPositionReply(body, reply, stamp);
                 return true;
             }
             catch (Exception e)
@@ -302,13 +316,15 @@ namespace osWebRtcVoice
 
         // The mixer answers a peer_pos it will not apply with an error reply inside a successful transport. Count what it
         // answered, and write one warning a minute for the refusals, with the number held back.
-        private void CountPositionReply(OSDMap request, in SlvoiceReply reply)
+        private void CountPositionReply(OSDMap request, in SlvoiceReply reply, long stamp)
         {
             PositionReplyKind kind = PositionReply.Classify(reply.Present, reply.Status, reply.Reason);
             Replies.Record(kind);
             if (kind == PositionReplyKind.None || kind == PositionReplyKind.Applied)
                 return;
             int room = request.TryGetValue("room", out OSD ro) ? ro.AsInteger() : 0;
+            if (kind == PositionReplyKind.UnknownRoom)
+                Refusals?.Refused(room, stamp);   // the pump sends nothing more to it until a join into it is recorded
             string what = PositionReply.WireName(kind);
             if (_positionRefusalGate.ShouldLog("peer_pos refused", UUID.Zero, s_gateEpoch.AddMilliseconds(_nowMs()), out int held))
                 m_log.LogWarning("{LogHeader} region {RegionName}: the mixer refused a peer_pos request for room {Room} ({Reason}); " +
@@ -346,6 +362,8 @@ namespace osWebRtcVoice
             IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> excl,
             IReadOnlyDictionary<UUID, IReadOnlyCollection<UUID>> mute = null)
         {
+            RoomRefusals refusals = Refusals;
+            long stamp = refusals?.Stamp() ?? 0;   // before the first request goes out: see RoomRefusals
             PeerCtlBatchPartition part = PeerCtlBatchPartitioner.Partition(excl, RoomOf, _fallbackRoom);
             // Exclusion-channel fallback counts keep their exact meaning; _lastSendRooms is set from the
             // CHANNEL UNION further below (a mute-only op addresses rooms the excl partition never sees).
@@ -372,6 +390,10 @@ namespace osWebRtcVoice
             foreach (int r in part.Rooms.Keys) roomKeys.Add(r);
             if (muteRooms != null)
                 foreach (int r in muteRooms.Keys) roomKeys.Add(r);
+            int heldBack = refusals == null ? 0 : roomKeys.RemoveWhere(refusals.IsRefused);
+            _lastSendHeldBackRooms = heldBack;
+            if (heldBack > 0)
+                Interlocked.Add(ref _roomsHeldBack, heldBack);
             _lastSendRooms = roomKeys.Count;   // rooms addressed by EITHER channel (the true count)
             var roomNumbers = new List<int>(roomKeys);
             roomNumbers.Sort();
@@ -433,6 +455,8 @@ namespace osWebRtcVoice
                 {
                     (PeerCtlSendResult result, SlvoiceReply reply) = results[i][j];
                     replies.Add(reply);
+                    if (IsUnknownRoom(in reply))
+                        refusals?.Refused(roomSends[i].Room, stamp);
                     if (Severity(result) > Severity(worst))
                         worst = result;
                     if (authority != null)
@@ -655,6 +679,9 @@ namespace osWebRtcVoice
             return (warn, info);
         }
 
+        private static bool IsUnknownRoom(in SlvoiceReply reply)
+            => reply.Reason == "unknown_room" || reply.StatusField == "unknown_room";
+
         private void LogReply(int room, in SlvoiceReply reply)
         {
             (bool warn, bool info) = ClassifyReply(in reply);
@@ -663,7 +690,7 @@ namespace osWebRtcVoice
                 // The first unknown_room for a room that never answered, or whose last listener left, is expected: the
                 // mixer removes an empty room and the room comes back with the next provision. The authority knows
                 // which that is; without one every reply is reported as before.
-                bool unknownRoom = reply.Reason == "unknown_room" || reply.StatusField == "unknown_room";
+                bool unknownRoom = IsUnknownRoom(in reply);
                 if (unknownRoom && Authority?.ExpectsUnknownRoom(room) == true)
                     m_log.LogDebug("{LogHeader} region {RegionName} room {Room}: peer_ctl_batch reply unknown_room; the mixer " +
                         "has not created this room yet, or removed it once it stood empty [{Raw}]",

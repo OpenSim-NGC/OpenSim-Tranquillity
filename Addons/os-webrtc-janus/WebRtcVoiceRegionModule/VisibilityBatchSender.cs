@@ -51,6 +51,9 @@ namespace osWebRtcVoice
         /// <summary>How many agents the last arming pass could not place, and so left out.</summary>
         public int Unplaced => _unplaced;
 
+        /// <summary>How many agents the last arming pass left out because the mixer had refused their room as unknown.</summary>
+        public int HeldBack => _heldBack;
+
         /// <summary>Bounded blind re-sends of a joining listener's replace — no admin membership
         /// query exists to confirm presence, so we re-send this many ticks then give up loudly.</summary>
         public const int PendingJoinMaxAttempts = 6;
@@ -96,10 +99,12 @@ namespace osWebRtcVoice
         private readonly Dictionary<UUID, int> _pending = new Dictionary<UUID, int>();   // listener -> attempts left
 
         // Arming mode ([WebRtcVoice] VisibilityArmingEnabled). Null
-        // authority = the knob is off, and every method below takes its pre-0.2 path unchanged.
+        // authority = the knob is off, and every method below takes its knob-off path unchanged.
         private readonly VisAuthority _authority;
-        private readonly Func<UUID, int?> _resolveRoom;  // recorded room, else the resolved parcel room, else null
+        private readonly Func<UUID, int?> _resolveRoom;  // the room the agent's last provision joined, else null
+        private readonly RoomRefusals _refusals;         // rooms the mixer answered unknown_room for; null holds nothing back
         private int _unplaced;                          // agents left out of the last pass, for the reader
+        private int _heldBack;                          // agents in a room the mixer refused as unknown, left out of the last pass
         private long _heartbeatInFlight;                 // the heartbeat's OWN single-flight, 0 or 1
         private long _lastHeartbeatMs;
         private bool _loggedHeartbeatStart;
@@ -128,15 +133,17 @@ namespace osWebRtcVoice
         private static readonly DateTime s_gateEpoch = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         /// <param name="authority">Non-null only when arming is enabled; requires <paramref name="resolveRoom"/>.</param>
-        /// <param name="resolveRoom">The room each agent is addressed at (its record, else the fallback room).</param>
+        /// <param name="resolveRoom">The room each agent is addressed at (the room its last provision joined), or null.</param>
+        /// <param name="refusals">Rooms the mixer has refused as unknown. Arming leaves them out until a join into them is recorded.</param>
         public VisibilityBatchSender(IVisibilityFeed feed, IPeerCtlBatchSink sink, bool enabled,
             TimeSpan? adminTimeout = null, string region = null, Func<long> nowMs = null,
-            VisAuthority authority = null, Func<UUID, int?> resolveRoom = null)
+            VisAuthority authority = null, Func<UUID, int?> resolveRoom = null, RoomRefusals refusals = null)
         {
             if (authority != null && resolveRoom == null)
                 throw new ArgumentNullException(nameof(resolveRoom), "arming needs the room resolver");
             _authority = authority;
             _resolveRoom = resolveRoom;
+            _refusals = refusals;
             _feed = feed;
             _sink = sink;
             _enabled = enabled;
@@ -185,7 +192,7 @@ namespace osWebRtcVoice
             if (Interlocked.CompareExchange(ref _sendInFlight, myEpoch, 0L) != 0L)
             {
                 // A send is already in flight. Self-heal if it has been stuck far longer than
-                // possible (FIX 2) — neither the per-call token nor the HttpClient backstop resolved it.
+                // possible — neither the per-call token nor the HttpClient backstop resolved it.
                 ForceClearStalledSend();
                 _synced = false;   // a skipped tick -> snapshot next
                 return Task.CompletedTask;
@@ -227,7 +234,7 @@ namespace osWebRtcVoice
             }
         }
 
-        // FIX 2: self-heal a send stuck in-flight far longer than possible. Called on a skipped Pump
+        // Self-heal a send stuck in-flight far longer than possible. Called on a skipped Pump
         // (a send is already in flight). Logs once per stall episode — the CAS-clear resolves the
         // stall, so the next detection is a fresh episode — never once per tick.
         private void ForceClearStalledSend()
@@ -259,7 +266,7 @@ namespace osWebRtcVoice
         // Every pass: arm whoever is not armed at their current room, then send deltas for listeners already armed.
         // "Arm" is a replace naming the listener with its full columns, empty ones included. A snapshot (first pass,
         // transport error, skipped tick, in-flight guard, or a detected mixer restart) arms the whole population, and
-        // replaces the pre-0.2 clear-tracking: a departed listener is left to the heartbeat's omission rule, because an
+        // replaces the clear-tracking: a departed listener is left to the heartbeat's omission rule, because an
         // empty replace for it would ARM it.
         private async Task EmitArmedAsync(VisibilityBatch batch)
         {
@@ -273,29 +280,38 @@ namespace osWebRtcVoice
 
             var arm = new List<UUID>();
             int unplaced = 0;
+            int heldBack = 0;
             foreach (UUID l in population)
             {
-                // An agent the sim cannot place - no room record and no parcel resolved for it -
-                // is left OUT of the batch and the heartbeat rather than addressed at a guessed number. It is counted
-                // so the state is loud instead of silent, and it is picked up as soon as either source answers.
+                // An agent with no record of a room it joined is left OUT of the batch and the heartbeat rather than
+                // addressed at a guessed number. It is counted so the state is loud instead of silent, and it is picked up
+                // as soon as a provision for it is recorded.
                 int? room = _resolveRoom(l);
                 if (room is null)
                 {
                     unplaced++;
                     continue;
                 }
+                // A room the mixer has refused as unknown gets nothing until a join into it is recorded; that join also
+                // requests this listener's arming (OnListenerProvisioned).
+                if (_refusals != null && _refusals.IsRefused(room.Value))
+                {
+                    heldBack++;
+                    continue;
+                }
                 // CanArmNow gates EVERY path, including a standing re-arm request and a
                 // snapshot. A presence that never leaves the population, an NPC for one, never had its re-arm request expire and the
                 // first clause re-armed it into a missing room on every tick — 8,933 unknown_room lines at ~3.8/s in
-                // the 0.8 soak, with the authority's own backoff sitting there unread.
+                // a soak run, with the authority's own backoff sitting there unread.
                 if ((snapshot || _authority.IsRearmRequested(l) || !_authority.IsArmed(room.Value, l))
                     && _authority.CanArmNow(l))
                     arm.Add(l);
             }
             _unplaced = unplaced;
+            _heldBack = heldBack;
             if (unplaced > 0)
-                m_log.LogDebug("{LogHeader} region {RegionName}: {Count} agent(s) not addressed this pass (no room record " +
-                    "and no parcel resolved); they are omitted, never sent to a guessed room", LogHeader, _region, unplaced);
+                m_log.LogDebug("{LogHeader} region {RegionName}: {Count} agent(s) not addressed this pass (no record of a " +
+                    "room they joined); they are omitted, never sent to a guessed room", LogHeader, _region, unplaced);
 
             if (arm.Count > 0)
             {

@@ -143,7 +143,11 @@ namespace osWebRtcVoice.Tests
                 return c.Lines.Any(l => l.Contains(fragment));
         }
 
-        [Test]
+        // The test restarts the mixer's container and waits up to 90 s for its Admin API, so the
+        // assembly-wide 10 s limit is too short for it.
+#pragma warning disable CS0618
+        [Test, Timeout(240000)]
+#pragma warning restore CS0618
         public async Task RealSimPath_ArmsHeartbeatsAndDetectsAMixerRestart()
         {
             string url = Env("LVM_LIVE_ADMIN_URL");

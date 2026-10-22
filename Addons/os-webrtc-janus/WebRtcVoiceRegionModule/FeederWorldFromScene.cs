@@ -17,7 +17,6 @@
  */
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -34,11 +33,6 @@ namespace osWebRtcVoice
             new ParcelView(UUID.Zero, seeAVs: true, allowVoiceChat: true, null, null);
 
         private readonly Scene m_scene;
-        // The parcel-local-id each admitted agent would be PROVISIONED with, captured while the
-        // snapshot is taken - on the feeder tick thread, which is the only thread that already reads LandChannel for
-        // this region. The sender and the sink resolve rooms from this map instead of reading the Scene from their own
-        // threads, and instead of guessing the estate number for an agent with no room record.
-        private readonly ConcurrentDictionary<UUID, int> m_parcelLocalIds = new ConcurrentDictionary<UUID, int>();
         // Voice moderation state (in-memory, per-region). Optional: the real-scene tests
         // construct this adapter without it, in which case no source is ever moderated.
         private readonly VoiceModerationStore m_moderation;
@@ -71,41 +65,15 @@ namespace osWebRtcVoice
             // RegionId-scoped is deliberate: a child agent of an adjacent region shows up in this
             // scene but is voiced in its home region, not here, so it is correctly excluded rather
             // than emitted as a spurious column the mixer would have to drop.
-            var placed = new HashSet<UUID>();
             m_scene.ForEachScenePresence(sp =>
             {
                 if (!VoiceViewerSession.IsAgentInRegion(regionId, sp.UUID))
                     return;
                 agents.Add(new AgentView(
                     sp.UUID, sp.IsChildAgent, sp.AbsolutePosition, sp.currentParcelUUID, sp.IsViewerUIGod));
-                // The same parcel the provisioning path would resolve for this avatar, as a local id.
-                // A presence whose parcel cannot be read is left OUT of the map, so it resolves to "unplaced" rather
-                // than to a guessed number.
-                ILandObject parcel = m_scene.LandChannel?.GetLandObject(sp.AbsolutePosition.X, sp.AbsolutePosition.Y);
-                if (parcel?.LandData is not null)
-                {
-                    m_parcelLocalIds[sp.UUID] = ParcelLocalIdFor(parcel.LandData);
-                    placed.Add(sp.UUID);
-                }
             });
-            foreach (UUID gone in new List<UUID>(m_parcelLocalIds.Keys))
-                if (!placed.Contains(gone))
-                    m_parcelLocalIds.TryRemove(gone, out _);
             return agents;
         }
-
-        /// <summary>The parcel-local-id this agent's position resolved to at the last snapshot, or
-        /// null when the agent is not in the population or its parcel could not be read. Read from the sender's and the
-        /// sink's threads; the map is concurrent and written only by the tick thread.</summary>
-        public int? ParcelLocalIdOf(UUID agent)
-            => m_parcelLocalIds.TryGetValue(agent, out int localId) ? localId : (int?)null;
-
-        /// <summary>The parcel_local_id an avatar on this parcel is provisioned with: the parcel's own id, or
-        /// REGION_ROOM_ID when the parcel runs the estate channel.</summary>
-        internal static int ParcelLocalIdFor(LandData land)
-            => land is null || (land.Flags & (uint)ParcelFlags.UseEstateVoiceChan) != 0
-                ? JanusAudioBridge.REGION_ROOM_ID
-                : land.LocalID;
 
         /// <summary>Where every presence that holds a voice session in this region is, in global centimetres, with the
         /// sim's own speed for it. Same population as <see cref="SnapshotAgents"/>. A child agent's position is the one

@@ -200,13 +200,13 @@ namespace osWebRtcVoice.Tests
                     AddAgents();
                 Sink = new JanusPeerCtlBatchSink("http://unused", "unused", TimeSpan.FromSeconds(5), Id(77), "noise",
                     sendOne: T.SendAsync);
-                Sink.RoomOf = a => Rooms.TryGetValue(a, out int r) ? r : (int?)Sink.FallbackRoom;
+                Sink.RoomOf = a => Rooms.TryGetValue(a, out int r) ? r : (int?)null;
                 Auth = heartbeatMs.HasValue
                     ? new VisAuthority(VisAuthority.NewEpoch(), "noise", () => Clock, heartbeatMs.Value)
                     : new VisAuthority(VisAuthority.NewEpoch(), "noise", () => Clock);
                 Sink.Authority = Auth;
                 Sender = new VisibilityBatchSender(Feed, Sink, true, TimeSpan.FromSeconds(5), "noise", () => Clock,
-                    Auth, a => Rooms.TryGetValue(a, out int r) ? r : (int?)Sink.FallbackRoom);
+                    Auth, a => Rooms.TryGetValue(a, out int r) ? r : (int?)null);
             }
 
             public void AddAgents()

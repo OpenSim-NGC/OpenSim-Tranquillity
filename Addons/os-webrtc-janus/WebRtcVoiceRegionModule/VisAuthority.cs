@@ -540,7 +540,7 @@ namespace osWebRtcVoice
             var byRoom = new SortedDictionary<int, List<UUID>>();
             foreach (UUID l in population)
             {
-                // An agent with no record and no resolved parcel is named in NO room's entry. A
+                // An agent with no record of a room it joined is named in NO room's entry. A
                 // heartbeat that named it at a guessed room would be claiming authority over a room it cannot place it
                 // in; omission here is not a disarm, because it was never armed anywhere.
                 int? room = resolveRoom(l);

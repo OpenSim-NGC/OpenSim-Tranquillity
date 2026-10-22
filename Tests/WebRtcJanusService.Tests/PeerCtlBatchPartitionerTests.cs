@@ -7,12 +7,13 @@
 
 /*
  * Unit tests for PeerCtlBatchPartitioner - the per-room split that makes SLV_VIS_MAX_EXCL
- * unreachable by construction (design, OQ2/OQ4 and the missing-record resolution).
+ * unreachable by construction.
  *
- * The load-bearing cases are the two fallbacks. A missing room record resolves to the estate room
- * for BOTH roles, and the pair of counters is what tells an operator which state a deployment is
- * in: fallback_listeners non-zero means agents the table does not cover, fallback_sources non-zero
- * means a service that does not yet report the room it joined.
+ * The load-bearing cases are the two roles with no record. The resolver answers the room an agent's
+ * last provision joined, or null when the agent has no record; an agent with no record is left out of
+ * every column and every room, and counted. The pair of counters is what tells an operator which
+ * state a deployment is in: fallback_listeners non-zero means listeners with no record,
+ * fallback_sources non-zero means sources with no record.
  */
 
 using System;
@@ -80,7 +81,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(p.FallbackSources, Is.Zero);
         }
 
-        // ---- same-room source filtering (OQ2a) ----
+        // ---- same-room source filtering ----
 
         [Test]
         public void Partition_KeepsOnlySourcesInTheListenersRoom()
@@ -111,15 +112,14 @@ namespace osWebRtcVoice.Tests
             Assert.That(Column(p, 100, 1).Count, Is.Zero);
         }
 
-        // ---- fallback: listener with no record (OQ4a) ----
+        // ---- listener with no record ----
 
         [Test]
         public void Partition_ListenerTheResolverCannotPlace_IsOmittedAndCounted()
         {
-            // 2, the contract this test used to pin the other way round: the resolver now answers
-            // "the record, else the room this agent's parcel would provision it into", so a null means the sim cannot
-            // place the agent at all. An agent it cannot place is NOT addressed at the estate number because that is
-            // the default - it is left out, and counted.
+            // The resolver answers the agent's record, so a null means the agent has no record. An agent
+            // with no record is NOT addressed at the estate number because that is the default - it is
+            // left out, and counted.
             var excl = Excl((1, new[] { 2 }), (5, new[] { 6 }));
             var roomOf = Resolver((1, 100), (2, 100), (6, 100));
 
@@ -131,15 +131,14 @@ namespace osWebRtcVoice.Tests
             Assert.That(p.FallbackSources, Is.Zero, "every source here has a record");
         }
 
-        // ---- fallback: source with no record (the resolution that supersedes OQ2's draft) ----
+        // ---- source with no record ----
 
         [Test]
         public void Partition_SourceTheResolverCannotPlace_IsFilteredOutOfEveryColumn_AndCounted()
         {
-            // 2: a source the sim cannot place is in no room, so it survives in no column. Before 0.8c2 it
-            // was treated as an estate-room source and kept for estate-room listeners; that was the guess this change
-            // removes. A source resolved to the estate room by its PARCEL still behaves exactly as it did - that is
-            // the case below, where listener 7 and source 9 are both placed there.
+            // A source with no record is in no room, so it survives in no column. A source whose record is
+            // the estate room is kept for listeners recorded there - that is the case below, where
+            // listener 7 and source 9 both have the estate room.
             var excl = Excl((1, new[] { 9 }), (7, new[] { 9 }));
             var roomOf = Resolver((1, 100), (7, EstateRoom));
 
@@ -150,7 +149,7 @@ namespace osWebRtcVoice.Tests
             Assert.That(p.FallbackSources, Is.EqualTo(1), "counted once");
             Assert.That(p.FallbackListeners, Is.Zero, "listener 7's estate room is RECORDED, not a guess");
 
-            // The same shape with source 9 PLACED at the estate room by resolution: kept for 7, filtered for 1.
+            // The same shape with source 9 recorded in the estate room: kept for 7, filtered for 1.
             PeerCtlBatchPartition placed = PeerCtlBatchPartitioner.Partition(
                 excl, Resolver((1, 100), (7, EstateRoom), (9, EstateRoom)), EstateRoom);
             Assert.That(Column(placed, EstateRoom, 7), Is.EquivalentTo(new[] { Id(9) }));
@@ -219,9 +218,9 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Partition_NobodyCanBePlaced_SendsNothingAtAll_AndCountsEveryone()
         {
-            // 2: with no answer for anyone there is nothing to address. The old behaviour - one estate-room
-            // batch carrying everybody - was the guess that sent live policy to a room that may never have existed
-            // . The counters carry the whole population so the state is impossible to miss.
+            // With no record for anyone there is nothing to address: sending one estate-room batch carrying
+            // everybody would send live policy to a room that may not exist. The counters carry the whole
+            // population so the state is impossible to miss.
             var excl = Excl((1, new[] { 2, 3 }), (2, new[] { 1, 3 }));
 
             PeerCtlBatchPartition p = PeerCtlBatchPartitioner.Partition(excl, Resolver(), EstateRoom);
@@ -234,7 +233,7 @@ namespace osWebRtcVoice.Tests
         [Test]
         public void Partition_NullResolver_SendsNothing_AndShouts()
         {
-            // An unwired sink must not throw on the send path. 2: it now sends NOTHING rather than sending
+            // An unwired sink must not throw on the send path. It sends NOTHING rather than sending
             // everything to a guessed room, and both counters shout. Until the service assigns the resolver there is
             // no honest address for anyone.
             var excl = Excl((1, new[] { 2 }));

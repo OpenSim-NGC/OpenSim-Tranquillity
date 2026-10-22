@@ -163,16 +163,12 @@ namespace osWebRtcVoice.Tests
                 World.Agents.Add(new AgentView(D, false, Vector3.Zero, ParcelQ, false));   // D on Q: empty columns
                 Sink = new JanusPeerCtlBatchSink("http://unused", "unused", TimeSpan.FromSeconds(5), Id(77), "arming",
                     sendOne: T.SendAsync);
-                // 0.8c2: as the service composes it - record, else the agent's parcel room (estate here), never a
-                // default applied merely because there is no record.
-                Sink.RoomOf = a => Rooms.TryGetValue(a, out int r) ? r : (int?)Sink.FallbackRoom;
+                // The rig resolves rooms as the service does, from the record only.
+                Sink.RoomOf = a => Rooms.TryGetValue(a, out int r) ? r : (int?)null;
                 Auth = new VisAuthority(epoch ?? VisAuthority.NewEpoch(), "arming", () => Clock);
                 Sink.Authority = Auth;
                 Sender = new VisibilityBatchSender(Feed, Sink, true, TimeSpan.FromSeconds(5), "arming", () => Clock,
-                    // 0.8c2: the rig's resolver answers with the room a record names, else the room this test's
-                    // world resolves for that agent - the estate/fallback number here, which is what an
-                    // estate-channel parcel resolves to, so these payloads are unchanged.
-                    Auth, a => Rooms.TryGetValue(a, out int r) ? r : (int?)Sink.FallbackRoom);
+                    Auth, a => Rooms.TryGetValue(a, out int r) ? r : (int?)null);
             }
 
             public async Task Tick(long advanceMs = 250)
@@ -382,7 +378,7 @@ namespace osWebRtcVoice.Tests
             var auth = new VisAuthority(VisAuthority.NewEpoch(), "asof", () => 10_000);
             var named = new List<UUID> { A };
             var population = new[] { A };
-            Func<UUID, int?> room = _ => RoomAB;   // 0.8c2: the resolver is nullable (unplaced = null)
+            Func<UUID, int?> room = _ => RoomAB;   // the resolver is nullable (no record = null)
             int AsOf() => Path(auth.BuildHeartbeat(population, room, false), "rooms", RoomAB.ToString(), "as_of").AsInteger();
             int Allocated() => Path(auth.BuildHeartbeat(population, room, false), "rooms", RoomAB.ToString(), "policy_generation").AsInteger();
 

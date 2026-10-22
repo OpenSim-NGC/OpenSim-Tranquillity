@@ -157,7 +157,7 @@ namespace osWebRtcVoice.Tests
                 "returned on the ~50ms deadline, not after the 30s hang");
         }
 
-        // ---- FIX 1: absolute HttpClient.Timeout backstop -------------------------------------
+        // ---- absolute HttpClient.Timeout backstop -------------------------------------
         [Test]
         public void ComputeClientTimeout_IsFourTimesTheAdminTimeout()
         {
