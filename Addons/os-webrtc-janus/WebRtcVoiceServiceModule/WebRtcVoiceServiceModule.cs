@@ -112,6 +112,12 @@ public class WebRtcVoiceServiceModule : ISharedRegionModule, IWebRtcVoiceService
                         m_Enabled = false;
                     }
                 }
+                else
+                {
+                    // The same DLL names both roles, so one service serves both. Share the instance;
+                    // otherwise the first non-local provision dereferences a null service.
+                    m_nonSpatialVoiceService = m_spatialVoiceService;
+                }
 
                 if (m_Enabled)
                 {
