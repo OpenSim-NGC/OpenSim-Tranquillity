@@ -122,6 +122,13 @@ namespace osWebRtcVoice
                 (int)((worldLocY + (double)position.Y) * 100.0),
                 (int)((double)position.Z * 100.0));
 
+        /// <summary>The parcel_local_id an avatar on this parcel is provisioned with: the parcel's own id, or
+        /// REGION_ROOM_ID when the parcel runs the estate channel.</summary>
+        internal static int ParcelLocalIdFor(LandData land)
+            => land is null || (land.Flags & (uint)ParcelFlags.UseEstateVoiceChan) != 0
+                ? JanusAudioBridge.REGION_ROOM_ID
+                : land.LocalID;
+
         public ParcelView GetParcelAt(Vector3 position)
             => ToParcelView(m_scene.LandChannel?.GetLandObject(position.X, position.Y));
 
