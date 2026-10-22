@@ -56,7 +56,7 @@ namespace osWebRtcVoice;
 /// The capabilities then pass the user request information to the IWebRtcVoiceService interface
 /// that has been registered for the reqion.
 /// </summary>
-public class WebRtcVoiceRegionModule : ISharedRegionModule
+public partial class WebRtcVoiceRegionModule : ISharedRegionModule
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string logHeader = "[REGION WEBRTC VOICE]";
@@ -79,6 +79,8 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
             if (m_Enabled)
             {
                 _MessageDetails = m_Config.GetBoolean("MessageDetails", false);
+                InitialiseRefusalCache();
+                InitialiseStunServers();
 
                 m_log.LogInformation($"{logHeader}: enabled");
             }
@@ -113,6 +115,8 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
 
             ISimulatorFeaturesModule simFeatures = scene.RequestModuleInterface<ISimulatorFeaturesModule>();
             simFeatures?.AddFeature("VoiceServerType", OSD.FromString("webrtc"));
+
+            AdvertiseStunServers(simFeatures);
         }
     }
 
@@ -185,7 +189,8 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
     /// <param name="agentID"></param>
     /// <param name="caps"></param>
     /// <returns></returns>
-    public void ProvisionVoiceAccountRequest(IOSHttpRequest request, IOSHttpResponse response, UUID agentID, Scene scene)
+    private void ProvisionVoiceAccountRequestCore(IOSHttpRequest request, IOSHttpResponse response, UUID agentID, Scene scene,
+        ProvisionCallContext ctx)
     {
         // Get the voice service. If it doesn't exist, return an error.
         IWebRtcVoiceService voiceService = scene.RequestModuleInterface<IWebRtcVoiceService>();
@@ -217,7 +222,8 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         {
             if (vstosd is OSDString vst && !((string)vst).Equals("webrtc", StringComparison.OrdinalIgnoreCase))
             {
-                m_log.LogWarning($"{logHeader}[ProvisionVoice]: voice_server_type is not 'webrtc'. Request: {map}");
+                // Firestorm's Vivox module probes this cap twice per login; refused as before, logged at DEBUG.
+                m_log.LogDebug($"{logHeader}[ProvisionVoice]: voice_server_type is not 'webrtc' (viewer Vivox probe, expected). Request: {map}");
                 response.RawBuffer = llsdUndefAnswerBytes;
                 response.StatusCode = (int)HttpStatusCode.OK;
                 return;
@@ -226,11 +232,20 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
 
         if (_MessageDetails) m_log.LogDebug($"{logHeader}[ProvisionVoice]: request: {map}");
 
+        // A teardown ({logout: true}) carries no channel_type; the wrapper clears the refusal cache for it.
+        ctx.IsLogout = map.TryGetBool("logout", out bool logout) && logout;
+
         if (map.TryGetString("channel_type", out string channelType))
         {
             //do fully not trust viewers voice parcel requests
             if (channelType == "local")
             {
+                // A repeat of a refusal this agent got a moment ago is answered from the cache, before the
+                // estate and parcel checks run again.
+                ctx.IsLocal = true;
+                if (TryReplayCachedRefusal(agentID, scene, response, ctx))
+                    return;
+
                 if (!scene.RegionInfo.EstateSettings.AllowVoice)
                 {
                     m_log.LogDebug($"{logHeader}[ProvisionVoice]:region \"{scene.Name}\": voice not enabled in estate settings");
@@ -302,13 +317,19 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         if(resp is not null)
         {
             if (_MessageDetails) m_log.LogDebug($"{logHeader}[ProvisionVoice]: response: {resp}");
-
-            // TODO: check for errors and package the response
+            ctx.Provisioned = resp.ContainsKey("viewer_session");   // a success map clears the refusal cache
 
             // Convert the OSD to LLSDXml for the response
             string xmlResp = OSDParser.SerializeLLSDXmlString(resp);
             response.RawBuffer = Util.UTF8.GetBytes(xmlResp);
-            response.StatusCode = (int)HttpStatusCode.OK;
+            // A capacity rejection carries the mixer's ROOM_FULL code; return HTTP 409 Conflict,
+            // which the viewer maps to ERROR_CHANNEL_FULL (llvoicewebrtc.cpp:2901). Every other
+            // failure map carries no error_code and keeps its OK status. Referencing the service
+            // constant keeps the 495 in one place (WebRtcJanusService.JANUS_ROOM_FULL_ERROR_CODE).
+            if (resp.TryGetInt("error_code", out int provErrorCode) && provErrorCode == WebRtcJanusService.JANUS_ROOM_FULL_ERROR_CODE)
+                response.StatusCode = (int)HttpStatusCode.Conflict;
+            else
+                response.StatusCode = (int)HttpStatusCode.OK;
         }
         else
         {

@@ -38,7 +38,7 @@ using Microsoft.Extensions.Logging;
 
 namespace osWebRtcVoice;
 
-public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
+public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
 {
     private static readonly ILogger _log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[JANUS WEBRTC SERVICE]";
@@ -57,8 +57,17 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
     //     is working and for a handle for the console commands.
     private JanusViewerSession _ViewerSession;
 
-    public WebRtcJanusService(IConfigSource pConfig) : base(pConfig)
+    // Test seam: builds the HttpMessageHandler for each JanusSession this service creates (null = the network).
+    // A factory, not one handler, because disposing the HttpClient of a Janus session disposes its handler.
+    private readonly Func<HttpMessageHandler> _httpHandlerFactory;
+
+    public WebRtcJanusService(IConfigSource pConfig) : this(pConfig, null)
     {
+    }
+
+    public WebRtcJanusService(IConfigSource pConfig, Func<HttpMessageHandler> pHttpHandlerFactory) : base(pConfig)
+    {
+        _httpHandlerFactory = pHttpHandlerFactory;
         Assembly assembly = Assembly.GetExecutingAssembly();
         string version = assembly.GetName().Version?.ToString() ?? "unknown";
 
@@ -76,8 +85,11 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 _JanusAPIToken = janusConfig.GetString("APIToken", string.Empty);
                 _JanusAdminURI = janusConfig.GetString("JanusGatewayAdminURI", string.Empty);
                 _JanusAdminToken = janusConfig.GetString("AdminAPIToken", string.Empty);
+                ReadPluginNameConfig(janusConfig);
+                ReadRoomReaperConfig(janusConfig);
                 // Debugging options
                 _MessageDetails = janusConfig.GetBoolean("MessageDetails", false);
+                ReadRequestTimeoutConfig(janusConfig);
 
                 if (string.IsNullOrEmpty(_JanusServerURI) || string.IsNullOrEmpty(_JanusAPIToken) ||
                     string.IsNullOrEmpty(_JanusAdminURI) || string.IsNullOrEmpty(_JanusAdminToken))
@@ -95,6 +107,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                         return;
                     }
                     RegisterConsoleCommands();
+                    StartRoomReaper();
                     _log.LogInformation($"{LogHeader} Enabled");
                 }
             }
@@ -124,13 +137,19 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
 
     private async Task<bool> ConnectToSessionAndAudioBridge(JanusViewerSession pViewerSession)
     {
-        JanusSession janusSession = new JanusSession(_JanusServerURI, _JanusAPIToken, _JanusAdminURI, _JanusAdminToken, _MessageDetails);
+        JanusSession janusSession = new JanusSession(_JanusServerURI, _JanusAPIToken, _JanusAdminURI, _JanusAdminToken, _MessageDetails,
+            CreateHttpHandler());
+        janusSession.JanusRequestTimeout = TimeSpan.FromMilliseconds(_JanusRequestTimeoutMs);
         if (await janusSession.CreateSession().ConfigureAwait(false))
         {
             _log.LogDebug("{0} JanusSession created", LogHeader);
 
             // Once the session is created, create a handle to the plugin for rooms
-            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession);
+            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName)
+            {
+                // Rooms this bridge creates are watched by the empty-room reaper (null when it is off).
+                RoomCreated = _roomReaper is null ? null : _roomReaper.NoteCreated,
+            };
 
             if (await audioBridge.Activate(_Config).ConfigureAwait(false))
             {
@@ -142,13 +161,22 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 pViewerSession.VoiceServiceSessionId = janusSession.SessionId;
                 pViewerSession.Session = janusSession;
                 pViewerSession.AudioBridge = audioBridge;
-                janusSession.OnDisconnect += Handle_Hangup;
+                janusSession.OnDisconnect += Handle_Disconnect;
                 janusSession.OnHangup += Handle_Hangup;
                 return true;
             }
             _log.LogError($"{LogHeader} JanusPluginHandle not created");
         }
-        _log.LogError($"{LogHeader} JanusSession not created");
+        else
+        {
+            _log.LogError($"{LogHeader} JanusSession not created");
+        }
+        // Never leave a half-built session behind. Created-but-attach-failed is a live Janus session
+        // (with its long poll) that nothing references; destroy it (bounded by RequestTimeoutMs,), then
+        // release its HttpClient.
+        if (janusSession.IsConnected)
+            await janusSession.DestroySession().ConfigureAwait(false);
+        janusSession.Dispose();
         return false;
     }
 
@@ -163,7 +191,7 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 // There is a viewer session associated with this session
                 DisconnectViewerSession(viewerSession as JanusViewerSession);
             }
-            else
+            else if (!MarkServiceSessionDisconnected(pResp))
             {
                 _log.LogDebug($"{LogHeader} Handle_Hangup: no session found. SessionId={sessionId}");
             }
@@ -197,13 +225,22 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
     {
         OSDMap ret = null;
         string errorMsg = null;
+        int errorCode = 0;   // mixer error_code to propagate on failure (0 = none); only ROOM_FULL is acted on downstream
         JanusViewerSession viewerSession = pSession as JanusViewerSession;
         if (viewerSession is not null)
         {
             if (viewerSession.Session is null)
             {
                 // This is a new session so we must create a new session and handle to the audio bridge
-                await ConnectToSessionAndAudioBridge(viewerSession).ConfigureAwait(false);
+                if (!await ConnectToSessionAndAudioBridge(viewerSession).ConfigureAwait(false))
+                {
+                    // The connect failed (Janus unreachable, or the plugin attach failed;
+                    // ConnectToSessionAndAudioBridge has already destroyed anything it half-built). The result used
+                    // to be ignored, and the offer's SelectRoom then threw NullReferenceException on the null
+                    // AudioBridge — a 500, not a failure map. Answer the failure-map shape the other arms return.
+                    _log.LogError($"{LogHeader} ProvisionVoiceAccountRequest: janus unavailable - no Janus session/plugin handle for agent {pUserID}");
+                    return ProvisionResponseBuilder.BuildFailure("janus unavailable", 0);
+                }
             }
 
             // TODO: need to keep count of users in a room to know when to close a room
@@ -216,10 +253,11 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                     await viewerSession.Room.LeaveRoom(viewerSession);
                     viewerSession.Room = null;
                 }
-                return new OSDMap
-                {
-                    { "response", "closed" }
-                };
+                // Remove the registry entry the same way hangup does — DisconnectViewerSession,
+                // not bare RemoveViewerSession, because the live Janus session/handle must be shut
+                // down, not just forgotten (a forgotten entry is unreachable by the close capture).
+                DisconnectViewerSession(viewerSession);
+                return ProvisionResponseBuilder.BuildClosed();
             }
 
             // Get the parameters that select the room
@@ -253,18 +291,41 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                         viewerSession.Offer = jsepSdp;
                         viewerSession.OfferOrig = jsepSdp;
                         viewerSession.AgentId = pUserID;
-                        if (await viewerSession.Room.JoinRoom(viewerSession).ConfigureAwait(false))
+                        // ONE join. SelectRoom above has just had the mixer create (or confirm) the room, so
+                        // this JSEP join never meets a room the sim merely believed in. It is never re-sent on this handle:
+                        // Janus core builds the handle's ICE agent from the offer before the plugin looks at the room, and
+                        // refuses a second JSEP join on the same handle with error 490.
+                        var joinResult = await viewerSession.Room.JoinRoom(viewerSession).ConfigureAwait(false);
+                        if (joinResult.Joined)
                         {
-                            ret = new OSDMap
-                            {
-                                { "jsep", viewerSession.Answer },
-                                { "viewer_session", viewerSession.ViewerSessionID }
-                            };
+                            ret = ProvisionResponseBuilder.BuildSuccess(viewerSession.Answer, viewerSession.ViewerSessionID);
+                        }
+                        else if (joinResult.ErrorCode == JANUS_ROOM_FULL_ERROR_CODE)
+                        {
+                            // Capacity rejection: carry the code so the CAP handler returns HTTP
+                            // 409 Conflict (viewer -> ERROR_CHANNEL_FULL). Distinct from every
+                            // other JoinRoom failure below, which stay generic (no error_code).
+                            errorMsg = "room is full";
+                            errorCode = joinResult.ErrorCode;
+                            _log.LogWarning($"{LogHeader} ProvisionVoiceAccountRequest: room full (ROOM_FULL {joinResult.ErrorCode})");
+                            viewerSession.Room = null;   // never joined: a later logout must not send a leave for it
+                        }
+                        else if (joinResult.ErrorCode == JANUS_NO_SUCH_ROOM_ERROR_CODE)
+                        {
+                            // The room vanished between the create a moment ago and this join - the
+                            // mixer's grace sweep landing in between. Not retried here (see above); the viewer's own
+                            // retry sends a fresh create and a fresh handle. One WARN, no ERROR.
+                            errorMsg = "JoinRoom failed";   // the failure map is what it always was: no error_code
+                            _log.LogWarning("{LogHeader} ProvisionVoiceAccountRequest: room {Room} was gone at the join (485) " +
+                                "although the mixer had just answered its create; failing back to the viewer, whose retry " +
+                                "creates it again", LogHeader, viewerSession.Room.RoomId);
+                            viewerSession.Room = null;   // never joined: a later logout must not send a leave for it
                         }
                         else
                         {
                             errorMsg = "JoinRoom failed";
-                            _log.LogError($"{LogHeader} ProvisionVoiceAccountRequest: JoinRoom failed");
+                            _log.LogError($"{LogHeader} ProvisionVoiceAccountRequest: JoinRoom failed (error_code={joinResult.ErrorCode})");
+                            viewerSession.Room = null;   // never joined: a later logout must not send a leave for it
                         }
                     }
                 }
@@ -288,12 +349,10 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
 
         if (!string.IsNullOrEmpty(errorMsg) && ret is null)
         {
-            // The provision failed so build an error messgage to return
-            ret = new OSDMap
-            {
-                { "response", "failed" },
-                { "error", errorMsg }
-            };
+            // The provision failed so build an error message to return.
+            // Only a capacity rejection sets errorCode; the CAP handler maps 495 -> HTTP 409.
+            // Every other failure leaves it 0 (no error_code field) and keeps its status.
+            ret = ProvisionResponseBuilder.BuildFailure(errorMsg, errorCode);
         }
 
         return ret;
@@ -310,6 +369,17 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
         OSDMap ret = null;
         JanusViewerSession viewerSession = pSession as JanusViewerSession;
         JanusMessageResp resp = null;
+        if (viewerSession is not null && viewerSession.Session is null)
+        {
+            // Signalling for a viewer session with no Janus session (never provisioned, or
+            // already shut down) used to throw NullReferenceException on Session. Answer the error map instead.
+            _log.LogWarning($"{LogHeader} VoiceSignalingRequest: viewer session {viewerSession.ViewerSessionID} of {pUserID} has no Janus session");
+            return new OSDMap
+            {
+                { "response", "error" },
+                { "error", "no voice session" }
+            };
+        }
         if (viewerSession is not null)
         {
             // The request should be an array of candidates
@@ -321,8 +391,25 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                     resp = await viewerSession.Session.TrickleCompleted(viewerSession).ConfigureAwait(false);
                     _log.LogDebug($"{LogHeader} VoiceSignalingRequest: candidate completed");
                 }
+                else if (candidate.TryGetString("candidate", out string candidateLine) && !string.IsNullOrEmpty(candidateLine))
+                {
+                    // The singular form {candidate:{candidate, sdpMid, sdpMLineIndex}} used to fall
+                    // into an empty else and was silently dropped. Pass it on as a one-element candidate list.
+                    OSDArray single = new OSDArray
+                    {
+                        new OSDMap
+                        {
+                            { "candidate", candidateLine },
+                            { "sdpMid", candidate["sdpMid"].AsString() },
+                            { "sdpMLineIndex", candidate["sdpMLineIndex"].AsLong() }
+                        }
+                    };
+                    resp = await viewerSession.Session.TrickleCandidates(viewerSession, single).ConfigureAwait(false);
+                    _log.LogDebug($"{LogHeader} VoiceSignalingRequest: 1 candidate (singular form)");
+                }
                 else
                 {
+                    _log.LogWarning($"{LogHeader} VoiceSignalingRequest: 'candidate' has neither 'completed' nor a candidate line");
                 }
             }
             else if (pRequest.TryGetOSDArray("candidates", out OSDArray candidates))
@@ -387,7 +474,8 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
     // ======================================================================================================
     private void RegisterConsoleCommands()
     {
-        if (_Enabled) {
+        // No console when the service is hosted without one (unit tests construct it directly).
+        if (_Enabled && MainConsole.Instance is not null) {
             MainConsole.Instance.Commands.AddCommand("Webrtc", false, "janus info",
                 "janus info",
                 "Show Janus server information",
@@ -403,24 +491,36 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
 
     private void HandleJanusInfo(string module, string[] cmdparms)
     {
-        if (_ViewerSession is not null && _ViewerSession.Session is not null)
+        // Reconnects a dead service session first instead of using it as-is.
+        JanusViewerSession svc = EnsureServiceSessionAsync().Result;
+        if (svc is not null && svc.Session is not null)
         {
-            WriteOut("{0} Janus session: {1}", LogHeader, _ViewerSession.Session.SessionId);
-            string infoURI = _ViewerSession.Session.JanusServerURI + "/info";
+            WriteOut("{0} Janus session: {1}", LogHeader, svc.Session.SessionId);
+            string infoURI = svc.Session.JanusServerURI + "/info";
 
-            var resp = _ViewerSession.Session.GetFromJanus(infoURI).Result;
-            
+            var resp = svc.Session.GetFromJanus(infoURI).Result;
+
             if (resp is not null)
                 MainConsole.Instance.Output(resp.ToJson());
+        }
+        else
+        {
+            MainConsole.Instance.Output("No Janus service session (Janus unreachable)");
         }
     }
 
     private void HandleJanusListRooms(string module, string[] cmdparms)
     {
-        if (_ViewerSession is not null && _ViewerSession.Session is not null && _ViewerSession.AudioBridge is not null)
+        // ServiceListRoomsAsync reconnects the service session when it is dead and retries once,
+        // so "janus list rooms" heals after a mixer restart instead of failing until the region restarts.
+        var resp = ServiceListRoomsAsync().Result;
+        var ab = _ViewerSession?.AudioBridge;
+        if (ab is null)
         {
-            var ab = _ViewerSession.AudioBridge;
-            var resp = ab.SendAudioBridgeMsg(new AudioBridgeListRoomsReq()).Result;
+            MainConsole.Instance.Output("Failed to get room list (no Janus service session)");
+        }
+        else
+        {
             if (resp is not null && resp.isSuccess)
             {
                 if (resp.PluginRespData.TryGetValue("list", out OSD list))
@@ -470,6 +570,5 @@ public class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
         // m_log.LogInformation(msg, args);
         MainConsole.Instance.Output(msg, args);
     }
-
 
 }

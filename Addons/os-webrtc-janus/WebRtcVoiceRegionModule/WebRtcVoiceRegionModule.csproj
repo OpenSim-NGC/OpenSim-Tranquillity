@@ -18,6 +18,8 @@
     <ProjectReference Include="../../../Source/OpenSim.Services.Connectors/OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="../../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
     <ProjectReference Include="../../../Addons/os-webrtc-janus/WebRtcVoice/WebRtcVoice.csproj" />
+    <!-- JANUS_ROOM_FULL_ERROR_CODE is a compile-time constant; WebRtcJanusService does not reference this module. -->
+    <ProjectReference Include="../../../Addons/os-webrtc-janus/Janus/WebRtcJanusService.csproj" />
   </ItemGroup>
 
   <ItemGroup>

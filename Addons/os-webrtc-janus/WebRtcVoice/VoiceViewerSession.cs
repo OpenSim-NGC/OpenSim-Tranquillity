@@ -29,7 +29,7 @@ using OpenMetaverse;
 
 namespace osWebRtcVoice;
 
-public class VoiceViewerSession : IVoiceViewerSession
+public partial class VoiceViewerSession : IVoiceViewerSession
 {
 
     // A simple session structure that is used when the connection is actually in the
@@ -64,15 +64,12 @@ public class VoiceViewerSession : IVoiceViewerSession
             return ViewerSessions.TryGetValue(pViewerSessionId, out pViewerSession);
         }
     }
-    // public static bool TryGetViewerSessionByAgentId(UUID pAgentId, out IVoiceViewerSession pViewerSession)
-    public static bool TryGetViewerSessionByAgentId(UUID pAgentId, out IEnumerable<KeyValuePair<string, IVoiceViewerSession>> pViewerSessions)
-    {
-        lock (ViewerSessions)
-        {
-            pViewerSessions = ViewerSessions.Where(v => v.Value.AgentId == pAgentId);
-            return pViewerSessions.Count() > 0;
-        }
-    }
+    // TryGetViewerSessionByAgentId was DELETED here: it returned a DEFERRED LINQ query that
+    // callers enumerated outside the lock (a torn read / InvalidOperationException waiting to
+    // happen), matched across all regions and all generations, and its only caller was the
+    // dormant Event_OnRemovePresence handler. Close-time teardown uses CaptureSessionsForClose
+    // instead - materialized under the lock, scoped by region and generation.
+
     // Get a viewer session by the VoiceService session ID
     public static bool TryGetViewerSessionByVSSessionId(string pVSSessionId, out IVoiceViewerSession pViewerSession)
     {
@@ -93,13 +90,21 @@ public class VoiceViewerSession : IVoiceViewerSession
         lock (ViewerSessions)
         {
             ViewerSessions[pSession.ViewerSessionID] = pSession;
+            IndexAdd(pSession);
         }
     }
     public static void RemoveViewerSession(string pSessionId)
     {
         lock (ViewerSessions)
         {
-            ViewerSessions.Remove(pSessionId);
+            // Remove the reference to this voice session from the membership index — resolved before the
+            // dictionary removal so the lookup still succeeds. A session ID with no entry
+            // (double-remove, or a close-capture racing a hangup) leaves the index untouched.
+            if (ViewerSessions.TryGetValue(pSessionId, out IVoiceViewerSession session))
+            {
+                ViewerSessions.Remove(pSessionId);
+                IndexRemove(session);
+            }
         }
     }
 
