@@ -165,6 +165,16 @@ public class NPCModule : INPCModule, ISharedRegionModule
                 return UUID.Zero;
         }
 
+        // A caller-chosen agent id must not collide with a presence already in the scene, or a
+        // second circuit would be registered for the same id. Refuse instead. A zero id (the random-id
+        // path) and a fresh random id (osNpcCreate) never collide, so their behaviour is unchanged.
+        if (!agentID.IsZero() && scene.TryGetScenePresence(agentID, out ScenePresence existing))
+        {
+            m_log.LogError("[NPC MODULE]: refusing to create NPC {0} {1} with agent id {2} in {3}: a presence with that id already exists ({4})",
+                firstname, lastname, agentID, scene.RegionInfo.RegionName, existing.Name);
+            return UUID.Zero;
+        }
+
         NPCAvatar npcAvatar = null;
         string born = DateTime.UtcNow.ToString();
 
