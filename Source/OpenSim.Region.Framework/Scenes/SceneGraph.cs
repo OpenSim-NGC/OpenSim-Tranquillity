@@ -348,6 +348,10 @@ public class SceneGraph
 
         bool ret = AddSceneObject(sceneObject, attachToBackup, sendClientUpdates);
 
+        // an object this region refused (one with its id is here already) is not touched
+        if (!ret)
+            return false;
+
         if (attachToBackup && (!alreadyPersisted))
         {
             sceneObject.ForceInventoryPersistence();
@@ -1784,7 +1788,8 @@ public class SceneGraph
             remoteClient?.SendPartPhysicsProprieties(part);
         }
 
-        if (wantedPhys != group.UsesPhysics && remoteClient is not null)
+        // an engine's complexity limit has told the owner why already
+        if (wantedPhys != group.UsesPhysics && remoteClient is not null && !group.TakePhysicsTooComplexTold())
         {
             if(m_parentScene.m_linksetPhysCapacity != 0)
                 remoteClient.SendAlertMessage("Object physics cancelled because it exceeds limits for physical prims, either size or number of primswith shape type not set to None");

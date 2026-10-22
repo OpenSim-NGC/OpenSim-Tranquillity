@@ -1,0 +1,57 @@
+<!--
+  Copyright (c) 2026 Legion Builds
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests for the Jolt backend (JoltPhysicsBackend) driven directly, with no module around it.
+    These drive real native joltc instances, which the tests run on for win-x64 and linux-x64. Helpers used by more
+    than one Jolt test project are in ../JoltTestShared and are compiled into each project that uses them.
+    This project holds the tests of the native joltc package record (JoltNativePackageTests).
+  -->
+  <PropertyGroup>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- SkiaSharp brings its Windows and macOS natives along; the Linux one is a separate package, which the region server also references. -->
+  <ItemGroup>
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux" Version="4.153.1" />
+  </ItemGroup>
+
+  <!-- The joltc arrives from the JoltPhysics.Native package, under runtimes/<rid>/native/, as in the region server. -->
+  <Import Project="..\..\Source\OpenSim.Region.PhysicsModules.Jolt.Backend\JoltNative.targets" />
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.Jolt.Backend\OpenSim.Region.PhysicsModules.Jolt.Backend.csproj" />
+    <!-- The mesher a region loads with meshing = Meshmerizer, for the tests that cook a mesh asset. -->
+    <ProjectReference Include="..\..\Source\OpenSim.Region.PhysicsModules.Meshing\OpenSim.Region.PhysicsModules.Meshing.csproj" />
+    <ProjectReference Include="..\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\JoltTestShared\TestNativeOverride.cs" Link="Shared\TestNativeOverride.cs" />
+    <Compile Include="..\JoltTestShared\JoltTestBackend.cs" Link="Shared\JoltTestBackend.cs" />
+    <Compile Include="..\JoltTestShared\ScratchFolders.cs" Link="Shared\ScratchFolders.cs" />
+    <Compile Include="..\JoltTestShared\PinnedMaterialsAttribute.cs" Link="Shared\PinnedMaterialsAttribute.cs" />
+    <Compile Include="..\JoltTestShared\MaterialPins.cs" Link="Shared\MaterialPins.cs" />
+  </ItemGroup>
+
+</Project>

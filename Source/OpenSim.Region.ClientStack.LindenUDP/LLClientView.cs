@@ -5809,7 +5809,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
 
             if (e is SceneObjectGroup grp)
             {
-                if(grp.IsDeleted || grp.IsAttachment )
+                if(grp.IsDeleted || grp.IsAttachment || grp.HiddenForCrossing)
                     continue;
 
                 bool inviewgroups;

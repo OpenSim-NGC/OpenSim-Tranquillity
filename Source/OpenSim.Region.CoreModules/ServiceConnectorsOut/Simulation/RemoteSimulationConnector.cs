@@ -265,5 +265,54 @@ public class RemoteSimulationConnectorModule : ISharedRegionModule, ISimulationS
         return false;
     }
 
+    // The held crossing: a region of this simulator is answered directly, any other over the REST connector. A region
+    // on another simulator that does not know the messages says so when asked, and is then sent the object the old way.
+    public bool SupportsHeldCrossing(GridRegion destination)
+    {
+        if (destination == null)
+            return false;
+
+        if (m_localBackend.IsLocalRegion(destination.RegionID))
+            return m_localBackend.SupportsHeldCrossing(destination);
+
+        return m_remoteConnector.SupportsHeldCrossing(destination);
+    }
+
+    public bool CreateObject(GridRegion destination, Vector3 newPosition, ISceneObject sog, bool isLocalCall, CrossingHoldRequest hold)
+    {
+        if (hold is null)
+            return CreateObject(destination, newPosition, sog, isLocalCall);
+
+        if (destination == null)
+            return false;
+
+        if (m_localBackend.IsLocalRegion(destination.RegionID))
+            return m_localBackend.CreateObject(destination, newPosition, sog, isLocalCall, hold);
+
+        return m_remoteConnector.CreateObject(destination, newPosition, sog, isLocalCall, hold);
+    }
+
+    public bool RecallObject(GridRegion destination, UUID objectID)
+    {
+        if (destination == null)
+            return false;
+
+        if (m_localBackend.IsLocalRegion(destination.RegionID))
+            return m_localBackend.RecallObject(destination, objectID);
+
+        return m_remoteConnector.RecallObject(destination, objectID);
+    }
+
+    public bool CrossingCompleted(GridRegion source, UUID objectID, IList<UUID> missingRiders)
+    {
+        if (source == null)
+            return false;
+
+        if (m_localBackend.IsLocalRegion(source.RegionID))
+            return m_localBackend.CrossingCompleted(source, objectID, missingRiders);
+
+        return m_remoteConnector.CrossingCompleted(source, objectID, missingRiders);
+    }
+
     #endregion
 }

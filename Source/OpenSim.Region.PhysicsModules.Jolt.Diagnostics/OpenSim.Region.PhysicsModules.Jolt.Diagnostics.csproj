@@ -1,0 +1,42 @@
+<!--
+  Copyright (c) 2026 Legion Builds
+
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Jolt console test commands (`jolt linktest`, `jolt boattest`, `jolt parity` and the rest), kept out of the
+    production module. The region server does not reference this project, so its output does not ship. An operator
+    who wants the commands copies OpenSim.Region.PhysicsModules.Jolt.Diagnostics.dll beside
+    OpenSim.Region.PhysicsModules.Jolt.dll and sets [Jolt] TestCommands = true; the Jolt module then loads it into its
+    own load context (JoltDiagnosticsLoader.cs in the module). It holds no region module of its own: a region module
+    found by the plugin discovery is loaded into a separate load context and could not use the module's types.
+  -->
+  <PropertyGroup>
+    <AssemblyName>OpenSim.Region.PhysicsModules.Jolt.Diagnostics</AssemblyName>
+    <RootNamespace>OpenSim.Region.PhysicsModules.Jolt.Diagnostics</RootNamespace>
+    <AssemblyTitle>OpenSim.Region.PhysicsModules.Jolt.Diagnostics</AssemblyTitle>
+    <Company>http://opensimulator.org</Company>
+    <Product>OpenSim</Product>
+    <Copyright>OpenSimulator developers</Copyright>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../Source/OpenSim.Framework/OpenSim.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.Framework/OpenSim.Region.Framework.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.SharedBase/OpenSim.Region.PhysicsModules.SharedBase.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Meshing/OpenSim.Region.PhysicsModules.Meshing.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Jolt.Backend/OpenSim.Region.PhysicsModules.Jolt.Backend.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Jolt.Vehicles/OpenSim.Region.PhysicsModules.Jolt.Vehicles.csproj" />
+    <ProjectReference Include="../../Source/OpenSim.Region.PhysicsModules.Jolt/OpenSim.Region.PhysicsModules.Jolt.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="OpenSim.Region.PhysicsModules.Jolt.Diagnostics.Tests" />
+  </ItemGroup>
+
+</Project>

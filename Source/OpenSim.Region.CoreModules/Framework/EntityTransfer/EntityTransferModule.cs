@@ -308,7 +308,8 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         ViewerAddressConfig config = ViewerAddressConfig.Create(addresses,
             section?.GetInt("RefreshMinutes", (int)ViewerAddressConfig.DefaultRefreshInterval.TotalMinutes)
                 ?? (int)ViewerAddressConfig.DefaultRefreshInterval.TotalMinutes,
-            m_log);
+            m_log,
+            dnsServers: section?.GetString("DnsServers", string.Empty));
 
         return ViewerAddressSelector.Create(config, m_log);
     }
@@ -2804,9 +2805,8 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 }
                 catch (Exception e)
                 {
-                    m_log.LogError(
-                        "[ENTITY TRANSFER MODULE]: Exception deleting the old object left behind on a border crossing for {0}, {1}",
-                        grp, e);
+                    m_log.LogError(e,
+                        $"[ENTITY TRANSFER MODULE]: Exception deleting the old object left behind on a border crossing for {grp}: {e.GetType().Name}: {e.Message}");
                 }
             }
         }
@@ -2816,6 +2816,28 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         }
 
         return successYN;
+    }
+
+    public bool SupportsHeldCrossing(GridRegion destination)
+    {
+        // a region with the rider crossing feature off sends every object the old way
+        return destination is not null && m_scene.EnableStandingRiderCrossing && m_scene.SimulationService is not null
+            && m_scene.SimulationService.SupportsHeldCrossing(destination);
+    }
+
+    public bool CrossPrimGroupIntoNewRegionHeld(GridRegion destination, Vector3 newPosition, SceneObjectGroup grp, CrossingHoldRequest hold)
+    {
+        Culture.SetCurrentCulture();
+
+        grp.RootPart.ClearUpdateSchedule();
+        return destination is not null && m_scene.SimulationService is not null
+            && m_scene.SimulationService.CreateObject(destination, newPosition, grp, true, hold);
+    }
+
+    public bool RecallCrossingObject(GridRegion destination, SceneObjectGroup grp)
+    {
+        return destination is not null && m_scene.SimulationService is not null
+            && m_scene.SimulationService.RecallObject(destination, grp.UUID);
     }
 
     #endregion
@@ -2909,11 +2931,26 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 return false;
             }
 
+            m_scene.CrossingStepHook?.Invoke(so, "destination-add");
+
             // For attachments, we need to wait until the agent is root
             // before we restart the scripts, or else some functions won't work.
-            so.RootPart.ParentGroup.CreateScriptInstances(0, false, m_scene.DefaultScriptEngine, GetStateSource(so));
+            // The object is in the region now: a script engine that fails to start its scripts costs the object its
+            // scripts, not its crossing.
+            try
+            {
+                m_scene.CrossingStepHook?.Invoke(so, "script-start");
 
-            so.ResumeScripts();
+                so.RootPart.ParentGroup.CreateScriptInstances(0, false, m_scene.DefaultScriptEngine, GetStateSource(so));
+
+                // An object that arrived with riders starts when they have arrived (Scene.IncomingCreateObject)
+                if (!so.HeldForRiders)
+                    so.ResumeScripts();
+            }
+            catch (Exception e)
+            {
+                m_log.LogError(e, $"[ENTITY TRANSFER MODULE]: Starting the scripts of {so.Name} {so.UUID} in {m_sceneName} failed with {e.GetType().Name}: {e.Message}");
+            }
 
             // AddSceneObject already does this and doing it again messes
             //if (so.RootPart.KeyframeMotion != null)
