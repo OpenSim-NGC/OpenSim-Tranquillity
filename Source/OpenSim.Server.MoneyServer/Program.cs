@@ -153,7 +153,8 @@ class Program
                 "OpenSim.Server.MoneyServer",
                 logPath,
                 context.Configuration["Startup:logfile"],
-                context.Configuration["Startup:StatsLogFile"]);
+                context.Configuration["Startup:StatsLogFile"],
+                context.Configuration);
 
             LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })

@@ -7,6 +7,7 @@
  * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 using OpenSim.Framework;
@@ -25,17 +26,26 @@ public static class OpenSimLoggingBuilderExtensions
     /// <summary>
     /// Registers the interactive console sink and a daily rolling file sink.
     /// </summary>
+    /// <remarks>
+    /// Levels come from the <c>Logging:LogLevel</c> settings (normally appsettings.json) when <c>configuration</c> is given.
+    /// The console starts at the <c>Default</c> entry, or at Information when there is none, and
+    /// <c>Logging:OpenSimConsole:LogLevel</c> entries replace the general ones for the console only.
+    /// The log file starts at Debug whatever <c>Default</c> says, so diagnostics stay in it; category entries other than
+    /// <c>Default</c> apply to it, so a noisy category can be quietened in the file as well as on the console.
+    /// </remarks>
     /// <param name="builder">Logging builder being configured.</param>
     /// <param name="serviceName">Used as the log file base name, e.g. OpenSim.Server.GridServer.</param>
     /// <param name="logPath">Directory that log files are written to.</param>
     /// <param name="configuredLogFile">Optional log file path from the Startup ini section.</param>
     /// <param name="configuredStatsLogFile">Optional stats log file path from the Startup ini section.</param>
+    /// <param name="configuration">Optional host configuration holding the <c>Logging</c> section.</param>
     public static ILoggingBuilder AddOpenSimLogging(
         this ILoggingBuilder builder,
         string serviceName,
         string logPath,
         string configuredLogFile = null,
-        string configuredStatsLogFile = null)
+        string configuredStatsLogFile = null,
+        IConfiguration configuration = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(serviceName);
 
@@ -54,10 +64,17 @@ public static class OpenSimLoggingBuilderExtensions
             statsLogFilePath,
             !string.IsNullOrWhiteSpace(configuredStatsLogFile));
 
+        CategoryLogLevels fileLevels = ReadLevels(configuration, "Logging:LogLevel");
+        CategoryLogLevels consoleLevels = ReadLevels(configuration, "Logging:LogLevel", "Logging:OpenSimConsole:LogLevel");
+
+        OpenSimConsoleLogSink.Configure(consoleLevels);
         builder.AddOpenSimConsole();
 
         var loggerConfiguration = new LoggerConfiguration()
             .MinimumLevel.Verbose();
+
+        if (fileLevels.Count > 0)
+            loggerConfiguration.Filter.ByExcluding(logEvent => !AllowedByCategory(fileLevels, logEvent));
 
         if (string.IsNullOrWhiteSpace(configuredStatsLogFile))
         {
@@ -96,6 +113,37 @@ public static class OpenSimLoggingBuilderExtensions
         builder.AddSerilog(fileLogger, dispose: true);
 
         return builder;
+    }
+
+    /// <summary>
+    /// Reads the level entries of the given configuration sections; an entry in a later section replaces an earlier one.
+    /// </summary>
+    private static CategoryLogLevels ReadLevels(IConfiguration configuration, params string[] sections)
+    {
+        if (configuration is null)
+            return CategoryLogLevels.Empty;
+
+        return CategoryLogLevels.FromSettings(sections.SelectMany(section =>
+            configuration.GetSection(section).GetChildren().Select(child => KeyValuePair.Create(child.Key, child.Value))));
+    }
+
+    private static bool AllowedByCategory(CategoryLogLevels levels, Serilog.Events.LogEvent logEvent)
+    {
+        if (!logEvent.Properties.TryGetValue("SourceContext", out Serilog.Events.LogEventPropertyValue sourceContext)
+            || sourceContext is not Serilog.Events.ScalarValue { Value: string category })
+            return true;
+
+        LogLevel level = logEvent.Level switch
+        {
+            LogEventLevel.Verbose => LogLevel.Trace,
+            LogEventLevel.Debug => LogLevel.Debug,
+            LogEventLevel.Information => LogLevel.Information,
+            LogEventLevel.Warning => LogLevel.Warning,
+            LogEventLevel.Error => LogLevel.Error,
+            _ => LogLevel.Critical
+        };
+
+        return levels.Allows(category, level);
     }
 
     private static bool IsStatsLogEvent(Serilog.Events.LogEvent logEvent) =>
