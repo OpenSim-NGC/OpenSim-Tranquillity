@@ -382,16 +382,37 @@ Watching the pools:
 - `jolt capacity` shows the pools, the handoff, the region's waits for its pool since start (count,
   total and longest), its steps' waits for its own region lock (held by a body change or a query on
   another thread; the step holds its pool while it waits), and the last metrics interval.
-- Every 30 s the log prints a `[JOLT METRICS]` summary line and, after it, a `[JOLT METRICS] last
-  <seconds>s` line with each region's figures for that interval: heartbeats, the longest heartbeat's
+- Every `MetricsLogIntervalSeconds` (default 30) the log gets a `[JOLT METRICS]` summary line and, after it, a
+  `[JOLT METRICS] last <seconds>s` line with each region's figures for that interval. Both are written at Debug
+  level, so they reach the console and the log only when Debug is on for the Jolt module; `0` writes neither
+  (an interval still closes every 30 s for `jolt metrics`). The lines carry: heartbeats, the longest heartbeat's
   physics time and the longest single physics step (both include region lock waits and leave out
   pool waits), the pool waits (count, total, longest, and which region held the pool when the
   longest began, or, if the pool was changing hands at that moment, the region that had it just
   before this one; never the region itself), the region lock waits (count, total, longest), the longest gap between two
   heartbeats' physics calls against the frame time, and the ray casts refused in the interval in
-  each budget (`ray casts refused script=<n> simulator=<n>`). `jolt metrics` shows both lines.
+  each budget (`ray casts refused script=<n> simulator=<n>`). `jolt metrics` shows both lines, whatever the log level.
 - The harness's `--pool-bench` (see "Physics harness") measures waits and step times for a heavy
   region sharing pools with light ones, for any `JobPools` and handoff.
+
+### What the module writes to the log
+
+A quiet region writes nothing after start-up. At Information level the module logs, once per region, how it
+started (the native, the settings, the step rate, the job pool), and its warnings and
+errors. These go to Debug level, so they show only when Debug is on for the Jolt module:
+
+| Line | When it is written |
+|---|---|
+| `[JOLT METRICS]` summary and `last <seconds>s` lines | Every `MetricsLogIntervalSeconds` (default 30; `0` writes none). `jolt metrics` shows the same figures at any log level. |
+| `avatar '<name>' id=<n> placed` and `removed` | Each time an avatar gets or loses a physics body (a login, a teleport, a crossing) |
+| `terrain set` | Each time the region's terrain is handed to physics (at start, and after a terrain edit) |
+| `terrain-unbury` | Each avatar lifted out of rising terrain |
+
+A warning that can repeat while a fault lasts is written for its first occurrence and then for every 100th, and
+says which occurrence it is: a prim whose shape cannot be built (`AddPrimShape failed`, the `IMesher` and
+mesher-geometry warnings, a cook that threw) and a body whose position is not a number (`[physglitch]`). The
+capacity and buffer warnings already hold back for `CapacityLogIntervalSeconds`, a mesh asset's warnings are
+written once per asset, and errors are always written.
 
 ## Script forces on objects
 

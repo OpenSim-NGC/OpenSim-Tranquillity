@@ -14,7 +14,8 @@
 //   - per-region step time (EMA + last) and active-body count
 //   - whole-process step-time sum and total process THREAD COUNT (a per-region
 //     JobSystemThreadPool of ProcessorCount-1 -> N*(cores-1) threads; this is how we watch it)
-//   - a throttled process-wide summary emitted to the LOG (~30 s) so the metrics are captured without
+//   - a throttled process-wide summary emitted to the LOG at Debug level ([Jolt] MetricsLogIntervalSeconds, 30 s
+//     unless set; 0 logs nothing) so the metrics are captured without
 //     needing console interaction, followed by a second line with each region's figures for that interval: its
 //     longest heartbeat and longest physics step, its waits for its job pool (and which region held the pool at
 //     the longest) and for its own region lock, the longest gap between heartbeats against the frame time, and the
@@ -38,7 +39,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 {
     internal static class JoltMetrics
     {
-        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
         private const string LogHeader = "[JOLT METRICS]";
 
 
@@ -54,7 +55,41 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         private static readonly ConcurrentDictionary<string, RegionStat> s_regions =
             new ConcurrentDictionary<string, RegionStat>();
-        private static long s_lastLogTick;   // throttle the periodic process summary (~30 s)
+        private static long s_lastLogTick;   // throttle the periodic process summary
+        private static long s_intervalMs = DefaultIntervalMs;   // how often an interval closes ([Jolt] MetricsLogIntervalSeconds, or the default when that is 0)
+        private static int s_logLines = 1;   // 0: the interval still closes for `jolt metrics`, but its lines are not logged
+
+        internal const long DefaultIntervalMs = 30000;
+
+        /// <summary>The clock the interval is measured on (milliseconds); a test replaces it.</summary>
+        internal static Func<long> Clock = () => Environment.TickCount64;
+
+        /// <summary>The logger the periodic lines go to; a test replaces it.</summary>
+        internal static ILogger Log { get => m_log; set => m_log = value; }
+
+        /// <summary>Seconds between two intervals, as <c>jolt metrics</c> says it.</summary>
+        internal static long IntervalSeconds => Interlocked.Read(ref s_intervalMs) / 1000;
+
+        /// <summary>
+        /// Apply [Jolt] MetricsLogIntervalSeconds. An interval closes every <paramref name="seconds"/> and its two lines go to the
+        /// log at Debug level. With 0 the lines are not logged; the interval still closes every 30 s, so `jolt metrics`
+        /// has its figures.
+        /// </summary>
+        internal static void Configure(float seconds)
+        {
+            Interlocked.Exchange(ref s_intervalMs, seconds > 0f ? Math.Max(1L, (long)(seconds * 1000f)) : DefaultIntervalMs);
+            Volatile.Write(ref s_logLines, seconds > 0f ? 1 : 0);
+        }
+
+        /// <summary>Forget every region and the interval clock (tests).</summary>
+        internal static void Reset()
+        {
+            s_regions.Clear();
+            Interlocked.Exchange(ref s_lastLogTick, 0);
+            Interlocked.Exchange(ref s_intervalStartTick, 0);
+            Volatile.Write(ref s_lastIntervalLine, null);
+            Configure(30f);
+        }
         private static long s_intervalStartTick;   // when the interval being recorded began (TickCount64)
         private static string s_lastIntervalLine;  // the last interval line logged
 
@@ -62,7 +97,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         {
             RegionStat st = s_regions.GetOrAdd(region, _ => new RegionStat());
             st.InitRssDeltaMB = rssDeltaBytes / (1024.0 * 1024.0);
-            Interlocked.CompareExchange(ref s_intervalStartTick, Environment.TickCount64, 0);
+            Interlocked.CompareExchange(ref s_intervalStartTick, Clock(), 0);
             m_log.LogInformation($"{LogHeader} region '{region}': backend-init RSS delta = {st.InitRssDeltaMB:0.0} MB; process threads now = {ThreadCount()}.");
         }
 
@@ -82,17 +117,23 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             st.Interval.Record(physicsMs, in timing, gapMs, frameMs);
             st.Interval.NoteRayCastsRefused(scriptRaysRefused, simulatorRaysRefused);
 
-            // Throttled process-wide summary to the log so the metrics are captured without
-            // console interaction. Single-writer via CompareExchange so only one region logs per window.
+            // Throttled process-wide summary so the metrics are captured without console interaction.
+            // Single-writer via CompareExchange so only one region closes the interval per window. The lines go to the
+            // log at Debug level, and are not built at all when that level is off; the interval closes either way, for
+            // `jolt metrics`.
             // TickCount64 (monotonic, non-wrapping) — plain Environment.TickCount goes negative past
             // ~24.9 days uptime, which silently disables the throttle.
-            long now = Environment.TickCount64;
+            long now = Clock();
             long last = Interlocked.Read(ref s_lastLogTick);
-            if (now - last > 30000 &&
+            if (now - last > Interlocked.Read(ref s_intervalMs) &&
                 Interlocked.CompareExchange(ref s_lastLogTick, now, last) == last)
             {
-                m_log.LogInformation(Report());
-                m_log.LogInformation(EndInterval(now));
+                bool log = Volatile.Read(ref s_logLines) != 0 && m_log.IsEnabled(LogLevel.Debug);
+                if (log)
+                    m_log.LogDebug(Report());
+                string line = EndInterval(now);
+                if (log)
+                    m_log.LogDebug(line);
             }
         }
 
