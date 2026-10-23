@@ -264,7 +264,7 @@ namespace osWebRtcVoice.Tests
         }
 
         private static int EstateRoomOf(UUID region)
-            => JanusAudioBridge.CalcRoomNumber(region.ToString(), "local", JanusAudioBridge.REGION_ROOM_ID, string.Empty);
+            => JanusAudioBridge.CalcRoomNumber(string.Empty, region.ToString(), "local", JanusAudioBridge.REGION_ROOM_ID, string.Empty);
 
         private sealed class Caller
         {

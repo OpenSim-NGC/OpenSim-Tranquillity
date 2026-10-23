@@ -2741,6 +2741,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         public override float TimeDilation => _timeDilation;
 
+        // The engine caps every body's speed at [Jolt] BodyMaxLinearSpeed, so nothing in the region moves faster than that.
+        public override float MaximumLinearVelocity => BodyMaxLinearSpeed;
+
         private void NoteDilationSample(float timeStep, long gapTicks)
         {
             _dilationStepSeconds[_dilationNext] = timeStep;

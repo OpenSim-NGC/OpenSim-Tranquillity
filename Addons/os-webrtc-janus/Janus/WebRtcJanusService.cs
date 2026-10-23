@@ -85,7 +85,12 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                 _JanusAPIToken = janusConfig.GetString("APIToken", string.Empty);
                 _JanusAdminURI = janusConfig.GetString("JanusGatewayAdminURI", string.Empty);
                 _JanusAdminToken = janusConfig.GetString("AdminAPIToken", string.Empty);
+                WarnOnShortJanusSecrets();
+                ReadTlsConfig(janusConfig);
                 ReadPluginNameConfig(janusConfig);
+                MixerOnlySwitches.DisableOnStockPlugin(_Config, _log);
+                ReadGridIdConfig();
+                ReadArmingConfig(webRtcVoiceConfig, janusConfig);
                 ReadRoomReaperConfig(janusConfig);
                 // Debugging options
                 _MessageDetails = janusConfig.GetBoolean("MessageDetails", false);
@@ -145,8 +150,11 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             _log.LogDebug("{0} JanusSession created", LogHeader);
 
             // Once the session is created, create a handle to the plugin for rooms
-            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName)
+            JanusAudioBridge audioBridge = new JanusAudioBridge(janusSession, _JanusPluginName, _GridId, _DeclareVisAuthority)
             {
+                // What JanusRoom.JoinRoom mints with. Both stay at their defaults with the switch off.
+                JoinCapabilityEnabled = _JoinCapabilityEnabled,
+                JoinCapabilitySecret = _JoinCapabilitySecret,
                 // Rooms this bridge creates are watched by the empty-room reaper (null when it is off).
                 RoomCreated = _roomReaper is null ? null : _roomReaper.NoteCreated,
             };
@@ -261,9 +269,17 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
             }
 
             // Get the parameters that select the room
-            // To get here, voice_server_type has already been checked to be 'webrtc' and channel_type='local'
+            // To get here, voice_server_type has already been checked to be 'webrtc' and the region module
+            // has admitted channel_type as 'local' (parcel/estate checks) or 'multiagent' (a call or conference
+            // the module knows: channel + member + credentials), or has passed the body through unexamined
+            // while no call feature is on.
             int parcel_local_id = pRequest.TryGetInt("parcel_local_id", out int pli) ? pli : JanusAudioBridge.REGION_ROOM_ID;
-            string channel_id = pRequest.TryGetString("channel_id", out string cli) ? cli : string.Empty;
+            // The viewer's multiagent body names the session under `channel` (SL llvoicewebrtc.cpp:3341-3343,
+            // Firestorm llvoicewebrtc.cpp:3695-3697), not `channel_id`. Reading only channel_id gave "" and put every
+            // call on the grid into one room. `channel_id` stays as a fallback.
+            string channel_id = pRequest.TryGetString("channel", out string chn) && !string.IsNullOrEmpty(chn)
+                ? chn
+                : pRequest.TryGetString("channel_id", out string cli) ? cli : string.Empty;
             string channel_credentials = pRequest.TryGetString("credentials", out string cred) ? cred : string.Empty;
             string channel_type = pRequest["channel_type"].AsString();
             bool isSpatial = channel_type == "local";
@@ -290,6 +306,7 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                     else {
                         viewerSession.Offer = jsepSdp;
                         viewerSession.OfferOrig = jsepSdp;
+                        viewerSession.Spatial = isSpatial;
                         viewerSession.AgentId = pUserID;
                         // ONE join. SelectRoom above has just had the mixer create (or confirm) the room, so
                         // this JSEP join never meets a room the sim merely believed in. It is never re-sent on this handle:
@@ -298,7 +315,9 @@ public partial class WebRtcJanusService : ServiceBase, IWebRtcVoiceService
                         var joinResult = await viewerSession.Room.JoinRoom(viewerSession).ConfigureAwait(false);
                         if (joinResult.Joined)
                         {
-                            ret = ProvisionResponseBuilder.BuildSuccess(viewerSession.Answer, viewerSession.ViewerSessionID);
+                            // Additive: the joined room number, so the region can record which mixer room this agent is actually in.
+                            // Success branch only; failure maps carry no room.
+                            ret = ProvisionResponseBuilder.BuildSuccess(viewerSession.Answer, viewerSession.ViewerSessionID, viewerSession.Room.RoomId);
                         }
                         else if (joinResult.ErrorCode == JANUS_ROOM_FULL_ERROR_CODE)
                         {

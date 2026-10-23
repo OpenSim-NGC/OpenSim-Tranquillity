@@ -48,7 +48,7 @@ namespace osWebRtcVoice.Tests
             switch (Mode)
             {
                 case FakeProvisionMode.Succeed:
-                    return ProvisionResponseBuilder.BuildSuccess(new OSDMap { ["type"] = OSD.FromString("answer") }, pVSession.ViewerSessionID);
+                    return ProvisionResponseBuilder.BuildSuccess(new OSDMap { ["type"] = OSD.FromString("answer") }, pVSession.ViewerSessionID, 1);
                 case FakeProvisionMode.Null:
                     return null;
                 default:

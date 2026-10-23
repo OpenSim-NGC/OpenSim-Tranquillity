@@ -49,6 +49,17 @@ public partial class JanusSession : IDisposable
     private string _JanusAdminURI = String.Empty;
     private string _JanusAdminToken = String.Empty;
 
+    /// <summary>A URI as it may appear in a log: the query string and fragment are replaced, because a
+    /// query can carry the API secret (the long-poll GET must send it there; Janus reads a GET's secret
+    /// from nowhere else). A value that is not an absolute URI is cut at the first '?' or '#' as text.</summary>
+    public static string RedactUriForLog(string pUri)
+    {
+        if (string.IsNullOrEmpty(pUri))
+            return pUri;
+        int cut = pUri.IndexOfAny(new[] { '?', '#' });
+        return cut < 0 ? pUri : pUri.Substring(0, cut) + "?<redacted>";
+    }
+
     public string JanusServerURI => _JanusServerURI;
     public string JanusAdminURI => _JanusAdminURI;
 
@@ -112,7 +123,7 @@ public partial class JanusSession : IDisposable
                 SessionId = sessionResp.returnedId;
                 IsConnected = true;
                 SessionUri = _JanusServerURI + "/" + SessionId;
-                m_log.LogDebug("{0} CreateSession. Created. ID={1}, URL={2}", LogHeader, SessionId, SessionUri);
+                m_log.LogDebug("{0} CreateSession. Created. ID={1}, URL={2}", LogHeader, SessionId, RedactUriForLog(SessionUri));
                 ret = true;
                 StartLongPoll();
             }
@@ -253,7 +264,9 @@ public partial class JanusSession : IDisposable
     {
         AddJanusHeaders(pReq, pNamesHandle);
         // m_log.LogDebug("{0} SendToJanus", LogHeader);
-        if (_MessageDetails) m_log.LogDebug("{0} SendToJanus. URI={1}, req={2}", LogHeader, pURI, pReq.ToJson());
+        // ToJsonForLog, not ToJson — this is the only place a request body reaches a log. It hides the API
+        // and admin secrets, and a join's capability, which must never be printed at any level (design).
+        if (_MessageDetails) m_log.LogDebug("{0} SendToJanus. URI={1}, req={2}", LogHeader, RedactUriForLog(pURI), pReq.ToJsonForLog());
 
         JanusMessageResp ret = null;
         OutstandingRequest outReq = new OutstandingRequest
@@ -436,7 +449,7 @@ public partial class JanusSession : IDisposable
         JanusMessageResp ret = null;
         try
         {
-            // m_log.LogDebug("{0} GetFromJanus: URI = \"{1}\"", LogHeader, pURI);
+            if (_MessageDetails) m_log.LogDebug("{0} GetFromJanus: URI={1}", LogHeader, RedactUriForLog(pURI));
             HttpRequestMessage reqMsg = new HttpRequestMessage(HttpMethod.Get, pURI);
             reqMsg.Headers.Add("Accept", "application/json");
             HttpResponseMessage response = null;
@@ -643,20 +656,20 @@ public partial class JanusSession : IDisposable
                                         case 404:
                                             // "Not found" means there is a Janus server but the session is gone
                                             m_log.LogError("{0} EventLongPoll: GETERROR Not Found. URI={1}: {2}",
-                                                        LogHeader, SessionUri, resp.ToString());
+                                                        LogHeader, RedactUriForLog(SessionUri), resp.ToString());
                                             break;
                                         case 400:
                                             // "Bad request" means the session is gone
                                             m_log.LogError("{0} EventLongPoll: Bad Request. URI={1}: {2}",
-                                                        LogHeader, SessionUri, resp.ToString());
+                                                        LogHeader, RedactUriForLog(SessionUri), resp.ToString());
                                             break;
                                         case 499:
                                             // "Task canceled" means the long poll was canceled
-                                            m_log.LogDebug("{0} EventLongPoll: Task canceled. URI={1}", LogHeader, SessionUri);
+                                            m_log.LogDebug("{0} EventLongPoll: Task canceled. URI={1}", LogHeader, RedactUriForLog(SessionUri));
                                             break;
                                         default:
                                             m_log.LogDebug("{0} EventLongPoll: unknown response. URI={1}: {2}",
-                                                        LogHeader, SessionUri, resp.ToString());
+                                                        LogHeader, RedactUriForLog(SessionUri), resp.ToString());
                                             break;
                                     }   
                                     // This will cause the long poll to exit
@@ -684,7 +697,7 @@ public partial class JanusSession : IDisposable
                     m_log.LogError("{0} EventLongPoll: exception {1}", LogHeader, e);
                 }
             }
-            m_log.LogInformation("{0} EventLongPoll: Exiting long poll loop", LogHeader);
+            m_log.LogDebug("{0} EventLongPoll: Exiting long poll loop", LogHeader);
         });
     }
 }

@@ -92,7 +92,7 @@ public class JanusPlugin : IDisposable
                 var handleResp = new AttachPluginResp(resp);
                 PluginId = handleResp.pluginId;
                 PluginUri = _JanusSession.SessionUri + "/" + PluginId;
-                m_log.LogDebug("{0} Activate. Plugin attached. ID={1}, URL={2}", LogHeader, PluginId, PluginUri);
+                m_log.LogDebug("{0} Activate. Plugin attached. ID={1}, URL={2}", LogHeader, PluginId, JanusSession.RedactUriForLog(PluginUri));
                 _JanusSession.PluginId = PluginId;
                 _JanusSession.OnEvent += Handle_Event;
                 _JanusSession.OnMessage += Handle_Message;

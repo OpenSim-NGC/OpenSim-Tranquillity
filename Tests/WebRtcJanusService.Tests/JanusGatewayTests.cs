@@ -23,6 +23,7 @@ using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Console;
+using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
 {
@@ -35,6 +36,7 @@ namespace osWebRtcVoice.Tests
             o.GetType().GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).GetValue(o);
 
         [Test]
+        [NeedsPlugin(JanusPluginKind.Stock)]   // it attaches Janus's stock AudioBridge plugin, not the slvoice mixer
         public async Task ServiceStarts_CreatesASessionAttachesAudioBridgeAndCreatesARoom()
         {
             string url = Env("WEBRTC_JANUS_TEST_URL");

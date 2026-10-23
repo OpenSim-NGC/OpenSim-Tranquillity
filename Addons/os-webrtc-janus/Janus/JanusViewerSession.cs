@@ -64,6 +64,9 @@ public class JanusViewerSession : IVoiceViewerSession
     public JanusAudioBridge AudioBridge { get; set; }
     public JanusRoom Room { get; set; }
 
+    // True when the room this session joined is a spatial ("local") room, as opposed to a call or conference room.
+    public bool Spatial { get; set; }
+
     // Serializes Shutdown against concurrent invocation (the hangup path and, if wired,
     // presence removal), so the teardown steps below cannot double-invoke
     // LeaveRoom/Detach/DestroySession. House pattern: SemaphoreSlim(1,1)

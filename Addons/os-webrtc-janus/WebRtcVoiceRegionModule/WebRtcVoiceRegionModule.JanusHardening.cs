@@ -42,13 +42,13 @@ public partial class WebRtcVoiceRegionModule
 {
     // Replays a provision refusal (403/404/501) to the viewer's immediate retries for RefusalCacheSeconds
     // without re-running the estate/parcel checks. Replaced from config in Initialise.
-    private ProvisionRefusalCache m_refusalCache = new ProvisionRefusalCache(TimeSpan.FromSeconds(ProvisionRefusalCache.DefaultSeconds));
+    private readonly RefusalEpisodeLog m_refusalLog = new RefusalEpisodeLog(m_log, logHeader + "[ProvisionVoice]:");
+    private ProvisionRefusalCache m_refusalCache => m_refusalLog.Cache;
 
     // What one provision call decided, read back by the wrapper once the handler has answered.
     private sealed class ProvisionCallContext
     {
-        public bool IsLocal;                 // the request was a "local" (spatial) provision
-        public bool IsLogout;                // the request was a teardown ({logout: true})
+        public ProvisionKind? Kind;          // set once admission has decided (null: refused earlier)
         public bool AnsweredFromCache;       // the refusal cache answered this call
         public bool Provisioned;             // the voice service returned a success map (viewer_session)
     }
@@ -64,31 +64,32 @@ public partial class WebRtcVoiceRegionModule
     // handler below is unchanged except that, for an admitted "local" provision, a refusal recorded within
     // RefusalCacheSeconds for this (agent, region) is answered again from the cache before the estate/parcel
     // checks run. This wrapper records a fresh 403/404/501 refusal of a "local" provision, and clears the
-    // entry on a successful provision or a logout. At most one INFO line per (agent, region) per window.
+    // entry on a successful provision or a logout. A run of refusals for one (agent, region) is one episode: one INFO
+    // line for the first refusal and one with the count when the episode ends (RefusalEpisodeLog).
     public void ProvisionVoiceAccountRequest(IOSHttpRequest request, IOSHttpResponse response, UUID agentID, Scene scene)
     {
         var ctx = new ProvisionCallContext();
         ProvisionVoiceAccountRequestCore(request, response, agentID, scene, ctx);
 
         UUID regionId = scene.RegionInfo.RegionID;
-        if (ctx.IsLogout || ctx.Provisioned)
+        if (ctx.Kind == ProvisionKind.Logout || ctx.Provisioned)
         {
-            m_refusalCache.Clear(agentID, regionId);
+            m_refusalLog.Ended(agentID, regionId, ctx.Kind == ProvisionKind.Logout ? "it logged out" : "it was admitted");
         }
-        else if (ctx.IsLocal && !ctx.AnsweredFromCache && IsCacheableRefusalStatus(response.StatusCode))
+        else if (ctx.Kind == ProvisionKind.Local && !ctx.AnsweredFromCache && IsCacheableRefusalStatus(response.StatusCode))
         {
             int suppressed = m_refusalCache.RecordRefusal(agentID, regionId, new CachedRefusal(response.StatusCode, response.RawBuffer));
-            if (suppressed > 0)
-                m_log.LogInformation("{LogHeader}[ProvisionVoice]: provision from {AgentId} in \"{RegionName}\" refused again (cached, {Suppressed} retries suppressed)",
-                    logHeader, agentID, scene.Name, suppressed);
+            m_refusalLog.Refused(agentID, regionId, $" in \"{scene.Name}\"", string.Empty, suppressed);
         }
     }
 
     // Answers a repeat of a refusal this (agent, region) got within RefusalCacheSeconds straight from the cache.
     // Returns true when it has answered the request.
-    private bool TryReplayCachedRefusal(UUID agentID, Scene scene, IOSHttpResponse response, ProvisionCallContext ctx)
+    private bool TryReplayCachedRefusal(ProvisionAdmission admission, UUID agentID, Scene scene, IOSHttpResponse response,
+        ProvisionCallContext ctx)
     {
-        if (m_refusalCache.TryGetRefusal(agentID, scene.RegionInfo.RegionID, out object cachedRefusal)
+        if (admission.Kind == ProvisionKind.Local
+            && m_refusalCache.TryGetRefusal(agentID, scene.RegionInfo.RegionID, out object cachedRefusal)
             && cachedRefusal is CachedRefusal cached)
         {
             ctx.AnsweredFromCache = true;
@@ -103,7 +104,8 @@ public partial class WebRtcVoiceRegionModule
     private void InitialiseRefusalCache()
     {
         // [WebRtcVoice] RefusalCacheSeconds (default 5; 0 disables).
-        m_refusalCache = new ProvisionRefusalCache(TimeSpan.FromSeconds(
+        m_refusalLog.SetWindow(TimeSpan.FromSeconds(
             Math.Max(0, m_Config.GetInt("RefusalCacheSeconds", ProvisionRefusalCache.DefaultSeconds))));
+        m_refusalLog.Start();
     }
 }

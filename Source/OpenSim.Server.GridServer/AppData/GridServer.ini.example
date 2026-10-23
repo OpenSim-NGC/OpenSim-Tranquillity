@@ -146,6 +146,11 @@
 
     MuteListConnector = "${Const|PrivatePort}/OpenSim.Server.Handlers.dll:MuteListServiceConnector"
 
+    ;; Uncomment to host the grid-wide voice call session store (group, conference and avatar-to-avatar calls
+    ;; kept in memory here so that every region process shares one record of each call). Also configure
+    ;; [WebRtcVoiceSessionService] below; regions opt in with SessionStoreMode in their voice settings.
+    ; VoiceSessionConnector = "${Const|PrivatePort}/WebRtcVoice.dll:VoiceSessionServerConnector"
+
 ; * This is common for all services, it's the network setup for the entire
 ; * server instance, if none is specified above
 ; *
@@ -759,6 +764,40 @@
 
 [MuteListService]
 	LocalServiceModule = "OpenSim.Services.MuteListService.dll:MuteListService"
+
+;; The grid-wide voice call session store. Loaded only when VoiceSessionConnector is uncommented in
+;; [ServiceList]. Sessions live in memory and are gone when this process restarts. Regions must also
+;; set SessionStoreMode = grid and SessionStoreServerURI in their voice settings.
+[WebRtcVoiceSessionService]
+    ;; Nothing is served unless this is true.
+    ; Enabled = false
+
+    ;; Required when enabled: the service refuses to load without HTTP basic authentication and a password
+    ;; of at least 32 characters. Regions use the same user and password in their voice settings.
+    ; AuthType = "BasicHttpAuthentication"
+    ; HttpAuthUsername = ""
+    ; HttpAuthPassword = ""
+
+    ;; The grid id that call room keys are derived from. Left empty it is read the way regions read it
+    ;; (GatekeeperURI, then [GatekeeperService] ExternalName, then [GridService] Gatekeeper).
+    ; GridId = ""
+
+    ;; Limits for the whole grid. Defaults shown.
+    ; MaxSessions = 5000
+    ; MaxSessionsPerAgent = 20
+    ;; Start-conference and invite requests one agent can make back to back, and seconds for one more to refill.
+    ; ConferenceRequestBurst = 5
+    ; ConferenceRequestRefillSeconds = 10
+
+    ;; How long an unanswered invitation lasts, how long a call with nobody renewing it is kept (hours),
+    ;; and how often the service sweeps for expired ones. Defaults shown.
+    ; InviteTtlSeconds = 120
+    ; IdleTtlHours = 8
+    ; SweepSeconds = 30
+
+    ;; A seat is released when its region has not renewed it for this long (a region that stopped or lost
+    ;; its connection). Regions renew every SessionSeatRenewSeconds; keep this at three times that or more.
+    ; SeatLeaseSeconds = 180
 
     
 [ExperienceService]

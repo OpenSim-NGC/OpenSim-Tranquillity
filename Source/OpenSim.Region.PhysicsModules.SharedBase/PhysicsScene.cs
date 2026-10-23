@@ -233,6 +233,16 @@ public abstract class PhysicsScene
         get { return 1.0f; }
     }
 
+    /// <summary>
+    /// The largest linear speed, in metres per second, that this engine will give a body. Zero means
+    /// the engine declares no limit. Read by modules that need an upper bound on how far something
+    /// can move in a given time.
+    /// </summary>
+    public virtual float MaximumLinearVelocity
+    {
+        get { return 0f; }
+    }
+
     //legacy for any modules that may still call it
     public virtual void AddPhysicsActorTaint(PhysicsActor prim) { }
 

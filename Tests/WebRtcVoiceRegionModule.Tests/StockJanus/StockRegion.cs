@@ -69,6 +69,7 @@ namespace osWebRtcVoice.Tests
     {
         public readonly List<(string Name, OSD Body, UUID To)> Sent = new();
         public readonly List<(UUID SessionId, UUID TempSessionId, UUID To)> StartReplies = new();
+        public readonly List<(UUID To, UUID Session, string Reason)> Closes = new();
         private string _lastName;
         private OSD _lastBody;
 
@@ -86,7 +87,7 @@ namespace osWebRtcVoice.Tests
             lock (StartReplies) StartReplies.Add((sessionID, tmpSessionID, toAgent));
         }
         public void ChatterBoxSessionAgentListUpdates(UUID sessionID, UUID toAgent, List<GroupChatListAgentUpdateData> updates) { }
-        public void ChatterBoxForceClose(UUID toAgent, UUID sessionID, string reason) { }
+        public void ChatterBoxForceClose(UUID toAgent, UUID sessionID, string reason) { lock (Closes) Closes.Add((toAgent, sessionID, reason)); }
         public void GroupMembershipData(UUID receiverAgent, GroupMembershipData[] data) { }
         public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID) { }
         public void partPhysicsProperties(uint localID, byte physhapetype, float density, float friction, float bounce, float gravmod, UUID avatarID) { }
@@ -193,6 +194,13 @@ namespace osWebRtcVoice.Tests
             return Answer(resp);
         });
 
+        public Task<CapAnswer> ModerateAsync(UUID agent, OSDMap body) => Task.Run(() =>
+        {
+            var resp = new TestOSHttpResponse();
+            Region.SpatialVoiceModerationRequest(new LlsdPost(body), resp, agent, Scene);
+            return Answer(resp);
+        });
+
         public Task<CapAnswer> ChatSessionAsync(UUID agent, OSDMap body) => Task.Run(() =>
         {
             var resp = new TestOSHttpResponse();
@@ -258,13 +266,18 @@ namespace osWebRtcVoice.Tests
             return joined;
         }
 
-        /// <summary>The room a "local" provision joins: the region-wide estate room, or the room of the named parcel.</summary>
+        /// <summary>The room a provision joins. A "multiagent" one is the room of its channel (the region has no grid id
+        /// here, so the grid part of the number is empty); a "local" one is the region-wide estate room, or the room of
+        /// the named parcel.</summary>
         private int LocalRoomOf(OSDMap body)
         {
+            if (body.TryGetString("channel_type", out string channelType) && channelType == "multiagent")
+                return JanusAudioBridge.CalcRoomNumber(string.Empty, Scene.RegionInfo.RegionID.ToString(), "multiagent",
+                    JanusAudioBridge.REGION_ROOM_ID, body["channel"].AsString());
             int parcel = JanusAudioBridge.REGION_ROOM_ID;
             if (body.TryGetInt("parcel_local_id", out int named) && named != EstateChannelParcelLocalId)
                 parcel = named;
-            return JanusAudioBridge.CalcRoomNumber(Scene.RegionInfo.RegionID.ToString(), "local", parcel, string.Empty);
+            return JanusAudioBridge.CalcRoomNumber(string.Empty, Scene.RegionInfo.RegionID.ToString(), "local", parcel, string.Empty);
         }
 
         public async Task<CapAnswer> LogoutAsync(Joined j) => await ProvisionAsync(j.Agent, LogoutBody(j.Answer.ViewerSession));

@@ -5,6 +5,9 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- The non-spatial session model keeps internal setters; the region module and its tests build and read sessions. -->
+    <InternalsVisibleTo Include="WebRtcVoiceRegionModule" />
+    <InternalsVisibleTo Include="WebRtcVoiceRegionModule.Tests" />
   </ItemGroup>
 
   <ItemGroup>
