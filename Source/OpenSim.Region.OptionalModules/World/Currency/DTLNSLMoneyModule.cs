@@ -269,7 +269,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-        if (m_debug) m_log.LogInformation("[MONEY]: Initialise:");
+        if (m_debug) m_log.LogDebug("[MONEY]: Initialise:");
 
         m_enable_server = false;
         m_sellEnabled = false;
@@ -291,7 +291,7 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
             if (economyConfig.GetString("EconomyModule") != EconomyModule)
             {
                 m_enable_server = false;
-                m_log.LogInformation("[MONEY]: The DTL/NSL MoneyModule is disabled (not selected in OpenSim.ini)");
+                m_log.LogDebug("[MONEY]: The DTL/NSL MoneyModule is disabled (not selected in OpenSim.ini)");
                 return;
             }
             else
@@ -382,11 +382,15 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void AddRegion(Scene scene)
     {
+        // A module that is switched off is loaded for every region all the same; Initialise has already said so once.
+        if (m_enable_server == false)
+            return;
+
         m_log.LogInformation("[MONEY]: AddRegion:");
 
-        if ((scene == null) || (m_enable_server == false))
+        if (scene == null)
         {
-            m_log.LogError("[MONEY]: AddRegion ignored; module is disabled");
+            m_log.LogError("[MONEY]: AddRegion ignored; no scene");
             return;
         }
         scene.RegisterModuleInterface<IMoneyModule>(this);  // 競合するモジュールの排除
@@ -492,9 +496,12 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void RemoveRegion(Scene scene)
     {
-        if ((scene == null) || (m_enable_server == false))
+        if (m_enable_server == false)
+            return;
+
+        if (scene == null)
         {
-            m_log.LogError("[MONEY]: RemoveRegion ignored; module is disabled");
+            m_log.LogError("[MONEY]: RemoveRegion ignored; no scene");
             return;
         }
 
@@ -636,10 +643,13 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void RegionLoaded(Scene scene)
     {
+        if (m_enable_server == false)
+            return;
+
         m_log.LogInformation("[MONEY]: RegionLoaded:");
-        if ((scene == null) || (m_enable_server == false))
+        if (scene == null)
         {
-            m_log.LogError("[MONEY]: RegionLoaded ignored; module is disabled");
+            m_log.LogError("[MONEY]: RegionLoaded ignored; no scene");
             return;
         }
 
@@ -704,12 +714,12 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
 
     public void PostInitialise()
     {
-        m_log.LogInformation("[MONEY]: PostInitialise:");
+        m_log.LogDebug("[MONEY]: PostInitialise:");
     }
 
     public void Close()
     {
-        m_log.LogInformation("[MONEY]: Close:");
+        m_log.LogDebug("[MONEY]: Close:");
     }
 
     #endregion ISharedRegionModule interface
