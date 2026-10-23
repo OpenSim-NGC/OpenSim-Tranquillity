@@ -129,7 +129,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
 
         // One line per region, naming which config decided. This is what an operator checks - after the
         // two global lines go in and a region section comes out, every region must say "on (global)".
-        m_log.LogInformation("[SSB]: region {Region}: server-side baking {State} ({Source})",
+        m_log.LogDebug("[SSB]: region {Region}: server-side baking {State} ({Source})",
             scene.Name, enabled ? "ON" : "off", source);
 
         var region = new ServerSideBakingRegion(enabled, new CofHandshake());
@@ -148,14 +148,14 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
             scene.EventManager.OnRemovePresence += region.Forget;
             scene.EventManager.OnAvatarAppearanceChange += OnAvatarAppearanceChanged;
-            m_log.LogInformation(
+            m_log.LogDebug(
                 "[SSB]: region {Region} has server-side baking ON: RegionProtocols bit 0 set, {Cap} advertised, "
                 + "login bake armed, appearances carry AppearanceData. Firestorm there will stop client-baking.",
                 scene.Name, CapName);
         }
         else
         {
-            m_log.LogInformation("[SSB]: region {Region} has server-side baking off; the wire is unchanged there", scene.Name);
+            m_log.LogDebug("[SSB]: region {Region} has server-side baking off; the wire is unchanged there", scene.Name);
         }
 
         scene.AddCommand(
@@ -263,9 +263,11 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             sp.SendAppearanceToAgent(sp);
         }
 
-        // step 8: one INFO line per bake, carrying the phase split (Ledger Q-10); the fidelity evidence at DEBUG
+        // step 8: one line per bake, carrying the phase split, and the fidelity evidence at DEBUG. A bake runs on
+        // every login and every outfit change, so a normal one is written at DEBUG; the line is INFORMATION only
+        // when the bake failed, partly failed, or took longer than SlowBakeMs.
         var t = outcome.Timings;
-        m_log.LogInformation("[SSB]: bake for {Name} ({Agent}) reason={Reason}: {Summary} in {Ms} ms [{Split}, other={Other} ms]",
+        m_log.Log(LogLevelFor(outcome), "[SSB]: bake for {Name} ({Agent}) reason={Reason}: {Summary} in {Ms} ms [{Split}, other={Other} ms]",
             sp.Name, sp.UUID, reason, Summarise(outcome), outcome.ElapsedMs, t.Summary,
             Math.Max(0, outcome.ElapsedMs - (long)t.Accounted.TotalMilliseconds));
         if (m_log.IsEnabled(LogLevel.Debug))
@@ -277,6 +279,25 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
                 foreach (var note in c.Fidelity.Notes) m_log.LogDebug("[SSB]: {Channel} layer {Note}", c.Channel, note);
             }
         return outcome;
+    }
+
+    /// <summary>
+    /// A bake slower than this is logged at Information. Bake times on a running grid: a bake that reuses the stored
+    /// bakes takes tens of milliseconds (median 45 ms, 99th percentile 348 ms) and one that composites takes about a
+    /// second (median 1.0 s, 95th percentile 1.8 s), so five seconds is several times what a healthy bake needs and
+    /// only a stalled asset or avatar service gets there.
+    /// </summary>
+    public const long SlowBakeMs = 5000;
+
+    /// <summary>
+    /// The level of a bake's log line: Information when a channel failed, when the bake index could not be written
+    /// for a bake that produced live channels, or when the bake took longer than <see cref="SlowBakeMs"/>; Debug otherwise.
+    /// </summary>
+    public static LogLevel LogLevelFor(BakeOutcome o)
+    {
+        if (o.ElapsedMs > SlowBakeMs || o.Count(ChannelStatus.Failed) > 0) return LogLevel.Information;
+        var live = o.Count(ChannelStatus.Baked) + o.Count(ChannelStatus.Reused) > 0;
+        return live && !o.IndexWritten ? LogLevel.Information : LogLevel.Debug;
     }
 
     private static string Summarise(BakeOutcome o)
