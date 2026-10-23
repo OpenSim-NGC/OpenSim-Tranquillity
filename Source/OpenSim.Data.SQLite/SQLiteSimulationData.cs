@@ -112,7 +112,7 @@ public class SQLiteSimulationData : ISimulationDataStore
 
             ds = new DataSet("Region");
 
-            m_log.LogInformation("[SQLITE REGION DB]: Sqlite - connecting: " + connectionString);
+            m_log.LogInformation("[SQLITE REGION DB]: Sqlite - connecting: " + Util.GetDisplayConnectionString(connectionString));
             m_conn = new SQLiteConnection(m_connectionString);
             m_conn.Open();
 

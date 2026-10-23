@@ -19,6 +19,10 @@
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Console\OpenSim.Framework.Console.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Framework.Servers.HttpServer\OpenSim.Framework.Servers.HttpServer.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Server.Base\OpenSim.Server.Base.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.ApplicationPlugins.RemoteController\OpenSim.ApplicationPlugins.RemoteController.csproj" />
+    <ProjectReference Include="..\..\Addons\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj" />
+    <ProjectReference Include="..\..\Addons\Gloebit.GloebitMoneyModule\Gloebit.GloebitMoneyModule.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Server.Handlers\OpenSim.Server.Handlers.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services.HypergridService\OpenSim.Services.HypergridService.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services.LLLoginService\OpenSim.Services.LLLoginService.csproj" />
@@ -32,8 +36,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.10" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.13" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
     <PackageReference Include="NUnit" Version="4.3.2" />
     <PackageReference Include="NUnit.Analyzers" Version="4.9.2">
       <PrivateAssets>all</PrivateAssets>

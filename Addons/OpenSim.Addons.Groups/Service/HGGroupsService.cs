@@ -141,7 +141,7 @@ public class HGGroupsService : GroupsService
             }
             else
             {
-                m_log.LogDebug("[Groups.HGGroupsService]: access token {0} did not match stored one {1}", token, membership.Data["AccessToken"]);
+                m_log.LogDebug("[Groups.HGGroupsService]: access token for {0} did not match the stored one", AgentID);
                 return false;
             }
         }
@@ -348,7 +348,7 @@ public class HGGroupsService : GroupsService
             if (token != string.Empty && token.Equals(membership.Data["AccessToken"]))
                 return true;
             else
-                m_log.LogDebug("[Groups.HGGroupsService]: access token {0} did not match stored one {1}", token, membership.Data["AccessToken"]);
+                m_log.LogDebug("[Groups.HGGroupsService]: access token for {0} did not match the stored one", agentID);
         }
         else
             m_log.LogDebug("[Groups.HGGroupsService]: membership not found for {0}", agentID);

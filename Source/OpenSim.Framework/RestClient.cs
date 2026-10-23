@@ -235,6 +235,15 @@ public class RestClient : IDisposable
     }
 
     /// <summary>
+    /// The request address as it may appear in the log: without the query string, which callers fill through
+    /// <see cref="AddQueryParameter"/> and may use to carry a credential.
+    /// </summary>
+    private static string LoggableUri(Uri uri)
+    {
+        return uri.GetLeftPart(UriPartial.Path);
+    }
+
+    /// <summary>
     /// Perform a synchronous request
     /// </summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -275,7 +284,7 @@ public class RestClient : IDisposable
 
 
                 if (WebUtil.DebugLevel >= 3)
-                    m_log.LogDebug("[REST CLIENT] {0} to {1}", RequestMethod, uri);
+                    m_log.LogDebug("[REST CLIENT] {0} to {1}", RequestMethod, LoggableUri(uri));
 
                 //_request.ContentType = "application/xml";
                 responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
@@ -299,16 +308,16 @@ public class RestClient : IDisposable
                         if (status == HttpStatusCode.NotFound)
                         {
                             // This is often benign. E.g., requesting a missing asset will return 404.
-                            m_log.LogDebug("[REST CLIENT] Resource not found (404): {0}", uri.ToString());
+                            m_log.LogDebug("[REST CLIENT] Resource not found (404): {0}", LoggableUri(uri));
                         }
                         else
                         {
-                            m_log.LogError($"[REST CLIENT] Error fetching resource from server: {uri} status: {status} {e.Message}");
+                            m_log.LogError($"[REST CLIENT] Error fetching resource from server: {LoggableUri(uri)} status: {status} {e.Message}");
                         }
                     }
                     else
                     {
-                        m_log.LogError($"[REST CLIENT] Error fetching resource from server: {uri} {e.Message}");
+                        m_log.LogError($"[REST CLIENT] Error fetching resource from server: {LoggableUri(uri)} {e.Message}");
                     }
                 }
                 else

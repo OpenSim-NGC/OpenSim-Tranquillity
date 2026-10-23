@@ -489,8 +489,10 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         }
 
         TravelingAgentInfo travel = new TravelingAgentInfo(hgt);
-        m_log.LogDebug("[USER AGENT SERVICE]: Verifying agent token {0} against {1}", token, travel.ServiceToken);
-        return travel.ServiceToken == token;
+        bool matched = travel.ServiceToken == token;
+        m_log.LogDebug("[USER AGENT SERVICE]: Verifying agent token for session {0}: {1}",
+            sessionID, matched ? "token matched" : "token did not match");
+        return matched;
     }
 
     [Obsolete]

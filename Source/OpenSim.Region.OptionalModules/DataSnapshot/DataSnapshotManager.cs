@@ -425,7 +425,7 @@ public class DataSnapshotManager : ISharedRegionModule, IDataSnapshot
 
                 // This is not quite working, so...
                 // string responseStr = Util.UTF8.GetString(response);
-                m_log.LogInformation("[DATASNAPSHOT]: data service " + url + " notified. Secret: " + m_Secret);
+                m_log.LogInformation("[DATASNAPSHOT]: data service " + url + " notified");
             }
         }
     }

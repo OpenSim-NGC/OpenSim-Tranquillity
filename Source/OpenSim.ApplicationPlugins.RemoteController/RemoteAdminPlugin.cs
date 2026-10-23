@@ -1578,8 +1578,8 @@ public class RemoteAdminPlugin : IApplicationPlugin
                         lastName));
                 }
 
-                m_log.LogDebug("[RADMIN]: AuthenticateUser: account for user {0} {1} identified with token {2}",
-                    firstName, lastName, token);
+                m_log.LogDebug("[RADMIN]: AuthenticateUser: account for user {0} {1} identified, token issued",
+                    firstName, lastName);
 
                 responseData["token"] = token;
                 responseData["success"] = true;

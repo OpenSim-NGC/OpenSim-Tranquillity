@@ -86,7 +86,7 @@ public class WebkeyAuthenticationService :
                     }
                     else
                     {
-                        m_log.LogDebug("[AUTH SERVICE]: web login auth failed, got PrincipalID {0} gave {1} instead of {2}", principalID, password, key);
+                        m_log.LogDebug("[AUTH SERVICE]: web login auth failed for PrincipalID {0}: the key presented did not match the stored key", principalID);
                     }
                 }else{
                     m_log.LogDebug("[AUTH SERVICE]: no col webLoginKey in passwd.db");

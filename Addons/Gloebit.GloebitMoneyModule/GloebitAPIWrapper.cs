@@ -147,6 +147,15 @@ public class GloebitAPIWrapper : GloebitAPI.IAsyncEndpointCallback {
         m_uriLoaders.LoadAuthorizeUriForUser(user, authUri);
     }
         
+    /// <summary>
+    /// The value of a callback parameter as it may be logged. A parameter that carries a credential (the
+    /// authorization code and state, or the transaction callback key) is named in <paramref name="withheld"/>
+    /// and logged as "(withheld)"; the callback only needs to read it.
+    /// </summary>
+    private static object LoggableCallbackValue(DictionaryEntry e, params string[] withheld) {
+        return Array.IndexOf(withheld, e.Key as string) >= 0 ? "(withheld)" : e.Value;
+    }
+
     /*** GloebitAPI Required HTTP Callback Entrance Point - must be registered by GMM ***/
     /// <summary>
     /// Registered to the redirectURI from GloebitAPI.Authorize.  Called when a user approves authorization.
@@ -155,7 +164,7 @@ public class GloebitAPIWrapper : GloebitAPI.IAsyncEndpointCallback {
     /// <param name="requestData">response data from GloebitAPI.Authorize</param>
     public Hashtable authComplete_func(Hashtable requestData) {
         m_log.LogInformation("[GLOEBITMONEYMODULE] authComplete_func");
-        foreach(DictionaryEntry e in requestData) { m_log.LogDebug("{0}: {1}", e.Key, e.Value); }
+        foreach(DictionaryEntry e in requestData) { m_log.LogDebug("{0}: {1}", e.Key, LoggableCallbackValue(e, "code", "state")); }
 
         string agentId = requestData["agentId"] as string;
         string code = requestData["code"] as string;
@@ -720,7 +729,7 @@ public class GloebitAPIWrapper : GloebitAPI.IAsyncEndpointCallback {
     /// </returns>
     public Hashtable transactionState_func(Hashtable requestData) {
         m_log.LogDebug("[GLOEBITMONEYMODULE] transactionState_func **************** Got Callback");
-        foreach(DictionaryEntry e in requestData) { m_log.LogDebug("{0}: {1}", e.Key, e.Value); }
+        foreach(DictionaryEntry e in requestData) { m_log.LogDebug("{0}: {1}", e.Key, LoggableCallbackValue(e, "key")); }
 
         // TODO: check that these exist in requestData.  If not, signal error and send response with false.
         string transactionIDstr = requestData["id"] as string;
