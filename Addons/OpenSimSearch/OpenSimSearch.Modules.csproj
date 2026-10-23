@@ -4,7 +4,7 @@
     <Product>OpenSim</Product>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.10" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.13" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="xmlrpc" HintPath="..\..\Library\xmlrpc.dll" />
