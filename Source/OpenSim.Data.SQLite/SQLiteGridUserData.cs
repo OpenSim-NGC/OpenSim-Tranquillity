@@ -28,6 +28,8 @@ using OpenSim.Framework;
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Data.SQLite;
+
 namespace OpenSim.Data.SQLite;
 
 /// <summary>
@@ -52,7 +54,12 @@ public class SQLiteGridUserData : SQLiteGenericTableHandler<GridUserData>, IGrid
 
     public GridUserData[] GetAll(string userID)
     {
-        return base.Get(String.Format("UserID LIKE '{0}%'", userID));
+        using (SQLiteCommand cmd = new SQLiteCommand("select * from " + m_Realm + " where UserID LIKE :userID"))
+        {
+            cmd.Parameters.Add(new SQLiteParameter(":userID", userID + "%"));
+
+            return DoQuery(cmd);
+        }
     }
 
 }
