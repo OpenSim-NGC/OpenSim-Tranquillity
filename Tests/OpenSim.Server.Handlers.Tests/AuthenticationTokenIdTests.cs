@@ -79,7 +79,7 @@ public class AuthenticationTokenIdTests
         (AuthenticationServerPostHandler handler, Calls calls) = NewHandler();
         UUID id = UUID.Random();
 
-        Post(handler, "verify", "{" + id.ToString().ToUpperInvariant() + "}");
+        Post(handler, "verify", id.ToString().ToUpperInvariant());
 
         Xunit.Assert.Equal(new[] { "Verify:" + id }, calls.Seen);
     }
