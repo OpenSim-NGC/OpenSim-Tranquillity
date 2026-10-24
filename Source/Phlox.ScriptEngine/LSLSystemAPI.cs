@@ -8863,16 +8863,6 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             part.UpdateShape(shapeBlock);
         }
 
-        /// <summary>
-        /// One prim's getter rules. A rule Phlox does not implement yet returns nothing and takes its face, if it
-        /// has one, so the walk goes on with the next rule. PRIM_LINK_TARGET takes its link and changes nothing
-        /// here: the walk above (and osGetPrimitiveParams' one prim) decides which prims a rule reads.
-        /// </summary>
-        /// <summary>
-        /// The faces a per-face read reports: every face of the prim in turn for ALL_SIDES, the one face asked for, or
-        /// none for a face the prim does not have (Halcyon GetPrimParams; SL: ALL_SIDES gives one entry per face). An
-        /// entry is null when the prim has no texture entry at all.
-        /// </summary>
         // ---- per-face material writes ----
         //
         // OpenMetaverse's TextureEntryFace setters for the material byte (bump, shiny, fullbright) and the media byte
@@ -8922,6 +8912,16 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             f.TexMapType = mapping;
         }
 
+        /// <summary>
+        /// One prim's getter rules. A rule Phlox does not implement yet returns nothing and takes its face, if it
+        /// has one, so the walk goes on with the next rule. PRIM_LINK_TARGET takes its link and changes nothing
+        /// here: the walk above (and osGetPrimitiveParams' one prim) decides which prims a rule reads.
+        /// </summary>
+        /// <summary>
+        /// The faces a per-face read reports: every face of the prim in turn for ALL_SIDES, the one face asked for, or
+        /// none for a face the prim does not have (Halcyon GetPrimParams; SL: ALL_SIDES gives one entry per face). An
+        /// entry is null when the prim has no texture entry at all.
+        /// </summary>
         private static IEnumerable<Primitive.TextureEntryFace> FacesRead(SceneObjectPart part, int face)
         {
             int sides = part.GetNumberOfSides();
