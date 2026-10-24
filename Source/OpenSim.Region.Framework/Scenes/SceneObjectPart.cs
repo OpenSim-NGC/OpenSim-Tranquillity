@@ -5371,8 +5371,11 @@ public class SceneObjectPart : EntityBase, IDisposable
         // we do need better compacter do just the trivial case
         if (nsides == 1 && newTex.FaceTextures[0] != null)
         {
-            newTex.DefaultTexture = newTex.GetFace(0);
-            newTex.FaceTextures[0] = null;
+            // Face 0 becomes the default face. A face stores only the attributes it overrides and takes the rest from
+            // the default face, so the new default is built from face 0's effective values (texture, colour, repeats,
+            // offsets, rotation, glow, material and media bytes, material id). Using the face object itself would
+            // store its unset fields as zero and lose what the old default carried.
+            newTex = new Primitive.TextureEntry(newTex.GetFace(0));
         }
         m_shape.TextureEntry = newTex.GetBytes(nsides);
         TriggerScriptChangedEvent(changeFlags);
