@@ -24,7 +24,12 @@ public class CofWearableRemovalTests
     private const int Shape = 0, Skin = 1, Hair = 2, Eyes = 3, Shirt = 4, Pants = 5, Jacket = 8, Alpha = 13, Tattoo = 14, Physics = 15, Universal = 16;
     private static readonly int[] BodyParts = { Shape, Skin, Hair, Eyes };
 
-    private static readonly string[] None = Array.Empty<string>();
+    private static readonly CofUnresolvedLink[] None = Array.Empty<CofUnresolvedLink>();
+
+    private const int InvTexture = 0, InvObject = 6, InvAttachment = 17, InvWearable = 18, InvGesture = 20;
+
+    /// <summary>A link this region could not resolve, as the inventory stored it (a wearable link by default).</summary>
+    private static CofUnresolvedLink Broken(string description, int invType = InvWearable) => new(description, invType);
 
     private static AvatarWearable[] Empty()
     {
@@ -126,7 +131,7 @@ public class CofWearableRemovalTests
         var (worn, items) = WearAll(Shape, Skin, Hair, Eyes, Shirt, Pants);
         var links = BodyParts.Select(t => Link(t, items[t])).ToList();
 
-        var derived = CofWearables.Derive(worn, links, new[] { "" }, out var changed);
+        var derived = CofWearables.Derive(worn, links, new[] { Broken("") }, out var changed);
 
         Assert.False(changed);
         Assert.Equal(items[Shirt], derived[Shirt][0].ItemID);
@@ -141,7 +146,7 @@ public class CofWearableRemovalTests
         var (worn, items) = WearAll(Shape, Skin, Hair, Eyes, Shirt, Pants, Jacket);
         var links = BodyParts.Select(t => Link(t, items[t])).Append(Link(Shirt, items[Shirt], "@400")).ToList();
 
-        var derived = CofWearables.Derive(worn, links, new[] { "@500" }, out var changed);
+        var derived = CofWearables.Derive(worn, links, new[] { Broken("@500") }, out var changed);
 
         Assert.True(changed);
         Assert.Equal(items[Pants], derived[Pants][0].ItemID);
@@ -158,7 +163,7 @@ public class CofWearableRemovalTests
         var (worn, items) = WearAll(Shape, Skin, Hair, Eyes, Shirt, Pants, Jacket);
         var links = BodyParts.Select(t => Link(t, items[t])).Append(Link(Shirt, items[Shirt], "@400")).ToList();
 
-        var derived = CofWearables.Derive(worn, links, new[] { description }, out var changed);
+        var derived = CofWearables.Derive(worn, links, new[] { Broken(description) }, out var changed);
 
         Assert.False(changed);
         Assert.Equal(items[Pants], derived[Pants][0].ItemID);
@@ -173,7 +178,7 @@ public class CofWearableRemovalTests
         var (worn, items) = WearAll(Shape, Skin, Hair, Eyes, Shirt, Pants, Jacket);
         var links = BodyParts.Select(t => Link(t, items[t])).Append(Link(Shirt, items[Shirt], "@400")).ToList();
 
-        var derived = CofWearables.Derive(worn, links, new[] { description }, out var changed);
+        var derived = CofWearables.Derive(worn, links, new[] { Broken(description) }, out var changed);
 
         Assert.False(changed);
         Assert.Equal(items[Pants], derived[Pants][0].ItemID);
@@ -186,10 +191,59 @@ public class CofWearableRemovalTests
         var (worn, items) = WearAll(Shape, Skin, Hair, Eyes, Pants, Jacket);
         var links = BodyParts.Select(t => Link(t, items[t])).ToList();
 
-        var derived = CofWearables.Derive(worn, links, new[] { "@500", "" }, out var changed);
+        var derived = CofWearables.Derive(worn, links, new[] { Broken("@500"), Broken("") }, out var changed);
 
         Assert.False(changed);
         Assert.Equal(items[Jacket], derived[Jacket][0].ItemID);
+    }
+
+    // A broken link whose own record says it was not a wearable says nothing about clothing.
+    [Theory]
+    [InlineData(InvObject)]
+    [InlineData(InvAttachment)]
+    [InlineData(InvGesture)]
+    public void ABrokenNonWearableLinkDoesNotSwitchTheClothingRuleOff(int invType)
+    {
+        var (worn, items) = WearAll(Shape, Skin, Hair, Eyes, Shirt, Pants);
+        var links = BodyParts.Select(t => Link(t, items[t])).Append(Link(Shirt, items[Shirt], "@400")).ToList();
+
+        var derived = CofWearables.Derive(worn, links, new[] { Broken("", invType) }, out var changed);
+
+        Assert.True(changed);
+        Assert.Equal(items[Shirt], derived[Shirt][0].ItemID);
+        Assert.Equal(0, derived[Pants].Count);
+    }
+
+    [Fact]
+    public void ABrokenWearableLinkWithNoNumberStillEmptiesNothingBesideABrokenAttachment()
+    {
+        var (worn, items) = WearAll(Shape, Skin, Hair, Eyes, Shirt, Pants);
+        var links = BodyParts.Select(t => Link(t, items[t])).Append(Link(Shirt, items[Shirt], "@400")).ToList();
+
+        var derived = CofWearables.Derive(worn, links, new[] { Broken("", InvAttachment), Broken("", InvWearable) }, out var changed);
+
+        Assert.False(changed);
+        Assert.Equal(items[Pants], derived[Pants][0].ItemID);
+    }
+
+    // Type 0 is also what an unset type reads as, so it proves nothing.
+    [Fact]
+    public void ABrokenLinkOfTypeTextureCountsAsUnknown() => AssertEmptiesNothing(InvTexture);
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(99)]
+    public void ABrokenLinkOfNoInventoryTypeCountsAsUnknown(int invType) => AssertEmptiesNothing(invType);
+
+    private static void AssertEmptiesNothing(int invType)
+    {
+        var (worn, items) = WearAll(Shape, Skin, Hair, Eyes, Shirt, Pants);
+        var links = BodyParts.Select(t => Link(t, items[t])).Append(Link(Shirt, items[Shirt], "@400")).ToList();
+
+        var derived = CofWearables.Derive(worn, links, new[] { Broken("", invType) }, out var changed);
+
+        Assert.False(changed);
+        Assert.Equal(items[Pants], derived[Pants][0].ItemID);
     }
 
     // a read that found nothing is not a statement that the avatar is naked

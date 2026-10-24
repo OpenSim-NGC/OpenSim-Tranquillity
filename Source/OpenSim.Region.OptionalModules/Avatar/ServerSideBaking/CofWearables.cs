@@ -26,6 +26,13 @@ namespace OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
 public sealed record CofWearableLink(UUID LinkItemId, string Description, UUID TargetItemId, int WearableType, UUID AssetId);
 
 /// <summary>
+/// A Current Outfit link whose target this region could not resolve, as the inventory stored the link itself.
+/// </summary>
+/// <param name="Description">The link item's description; for a wearable link, the viewer's <c>"@NNN"</c> ordering string.</param>
+/// <param name="InvType">The link item's inventory type, which the viewer sets from its target when it creates the link.</param>
+public sealed record CofUnresolvedLink(string Description, int InvType);
+
+/// <summary>
 /// Turns the Current Outfit Folder's wearable links into <see cref="AvatarAppearance.Wearables"/>, keeping
 /// every link of a type and putting them in the order the viewer layers them.
 ///
@@ -106,7 +113,8 @@ public static class CofWearables
     /// replaced (llappearancemgr.cpp:2172-2179, :4228). Exceptions: a type named only by an unresolvable link keeps
     /// what the agent wears (the link's description gives the type, see <paramref name="unresolvedLinks"/>); and
     /// when an unresolvable link's type cannot be read, or the read found no wearable link at all, nothing is
-    /// emptied.</item>
+    /// emptied. An unresolvable link whose own inventory type is a known non-wearable type (<see cref="IsKnownNonWearable"/>)
+    /// is ignored.</item>
     /// <item><see cref="AvatarWearable.Add"/> caps a type at five items and ignores <see cref="UUID.Zero"/> item
     /// ids, so a sixth link of a type and a link to nothing are both dropped here, as they are on every other
     /// path into the wearable table.</item>
@@ -117,9 +125,10 @@ public static class CofWearables
     /// <param name="unresolvedLinks">
     /// The descriptions of the links the caller had to drop because their target could not be resolved. A
     /// description of the viewer's form <c>"@NNN"</c> names the type <c>NNN / 100</c> (see <see cref="OrderKey"/>).
+    /// A link whose own inventory type is a known non-wearable type is ignored.
     /// </param>
     /// <param name="changed">True when the result differs from <paramref name="existing"/> in any item id or order.</param>
-    public static AvatarWearable[] Derive(AvatarWearable[] existing, IReadOnlyList<CofWearableLink> links, IReadOnlyList<string> unresolvedLinks, out bool changed)
+    public static AvatarWearable[] Derive(AvatarWearable[] existing, IReadOnlyList<CofWearableLink> links, IReadOnlyList<CofUnresolvedLink> unresolvedLinks, out bool changed)
     {
         existing ??= Array.Empty<AvatarWearable>();
         links ??= Array.Empty<CofWearableLink>();
@@ -142,9 +151,10 @@ public static class CofWearables
         var brokenTypes = new HashSet<int>();
         var typeUnknown = false;
         if (unresolvedLinks is not null)
-            foreach (var description in unresolvedLinks)
+            foreach (var broken in unresolvedLinks)
             {
-                var key = OrderKey(description);
+                if (broken is null || IsKnownNonWearable(broken.InvType)) continue;
+                var key = OrderKey(broken.Description);
                 if (key >= 0 && key / 100 < AvatarWearable.MAX_WEARABLES) brokenTypes.Add(key / 100);
                 else typeUnknown = true;
             }
@@ -191,6 +201,17 @@ public static class CofWearables
     /// none (:2163-2170). Every other wearable type is clothing.
     /// </summary>
     private static bool IsClothing(int wearableType) => wearableType > (int)WearableType.Eyes;
+
+    /// <summary>
+    /// True when a link's own inventory type says its target was not a wearable (an object, an attachment, a
+    /// gesture, a sound and so on), so a broken one says nothing about clothing. The viewer sets a link's inventory
+    /// type from its target when it creates the link (<c>link_inventory_array</c>, llviewerinventory.cpp:1330 and
+    /// :1355). Wearable is not in this set, and neither is Texture (0), which is also what an unset type reads as,
+    /// nor any value that is not an inventory type at all: those stay unknown.
+    /// </summary>
+    private static bool IsKnownNonWearable(int invType) =>
+        invType != (int)InventoryType.Texture && invType != (int)InventoryType.Wearable
+        && invType is >= 0 and <= 127 && Enum.IsDefined((InventoryType)invType);
 
     /// <summary>Item ids, per type, in order: the comparison that decides whether a save is worth making.</summary>
     private static bool SameItems(AvatarWearable[] a, AvatarWearable[] b)

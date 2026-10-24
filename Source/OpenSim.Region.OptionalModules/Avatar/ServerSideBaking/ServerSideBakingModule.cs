@@ -443,7 +443,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         if (inventory is null || sp is null) return;
 
         List<CofWearableLink> links;
-        var unresolved = new List<string>();
+        var unresolved = new List<CofUnresolvedLink>();
         try
         {
             var cof = inventory.GetFolderForType(sp.UUID, FolderType.CurrentOutfit);
@@ -455,12 +455,12 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             foreach (var link in content.Items)
             {
                 if (link is null || link.AssetType != (int)AssetType.Link) continue;
-                if (link.AssetID.IsZero()) { unresolved.Add(link.Description); continue; }   // a link to nothing
+                if (link.AssetID.IsZero()) { unresolved.Add(new CofUnresolvedLink(link.Description, link.InvType)); continue; }   // a link to nothing
                 var target = inventory.GetItem(sp.UUID, link.AssetID);
-                if (target is null) { unresolved.Add(link.Description); continue; }
+                if (target is null) { unresolved.Add(new CofUnresolvedLink(link.Description, link.InvType)); continue; }
                 if (target.InvType != (int)InventoryType.Wearable) continue;   // an attachment or a gesture link
                 var type = (int)(target.Flags & 0xff);
-                if (type < 0 || type >= AvatarWearable.MAX_WEARABLES) { unresolved.Add(link.Description); continue; }
+                if (type < 0 || type >= AvatarWearable.MAX_WEARABLES) { unresolved.Add(new CofUnresolvedLink(link.Description, (int)InventoryType.Wearable)); continue; }
                 links.Add(new CofWearableLink(link.ID, link.Description, target.ID, type, target.AssetID));
             }
             if (unresolved.Count > 0)
