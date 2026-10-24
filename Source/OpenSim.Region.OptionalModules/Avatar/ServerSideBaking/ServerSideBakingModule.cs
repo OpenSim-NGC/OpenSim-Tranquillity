@@ -443,7 +443,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         if (inventory is null || sp is null) return;
 
         List<CofWearableLink> links;
-        var unresolved = 0;
+        var unresolved = new List<string>();
         try
         {
             var cof = inventory.GetFolderForType(sp.UUID, FolderType.CurrentOutfit);
@@ -455,16 +455,16 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             foreach (var link in content.Items)
             {
                 if (link is null || link.AssetType != (int)AssetType.Link) continue;
-                if (link.AssetID.IsZero()) { unresolved++; continue; }   // a link to nothing: cannot say what type it was
+                if (link.AssetID.IsZero()) { unresolved.Add(link.Description); continue; }   // a link to nothing
                 var target = inventory.GetItem(sp.UUID, link.AssetID);
-                if (target is null) { unresolved++; continue; }
+                if (target is null) { unresolved.Add(link.Description); continue; }
                 if (target.InvType != (int)InventoryType.Wearable) continue;   // an attachment or a gesture link
                 var type = (int)(target.Flags & 0xff);
-                if (type < 0 || type >= AvatarWearable.MAX_WEARABLES) { unresolved++; continue; }
+                if (type < 0 || type >= AvatarWearable.MAX_WEARABLES) { unresolved.Add(link.Description); continue; }
                 links.Add(new CofWearableLink(link.ID, link.Description, target.ID, type, target.AssetID));
             }
-            if (unresolved > 0)
-                m_log.LogWarning("[SSB]: {Count} COF link(s) for {Name} name an item this region cannot resolve as a wearable; this read drops no clothing type (S8)", unresolved, sp.Name);
+            if (unresolved.Count > 0)
+                m_log.LogWarning("[SSB]: {Count} COF link(s) for {Name} name an item this region cannot resolve as a wearable; a type they name keeps what the agent wears, and without a readable type this read drops no clothing (S8)", unresolved.Count, sp.Name);
         }
         catch (Exception ex)
         {

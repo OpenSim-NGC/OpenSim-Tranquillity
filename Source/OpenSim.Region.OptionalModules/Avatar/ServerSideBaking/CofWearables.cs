@@ -46,8 +46,9 @@ public sealed record CofWearableLink(UUID LinkItemId, string Description, UUID T
 /// other way round: the Current Outfit is the authority, so a clothing type with no link is not worn. <b>Unresolvable</b>: a link whose
 /// target this region cannot resolve is a statement about the inventory lookup, not about what the avatar is
 /// wearing (<c>AvatarFactoryModule.SetAppearanceAssets</c>, AvatarFactoryModule.cs:975-989) — such a link never
-/// reaches here. The caller drops it, counts it, and passes the count, and a read with any such link empties no
-/// clothing type. The caller must not pass an unresolvable link with a guessed type.
+/// reaches here. The caller drops it and passes its description; the type the description names keeps its contents,
+/// and a link with no readable type makes the read empty no clothing type. The caller must not pass an
+/// unresolvable link with a guessed type.
 /// </para>
 ///
 /// <para>Pure, and free of <c>Scene</c> and <c>IInventoryService</c>, so every rule above is a plain unit test.</para>
@@ -102,9 +103,10 @@ public static class CofWearables
     /// <item>A body part type (shape, skin, hair, eyes) no link names keeps its current items.</item>
     /// <item>A clothing type no link names is emptied: on a server-baking region the Current Outfit decides
     /// which clothing is worn, and the viewer drops a clothing link when the item is taken off or the outfit is
-    /// replaced (llappearancemgr.cpp:2172-2179, :4228). Exception: when <paramref name="unresolvedLinks"/> is above
-    /// zero, or the read found no wearable link at all, nothing is emptied. An unresolvable link cannot be given a
-    /// type, so any clothing type might be the one it names, and that must stay harmless.</item>
+    /// replaced (llappearancemgr.cpp:2172-2179, :4228). Exceptions: a type named only by an unresolvable link keeps
+    /// what the agent wears (the link's description gives the type, see <paramref name="unresolvedLinks"/>); and
+    /// when an unresolvable link's type cannot be read, or the read found no wearable link at all, nothing is
+    /// emptied.</item>
     /// <item><see cref="AvatarWearable.Add"/> caps a type at five items and ignores <see cref="UUID.Zero"/> item
     /// ids, so a sixth link of a type and a link to nothing are both dropped here, as they are on every other
     /// path into the wearable table.</item>
@@ -112,9 +114,12 @@ public static class CofWearables
     /// </remarks>
     /// <param name="existing">The agent's current wearables. May be null (treated as empty).</param>
     /// <param name="links">The COF's resolved wearable links, in any order.</param>
-    /// <param name="unresolvedLinks">How many wearable-looking links the caller had to drop because their target could not be resolved.</param>
+    /// <param name="unresolvedLinks">
+    /// The descriptions of the links the caller had to drop because their target could not be resolved. A
+    /// description of the viewer's form <c>"@NNN"</c> names the type <c>NNN / 100</c> (see <see cref="OrderKey"/>).
+    /// </param>
     /// <param name="changed">True when the result differs from <paramref name="existing"/> in any item id or order.</param>
-    public static AvatarWearable[] Derive(AvatarWearable[] existing, IReadOnlyList<CofWearableLink> links, int unresolvedLinks, out bool changed)
+    public static AvatarWearable[] Derive(AvatarWearable[] existing, IReadOnlyList<CofWearableLink> links, IReadOnlyList<string> unresolvedLinks, out bool changed)
     {
         existing ??= Array.Empty<AvatarWearable>();
         links ??= Array.Empty<CofWearableLink>();
@@ -129,10 +134,21 @@ public static class CofWearables
             if (link.WearableType >= length) length = link.WearableType + 1;
         }
 
-        // A read is a complete statement of the outfit only when it found wearable links and every link in the
-        // folder was resolved. A link this region could not resolve, or an empty read, says something about the
-        // inventory lookup, not about what is worn.
-        var outfitIsComplete = unresolvedLinks == 0 && byType.Count > 0;
+        // A read is a complete statement of the outfit only when it found wearable links. A link this region could not
+        // resolve says something about the inventory lookup, not about what is worn, but its own description usually
+        // still carries the viewer's ordering number, which names its type: that type keeps what the agent wears, and
+        // every other type follows the normal rule. A broken link whose type cannot be read leaves no way to tell
+        // which type it was, so the read then empties no clothing type.
+        var brokenTypes = new HashSet<int>();
+        var typeUnknown = false;
+        if (unresolvedLinks is not null)
+            foreach (var description in unresolvedLinks)
+            {
+                var key = OrderKey(description);
+                if (key >= 0 && key / 100 < AvatarWearable.MAX_WEARABLES) brokenTypes.Add(key / 100);
+                else typeUnknown = true;
+            }
+        var outfitIsComplete = !typeUnknown && byType.Count > 0;
 
         var derived = new AvatarWearable[length];
         for (var type = 0; type < length; type++)
@@ -157,7 +173,7 @@ public static class CofWearables
 
             // No link of this type. The Current Outfit decides clothing, so a clothing type with no link is not worn;
             // see the remarks on Derive for when this read is not a complete statement and the type is kept.
-            if (outfitIsComplete && IsClothing(type)) continue;
+            if (outfitIsComplete && IsClothing(type) && !brokenTypes.Contains(type)) continue;
 
             // Untouched by this read: keep what the agent already wears.
             if (type < existing.Length && existing[type] is not null)

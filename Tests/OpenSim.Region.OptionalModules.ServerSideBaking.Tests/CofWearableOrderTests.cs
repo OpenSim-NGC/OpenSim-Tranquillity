@@ -65,7 +65,7 @@ public class CofWearableOrderTests
             Link("@400", Shirt, shirt0, asset0),
         };
 
-        var derived = CofWearables.Derive(Empty(), links, 0, out var changed);
+        var derived = CofWearables.Derive(Empty(), links, Array.Empty<string>(), out var changed);
 
         Assert.True(changed);
         Assert.Equal(2, derived[Shirt].Count);
@@ -101,7 +101,7 @@ public class CofWearableOrderTests
             Link("@400", Shirt, ordered, UUID.Random()),
         };
 
-        var derived = CofWearables.Derive(Empty(), links, 0, out _);
+        var derived = CofWearables.Derive(Empty(), links, Array.Empty<string>(), out _);
 
         Assert.Equal(ordered, derived[Shirt][0].ItemID);
         Assert.Equal(unordered, derived[Shirt][1].ItemID);
@@ -120,7 +120,7 @@ public class CofWearableOrderTests
         var existing = With((Shirt, shirt, shirtAsset), (Pants, pants, pantsAsset));
 
         // Only the shirt link resolved this time; the pants link's target could not be read.
-        var derived = CofWearables.Derive(existing, new[] { Link("@400", Shirt, shirt, shirtAsset) }, 1, out var changed);
+        var derived = CofWearables.Derive(existing, new[] { Link("@400", Shirt, shirt, shirtAsset) }, new[] { "" }, out var changed);
 
         Assert.False(changed);
         Assert.Equal(shirt, derived[Shirt][0].ItemID);
@@ -134,7 +134,7 @@ public class CofWearableOrderTests
         var shirt = UUID.Random();
         var existing = With((Shirt, shirt, UUID.Random()));
 
-        var derived = CofWearables.Derive(existing, Array.Empty<CofWearableLink>(), 0, out var changed);
+        var derived = CofWearables.Derive(existing, Array.Empty<CofWearableLink>(), Array.Empty<string>(), out var changed);
 
         Assert.False(changed);
         Assert.Equal(shirt, derived[Shirt][0].ItemID);
@@ -235,7 +235,7 @@ public class CofWearableOrderTests
         {
             Link("@400", Shirt, UUID.Random(), red),
             Link("@401", Shirt, UUID.Random(), blue),
-        }, 0, out _);
+        }, Array.Empty<string>(), out _);
         var (r1, b1) = Count(compositor.Bake(BakeChannel.Upper, Worn(blueOnTop, textures), size).Image);
         Assert.True(b1 > 1000, $"the @401 shirt must cover the upper body; {b1} blue pixels");
         Assert.Equal(0, r1);
@@ -245,7 +245,7 @@ public class CofWearableOrderTests
         {
             Link("@401", Shirt, UUID.Random(), red),
             Link("@400", Shirt, UUID.Random(), blue),
-        }, 0, out _);
+        }, Array.Empty<string>(), out _);
         var (r2, b2) = Count(compositor.Bake(BakeChannel.Upper, Worn(redOnTop, textures), size).Image);
         Assert.True(r2 > 1000, $"the @401 shirt must cover the upper body; {r2} red pixels");
         Assert.Equal(0, b2);
