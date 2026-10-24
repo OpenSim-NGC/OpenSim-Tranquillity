@@ -4459,7 +4459,14 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
         }
         // If this transaction was one user paying another, if the user is online, we should let them know they received a payment
         if (txn.TransactionType == (int)TransactionType.USER_PAYS_USER) {
-            string message = String.Format("You've received Gloebits from {0}.", resolveAgentName(payerClient.AgentId));
+            // Use the name captured when the transaction was created, not a
+            // fresh resolveAgentName(payerClient.AgentId) lookup -- payerClient
+            // is null if the payer has since logged out or left the region,
+            // and payerClient.AgentId threw a NullReferenceException here,
+            // which escaped as an unhandled HTTP 500 to Gloebit's transaction
+            // processor on every consume for a since-departed payer.
+            string payerName = String.IsNullOrEmpty(txn.PayerName) ? "another user" : txn.PayerName;
+            string message = String.Format("You've received Gloebits from {0}.", payerName);
             sendTxnStatusToClient(txn, payeeClient, message, true, showIDWithTxnSucceeded, UUID.Parse(txn.PayeeID));
         }
         // TODO: consider if we want to send an alert that payee earned money with transaction details for other transaction types
