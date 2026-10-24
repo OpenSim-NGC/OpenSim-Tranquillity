@@ -443,6 +443,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         if (inventory is null || sp is null) return;
 
         List<CofWearableLink> links;
+        var unresolved = 0;
         try
         {
             var cof = inventory.GetFolderForType(sp.UUID, FolderType.CurrentOutfit);
@@ -451,10 +452,10 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             if (content?.Items is null) return;
 
             links = new List<CofWearableLink>(content.Items.Count);
-            var unresolved = 0;
             foreach (var link in content.Items)
             {
-                if (link is null || link.AssetType != (int)AssetType.Link || link.AssetID.IsZero()) continue;
+                if (link is null || link.AssetType != (int)AssetType.Link) continue;
+                if (link.AssetID.IsZero()) { unresolved++; continue; }   // a link to nothing: cannot say what type it was
                 var target = inventory.GetItem(sp.UUID, link.AssetID);
                 if (target is null) { unresolved++; continue; }
                 if (target.InvType != (int)InventoryType.Wearable) continue;   // an attachment or a gesture link
@@ -463,7 +464,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
                 links.Add(new CofWearableLink(link.ID, link.Description, target.ID, type, target.AssetID));
             }
             if (unresolved > 0)
-                m_log.LogWarning("[SSB]: {Count} COF link(s) for {Name} name an item this region cannot resolve as a wearable; their types keep what the agent already wears (S8)", unresolved, sp.Name);
+                m_log.LogWarning("[SSB]: {Count} COF link(s) for {Name} name an item this region cannot resolve as a wearable; this read drops no clothing type (S8)", unresolved, sp.Name);
         }
         catch (Exception ex)
         {
@@ -471,7 +472,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             return;
         }
 
-        var derived = CofWearables.Derive(sp.Appearance?.Wearables, links, out var changed);
+        var derived = CofWearables.Derive(sp.Appearance?.Wearables, links, unresolved, out var changed);
         if (!changed) return;
 
         sp.Appearance.Wearables = derived;
