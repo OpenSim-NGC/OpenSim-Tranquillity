@@ -394,12 +394,15 @@ public class GloebitTransaction {
     /// reported failure. There's nothing left to retry at that point; retrying
     /// would just hit the same alert bug again.
     /// </summary>
-    private static void SafeAlert(Action alertCall, string description)
+    private void SafeAlert(Action alertCall, string description)
     {
         try {
             alertCall();
         } catch (Exception e) {
-            m_log.LogError("[GLOEBITMONEYMODULE] {0} alert threw (swallowed): {1}", description, e.ToString());
+            // Exception-typed overload, not e.ToString() as a message arg, so
+            // providers that only do structured exception capture/correlation
+            // via this overload (e.g. Application Insights, Seq) still pick it up.
+            m_log.LogError(e, "[GLOEBITMONEYMODULE] {0} alert threw (swallowed) for transaction {1}", description, this.TransactionID);
         }
     }
 
@@ -482,7 +485,7 @@ public class GloebitTransaction {
         // First reception of consume for asset.
         // Send alert that CONSUME_GLOEBIT has completed
         SafeAlert(() => transactionAlerts.AlertTransactionStageCompleted(this, GloebitAPI.TransactionStage.CONSUME_GLOEBIT, String.Empty),
-                  "CONSUME_GLOEBIT");
+                  GloebitAPI.TransactionStage.CONSUME_GLOEBIT.ToString());
         // Do specific consume functionality for the Asset / local transaction part
         this.consumed = assetCallbacks.processAssetConsumeHold(this, out returnMsg);
         if (this.consumed) {
@@ -492,7 +495,7 @@ public class GloebitTransaction {
             // send alert that CONSUME_ASSET has completed
             // TODO: should we pass the returnMsg instead of String.Empty, or is this always empty on success? -- investigate
             SafeAlert(() => transactionAlerts.AlertTransactionStageCompleted(this, GloebitAPI.TransactionStage.CONSUME_ASSET, String.Empty),
-                      "CONSUME_ASSET");
+                      GloebitAPI.TransactionStage.CONSUME_ASSET.ToString());
             // transaction officially complete at this point -- this.consumed is
             // already true and persisted above; AlertTransactionSucceeded is
             // purely a user-facing notification from here on.
@@ -522,7 +525,7 @@ public class GloebitTransaction {
         // First reception of cancel for asset.
         // Send alert that CANCEL_GLOEBIT has completed
         SafeAlert(() => transactionAlerts.AlertTransactionStageCompleted(this, GloebitAPI.TransactionStage.CANCEL_GLOEBIT, String.Empty),
-                  "CANCEL_GLOEBIT");
+                  GloebitAPI.TransactionStage.CANCEL_GLOEBIT.ToString());
         // Do specific cancel functionality for the Asset / local transaction part
         this.canceled = assetCallbacks.processAssetCancelHold(this, out returnMsg); // Do I need to grab the money module for this?
         if (this.canceled) {
@@ -532,7 +535,7 @@ public class GloebitTransaction {
             // send alert that CANCEL_ASSET has completed
             // TODO: should we pass the returnMsg instead of String.Empty, or is this always empty on success? -- investigate
             SafeAlert(() => transactionAlerts.AlertTransactionStageCompleted(this, GloebitAPI.TransactionStage.CANCEL_ASSET, String.Empty),
-                      "CANCEL_ASSET");
+                      GloebitAPI.TransactionStage.CANCEL_ASSET.ToString());
         }
         return this.canceled;
     }
