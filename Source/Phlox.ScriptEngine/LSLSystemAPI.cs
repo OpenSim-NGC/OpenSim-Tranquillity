@@ -7687,7 +7687,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     }
                     if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) ApplyTex(texEntry.CreateFace((uint)i)); }
                     else { try { ApplyTex(texEntry.CreateFace((uint)face)); } catch { } }
-                    part.UpdateTextureEntry(texEntry.GetBytes());
+                    part.UpdateTextureEntry(texEntry);
                     break;
                 }
 
@@ -7709,7 +7709,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     }
                     else if (face >= 0 && face < sides) te.CreateFace((uint)face).Glow = glow;
                     else break;
-                    part.UpdateTextureEntry(te.GetBytes());
+                    part.UpdateTextureEntry(te);
                     break;
                 }
 
@@ -7720,9 +7720,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     try { face  = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
                     try { bright = Convert.ToInt32(data[idx++]) != 0; } catch { break; }
                     Primitive.TextureEntry te = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
-                    if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) te.CreateFace((uint)i).Fullbright = bright; }
-                    else { try { te.CreateFace((uint)face).Fullbright = bright; } catch { } }
-                    part.UpdateTextureEntry(te.GetBytes());
+                    // SL: a face the prim does not have is ignored; ALL_SIDES is the default face and the prim's own
+                    // faces (Halcyon SetFullBright).
+                    if (!WriteFaces(te, part.GetNumberOfSides(), face, f => SetFaceFullbright(f, bright))) break;
+                    part.UpdateTextureEntry(te);
                     break;
                 }
 
@@ -7738,13 +7739,9 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     // Shininess Low = 0x40 .. High = 0xC0); anything else is none (Halcyon and YEngine SetShiny). The bump
                     // keeps to its five bits (BUMP_MASK 0x1F) so it cannot write the fullbright or shiny bits.
                     Shininess shinyBits = shiny >= 0 && shiny <= 3 ? (Shininess)(shiny << 6) : Shininess.None;
-                    void ApplyBS(Primitive.TextureEntryFace f) {
-                        f.Shiny = shinyBits;
-                        f.Bump  = (Bumpiness)(bump & 0x1F);
-                    }
-                    if (face == ALL_SIDES) { for (int i = 0; i < 8; i++) ApplyBS(te.CreateFace((uint)i)); }
-                    else { try { ApplyBS(te.CreateFace((uint)face)); } catch { } }
-                    part.UpdateTextureEntry(te.GetBytes());
+                    Bumpiness bumpBits = (Bumpiness)(bump & 0x1F);
+                    if (!WriteFaces(te, part.GetNumberOfSides(), face, f => SetFaceBumpShiny(f, shinyBits, bumpBits))) break;
+                    part.UpdateTextureEntry(te);
                     break;
                 }
 
@@ -8011,7 +8008,13 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     // faces planar, any other mode default. SL: it "silently fails if its face value indicates a
                     // face that does not exist." The scene's own helper, which OpenSim's LSL_Api uses too.
                     if (data[idx] is not int face || data[idx + 1] is not int mode) break;
-                    OpenSim.Region.ScriptEngine.Shared.Api.LSL_Api.SetTexGen(part, face, mode);
+                    // Written here and not through LSL_Api.SetTexGen: that helper (YEngine's) compares against the
+                    // face's own stored value, which leaves a face that inherits the planar mapping from the default
+                    // unchanged when it is set back to default (see SetFaceTexGen).
+                    Primitive.TextureEntry texgenEntry = part.Shape.Textures ?? new Primitive.TextureEntry(UUID.Zero);
+                    MappingType mapping = mode == PRIM_TEXGEN_PLANAR ? MappingType.Planar : MappingType.Default;
+                    if (!WriteFaces(texgenEntry, part.GetNumberOfSides(), face, f => SetFaceTexGen(f, mapping))) break;
+                    part.UpdateTextureEntry(texgenEntry);
                     break;
                 }
 
@@ -8870,6 +8873,55 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         /// none for a face the prim does not have (Halcyon GetPrimParams; SL: ALL_SIDES gives one entry per face). An
         /// entry is null when the prim has no texture entry at all.
         /// </summary>
+        // ---- per-face material writes ----
+        //
+        // OpenMetaverse's TextureEntryFace setters for the material byte (bump, shiny, fullbright) and the media byte
+        // (texture mapping) compare the new value with the byte the face stores itself, which is zero while the face
+        // has no value of its own, instead of the value it inherits from the default face. Writing a value whose byte
+        // is zero (fullbright off, bump none, mapping default) to a face that inherits a non-zero byte is therefore
+        // dropped and the face keeps the default's value (libopenmetaverse TextureEntry.cs, the Bump, Shiny,
+        // Fullbright, MediaFlags and TexMapType setters). The helpers below skip a face that already shows the value
+        // and otherwise write a non-zero value first, which gives the face a value of its own, so the real write
+        // that follows is compared with what the face holds.
+
+        // Applies write to the face (or, for ALL_SIDES, to the default face and to each of the prim's own faces that has
+        // an entry). A face number the prim lacks is ignored, as in SL; false means nothing was written.
+        private static bool WriteFaces(Primitive.TextureEntry te, int sides, int face, Action<Primitive.TextureEntryFace> write)
+        {
+            if (face == ALL_SIDES)
+            {
+                write(te.DefaultTexture);
+                for (int i = 0; i < sides && i < te.FaceTextures.Length; i++)
+                    if (te.FaceTextures[i] != null) write(te.FaceTextures[i]);
+                return true;
+            }
+            if (face < 0 || face >= sides) return false;
+            write(te.CreateFace((uint)face));
+            return true;
+        }
+
+        private static void SetFaceFullbright(Primitive.TextureEntryFace f, bool bright)
+        {
+            if (f.Fullbright == bright) return;
+            if (!bright) f.Fullbright = true;
+            f.Fullbright = bright;
+        }
+
+        private static void SetFaceBumpShiny(Primitive.TextureEntryFace f, Shininess shiny, Bumpiness bump)
+        {
+            if (f.Shiny == shiny && f.Bump == bump) return;
+            f.Bump = Bumpiness.Brightness;
+            f.Shiny = shiny;
+            f.Bump = bump;
+        }
+
+        private static void SetFaceTexGen(Primitive.TextureEntryFace f, MappingType mapping)
+        {
+            if (f.TexMapType == mapping) return;
+            f.TexMapType = MappingType.Planar;
+            f.TexMapType = mapping;
+        }
+
         private static IEnumerable<Primitive.TextureEntryFace> FacesRead(SceneObjectPart part, int face)
         {
             int sides = part.GetNumberOfSides();
