@@ -1182,9 +1182,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             return prim;
         }
 
-        // Fixed-shape fast path: an UN-CUT box / sphere / cylinder prim (never a mesh or sculpt part: its shape fields hold a face
-        // count or a sculpt type, not its shape) cooks straight to a
-        // Jolt primitive with NO meshmerizer. Classification matches what a real viewer/OAR prim
+        // Fixed-shape fast path: an UN-CUT box / sphere / cylinder prim cooks straight to a
+        // Jolt primitive with NO meshmerizer. A mesh or sculpt part never does: its shape is its asset's, not what its
+        // profile and path fields say. Classification matches what a real viewer/OAR prim
         // carries (canonical ProfileShape+Extrusion), NOT PrimitiveBaseShape.CreateCylinder() - whose
         // factory emits Square+Curve1 (an SL "tube"), a known OpenSim quirk. Anything else (cut/hollow/
         // twisted, sculpt/mesh, non-uniform sphere/cylinder) goes to the IMesher path - a
