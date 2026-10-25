@@ -1182,7 +1182,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             return prim;
         }
 
-        // Fixed-shape fast path: an UN-CUT box / sphere / cylinder cooks straight to a
+        // Fixed-shape fast path: an UN-CUT box / sphere / cylinder prim (never a mesh or sculpt part: its shape fields hold a face
+        // count or a sculpt type, not its shape) cooks straight to a
         // Jolt primitive with NO meshmerizer. Classification matches what a real viewer/OAR prim
         // carries (canonical ProfileShape+Extrusion), NOT PrimitiveBaseShape.CreateCylinder() - whose
         // factory emits Square+Curve1 (an SL "tube"), a known OpenSim quirk. Anything else (cut/hollow/
@@ -1221,7 +1222,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             massVolume = 0.0;
             float hx = size.X * 0.5f, hy = size.Y * 0.5f, hz = size.Z * 0.5f;
 
-            if (pbs != null && PrimHasNoCuts(pbs))
+            // The native shapes are for a prim made from its own profile and path. A mesh or sculpt part's profile and path fields
+            // are not its shape: an upload writes its face count there (PrimitiveBaseShape.CreateMesh: 6 faces is a square profile on
+            // a straight path, 3 faces a circle profile on a straight path), so such a part can show no cuts and still be any shape.
+            // Its shape is its asset's, and goes through the mesher.
+            if (pbs != null && !IsMeshPrim(pbs) && !IsSculptPrim(pbs) && PrimHasNoCuts(pbs))
             {
                 byte path = pbs.PathCurve;
                 ProfileShape profile = pbs.ProfileShape;
