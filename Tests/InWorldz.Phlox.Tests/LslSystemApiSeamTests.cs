@@ -24,7 +24,7 @@ namespace InWorldz.Phlox.Tests;
 public class LslSystemApiSeamTests
 {
     static bool IsFunction(MethodInfo m)
-        => !m.IsStatic && !m.IsSpecialName && System.Text.RegularExpressions.Regex.IsMatch(m.Name, "^(ll|os|iw|bot)[A-Z]");
+        => !m.IsStatic && !m.IsSpecialName && System.Text.RegularExpressions.Regex.IsMatch(m.Name, "^(ll|os|iw|bot)[A-Za-z]");
 
     static string TypeName(Type t) => t.FullName ?? t.Name;
 
