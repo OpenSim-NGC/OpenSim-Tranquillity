@@ -657,7 +657,7 @@ namespace Phlox.ScriptEngine
         /// The SensorRepeat and Control records stay, and listens stay registered (a stopped script's chat is dropped by
         /// the scheduler), so a start carries on with them through OnScriptInjected.
         /// </summary>
-        internal void OnScriptStopped()
+        public void OnScriptStopped()
         {
             PauseSensorForParcel();
             m_PendingDataserver.Clear();
@@ -673,7 +673,7 @@ namespace Phlox.ScriptEngine
         /// failed crossing leaves the object here, so they keep working; a crossing that succeeds removes the script here,
         /// and that unload releases them (ReleaseScriptResources).
         /// </summary>
-        internal void OnCrossingHold()
+        public void OnCrossingHold()
         {
             PauseSensorForParcel();
             m_PendingDataserver.Clear();
@@ -5165,14 +5165,14 @@ namespace Phlox.ScriptEngine
         internal SceneObjectPart HostPart => m_host;
 
         /// <summary>A parcel pause stops the sensor repeat; the record in MiscAttributes stays for the resume.</summary>
-        internal void PauseSensorForParcel()
+        public void PauseSensorForParcel()
         {
             if (m_thisScript?.ScriptState?.MiscAttributes?.ContainsKey((int)RuntimeState.MiscAttr.SensorRepeat) == true)
                 m_ScriptEngine.AsyncCommands?.SensorRepeatPlugin.UnSetSenseRepeaterEvents(m_localID, m_itemID);
         }
 
         /// <summary>The resume starts the sensor repeat again from its record, as a state restore does.</summary>
-        internal void RestoreSensorAfterParcel()
+        public void RestoreSensorAfterParcel()
         {
             if (m_thisScript?.ScriptState?.MiscAttributes != null
                 && m_thisScript.ScriptState.MiscAttributes.TryGetValue((int)RuntimeState.MiscAttr.SensorRepeat, out object[] s))
