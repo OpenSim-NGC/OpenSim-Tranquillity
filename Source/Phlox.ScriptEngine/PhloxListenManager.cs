@@ -213,6 +213,14 @@ namespace Phlox.ScriptEngine
             m_ShoutDistance = shoutDistance;
         }
 
+        /// <summary>The manager of an engine that is not Phlox's scheduler.</summary>
+        public PhloxListenManager(IListenEventSink sink, Scene scene,
+                                  int whisperDistance, int sayDistance, int shoutDistance,
+                                  int maxListensPerScript, int maxListensPerRegion)
+            : this((PhloxExecutionScheduler)null, scene, whisperDistance, sayDistance, shoutDistance, maxListensPerScript, maxListensPerRegion)
+        {
+        }
+
         // ── Called from llListen ───────────────────────────────────────────────
 
         public int Add(uint localID, UUID itemID, UUID hostID,

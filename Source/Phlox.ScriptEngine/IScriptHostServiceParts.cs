@@ -45,4 +45,23 @@ namespace Phlox.ScriptEngine
     {
         void ScriptChanged(IScriptRuntimeAccess script);
     }
+
+    /// <summary>
+    /// What the listen manager needs of the script engine that owns it: where a heard message goes, the engine's settings,
+    /// and the three calls it makes about a script (mark it for saving, tell its owner of an error, wake the engine).
+    /// PhloxExecutionScheduler implements it for Phlox.
+    /// </summary>
+    public interface IListenEventSink
+    {
+        /// <summary>The engine's own settings section; may be null.</summary>
+        Nini.Config.IConfig EngineConfig { get; }
+        /// <summary>Queues a heard message (a listen event) for the script.</summary>
+        void PostEvent(UUID itemId, InWorldz.Phlox.VM.PostedEvent evt);
+        /// <summary>The script changed outside any event of its own (a listen switched off), so it is marked for saving.</summary>
+        void ScriptChangedOutsideARun(UUID itemId);
+        /// <summary>Tells the script's owner of an error, on the debug channel.</summary>
+        void ShoutError(UUID itemId, string message);
+        /// <summary>Asks the engine to run its next pass.</summary>
+        void Wake();
+    }
 }
