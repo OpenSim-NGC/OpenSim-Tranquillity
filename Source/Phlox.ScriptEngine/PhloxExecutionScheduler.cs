@@ -55,7 +55,7 @@ using SysLinkedListNode = System.Collections.Generic.LinkedListNode<InWorldz.Phl
 
 namespace Phlox.ScriptEngine
 {
-    internal class PhloxExecutionScheduler
+    internal class PhloxExecutionScheduler : IListenEventSink
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -738,6 +738,11 @@ namespace Phlox.ScriptEngine
 
         /// <summary>A pass with nothing posted, so the next wake takes in a log line that became due from another thread.</summary>
         internal void Wake() => m_WorkArrived?.Invoke();
+
+        void IListenEventSink.Wake() => Wake();
+        Nini.Config.IConfig IListenEventSink.EngineConfig => EngineConfig;
+        void IListenEventSink.ScriptChangedOutsideARun(UUID itemId) => ScriptChangedOutsideARun(itemId);
+        void IListenEventSink.ShoutError(UUID itemId, string message) => FindScript(itemId)?.ShoutError(message);
 
         public void PostEvent(UUID itemId, PostedEvent evt)
         {

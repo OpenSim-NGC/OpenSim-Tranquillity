@@ -59,11 +59,11 @@ namespace Phlox.ScriptEngine
         public ActiveListen Saved;
     }
 
-    internal class PhloxListenManager : IScriptListenService
+    public class PhloxListenManager : IScriptListenService
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
-        private readonly PhloxExecutionScheduler m_Scheduler;
+        private readonly IListenEventSink m_Scheduler;
         private readonly object m_Lock = new();
 
         /// <summary>The listen events per second one script may receive with no [InWorldz.Phlox] MaxListenEventsPerSecond.</summary>
@@ -184,12 +184,12 @@ namespace Phlox.ScriptEngine
         private readonly float m_SayDistance;
         private readonly float m_ShoutDistance;
 
-        public PhloxListenManager(PhloxExecutionScheduler scheduler)
+        public PhloxListenManager(IListenEventSink scheduler)
             : this(scheduler, null, DefaultWhisperDistance, DefaultSayDistance, DefaultShoutDistance)
         {
         }
 
-        public PhloxListenManager(PhloxExecutionScheduler scheduler, Scene scene,
+        public PhloxListenManager(IListenEventSink scheduler, Scene scene,
                                   int whisperDistance, int sayDistance, int shoutDistance)
             : this(scheduler, scene, whisperDistance, sayDistance, shoutDistance,
                    DefaultMaxListensPerScript, DefaultMaxListensPerRegion)
@@ -198,7 +198,7 @@ namespace Phlox.ScriptEngine
 
         /// <param name="maxListensPerScript">From <see cref="ReadListenCaps"/>.</param>
         /// <param name="maxListensPerRegion">From <see cref="ReadListenCaps"/>.</param>
-        public PhloxListenManager(PhloxExecutionScheduler scheduler, Scene scene,
+        public PhloxListenManager(IListenEventSink scheduler, Scene scene,
                                   int whisperDistance, int sayDistance, int shoutDistance,
                                   int maxListensPerScript, int maxListensPerRegion)
         {
@@ -211,14 +211,6 @@ namespace Phlox.ScriptEngine
             m_WhisperDistance = whisperDistance;
             m_SayDistance = sayDistance;
             m_ShoutDistance = shoutDistance;
-        }
-
-        /// <summary>The manager of an engine that is not Phlox's scheduler.</summary>
-        public PhloxListenManager(IListenEventSink sink, Scene scene,
-                                  int whisperDistance, int sayDistance, int shoutDistance,
-                                  int maxListensPerScript, int maxListensPerRegion)
-            : this((PhloxExecutionScheduler)null, scene, whisperDistance, sayDistance, shoutDistance, maxListensPerScript, maxListensPerRegion)
-        {
         }
 
         // ── Called from llListen ───────────────────────────────────────────────
@@ -642,7 +634,7 @@ namespace Phlox.ScriptEngine
                         ScriptRegex.TimedOutMessage, entry.Handle, entry.ItemID);
                     // The switch-off happens outside any event of the script, so the script is marked for saving here.
                     m_Scheduler.ScriptChangedOutsideARun(entry.ItemID);
-                    try { m_Scheduler.FindScript(entry.ItemID)?.ShoutError(ListenRegexTimedOutNotice); }
+                    try { m_Scheduler.ShoutError(entry.ItemID, ListenRegexTimedOutNotice); }
                     catch (Exception e) { m_log.LogWarning("[PhloxListen]: could not tell the owner: {0}", e.Message); }
                 }
                 return false;
