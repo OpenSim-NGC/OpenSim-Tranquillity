@@ -95,6 +95,7 @@ namespace Phlox.ScriptEngine
 
         // The members that are public here already satisfy the interface. The ones below are internal or have an
         // internal type, so the interface gets them through these.
+        IScriptEngine IScriptHostServices.ScriptEngine => this;
         PhloxNotecardCache IScriptHostServices.NotecardCache => NotecardCache;
         int IScriptHostServices.PhysicsFrameTimeAvg => PhysicsFrameTimeAvg;
         IScriptOsslChecks IScriptHostServices.Ossl => Ossl;

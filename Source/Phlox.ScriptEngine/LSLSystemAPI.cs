@@ -192,13 +192,22 @@ namespace Phlox.ScriptEngine
         private static readonly RateLimitedLog s_returnByIdLog = new();
         private static readonly RateLimitedLog s_experienceGrantedLog = new();
 
-        protected PhloxEngine m_ScriptEngine;
+        protected IScriptHostServices m_ScriptEngine;
         protected SceneObjectPart m_host;
         protected uint m_localID;
         protected UUID m_itemID;
 
-        private Interpreter m_thisScript;
-        public Interpreter Script { get => m_thisScript; set => m_thisScript = value; }
+        private IScriptRuntimeAccess m_thisScript;
+
+        /// <summary>Phlox's interpreter for the script; null when the script is served by another engine.</summary>
+        public Interpreter Script
+        {
+            get => (m_thisScript as InterpreterAccess)?.Interpreter;
+            set => m_thisScript = value == null ? null : new InterpreterAccess(value);
+        }
+
+        /// <summary>The script as the API sees it. Phlox sets it through <see cref="Script"/>; another engine sets it directly.</summary>
+        public IScriptRuntimeAccess RuntimeAccess { get => m_thisScript; set => m_thisScript = value; }
         public Scene World => m_ScriptEngine.World;
 
         // Thread-local Random so each scheduler thread gets its own seeded instance;
@@ -208,23 +217,18 @@ namespace Phlox.ScriptEngine
         private static Random ThreadRandom => s_threadRandom ??= new Random();
 
         public LSLSystemAPI(PhloxEngine engine, SceneObjectPart host, uint localID, UUID itemID)
+            : this((IScriptHostServices)engine, host, localID, itemID)
         {
-            m_ScriptEngine = engine;
-            m_host = host;
-            m_localID = localID;
-            m_itemID = itemID;
         }
 
-        // Stub: not wired yet.
+        /// <summary>The API for a script of any engine that provides the host services.</summary>
         public LSLSystemAPI(IScriptHostServices services, SceneObjectPart host, uint localID, UUID itemID)
         {
+            m_ScriptEngine = services;
             m_host = host;
             m_localID = localID;
             m_itemID = itemID;
         }
-
-        // Stub: not wired yet.
-        public IScriptRuntimeAccess RuntimeAccess { get; set; }
 
         // ── Helpers ────────────────────────────────────────────────────────────
 
@@ -556,8 +560,8 @@ namespace Phlox.ScriptEngine
             if (m_thisScript.ScriptState.GeneralEnable && m_thisScript.ScriptState.Enabled
                 && m_thisScript.ScriptState.LocalDisable == RuntimeState.LocalDisableFlag.None)
             {
-                foreach (var evt in m_thisScript.Script.StateEvents[m_thisScript.ScriptState.LSLState])
-                    flags |= MapEventFlag((SupportedEventList.Events)evt.EventType);
+                foreach (int evt in m_thisScript.EventTypesHandledIn(m_thisScript.ScriptState.LSLState))
+                    flags |= MapEventFlag((SupportedEventList.Events)evt);
             }
             m_host.SetScriptEvents(m_itemID, flags);
         }
@@ -740,7 +744,7 @@ namespace Phlox.ScriptEngine
             {
                 // Halcyon ScriptLoader: AsyncCommandManager.RemoveScript(engine, localId, itemId) - sensor, HTTP, XML-RPC
                 if (m_ScriptEngine != null && async != null)
-                    Phlox.ScriptEngine.AsyncCommand.AsyncCommandManager.RemoveScript(m_ScriptEngine, m_localID, m_itemID);
+                    Phlox.ScriptEngine.AsyncCommand.AsyncCommandManager.RemoveScript(m_ScriptEngine.ScriptEngine, m_localID, m_itemID);
             }
             else
             {
@@ -2981,7 +2985,7 @@ namespace Phlox.ScriptEngine
         {
             var others = new List<OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine>();
             foreach (IScriptModule m in World?.RequestModuleInterfaces<IScriptModule>() ?? Array.Empty<IScriptModule>())
-                if (!ReferenceEquals(m, m_ScriptEngine) && m is OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine e && !others.Contains(e))
+                if (!ReferenceEquals(m, m_ScriptEngine.ScriptModule) && m is OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine e && !others.Contains(e))
                     others.Add(e);
             if (others.Count == 0) return;
 
@@ -12765,7 +12769,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             OsslCheck(TlModerate, "osRequestURL");
             IUrlModule urlMod = World?.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return UUID.Zero.ToString();
-            return urlMod.RequestURL(m_ScriptEngine, m_host, m_itemID, OsslUrlOptions(options)).ToString();
+            return urlMod.RequestURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, OsslUrlOptions(options)).ToString();
         }
 
         /// <summary>OSSL_Api.cs:4633-4647 - Moderate.</summary>
@@ -12774,7 +12778,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             OsslCheck(TlModerate, "osRequestSecureURL");
             IUrlModule urlMod = World?.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return UUID.Zero.ToString();
-            return urlMod.RequestSecureURL(m_ScriptEngine, m_host, m_itemID, OsslUrlOptions(options)).ToString();
+            return urlMod.RequestSecureURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, OsslUrlOptions(options)).ToString();
         }
 
         /// <summary>OSSL_Api.cs:2697-2710 - VeryLow. Regex replace of at most count matches from start (negative start counts from the end).</summary>
@@ -15065,7 +15069,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             IUrlModule urlMod = World.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return UUID.Zero.ToString();
-            UUID reqID = urlMod.RequestURL(m_ScriptEngine, m_host, m_itemID, null);
+            UUID reqID = urlMod.RequestURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, null);
             return reqID.ToString();
         }
 
@@ -15073,7 +15077,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         {
             IUrlModule urlMod = World.RequestModuleInterface<IUrlModule>();
             if (urlMod == null) return UUID.Zero.ToString();
-            UUID reqID = urlMod.RequestSecureURL(m_ScriptEngine, m_host, m_itemID, null);
+            UUID reqID = urlMod.RequestSecureURL(m_ScriptEngine.ScriptModule, m_host, m_itemID, null);
             return reqID.ToString();
         }
 

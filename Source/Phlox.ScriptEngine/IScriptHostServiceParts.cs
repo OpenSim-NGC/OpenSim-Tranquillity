@@ -23,6 +23,8 @@ namespace Phlox.ScriptEngine
         void SetActive(UUID itemID, int handle, bool active);
         void Remove(UUID itemID, int handle);
         void Remove(UUID itemID);
+        /// <summary>The script is being unloaded: its listens go, and the record of them the script keeps stays.</summary>
+        void Forget(UUID itemID);
         void DeliverChat(ChatTypeEnum type, int channel, string speakerName, UUID speakerKey, string message, Vector3 speakerPosition, UUID destId);
     }
 

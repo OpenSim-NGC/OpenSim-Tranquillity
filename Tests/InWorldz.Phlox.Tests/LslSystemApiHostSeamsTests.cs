@@ -15,6 +15,7 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api.Interfaces;
 using Phlox.ScriptEngine;
@@ -47,6 +48,7 @@ public class LslSystemApiHostSeamsTests
         public void SetActive(UUID itemID, int handle, bool active) => Controlled.Add((itemID, handle, active));
         public void Remove(UUID itemID, int handle) => Removed.Add((itemID, handle));
         public void Remove(UUID itemID) => Removed.Add((itemID, 0));
+        public void Forget(UUID itemID) { }
         public void DeliverChat(ChatTypeEnum type, int channel, string speakerName, UUID speakerKey, string message, Vector3 speakerPosition, UUID destId) { }
     }
 
@@ -62,6 +64,7 @@ public class LslSystemApiHostSeamsTests
         public Scene World => null;
         public IConfigSource ConfigSource => null;
         public IScriptModule ScriptModule => null;
+        public IScriptEngine ScriptEngine => null;
         public ServiceCallDeferralMode ServiceCallDeferral => ServiceCallDeferralMode.Auto;
         public bool AllowGodFunctions => false;
         public bool AutomaticLinkPermission => false;

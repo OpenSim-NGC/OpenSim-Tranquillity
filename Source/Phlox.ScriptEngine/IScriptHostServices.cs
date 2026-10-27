@@ -11,6 +11,7 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using Phlox.ScriptEngine.AsyncCommand;
 
@@ -28,6 +29,8 @@ namespace Phlox.ScriptEngine
         Scene World { get; }
         IConfigSource ConfigSource { get; }
         IScriptModule ScriptModule { get; }
+        /// <summary>The engine as the asynchronous command plugins and the other engines know it.</summary>
+        IScriptEngine ScriptEngine { get; }
         ServiceCallDeferralMode ServiceCallDeferral { get; }
         bool AllowGodFunctions { get; }
         bool AutomaticLinkPermission { get; }
