@@ -90,7 +90,7 @@ namespace Phlox.ScriptEngine
         /// </summary>
         public OsslGate(IConfigSource config, string engineSection)
         {
-            m_osslconfig = config?.Configs["OSSL"] ?? config?.Configs["InWorldz.Phlox"];
+            m_osslconfig = config?.Configs["OSSL"] ?? config?.Configs[engineSection];
             m_enabled = m_osslconfig?.GetBoolean("AllowOSFunctions", true) ?? true;
             m_errorToOwner = m_osslconfig?.GetBoolean("PermissionErrorToOwner", false) ?? false;
             string risk = m_osslconfig?.GetString("OSFunctionThreatLevel", "VeryLow") ?? "VeryLow";
