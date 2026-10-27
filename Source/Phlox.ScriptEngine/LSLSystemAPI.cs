@@ -215,6 +215,17 @@ namespace Phlox.ScriptEngine
             m_itemID = itemID;
         }
 
+        // Stub: not wired yet.
+        public LSLSystemAPI(IScriptHostServices services, SceneObjectPart host, uint localID, UUID itemID)
+        {
+            m_host = host;
+            m_localID = localID;
+            m_itemID = itemID;
+        }
+
+        // Stub: not wired yet.
+        public IScriptRuntimeAccess RuntimeAccess { get; set; }
+
         // ── Helpers ────────────────────────────────────────────────────────────
 
         private void Stub(string name) =>

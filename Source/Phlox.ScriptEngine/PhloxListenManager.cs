@@ -59,7 +59,7 @@ namespace Phlox.ScriptEngine
         public ActiveListen Saved;
     }
 
-    internal class PhloxListenManager
+    internal class PhloxListenManager : IScriptListenService
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 

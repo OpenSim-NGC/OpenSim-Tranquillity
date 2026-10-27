@@ -55,7 +55,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Phlox.ScriptEngine
 {
-    internal sealed class OsslGate
+    internal sealed class OsslGate : IScriptOsslChecks
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(OsslGate));
 

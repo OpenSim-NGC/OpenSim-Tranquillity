@@ -55,13 +55,13 @@ using OpenMetaverse;
 
 namespace Phlox.ScriptEngine
 {
-    internal sealed class PhloxNotecardCache
+    public sealed class PhloxNotecardCache
     {
         /// <summary>Halcyon's NOTECARD_CACHE_TIMEOUT: 60 seconds since the last read, in ms of the engine's clock.</summary>
         public const ulong NOTECARD_CACHE_TIMEOUT_MS = 60_000;
 
         /// <summary>One notecard's text as the read calls see it.</summary>
-        internal sealed class Card
+        public sealed class Card
         {
             private readonly string[] m_lines;
 
