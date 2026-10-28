@@ -593,6 +593,8 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>The engine named in the script's own header if loaded, or this region's default.</summary>
+        internal static string ChosenEngineName(Scene scene, TaskInventoryItem item) => null;
+
         private string ScriptEngineNameFor(TaskInventoryItem item)
         {
             try
