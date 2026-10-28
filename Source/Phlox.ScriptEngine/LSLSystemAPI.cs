@@ -864,7 +864,7 @@ namespace Phlox.ScriptEngine
         /// SL: the script loses PERMISSION_TAKE_CONTROLS "on reset, or if the object is deleted, detached, or dropped"
         /// (llTakeControls). Every restore calls this after the saved grant is decided, before anything runs.
         /// </summary>
-        internal void DropGrantRecordsWithoutGrant()
+        public void DropGrantRecordsWithoutGrant()
         {
             var misc = m_thisScript?.ScriptState?.MiscAttributes;
             if (misc == null) return;
@@ -934,7 +934,7 @@ namespace Phlox.ScriptEngine
         /// event waiting on its queue: no Experience gave this script a grant.
         /// </para>
         /// </summary>
-        internal void RestoreSavedGrant(bool carried)
+        public void RestoreSavedGrant(bool carried)
         {
             m_grantClaim = null;
             RuntimeState st = m_thisScript?.ScriptState;
@@ -1187,7 +1187,7 @@ namespace Phlox.ScriptEngine
         /// The grant this script's state carries to its next region: the item's grant, else a claim still waiting for its
         /// granter, as it was carried here and marked unverified. Scheduler thread, before the capture.
         /// </summary>
-        internal void NoteGrantForCarry()
+        public void NoteGrantForCarry()
         {
             RuntimeState st = m_thisScript?.ScriptState;
             TaskInventoryItem item = GetInventorySelf();
