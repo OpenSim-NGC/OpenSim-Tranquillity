@@ -59,25 +59,25 @@ public class ScriptEngineSelectionTests : OpenSimTestCase
     [Fact]
     public void A_header_alias_gives_the_script_to_the_engine_that_names_it()
     {
-        var alpha = new Engine("Alpha") { HeaderAliases = new[] { "Al" } };
+        var alpha = new Engine("Alpha") { HeaderAliases = new[] { "Alf" } };
         var beta = new Engine("Beta");
         Scene scene = Region(beta, alpha);
 
-        Assert.Same(alpha, scene.ResolveScriptEngine("Beta", "//Al:\ndefault {}"));
-        Assert.Same(alpha, scene.ResolveScriptEngine("Beta", "//Al:slua\nprint(1)"));
+        Assert.Same(alpha, scene.ResolveScriptEngine("Beta", "//Alf:\ndefault {}"));
+        Assert.Same(alpha, scene.ResolveScriptEngine("Beta", "//Alf:slua\nprint(1)"));
         Assert.Same(alpha, scene.ResolveScriptEngine("Beta", "//Alpha:\ndefault {}"));   // its own name still works
-        Assert.Same(beta, scene.ResolveScriptEngine("Beta", "//Be:\ndefault {}"));       // an unknown name is no header
+        Assert.Same(beta, scene.ResolveScriptEngine("Beta", "//Bex:\ndefault {}"));       // an unknown name is no header
     }
 
     [Fact]
     public void An_alias_is_compared_as_written_like_an_engine_name()
     {
-        var alpha = new Engine("Alpha") { HeaderAliases = new[] { "Al" } };
+        var alpha = new Engine("Alpha") { HeaderAliases = new[] { "Alf" } };
         var beta = new Engine("Beta");
         Scene scene = Region(beta, alpha);
 
-        Assert.Same(alpha, scene.ResolveScriptEngine("Beta", "//Al:\ndefault {}"));
-        Assert.Same(beta, scene.ResolveScriptEngine("Beta", "//al:\ndefault {}"));
+        Assert.Same(alpha, scene.ResolveScriptEngine("Beta", "//Alf:\ndefault {}"));
+        Assert.Same(beta, scene.ResolveScriptEngine("Beta", "//alf:\ndefault {}"));
     }
 
     [Fact]

@@ -68,6 +68,12 @@ namespace Phlox.ScriptEngine
         /// <summary>Phlox's engine name (PhloxEngine.Name), the name its own header carries.</summary>
         internal const string PhloxName = "InWorldz.Phlox";
 
+        /// <summary>The shorter name a first line may use for Phlox ("//Phlox:"), read as written like the long one.</summary>
+        internal const string PhloxAlias = "Phlox";
+
+        /// <summary>Does a name read from a first line mean Phlox: its engine name or its alias?</summary>
+        internal static bool IsPhloxName(string name) => name == PhloxName || name == PhloxAlias;
+
         /// <summary>
         /// The language part of the first line ("//&lt;engine&gt;:&lt;language&gt;"), or "" for none. YEngine's parse, call for
         /// call (XMREngine.OnRezScript): the text after the first ':' when at least two characters follow it, trimmed and
@@ -99,8 +105,8 @@ namespace Phlox.ScriptEngine
             {
                 foreach (string loaded in loadedEngines)
                 {
-                    if (loaded == named)
-                        return named;
+                    if (loaded == named || (loaded == PhloxName && named == PhloxAlias))
+                        return loaded;
                 }
             }
             return defaultEngine;

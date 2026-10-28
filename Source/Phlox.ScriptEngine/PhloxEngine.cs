@@ -95,7 +95,10 @@ namespace Phlox.ScriptEngine
 
         public string Name => PhloxEngineHeader.PhloxName;
 
-        public IReadOnlyList<string> HeaderAliases => Array.Empty<string>();
+        private static readonly string[] s_headerAliases = { PhloxEngineHeader.PhloxAlias };
+
+        /// <summary>"//Phlox:" gives a script to this engine as "//InWorldz.Phlox:" does.</summary>
+        public IReadOnlyList<string> HeaderAliases => s_headerAliases;
 
         public bool ClaimsScript(string scriptSource) => false;
         public Type ReplaceableInterface => null;
