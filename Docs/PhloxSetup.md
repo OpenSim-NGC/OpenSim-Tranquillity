@@ -56,7 +56,10 @@ default { state_entry() { llOwnerSay("I run on YEngine"); } }
 - **Form.** The header is `//` followed by the engine name and a colon. It must be the very
   first characters of the script, with no blank line or space before it, and the first line
   must end with a line break.
-- **Names.** `//YEngine:` keeps a script on YEngine; `//InWorldz.Phlox:` puts it on Phlox.
+- **Names.** `//YEngine:` keeps a script on YEngine; `//InWorldz.Phlox:` puts it on Phlox. `//Phlox:` is a
+  shorter name for the same engine and is read everywhere `//InWorldz.Phlox:` is, language part included.
+  Names are compared as written, so `//phlox:` names nothing. Only the Phlox names put a script on Phlox
+  whatever the default; `DefaultScriptEngine` still takes the full name `InWorldz.Phlox`.
 - **Unknown names.** A header naming an engine that is not loaded in the region is ignored,
   and saved-state routing applies, with the default engine as the final fallback.
 - **The language part.** Text after the colon is a language name. Both engines read it the
