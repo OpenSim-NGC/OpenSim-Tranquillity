@@ -587,6 +587,12 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
+        /// A script engine's check before an error is spoken on DEBUG_CHANNEL: when it returns false the shout is left out (the engine says it
+        /// itself, for example as a count of repeats). Null, as Phlox leaves it, speaks every error.
+        /// </summary>
+        public Func<string, bool> ShoutErrorFilter { get; set; }
+
+        /// <summary>
         /// Run-time errors go out on DEBUG_CHANNEL, as SL does (https://wiki.secondlife.com/wiki/DEBUG_CHANNEL
         /// describes it as a
         /// chat channel set aside for debugging output and error reports from scripts; viewers route it to the
@@ -599,6 +605,8 @@ namespace Phlox.ScriptEngine
         /// </summary>
         public void ShoutError(string errorText)
         {
+            if (ShoutErrorFilter != null && !ShoutErrorFilter(errorText))
+                return;
             HostSimChat(CapChatBytes("Script error: " + errorText), ChatTypeEnum.Say, DEBUG_CHANNEL);
         }
 
