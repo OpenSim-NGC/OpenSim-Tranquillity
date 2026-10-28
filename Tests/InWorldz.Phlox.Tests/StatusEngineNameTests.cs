@@ -35,6 +35,9 @@ public class StatusEngineNameTests
     private static (Scene scene, TaskInventoryItem item) Region(string source, Engine phlox, Engine other)
     {
         Scene scene = new SceneHelpers().SetupScene();
+        // The test scene reads no [Startup] section, so it has no default engine until one is set.
+        typeof(Scene).GetField("m_defaultScriptEngine", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+            .SetValue(scene, phlox.ScriptEngineName);
         scene.StackModuleInterface<IScriptModule>(phlox);
         scene.StackModuleInterface<IScriptModule>(other);
         SceneObjectGroup group = SceneHelpers.AddSceneObject(scene);
@@ -45,31 +48,31 @@ public class StatusEngineNameTests
     [Fact]
     public void TheStatusNamesTheEngineTheRegionChoseNotJustTheOneTheHeaderSuggests()
     {
-        var phlox = new Engine("InWorldz.Phlox");
+        var phlox = new Engine("YEngine");
         var other = new Engine("SLua") { Claims = true };
         var (scene, item) = Region("--!slua\nprint(1)", phlox, other);
 
         Assert.Equal("SLua", PhloxEngine.ChosenEngineName(scene, item));          // claimed
         other.Claims = false;
-        Assert.Equal("InWorldz.Phlox", PhloxEngine.ChosenEngineName(scene, item)); // not claimed: the default
+        Assert.Equal("YEngine", PhloxEngine.ChosenEngineName(scene, item)); // not claimed: the default
     }
 
     [Fact]
     public void TheStatusNamesTheEngineThatHoldsTheScriptsSavedState()
     {
-        var phlox = new Engine("InWorldz.Phlox");
+        var phlox = new Engine("YEngine");
         var other = new Engine("SLua") { Claims = true };
         var (scene, item) = Region("--!slua\nprint(1)", phlox, other);
 
         Assert.Equal("SLua", PhloxEngine.ChosenEngineName(scene, item));
         phlox.HoldsState = true;
-        Assert.Equal("InWorldz.Phlox", PhloxEngine.ChosenEngineName(scene, item));
+        Assert.Equal("YEngine", PhloxEngine.ChosenEngineName(scene, item));
     }
 
     [Fact]
     public void AScriptTheRegionHasNoEngineForIsNamedUnknown()
     {
-        var phlox = new Engine("InWorldz.Phlox");
+        var phlox = new Engine("YEngine");
         var other = new Engine("SLua") { Claims = true };
         var (scene, item) = Region("--!slua\nprint(1)", phlox, other);
 

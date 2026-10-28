@@ -592,17 +592,20 @@ namespace Phlox.ScriptEngine
             MainConsole.Instance.Output("  and no prim in this region holds an inventory item with that id.");
         }
 
-        /// <summary>The engine named in the script's own header if loaded, or this region's default.</summary>
-        internal static string ChosenEngineName(Scene scene, TaskInventoryItem item) => null;
+        /// <summary>The engine the region chose for this script: its header, saved state, a claim, or the default.</summary>
+        private string ScriptEngineNameFor(TaskInventoryItem item) => ChosenEngineName(m_Scene, item);
 
-        private string ScriptEngineNameFor(TaskInventoryItem item)
+        /// <summary>
+        /// The name of the engine <see cref="Scene.ResolveScriptEngine"/> gives the script, as the region decides it at a
+        /// rez, or "(unknown)" when the script, its asset or an engine for it cannot be found.
+        /// </summary>
+        internal static string ChosenEngineName(Scene scene, TaskInventoryItem item)
         {
             try
             {
-                string engine = m_Scene?.DefaultScriptEngine;
-                AssetBase asset = m_Scene?.AssetService?.Get(item.AssetID.ToString());
-                if (asset?.Data != null)
-                    engine = PhloxEngineHeader.Owner(OpenMetaverse.Utils.BytesToString(asset.Data), engine, LoadedEngineNames());
+                AssetBase asset = scene?.AssetService?.Get(item.AssetID.ToString());
+                string source = asset?.Data != null ? OpenMetaverse.Utils.BytesToString(asset.Data) : null;
+                string engine = scene?.ResolveScriptEngine(scene.DefaultScriptEngine, source, item)?.ScriptEngineName;
                 return string.IsNullOrEmpty(engine) ? "(unknown)" : engine;
             }
             catch { return "(unknown)"; }
