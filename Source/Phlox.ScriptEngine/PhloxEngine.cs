@@ -62,7 +62,7 @@ namespace Phlox.ScriptEngine
     /// <summary>Where syscalls that can reach a service run.</summary>
     public enum ServiceCallDeferralMode { Auto, Always, Never }
 
-    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine, IScriptStateProvider
+    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine, IScriptStateProvider, IScriptEngineSelection
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -94,6 +94,10 @@ namespace Phlox.ScriptEngine
         #region INonSharedRegionModule
 
         public string Name => PhloxEngineHeader.PhloxName;
+
+        public IReadOnlyList<string> HeaderAliases => Array.Empty<string>();
+
+        public bool ClaimsScript(string scriptSource) => false;
         public Type ReplaceableInterface => null;
 
         /// <summary>
