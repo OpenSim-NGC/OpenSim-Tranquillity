@@ -389,6 +389,9 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
         Enqueue(EndEventToBytes(sb), avatarID);
     }
 
+    public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target)
+        => ScriptRunningEvent(objectID, itemID, running, avatarID);
+
     public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID)
     {
         osUTF8 sb = StartEvent("ScriptRunningReply");

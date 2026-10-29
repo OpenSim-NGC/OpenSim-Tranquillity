@@ -107,6 +107,13 @@ public interface IEventQueue
     //void ParcelProperties(ParcelPropertiesMessage parcelPropertiesMessage, UUID avatarID);
     void GroupMembershipData(UUID receiverAgent, GroupMembershipData[] data);
     void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID);
+
+    /// <summary>
+    /// ScriptRunningReply with the script's compile target for the viewer's editor (Mono, Luau and LuauLanguage fields).
+    /// The default sends the reply without it, so an implementation written before this member existed keeps working.
+    /// </summary>
+    void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target)
+        => ScriptRunningEvent(objectID, itemID, running, avatarID);
     byte[] BuildEvent(string eventName, OSD eventBody);
     void partPhysicsProperties(uint localID, byte physhapetype, float density, float friction, float bounce, float gravmod, UUID avatarID);
     void WindlightRefreshEvent(int interpolate, UUID avatarID);

@@ -1190,6 +1190,15 @@ public class TestClient : IClientAPI, IClientCore
 
     public void SendScriptRunningReply(UUID objectID, UUID itemID, bool running)
     {
+        ScriptRunningReplies.Add((objectID, itemID, running, ScriptCompileTarget.Unspecified));
+    }
+
+    /// <summary>Every script running reply sent to this client, with the compile target it carried.</summary>
+    public readonly List<(UUID ObjectID, UUID ItemID, bool Running, ScriptCompileTarget Target)> ScriptRunningReplies = new();
+
+    public void SendScriptRunningReply(UUID objectID, UUID itemID, bool running, ScriptCompileTarget target)
+    {
+        ScriptRunningReplies.Add((objectID, itemID, running, target));
     }
 
     public void SendAsset(AssetRequestToClient req)

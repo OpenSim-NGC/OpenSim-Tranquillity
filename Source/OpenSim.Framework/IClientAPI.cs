@@ -1384,6 +1384,14 @@ public interface IClientAPI
 
     void SendScriptRunningReply(UUID objectID, UUID itemID, bool running);
 
+    /// <summary>
+    /// The same reply, saying which compile target the viewer's script editor should show
+    /// (<see cref="ScriptCompileTarget.Unspecified"/> shows LSL on Mono, as before). The default sends the reply without it,
+    /// so a client written before this member existed keeps working.
+    /// </summary>
+    void SendScriptRunningReply(UUID objectID, UUID itemID, bool running, ScriptCompileTarget target)
+        => SendScriptRunningReply(objectID, itemID, running);
+
     void SendAsset(AssetRequestToClient req);
 
     void SendTexture(AssetBase TextureAsset);

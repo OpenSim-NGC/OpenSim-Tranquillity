@@ -180,6 +180,12 @@ public partial class Scene
     }
 
     /// <summary>
+    /// The compile target kept with a script in a prim's inventory, which the viewer's editor shows for the script;
+    /// <see cref="ScriptCompileTarget.Unspecified"/> when the script, the prim or the target is not there.
+    /// </summary>
+    public ScriptCompileTarget GetScriptCompileTarget(UUID primId, UUID itemId) => ScriptCompileTarget.Unspecified;
+
+    /// <summary>
     /// Lets the script engines start processing scripts.
     /// </summary>
     public void StartScripts()
@@ -324,6 +330,13 @@ public partial class Scene
     /// <see>CapsUpdatedInventoryItemAsset(IClientAPI, UUID, byte[])</see>
     /// </summary>
     public UUID CapsUpdateItemAsset(UUID avatarId, UUID itemID, UUID objectID, byte[] data)
+        => CapsUpdateItemAsset(avatarId, itemID, objectID, data, null);
+
+    /// <summary>
+    /// The same, with the compile target the viewer's editor sent when the item is a script ("luau", "lsl-luau", "mono",
+    /// "lsl2"; null when it sent none).
+    /// </summary>
+    public UUID CapsUpdateItemAsset(UUID avatarId, UUID itemID, UUID objectID, byte[] data, string compileTarget)
     {
         if (!TryGetScenePresence(avatarId, out ScenePresence avatar))
         {
@@ -439,6 +452,13 @@ public partial class Scene
     /// <param name="data"></param>
     public ArrayList CapsUpdateTaskInventoryScriptAsset(IClientAPI remoteClient, UUID itemId,
                                                    UUID primId, bool isScriptRunning, UUID experience, byte[] data)
+        => CapsUpdateTaskInventoryScriptAsset(remoteClient, itemId, primId, isScriptRunning, experience, data, null);
+
+    /// <summary>
+    /// The same, with the compile target the viewer's editor sent ("luau", "lsl-luau", "mono", "lsl2"; null when it sent none).
+    /// </summary>
+    public ArrayList CapsUpdateTaskInventoryScriptAsset(IClientAPI remoteClient, UUID itemId,
+                                                   UUID primId, bool isScriptRunning, UUID experience, byte[] data, string compileTarget)
     {
         if (!Permissions.CanEditScript(itemId, primId, remoteClient.AgentId))
         {
@@ -518,11 +538,18 @@ public partial class Scene
     /// </summary>
     public ArrayList CapsUpdateTaskInventoryScriptAsset(UUID avatarId, UUID itemId,
                                                     UUID primId, bool isScriptRunning, UUID experience, byte[] data)
+        => CapsUpdateTaskInventoryScriptAsset(avatarId, itemId, primId, isScriptRunning, experience, data, null);
+
+    /// <summary>
+    /// The same, with the compile target the viewer's editor sent ("luau", "lsl-luau", "mono", "lsl2"; null when it sent none).
+    /// </summary>
+    public ArrayList CapsUpdateTaskInventoryScriptAsset(UUID avatarId, UUID itemId,
+                                                    UUID primId, bool isScriptRunning, UUID experience, byte[] data, string compileTarget)
     {
         if (TryGetScenePresence(avatarId, out ScenePresence avatar))
         {
             return CapsUpdateTaskInventoryScriptAsset(
-                avatar.ControllingClient, itemId, primId, isScriptRunning, experience, data);
+                avatar.ControllingClient, itemId, primId, isScriptRunning, experience, data, compileTarget);
         }
         else
         {
