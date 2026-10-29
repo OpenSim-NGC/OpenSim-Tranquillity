@@ -1642,7 +1642,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                     invString.AddNameValueLine("asset_id", UUID.ZeroString);
                 invString.AddNameValueLine("type", Utils.AssetTypeToString((AssetType)item.Type));
                 invString.AddNameValueLine("inv_type", Utils.InventoryTypeToString((InventoryType)item.InvType));
-                invString.AddNameValueLine("flags", Utils.UIntToHexString(item.Flags));
+                invString.AddNameValueLine("flags", Utils.UIntToHexString(ScriptCompileTargets.ForViewer(item.Flags)));
 
                 invString.AddSaleStart();
                 invString.AddNameValueLine("sale_type", "not");

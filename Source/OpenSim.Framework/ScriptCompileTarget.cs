@@ -45,7 +45,7 @@ public static class ScriptCompileTargets
     /// The flag bit that marks a script as "LSL on Lua" (<see cref="ScriptCompileTarget.LslOnLuau"/>). The script keeps the
     /// subtype of an LSL script (0 in the low byte). Second Life's viewer defines nothing at this bit: its item flags are the
     /// subtype byte, bits 8 and 12 (permission slam), bits 16 to 20 (permission overwrite), bit 21 (multiple items) and
-    /// bit 30 (shared single reference), and the region sends a viewer only the flags in 0x2000ff, so it never sees this one.
+    /// bit 30 (shared single reference). The region never tells a viewer this bit (see <see cref="ForViewer"/>).
     /// </summary>
     public const uint LslOnLuauFlag = 0x01000000u;
 
@@ -54,7 +54,7 @@ public static class ScriptCompileTargets
     /// record of a script's target; no viewer knows it, so it never leaves the region. Every other bit, the script
     /// subtype in the low byte among them, is sent as it is.
     /// </summary>
-    public static uint ForViewer(uint flags) => flags;
+    public static uint ForViewer(uint flags) => flags & ~LslOnLuauFlag;
 
     /// <summary>The target a viewer named in the "target" field of a script upload; anything but "luau" and "lsl-luau" is <see cref="ScriptCompileTarget.Unspecified"/>.</summary>
     public static ScriptCompileTarget Parse(string viewerValue)
