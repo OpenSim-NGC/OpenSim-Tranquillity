@@ -1799,11 +1799,35 @@ public class EventManager
 
     public void TriggerRezScript(uint localID, UUID itemID, string script, int startParam, bool postOnRez, string engine, int stateSource)
     {
+        TriggerRezScript(localID, itemID, script, startParam, postOnRez, engine, stateSource, null);
+    }
+
+    /// <summary>
+    /// Tells the script engines to start a script, as <see cref="TriggerRezScript(uint, UUID, string, int, bool, string, int)"/>
+    /// does, for a script item that may carry a compile target a viewer chose.
+    /// </summary>
+    /// <remarks>
+    /// <para>Every handler hears every rez, and each engine decides from the script's first line whether the script is its own.
+    /// A script saved with a Luau target is the exception: the region has already chosen its engine
+    /// (<see cref="Scene.ResolveScriptEngine"/>), the first line does not count, and exactly one engine may start it.</para>
+    /// <para>An engine that implements <see cref="IScriptEngineSelection"/> can read the target itself, so it hears the rez,
+    /// starts the script only if it is the engine named in <paramref name="engine"/>, and lets go of one that is not its own.
+    /// An engine that cannot read the target (YEngine reads only the first line) is not told of such a script unless it is
+    /// the engine named, because it would start a script whose first line names it, whatever the region chose.
+    /// Handlers that are not script engines hear every rez.</para>
+    /// </remarks>
+    public void TriggerRezScript(uint localID, UUID itemID, string script, int startParam, bool postOnRez, string engine, int stateSource, TaskInventoryItem item)
+    {
         NewRezScript handlerRezScript = OnRezScript;
         if (handlerRezScript != null)
         {
+            bool carriesTarget = item is not null && ScriptCompileTargets.FromFlags(item.Flags) != ScriptCompileTarget.Unspecified;
             foreach (NewRezScript d in handlerRezScript.GetInvocationList())
             {
+                if (carriesTarget && d.Target is IScriptModule module
+                    && module is not IScriptEngineSelection && module.ScriptEngineName != engine)
+                    continue;
+
                 try
                 {
                     d(localID, itemID, script, startParam, postOnRez, engine, stateSource);
@@ -1816,15 +1840,6 @@ public class EventManager
                 }
             }
         }
-    }
-
-    /// <summary>
-    /// <see cref="TriggerRezScript(uint, UUID, string, int, bool, string, int)"/> for a script item, which may carry a
-    /// compile target a viewer chose.
-    /// </summary>
-    public void TriggerRezScript(uint localID, UUID itemID, string script, int startParam, bool postOnRez, string engine, int stateSource, TaskInventoryItem item)
-    {
-        TriggerRezScript(localID, itemID, script, startParam, postOnRez, engine, stateSource);
     }
 
     public void TriggerStartScript(uint localID, UUID itemID)
