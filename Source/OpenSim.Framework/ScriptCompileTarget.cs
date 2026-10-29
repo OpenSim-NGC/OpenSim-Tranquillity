@@ -5,6 +5,8 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+using System;
+
 namespace OpenSim.Framework;
 
 /// <summary>
@@ -39,14 +41,34 @@ public static class ScriptCompileTargets
     public const uint SubtypeMask = 0xff;
 
     /// <summary>The target a viewer named in the "target" field of a script upload; anything but "luau" and "lsl-luau" is <see cref="ScriptCompileTarget.Unspecified"/>.</summary>
-    public static ScriptCompileTarget Parse(string viewerValue) => ScriptCompileTarget.Unspecified;
+    public static ScriptCompileTarget Parse(string viewerValue)
+    {
+        if (viewerValue is null)
+            return ScriptCompileTarget.Unspecified;
+        string value = viewerValue.Trim();
+        if (value.Equals("luau", StringComparison.OrdinalIgnoreCase))
+            return ScriptCompileTarget.Luau;
+        if (value.Equals("lsl-luau", StringComparison.OrdinalIgnoreCase))
+            return ScriptCompileTarget.LslOnLuau;
+        return ScriptCompileTarget.Unspecified;
+    }
 
     /// <summary>The value a viewer's compiler list uses for the target; empty for <see cref="ScriptCompileTarget.Unspecified"/>.</summary>
-    public static string ToViewerValue(ScriptCompileTarget target) => string.Empty;
+    public static string ToViewerValue(ScriptCompileTarget target) => target switch
+    {
+        ScriptCompileTarget.Luau => "luau",
+        ScriptCompileTarget.LslOnLuau => "lsl-luau",
+        _ => string.Empty,
+    };
 
     /// <summary>The target kept in an item's flags; a subtype this code does not know is <see cref="ScriptCompileTarget.Unspecified"/>.</summary>
-    public static ScriptCompileTarget FromFlags(uint flags) => ScriptCompileTarget.Unspecified;
+    public static ScriptCompileTarget FromFlags(uint flags) => (flags & SubtypeMask) switch
+    {
+        (uint)ScriptCompileTarget.Luau => ScriptCompileTarget.Luau,
+        (uint)ScriptCompileTarget.LslOnLuau => ScriptCompileTarget.LslOnLuau,
+        _ => ScriptCompileTarget.Unspecified,
+    };
 
     /// <summary>The flags with the subtype replaced by the target's; every other bit is kept.</summary>
-    public static uint WithTarget(uint flags, ScriptCompileTarget target) => flags;
+    public static uint WithTarget(uint flags, ScriptCompileTarget target) => (flags & ~SubtypeMask) | (uint)target;
 }

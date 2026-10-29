@@ -108,6 +108,26 @@ public partial class Scene
     {
         IScriptModule[] engines = RequestModuleInterfaces<IScriptModule>();
 
+        // A viewer's compile target kept with the item (the editor's "Lua" and "LSL on Lua" choices) comes first,
+        // as the editor's choice does in Second Life. Saved state for this item and asset still places a script
+        // that already runs elsewhere; an edited script has a new asset and so none.
+        if (item is not null)
+        {
+            ScriptCompileTarget target = ScriptCompileTargets.FromFlags(item.Flags);
+            if (target != ScriptCompileTarget.Unspecified)
+            {
+                foreach (IScriptModule engine in engines)
+                {
+                    if (engine is IScriptEngineSelection selection && selection.AcceptsCompileTarget(target))
+                    {
+                        if (!AnotherEngineHoldsSavedState(engines, engine, item))
+                            return engine;
+                        break;
+                    }
+                }
+            }
+        }
+
         // the same first-line parse YEngine uses to pick its engine
         if (scriptSource is not null && scriptSource.StartsWith("//"))
         {
@@ -166,6 +186,17 @@ public partial class Scene
         return defaultModule;
     }
 
+    private static bool AnotherEngineHoldsSavedState(IScriptModule[] engines, IScriptModule except, TaskInventoryItem item)
+    {
+        foreach (IScriptModule engine in engines)
+        {
+            if (engine != except && engine is IScriptStateProvider state
+                && state.HasSavedScriptState(item.ItemID, item.AssetID))
+                return true;
+        }
+        return false;
+    }
+
     private static bool HasHeaderAlias(IScriptEngineSelection engine, string named)
     {
         IReadOnlyList<string> aliases = engine.HeaderAliases;
@@ -183,7 +214,11 @@ public partial class Scene
     /// The compile target kept with a script in a prim's inventory, which the viewer's editor shows for the script;
     /// <see cref="ScriptCompileTarget.Unspecified"/> when the script, the prim or the target is not there.
     /// </summary>
-    public ScriptCompileTarget GetScriptCompileTarget(UUID primId, UUID itemId) => ScriptCompileTarget.Unspecified;
+    public ScriptCompileTarget GetScriptCompileTarget(UUID primId, UUID itemId)
+    {
+        TaskInventoryItem item = GetSceneObjectPart(primId)?.Inventory.GetInventoryItem(itemId);
+        return item is null ? ScriptCompileTarget.Unspecified : ScriptCompileTargets.FromFlags(item.Flags);
+    }
 
     /// <summary>
     /// Lets the script engines start processing scripts.
@@ -327,6 +362,22 @@ public partial class Scene
     }
 
     /// <summary>
+    /// Keeps the compile target with a script in an avatar's inventory (in the item's flags), after the script was saved.
+    /// Other kinds of item are left alone.
+    /// </summary>
+    private void StoreScriptCompileTarget(UUID avatarId, UUID itemId, ScriptCompileTarget target)
+    {
+        InventoryItemBase item = InventoryService.GetItem(avatarId, itemId);
+        if (item is null || item.InvType != (int)InventoryType.LSL)
+            return;
+        uint flags = ScriptCompileTargets.WithTarget(item.Flags, target);
+        if (flags == item.Flags)
+            return;
+        item.Flags = flags;
+        InventoryService.UpdateItem(item);
+    }
+
+    /// <summary>
     /// <see>CapsUpdatedInventoryItemAsset(IClientAPI, UUID, byte[])</see>
     /// </summary>
     public UUID CapsUpdateItemAsset(UUID avatarId, UUID itemID, UUID objectID, byte[] data)
@@ -347,7 +398,10 @@ public partial class Scene
         if (objectID.IsZero())
         {
             IInventoryAccessModule invAccess = RequestModuleInterface<IInventoryAccessModule>();
-            return invAccess is not null ? invAccess.CapsUpdateInventoryItemAsset(avatar.ControllingClient, itemID, data) : UUID.Zero;
+            UUID newAssetId = invAccess is not null ? invAccess.CapsUpdateInventoryItemAsset(avatar.ControllingClient, itemID, data) : UUID.Zero;
+            if (!newAssetId.IsZero() && compileTarget is not null)
+                StoreScriptCompileTarget(avatarId, itemID, ScriptCompileTargets.Parse(compileTarget));
+            return newAssetId;
         }
 
         SceneObjectPart sop = GetSceneObjectPart(objectID);
@@ -486,6 +540,9 @@ public partial class Scene
         }
 
         item.ScriptRunning = isScriptRunning;
+        // "mono" and "lsl2" are a choice too: they clear an earlier Luau target. A save that names no target leaves it be.
+        if (compileTarget is not null)
+            item.Flags = ScriptCompileTargets.WithTarget(item.Flags, ScriptCompileTargets.Parse(compileTarget));
         AssetBase asset = CreateAsset(item.Name, item.Description, (sbyte)AssetType.LSLText, data, remoteClient.AgentId);
         AssetService.Store(asset);
 

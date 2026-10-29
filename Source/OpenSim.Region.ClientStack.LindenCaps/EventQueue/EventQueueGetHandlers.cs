@@ -389,17 +389,31 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
         Enqueue(EndEventToBytes(sb), avatarID);
     }
 
-    public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target)
-        => ScriptRunningEvent(objectID, itemID, running, avatarID);
-
     public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID)
+        => ScriptRunningEvent(objectID, itemID, running, avatarID, ScriptCompileTarget.Unspecified);
+
+    /// <summary>
+    /// The fields Second Life's script editor reads to choose its compiler entry (llpreviewscript.cpp,
+    /// LLLiveLSLEditor::processScriptRunningReply): Luau and LuauLanguage give "Lua", Luau alone "LSL on Lua", otherwise
+    /// Mono gives "LSL on Mono". A script with no Luau target is described as before, by Mono alone.
+    /// </summary>
+    public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target)
     {
         osUTF8 sb = StartEvent("ScriptRunningReply");
         LLSDxmlEncode2.AddArrayAndMap("Script", sb);
             LLSDxmlEncode2.AddElem("ObjectID", objectID, sb);
             LLSDxmlEncode2.AddElem("ItemID", itemID, sb);
             LLSDxmlEncode2.AddElem("Running", running, sb);
-            LLSDxmlEncode2.AddElem("Mono", true, sb);
+            if (target == ScriptCompileTarget.Unspecified)
+            {
+                LLSDxmlEncode2.AddElem("Mono", true, sb);
+            }
+            else
+            {
+                LLSDxmlEncode2.AddElem("Mono", false, sb);
+                LLSDxmlEncode2.AddElem("Luau", true, sb);
+                LLSDxmlEncode2.AddElem("LuauLanguage", target == ScriptCompileTarget.Luau, sb);
+            }
         LLSDxmlEncode2.AddEndMapAndArray(sb);
 
         Enqueue(EndEventToBytes(sb), avatarID);

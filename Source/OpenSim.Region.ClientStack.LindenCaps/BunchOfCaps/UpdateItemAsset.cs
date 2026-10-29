@@ -14,7 +14,7 @@ using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public delegate UUID UpdateItem(UUID itemID, UUID objectID, byte[] data);
-public delegate UUID ItemUpdatedCallback(UUID userID, UUID itemID, UUID objectID, byte[] data);
+public delegate UUID ItemUpdatedCallback(UUID userID, UUID itemID, UUID objectID, byte[] data, string compileTarget);
 
 public partial class BunchOfCaps
 {
@@ -56,6 +56,7 @@ public partial class BunchOfCaps
 
         UUID itemID = UUID.Zero;
         UUID objectID = UUID.Zero;
+        string compileTarget = null;
 
         try
         {
@@ -63,6 +64,9 @@ public partial class BunchOfCaps
                 itemID = itmp;
             if (map.TryGetValue("task_id", out OSD tmp))
                 objectID = tmp;
+            // a script saved from the viewer's editor says which compiler was chosen: mono, lsl2, lsl-luau or luau
+            if (atype == (byte)AssetType.LSLText && map.TryGetValue("target", out OSD target))
+                compileTarget = target.AsString();
         }
         catch { }
 
@@ -108,7 +112,7 @@ public partial class BunchOfCaps
         ItemUpdater uploader = new ItemUpdater(itemID, objectID, atype, uploaderPath, m_HostCapsObj.HttpListener, m_dumpAssetsToFile);
         uploader.m_remoteAdress = httpRequest.RemoteIPEndPoint.Address;
 
-        uploader.OnUpLoad += ItemUpdated;
+        uploader.OnUpLoad += (id, oid, data) => ItemUpdated(id, oid, data, compileTarget);
 
         var uploaderHandler = new SimpleBinaryHandler("POST", uploaderPath, uploader.process);
 
@@ -128,11 +132,11 @@ public partial class BunchOfCaps
     /// <param name="itemID">Item to update</param>
     /// <param name="data">New asset data</param>
     /// <returns></returns>
-    public UUID ItemUpdated(UUID itemID, UUID objectID, byte[] data)
+    public UUID ItemUpdated(UUID itemID, UUID objectID, byte[] data, string compileTarget = null)
     {
         if (ItemUpdatedCall != null)
         {
-            return ItemUpdatedCall(m_HostCapsObj.AgentID, itemID, objectID, data);
+            return ItemUpdatedCall(m_HostCapsObj.AgentID, itemID, objectID, data, compileTarget);
         }
         return UUID.Zero;
     }
@@ -156,6 +160,7 @@ public partial class BunchOfCaps
             UUID objectID = UUID.Zero;
             bool is_script_running = false;
             UUID experience_key = UUID.Zero;
+            string compileTarget = null;
             OSD tmp;
             try
             {
@@ -167,6 +172,8 @@ public partial class BunchOfCaps
                     is_script_running = tmp;
                 if (map.TryGetValue("experience", out tmp))
                     experience_key = tmp;
+                if (map.TryGetValue("target", out tmp))
+                    compileTarget = tmp.AsString();
             }
             catch { }
 
@@ -215,7 +222,7 @@ public partial class BunchOfCaps
             uploadResponse.state = "upload";
 
             TaskInventoryScriptUpdater uploader = new TaskInventoryScriptUpdater(itemID, objectID, is_script_running, experience_key,
-                    uploaderPath, m_HostCapsObj.HttpListener, httpRequest.RemoteIPEndPoint.Address, m_dumpAssetsToFile);
+                    uploaderPath, m_HostCapsObj.HttpListener, httpRequest.RemoteIPEndPoint.Address, m_dumpAssetsToFile, compileTarget);
             uploader.OnUpLoad += TaskScriptUpdated;
 
             var uploaderHandler = new SimpleBinaryHandler("POST", uploaderPath, uploader.process);
@@ -242,11 +249,11 @@ public partial class BunchOfCaps
     /// <param name="primID">Prim containing item to update</param>
     /// <param name="isScriptRunning">Signals whether the script to update is currently running</param>
     /// <param name="data">New asset data</param>
-    public void TaskScriptUpdated(UUID itemID, UUID primID, bool isScriptRunning, UUID experience, byte[] data, ref ArrayList errors)
+    public void TaskScriptUpdated(UUID itemID, UUID primID, bool isScriptRunning, UUID experience, byte[] data, string compileTarget, ref ArrayList errors)
     {
         if (TaskScriptUpdatedCall != null)
         {
-            ArrayList e = TaskScriptUpdatedCall(m_HostCapsObj.AgentID, itemID, primID, isScriptRunning, experience, data);
+            ArrayList e = TaskScriptUpdatedCall(m_HostCapsObj.AgentID, itemID, primID, isScriptRunning, experience, data, compileTarget);
             foreach (Object item in e)
                 errors.Add(item);
         }
@@ -353,13 +360,15 @@ public partial class BunchOfCaps
         private UUID m_primID;
         private bool m_isScriptRunning;
         private UUID m_experienceKey;
+        private string m_compileTarget;
         private bool m_dumpAssetToFile;
         public IPAddress m_remoteAddress;
 
         public TaskInventoryScriptUpdater(UUID inventoryItemID, UUID primID, bool isScriptRunning, UUID experience_id,
                                             string path, IHttpServer httpServer, IPAddress address,
-                                            bool dumpAssetToFile) : base(httpServer, path)
+                                            bool dumpAssetToFile, string compileTarget = null) : base(httpServer, path)
         {
+            m_compileTarget = compileTarget;
             m_dumpAssetToFile = dumpAssetToFile;
             m_inventoryItemID = inventoryItemID;
             m_primID = primID;
@@ -406,7 +415,7 @@ public partial class BunchOfCaps
                 LLSDTaskScriptUploadComplete uploadComplete = new LLSDTaskScriptUploadComplete();
 
                 ArrayList errors = new ArrayList();
-                OnUpLoad?.Invoke(m_inventoryItemID, m_primID, m_isScriptRunning, m_experienceKey, data, ref errors);
+                OnUpLoad?.Invoke(m_inventoryItemID, m_primID, m_isScriptRunning, m_experienceKey, data, m_compileTarget, ref errors);
 
                 uploadComplete.new_asset = m_inventoryItemID;
                 uploadComplete.compiled = errors.Count > 0 ? false : true;
