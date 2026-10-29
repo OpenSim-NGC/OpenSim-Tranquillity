@@ -25,6 +25,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Net;
+using Nini.Config;
+using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
@@ -75,6 +78,38 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             base.SetUp();
             m_scene = new SceneHelpers().SetupScene();
             StatsManager.SimExtraStats = new SimExtraStatsCollector();
+        }
+
+        [Fact]
+        public void RequestClientInfoCarriesTheCurrentTravelToken()
+        {
+            const uint circuitCode = 123456;
+            AgentCircuitData circuit = SceneHelpers.GenerateAgentData(UUID.Random());
+            circuit.ServiceSessionID = "http://home.example:8002/;initial-token";
+            m_scene.AuthenticateHandler.AddNewCircuit(circuitCode, circuit);
+
+            TestLLUDPServer udpServer = ClientStackHelpers.AddUdpServer(m_scene);
+            LLUDPClient udpClient = new(udpServer, new ThrottleRates(new IniConfigSource()), udpServer.Throttle,
+                circuitCode, circuit.AgentID, new IPEndPoint(IPAddress.Loopback, 999), 0, 0);
+            AuthenticateResponse response = new()
+            {
+                LoginInfo = new Login { First = "Token", Last = "Tester", SecureSession = circuit.SecureSessionID }
+            };
+            LLClientView client = new(m_scene, udpServer, udpClient, response,
+                circuit.AgentID, circuit.SessionID, circuitCode);
+
+            try
+            {
+                Assert.Equal(circuit.ServiceSessionID, client.RequestClientInfo().ServiceSessionID);
+
+                circuit.ServiceSessionID = "http://next.example:8002/;rotated-token";
+
+                Assert.Equal(circuit.ServiceSessionID, client.RequestClientInfo().ServiceSessionID);
+            }
+            finally
+            {
+                client.Close(false, false);
+            }
         }
 
 //        /// <summary>

@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 
 using ProtoBuf;
+using System.ComponentModel;
 
 namespace InWorldz.Phlox.Serialization
 {
@@ -92,7 +93,7 @@ namespace InWorldz.Phlox.Serialization
         /// here and not 0 - 0 is a real table index.
         /// </para>
         /// </summary>
-        [ProtoMember(22)]
+        [ProtoMember(22), DefaultValue((int)-1)]
         public int LastSyscallIndex = -1;
 
         /// <summary>Tags 23-25. Rows written before them load as 0 / false / 0, which is

@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using ProtoBuf;
+using System.ComponentModel;
 
 namespace InWorldz.Phlox.Types
 {
@@ -20,7 +21,7 @@ namespace InWorldz.Phlox.Types
     {
         public readonly static Sentinel Instance = new Sentinel();
 
-        [ProtoMember(1, IsRequired = false)]
+        [ProtoMember(1, IsRequired = false), DefaultValue((int)0xbadf00d)]
         public int SentinalValue = 0xbadf00d;
     }
 }

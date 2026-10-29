@@ -113,7 +113,7 @@ public class UserAgentServiceSecurityTests
         HGTravelingData travel = new()
         {
             SessionID = sessionID,
-            Data = new Dictionary<string, string> { ["UserID"] = userID.ToString() }
+            UserID = userID
         };
 
         Xunit.Assert.True(UserAgentService.TravelSessionMatches(travel, userID, sessionID));
@@ -127,10 +127,37 @@ public class UserAgentServiceSecurityTests
         HGTravelingData travel = new()
         {
             SessionID = sessionID,
-            Data = new Dictionary<string, string> { ["UserID"] = userID.ToString() }
+            UserID = userID
         };
 
         Xunit.Assert.False(UserAgentService.TravelSessionMatches(travel, UUID.Random(), sessionID));
         Xunit.Assert.False(UserAgentService.TravelSessionMatches(travel, userID, UUID.Random()));
+    }
+
+    [Xunit.Fact]
+    public void TravelSessionIgnoresUserIDInDataDictionary()
+    {
+        UUID userID = UUID.Random();
+        UUID sessionID = UUID.Random();
+        HGTravelingData travel = new()
+        {
+            SessionID = sessionID,
+            UserID = UUID.Random(),
+            Data = new Dictionary<string, string> { ["UserID"] = userID.ToString() }
+        };
+
+        Xunit.Assert.False(UserAgentService.TravelSessionMatches(travel, userID, sessionID));
+        Xunit.Assert.True(UserAgentService.TravelSessionMatches(travel, travel.UserID, sessionID));
+    }
+
+    [Xunit.Fact]
+    public void TravelSessionRejectsMissingRecordOrData()
+    {
+        UUID userID = UUID.Random();
+        UUID sessionID = UUID.Random();
+
+        Xunit.Assert.False(UserAgentService.TravelSessionMatches(null, userID, sessionID));
+        Xunit.Assert.False(UserAgentService.TravelSessionMatches(
+            new HGTravelingData { SessionID = sessionID, UserID = userID, Data = null }, userID, sessionID));
     }
 }

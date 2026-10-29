@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text;
 
 using ProtoBuf;
+using System.ComponentModel;
 
 namespace InWorldz.Phlox.Serialization
 {
@@ -31,7 +32,7 @@ namespace InWorldz.Phlox.Serialization
         [ProtoMember(4)]
         public SerializedClosure Closure; // set when this frame is executing a closure (upvalue access)
 
-        [ProtoMember(5)]
+        [ProtoMember(5), DefaultValue((int)-1)]
         public int Wanted = -1; // value-call result adjustment (-1 = named-call/event)
 
         [ProtoMember(6)]
