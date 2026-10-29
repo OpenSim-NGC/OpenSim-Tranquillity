@@ -649,6 +649,54 @@ public partial class SceneObjectGroup : EntityBase
         return suspended;
     }
 
+    /// <summary>
+    /// Allowing scripts again after they were disabled: the scripts of this object that the scene suspended
+    /// (<paramref name="suspendedByDisable"/>, whose entries for this object are taken out) are resumed, and a script
+    /// that no engine holds, for instance one that came into the region while scripts were off, is started.
+    /// A script an engine holds that the scene did not suspend is left as it is.
+    /// </summary>
+    public void ResumeScriptsAfterDisable(IScriptModule[] engines, HashSet<UUID> suspendedByDisable, string defaultEngine)
+    {
+        if (engines is null || engines.Length == 0)
+            return;
+
+        List<UUID> resume = new();
+        List<(SceneObjectPart Part, TaskInventoryItem Item)> start = new();
+        SceneObjectPart[] parts = m_parts.GetArray();
+        for (int i = 0; i < parts.Length; i++)
+        {
+            foreach (TaskInventoryItem item in parts[i].Inventory.GetInventoryItems(InventoryType.LSL))
+            {
+                bool wasSuspended;
+                lock (suspendedByDisable)
+                    wasSuspended = suspendedByDisable.Remove(item.ItemID);
+
+                if (wasSuspended)
+                {
+                    resume.Add(item.ItemID);
+                    continue;
+                }
+
+                bool held = false;
+                foreach (IScriptModule engine in engines)
+                {
+                    if (engine is not null && engine.HasScript(item.ItemID, out _))
+                    {
+                        held = true;
+                        break;
+                    }
+                }
+                if (!held)
+                    start.Add((parts[i], item));
+            }
+        }
+
+        ResumeScripts(engines, resume);
+
+        foreach ((SceneObjectPart part, TaskInventoryItem item) in start)
+            part.Inventory.CreateScriptInstance(item, 0, false, defaultEngine, 0);
+    }
+
     /// <summary>Lets the scripts that <see cref="SuspendScripts"/> stopped run again.</summary>
     public static void ResumeScripts(IScriptModule[] engines, List<UUID> suspended)
     {

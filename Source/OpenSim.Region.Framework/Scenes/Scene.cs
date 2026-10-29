@@ -117,7 +117,11 @@ public partial class Scene : SceneBase
     private bool m_physicsEnabled;
 
     /// <summary>
-    /// If false then scripts are not enabled on the simulator
+    /// If false then scripts are not enabled on the simulator. Turning scripts off pauses them, as the region's
+    /// "disable scripts" setting does in Second Life: every engine is asked to suspend each script, nothing is
+    /// removed, and a script keeps its state, its timers and the events that reach it. Turning scripts on again
+    /// resumes the scripts that were suspended here, and starts a script that no engine holds (one that arrived
+    /// while scripts were off).
     /// </summary>
     public bool ScriptsEnabled
     {
@@ -126,37 +130,49 @@ public partial class Scene : SceneBase
         {
             if (m_scripts_enabled != value)
             {
+                // the new value is set first, so a script started from the loops below sees it
+                m_scripts_enabled = value;
+                IScriptModule[] engines = RequestModuleInterfaces<IScriptModule>();
+
                 if (!value)
                 {
-                    m_log.LogInformation("Stopping all Scripts in Scene");
+                    m_log.LogInformation("Pausing all Scripts in Scene");
 
                     EntityBase[] entities = Entities.GetEntities();
                     foreach (EntityBase ent in entities)
                     {
                         if (ent is SceneObjectGroup group)
-                            group.RemoveScriptInstances(false);
+                        {
+                            List<UUID> suspended = group.SuspendScripts(engines);
+                            lock (m_scriptsSuspendedByDisable)
+                                m_scriptsSuspendedByDisable.UnionWith(suspended);
+                        }
                     }
                 }
                 else
                 {
-                    m_log.LogInformation("Starting all Scripts in Scene");
+                    m_log.LogInformation("Resuming all Scripts in Scene");
 
                     EntityBase[] entities = Entities.GetEntities();
                     foreach (EntityBase ent in entities)
                     {
                         if (ent is SceneObjectGroup sog)
                         {
-                            sog.CreateScriptInstances(0, false, DefaultScriptEngine, 0);
+                            sog.ResumeScriptsAfterDisable(engines, m_scriptsSuspendedByDisable, DefaultScriptEngine);
                             sog.ResumeScripts();
                         }
                     }
+                    lock (m_scriptsSuspendedByDisable)
+                        m_scriptsSuspendedByDisable.Clear();
                 }
-
-                m_scripts_enabled = value;
             }
         }
     }
     private bool m_scripts_enabled;
+
+    /// <summary>The script items that <see cref="ScriptsEnabled"/> suspended, so that only they are resumed.</summary>
+    private readonly HashSet<UUID> m_scriptsSuspendedByDisable = new();
+
 
     /// <summary>
     /// Used to prevent simultaneous calls to code that adds and removes agents.
