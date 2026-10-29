@@ -82,6 +82,11 @@ public class LuaDefaultScriptTests : OpenSimTestCase
             Alpha.Attach(Scene);
             Beta.Attach(Scene);
             Part = SceneHelpers.AddSceneObject(Scene).RootPart;
+            // the LSL default is one of the grid's default assets; a test region has none until it is stored
+            Scene.AssetService.Store(new AssetBase(Constants.DefaultScriptID, "Default script", (sbyte)AssetType.LSLText, UUID.Zero.ToString())
+            {
+                Data = Constants.DefaultScriptData,
+            });
         }
 
         /// <summary>What a viewer sends to make a new script in an object: a script with no item id, and the subtype in the flags.</summary>
@@ -96,9 +101,9 @@ public class LuaDefaultScriptTests : OpenSimTestCase
                 Description = string.Empty,
                 AssetType = (int)AssetType.LSLText,
                 InvType = (int)InventoryType.LSL,
-                BasePermissions = (uint)PermissionMask.All,
-                CurrentPermissions = (uint)PermissionMask.All,
-                NextPermissions = (uint)PermissionMask.All,
+                BasePermissions = (uint)OpenMetaverse.PermissionMask.All,
+                CurrentPermissions = (uint)OpenMetaverse.PermissionMask.All,
+                NextPermissions = (uint)OpenMetaverse.PermissionMask.All,
                 Flags = flags,
             };
             Assert.NotNull(Scene.RezNewScript(AgentId, itemBase));
@@ -113,7 +118,7 @@ public class LuaDefaultScriptTests : OpenSimTestCase
             InventoryFolderBase folder = Scene.InventoryService.GetFolderForType(AgentId, FolderType.LSLText);
             InventoryAccess.CreateNewInventoryItem(
                 sp.ControllingClient, UUID.Zero, folder.ID, 1, string.Empty, name,
-                (sbyte)InventoryType.LSL, (sbyte)AssetType.LSLText, subType, (uint)PermissionMask.All, Util.UnixTimeSinceEpoch());
+                (sbyte)InventoryType.LSL, (sbyte)AssetType.LSLText, subType, (uint)OpenMetaverse.PermissionMask.All, Util.UnixTimeSinceEpoch());
             return Assert.Single(Scene.InventoryService.GetFolderContent(AgentId, folder.ID).Items, i => i.Name == name);
         }
     }
