@@ -1818,6 +1818,15 @@ public class EventManager
         }
     }
 
+    /// <summary>
+    /// <see cref="TriggerRezScript(uint, UUID, string, int, bool, string, int)"/> for a script item, which may carry a
+    /// compile target a viewer chose.
+    /// </summary>
+    public void TriggerRezScript(uint localID, UUID itemID, string script, int startParam, bool postOnRez, string engine, int stateSource, TaskInventoryItem item)
+    {
+        TriggerRezScript(localID, itemID, script, startParam, postOnRez, engine, stateSource);
+    }
+
     public void TriggerStartScript(uint localID, UUID itemID)
     {
         StartScript handlerStartScript = OnStartScript;

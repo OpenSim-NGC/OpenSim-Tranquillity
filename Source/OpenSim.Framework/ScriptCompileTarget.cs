@@ -40,6 +40,9 @@ public static class ScriptCompileTargets
     /// <summary>The bits of an item's flags that hold the subtype.</summary>
     public const uint SubtypeMask = 0xff;
 
+    /// <summary>The flag bit that marks a script as "LSL on Lua" (<see cref="ScriptCompileTarget.LslOnLuau"/>).</summary>
+    public const uint LslOnLuauFlag = 0u;
+
     /// <summary>The target a viewer named in the "target" field of a script upload; anything but "luau" and "lsl-luau" is <see cref="ScriptCompileTarget.Unspecified"/>.</summary>
     public static ScriptCompileTarget Parse(string viewerValue)
     {
