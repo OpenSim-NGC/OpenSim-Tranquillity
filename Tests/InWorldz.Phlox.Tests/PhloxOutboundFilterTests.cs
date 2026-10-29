@@ -419,9 +419,12 @@ public class PhloxOutboundFilterYEngineTests
 internal static class SchedulerHarnessYEngine
 {
     public static UUID Rez(SchedulerHarness h, OpenSim.Region.Framework.Scenes.SceneObjectPart part, string source)
+        => Rez(h, part, source, "yscript" + Guid.NewGuid().ToString("N")[..6]);
+
+    public static UUID Rez(SchedulerHarness h, OpenSim.Region.Framework.Scenes.SceneObjectPart part, string source, string name)
     {
         var item = OpenSim.Tests.Common.TaskInventoryHelpers.AddScript(
-            h.Scene.AssetService, part, UUID.Random(), UUID.Random(), "yscript" + Guid.NewGuid().ToString("N")[..6], source);
+            h.Scene.AssetService, part, UUID.Random(), UUID.Random(), name, source);
         Assert.True(part.Inventory.CreateScriptInstance(item.ItemID, 0, false, h.YEngine.ScriptEngineName, 1));
         var errors = h.YEngine.GetScriptErrors(item.ItemID);
         Assert.True(errors.Count == 0, "YEngine did not compile it: " + string.Join(" | ", errors.Cast<object>()));
