@@ -246,9 +246,12 @@ public class BasicInventoryAccessModule : INonSharedRegionModule, IInventoryAcce
                 }
                 case (sbyte)AssetType.LSLText:
                 {
+                    // the viewer's subtype for a new script says whether it is Lua; the item keeps it in its flags
+                    flags = subType;
+                    UUID scriptAssetID = m_Scene.GetDefaultScriptAsset(ref flags);
                     m_Scene.CreateNewInventoryItem(
                             remoteClient, remoteClient.AgentId.ToString(), string.Empty, folderID,
-                            name, description, flags, callbackID, Constants.DefaultScriptID, (sbyte)AssetType.LSLText, invType,
+                            name, description, flags, callbackID, scriptAssetID, (sbyte)AssetType.LSLText, invType,
                             (uint)PermissionMask.AllAndExport, (uint)PermissionMask.AllAndExport,
                             everyonemask, nextOwnerMask, groupmask,
                             creationDate); // Data from viewer

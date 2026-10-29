@@ -187,9 +187,43 @@ public partial class Scene
     }
 
     /// <summary>
-    /// The asset a new script item gets as its text, given the flags the viewer created the item with.
+    /// The asset a new script item gets as its text, given the flags the viewer created the item with. A viewer that has
+    /// been told the region runs Lua (the "LuaScriptsEnabled" simulator feature) creates a new script with the Lua subtype,
+    /// the value 1 in the low byte of the flags, and expects the region to choose the Lua default text for it. That is done
+    /// only when a loaded engine takes Lua scripts; otherwise the LSL default is kept. <paramref name="flags"/> comes back
+    /// with the subtype the new script really has: Lua, or none.
     /// </summary>
-    public UUID GetDefaultScriptAssetID(uint flags) => Constants.DefaultScriptID;
+    public UUID GetDefaultScriptAsset(ref uint flags)
+    {
+        ScriptCompileTarget asked = (flags & ScriptCompileTargets.SubtypeMask) == (uint)ScriptCompileTarget.Luau
+            ? ScriptCompileTarget.Luau : ScriptCompileTarget.Unspecified;
+        if (asked != ScriptCompileTarget.Unspecified && !AnyEngineAcceptsCompileTarget(asked))
+            asked = ScriptCompileTarget.Unspecified;
+        flags = ScriptCompileTargets.WithTarget(flags, asked);
+
+        if (asked != ScriptCompileTarget.Luau)
+            return Constants.DefaultScriptID;
+
+        // The LSL default is one of the grid's default assets; the Lua default is stored here the first time it is needed.
+        if (AssetService.GetMetadata(DefaultLuaScript.ID.ToString()) is null)
+        {
+            AssetService.Store(new AssetBase(DefaultLuaScript.ID, "Default Lua script", (sbyte)AssetType.LSLText, UUID.Zero.ToString())
+            {
+                Data = Encoding.ASCII.GetBytes(DefaultLuaScript.Text),
+            });
+        }
+        return DefaultLuaScript.ID;
+    }
+
+    private bool AnyEngineAcceptsCompileTarget(ScriptCompileTarget target)
+    {
+        foreach (IScriptModule engine in RequestModuleInterfaces<IScriptModule>())
+        {
+            if (engine is IScriptEngineSelection selection && selection.AcceptsCompileTarget(target))
+                return true;
+        }
+        return false;
+    }
 
     private static bool AnotherEngineHoldsSavedState(IScriptModule[] engines, IScriptModule except, TaskInventoryItem item)
     {
@@ -2307,9 +2341,10 @@ public partial class Scene
         }
 
         UUID assetID;
+        uint flags = itemBase.Flags;
 
         if (scriptText is null)
-            assetID = Constants.DefaultScriptID;
+            assetID = GetDefaultScriptAsset(ref flags);
         else
         {
             AssetBase asset = CreateAsset(
@@ -2342,7 +2377,7 @@ public partial class Scene
             GroupPermissions = 0,
             NextPermissions = itemBase.NextPermissions,
             GroupID = itemBase.GroupID,
-            Flags = itemBase.Flags,
+            Flags = flags,
             PermsGranter = UUID.Zero,
             PermsMask = 0,
             AssetID = assetID
