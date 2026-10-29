@@ -25,8 +25,10 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.CoreModules.Scripting.XMLRPC;
+using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Interfaces;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
@@ -72,14 +74,7 @@ public class XmlRequest
                     new LSL_Types.LSLString(rInfo.GetStrVal())
                 };
 
-                foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
-                {
-                    if (e.PostScriptEvent(
-                            rInfo.GetItemID(), new EventParams(
-                                "remote_data", resobj,
-                                new DetectParams[0])))
-                        break;
-                }
+                PostRemoteData(rInfo.GetItemID(), resobj);
 
                 rInfo = xmlrpc.GetNextCompletedRequest();
             }
@@ -101,17 +96,71 @@ public class XmlRequest
                     new LSL_Types.LSLString(srdInfo.Sdata)
                 };
 
-                foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
-                {
-                    if (e.PostScriptEvent(
-                            srdInfo.ItemID, new EventParams(
-                                "remote_data", resobj,
-                                new DetectParams[0])))
-                        break;
-                }
+                PostRemoteData(srdInfo.ItemID, resobj);
 
                 srdInfo = (SendRemoteDataRequest)xmlrpc.GetNextCompletedSRDRequest();
             }
         }
+    }
+
+    /// <summary>
+    /// remote_data goes to the one script it is for. The XML-RPC module is shared by every
+    /// region and drained by every script engine's pump, so the script may run in an engine
+    /// this pump does not serve. When none of this pump's engines runs it, each other script
+    /// engine of the regions is offered it once; only the engine that runs the script posts it.
+    /// </summary>
+    private void PostRemoteData(UUID itemID, object[] resobj)
+    {
+        foreach (IScriptEngine e in m_CmdManager.ScriptEngines)
+        {
+            if (e.PostScriptEvent(
+                    itemID, new EventParams(
+                        "remote_data", resobj,
+                        new DetectParams[0])))
+                return;
+        }
+
+        // Not stopping at the first that says yes: an engine may accept an item it does not run.
+        // Arguments built for each (an engine may convert them in place), as plain values, as core
+        // modules post to any engine (UrlModule): string and int.
+        foreach (IScriptEngine e in OtherScriptEngines())
+            e.PostScriptEvent(itemID, new EventParams("remote_data", PlainValues(resobj), new DetectParams[0]));
+    }
+
+    private static object[] PlainValues(object[] resobj)
+    {
+        return Array.ConvertAll(resobj, a => a switch
+        {
+            LSL_Types.LSLInteger i => (object)i.value,
+            LSL_Types.LSLString s => s.m_string,
+            _ => a
+        });
+    }
+
+    /// <summary>
+    /// The script engines of the simulator's regions that this pump does not serve, each once.
+    /// </summary>
+    private List<IScriptEngine> OtherScriptEngines()
+    {
+        IScriptEngine[] own = m_CmdManager.ScriptEngines;
+
+        HashSet<Scene> scenes = new HashSet<Scene>(SceneManager.Instance.GetScenes());
+        foreach (IScriptEngine e in own)
+        {
+            Scene world = e.World;
+            if (world != null)
+                scenes.Add(world);
+        }
+
+        List<IScriptEngine> others = new List<IScriptEngine>();
+        foreach (Scene scene in scenes)
+        {
+            foreach (IScriptModule m in scene.RequestModuleInterfaces<IScriptModule>())
+            {
+                if (m is IScriptEngine e && Array.IndexOf(own, e) < 0 && !others.Contains(e))
+                    others.Add(e);
+            }
+        }
+        return others;
     }
 }

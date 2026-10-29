@@ -31,6 +31,11 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Tests.Common;
 
+// These tests exercise scenes that share process-wide static state (MainServer,
+// Util.FireAndForgetMethod, static caps registries), so they cannot run in parallel. The same
+// declaration, for the same reason, is in OpenSim.Region.CoreModules.Tests/AssemblyInfo.cs.
+[assembly: Xunit.CollectionBehavior(DisableTestParallelization = true)]
+
 namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 {
     public class FetchInventory2HandlerTests : OpenSimTestCase
@@ -112,12 +117,12 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
             string llsdresponse = handler.FetchInventoryRequest(request, "/FETCH", string.Empty, req, resp);
 
-            Assert.True(llsdresponse != null);
-            Assert.True(llsdresponse != string.Empty);
-            Assert.True(llsdresponse.Contains(m_userID.ToString()));
+            Assert.True(llsdresponse != null, "Incorrect null response");
+            Assert.True(llsdresponse != string.Empty, "Incorrect empty response");
+            Assert.True(llsdresponse.Contains(m_userID.ToString()), "Response should contain userID");
 
-            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"));
-            Assert.True(llsdresponse.Contains("Notecard 1"));
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"), "Response does not contain item uuid");
+            Assert.True(llsdresponse.Contains("Notecard 1"), "Response does not contain item Name");
             Console.WriteLine(llsdresponse);
         }
 
@@ -142,16 +147,16 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
             string llsdresponse = handler.FetchInventoryRequest(request, "/FETCH", string.Empty, req, resp);
 
-            Assert.True(llsdresponse != null);
-            Assert.True(llsdresponse != string.Empty);
-            Assert.True(llsdresponse.Contains(m_userID.ToString()));
+            Assert.True(llsdresponse != null, "Incorrect null response");
+            Assert.True(llsdresponse != string.Empty, "Incorrect empty response");
+            Assert.True(llsdresponse.Contains(m_userID.ToString()), "Response should contain userID");
 
             Console.WriteLine(llsdresponse);
-            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"));
-            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000002"));
-            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000003"));
-            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000004"));
-            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000005"));
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"), "Response does not contain notecard 1");
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000002"), "Response does not contain notecard 2");
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000003"), "Response does not contain notecard 3");
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000004"), "Response does not contain notecard 4");
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000005"), "Response does not contain notecard 5");
         }
 
     }

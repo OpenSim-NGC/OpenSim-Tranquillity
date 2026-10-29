@@ -249,9 +249,19 @@ public class MockScriptEngine : INonSharedRegionModule, IScriptModule, IScriptEn
         throw new System.NotImplementedException ();
     }
 
+    private readonly Dictionary<(UUID, string), IScriptApi> m_apis = new();
+
+    /// <summary>
+    /// Makes <paramref name="api"/> the answer to GetApi(itemID, name), as a real engine answers for a running script.
+    /// </summary>
+    public void RegisterApi(UUID itemID, string name, IScriptApi api)
+    {
+        m_apis[(itemID, name)] = api;
+    }
+
     public IScriptApi GetApi(UUID itemID, string name)
     {
-        throw new System.NotImplementedException ();
+        return m_apis.TryGetValue((itemID, name), out IScriptApi api) ? api : null;
     }
 
     public Scene World { get { return m_scene; } }
@@ -268,9 +278,9 @@ public class MockScriptEngine : INonSharedRegionModule, IScriptModule, IScriptEn
 
     public ParameterInfo[] ScriptBaseClassParameters { get { throw new System.NotImplementedException (); } }
 
-    IConfig IScriptEngine.Config => throw new NotImplementedException();
+    IConfig IScriptEngine.Config => Config;
 
-    IConfigSource IScriptEngine.ConfigSource => throw new NotImplementedException();
+    IConfigSource IScriptEngine.ConfigSource => ConfigSource;
 
     public void ClearPostedEvents()
     {

@@ -1,0 +1,48 @@
+{
+  "id": "E01-hair-nothing-worn",
+  "title": "Hair channel with no hair worn: nothing drawn",
+  "rules": [
+    "R18"
+  ],
+  "note": "",
+  "channel": "Hair",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": true,
+    "rgbaSha256": "62fb561c59d0cea247fc588f3311ee665375f35d8675b186e2792cb7dfcff88c",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "skipped",
+        "wearable": "Hair",
+        "detail": "no Hair worn"
+      },
+      {
+        "layer": "hair_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "hair texture alpha layer",
+        "status": "skipped",
+        "wearable": "Hair",
+        "detail": "no Hair worn"
+      },
+      {
+        "layer": "hair alpha",
+        "status": "skipped",
+        "wearable": "Alpha",
+        "detail": "no Alpha worn"
+      }
+    ]
+  }
+}

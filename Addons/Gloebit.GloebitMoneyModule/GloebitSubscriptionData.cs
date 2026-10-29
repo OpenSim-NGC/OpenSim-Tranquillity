@@ -27,6 +27,8 @@ using NpgsqlTypes;
 using OpenMetaverse;  // Necessary for UUID type
 using MySqlConnector;
 
+using Microsoft.Extensions.Logging;
+
 namespace Gloebit.GloebitMoneyModule;
 
 class GloebitSubscriptionData {
@@ -91,7 +93,7 @@ class GloebitSubscriptionData {
         
         public override bool Store(GloebitSubscription subscription)
         {
-            //            m_log.DebugFormat("[MYSQL GENERIC TABLE HANDLER]: Store(T row) invoked");
+            //            m_log.LogDebug("[MYSQL GENERIC TABLE HANDLER]: Store(T row) invoked");
             
             using (MySqlCommand cmd = new MySqlCommand())
             {
@@ -182,10 +184,10 @@ class GloebitSubscriptionData {
                 cmd.CommandText = query.ToString();
                 conn.Open();
                 if (cmd.ExecuteNonQuery() > 0) {
-                    //m_log.Info("[PGSQLGenericTable]: UpdateFromGloebit completed successfully");
+                    //m_log.LogInformation("[PGSQLGenericTable]: UpdateFromGloebit completed successfully");
                     return true;
                 } else {
-                    //m_log.Error("[PGSQLGenericTable]: UpdateFromGloebit FAILED!!!!!");
+                    //m_log.LogError("[PGSQLGenericTable]: UpdateFromGloebit FAILED!!!!!");
                     return false;
                 }
                 

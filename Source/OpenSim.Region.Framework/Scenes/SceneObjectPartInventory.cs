@@ -30,16 +30,16 @@ using System.Xml;
 using System.Collections;
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.Framework.Scenes;
 
 public class SceneObjectPartInventory : IEntityInventory , IDisposable
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private byte[] m_inventoryFileData = Array.Empty<byte>();
     private byte[] m_inventoryFileNameBytes = Array.Empty<byte>();
@@ -453,10 +453,37 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
     /// <returns>true if the script instance was created, false otherwise</returns>
     public bool CreateScriptInstance(TaskInventoryItem item, int startParam, bool postOnRez, string engine, int stateSource)
     {
-        //m_log.DebugFormat("[PRIM INVENTORY]: Starting script {0} {1} in prim {2} {3} in {4}",
+        //m_log.LogDebug("[PRIM INVENTORY]: Starting script {0} {1} in prim {2} {3} in {4}",
         //    item.Name, item.ItemID, m_part.Name, m_part.UUID, m_part.ParentGroup.Scene.RegionInfo.RegionName);
 
-        if (!m_part.ParentGroup.Scene.Permissions.CanRunScript(item, m_part))
+        Scene scene = m_part.ParentGroup.Scene;
+
+        // Offer carried state before choosing the parcel policy, but keep the object's copy if starting is denied.
+        UUID restoredStateID = item.OldItemID;
+        if (m_part.ParentGroup.m_savedScriptState != null)
+            restoredStateID = RestoreSavedScriptState(item.LoadedItemID, item.OldItemID, item.ItemID);
+
+        // Only when a loaded engine enforces the parcel script rules itself do we need to know which engine will
+        // run this script, and for that the script's first line. Otherwise this is the same check as before.
+        bool engineEnforcesParcelRules = false;
+        IScriptModule selectedEngine = null;
+        AssetBase asset = null;
+        string script = null;
+        if (scene.AnyScriptEngineEnforcesParcelRules())
+        {
+            // A trusted-binaries crossing has no header to inspect, but saved state still selects the engine.
+            if (!(stateSource == 2 && scene.m_trustBinaries))
+            {
+                asset = scene.AssetService.Get(item.AssetID.ToString());
+                if (asset is not null)
+                    script = Utils.BytesToString(asset.Data);
+            }
+            selectedEngine = scene.ResolveScriptEngine(engine, script, item);
+            engineEnforcesParcelRules = selectedEngine is IParcelScriptPolicyEngine policy
+                    && policy.EnforcesParcelScriptRules;
+        }
+
+        if (!scene.Permissions.CanRunScript(item, m_part, engineEnforcesParcelRules))
         {
             StoreScriptError(item.ItemID, "no permission");
             return false;
@@ -475,7 +502,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             m_items.LockItemsForRead(false);
 
             StoreScriptError(itemID, String.Format("TaskItem ID {0} could not be found", item.ItemID));
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Couldn't start script {0}, {1} at {2} in {3} since taskitem ID {4} could not be found",
                 item.Name, item.ItemID, m_part.AbsolutePosition,
                 m_part.ParentGroup.Scene.RegionInfo.RegionName, item.ItemID);
@@ -486,11 +513,15 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         if (stateSource == 2 && m_part.ParentGroup.Scene.m_trustBinaries)
         {
             // Prim crossing
+            m_part.ParentGroup.m_savedScriptState?.Remove(restoredStateID);
             m_items.LockItemsForWrite(true);
+            it.OldItemID = restoredStateID;
             it.PermsMask = 0;
             it.PermsGranter = UUID.Zero;
             m_items.LockItemsForWrite(false);
 
+            selectedEngine ??= scene.ResolveScriptEngine(engine, String.Empty, item);
+            engine = selectedEngine?.ScriptEngineName ?? engine;
             m_part.ParentGroup.Scene.EventManager.TriggerRezScript(
                 m_part.LocalId, itemID, String.Empty, startParam, postOnRez, engine, stateSource);
             StoreScriptErrors(itemID, null);
@@ -499,11 +530,11 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             return true;
         }
 
-        AssetBase asset = m_part.ParentGroup.Scene.AssetService.Get(item.AssetID.ToString());
+        asset ??= m_part.ParentGroup.Scene.AssetService.Get(item.AssetID.ToString());
         if (asset == null)
         {
             StoreScriptError(itemID, String.Format("asset ID {0} could not be found", item.AssetID));
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: Couldn't start script {0}, {1} at {2} in {3} since asset ID {4} could not be found",
                 item.Name, item.ItemID, m_part.AbsolutePosition,
                 m_part.ParentGroup.Scene.RegionInfo.RegionName, item.AssetID);
@@ -511,16 +542,18 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             return false;
         }
 
-        if (m_part.ParentGroup.m_savedScriptState != null)
-            item.OldItemID = RestoreSavedScriptState(item.LoadedItemID, item.OldItemID, itemID);
-
+        m_part.ParentGroup.m_savedScriptState?.Remove(restoredStateID);
+        item.OldItemID = restoredStateID;
         m_items.LockItemsForWrite(true);
         it.OldItemID = item.OldItemID;
         it.PermsMask = 0;
         it.PermsGranter = UUID.Zero;
         m_items.LockItemsForWrite(false);
 
-        string script = Utils.BytesToString(asset.Data);
+        script ??= Utils.BytesToString(asset.Data);
+        // Resolve once: an engine may consume carried state as soon as its rez callback runs.
+        selectedEngine ??= scene.ResolveScriptEngine(engine, script, item);
+        engine = selectedEngine?.ScriptEngineName ?? engine;
         m_part.ParentGroup.Scene.EventManager.TriggerRezScript(
             m_part.LocalId, itemID, script, startParam, postOnRez, engine, stateSource);
         StoreScriptErrors(itemID, null);
@@ -532,7 +565,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
 
     private UUID RestoreSavedScriptState(UUID loadedID, UUID oldID, UUID newID)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[PRIM INVENTORY]: Restoring scripted state for item {0}, oldID {1}, loadedID {2}",
         //     newID, oldID, loadedID);
         IScriptModule[] scriptEngines = m_part.ParentGroup.Scene.RequestModuleInterfaces<IScriptModule>();
@@ -545,7 +578,18 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         if (m_part.ParentGroup.m_savedScriptState.ContainsKey(stateID))
         {
             XmlDocument doc = new XmlDocument();
-            doc.LoadXml(m_part.ParentGroup.m_savedScriptState[stateID]);
+            try
+            {
+                doc.LoadXml(m_part.ParentGroup.m_savedScriptState[stateID]);
+            }
+            catch (XmlException e)
+            {
+                // Unreadable saved state cannot be applied: this script starts fresh and the rez goes on.
+                m_log.LogWarning(
+                    "[PRIM INVENTORY]: Ignoring unreadable saved script state for item {0} in part {1} of {2}: {3}",
+                    newID, m_part.Name, m_part.ParentGroup.Name, e.Message);
+                return stateID;
+            }
 
             ////////// CRUFT WARNING ///////////////////////////////////
             //
@@ -576,7 +620,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                 // This created document has only the minimun data
                 // necessary for XEngine to parse it successfully
 
-                //m_log.DebugFormat("[PRIM INVENTORY]: Adding legacy state {0} in {1}", stateID, newID);
+                //m_log.LogDebug("[PRIM INVENTORY]: Adding legacy state {0} in {1}", stateID, newID);
 
                 m_part.ParentGroup.m_savedScriptState[stateID] = newDoc.OuterXml;
             }
@@ -590,7 +634,6 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                 }
             }
 
-            m_part.ParentGroup.m_savedScriptState.Remove(stateID);
         }
 
         return stateID;
@@ -629,7 +672,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             string msg = String.Format("couldn't be found for prim {0}, {1} at {2} in {3}", m_part.Name, m_part.UUID,
                 m_part.AbsolutePosition, m_part.ParentGroup.Scene.RegionInfo.RegionName);
             StoreScriptError(itemId, msg);
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: " +
                 "Couldn't start script with ID {0} since it {1}", itemId, msg);
         }
@@ -662,7 +705,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             {
                 if (!System.Threading.Monitor.Wait(m_scriptErrors, 15000))
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[PRIM INVENTORY]: " +
                         "timedout waiting for script {0} errors", itemId);
                     errors = m_scriptErrors[itemId];
@@ -748,7 +791,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[PRIM INVENTORY]: " +
                 "Couldn't stop script with ID {0} since it couldn't be found for prim {1}, {2} at {3} in {4}",
                 itemId, m_part.Name, m_part.UUID,
@@ -776,7 +819,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[PRIM INVENTORY]: " +
                 "Couldn't stop script with ID {0} since it couldn't be found for prim {1}, {2} at {3} in {4}",
                 itemId, m_part.Name, m_part.UUID,
@@ -845,6 +888,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         bool removeControl = ((permissions & 4) != 0); //takecontrol
         List<UUID> grants = new List<UUID>();
         List<UUID> items = new List<UUID>();
+        List<(UUID item, UUID granter, int removed)> removedGrants = new();
 
         permissions = ~permissions;
         foreach (TaskInventoryItem item in m_scripts.Values)
@@ -856,10 +900,13 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                 grants.Add(curGrant);
                 items.Add(item.ItemID);
             }
+            int oldmask = curmask;
             curmask &= permissions;
             item.PermsMask = curmask;
             if(curmask == 0)
                 item.PermsGranter = UUID.Zero;
+            if (curmask != oldmask)
+                removedGrants.Add((item.ItemID, curGrant, oldmask & ~curmask));
         }
         m_items.LockItemsForWrite(false);
 
@@ -872,6 +919,8 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                     presence.UnRegisterControlEventsToScript(m_part.LocalId, items[i]);
             }
         }
+
+        TriggerScriptPermissionsRemoved(removedGrants);
     }
 
     public void RemoveScriptsPermissions(ScenePresence sp, int permissions)
@@ -888,6 +937,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         List<UUID> items = new List<UUID>();
 
         permissions = ~permissions;
+        List<(UUID item, UUID granter, int removed)> removedGrants = new();
         foreach (TaskInventoryItem item in m_scripts.Values)
         {
                 if(grant != item.PermsGranter)
@@ -895,10 +945,13 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                 int curmask = item.PermsMask;
                 if (removeControl && ((curmask & 4) != 0))
                     items.Add(item.ItemID);
+                int oldmask = curmask;
                 curmask &= permissions;
                 item.PermsMask = curmask;
                 if(curmask == 0)
                     item.PermsGranter = UUID.Zero;
+                if (curmask != oldmask)
+                    removedGrants.Add((item.ItemID, grant, oldmask & ~curmask));
         }
         m_items.LockItemsForWrite(false);
 
@@ -910,6 +963,23 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                     sp.UnRegisterControlEventsToScript(m_part.LocalId, items[i]);
             }
         }
+
+        TriggerScriptPermissionsRemoved(removedGrants);
+    }
+
+    /// <summary>
+    /// Tell script engines which items lost which permissions (EventManager.OnScriptPermissionsRemoved). Called with
+    /// the inventory lock released.
+    /// </summary>
+    private void TriggerScriptPermissionsRemoved(List<(UUID item, UUID granter, int removed)> removedGrants)
+    {
+        if (removedGrants.Count == 0)
+            return;
+        EventManager events = m_part.ParentGroup?.Scene?.EventManager;
+        if (events is null)
+            return;
+        foreach ((UUID item, UUID granter, int removed) in removedGrants)
+            events.TriggerScriptPermissionsRemoved(m_part.UUID, item, granter, removed);
     }
 
     /// <summary>
@@ -1172,7 +1242,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
 
         if (null == rezAsset)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[PRIM INVENTORY]: Could not find asset {0} for inventory item {1} in {2}",
                 item.AssetID, item.Name, m_part.Name);
             objlist = null;
@@ -1260,7 +1330,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         AssetBase rezAsset = m_part.ParentGroup.Scene.AssetService.Get(item.AssetID.ToString());
         if (rezAsset is null)
         {
-            m_log.Warn($"[PRIM INVENTORY]: Could not find asset {item.AssetID} for inventory item {item.Name} in {m_part.Name}");
+            m_log.LogWarning($"[PRIM INVENTORY]: Could not find asset {item.AssetID} for inventory item {item.Name} in {m_part.Name}");
             return null;
         }
 
@@ -1343,7 +1413,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
 
         if (m_items.TryGetValue(item.ItemID, out TaskInventoryItem olditem))
         {
-            //m_log.DebugFormat("[PRIM INVENTORY]: Updating item {0} in {1}", item.Name, m_part.Name);
+            //m_log.LogDebug("[PRIM INVENTORY]: Updating item {0} in {1}", item.Name, m_part.Name);
 
             item.ParentID = m_part.UUID;
             item.ParentPartID = m_part.UUID;
@@ -1382,7 +1452,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: " +
                 "Tried to retrieve item ID {0} from prim {1}, {2} at {3} in {4} but the item does not exist in this inventory",
                 item.ItemID, m_part.Name, m_part.UUID,
@@ -1431,7 +1501,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             }
             else
             {
-                m_log.Error(
+                m_log.LogError(
                     "[PRIM INVENTORY]: Tried to remove item ID " +
                     $"{itemID} from prim {m_part.Name}, {m_part.UUID} but the item does not exist in this inventory");
             }
@@ -1895,7 +1965,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             {
                 if (e != null)
                 {
-                    //m_log.DebugFormat(
+                    //m_log.LogDebug(
                     //    "[PRIM INVENTORY]: Getting script state from engine {0} for {1} in part {2} in group {3} in {4}",
                     //    e.Name, item.Name, m_part.Name, m_part.ParentGroup.Name, m_part.ParentGroup.Scene.Name);
 
@@ -1941,7 +2011,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             {
                 if (engine != null)
                 {
-                    //m_log.DebugFormat(
+                    //m_log.LogDebug(
                     //    "[PRIM INVENTORY]: Resuming script {0} {1} for {2}, OwnerChanged {3}",
                     //     item.Name, item.ItemID, item.OwnerID, item.OwnerChanged);
 

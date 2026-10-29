@@ -31,7 +31,6 @@ using System.Reflection;
 using System.Xml;
 
 using Nini.Config;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Data;
 using OpenSim.Server.Base;
@@ -40,11 +39,13 @@ using OpenSim.Services.Connectors.Hypergrid;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.GridService;
 
 public class HypergridLinker : IHypergridLinker
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static uint m_autoMappingX = 0;
     private static uint m_autoMappingY = 0;
@@ -72,7 +73,7 @@ public class HypergridLinker : IHypergridLinker
 
         m_Database = db;
         m_GridService = gridService;
-        m_log.DebugFormat("[HYPERGRID LINKER]: Starting with db {0}", db.GetType());
+        m_log.LogDebug("[HYPERGRID LINKER]: Starting with db {0}", db.GetType());
 
         string assetService = gridConfig.GetString("AssetService", string.Empty);
 
@@ -93,11 +94,11 @@ public class HypergridLinker : IHypergridLinker
         if(!m_ThisGridInfo.HasHGConfig)
             throw new Exception("missing HyperGrid configuration");
 
-        m_log.DebugFormat("[HYPERGRID LINKER]: Local Gatekeeper: {0}", m_ThisGridInfo.GateKeeperURL);
+        m_log.LogDebug("[HYPERGRID LINKER]: Local Gatekeeper: {0}", m_ThisGridInfo.GateKeeperURL);
 
         m_GatekeeperConnector = new GatekeeperServiceConnector(m_AssetService);
 
-        m_log.Debug("[HYPERGRID LINKER]: Loaded all services...");
+        m_log.LogDebug("[HYPERGRID LINKER]: Loaded all services...");
 
         if (!string.IsNullOrEmpty(m_MapTileDirectory))
         {
@@ -107,7 +108,7 @@ public class HypergridLinker : IHypergridLinker
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[HYPERGRID LINKER]: Could not create map tile storage directory {0}: {1}", m_MapTileDirectory, e);
+                m_log.LogWarning("[HYPERGRID LINKER]: Could not create map tile storage directory {0}: {1}", m_MapTileDirectory, e);
                 m_MapTileDirectory = string.Empty;
             }
         }
@@ -148,7 +149,7 @@ public class HypergridLinker : IHypergridLinker
 
         if (rurl.IsLocalGrid)
         {
-            m_log.InfoFormat("[HYPERGRID LINKER]: Cannot hyperlink to regions on the same grid");
+            m_log.LogInformation("[HYPERGRID LINKER]: Cannot hyperlink to regions on the same grid");
             return null;
         }
 
@@ -161,7 +162,7 @@ public class HypergridLinker : IHypergridLinker
     private static readonly IPEndPoint dummyIP = new IPEndPoint(0,0);
     private bool TryCreateLinkImpl(UUID scopeID, int xloc, int yloc, RegionURI rurl, UUID ownerID, out GridRegion regInfo)
     {
-        m_log.InfoFormat("[HYPERGRID LINKER]: Link to {0} {1}, in <{2},{3}>",
+        m_log.LogInformation("[HYPERGRID LINKER]: Link to {0} {1}, in <{2},{3}>",
             rurl.HostUrl, rurl.RegionName, Util.WorldToRegionLoc((uint)xloc), Util.WorldToRegionLoc((uint)yloc));
 
 
@@ -169,7 +170,7 @@ public class HypergridLinker : IHypergridLinker
         GridRegion region = m_GridService.GetRegionByPosition(scopeID, xloc, yloc);
         if (region != null)
         {
-            m_log.WarnFormat("[HYPERGRID LINKER]: Coordinates <{0},{1}> are already occupied by region {2} with uuid {3}",
+            m_log.LogWarning("[HYPERGRID LINKER]: Coordinates <{0},{1}> are already occupied by region {2} with uuid {3}",
                 Util.WorldToRegionLoc((uint)xloc), Util.WorldToRegionLoc((uint)yloc),
                 region.RegionName, region.RegionID);
             regInfo = null;
@@ -202,14 +203,14 @@ public class HypergridLinker : IHypergridLinker
 
         if (regionID.IsZero())
         {
-            m_log.Warn("[HYPERGRID LINKER]: Unable to link region: " + reason);
+            m_log.LogWarning("[HYPERGRID LINKER]: Unable to link region: " + reason);
             return false;
         }
 
         region = m_GridService.GetRegionByUUID(scopeID, regionID);
         if (region != null)
         {
-            m_log.DebugFormat("[HYPERGRID LINKER]: Region already exists in coordinates <{0},{1}>",
+            m_log.LogDebug("[HYPERGRID LINKER]: Region already exists in coordinates <{0},{1}>",
                 Util.WorldToRegionLoc((uint)region.RegionLocX), Util.WorldToRegionLoc((uint)region.RegionLocY));
             regInfo = region;
             return true;
@@ -224,7 +225,7 @@ public class HypergridLinker : IHypergridLinker
         else
             regInfo.RegionName = externalName;
 
-        m_log.DebugFormat("[HYPERGRID LINKER]: naming linked region {0}, handle {1}", regInfo.RegionName, handle.ToString());
+        m_log.LogDebug("[HYPERGRID LINKER]: naming linked region {0}, handle {1}", regInfo.RegionName, handle.ToString());
 
         // Get the map image
         regInfo.TerrainImage = GetMapImage(regionID, imageURL);
@@ -233,7 +234,7 @@ public class HypergridLinker : IHypergridLinker
         regInfo.RegionSecret = handle.ToString();
 
         AddHyperlinkRegion(regInfo, handle);
-        m_log.InfoFormat("[HYPERGRID LINKER]: Successfully linked to region {0} at <{1},{2}> with image {3}",
+        m_log.LogInformation("[HYPERGRID LINKER]: Successfully linked to region {0} at <{1},{2}> with image {3}",
             regInfo.RegionName, Util.WorldToRegionLoc((uint)regInfo.RegionLocX), Util.WorldToRegionLoc((uint)regInfo.RegionLocY), regInfo.TerrainImage);
         return true;
     }
@@ -287,7 +288,7 @@ public class HypergridLinker : IHypergridLinker
 
     private bool TryCreateLinkImpl(UUID scopeID, int xloc, int yloc, string remoteRegionName, uint externalPort, string externalHostName, string serverURI, UUID ownerID, out GridRegion regInfo, out string reason)
     {
-        m_log.InfoFormat("[HYPERGRID LINKER]: Link to {0} {1}, in <{2},{3}>",
+        m_log.LogInformation("[HYPERGRID LINKER]: Link to {0} {1}, in <{2},{3}>",
             (serverURI ?? externalHostName + ":" + externalPort),
             remoteRegionName, Util.WorldToRegionLoc((uint)xloc), Util.WorldToRegionLoc((uint)yloc));
 
@@ -325,7 +326,7 @@ public class HypergridLinker : IHypergridLinker
 
         if(IsLocalGrid(regInfo.ServerURI))
         {
-            m_log.InfoFormat("[HYPERGRID LINKER]: Cannot hyperlink to regions on the same grid");
+            m_log.LogInformation("[HYPERGRID LINKER]: Cannot hyperlink to regions on the same grid");
             reason = "Cannot hyperlink to regions on the same grid";
             return false;
         }
@@ -334,7 +335,7 @@ public class HypergridLinker : IHypergridLinker
         GridRegion region = m_GridService.GetRegionByPosition(regInfo.ScopeID, regInfo.RegionLocX, regInfo.RegionLocY);
         if (region != null)
         {
-            m_log.WarnFormat("[HYPERGRID LINKER]: Coordinates <{0},{1}> are already occupied by region {2} with uuid {3}",
+            m_log.LogWarning("[HYPERGRID LINKER]: Coordinates <{0},{1}> are already occupied by region {2} with uuid {3}",
                 Util.WorldToRegionLoc((uint)regInfo.RegionLocX), Util.WorldToRegionLoc((uint)regInfo.RegionLocY),
                 region.RegionName, region.RegionID);
             reason = "Coordinates are already in use";
@@ -347,7 +348,7 @@ public class HypergridLinker : IHypergridLinker
         }
         catch (Exception e)
         {
-            m_log.Warn("[HYPERGRID LINKER]: Wrong format for link-region: " + e.Message);
+            m_log.LogWarning("[HYPERGRID LINKER]: Wrong format for link-region: " + e.Message);
             reason = "Internal error";
             return false;
         }
@@ -364,7 +365,7 @@ public class HypergridLinker : IHypergridLinker
 
         if (regionID.IsZero())
         {
-            m_log.Warn("[HYPERGRID LINKER]: Unable to link region");
+            m_log.LogWarning("[HYPERGRID LINKER]: Unable to link region");
             reason = "Remote region could not be found";
             return false;
         }
@@ -372,7 +373,7 @@ public class HypergridLinker : IHypergridLinker
         region = m_GridService.GetRegionByUUID(scopeID, regionID);
         if (region != null)
         {
-            m_log.DebugFormat("[HYPERGRID LINKER]: Region already exists in coordinates <{0},{1}>",
+            m_log.LogDebug("[HYPERGRID LINKER]: Region already exists in coordinates <{0},{1}>",
                 Util.WorldToRegionLoc((uint)region.RegionLocX), Util.WorldToRegionLoc((uint)region.RegionLocY));
             regInfo = region;
             return true;
@@ -387,7 +388,7 @@ public class HypergridLinker : IHypergridLinker
 //            {
 //                //RemoveHyperlinkRegion(regInfo.RegionID);
 //                reason = "Region is too far (" + x + ", " + y + ")";
-//                m_log.Info("[HYPERGRID LINKER]: Unable to link, region is too far (" + x + ", " + y + ")");
+//                m_log.LogInformation("[HYPERGRID LINKER]: Unable to link, region is too far (" + x + ", " + y + ")");
 //                //return false;
 //            }
 
@@ -400,7 +401,7 @@ public class HypergridLinker : IHypergridLinker
          else
             regInfo.RegionName = externalName;
 
-        m_log.DebugFormat("[HYPERGRID LINKER]: naming linked region {0}, handle {1}", regInfo.RegionName, handle.ToString());
+        m_log.LogDebug("[HYPERGRID LINKER]: naming linked region {0}, handle {1}", regInfo.RegionName, handle.ToString());
 
         // Get the map image
         regInfo.TerrainImage = GetMapImage(regionID, imageURL);
@@ -409,14 +410,14 @@ public class HypergridLinker : IHypergridLinker
         regInfo.RegionSecret = handle.ToString();
 
         AddHyperlinkRegion(regInfo, handle);
-        m_log.InfoFormat("[HYPERGRID LINKER]: Successfully linked to region {0} at <{1},{2}> with image {3}",
+        m_log.LogInformation("[HYPERGRID LINKER]: Successfully linked to region {0} at <{1},{2}> with image {3}",
             regInfo.RegionName, Util.WorldToRegionLoc((uint)regInfo.RegionLocX), Util.WorldToRegionLoc((uint)regInfo.RegionLocY), regInfo.TerrainImage);
         return true;
     }
 
     public bool TryUnlinkRegion(string mapName)
     {
-        m_log.DebugFormat("[HYPERGRID LINKER]: Request to unlink {0}", mapName);
+        m_log.LogDebug("[HYPERGRID LINKER]: Request to unlink {0}", mapName);
         GridRegion regInfo = null;
 
         List<RegionData> regions = m_Database.Get(Util.EscapeForLike(mapName), m_ScopeID);
@@ -438,7 +439,7 @@ public class HypergridLinker : IHypergridLinker
         }
         else
         {
-            m_log.InfoFormat("[HYPERGRID LINKER]: Region {0} not found", mapName);
+            m_log.LogInformation("[HYPERGRID LINKER]: Region {0} not found", mapName);
             return false;
         }
     }
@@ -731,7 +732,7 @@ public class HypergridLinker : IHypergridLinker
         }
         catch (Exception e)
         {
-            m_log.Error(e.ToString());
+            m_log.LogError(e.ToString());
         }
     }
 

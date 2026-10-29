@@ -1,0 +1,53 @@
+{
+  "id": "G03-aux1-tattoo",
+  "title": "Aux 1 universal tattoo",
+  "rules": [
+    "R03"
+  ],
+  "note": "",
+  "channel": "Aux1",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Universal",
+      "label": "uni",
+      "params": {},
+      "textures": [
+        {
+          "slot": "Aux1Tattoo",
+          "generator": "checkA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-uni-Aux1Tattoo.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "d9bb6c1f653af00888def9e6774d21ef7c37ad8076a26616cf5c67ea31932584",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.50,0.50,0.50,1.00); aux_base.tga\u002Balpha"
+      },
+      {
+        "layer": "aux1_tattoo",
+        "status": "drawn",
+        "wearable": "Universal",
+        "detail": "uni: Aux1Tattoo 64x64\u002Balpha -\u003E 64; colour (1.00,1.00,1.00,1.00)"
+      }
+    ]
+  }
+}

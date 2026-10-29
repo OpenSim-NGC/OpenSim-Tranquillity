@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <AssemblyTitle>OpenSim.Region.CoreModules</AssemblyTitle>
     <Product>OpenSim.Region.CoreModules.Properties</Product>
     <Description>Core modules for OpenSim</Description>
@@ -35,12 +34,11 @@
   </ItemGroup>
   
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.1" />
-    <PackageReference Include="MailKit" Version="4.16.0" />
-    <PackageReference Include="MimeKit" Version="4.16.0" />
-    <PackageReference Include="MySqlConnector" Version="2.5.0" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
-    <PackageReference Include="SkiaSharp" Version="3.119.2" />
+    <PackageReference Include="MailKit" Version="4.18.1" />
+    <PackageReference Include="MimeKit" Version="4.18.2" />
+    <PackageReference Include="MySqlConnector" Version="2.6.2" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.13" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.4.1.108" />
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
   </ItemGroup>
 </Project>

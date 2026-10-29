@@ -34,6 +34,8 @@ using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ScriptEngine.Yengine;
 
 public partial class XMRInstance
@@ -431,7 +433,7 @@ public partial class XMRInstance
         {
             if (stackFrames is not null)
             {
-                m_log.Error($"CheckRunLockInvariants: script {m_DescName}, eventcode: None, stackFrame not null");
+                m_log.LogError($"CheckRunLockInvariants: script {m_DescName}, eventcode: None, stackFrame not null");
                 if (throwIt)
                     throw new Exception("CheckRunLockInvariants: eventcode=None, stackFrame not null");
             }
@@ -440,7 +442,7 @@ public partial class XMRInstance
         {
             if (stackFrames is null)
             {
-                m_log.Error($"CheckRunLockInvariants: script {m_DescName}, eventcode {eventCode}, stackFrame null");
+                m_log.LogError($"CheckRunLockInvariants: script {m_DescName}, eventcode {eventCode}, stackFrame null");
                 if (throwIt)
                     throw new Exception("CheckRunLockInvariants: eventcode=" + eventCode.ToString() + ", stackFrame null");
             }
@@ -599,7 +601,7 @@ public partial class XMRInstance
                                                        ChatTypeEnum.DebugChannel, 0x7FFFFFFF,
                                                        m_Part.AbsolutePosition,
                                                        m_Part.Name, m_Part.UUID, false);
-        m_log.Debug(string.Format(
+        m_log.LogDebug(string.Format(
             "[SCRIPT ERROR]: {0} (at event {1}, part {2} {3} at {4} in {5}",
             (string.IsNullOrEmpty(evMessage) ? "" : evMessage),
             ev.ToString(),
@@ -646,7 +648,7 @@ public partial class XMRInstance
         msg.Append(">\nScript must be Reset to re-enable.\n");
 
          // Display full exception message in log.
-        m_log.Info(msg.ToString() + XMRExceptionStackString(e), e);
+        m_log.LogInformation(e, msg.ToString() + XMRExceptionStackString(e));
 
          // Give script owner the stack dump.
         msg.Append(XMRExceptionStackString(e));

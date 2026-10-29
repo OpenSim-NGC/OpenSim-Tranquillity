@@ -156,10 +156,10 @@ public sealed class RegionConsoleRunnerServiceTests
 
         public FakeConsole(Action onPrompt) => _onPrompt = onPrompt;
 
-        public event OnOutputDelegate OnOutput;
+        public event OnOutputDelegate OnOutput = delegate { };
         public ICommands Commands => _commands;
         public string DefaultPrompt { get; set; } = string.Empty;
-        public IScene ConsoleScene { get; set; }
+        public IScene ConsoleScene { get; set; } = null!;
         public void RunCommand(string cmd) { }
         public string ReadLine(string p, bool isCommand, bool e) => string.Empty;
         public void WriteLine(string s) { }

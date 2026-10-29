@@ -28,7 +28,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net;
-using Xunit;
+using Mono.Addins;
 using OpenMetaverse;
 using OpenSim;
 using OpenSim.ApplicationPlugins.RegionModulesController;
@@ -37,11 +37,13 @@ using OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Tests.Common;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.Framework.Scenes.Tests
 {
     public class SharedRegionModuleTests : OpenSimTestCase
     {
-//        [Fact]
+//        [Test]
         public void TestLifecycle()
         {
             TestHelpers.InMethod();
@@ -220,7 +222,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
         {
             foreach (IRegionModuleBase module in scene.RegionModules.Values)
             {
-//                m_log.DebugFormat("[REGIONMODULE]: Removing scene {0} from module {1}",
+//                m_log.LogDebug("[REGIONMODULE]: Removing scene {0} from module {1}",
 //                                  scene.RegionInfo.RegionName, module.Name);
                 module.RemoveRegion(scene);
             }

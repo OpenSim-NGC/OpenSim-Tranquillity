@@ -32,14 +32,13 @@ using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
 using OpenSim.Server.Handlers.Simulation;
 using OpenMetaverse.StructuredData;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Hypergrid;
 
 public class HomeAgentHandler : AgentPostHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private IUserAgentService m_UserAgentService;
 
     private string m_LoginServerIP;
@@ -75,12 +74,16 @@ public class HomeAgentHandler : AgentPostHandler
         }
         catch (InvalidCastException)
         {
-            m_log.ErrorFormat("[HOME AGENT HANDLER]: Bad cast in UnpackData");
+            m_log.LogError("[HOME AGENT HANDLER]: Bad cast in UnpackData");
         }
 
-        // Verify if this call came from the login server
-        if (remoteAddress == m_LoginServerIP)
-            data.fromLogin = true;
+        // SECURITY: /homeagent is ALWAYS a simulator-originated launch, never a first login.
+        // Password logins reach LoginAgentToGrid in-process with fromLogin: true; they do not
+        // arrive over HTTP. Inferring fromLogin from the caller's IP meant that anything behind
+        // a local proxy - or able to present the login server's address - was treated as a
+        // first login and skipped the travel-session checks entirely.
+        // DHPG security plan hg_homeagent_session_bind, item 3.
+        data.fromLogin = false;
 
     }
 
@@ -98,7 +101,7 @@ public class HomeAgentHandler : AgentPostHandler
             return gatekeeper;
         }
         else
-            m_log.WarnFormat("[HOME AGENT HANDLER]: Wrong data type");
+            m_log.LogWarning("[HOME AGENT HANDLER]: Wrong data type");
 
         return null;
     }

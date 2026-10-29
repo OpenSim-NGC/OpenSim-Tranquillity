@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -33,12 +32,13 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class AuthenticationServicesConnector : BaseServiceConnector, IAuthenticationService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
@@ -63,7 +63,7 @@ public class AuthenticationServicesConnector : BaseServiceConnector, IAuthentica
         IConfig assetConfig = source.Configs["AuthenticationService"];
         if (assetConfig == null)
         {
-            m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
+            m_log.LogError("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
             throw new Exception("Authentication connector init error");
         }
 
@@ -72,7 +72,7 @@ public class AuthenticationServicesConnector : BaseServiceConnector, IAuthentica
 
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[AUTH CONNECTOR]: No Server URI named in section AuthenticationService");
+            m_log.LogError("[AUTH CONNECTOR]: No Server URI named in section AuthenticationService");
             throw new Exception("Authentication connector init error");
         }
         m_ServerURI = serviceURI;
@@ -111,7 +111,7 @@ public class AuthenticationServicesConnector : BaseServiceConnector, IAuthentica
 
     public bool Verify(UUID principalID, string token, int lifetime)
     {
-//            m_log.Error("[XXX]: Verify");
+//            m_log.LogError("[XXX]: Verify");
         Dictionary<string, object> sendData = new Dictionary<string, object>();
         sendData["LIFETIME"] = lifetime.ToString();
         sendData["PRINCIPAL"] = principalID.ToString();

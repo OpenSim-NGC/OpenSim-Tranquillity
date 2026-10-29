@@ -32,14 +32,15 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
 using System.Reflection;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Scripting.LoadImageURL;
 
 public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_name = "LoadImageURL";
     private Scene m_scene;
@@ -163,16 +164,30 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
     {
         if (m_textureManager is null)
         {
-            m_log.WarnFormat("[LOADIMAGEURLMODULE]: No texture manager. Can't function.");
+            m_log.LogWarning("[LOADIMAGEURLMODULE]: No texture manager. Can't function.");
             return false;
         }
 
-        if (!m_outboundUrlFilter.CheckAllowed(new Uri(url)))
+        Uri uri = new(url);
+        if (!m_outboundUrlFilter.CheckAllowed(uri))
             return false;
 
-        var client = new System.Net.Http.HttpClient();
+        // Every redirect hop is checked by the filtering handler. A connection straight to the target goes only to
+        // an address the filter allows; one to the default proxy is left alone.
+        var client = new System.Net.Http.HttpClient(new OutboundUrlFilterRedirectHandler(
+            m_outboundUrlFilter, m_outboundUrlFilter.CreateHandler(System.Net.Http.HttpClient.DefaultProxy), 50));
         var requestState = new RequestState(url, requestID);
-        client.GetAsync(url).ContinueWith((task) => HttpRequestReturn(task, requestState));
+        client.GetAsync(uri).ContinueWith((task) =>
+        {
+            try
+            {
+                HttpRequestReturn(task, requestState);
+            }
+            finally
+            {
+                client.Dispose();
+            }
+        });
         return true;
     }
 
@@ -240,7 +255,7 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
                                         var canvas = surface.Canvas;
                                         var srcRect = SKRect.Create(0, 0, image.Width, image.Height);
                                         var dstRect = SKRect.Create(0, 0, newSize.width, newSize.height);
-                                        canvas.DrawImage(image, srcRect, dstRect);
+                                        canvas.DrawImage(image, srcRect, dstRect, SKSamplingOptions.Default);
                                         canvas.Flush();
 
                                         using (var resized = surface.Snapshot())
@@ -261,12 +276,12 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
                         }
                         catch (Exception)
                         {
-                            m_log.Error("[LOADIMAGEURLMODULE]: Image Conversion Failed.  Empty byte data returned!");
+                            m_log.LogError("[LOADIMAGEURLMODULE]: Image Conversion Failed.  Empty byte data returned!");
                         }
                     }
                     else
                     {
-                        m_log.WarnFormat("[LOADIMAGEURLMODULE] No data returned");
+                        m_log.LogWarning("[LOADIMAGEURLMODULE] No data returned");
                     }
                 }
                 response.Dispose();
@@ -274,10 +289,10 @@ public class LoadImageURLModule : ISharedRegionModule, IDynamicTextureRender
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[LOADIMAGEURLMODULE]: unexpected exception {0}", e.Message);
+            m_log.LogError("[LOADIMAGEURLMODULE]: unexpected exception {0}", e.Message);
         }
 
-        m_log.DebugFormat("[LOADIMAGEURLMODULE]: Returning {0} bytes of image data for request {1}",
+        m_log.LogDebug("[LOADIMAGEURLMODULE]: Returning {0} bytes of image data for request {1}",
                           imageJ2000.Length, state.RequestID);
 
         m_textureManager.ReturnData(

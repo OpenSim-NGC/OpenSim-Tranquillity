@@ -27,20 +27,21 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Services.Interfaces;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Services.AuthorizationService;
 
 public class AuthorizationService : AuthorizationServiceBase, IAuthorizationService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     public AuthorizationService(IConfigSource config) : base(config)
     {
-            m_log.Info("[AUTHORIZATION CONNECTOR]: Local Authorization service enabled");
+            m_log.LogInformation("[AUTHORIZATION CONNECTOR]: Local Authorization service enabled");
     }
 
     public bool IsAuthorizedForRegion(

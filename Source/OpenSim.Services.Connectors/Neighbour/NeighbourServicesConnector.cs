@@ -25,21 +25,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using OpenSim.Framework;
 
 using OpenSim.Services.Interfaces;
 using OpenMetaverse.StructuredData;
 
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Services.Connectors;
 
 public class NeighbourServicesConnector : INeighbourService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     protected IGridService m_GridService = null;
@@ -77,7 +76,7 @@ public class NeighbourServicesConnector : INeighbourService
     public bool DoHelloNeighbourCall(GridRegion region, RegionInfo thisRegion)
     {
         string uri = region.ServerURI + "region/" + thisRegion.RegionID + "/";
-        //m_log.Debug("   >>> DoHelloNeighbourCall <<< " + uri);
+        //m_log.LogDebug("   >>> DoHelloNeighbourCall <<< " + uri);
 
         byte[] buffer;
         try
@@ -88,7 +87,7 @@ public class NeighbourServicesConnector : INeighbourService
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[NEIGHBOUR SERVICES CONNECTOR]: PackRegionInfoData failed for HelloNeighbour from {0} to {1}.  Exception: {2} ",
+            m_log.LogWarning("[NEIGHBOUR SERVICES CONNECTOR]: PackRegionInfoData failed for HelloNeighbour from {0} to {1}.  Exception: {2} ",
                 thisRegion.RegionName, region.RegionName, e.Message);
             return false;
         }
@@ -117,7 +116,7 @@ public class NeighbourServicesConnector : INeighbourService
             request.Content.Headers.TryAddWithoutValidation("Content-Type", "application/json");
             request.Content.Headers.TryAddWithoutValidation("Content-Length", buffer.Length.ToString());
 
-            //m_log.InfoFormat("[REST COMMS]: Posted HelloNeighbour request to remote sim {0}", uri);
+            //m_log.LogInformation("[REST COMMS]: Posted HelloNeighbour request to remote sim {0}", uri);
 
             responseMessage = client.Send(request, HttpCompletionOption.ResponseContentRead);
             responseMessage.EnsureSuccessStatusCode();
@@ -125,12 +124,12 @@ public class NeighbourServicesConnector : INeighbourService
             //using StreamReader sr = new(responseMessage.Content.ReadAsStream());
             //sr.ReadToEnd(); // just try to read
             //string reply = sr.ReadToEnd();
-            //m_log.InfoFormat("[REST COMMS]: DoHelloNeighbourCall reply was {0} ", reply);
+            //m_log.LogInformation("[REST COMMS]: DoHelloNeighbourCall reply was {0} ", reply);
             return true;
         }
         catch (Exception e)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[NEIGHBOUR SERVICES CONNECTOR]: Exception on DoHelloNeighbourCall from {0} back to {1}.  Exception: {2} ",
                 region.RegionName, thisRegion.RegionName, e.Message);
         }

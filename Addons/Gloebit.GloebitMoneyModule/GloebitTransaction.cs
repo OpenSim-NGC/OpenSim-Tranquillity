@@ -24,13 +24,17 @@
  */
 
 using System.Reflection;
-using log4net;
+using System.Security.Cryptography;
+using System.Text;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace Gloebit.GloebitMoneyModule; 
 
 public class GloebitTransaction {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Primary Key value
     //public UUID TransactionID;
@@ -78,6 +82,7 @@ public class GloebitTransaction {
     public bool enacted;
     public bool consumed;
     public bool canceled;
+    public string CallbackKey;
 
     // Timestamps for reporting
     public DateTime cTime;
@@ -159,6 +164,7 @@ public class GloebitTransaction {
         this.enacted = false;
         this.consumed = false;
         this.canceled = false;
+        this.CallbackKey = UUID.Random().ToString();
 
         // Timestamps for reporting
         this.cTime = DateTime.UtcNow;
@@ -234,26 +240,26 @@ public class GloebitTransaction {
     }
 
     public static GloebitTransaction Get(string transactionIDStr) {
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] in Transaction.Get");
+        m_log.LogInformation("[GLOEBITMONEYMODULE] in Transaction.Get");
         GloebitTransaction transaction = null;
         lock(s_transactionMap) {
             s_transactionMap.TryGetValue(transactionIDStr, out transaction);
         }
 
         if(transaction == null) {
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] Looking for prior transaction for {0}", transactionIDStr);
+            m_log.LogDebug("[GLOEBITMONEYMODULE] Looking for prior transaction for {0}", transactionIDStr);
             GloebitTransaction[] transactions = GloebitTransactionData.Instance.Get("TransactionID", transactionIDStr);
 
             switch(transactions.Length) {
             case 1:
                 transaction = transactions[0];
-                m_log.DebugFormat("[GLOEBITMONEYMODULE] FOUND TRANSACTION! {0} {1} {2}", transaction.TransactionID, transaction.PayerID, transaction.PayeeID);
+                m_log.LogDebug("[GLOEBITMONEYMODULE] FOUND TRANSACTION! {0} {1} {2}", transaction.TransactionID, transaction.PayerID, transaction.PayeeID);
                 lock(s_transactionMap) {
                     s_transactionMap[transactionIDStr] = transaction;
                 }
                 return transaction;
             case 0:
-                m_log.DebugFormat("[GLOEBITMONEYMODULE] Could not find transaction matching tID:{0}", transactionIDStr);
+                m_log.LogDebug("[GLOEBITMONEYMODULE] Could not find transaction matching tID:{0}", transactionIDStr);
                 return null;
             default:
                 throw new Exception(String.Format("[GLOEBITMONEYMODULE] Failed to find exactly one transaction for {0}", transactionIDStr));
@@ -266,19 +272,19 @@ public class GloebitTransaction {
     public Uri BuildEnactURI(Uri baseURI) {
         UriBuilder enact_uri = new UriBuilder(baseURI);
         enact_uri.Path = "gloebit/transaction";
-        enact_uri.Query = String.Format("id={0}&state={1}", this.TransactionID, "enact");
+        enact_uri.Query = String.Format("id={0}&state={1}&key={2}", this.TransactionID, "enact", this.CallbackKey);
         return enact_uri.Uri;
     }
     public Uri BuildConsumeURI(Uri baseURI) {
         UriBuilder consume_uri = new UriBuilder(baseURI);
         consume_uri.Path = "gloebit/transaction";
-        consume_uri.Query = String.Format("id={0}&state={1}", this.TransactionID, "consume");
+        consume_uri.Query = String.Format("id={0}&state={1}&key={2}", this.TransactionID, "consume", this.CallbackKey);
         return consume_uri.Uri;
     }
     public Uri BuildCancelURI(Uri baseURI) {
         UriBuilder cancel_uri = new UriBuilder(baseURI);
         cancel_uri.Path = "gloebit/transaction";
-        cancel_uri.Query = String.Format("id={0}&state={1}", this.TransactionID, "cancel");
+        cancel_uri.Query = String.Format("id={0}&state={1}&key={2}", this.TransactionID, "cancel", this.CallbackKey);
         return cancel_uri.Uri;
     }
 
@@ -287,6 +293,11 @@ public class GloebitTransaction {
     /**************************************************/
 
     public static bool ProcessStateRequest(string transactionIDstr, string stateRequested, IAssetCallback assetCallbacks, GloebitAPIWrapper.ITransactionAlert transactionAlerts, out string returnMsg)
+    {
+        return ProcessStateRequest(transactionIDstr, stateRequested, null, assetCallbacks, transactionAlerts, out returnMsg);
+    }
+
+    public static bool ProcessStateRequest(string transactionIDstr, string stateRequested, string callbackKey, IAssetCallback assetCallbacks, GloebitAPIWrapper.ITransactionAlert transactionAlerts, out string returnMsg)
     {
         bool result = false;
 
@@ -297,6 +308,11 @@ public class GloebitTransaction {
         // TODO: is this what we want to return?
         if (myTxn == null) {
             returnMsg = "No matching transaction found.";
+            return false;
+        }
+
+        if (!myTxn.VerifyCallbackKey(callbackKey)) {
+            returnMsg = "Invalid callback key.";
             return false;
         }
 
@@ -349,6 +365,16 @@ public class GloebitTransaction {
         return result;
     }
 
+    public bool VerifyCallbackKey(string callbackKey)
+    {
+        if (string.IsNullOrEmpty(CallbackKey) || string.IsNullOrEmpty(callbackKey))
+            return false;
+
+        byte[] expected = Encoding.UTF8.GetBytes(CallbackKey);
+        byte[] actual = Encoding.UTF8.GetBytes(callbackKey);
+        return expected.Length == actual.Length && CryptographicOperations.FixedTimeEquals(expected, actual);
+    }
+
     private bool enactHold(IAssetCallback assetCallbacks, GloebitAPIWrapper.ITransactionAlert transactionAlerts, out string returnMsg)
     {
         if (this.canceled) {
@@ -373,23 +399,23 @@ public class GloebitTransaction {
         this.enacted = assetCallbacks.processAssetEnactHold(this, out returnMsg);
 
         // TODO: remove this after testing.
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitTransaction.enactHold: {0}", this.enacted);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitTransaction.enactHold: {0}", this.enacted);
         if (this.enacted) {
-            m_log.InfoFormat("TransactionID: {0}", this.TransactionID);
-            m_log.DebugFormat("PayerID: {0}", this.PayerID);
-            m_log.DebugFormat("PayeeID: {0}", this.PayeeID);
-            m_log.DebugFormat("PartID: {0}", this.PartID);
-            m_log.DebugFormat("PartName: {0}", this.PartName);
-            m_log.DebugFormat("CategoryID: {0}", this.CategoryID);
-            m_log.DebugFormat("SaleType: {0}", this.SaleType);
-            m_log.DebugFormat("Amount: {0}", this.Amount);
-            m_log.DebugFormat("PayerEndingBalance: {0}", this.PayerEndingBalance);
-            m_log.DebugFormat("enacted: {0}", this.enacted);
-            m_log.DebugFormat("consumed: {0}", this.consumed);
-            m_log.DebugFormat("canceled: {0}", this.canceled);
-            m_log.DebugFormat("cTime: {0}", this.cTime);
-            m_log.DebugFormat("enactedTime: {0}", this.enactedTime);
-            m_log.DebugFormat("finishedTime: {0}", this.finishedTime);
+            m_log.LogInformation("TransactionID: {0}", this.TransactionID);
+            m_log.LogDebug("PayerID: {0}", this.PayerID);
+            m_log.LogDebug("PayeeID: {0}", this.PayeeID);
+            m_log.LogDebug("PartID: {0}", this.PartID);
+            m_log.LogDebug("PartName: {0}", this.PartName);
+            m_log.LogDebug("CategoryID: {0}", this.CategoryID);
+            m_log.LogDebug("SaleType: {0}", this.SaleType);
+            m_log.LogDebug("Amount: {0}", this.Amount);
+            m_log.LogDebug("PayerEndingBalance: {0}", this.PayerEndingBalance);
+            m_log.LogDebug("enacted: {0}", this.enacted);
+            m_log.LogDebug("consumed: {0}", this.consumed);
+            m_log.LogDebug("canceled: {0}", this.canceled);
+            m_log.LogDebug("cTime: {0}", this.cTime);
+            m_log.LogDebug("enactedTime: {0}", this.enactedTime);
+            m_log.LogDebug("finishedTime: {0}", this.finishedTime);
 
             // TODO: Should we store and update the time even if it fails to track time enact attempted/failed?
             this.enactedTime = DateTime.UtcNow;

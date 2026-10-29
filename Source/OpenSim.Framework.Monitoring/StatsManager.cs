@@ -30,6 +30,8 @@ using System.Diagnostics;
 using System.Text;
 using OpenMetaverse.StructuredData;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework.Monitoring;
 
 /// <summary>
@@ -364,7 +366,7 @@ public static class StatsManager
             strOut = request["callback"].ToString() + "(" + strOut + ");";
         }
 
-        // m_log.DebugFormat("{0} StatFetch: uri={1}, cat={2}, cont={3}, stat={4}, resp={5}",
+        // m_log.LogDebug("{0} StatFetch: uri={1}, cat={2}, cont={3}, stat={4}, resp={5}",
         //                         LogHeader, regpath, pCategoryName, pContainerName, pStatName, strOut);
 
         responsedata["int_response_code"] = response_code;

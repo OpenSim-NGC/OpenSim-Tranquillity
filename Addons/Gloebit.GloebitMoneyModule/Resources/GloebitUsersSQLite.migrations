@@ -49,3 +49,12 @@ CREATE INDEX IF NOT EXISTS ix_gu_pid ON GloebitUsers(PrincipalID);
 COMMIT;
 
 
+:VERSION 4
+
+BEGIN TRANSACTION;
+
+ALTER TABLE GloebitUsers ADD COLUMN PendingAuthState CHAR(36) NOT NULL DEFAULT '';
+
+COMMIT;
+
+

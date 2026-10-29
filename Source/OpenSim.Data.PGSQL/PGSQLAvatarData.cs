@@ -29,6 +29,9 @@ using OpenMetaverse;
 using Npgsql;
 
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.PGSQL;
 
 /// <summary>
@@ -37,7 +40,7 @@ namespace OpenSim.Data.PGSQL;
 public class PGSQLAvatarData : PGSQLGenericTableHandler<AvatarBaseData>,
         IAvatarData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public PGSQLAvatarData(string connectionString, string realm) :
             base(connectionString, realm, "Avatar")

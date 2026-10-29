@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -33,11 +32,13 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.OfflineIM;
 
 public class OfflineIMRegionModule : ISharedRegionModule, IOfflineIMService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
     private List<Scene> m_SceneList = new List<Scene>();
@@ -63,7 +64,7 @@ public class OfflineIMRegionModule : ISharedRegionModule, IOfflineIMService
             m_OfflineIMService = new OfflineIMServiceRemoteConnector(config);
 
         m_ForwardOfflineGroupMessages = cnf.GetBoolean("ForwardOfflineGroupMessages", m_ForwardOfflineGroupMessages);
-        m_log.DebugFormat("[OfflineIM.V2]: Offline messages enabled by {0}", Name);
+        m_log.LogDebug("[OfflineIM.V2]: Offline messages enabled by {0}", Name);
     }
 
     public void AddRegion(Scene scene)
@@ -90,7 +91,7 @@ public class OfflineIMRegionModule : ISharedRegionModule, IOfflineIMService
 
                 m_SceneList.Clear();
 
-                m_log.Error("[OfflineIM.V2]: No message transfer module is enabled. Disabling offline messages");
+                m_log.LogError("[OfflineIM.V2]: No message transfer module is enabled. Disabling offline messages");
             }
             m_TransferModule.OnUndeliveredMessage += UndeliveredMessage;
         }
@@ -159,12 +160,12 @@ public class OfflineIMRegionModule : ISharedRegionModule, IOfflineIMService
 
     private void RetrieveInstantMessages(IClientAPI client)
     {
-        m_log.DebugFormat("[OfflineIM.V2]: Retrieving stored messages for {0}", client.AgentId);
+        m_log.LogDebug("[OfflineIM.V2]: Retrieving stored messages for {0}", client.AgentId);
 
         List<GridInstantMessage> msglist = m_OfflineIMService.GetMessages(client.AgentId);
 
         if (msglist == null)
-            m_log.DebugFormat("[OfflineIM.V2]: WARNING null message list.");
+            m_log.LogDebug("[OfflineIM.V2]: WARNING null message list.");
 
         foreach (GridInstantMessage im in msglist)
         {

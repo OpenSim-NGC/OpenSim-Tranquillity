@@ -28,9 +28,11 @@
 using System.Net;
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.Handlers.Hypergrid;
 
@@ -45,7 +47,7 @@ public class HeloServiceInConnector : ServiceConnector
 
 public class HeloServerGetAndHeadHandler : SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_HandlersType;
 
@@ -59,11 +61,11 @@ public class HeloServerGetAndHeadHandler : SimpleStreamHandler
         if (httpRequest.HttpMethod == "GET")
         {
             //Obsolete
-            m_log.Debug("[HELO]: hi, GET was called");
+            m_log.LogDebug("[HELO]: hi, GET was called");
         }
         else if (httpRequest.HttpMethod == "HEAD")
         {
-            m_log.Debug("[HELO]: hi, HEAD was called");
+            m_log.LogDebug("[HELO]: hi, HEAD was called");
         }
         else
         {

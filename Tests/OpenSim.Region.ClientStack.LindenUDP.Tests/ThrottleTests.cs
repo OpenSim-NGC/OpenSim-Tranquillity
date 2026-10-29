@@ -113,10 +113,10 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         private void AssertRates(
             TokenBucket tb, double requestedDripRate, double totalDripRequest, double dripRate, double maxDripRate)
         {
-            Assert.Equal((int)requestedDripRate, tb.RequestedDripRate, "Requested drip rate");
-            Assert.Equal((int)totalDripRequest, tb.TotalDripRequest, "Total drip request");
-            Assert.Equal((int)dripRate, tb.DripRate, "Drip rate");
-            Assert.Equal((int)maxDripRate, tb.MaxDripRate, "Max drip rate");
+            Assert.Equal((int)requestedDripRate, tb.RequestedDripRate);
+            Assert.Equal((int)totalDripRequest, tb.TotalDripRequest);
+            Assert.Equal((int)dripRate, tb.DripRate);
+            Assert.Equal((int)maxDripRate, tb.MaxDripRate);
         }
 
         [Fact]
@@ -391,16 +391,16 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 //                                "Resend={0}, Land={1}, Wind={2}, Cloud={3}, Task={4}, Texture={5}, Asset={6}, TOTAL = {7}",
 //                                ci.resendThrottle, ci.landThrottle, ci.windThrottle, ci.cloudThrottle, ci.taskThrottle, ci.textureThrottle, ci.assetThrottle, ci.totalThrottle);
 
-            Assert.Equal((int)resendBytes, ci.resendThrottle, "Resend");
-            Assert.Equal((int)landBytes, ci.landThrottle, "Land");
-            Assert.Equal((int)windBytes, ci.windThrottle, "Wind");
-            Assert.Equal((int)cloudBytes, ci.cloudThrottle, "Cloud");
-            Assert.Equal((int)taskBytes, ci.taskThrottle, "Task");
-            Assert.Equal((int)textureBytes, ci.textureThrottle, "Texture");
-            Assert.Equal((int)assetBytes, ci.assetThrottle, "Asset");
-            Assert.Equal((int)totalBytes, ci.totalThrottle, "Total");
-            Assert.Equal((int)targetBytes, ci.targetThrottle, "Target");
-            Assert.Equal((int)maxBytes, ci.maxThrottle, "Max");
+            Assert.Equal((int)resendBytes, ci.resendThrottle);
+            Assert.Equal((int)landBytes, ci.landThrottle);
+            Assert.Equal((int)windBytes, ci.windThrottle);
+            Assert.Equal((int)cloudBytes, ci.cloudThrottle);
+            Assert.Equal((int)taskBytes, ci.taskThrottle);
+            Assert.Equal((int)textureBytes, ci.textureThrottle);
+            Assert.Equal((int)assetBytes, ci.assetThrottle);
+            Assert.Equal((int)totalBytes, ci.totalThrottle);
+            Assert.Equal((int)targetBytes, ci.targetThrottle);
+            Assert.Equal((int)maxBytes, ci.maxThrottle);
         }
 
         private void SetThrottles(

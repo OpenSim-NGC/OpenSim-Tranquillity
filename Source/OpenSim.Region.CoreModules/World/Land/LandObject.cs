@@ -28,11 +28,11 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using RegionFlags = OpenMetaverse.RegionFlags;
 
 namespace OpenSim.Region.CoreModules.World.Land;
@@ -44,7 +44,7 @@ public class LandObject : ILandObject
 {
     #region Member Variables
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[LAND OBJECT]";
 
     protected const int GROUPMEMBERCACHETIMEOUT = 30000;  // cache invalidation after 30s
@@ -453,7 +453,7 @@ public class LandObject : ILandObject
             if(parcelMax > m_regionInfo.ObjectCapacity)
                 parcelMax = m_regionInfo.ObjectCapacity;
 
-            //m_log.DebugFormat("Area: {0}, Capacity {1}, Bonus {2}, Parcel {3}", LandData.Area, m_regionInfo.ObjectCapacity, m_regionInfo.RegionSettings.ObjectBonus, parcelMax);
+            //m_log.LogDebug("Area: {0}, Capacity {1}, Bonus {2}, Parcel {3}", LandData.Area, m_regionInfo.ObjectCapacity, m_regionInfo.RegionSettings.ObjectBonus, parcelMax);
             return parcelMax;
         }
     }
@@ -477,7 +477,7 @@ public class LandObject : ILandObject
             // sanity check
             if(simMax > m_regionInfo.ObjectCapacity)
                 simMax = m_regionInfo.ObjectCapacity;
-             //m_log.DebugFormat("Simwide Area: {0}, Capacity {1}, SimMax {2}, SimWidePrims {3}",
+             //m_log.LogDebug("Simwide Area: {0}, Capacity {1}, SimMax {2}, SimWidePrims {3}",
              //    LandData.SimwideArea, m_regionInfo.ObjectCapacity, simMax, LandData.SimwidePrims);
             return simMax;
         }
@@ -1337,7 +1337,7 @@ public class LandObject : ILandObject
             }
         }
 
-        // m_log.DebugFormat("{0} ModifyLandBitmapSquare. startXY=<{1},{2}>, endXY=<{3},{4}>, val={5}, landBitmapSize=<{6},{7}>",
+        // m_log.LogDebug("{0} ModifyLandBitmapSquare. startXY=<{1},{2}>, endXY=<{3},{4}>, val={5}, landBitmapSize=<{6},{7}>",
         //                         LogHeader, start_x, start_y, end_x, end_y, set_value, land_bitmap.GetLength(0), land_bitmap.GetLength(1));
         return land_bitmap;
     }
@@ -1445,7 +1445,7 @@ public class LandObject : ILandObject
                     }
                     catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                     {
-                        m_log.DebugFormat("{0} RemapLandBitmap Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", LogHeader, sx, sy, x, y);
+                        m_log.LogDebug("{0} RemapLandBitmap Rotate: Out of Bounds sx={1} sy={2} dx={3} dy={4}", LogHeader, sx, sy, x, y);
                     }
                 }
             }
@@ -1478,7 +1478,7 @@ public class LandObject : ILandObject
         if (endY > tmpY) endY = tmpY;
         if (endY < 0) endY = 0;
 
-        //m_log.DebugFormat("{0} RemapLandBitmap: inSize=<{1},{2}>, disp=<{3},{4}> rot={5}, offset=<{6},{7}>, boundingStart=<{8},{9}>, boundingEnd=<{10},{11}>, cosR={12}, sinR={13}, outSize=<{14},{15}>", LogHeader,
+        //m_log.LogDebug("{0} RemapLandBitmap: inSize=<{1},{2}>, disp=<{3},{4}> rot={5}, offset=<{6},{7}>, boundingStart=<{8},{9}>, boundingEnd=<{10},{11}>, cosR={12}, sinR={13}, outSize=<{14},{15}>", LogHeader,
         //                            baseX, baseY, dispX, dispY, radianRotation, offsetX, offsetY, startX, startY, endX, endY, cosR, sinR, newX, newY);
 
         isEmptyNow = true;
@@ -1502,7 +1502,7 @@ public class LandObject : ILandObject
                     }
                     catch (Exception)   //just in case we've still not taken care of every way the arrays might go out of bounds! ;)
                     {
-                        m_log.DebugFormat("{0} RemapLandBitmap - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", LogHeader, x, y, dx, dy);
+                        m_log.LogDebug("{0} RemapLandBitmap - Bound & Displace: Out of Bounds sx={1} sy={2} dx={3} dy={4}", LogHeader, x, y, dx, dy);
                     }
                 }
             }
@@ -1616,7 +1616,7 @@ public class LandObject : ILandObject
                 xLen = (int)(Constants.RegionSize / Constants.LandUnit);
             }
         }
-        // m_log.DebugFormat("{0} ConvertBytesToLandBitmap: bitmapLen={1}, xLen={2}", LogHeader, bitmapLen, xLen);
+        // m_log.LogDebug("{0} ConvertBytesToLandBitmap: bitmapLen={1}, xLen={2}", LogHeader, bitmapLen, xLen);
 
         byte tempByte;
         int x = 0, y = 0;
@@ -1632,7 +1632,7 @@ public class LandObject : ILandObject
                 }
                 catch (Exception)
                 {
-                    m_log.DebugFormat("{0} ConvertBytestoLandBitmap: i={1}, x={2}, y={3}", LogHeader, i, x, y);
+                    m_log.LogDebug("{0} ConvertBytestoLandBitmap: i={1}, x={2}, y={3}", LogHeader, i, x, y);
                 }
                 x++;
                 if (x >= xLen)
@@ -1660,7 +1660,7 @@ public class LandObject : ILandObject
 
     public void DebugLandBitmap(bool[,] landBitmap)
     {
-        m_log.InfoFormat("{0}: Map Key: #=claimed land .=unclaimed land.", LogHeader);
+        m_log.LogInformation("{0}: Map Key: #=claimed land .=unclaimed land.", LogHeader);
         for (int y = landBitmap.GetLength(1) - 1; y >= 0; y--)
         {
             string row = "";
@@ -1668,7 +1668,7 @@ public class LandObject : ILandObject
             {
                 row += landBitmap[x, y] ? "#" : ".";
             }
-            m_log.InfoFormat("{0}: {1}", LogHeader, row);
+            m_log.LogInformation("{0}: {1}", LogHeader, row);
         }
     }
 
@@ -1710,7 +1710,7 @@ public class LandObject : ILandObject
                 }
             } catch (InvalidOperationException)
             {
-                m_log.Error("[LAND]: Unable to force select the parcel objects. Arr.");
+                m_log.LogError("[LAND]: Unable to force select the parcel objects. Arr.");
             }
 
             remote_client.SendForceClientSelectObjects(resultLocalIDs);
@@ -1734,7 +1734,7 @@ public class LandObject : ILandObject
 
             lock (primsOverMe)
             {
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[LAND OBJECT]: Request for SendLandObjectOwners() from {0} with {1} known prims on region",
                 //    remote_client.Name, primsOverMe.Count);
 
@@ -1751,7 +1751,7 @@ public class LandObject : ILandObject
                         }
                         catch (NullReferenceException)
                         {
-                            m_log.Error("[LAND]: " + "Got Null Reference when searching land owners from the parcel panel");
+                            m_log.LogError("[LAND]: " + "Got Null Reference when searching land owners from the parcel panel");
                         }
                         try
                         {
@@ -1759,7 +1759,7 @@ public class LandObject : ILandObject
                         }
                         catch (KeyNotFoundException)
                         {
-                            m_log.Error("[LAND]: Unable to match a prim with it's owner.");
+                            m_log.LogError("[LAND]: Unable to match a prim with it's owner.");
                         }
                         if (obj.OwnerID.Equals(obj.GroupID) && (!groups.Contains(obj.OwnerID)))
                             groups.Add(obj.OwnerID);
@@ -1767,7 +1767,7 @@ public class LandObject : ILandObject
                 }
                 catch (InvalidOperationException)
                 {
-                    m_log.Error("[LAND]: Unable to Enumerate Land object arr.");
+                    m_log.LogError("[LAND]: Unable to Enumerate Land object arr.");
                 }
             }
 
@@ -1794,7 +1794,7 @@ public class LandObject : ILandObject
             }
             catch (InvalidOperationException)
             {
-                m_log.Error("[LAND]: Unable to enumerate land owners. arr.");
+                m_log.LogError("[LAND]: Unable to enumerate land owners. arr.");
             }
 
         }
@@ -1807,7 +1807,7 @@ public class LandObject : ILandObject
 
     public void SellLandObjects(UUID previousOwner)
     {
-        // m_log.DebugFormat(
+        // m_log.LogDebug(
         //    "[LAND OBJECT]: Request to sell objects in {0} from {1}", LandData.Name, previousOwner);
 
         if (LandData.IsGroupOwned)
@@ -1816,13 +1816,13 @@ public class LandObject : ILandObject
         IBuySellModule m_BuySellModule = m_scene.RequestModuleInterface<IBuySellModule>();
         if (m_BuySellModule == null)
         {
-            m_log.Error("[LAND OBJECT]: BuySellModule not found");
+            m_log.LogError("[LAND OBJECT]: BuySellModule not found");
             return;
         }
 
         if (!m_scene.TryGetScenePresence(LandData.OwnerID, out ScenePresence sp))
         {
-            m_log.Error("[LAND OBJECT]: New owner is not present in scene");
+            m_log.LogError("[LAND OBJECT]: New owner is not present in scene");
             return;
         }
 
@@ -1848,7 +1848,7 @@ public class LandObject : ILandObject
 
     public void ReturnLandObjects(uint type, UUID[] owners, UUID[] tasks, IClientAPI remote_client)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[LAND OBJECT]: Request to return objects in {0} from {1}", LandData.Name, remote_client.Name);
 
         Dictionary<UUID,List<SceneObjectGroup>> returns = new();
@@ -1935,7 +1935,7 @@ public class LandObject : ILandObject
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AddPrimOverMe(SceneObjectGroup obj)
     {
-//            m_log.DebugFormat("[LAND OBJECT]: Adding scene object {0} {1} over {2}", obj.Name, obj.LocalId, LandData.Name);
+//            m_log.LogDebug("[LAND OBJECT]: Adding scene object {0} {1} over {2}", obj.Name, obj.LocalId, LandData.Name);
 
         lock (primsOverMe)
             primsOverMe.Add(obj);
@@ -1944,7 +1944,7 @@ public class LandObject : ILandObject
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void RemovePrimFromOverMe(SceneObjectGroup obj)
     {
-        //m_log.DebugFormat("[LAND OBJECT]: Removing scene object {0} {1} from over {2}", obj.Name, obj.LocalId, LandData.Name);
+        //m_log.LogDebug("[LAND OBJECT]: Removing scene object {0} {1} from over {2}", obj.Name, obj.LocalId, LandData.Name);
         lock (primsOverMe)
             primsOverMe.Remove(obj);
     }
@@ -1968,7 +1968,7 @@ public class LandObject : ILandObject
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[LAND OBJECT]: SetMediaUrl error: {0}", e.Message);
+                m_log.LogError("[LAND OBJECT]: SetMediaUrl error: {0}", e.Message);
                 return;
             }
         }
@@ -1993,7 +1993,7 @@ public class LandObject : ILandObject
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[LAND OBJECT]: SetMusicUrl error: {0}", e.Message);
+                m_log.LogError("[LAND OBJECT]: SetMusicUrl error: {0}", e.Message);
                 return;
             }
         }
@@ -2078,7 +2078,7 @@ public class LandObject : ILandObject
                     presence.ControllingClient.SendAlertMessage("You have been ejected from this land");
                 }
             }
-            m_log.DebugFormat("[LAND]: Removing entry {0} because it has expired", entry.AgentID);
+            m_log.LogDebug("[LAND]: Removing entry {0} because it has expired", entry.AgentID);
         }
 
         if (delete.Count > 0)

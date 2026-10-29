@@ -35,13 +35,14 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Capabilities;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class AvatarPickerSearchModule : ISharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private int m_nscenes;
     private IPeople m_People = null;
@@ -112,14 +113,14 @@ public class AvatarPickerSearchModule : ISharedRegionModule
 
         if (m_URL == "localhost")
         {
-            // m_log.DebugFormat("[AVATAR PICKER SEARCH]: /CAPS/{0} in region {1}", capID, m_scene.RegionInfo.RegionName);
+            // m_log.LogDebug("[AVATAR PICKER SEARCH]: /CAPS/{0} in region {1}", capID, m_scene.RegionInfo.RegionName);
             if(m_People != null)
                 caps.RegisterSimpleHandler("AvatarPickerSearch",
                     new SimpleStreamHandler("/" + UUID.Random(), ProcessRequest));
         }
         else
         {
-            // m_log.DebugFormat("[AVATAR PICKER SEARCH]: {0} in region {1}", m_URL, m_scene.RegionInfo.RegionName);
+            // m_log.LogDebug("[AVATAR PICKER SEARCH]: {0} in region {1}", m_URL, m_scene.RegionInfo.RegionName);
             caps.RegisterHandler("AvatarPickerSearch", m_URL);
         }
     }

@@ -26,14 +26,19 @@
  */
 
 using System;
+using System.Collections;
+using System.Collections.Specialized;
 using System.IO;
 using System.Net;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
+using Nini.Config;
 using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
 using OpenSim.Server.Handlers.Asset;
 using OpenSim.Services.AssetService;
 using OpenSim.Services.Interfaces;
@@ -56,7 +61,7 @@ namespace OpenSim.Server.Handlers.Asset.Test
 
             AssetService assetService = new AssetService(config);
 
-            AssetServerPostHandler asph = new AssetServerPostHandler(assetService);
+            AssetServerPostHandler asph = new AssetServerPostHandler(assetService, null, TrustedAccess());
 
             AssetBase asset = AssetHelpers.CreateNotecardAsset(assetId, "Hello World");
 
@@ -73,11 +78,79 @@ namespace OpenSim.Server.Handlers.Asset.Test
             }
 
             buffer.Position = 0;
-            asph.Handle(null, buffer, null, null);
+            TestOSHttpResponse response = new TestOSHttpResponse();
+            asph.Handle(string.Empty, buffer, TrustedRequest(), response);
 
             AssetBase retrievedAsset = assetService.Get(assetId.ToString());
 
-            // TODO: Fix this assertion
+            Xunit.Assert.NotNull(retrievedAsset);
+        }
+
+        [Fact]
+        public void TestUntrustedAssetStoreRequestIsNotGatedByControlPlane()
+        {
+            TestHelpers.InMethod();
+
+            UUID assetId = TestHelpers.ParseTail(0x1);
+            IConfigSource config = new IniConfigSource();
+            config.AddConfig("AssetService");
+            config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
+            AssetService assetService = new AssetService(config);
+            AssetServerPostHandler handler = new AssetServerPostHandler(
+                assetService, null, new ControlPlaneAccess(new IniConfigSource()));
+
+            AssetBase asset = AssetHelpers.CreateNotecardAsset(assetId, "Upload without control-plane gating");
+            using MemoryStream buffer = new MemoryStream();
+            XmlSerializer serializer = new XmlSerializer(typeof(AssetBase));
+            serializer.Serialize(buffer, asset);
+            buffer.Position = 0;
+
+            TestOSHttpResponse response = new TestOSHttpResponse();
+            handler.Handle(string.Empty, buffer,
+                new TestRequest(new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000)), response);
+
+            Xunit.Assert.Equal(0, response.StatusCode);
+            Xunit.Assert.NotNull(assetService.Get(assetId.ToString()));
+        }
+
+        [Xunit.Theory]
+        [InlineData(AllowedRemoteDeleteTypes.All, true)]
+        [InlineData(AllowedRemoteDeleteTypes.None, false)]
+        [InlineData(AllowedRemoteDeleteTypes.MapTile, false)]
+        public void TestUntrustedAssetDeleteRetainsTypeRestrictions(
+            AllowedRemoteDeleteTypes allowedTypes, bool expectedDeleted)
+        {
+            UUID assetId = TestHelpers.ParseTail(0x1);
+            IConfigSource config = new IniConfigSource();
+            config.AddConfig("AssetService");
+            config.Configs["AssetService"].Set("StorageProvider", "OpenSim.Tests.Common.dll");
+            DeletionTrackingAssetService assetService = new DeletionTrackingAssetService(config);
+            assetService.Store(AssetHelpers.CreateNotecardAsset(assetId, "Delete test"));
+            AssetServerDeleteHandler handler = new AssetServerDeleteHandler(
+                assetService, allowedTypes, null, new ControlPlaneAccess(new IniConfigSource()));
+
+            TestOSHttpResponse response = new TestOSHttpResponse();
+            byte[] result = handler.Handle("/assets/" + assetId, Stream.Null,
+                new TestRequest(new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000)), response);
+
+            using MemoryStream buffer = new MemoryStream(result);
+            bool deleted = Xunit.Assert.IsType<bool>(new XmlSerializer(typeof(bool)).Deserialize(buffer));
+            Xunit.Assert.Equal(0, response.StatusCode);
+            Xunit.Assert.Equal(expectedDeleted, deleted);
+            Xunit.Assert.Equal(expectedDeleted, assetService.DeleteCalled);
+        }
+
+        private sealed class DeletionTrackingAssetService : AssetService
+        {
+            public bool DeleteCalled { get; private set; }
+
+            public DeletionTrackingAssetService(IConfigSource config) : base(config) {}
+
+            public override bool Delete(string id)
+            {
+                DeleteCalled = true;
+                return true;
+            }
         }
 
         [Fact]
@@ -91,7 +164,7 @@ namespace OpenSim.Server.Handlers.Asset.Test
 
             AssetService assetService = new AssetService(config);
 
-            AssetServerPostHandler asph = new AssetServerPostHandler(assetService);
+            AssetServerPostHandler asph = new AssetServerPostHandler(assetService, null, TrustedAccess());
 
             MemoryStream buffer = new MemoryStream();
             byte[] badData = new byte[] { 0x48, 0x65, 0x6c, 0x6c, 0x6f };
@@ -99,9 +172,53 @@ namespace OpenSim.Server.Handlers.Asset.Test
             buffer.Position = 0;
 
             TestOSHttpResponse response = new TestOSHttpResponse();
-            asph.Handle(null, buffer, null, response);
+            asph.Handle(string.Empty, buffer, TrustedRequest(), response);
 
-            Assert.True(response.StatusCode)HttpStatusCode.BadRequest));
+            Xunit.Assert.Equal((int)HttpStatusCode.BadRequest, response.StatusCode);
+        }
+
+        private static ControlPlaneAccess TrustedAccess()
+        {
+            IniConfigSource config = new IniConfigSource();
+            config.AddConfig("Network").Set("ControlPlaneTrustedHosts", "127.0.0.1");
+            return new ControlPlaneAccess(config);
+        }
+
+        private static IOSHttpRequest TrustedRequest()
+        {
+            return new TestRequest(new IPEndPoint(IPAddress.Loopback, 9000));
+        }
+
+        private sealed class TestRequest : IOSHttpRequest
+        {
+            public TestRequest(IPEndPoint remoteEndPoint)
+            {
+                RemoteIPEndPoint = remoteEndPoint;
+                Headers = new NameValueCollection();
+            }
+
+            public string[] AcceptTypes => Array.Empty<string>();
+            public Encoding ContentEncoding => Encoding.UTF8;
+            public long ContentLength => 0;
+            public long ContentLength64 => 0;
+            public string ContentType => string.Empty;
+            public bool HasEntityBody => true;
+            public NameValueCollection Headers { get; }
+            public string HttpMethod => "POST";
+            public Stream InputStream => Stream.Null;
+            public bool IsSecured => false;
+            public bool KeepAlive => false;
+            public NameValueCollection QueryString => new();
+            public Hashtable Query => new();
+            public HashSet<string> QueryFlags => new();
+            public Dictionary<string, string> QueryAsDictionary => new();
+            public string RawUrl => "/assets";
+            public IPEndPoint RemoteIPEndPoint { get; }
+            public IPEndPoint LocalIPEndPoint => new(IPAddress.Loopback, 0);
+            public Uri Url => new("http://localhost/assets");
+            public string UriPath => "/assets";
+            public string UserAgent => string.Empty;
+            public double ArrivalTS => 0;
         }
     }
 }

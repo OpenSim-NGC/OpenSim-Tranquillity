@@ -26,11 +26,12 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using System.Data;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
@@ -38,7 +39,7 @@ public class PGSQLEstateStore : IEstateDataStore
 {
     private const string _migrationStore = "EstateStore";
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private PGSQLManager _Database;
     private string m_connectionString;
@@ -167,6 +168,9 @@ public class PGSQLEstateStore : IEstateDataStore
         es.EstateManagers = LoadUUIDList(es.EstateID, "estate_managers");
         es.EstateAccess = LoadUUIDList(es.EstateID, "estate_users");
         es.EstateGroups = LoadUUIDList(es.EstateID, "estate_groups");
+        es.AllowedExperiences = LoadUUIDList(es.EstateID, "estate_allowed_experiences");
+        es.KeyExperiences = LoadUUIDList(es.EstateID, "estate_key_experiences");
+        es.BlockedExperiences = LoadUUIDList(es.EstateID, "estate_blocked_experiences");
 
         //Set event
         es.OnSave += StoreEstateSettings;
@@ -187,6 +191,9 @@ public class PGSQLEstateStore : IEstateDataStore
         es.EstateManagers = LoadUUIDList(es.EstateID, "estate_managers");
         es.EstateAccess = LoadUUIDList(es.EstateID, "estate_users");
         es.EstateGroups = LoadUUIDList(es.EstateID, "estate_groups");
+        es.AllowedExperiences = LoadUUIDList(es.EstateID, "estate_allowed_experiences");
+        es.KeyExperiences = LoadUUIDList(es.EstateID, "estate_key_experiences");
+        es.BlockedExperiences = LoadUUIDList(es.EstateID, "estate_blocked_experiences");
 
         return es;
     }
@@ -270,6 +277,9 @@ public class PGSQLEstateStore : IEstateDataStore
         SaveUUIDList(es.EstateID, "estate_managers", es.EstateManagers);
         SaveUUIDList(es.EstateID, "estate_users", es.EstateAccess);
         SaveUUIDList(es.EstateID, "estate_groups", es.EstateGroups);
+        SaveUUIDList(es.EstateID, "estate_allowed_experiences", es.AllowedExperiences);
+        SaveUUIDList(es.EstateID, "estate_key_experiences", es.KeyExperiences);
+        SaveUUIDList(es.EstateID, "estate_blocked_experiences", es.BlockedExperiences);
     }
 
     #endregion
@@ -349,9 +359,11 @@ public class PGSQLEstateStore : IEstateDataStore
                 //Insert after
                 cmd.CommandText = "insert into estateban (\"EstateID\", \"bannedUUID\",\"bannedIp\", \"bannedIpHostMask\", \"bannedNameMask\", \"banningUUID\",\"banTime\" ) values ( :EstateID, :bannedUUID, '','','', :banningUUID, :banTime )";
                 cmd.Parameters.AddWithValue("bannedUUID", Guid.Empty);
+                cmd.Parameters.AddWithValue("banningUUID", Guid.Empty);
+                cmd.Parameters.AddWithValue("banTime", 0);
                 foreach (EstateBan b in es.EstateBans)
                 {
-                    cmd.Parameters["EstateID"].Value = b.EstateID;
+                    cmd.Parameters["EstateID"].Value = (int)es.EstateID;
                     cmd.Parameters["bannedUUID"].Value = b.BannedUserID.Guid;
                     cmd.Parameters["banningUUID"].Value = b.BanningUserID.Guid;
                     cmd.Parameters["banTime"].Value = b.BanTime;
@@ -435,6 +447,9 @@ public class PGSQLEstateStore : IEstateDataStore
         es.EstateManagers = LoadUUIDList(es.EstateID, "estate_managers");
         es.EstateAccess = LoadUUIDList(es.EstateID, "estate_users");
         es.EstateGroups = LoadUUIDList(es.EstateID, "estate_groups");
+        es.AllowedExperiences = LoadUUIDList(es.EstateID, "estate_allowed_experiences");
+        es.KeyExperiences = LoadUUIDList(es.EstateID, "estate_key_experiences");
+        es.BlockedExperiences = LoadUUIDList(es.EstateID, "estate_blocked_experiences");
 
         //Set event
         es.OnSave += StoreEstateSettings;
@@ -565,7 +580,7 @@ public class PGSQLEstateStore : IEstateDataStore
             }
             catch (Exception ex)
             {
-                m_log.Error("[REGION DB]: LinkRegion failed: " + ex.Message);
+                m_log.LogError("[REGION DB]: LinkRegion failed: " + ex.Message);
                 transaction.Rollback();
             }
         }

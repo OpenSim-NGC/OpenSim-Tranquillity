@@ -25,8 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Net;
 using System.Text;
+using OpenSim.Framework;
 
 namespace OpenSim.ConsoleClient;
 
@@ -37,41 +37,34 @@ public class Requester
     public static void MakeRequest(string requestUrl, string data,
             ReplyDelegate action)
     {
-        WebRequest request = WebRequest.Create(requestUrl);
+        _ = MakeRequestAsync(requestUrl, data, action);
+    }
 
-        request.Method = "POST";
-
-        request.ContentType = "application/x-www-form-urlencoded";
-
-        byte[] buffer = Encoding.ASCII.GetBytes(data);
-        int length = (int) buffer.Length;
-        request.ContentLength = length;
-
-        request.BeginGetRequestStream(delegate(IAsyncResult res)
+    public static async Task MakeRequestAsync(string requestUrl, string data, ReplyDelegate action)
+    {
+        try
         {
-            Stream requestStream = request.EndGetRequestStream(res);
-
-            requestStream.Write(buffer, 0, length);
-
-            request.BeginGetResponse(delegate(IAsyncResult ar)
+            using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
+            using CancellationTokenSource cts = new(client.Timeout);
+            using HttpRequestMessage request = new(HttpMethod.Post, requestUrl);
+            request.Content = new ByteArrayContent(Encoding.ASCII.GetBytes(data));
+            request.Content.Headers.TryAddWithoutValidation("Content-Type", "application/x-www-form-urlencoded");
+            using HttpResponseMessage response = await client.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            using Stream stream = new MemoryStream(await response.Content.ReadAsByteArrayAsync(cts.Token).ConfigureAwait(false));
+            using StreamReader reader = new(stream);
+            action(requestUrl, data, reader.ReadToEnd());
+        }
+        catch (Exception e)
+        {
+            string operation = (Uri.TryCreate(requestUrl, UriKind.Absolute, out Uri uri) ? uri.AbsolutePath : string.Empty) switch
             {
-                string reply = String.Empty;
-
-                using (WebResponse response = request.EndGetResponse(ar))
-                {
-                    try
-                    {
-                        using (StreamReader r = new StreamReader(response.GetResponseStream()))
-                            reply = r.ReadToEnd();
-
-                    }
-                    catch (System.InvalidOperationException)
-                    {
-                    }
-                }
-
-                action(requestUrl, data, reply);
-            }, null);
-        }, null);
+                "/StartSession/" => "Login failed",
+                string path when path.StartsWith("/ReadResponses/", StringComparison.Ordinal) => "Polling stopped; reconnect to resume",
+                _ => "Request failed"
+            };
+            System.Console.Error.WriteLine($"[CONSOLE CLIENT]: {operation}: {e.Message}");
+        }
     }
 }

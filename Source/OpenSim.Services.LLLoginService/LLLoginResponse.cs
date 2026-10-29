@@ -34,9 +34,9 @@ using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
+using Microsoft.Extensions.Logging;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
@@ -119,7 +119,7 @@ public class LLFailedLoginResponse : OpenSim.Services.Interfaces.FailedLoginResp
 /// </summary>
 public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static Hashtable globalTexturesHash;
     // Global Textures
     private static string sunTexture = "cce0f112-878f-4586-a2e2-a8f104bba271";
@@ -178,6 +178,13 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
     private string openIDURL;
 
     private string searchURL;
+
+    /// <summary>
+    /// Where the viewer fetches other avatars' server-side bakes: <c>agent_appearance_service</c> in the login
+    /// response (viewer contract V6). Empty means "this grid has none", and the key is then left out of the
+    /// response entirely rather than sent empty — see <see cref="ToHashtable"/>.
+    /// </summary>
+    private string agentAppearanceServiceURL = String.Empty;
 
     // Error Flags
     private string errorReason;
@@ -265,7 +272,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
         LookAt = String.Format("[r{0},r{1},r{2}]", lookAt.X, lookAt.Y, lookAt.Z);
 
         FillOutRegionData(destination);
-        m_log.DebugFormat("[LOGIN RESPONSE] LLLoginResponse create. sizeX={0}, sizeY={1}", RegionSizeX, RegionSizeY);
+        m_log.LogDebug("[LOGIN RESPONSE] LLLoginResponse create. sizeX={0}, sizeY={1}", RegionSizeX, RegionSizeY);
 
         FillOutSeedCap(aCircuit, destination, clientIP);
         switch (DSTZone)
@@ -295,7 +302,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
 
                 if (dstTimeZone == null)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[LLOGIN RESPONSE]: No valid timezone found for DST in {0}, falling back to system time.", tzList);
                     DST = TimeZoneInfo.Local.IsDaylightSavingTime(DateTime.Now) ? "Y" : "N";
                 }
@@ -317,7 +324,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
         }
         catch (Exception e)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[LLLOGIN SERVICE]: Error processing inventory skeleton of agent {0} - {1}",
                 agentID, e);
 
@@ -463,6 +470,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
         profileURL = String.Empty;
         openIDURL = String.Empty;
         searchURL = String.Empty;
+        agentAppearanceServiceURL = String.Empty;
 
         currency = String.Empty;
         ClassifiedFee = "0";
@@ -533,10 +541,17 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
             responseData["region_y"] = (Int32)(RegionY);
             responseData["region_size_x"] = (Int32)RegionSizeX;
             responseData["region_size_y"] = (Int32)RegionSizeY;
-            m_log.DebugFormat("[LOGIN RESPONSE] returning sizeX={0}, sizeY={1}", RegionSizeX, RegionSizeY);
+            m_log.LogDebug("[LOGIN RESPONSE] returning sizeX={0}, sizeY={1}", RegionSizeX, RegionSizeY);
 
             if (searchURL != String.Empty)
                 responseData["search"] = searchURL;
+
+            // V6: with no service the viewer logs "AgentAppearanceServiceURL not set - Baked texture requests
+            // will fail" and never textures anyone on a bit-0 region (llvoavatar.cpp:5901-5906). Omitting the key
+            // is the honest form of "we have none"; the viewer only adopts a non-empty value anyway
+            // (llstartup.cpp:4047-4051).
+            if (agentAppearanceServiceURL != String.Empty)
+                responseData["agent_appearance_service"] = agentAppearanceServiceURL;
 
             if (mapTileURL != String.Empty)
                 responseData["map-server-url"] = mapTileURL;
@@ -577,7 +592,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
         }
         catch (Exception e)
         {
-            m_log.Warn("[CLIENT]: LoginResponse: Error creating Hashtable Response: " + e.Message);
+            m_log.LogWarning("[CLIENT]: LoginResponse: Error creating Hashtable Response: " + e.Message);
 
             return LLFailedLoginResponse.InternalError.ToHashtable();
         }
@@ -679,6 +694,9 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
             if (searchURL != String.Empty)
                 map["search"] = OSD.FromString(searchURL);
 
+            if (agentAppearanceServiceURL != String.Empty)
+                map["agent_appearance_service"] = OSD.FromString(agentAppearanceServiceURL);
+
             if (ClassifiedFee != String.Empty)
                 map["classified_fee"] = OSD.FromString(ClassifiedFee);
 
@@ -693,7 +711,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
         }
         catch (Exception e)
         {
-            m_log.Warn("[CLIENT]: LoginResponse: Error creating LLSD Response: " + e.Message);
+            m_log.LogWarning("[CLIENT]: LoginResponse: Error creating LLSD Response: " + e.Message);
 
             return LLFailedLoginResponse.InternalError.ToOSDMap();
         }
@@ -792,7 +810,7 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
     protected virtual ArrayList GetInventoryLibrary(ILibraryService library)
     {
         Dictionary<UUID, InventoryFolderImpl> rootFolders = library.GetAllFolders();
-//            m_log.DebugFormat("[LLOGIN]: Library has {0} folders", rootFolders.Count);
+//            m_log.LogDebug("[LLOGIN]: Library has {0} folders", rootFolders.Count);
         //Dictionary<UUID, InventoryFolderImpl> rootFolders = new Dictionary<UUID,InventoryFolderImpl>();
         ArrayList folderHashes = new ArrayList();
 
@@ -1067,6 +1085,13 @@ public class LLLoginResponse : OpenSim.Services.Interfaces.LoginResponse
     {
         get { return searchURL; }
         set { searchURL = value; }
+    }
+
+    /// <summary>See <see cref="agentAppearanceServiceURL"/>. Set by the login service from config; empty by default.</summary>
+    public string AgentAppearanceServiceURL
+    {
+        get { return agentAppearanceServiceURL; }
+        set { agentAppearanceServiceURL = value ?? String.Empty; }
     }
 
     public string Message

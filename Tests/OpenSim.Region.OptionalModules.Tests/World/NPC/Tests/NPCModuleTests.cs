@@ -28,7 +28,6 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using Xunit;
 using OpenMetaverse;
@@ -94,7 +93,6 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
         public void TestCreate()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
 
             SetUpScene();
 
@@ -132,7 +130,6 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
         public void TestRemove()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
 
             SetUpScene();
 
@@ -252,7 +249,6 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
         public void TestLoadAppearance()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
 
             SetUpScene();
 
@@ -419,7 +415,6 @@ namespace OpenSim.Region.OptionalModules.World.NPC.Tests
         public void TestSitAndStandWithSitTarget()
         {
             TestHelpers.InMethod();
-//            log4net.Config.XmlConfigurator.Configure();
 
             SetUpScene();
 

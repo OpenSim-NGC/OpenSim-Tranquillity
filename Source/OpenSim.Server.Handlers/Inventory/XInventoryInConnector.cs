@@ -34,14 +34,15 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Inventory;
 
 public class XInventoryInConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInventoryService m_InventoryService;
     private string m_ConfigName = "InventoryService";
@@ -52,7 +53,7 @@ public class XInventoryInConnector : ServiceConnector
         if (configName != String.Empty)
             m_ConfigName = configName;
 
-        m_log.DebugFormat("[XInventoryInConnector]: Starting with config name {0}", m_ConfigName);
+        m_log.LogDebug("[XInventoryInConnector]: Starting with config name {0}", m_ConfigName);
 
         IConfig serverConfig = config.Configs[m_ConfigName];
         if (serverConfig == null)
@@ -69,21 +70,32 @@ public class XInventoryInConnector : ServiceConnector
                 ServerUtils.LoadPlugin<IInventoryService>(inventoryService, args);
 
         IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
+        ControlPlaneAccess controlPlaneAccess = new(config);
 
-        server.AddStreamHandler(new XInventoryConnectorPostHandler(m_InventoryService, auth));
+        server.AddStreamHandler(new XInventoryConnectorPostHandler(m_InventoryService, auth, controlPlaneAccess));
     }
 }
 
 public class XInventoryConnectorPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IInventoryService m_InventoryService;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
 
     public XInventoryConnectorPostHandler(IInventoryService service, IServiceAuth auth) :
+        this(service, auth, new ControlPlaneAccess(null))
+    {
+    }
+
+    public XInventoryConnectorPostHandler(
+        IInventoryService service,
+        IServiceAuth auth,
+        ControlPlaneAccess controlPlaneAccess) :
             base("POST", "/xinventory", auth)
     {
         m_InventoryService = service;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override byte[] ProcessRequest(string path, Stream requestData,
@@ -94,7 +106,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
             body = sr.ReadToEnd();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -106,6 +118,12 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
             string method = request["METHOD"].ToString();
             request.Remove("METHOD");
+
+            // Deferred pending replacement authentication/authorization for assets and inventory.
+            // if (!IsReadOnlyMethod(method)
+            //     && !m_ControlPlaneAccess.AuthorizeControlPlaneMutation(
+            //         httpRequest, httpResponse, $"POST /xinventory METHOD={method}"))
+            //     return Array.Empty<byte>();
 
             switch (method)
             {
@@ -152,14 +170,33 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
                 case "GETASSETPERMISSIONS":
                     return HandleGetAssetPermissions(request);
             }
-            m_log.DebugFormat("[XINVENTORY HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[XINVENTORY HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[XINVENTORY HANDLER]: Exception {0} ", e.Message), e);
+            m_log.LogError(e, string.Format("[XINVENTORY HANDLER]: Exception {0} ", e.Message));
         }
 
         return FailureResult();
+    }
+
+    private static bool IsReadOnlyMethod(string method)
+    {
+        return method switch
+        {
+            "GETINVENTORYSKELETON" or
+            "GETROOTFOLDER" or
+            "GETFOLDERFORTYPE" or
+            "GETFOLDERCONTENT" or
+            "GETMULTIPLEFOLDERSCONTENT" or
+            "GETFOLDERITEMS" or
+            "GETITEM" or
+            "GETMULTIPLEITEMS" or
+            "GETFOLDER" or
+            "GETACTIVEGESTURES" or
+            "GETASSETPERMISSIONS" => true,
+            _ => false
+        };
     }
 
     private byte[] FailureResult()
@@ -208,7 +245,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -236,7 +273,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -252,7 +289,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -269,7 +306,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -312,7 +349,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -370,13 +407,13 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
                 }
 
                 resultSet["F_" + fids[count++]] = result;
-                //m_log.DebugFormat("[XXX]: Sending {0} {1}", fids[count-1], icoll.FolderID);
+                //m_log.LogDebug("[XXX]: Sending {0} {1}", fids[count-1], icoll.FolderID);
             }
         }
 
         string xmlString = ServerUtils.BuildXmlResponse(resultSet);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -404,7 +441,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -458,7 +495,15 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
                 uuids.Add(u);
         }
 
-        if (m_InventoryService.DeleteFolders(principal, uuids))
+        // Absent means true, so an older simulator that does not send the field keeps the trash-only behaviour.
+        bool onlyIfTrash = true;
+        if (request.TryGetValue("ONLYIFTRASH", out object flag))
+        {
+            string s = flag?.ToString();
+            onlyIfTrash = !(s == "0" || string.Equals(s, "false", StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (m_InventoryService.DeleteFolders(principal, uuids, onlyIfTrash))
             return SuccessResult();
         else
             return
@@ -525,7 +570,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[XINVENTORY IN CONNECTOR]: Exception in HandleMoveItems: {0}", e.Message);
+            m_log.LogDebug("[XINVENTORY IN CONNECTOR]: Exception in HandleMoveItems: {0}", e.Message);
             return FailureResult();
         }
 
@@ -570,7 +615,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -609,7 +654,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(resultSet);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -628,7 +673,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -653,7 +698,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -670,7 +715,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         result["RESULT"] = perms.ToString();
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -696,6 +741,7 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         ret["AssetType"] = item.AssetType.ToString();
         ret["BasePermissions"] = item.BasePermissions.ToString();
         ret["CreationDate"] = item.CreationDate.ToString();
+        ret["ExperienceID"] = item.ExperienceID.ToString();
         if (item.CreatorId != null)
             ret["CreatorId"] = item.CreatorId.ToString();
         else
@@ -762,6 +808,9 @@ public class XInventoryConnectorPostHandler : BaseStreamHandler
         item.SaleType = byte.Parse(data["SaleType"].ToString());
         item.Flags = uint.Parse(data["Flags"].ToString());
         item.CreationDate = int.Parse(data["CreationDate"].ToString());
+        // Absent from a region that predates the field: no Experience.
+        if (data.TryGetValue("ExperienceID", out object experience) && UUID.TryParse(experience?.ToString(), out UUID experienceID))
+            item.ExperienceID = experienceID;
 
         return item;
     }

@@ -27,17 +27,17 @@
 
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using System.Xml;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.Framework.Scenes;
 
 public partial class SceneObjectGroup : EntityBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Force all task inventories of prims in the scene object to persist
@@ -66,7 +66,7 @@ public partial class SceneObjectGroup : EntityBase
 
         if (m_scene == null)
         {
-            m_log.DebugFormat("[PRIM INVENTORY]: m_scene is null. Unable to create script instances");
+            m_log.LogDebug("[PRIM INVENTORY]: m_scene is null. Unable to create script instances");
             return 0;
         }
 
@@ -132,7 +132,7 @@ public partial class SceneObjectGroup : EntityBase
     /// <returns></returns>
     public bool AddInventoryItem(UUID agentID, uint localID, InventoryItemBase item, UUID copyItemID, bool withModRights = true)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[PRIM INVENTORY]: Adding inventory item {0} from {1} to part with local ID {2}",
         //       item.Name, remoteClient.Name, localID);
 
@@ -141,7 +141,7 @@ public partial class SceneObjectGroup : EntityBase
         SceneObjectPart part = GetPart(localID);
         if (part is null)
         {
-            m_log.Error(
+            m_log.LogError(
                 $"[PRIM INVENTORY]: Couldn't find prim local ID {localID} in group {Name}, {UUID} to add inventory item ID {newItemId}");
             return false;
         }
@@ -157,7 +157,8 @@ public partial class SceneObjectGroup : EntityBase
             CreatorID = item.CreatorIdAsUuid,
             Type = item.AssetType,
             InvType = item.InvType,
-            Flags = item.Flags
+            Flags = item.Flags,
+            ExperienceID = item.ExperienceID
         };
 
         if (agentID.NotEqual(part.OwnerID) && m_scene.Permissions.PropagatePermissions())
@@ -181,7 +182,7 @@ public partial class SceneObjectGroup : EntityBase
             taskItem.NextPermissions = item.NextPermissions;
         }
 
-        // m_log.DebugFormat(
+        // m_log.LogDebug(
         //      "[PRIM INVENTORY]: Flags are 0x{0:X} for item {1} added to part {2} by {3}",
         //       taskItem.Flags, taskItem.Name, localID, remoteClient.Name);
 
@@ -215,7 +216,7 @@ public partial class SceneObjectGroup : EntityBase
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: " +
                 "Couldn't find prim local ID {0} in prim {1}, {2} to get inventory item ID {3}",
                 primID, part.Name, part.UUID, itemID);
@@ -241,7 +242,7 @@ public partial class SceneObjectGroup : EntityBase
         }
         else
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[PRIM INVENTORY]: " +
                 "Couldn't find prim ID {0} to update item {1}, {2}",
                 item.ParentPartID, item.Name, item.ItemID);
@@ -475,7 +476,7 @@ public partial class SceneObjectGroup : EntityBase
 
     public void ApplyNextOwnerPermissions()
     {
-//            m_log.DebugFormat("[PRIM INVENTORY]: Applying next owner permissions to {0} {1}", Name, UUID);
+//            m_log.LogDebug("[PRIM INVENTORY]: Applying next owner permissions to {0} {1}", Name, UUID);
 
         SceneObjectPart[] parts = m_parts.GetArray();
         for (int i = 0; i < parts.Length; i++)
@@ -533,17 +534,18 @@ public partial class SceneObjectGroup : EntityBase
         if (objXMLData.Length == 0)
             return;
 
-        IScriptModule scriptModule = null;
-
+        // The default engine is offered each state first, then the region's other engines, so a state
+        // reaches the engine that owns the script. Each engine refuses a state that is not its own.
+        List<IScriptModule> scriptModules = new();
         foreach (IScriptModule sm in s.RequestModuleInterfaces<IScriptModule>())
         {
             if (sm.ScriptEngineName == s.DefaultScriptEngine)
-                scriptModule = sm;
+                scriptModules.Insert(0, sm);
             else
-                scriptModule ??= sm;
+                scriptModules.Add(sm);
         }
 
-        if (scriptModule is null)
+        if (scriptModules.Count == 0)
             return;
 
         XmlDocument doc = new();
@@ -576,10 +578,26 @@ public partial class SceneObjectGroup : EntityBase
 
         foreach (XmlNode n in dataE.ChildNodes)
         {
-            XmlElement stateE = (XmlElement)n;
-            UUID itemID = new(stateE.GetAttribute("UUID"));
+            // One unusable state must not cost the object's other scripts theirs.
+            if (n is not XmlElement stateE || !UUID.TryParse(stateE.GetAttribute("UUID"), out UUID itemID))
+            {
+                m_log.LogWarning($"[SCENE OBJECT GROUP]: Skipped a script state without a valid item id in object {Name} id: {UUID}");
+                continue;
+            }
 
-            scriptModule.SetXMLState(itemID, n.OuterXml);
+            string stateXml = n.OuterXml;
+            foreach (IScriptModule scriptModule in scriptModules)
+            {
+                try
+                {
+                    if (scriptModule.SetXMLState(itemID, stateXml))
+                        break;
+                }
+                catch (Exception e)
+                {
+                    m_log.LogWarning($"[SCENE OBJECT GROUP]: Script engine {scriptModule.ScriptEngineName} failed to take the state of script {itemID} in object {Name} id: {UUID}: {e.Message}");
+                }
+            }
         }
     }
 

@@ -26,11 +26,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers;
+using OpenSim.Server.Handlers.Base;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Framework.Servers;
@@ -38,11 +38,14 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Profile;
 
 public class LocalUserProfilesServicesConnector : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Dictionary<UUID, Scene> regions = new Dictionary<UUID, Scene>();
 
@@ -76,12 +79,12 @@ public class LocalUserProfilesServicesConnector : ISharedRegionModule
 
     public LocalUserProfilesServicesConnector()
     {
-        //m_log.Debug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector no params");
+        //m_log.LogDebug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector no params");
     }
 
     public LocalUserProfilesServicesConnector(IConfigSource source)
     {
-        //m_log.Debug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector instantiated directly.");
+        //m_log.LogDebug("[LOCAL USERPROFILES SERVICE CONNECTOR]: LocalUserProfileServicesConnector instantiated directly.");
         InitialiseService(source);
     }
 
@@ -95,7 +98,7 @@ public class LocalUserProfilesServicesConnector : ISharedRegionModule
         IConfig config = source.Configs[ConfigName];
         if (config == null)
         {
-            //m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: UserProfilesService missing from OpenSim.ini");
+            //m_log.LogError("[LOCAL USERPROFILES SERVICE CONNECTOR]: UserProfilesService missing from OpenSim.ini");
             return;
         }
 
@@ -111,7 +114,7 @@ public class LocalUserProfilesServicesConnector : ISharedRegionModule
 
         if (serviceDll.Length == 0)
         {
-            m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: No LocalServiceModule named in section UserProfilesService");
+            m_log.LogError("[LOCAL USERPROFILES SERVICE CONNECTOR]: No LocalServiceModule named in section UserProfilesService");
             return;
         }
 
@@ -120,13 +123,13 @@ public class LocalUserProfilesServicesConnector : ISharedRegionModule
 
         if (ServiceModule == null)
         {
-            m_log.Error("[LOCAL USERPROFILES SERVICE CONNECTOR]: Can't load user profiles service");
+            m_log.LogError("[LOCAL USERPROFILES SERVICE CONNECTOR]: Can't load user profiles service");
             return;
         }
 
         Enabled = true;
 
-        JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule);
+        JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule, new ControlPlaneAccess(source));
 
         Server.AddJsonRPCHandler("avatarclassifiedsrequest", handler.AvatarClassifiedsRequest);
         Server.AddJsonRPCHandler("classified_update", handler.ClassifiedUpdate);
@@ -170,7 +173,7 @@ public class LocalUserProfilesServicesConnector : ISharedRegionModule
             if (name == Name)
             {
                 InitialiseService(source);
-                m_log.Info("[LOCAL USERPROFILES SERVICE CONNECTOR]: Local user profiles connector enabled");
+                m_log.LogInformation("[LOCAL USERPROFILES SERVICE CONNECTOR]: Local user profiles connector enabled");
             }
         }
     }
@@ -188,7 +191,7 @@ public class LocalUserProfilesServicesConnector : ISharedRegionModule
         lock (regions)
         {
             if (regions.ContainsKey(scene.RegionInfo.RegionID))
-                m_log.ErrorFormat("[LOCAL USERPROFILES SERVICE CONNECTOR]: simulator seems to have more than one region with the same UUID. Please correct this!");
+                m_log.LogError("[LOCAL USERPROFILES SERVICE CONNECTOR]: simulator seems to have more than one region with the same UUID. Please correct this!");
             else
                 regions.Add(scene.RegionInfo.RegionID, scene);
         }

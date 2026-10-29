@@ -30,6 +30,8 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Data;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Tests.Common;
 
 /// <summary>
@@ -39,7 +41,7 @@ namespace OpenSim.Tests.Common;
 /// </summary>
 public class TestInventoryDataPlugin : IInventoryDataPlugin
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <value>
     /// Inventory folders
@@ -83,7 +85,7 @@ public class TestInventoryDataPlugin : IInventoryDataPlugin
     {
 //            InventoryFolderBase folder = m_folders[folderID];
 
-//            m_log.DebugFormat("[MOCK INV DB]: Getting items in folder {0} {1}", folder.Name, folder.ID);
+//            m_log.LogDebug("[MOCK INV DB]: Getting items in folder {0} {1}", folder.Name, folder.ID);
 
         List<InventoryItemBase> items = new List<InventoryItemBase>();
 
@@ -91,7 +93,7 @@ public class TestInventoryDataPlugin : IInventoryDataPlugin
         {
             if (item.Folder == folderID)
             {
-//                    m_log.DebugFormat("[MOCK INV DB]: getInventoryInFolder() adding item {0}", item.Name);
+//                    m_log.LogDebug("[MOCK INV DB]: getInventoryInFolder() adding item {0}", item.Name);
                 items.Add(item);
             }
         }
@@ -103,7 +105,7 @@ public class TestInventoryDataPlugin : IInventoryDataPlugin
 
     public InventoryFolderBase getUserRootFolder(UUID user)
     {
-//            m_log.DebugFormat("[MOCK INV DB]: Looking for root folder for {0}", user);
+//            m_log.LogDebug("[MOCK INV DB]: Looking for root folder for {0}", user);
 
         InventoryFolderBase folder = null;
         m_rootFolders.TryGetValue(user, out folder);
@@ -115,7 +117,7 @@ public class TestInventoryDataPlugin : IInventoryDataPlugin
     {
 //            InventoryFolderBase parentFolder = m_folders[parentID];
 
-//            m_log.DebugFormat("[MOCK INV DB]: Getting folders in folder {0} {1}", parentFolder.Name, parentFolder.ID);
+//            m_log.LogDebug("[MOCK INV DB]: Getting folders in folder {0} {1}", parentFolder.Name, parentFolder.ID);
 
         List<InventoryFolderBase> folders = new List<InventoryFolderBase>();
 
@@ -123,7 +125,7 @@ public class TestInventoryDataPlugin : IInventoryDataPlugin
         {
             if (folder.ParentID == parentID)
             {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[MOCK INV DB]: Found folder {0} {1} in {2} {3}",
 //                        folder.Name, folder.ID, parentFolder.Name, parentFolder.ID);
 
@@ -149,7 +151,7 @@ public class TestInventoryDataPlugin : IInventoryDataPlugin
 
     public void addInventoryFolder(InventoryFolderBase folder)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOCK INV DB]: Adding inventory folder {0} {1} type {2}",
 //                folder.Name, folder.ID, (AssetType)folder.Type);
 
@@ -157,7 +159,7 @@ public class TestInventoryDataPlugin : IInventoryDataPlugin
 
         if (folder.ParentID.IsZero())
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[MOCK INV DB]: Adding root folder {0} {1} for {2}", folder.Name, folder.ID, folder.Owner);
             m_rootFolders[folder.Owner] = folder;
         }
@@ -184,7 +186,7 @@ public class TestInventoryDataPlugin : IInventoryDataPlugin
     {
         InventoryFolderBase folder = m_folders[item.Folder];
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOCK INV DB]: Adding inventory item {0} {1} in {2} {3}", item.Name, item.ID, folder.Name, folder.ID);
 
         m_items[item.ID] = item;

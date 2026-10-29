@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -34,6 +33,9 @@ using netcd;
 using netcd.Serialization;
 using netcd.Advanced;
 using netcd.Advanced.Requests;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.OptionalModules.Framework.Monitoring;
 
@@ -43,7 +45,7 @@ namespace OpenSim.Region.OptionalModules.Framework.Monitoring;
 /// </summary>
 public class EtcdMonitoringModule : INonSharedRegionModule, IEtcdModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Scene m_scene;
     protected IEtcdClient m_client;
@@ -89,11 +91,11 @@ public class EtcdMonitoringModule : INonSharedRegionModule, IEtcdModule
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ETCD]: Error initializing connection: " + e.ToString());
+            m_log.LogDebug("[ETCD]: Error initializing connection: " + e.ToString());
             return;
         }
 
-        m_log.DebugFormat("[ETCD]: Etcd module configured");
+        m_log.LogDebug("[ETCD]: Etcd module configured");
         m_enabled = true;
     }
 
@@ -112,7 +114,7 @@ public class EtcdMonitoringModule : INonSharedRegionModule, IEtcdModule
             if (m_appendRegionID)
                 m_etcdBasePath += m_scene.RegionInfo.RegionID.ToString() + "/";
 
-            m_log.DebugFormat("[ETCD]: Using base path {0} for all keys", m_etcdBasePath);
+            m_log.LogDebug("[ETCD]: Using base path {0} for all keys", m_etcdBasePath);
 
             try
             {
@@ -120,7 +122,7 @@ public class EtcdMonitoringModule : INonSharedRegionModule, IEtcdModule
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("Exception trying to create base path {0}: " + e.ToString(), m_etcdBasePath);
+                m_log.LogError("Exception trying to create base path {0}: " + e.ToString(), m_etcdBasePath);
             }
 
             scene.RegisterModuleInterface<IEtcdModule>(this);
@@ -149,7 +151,7 @@ public class EtcdMonitoringModule : INonSharedRegionModule, IEtcdModule
 
         if (resp.ErrorCode.HasValue)
         {
-            m_log.DebugFormat("[ETCD]: Error {0} ({1}) storing {2} => {3}", resp.Cause, (int)resp.ErrorCode, m_etcdBasePath + k, v);
+            m_log.LogDebug("[ETCD]: Error {0} ({1}) storing {2} => {3}", resp.Cause, (int)resp.ErrorCode, m_etcdBasePath + k, v);
 
             return false;
         }
@@ -166,7 +168,7 @@ public class EtcdMonitoringModule : INonSharedRegionModule, IEtcdModule
 
         if (resp.ErrorCode.HasValue)
         {
-            m_log.DebugFormat("[ETCD]: Error {0} ({1}) getting {2}", resp.Cause, (int)resp.ErrorCode, m_etcdBasePath + k);
+            m_log.LogDebug("[ETCD]: Error {0} ({1}) getting {2}", resp.Cause, (int)resp.ErrorCode, m_etcdBasePath + k);
 
             return String.Empty;
         }

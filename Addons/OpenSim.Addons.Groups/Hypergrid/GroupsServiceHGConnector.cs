@@ -31,13 +31,13 @@ using OpenSim.Framework;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
 public class GroupsServiceHGConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI;
     private object m_Lock = new object();
@@ -48,7 +48,7 @@ public class GroupsServiceHGConnector
         if (!m_ServerURI.EndsWith("/"))
             m_ServerURI += "/";
 
-        m_log.DebugFormat("[Groups.HGConnector]: Groups server at {0}", m_ServerURI);
+        m_log.LogDebug("[Groups.HGConnector]: Groups server at {0}", m_ServerURI);
     }
 
     public bool CreateProxy(string RequestingAgentID, string AgentID, string accessToken, UUID groupID, string url, string name, out string reason)
@@ -276,7 +276,7 @@ public class GroupsServiceHGConnector
             return null;
         }
 
-        //m_log.DebugFormat("[XXX]: reply was {0}", reply);
+        //m_log.LogDebug("[XXX]: reply was {0}", reply);
 
         if (string.IsNullOrEmpty(reply))
             return null;

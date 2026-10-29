@@ -1,0 +1,54 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The first test project for the Phlox compiler: there was none, which is why
+       an earlier review had to report YEngine's overload verdict from reading the source rather than
+       from running it. CompilerFrontend.Compile(string) is a clean entry point - the
+       templatePath it takes is stored and never read - so a compile is a plain unit test. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="dispatch-baseline.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures\*.lsl" CopyToOutputDirectory="PreserveNewest" />
+    <!-- iwStringCodec golden vectors from Halcyon's own code on .NET Framework (Golden/README.md). The
+         generator's sources are kept beside them and are not part of this build. -->
+    <None Include="Golden\*.jsonl;Golden\*.txt" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Remove="Golden\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Source\InWorldz.Phlox\InWorldz.Phlox.csproj" />
+    <ProjectReference Include="..\..\Source\Phlox.ScriptEngine\Phlox.ScriptEngine.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.YEngine\OpenSim.Region.ScriptEngine.YEngine.csproj" />
+    <ProjectReference Include="..\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
+    <!-- The compile-limit child process (NestingLimitTests). -->
+    <ProjectReference Include="..\PhloxCompileProbe\PhloxCompileProbe.csproj" />
+    <!-- The saved-state tests read RuntimeState.EventQueue, a C5 collection; the same
+         Library/C5.dll identity InWorldz.Phlox is compiled against. -->
+    <Reference Include="C5">
+      <HintPath>..\..\Library\C5.dll</HintPath>
+      <Private>true</Private>
+    </Reference>
+    <!-- The XML-RPC cross-engine test calls XMLRPCModule.XmlRpcRemoteData, which takes Nwc.XmlRpc types. -->
+    <Reference Include="xmlrpc">
+      <HintPath>..\..\Library\xmlrpc.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

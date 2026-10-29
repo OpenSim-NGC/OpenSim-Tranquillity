@@ -31,6 +31,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.OptionalModules.PhysicsParameters;
 
 /// <summary>
@@ -39,7 +41,7 @@ namespace OpenSim.Region.OptionalModules.PhysicsParameters;
 /// </remarks>
 public class PhysicsParameters : ISharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 //        private static string LogHeader = "[PHYSICS PARAMETERS]";
 
     private List<Scene> m_scenes = new List<Scene>();
@@ -52,36 +54,36 @@ public class PhysicsParameters : ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-        // m_log.DebugFormat("{0}: INITIALIZED MODULE", LogHeader);
+        // m_log.LogDebug("{0}: INITIALIZED MODULE", LogHeader);
     }
 
     public void PostInitialise()
     {
-        // m_log.DebugFormat("[{0}: POST INITIALIZED MODULE", LogHeader);
+        // m_log.LogDebug("[{0}: POST INITIALIZED MODULE", LogHeader);
         InstallInterfaces();
     }
 
     public void Close()
     {
-        // m_log.DebugFormat("{0}: CLOSED MODULE", LogHeader);
+        // m_log.LogDebug("{0}: CLOSED MODULE", LogHeader);
     }
 
     public void AddRegion(Scene scene)
     {
-        // m_log.DebugFormat("{0}: REGION {1} ADDED", LogHeader, scene.RegionInfo.RegionName);
+        // m_log.LogDebug("{0}: REGION {1} ADDED", LogHeader, scene.RegionInfo.RegionName);
         m_scenes.Add(scene);
     }
 
     public void RemoveRegion(Scene scene)
     {
-        // m_log.DebugFormat("{0}: REGION {1} REMOVED", LogHeader, scene.RegionInfo.RegionName);
+        // m_log.LogDebug("{0}: REGION {1} REMOVED", LogHeader, scene.RegionInfo.RegionName);
         if (m_scenes.Contains(scene))
             m_scenes.Remove(scene);
     }
 
     public void RegionLoaded(Scene scene)
     {
-        // m_log.DebugFormat("{0}: REGION {1} LOADED", LogHeader, scene.RegionInfo.RegionName);
+        // m_log.LogDebug("{0}: REGION {1} LOADED", LogHeader, scene.RegionInfo.RegionName);
     }
     #endregion INonSharedRegionModule
 
@@ -247,13 +249,13 @@ public class PhysicsParameters : ISharedRegionModule
 
     private void WriteOut(string msg, params object[] args)
     {
-        // m_log.InfoFormat(msg, args);
+        // m_log.LogInformation(msg, args);
         MainConsole.Instance.Output(msg, args);
     }
 
     private void WriteError(string msg, params object[] args)
     {
-        // m_log.ErrorFormat(msg, args);
+        // m_log.LogError(msg, args);
         MainConsole.Instance.Output(msg, args);
     }
 }

@@ -788,8 +788,11 @@ public partial class LSL_Types
         public static readonly Quaternion Identity = new(0, 0, 0, 1);
     }
 
+    // Public LSL names are retained for compiled scripts and serialized state.
+#pragma warning disable CS8981
     [Serializable]
     public class list
+#pragma warning restore CS8981
     {
         private object[] m_data;
 
@@ -2249,8 +2252,11 @@ public partial class LSL_Types
         }
     }
 
+    // Public LSL names are retained for compiled scripts and serialized state.
+#pragma warning disable CS8981
     [Serializable]
     public struct key
+#pragma warning restore CS8981
     {
         public string value;
 

@@ -26,18 +26,20 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Grid;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid;
 
 public class GridInfoServiceInConnectorModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Enabled = false;
 
     private IConfigSource m_Config;
@@ -54,7 +56,7 @@ public class GridInfoServiceInConnectorModule : ISharedRegionModule
             m_Enabled = moduleConfig.GetBoolean("GridInfoServiceInConnector", false);
             if (m_Enabled)
             {
-                m_log.Info("[GRIDINFO IN CONNECTOR]: GridInfo Service In Connector enabled");
+                m_log.LogInformation("[GRIDINFO IN CONNECTOR]: GridInfo Service In Connector enabled");
             }
 
         }
@@ -100,7 +102,7 @@ public class GridInfoServiceInConnectorModule : ISharedRegionModule
         {
             m_Registered = true;
 
-            m_log.Info("[GridInfo]: Starting...");
+            m_log.LogInformation("[GridInfo]: Starting...");
 
             new GridInfoServerInConnector(m_Config, MainServer.Instance.DefaultServer, "GridInfoService");
         }

@@ -27,7 +27,7 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -44,7 +44,7 @@ namespace OpenSim.Framework;
 /// </summary>
 public class PluginLoaderHelper
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Phase 2 integration: Load plugins using registry + new loader.
@@ -60,7 +60,7 @@ public class PluginLoaderHelper
         try
         {
             // Step 1: Create registry from configuration
-            m_log.InfoFormat("[PLUGIN-HELPER]: Loading registry for {0}", extensionPath);
+            m_log.LogInformation("[PLUGIN-HELPER]: Loading registry for {0}", extensionPath);
             var registry = PluginRegistry.FromIniConfig(config, m_log);
 
             // Step 2: Create plugin loader
@@ -73,12 +73,12 @@ public class PluginLoaderHelper
             // Step 4: Collect loaded plugins
             result.AddRange(loader.LoadedPlugins);
 
-            m_log.InfoFormat("[PLUGIN-HELPER]: Loaded {0} plugins for {1} from registry",
+            m_log.LogInformation("[PLUGIN-HELPER]: Loaded {0} plugins for {1} from registry",
                 result.Count, extensionPath);
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PLUGIN-HELPER]: Error loading plugins for {0}: {1}",
+            m_log.LogError("[PLUGIN-HELPER]: Error loading plugins for {0}: {1}",
                 extensionPath, e.Message);
         }
 
@@ -98,7 +98,7 @@ public class PluginLoaderHelper
 
         try
         {
-            m_log.InfoFormat("[PLUGIN-HELPER]: Loading plugins for {0} using discovery backend",
+            m_log.LogInformation("[PLUGIN-HELPER]: Loading plugins for {0} using discovery backend",
                 extensionPath);
 
             // Create loader with the default discovery backend.
@@ -121,12 +121,12 @@ public class PluginLoaderHelper
             // Collect results
             result.AddRange(loader.LoadedPlugins);
 
-            m_log.InfoFormat("[PLUGIN-HELPER]: Loaded {0} plugins for {1} from discovery backend",
+            m_log.LogInformation("[PLUGIN-HELPER]: Loaded {0} plugins for {1} from discovery backend",
                 result.Count, extensionPath);
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PLUGIN-HELPER]: Error loading plugins for {0}: {1}",
+            m_log.LogError("[PLUGIN-HELPER]: Error loading plugins for {0}: {1}",
                 extensionPath, e.Message);
         }
 
@@ -153,7 +153,7 @@ public class PluginLoaderHelper
             var registry = PluginRegistry.FromIniConfig(config, m_log);
             if (registry.HasPlugins(extensionPath))
             {
-                m_log.InfoFormat("[PLUGIN-HELPER]: Using registry for {0}", extensionPath);
+                m_log.LogInformation("[PLUGIN-HELPER]: Using registry for {0}", extensionPath);
                 
                 var loader = DotNetCorePluginLoaderFactory.Create<T>(
                     initialiser: initialiser);
@@ -163,7 +163,7 @@ public class PluginLoaderHelper
             }
             else
             {
-                m_log.InfoFormat("[PLUGIN-HELPER]: Registry empty for {0}, using discovery", extensionPath);
+                m_log.LogInformation("[PLUGIN-HELPER]: Registry empty for {0}, using discovery", extensionPath);
                 
                 var loader = DotNetCorePluginLoaderFactory.Create<T>(
                     initialiser: initialiser);
@@ -181,12 +181,12 @@ public class PluginLoaderHelper
                 result.AddRange(loader.LoadedPlugins);
             }
 
-            m_log.InfoFormat("[PLUGIN-HELPER]: Loaded {0} plugins for {1} (hybrid mode)",
+            m_log.LogInformation("[PLUGIN-HELPER]: Loaded {0} plugins for {1} (hybrid mode)",
                 result.Count, extensionPath);
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PLUGIN-HELPER]: Error in hybrid loading for {0}: {1}",
+            m_log.LogError("[PLUGIN-HELPER]: Error in hybrid loading for {0}: {1}",
                 extensionPath, e.Message);
         }
 
@@ -200,7 +200,7 @@ public class PluginLoaderHelper
 /// </summary>
 public class DebugPluginLoader<T> : DotNetCorePluginLoader<T> where T : class, IPlugin
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private readonly bool m_verbose;
 
     public DebugPluginLoader(IPluginDiscovery discovery, PluginInitialiserBase initialiser = null, bool verbose = false)
@@ -216,19 +216,19 @@ public class DebugPluginLoader<T> : DotNetCorePluginLoader<T> where T : class, I
     {
         if (m_verbose)
         {
-            m_log.InfoFormat("[DEBUG-PLUGIN-LOADER]: Starting load for {0}", extensionPoint);
-            m_log.InfoFormat("[DEBUG-PLUGIN-LOADER]: Type hint: {0}", typeHint?.Name ?? "(none)");
+            m_log.LogInformation("[DEBUG-PLUGIN-LOADER]: Starting load for {0}", extensionPoint);
+            m_log.LogInformation("[DEBUG-PLUGIN-LOADER]: Type hint: {0}", typeHint?.Name ?? "(none)");
         }
 
         Load(extensionPoint, typeHint);
 
         if (m_verbose)
         {
-            m_log.InfoFormat("[DEBUG-PLUGIN-LOADER]: Load complete for {0}", extensionPoint);
-            m_log.InfoFormat("[DEBUG-PLUGIN-LOADER]: Loaded {0} plugins", LoadedPlugins.Count);
+            m_log.LogInformation("[DEBUG-PLUGIN-LOADER]: Load complete for {0}", extensionPoint);
+            m_log.LogInformation("[DEBUG-PLUGIN-LOADER]: Loaded {0} plugins", LoadedPlugins.Count);
             foreach (var plugin in LoadedPlugins)
             {
-                m_log.InfoFormat("[DEBUG-PLUGIN-LOADER]:   - {0} ({1})",
+                m_log.LogInformation("[DEBUG-PLUGIN-LOADER]:   - {0} ({1})",
                     plugin.GetType().Name, plugin.Name);
             }
         }

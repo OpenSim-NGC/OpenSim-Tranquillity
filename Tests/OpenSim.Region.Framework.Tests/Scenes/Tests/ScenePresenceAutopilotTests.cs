@@ -36,23 +36,17 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     {
         private TestScene m_scene;
 
-        [OneTimeSetUp]
-        public void FixtureInit()
-        {
-            // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
-            Util.FireAndForgetMethod = FireAndForgetMethod.None;
-        }
-
-        [OneTimeTearDown]
-        public void TearDown()
+        public override void Dispose()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
             // threads.  Possibly, later tests should be rewritten not to worry about such things.
             Util.FireAndForgetMethod = Util.DefaultFireAndForgetMethod;
         }
 
-        public void Init()
+        public ScenePresenceAutopilotTests()
         {
+            // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
+            Util.FireAndForgetMethod = FireAndForgetMethod.None;
             m_scene = new SceneHelpers().SetupScene();
         }
 
@@ -71,52 +65,50 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             sp.Flying = true;
 
             m_scene.Update(1);
-            Assert.Equal(,);
+            Assert.Equal(startPos, sp.AbsolutePosition);
 
             Vector3 targetPos = startPos + new Vector3(0, 10, 0);
             sp.MoveToTarget(targetPos, false, false, false);
 
-            Assert.Equal(,);
-            Assert.That(
-                sp.Rotation, new QuaternionToleranceConstraint(new Quaternion(0, 0, 0.7071068f, 0.7071068f), 0.000001));
+            Assert.Equal(startPos, sp.AbsolutePosition);
+            Assert.True(sp.Rotation.ApproxEquals(new Quaternion(0, 0, 0.7071068f, 0.7071068f), 0.000001f));
 
             m_scene.Update(1);
 
             // We should really check the exact figure.
-            Assert.Equal(,);
-            Assert.True(sp.AbsolutePosition.Y));
-            Assert.Equal(,);
-            Assert.True(sp.AbsolutePosition.Z));
+            Assert.Equal(startPos.X, sp.AbsolutePosition.X);
+            Assert.True(sp.AbsolutePosition.Y > startPos.Y);
+            Assert.Equal(startPos.Z, sp.AbsolutePosition.Z);
+            Assert.True(sp.AbsolutePosition.Z < targetPos.X);
 
             m_scene.Update(50);
 
             double distanceToTarget = Util.GetDistanceTo(sp.AbsolutePosition, targetPos);
-            Assert.True(distanceToTarget), "Avatar not within 1 unit of target position on first move");
-            Assert.Equal(,);
-            Assert.True(sp.AgentControlFlags)AgentManager.ControlFlags.NONE));
+            Assert.True(distanceToTarget < 1);
+            Assert.Equal(targetPos, sp.AbsolutePosition);
+            Assert.Equal((uint)AgentManager.ControlFlags.NONE, sp.AgentControlFlags);
 
             // Try a second movement
             startPos = sp.AbsolutePosition;
             targetPos = startPos + new Vector3(10, 0, 0);
             sp.MoveToTarget(targetPos, false, false, false);
 
-            Assert.Equal(,);
-            Assert.That(
-                sp.Rotation, new QuaternionToleranceConstraint(new Quaternion(0, 0, 0, 1), 0.000001));
+            Assert.Equal(startPos, sp.AbsolutePosition);
+            Assert.True(sp.Rotation.ApproxEquals(new Quaternion(0, 0, 0, 1), 0.000001f));
 
             m_scene.Update(1);
 
             // We should really check the exact figure.
-            Assert.True(sp.AbsolutePosition.X));
-            Assert.True(sp.AbsolutePosition.X));
-            Assert.Equal(,);
-            Assert.Equal(,);
+            Assert.True(sp.AbsolutePosition.X > startPos.X);
+            Assert.True(sp.AbsolutePosition.X < targetPos.X);
+            Assert.Equal(startPos.Y, sp.AbsolutePosition.Y);
+            Assert.Equal(startPos.Z, sp.AbsolutePosition.Z);
 
             m_scene.Update(50);
 
             distanceToTarget = Util.GetDistanceTo(sp.AbsolutePosition, targetPos);
-            Assert.True(distanceToTarget), "Avatar not within 1 unit of target position on second move");
-            Assert.Equal(,);
+            Assert.True(distanceToTarget < 1);
+            Assert.Equal(targetPos, sp.AbsolutePosition);
         }
     }
 }

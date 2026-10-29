@@ -28,7 +28,8 @@
 using System.Reflection;
 using OpenMetaverse.StructuredData;
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Servers.HttpServer;
 
@@ -37,7 +38,7 @@ namespace OpenSim.Framework.Servers.HttpServer;
 /// </summary>
 public class JsonRpcRequestManager
 {
-    static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public JsonRpcRequestManager()
     {
@@ -90,28 +91,28 @@ public class JsonRpcRequestManager
         }
         catch (Exception e)
         {
-            m_log.Debug(string.Format("JsonRpc request '{0}' to {1} failed", method, uri), e);
+            m_log.LogDebug(e, string.Format("JsonRpc request '{0}' to {1} failed", method, uri));
             return false;
         }
 
         OSD osdtmp;
         if (!outerResponse.TryGetValue("_Result", out osdtmp) || (osdtmp is not OSDMap response))
         {
-            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
+            m_log.LogDebug("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
                 method, uri, OSDParser.SerializeJsonString(outerResponse));
             return false;
         }
 
         if (response.TryGetValue("error", out osdtmp))
         {
-            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an error: {2}",
+            m_log.LogDebug("JsonRpc request '{0}' to {1} returned an error: {2}",
                 method, uri, OSDParser.SerializeJsonString(osdtmp));
             return false;
         }
 
         if (!response.TryGetValue("result", out osdtmp) || (osdtmp is not OSDMap resultmap))
         {
-            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
+            m_log.LogDebug("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
                 method, uri, OSDParser.SerializeJsonString(response));
             return false;
         }
@@ -158,14 +159,14 @@ public class JsonRpcRequestManager
         }
         catch (Exception e)
         {
-            m_log.Debug(string.Format("JsonRpc request '{0}' to {1} failed", method, uri), e);
+            m_log.LogDebug(e, string.Format("JsonRpc request '{0}' to {1} failed", method, uri));
             return false;
         }
 
         OSD osdtmp;
         if (!outerresponse.TryGetValue("_Result", out osdtmp) || (osdtmp is not OSDMap response))
         {
-            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
+            m_log.LogDebug("JsonRpc request '{0}' to {1} returned an invalid response: {2}",
                 method, uri, OSDParser.SerializeJsonString(outerresponse));
             return false;
         }
@@ -173,7 +174,7 @@ public class JsonRpcRequestManager
         if (response.TryGetValue("error", out osdtmp))
         {
             data = osdtmp;
-            m_log.DebugFormat("JsonRpc request '{0}' to {1} returned an error: {2}",
+            m_log.LogDebug("JsonRpc request '{0}' to {1} returned an error: {2}",
                 method, uri, OSDParser.SerializeJsonString(osdtmp));
             return false;
         }

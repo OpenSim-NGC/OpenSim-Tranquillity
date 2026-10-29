@@ -25,10 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Net;
-using System.Text;
-using System.Xml;
-using System.Xml.Serialization;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework.Servers.HttpServer;
 
@@ -37,6 +34,8 @@ namespace OpenSim.Framework.Servers.HttpServer;
 /// </summary>
 public class RestObjectPoster
 {
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(RestObjectPoster));
+
     public static void BeginPostObject<TRequest>(string requestUrl, TRequest obj)
     {
         BeginPostObject("POST", requestUrl, obj);
@@ -44,40 +43,30 @@ public class RestObjectPoster
 
     public static void BeginPostObject<TRequest>(string verb, string requestUrl, TRequest obj)
     {
-        Type type = typeof (TRequest);
-
-        WebRequest request = WebRequest.Create(requestUrl);
-        request.Method = verb;
-        request.ContentType = "text/xml";
-
-        using (MemoryStream buffer = new MemoryStream())
-        {
-            XmlWriterSettings settings = new XmlWriterSettings();
-            settings.Encoding = Encoding.UTF8;
-
-            using (XmlWriter writer = XmlWriter.Create(buffer, settings))
-            {
-                XmlSerializer serializer = new XmlSerializer(type);
-                serializer.Serialize(writer, obj);
-                writer.Flush();
-            }
-
-            int length = (int)buffer.Length;
-            request.ContentLength = length;
-
-            using (Stream requestStream = request.GetRequestStream())
-                requestStream.Write(buffer.ToArray(), 0, length);
-        }
-
-        // IAsyncResult result = request.BeginGetResponse(AsyncCallback, request);
-        request.BeginGetResponse(AsyncCallback, request);
+        _ = PostObjectAsync(verb, requestUrl, obj);
     }
 
-    private static void AsyncCallback(IAsyncResult result)
+    public static async Task PostObjectAsync<TRequest>(string verb, string requestUrl, TRequest obj,
+        int timeout = 100000, Action<Stream> responseCallback = null)
     {
-        WebRequest request = (WebRequest) result.AsyncState;
-        using (WebResponse resp = request.EndGetResponse(result))
+        try
         {
+            using HttpClient client = WebUtil.GetLegacyHttpClient(timeout);
+            using CancellationTokenSource cts = new(client.Timeout);
+            using HttpRequestMessage request = WebUtil.CreateXmlRequest(verb, requestUrl, obj);
+            using HttpResponseMessage response = await client.SendAsync(
+                request, HttpCompletionOption.ResponseHeadersRead, cts.Token).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            if (responseCallback != null)
+            {
+                byte[] data = await response.Content.ReadAsByteArrayAsync(cts.Token).ConfigureAwait(false);
+                using MemoryStream stream = new(data);
+                responseCallback(stream);
+            }
+        }
+        catch (Exception e)
+        {
+            m_log.LogError(e, "[REST OBJECT POSTER]: Request {Verb} {Url} failed", verb, requestUrl);
         }
     }
 }

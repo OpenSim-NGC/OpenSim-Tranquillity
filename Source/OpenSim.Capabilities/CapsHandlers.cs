@@ -91,12 +91,18 @@ public class CapsHandlers
         }
     }
 
-    public void AddSimpleHandler(string capName, ISimpleStreamHandler handler, bool addToListener = true)
+    /// <param name="varPath">
+    /// True when the capability serves paths *below* its own, as AIS v3 does
+    /// (<c>&lt;capurl&gt;/category/{id}/children</c>). The listener keeps those in a separate dictionary and matches
+    /// the segment before the second slash; the default dictionary is matched exactly, so a sub-path request
+    /// against it 404s before the handler is entered (<c>BaseHttpServer.TryGetSimpleStreamHandler</c>).
+    /// </param>
+    public void AddSimpleHandler(string capName, ISimpleStreamHandler handler, bool addToListener = true, bool varPath = false)
     {
         if(ContainsCap(capName))
             Remove(capName);
         if(m_capsSimpleHandlers.TryAdd(capName, handler) && addToListener)
-            m_httpListener.AddSimpleStreamHandler(handler);
+            m_httpListener.AddSimpleStreamHandler(handler, varPath);
     }
 
     public bool ContainsCap(string cap)

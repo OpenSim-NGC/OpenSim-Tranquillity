@@ -29,14 +29,16 @@ using System.Data;
 using OpenMetaverse;
 using System.Text;
 using Npgsql;
-using log4net;
 using System.Reflection;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Data.PGSQL;
 
 public class PGSQLUserAccountData : PGSQLGenericTableHandler<UserAccountData>,IUserAccountData
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
 
     public PGSQLUserAccountData(string connectionString, string realm) :
@@ -166,7 +168,7 @@ public class PGSQLUserAccountData : PGSQLGenericTableHandler<UserAccountData>,IU
         using (NpgsqlConnection conn = new NpgsqlConnection(m_ConnectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand())
         {
-            m_log.DebugFormat("[USER]: Try to update user {0} {1}", data.FirstName, data.LastName);
+            m_log.LogDebug("[USER]: Try to update user {0} {1}", data.FirstName, data.LastName);
 
             StringBuilder updateBuilder = new StringBuilder();
             updateBuilder.AppendFormat("update {0} set ", m_Realm);
@@ -194,11 +196,11 @@ public class PGSQLUserAccountData : PGSQLGenericTableHandler<UserAccountData>,IU
             cmd.Parameters.Add(m_database.CreateParameter("principalID", data.PrincipalID));
             cmd.Parameters.Add(m_database.CreateParameter("scopeID", data.ScopeID));
 
-            m_log.DebugFormat("[USER]: SQL update user {0} ", cmd.CommandText);
+            m_log.LogDebug("[USER]: SQL update user {0} ", cmd.CommandText);
 
             conn.Open();
 
-            m_log.DebugFormat("[USER]: CON opened update user {0} ", cmd.CommandText);
+            m_log.LogDebug("[USER]: CON opened update user {0} ", cmd.CommandText);
 
             int conta = 0;
             try
@@ -206,13 +208,13 @@ public class PGSQLUserAccountData : PGSQLGenericTableHandler<UserAccountData>,IU
                 conta = cmd.ExecuteNonQuery();
             }
             catch (Exception e){
-                m_log.ErrorFormat("[USER]: ERROR opened update user {0} ", e.Message);
+                m_log.LogError("[USER]: ERROR opened update user {0} ", e.Message);
             }
 
 
             if (conta < 1)
             {
-                m_log.DebugFormat("[USER]: Try to insert user {0} {1}", data.FirstName, data.LastName);
+                m_log.LogDebug("[USER]: Try to insert user {0} {1}", data.FirstName, data.LastName);
 
                 StringBuilder insertBuilder = new StringBuilder();
                 insertBuilder.AppendFormat(@"insert into {0} (""PrincipalID"", ""ScopeID"", ""FirstName"", ""LastName"", """, m_Realm);
@@ -232,7 +234,7 @@ public class PGSQLUserAccountData : PGSQLGenericTableHandler<UserAccountData>,IU
                 }
             }
             else
-                m_log.DebugFormat("[USER]: User {0} {1} exists", data.FirstName, data.LastName);
+                m_log.LogDebug("[USER]: User {0} {1} exists", data.FirstName, data.LastName);
         }
         return true;
     }

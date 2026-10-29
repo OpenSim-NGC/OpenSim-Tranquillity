@@ -27,9 +27,10 @@
 
 using System.Reflection;
 using System.Text;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander;
 
@@ -38,7 +39,7 @@ namespace OpenSim.Region.CoreModules.Framework.InterfaceCommander;
 /// </summary>
 public class Commander : ICommander
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <value>
     /// Used in runtime class generation
@@ -154,7 +155,7 @@ public class Commander : ICommander
         {
             if (function == "api")
             {
-                m_log.Info(GenerateRuntimeAPI());
+                m_log.LogInformation(GenerateRuntimeAPI());
             }
             else
             {

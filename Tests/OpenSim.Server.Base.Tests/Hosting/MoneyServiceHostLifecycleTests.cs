@@ -113,7 +113,7 @@ public sealed class MoneyServiceHostLifecycleTests
         public int StartMaintenanceCalls { get; private set; }
         public int StopCalls { get; private set; }
 
-        public Exception InitializeException { get; set; }
+        public Exception? InitializeException { get; set; }
 
         public void Initialize()
         {
@@ -131,16 +131,16 @@ public sealed class MoneyServiceHostLifecycleTests
         public int ThrowFatalCalls { get; private set; }
         public string LastFatalMessage { get; private set; } = string.Empty;
 
-        public Exception ThrowException { get; set; }
+        public Exception? ThrowException { get; set; }
 
-        public void ThrowFatal(string message, Exception exception = null)
+        public void ThrowFatal(string message, Exception? exception = null)
         {
             ThrowFatalCalls++;
             LastFatalMessage = message;
             throw ThrowException ?? new InvalidOperationException(message, exception);
         }
 
-        public void RequestStop(string message, Exception exception = null)
+        public void RequestStop(string message, Exception? exception = null)
         {
             // Not used in this C5 MoneyService path.
         }
@@ -156,7 +156,7 @@ public sealed class MoneyServiceHostLifecycleTests
         public int RegisterCommonCommandsCalls { get; private set; }
         public int RegisterCommonComponentsCalls { get; private set; }
 
-        public Exception ThrowOnRegisterCommonCommands { get; set; }
+        public Exception? ThrowOnRegisterCommonCommands { get; set; }
 
         public void RegisterCommonCommands()
         {

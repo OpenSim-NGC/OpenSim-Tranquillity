@@ -1,0 +1,3 @@
+# Fixtures are compiled byte-for-byte as the region compiles them.
+# Never normalise line endings here - the stored asset is LF and the README pins its sha256.
+*.lsl -text

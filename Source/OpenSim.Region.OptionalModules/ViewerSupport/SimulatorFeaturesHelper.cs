@@ -30,14 +30,15 @@ using System.Reflection;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 //using OpenSim.Framework.Capabilities;
-using log4net;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport;
 
 public class SimulatorFeaturesHelper
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
 

@@ -32,7 +32,8 @@ using System.Timers;
 using OpenMetaverse;
 using Nini.Config;
 using OpenSim.Framework.Servers.HttpServer;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Console;
 
@@ -40,7 +41,7 @@ namespace OpenSim.Framework.Console;
 //
 public class RemoteConsole : CommandConsole
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Connection specific data, indexed by a session ID
     // we create when a client connects.

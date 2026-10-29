@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -14,11 +13,13 @@ using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using System.Net;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class ExperienceModule : IExperienceModule, ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Dictionary of Agent IDs, with a dictionary of experience permissions and their bools
     private Dictionary<UUID, Dictionary<UUID, bool>> m_ExperiencePermissions = new Dictionary<UUID, Dictionary<UUID, bool>>();
@@ -35,6 +36,12 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
     private int CacheTimeout = 1 * 60;
 
+    // Acquire policy: who may create ("Acquire an Experience") via the viewer. SL gates on
+    // Premium; here the gate is grid-configurable instead
+    // ([Experience] ExperienceCreators). Values: EstateManagersAndRegionOwners
+    // (default) | Anyone | AdminsOnly.
+    private string m_AcquirePolicy = "EstateManagersAndRegionOwners";
+
     public void Initialise(IConfigSource source)
     {
         IConfig config = source.Configs["Experience"];
@@ -49,7 +56,11 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         if (!m_Enabled)
             return;
 
-        m_log.Info("[Experience] Plugin enabled!");
+        // Acquire policy (default estate-managers + region-owners), from the
+        // [Experience] ExperienceCreators key.
+        m_AcquirePolicy = config.GetString("ExperienceCreators", "EstateManagersAndRegionOwners");
+
+        m_log.LogInformation("[Experience] Plugin enabled!");
     }
 
     #region ISharedRegionModule
@@ -66,7 +77,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
     private void EventManager_OnAvatarEnteringNewParcel(ScenePresence avatar, int localLandID, UUID regionID)
     {
-        UpdateScriptExperiencePerms(avatar, false);
+        UpdateScriptExperiencePerms(avatar, false, UUID.Zero);
     }
 
     public void RemoveRegion(Scene scene)
@@ -87,7 +98,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         m_ExperienceService = scene.RequestModuleInterface<IExperienceService>();
         if (m_ExperienceService == null)
         {
-            m_log.Info("[EXPERIENCE]: Module disabled becuase IExperienceService was not found!");
+            m_log.LogInformation("[EXPERIENCE]: Module disabled becuase IExperienceService was not found!");
             return;
         }
 
@@ -122,7 +133,16 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         caps.RegisterHandler("GetExperiences", new GetExperiencesGetHandler(agent, this));
         caps.RegisterHandler("GetAdminExperiences", new GetAdminExperiencesGetHandler(agent, this));
         caps.RegisterHandler("GetCreatorExperiences", new GetCreatorExperiencesGetHandler(agent, this));
-        caps.RegisterHandler("AgentExperiences", new AgentExperiencesGetHandler(agent, this));
+        // AgentExperiences is GET (Owned tab) AND POST (Acquire).
+        // RegisterSimpleHandler method-dispatches both on one cap URL (like ExperiencePreferences),
+        // replacing the former GET-only handler. POST creates an experience owned by the agent when
+        // the acquire policy permits; the `purchase` key (emitted only for permitted agents) is what
+        // enables the viewer's Acquire button (llfloaterexperiences.cpp:240).
+        caps.RegisterSimpleHandler("AgentExperiences",
+            new SimpleStreamHandler(string.Format("/caps/{0}", UUID.Random()), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+            {
+                HandleAgentExperiences(httpRequest, httpResponse, agent);
+            }));
         caps.RegisterHandler("GetExperienceInfo", new GetExperienceInfoGetHandler(agent, this));
         caps.RegisterHandler("IsExperienceAdmin", new IsExperienceAdminGetHandler(agent, this));
         caps.RegisterHandler("IsExperienceContributor", new IsExperienceContributorGetHandler(agent, this));
@@ -131,6 +151,12 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         caps.RegisterHandler("GetMetadata", new GetMetadataPostHandler(agent, this, m_scene));
         caps.RegisterHandler("GroupExperiences", new GroupExperiencesGetHandler(agent, this));
         caps.RegisterHandler("FindExperienceByName", new FindExperienceByNameGetHandler(agent, this));
+        // A documented no-op: SL uses ExperienceQuery to clear
+        // experience-driven per-agent ENVIRONMENT injections that are no longer permitted on the
+        // agent's new parcel. Tranquillity's per-agent EEP (llSetAgentEnvironment/
+        // llReplaceAgentEnvironment) is STUBBED (log-only), so no injection ever exists to police —
+        // we answer every queried experience as permitted (true), so the viewer clears nothing.
+        caps.RegisterHandler("ExperienceQuery", new ExperienceQueryGetHandler(agent, this));
 
         caps.RegisterSimpleHandler("ExperiencePreferences",
             new SimpleStreamHandler(string.Format("/caps/{0}", UUID.Random()), delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
@@ -244,6 +270,86 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         response.StatusCode = (int)HttpStatusCode.OK;
     }
 
+    // AgentExperiences GET/POST. GET returns the agent's OWNED experiences
+    // (viewer Owned tab). POST is "Acquire an Experience": when the acquire policy permits, create a
+    // fresh experience owned by the agent; the viewer snapshots its owned ids, POSTs, diffs the
+    // returned experience_ids, and opens the profile (edit mode) on the new id for the user to name
+    // it (llfloaterexperiences.cpp:246-264).
+    private void HandleAgentExperiences(IOSHttpRequest request, IOSHttpResponse response, UUID agentID)
+    {
+        bool canAcquire = CanAcquireExperience(agentID);
+
+        if (request.HttpMethod == "POST")
+        {
+            if (canAcquire)
+            {
+                // Fresh random public_id per acquire -> a brand-new experience row. Tranquillity's
+                // uniqueness guard is on the KEY, not the name, so no name trick is needed to get past
+                // a name-uniqueness guard (two acquirers never collide
+                // on the random UUID). Empty name is still correct SL behaviour: the user names it in
+                // the profile the viewer opens. Grid-wide + enabled (Disabled bit clear), owner = agent.
+                ExperienceInfo created = new ExperienceInfo
+                {
+                    public_id = UUID.Random(),
+                    owner_id = agentID,
+                    name = string.Empty,
+                    properties = (int)ExperienceFlags.Grid
+                };
+                ExperienceInfo stored = UpdateExperienceInfo(created);
+                if (stored != null)
+                    m_log.LogInformation("[EXPERIENCE]: agent {0} acquired experience {1} (policy={2})",
+                        agentID, created.public_id, m_AcquirePolicy);
+                else
+                    m_log.LogWarning("[EXPERIENCE]: agent {0} acquire failed to persist (policy={1})",
+                        agentID, m_AcquirePolicy);
+            }
+            else
+            {
+                // Defensive: a non-permitted POST creates nothing (the viewer already keeps the button
+                // disabled via the missing `purchase` key; this guards a hand-crafted request).
+                m_log.LogWarning("[EXPERIENCE]: agent {0} not permitted to acquire an experience (policy={1}) — no create",
+                    agentID, m_AcquirePolicy);
+            }
+        }
+
+        UUID[] owned = GetAgentExperiences(agentID); // owner_id = agent (the agent's OWNED experiences)
+
+        string response_str = "<llsd><map><key>experience_ids</key>";
+        if (owned.Length > 0)
+        {
+            response_str += "<array>";
+            foreach (UUID id in owned)
+                response_str += string.Format("<uuid>{0}</uuid>", id);
+            response_str += "</array>";
+        }
+        else response_str += "<undef />";
+
+        // The `purchase` key's PRESENCE (not its value) enables the viewer's Acquire button
+        // (llfloaterexperiences.cpp:240 enableButton(content.has("purchase"))). Emit it ONLY for a
+        // permitted agent so a non-permitted agent's button stays disabled. 0 = no cost.
+        if (canAcquire)
+            response_str += "<key>purchase</key><integer>0</integer>";
+
+        response_str += "</map></llsd>";
+
+        response.RawBuffer = Encoding.UTF8.GetBytes(response_str);
+        response.StatusCode = (int)HttpStatusCode.OK;
+    }
+
+    // Acquire policy check. Default EstateManagersAndRegionOwners uses the estate-command
+    // gate (estate owner/manager OR god). Grid-configurable via [Experience]
+    // ExperienceCreators; Anyone -> always, AdminsOnly -> god/administrator only.
+    private bool CanAcquireExperience(UUID agentId)
+    {
+        switch (m_AcquirePolicy)
+        {
+            case "Anyone": return true;
+            case "AdminsOnly": return m_scene.Permissions.IsAdministrator(agentId);
+            case "EstateManagersAndRegionOwners":
+            default: return m_scene.Permissions.CanIssueEstateCommand(agentId, false);
+        }
+    }
+
     #region IExperienceModule
 
     public ExperiencePermission GetExperiencePermission(UUID avatar_id, UUID experience_id)
@@ -273,7 +379,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
                 ScenePresence scenePresence;
                 if (m_scene.TryGetScenePresence(avatar_id, out scenePresence))
                 {
-                    UpdateScriptExperiencePerms(scenePresence, true);
+                    UpdateScriptExperiencePerms(scenePresence, true, experience_id);
                 }
             }
         }
@@ -474,6 +580,10 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
     public bool IsExperienceAdmin(UUID agent_id, UUID experience_id)
     {
         ExperienceInfo info = GetExperienceInfo(experience_id, true);
+        // Guard an unresolved experience (unknown id) so the caps that surface this predicate
+        // return {status:false} rather than NRE'ing into a 500 the viewer can't parse.
+        if (info == null || agent_id == UUID.Zero)
+            return false;
         if (info.owner_id == agent_id)
             return true;
 
@@ -496,6 +606,10 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
     public bool IsExperienceContributor(UUID agent_id, UUID experience_id)
     {
         ExperienceInfo info = GetExperienceInfo(experience_id, true);
+        // The same unresolved-experience guard as IsExperienceAdmin. The owner ∪ GP_EXPERIENCE_CREATOR
+        // predicate below is unchanged, and so is the cap surface ({status:bool}).
+        if (info == null || agent_id == UUID.Zero)
+            return false;
         if (info.owner_id == agent_id)
             return true;
 
@@ -525,11 +639,21 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
         return m_scene.RegionInfo.EstateSettings.KeyExperiences;
     }
 
+    public UUID[] GetEstateBlockedExperiences()
+    {
+        return m_scene.RegionInfo.EstateSettings.BlockedExperiences;
+    }
+
 
     // These need to be added to the existing AccessList enum!
     public const int ACCESS_LIST_ALLOWED = 8;
 
-    private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent)
+    /// <summary>
+    /// Ends the Experience grants the avatar gave that may no longer stand. via_agent is true when the avatar
+    /// blocked blockedExperience (SL: experience_permissions_denied is raised when "The agent has blocked the
+    /// experience from the experience profile"), false when the avatar entered a new parcel.
+    /// </summary>
+    private void UpdateScriptExperiencePerms(ScenePresence avatar, bool via_agent, UUID blockedExperience)
     {
         var land = m_scene.LandChannel.GetLandObject(avatar.AbsolutePosition);
 
@@ -551,19 +675,14 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
                     if (item.PermsMask == 408628 && item.PermsGranter == avatar.UUID)
                     {
                         if (!allowed.Contains(item.ExperienceID))
-                        {
-                            item.PermsGranter = UUID.Zero;
-                            item.PermsMask = 0;
-
-                            foreach (var e in m_ScriptModules)
-                            {
-                                e.PostScriptEvent(item.ItemID, "experience_permissions_denied", new Object[] {
-                                    avatar.UUID.ToString(),
-                                    // I've decided to just hard code the ints rather than include Shared.Api.Runtime in LindenCaps
-                                    via_agent ? 4 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED*/ : 17 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED_LAND*/
-                                });
-                            }
-                        }
+                            EndExperienceGrant(part, item, avatar.UUID, via_agent);
+                    }
+                    // A block ends every grant the avatar gave to a script of the blocked Experience, whatever mask
+                    // the script engine recorded for it: the item carries no other mark of an Experience grant.
+                    else if (via_agent && blockedExperience != UUID.Zero && item.ExperienceID == blockedExperience &&
+                        item.PermsGranter == avatar.UUID && item.PermsMask != 0)
+                    {
+                        EndExperienceGrant(part, item, avatar.UUID, via_agent);
                     }
                 }
             });
@@ -577,6 +696,26 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
                 }
             }
         });
+    }
+
+    private void EndExperienceGrant(SceneObjectPart part, TaskInventoryItem item, UUID agent, bool via_agent)
+    {
+        // I've decided to just hard code the ints rather than include Shared.Api.Runtime in LindenCaps
+        int reason = via_agent ? 4 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED*/ : 17 /*ScriptBaseClass.XP_ERROR_NOT_PERMITTED_LAND*/;
+        int revokedMask = item.PermsMask;
+
+        item.PermsGranter = UUID.Zero;
+        item.PermsMask = 0;
+
+        foreach (var e in m_ScriptModules)
+        {
+            e.PostScriptEvent(item.ItemID, "experience_permissions_denied", new Object[] {
+                agent.ToString(),
+                reason
+            });
+        }
+
+        m_scene.EventManager.TriggerExperiencePermissionsRevoked(part.UUID, item.ItemID, agent, item.ExperienceID, revokedMask, reason);
     }
 
     public bool IsExperienceEnabled(UUID experience_id)
@@ -631,7 +770,7 @@ public class ExperienceModule : IExperienceModule, ISharedRegionModule
 
 public class FindExperienceByNameGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -650,29 +789,42 @@ public class FindExperienceByNameGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] FindExperienceByName path = {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] FindExperienceByName path = {0}", path);
 
         NameValueCollection query = HttpUtility.ParseQueryString(httpRequest.Url.Query);
 
-        string page = query.Get("page");
-        string page_size = query.Get("page_size");
-        string query_str = query.Get("query");
+        string query_str = query.Get("query") ?? string.Empty;
 
-        // todo: handle pages
+        // Pagination. The picker's `page` param is 1-BASED: it sends page=1 for
+        // the first search and onPage() clamps to >=1 (llpanelexperiencepicker.cpp:443-446).
+        // Treating it as 0-based dropped every result. Clamp <1 to page one; page_size defaults 30.
+        int page = 0, page_size = 30;
+        int.TryParse(query.Get("page"), out page);
+        if (!int.TryParse(query.Get("page_size"), out page_size) || page_size <= 0) page_size = 30;
+        if (page < 1) page = 1;
 
-        ExperienceInfo[] results = m_ExperienceModule.FindExperiencesByName(query_str);
+        // Tranquillity's data-layer FindExperiences has no SQL LIMIT (returns every match), so we
+        // page over the full set in-handler — no row is unreachable, and the storage layer is
+        // unchanged. Start of this page, one window wide.
+        ExperienceInfo[] results = m_ExperienceModule.FindExperiencesByName(query_str)
+            ?? new ExperienceInfo[0];
+        int start = (page - 1) * page_size;
+        int end = start + page_size;
+        if (end > results.Length) end = results.Length;
+        bool hasNext = results.Length > page * page_size;
 
         string new_str = "<?xml version=\"1.0\" ?><llsd><map><key>experience_keys</key><array>";
 
-        foreach(ExperienceInfo info in results)
+        for (int i = start; i < end; i++)
         {
+            ExperienceInfo info = results[i];
             string extended_meta = string.Format("<llsd><map><key>logo</key><uuid>{0}</uuid><key>marketplace</key>{1}</map></llsd>", info.logo, info.marketplace != string.Empty ? string.Format("<string>{0}</string>", info.marketplace) : "<string />");
 
             new_str += string.Format("<map>" +
                 "<key>public_id</key><uuid>{0}</uuid>" +
                 "<key>description</key><string>{1}</string>" +
                 "<key>name</key><string>{2}</string>" +
-                "<key>quota</key><integer>{9}</integer>" +
+                "<key>quota</key><integer>128</integer>" +
                 "<key>slurl</key><string>{6}</string>" +
                 "<key>maturity</key><integer>{7}</integer>" +
                 "<key>expiration</key><integer>600</integer>" +
@@ -680,18 +832,83 @@ public class FindExperienceByNameGetHandler : BaseStreamHandler
                 "<key>group_id</key><uuid>{3}</uuid>" +
                 "<key>properties</key><integer>{8}</integer>" +
                 "<key>agent_id</key><uuid>{4}</uuid>" +
-                "</map>", info.public_id, info.description, info.name, info.group_id, info.owner_id, HttpUtility.HtmlEncode(extended_meta), info.slurl, info.maturity, info.properties, info.quota);
+                "</map>", info.public_id, info.description, info.name, info.group_id, info.owner_id, HttpUtility.HtmlEncode(extended_meta), info.slurl, info.maturity, info.properties);
         }
 
-        new_str += "</array></map></llsd>";
+        new_str += "</array>";
+
+        // The picker enables its page buttons purely on the PRESENCE of these keys
+        // (llpanelexperiencepicker.cpp:248-249) and re-requests via ?page=N±1; the values are
+        // never dereferenced, but we emit real re-query URLs so they are correct if one ever is.
+        string basePath = httpRequest.Url.AbsolutePath;
+        if (hasNext)
+            new_str += string.Format("<key>next_page_url</key><string>{0}</string>",
+                HttpUtility.HtmlEncode(PageUrl(basePath, query_str, page + 1, page_size)));
+        if (page > 1)
+            new_str += string.Format("<key>previous_page_url</key><string>{0}</string>",
+                HttpUtility.HtmlEncode(PageUrl(basePath, query_str, page - 1, page_size)));
+
+        new_str += "</map></llsd>";
 
         return Encoding.UTF8.GetBytes(new_str);
+    }
+
+    private static string PageUrl(string basePath, string query, int page, int pageSize)
+    {
+        return (basePath ?? string.Empty) + "?page=" + page + "&page_size=" + pageSize +
+               "&query=" + Uri.EscapeDataString(query ?? string.Empty);
+    }
+}
+
+// ExperienceQuery cap, a documented no-op.
+// SL calls this (llenvironment.cpp testExperiencesOnParcelCoro) to learn which of a set of
+// experiences may still inject a per-agent ENVIRONMENT on the agent's current parcel; a
+// `false` answer makes the viewer clearInjections(). Tranquillity's per-agent EEP
+// (llSetAgentEnvironment / llReplaceAgentEnvironment) is STUBBED (log-only — see
+// Phlox.ScriptEngine/LSLSystemAPI.cs), so no injection ever exists to police. We answer every
+// queried experience as permitted (true) so the viewer clears nothing. GET
+// ?experiences=<uuid>,<uuid>,... -> { experiences: { <uuid>: true, ... } }.
+public class ExperienceQueryGetHandler : BaseStreamHandler
+{
+    private UUID m_AgentID = UUID.Zero;
+    private IExperienceModule m_ExperienceModule = null;
+
+    public ExperienceQueryGetHandler(UUID agent_id, IExperienceModule experienceModule)
+        : this(string.Format("/caps/{0}", UUID.Random()), agent_id, experienceModule)
+    {
+    }
+
+    public ExperienceQueryGetHandler(string path, UUID agent_id, IExperienceModule experienceModule)
+        : base("GET", path, null, null)
+    {
+        m_AgentID = agent_id;
+        m_ExperienceModule = experienceModule;
+    }
+
+    protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        NameValueCollection query = HttpUtility.ParseQueryString(httpRequest.Url.Query);
+        string csv = query.Get("experiences");
+
+        string response_str = "<?xml version=\"1.0\" ?><llsd><map><key>experiences</key><map>";
+        if (!string.IsNullOrEmpty(csv))
+        {
+            foreach (string part in csv.Split(','))
+            {
+                UUID id;
+                if (UUID.TryParse(part.Trim(), out id))
+                    response_str += string.Format("<key>{0}</key><boolean>true</boolean>", id);
+            }
+        }
+        response_str += "</map></map></llsd>";
+
+        return Encoding.UTF8.GetBytes(response_str);
     }
 }
 
 public class GroupExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -732,7 +949,7 @@ public class GroupExperiencesGetHandler : BaseStreamHandler
 
 public class GetMetadataPostHandler : ReadBaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -756,7 +973,7 @@ public class GetMetadataPostHandler : ReadBaseStreamHandler
     {
         byte[] data = ReadFully(request);
 
-        //m_log.InfoFormat("[EXPERIENCE] GetMetadata == {0}", Encoding.UTF8.GetString(data));
+        //m_log.LogInformation("[EXPERIENCE] GetMetadata == {0}", Encoding.UTF8.GetString(data));
 
         OSDMap map = (OSDMap)OSDParser.DeserializeLLSDXml(data);
 
@@ -803,7 +1020,7 @@ public class GetMetadataPostHandler : ReadBaseStreamHandler
 
 public class UpdateExperiencePostHandler : ReadBaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -849,13 +1066,25 @@ public class UpdateExperiencePostHandler : ReadBaseStreamHandler
 
         ExperienceInfo currentInfo = m_ExperienceModule.GetExperienceInfo(public_id);
 
+        // GATE: only an experience admin (owner OR group ExperienceAdmin) may edit. When NOT
+        // an admin, the update block is skipped and the UNCHANGED experience is echoed back below
+        // as the rejection; the viewer parses it and shows no edit.
         bool is_admin = m_ExperienceModule.IsExperienceAdmin(m_AgentID, public_id);
 
         if(is_admin)
         {
             currentInfo.name = name;
             currentInfo.description = desc;
-            currentInfo.group_id = group_id;
+
+            // GROUP FIELD IS OWNER-ONLY. SL's explicit rule: any experience administrator may
+            // edit every field EXCEPT the group; only the experience OWNER may change the group.
+            // Previously ANY admin could reassign it.
+            if (group_id != currentInfo.group_id)
+            {
+                if (currentInfo.owner_id == m_AgentID)
+                    currentInfo.group_id = group_id;
+                // else: admin-but-not-owner -> keep the existing group (change ignored).
+            }
 
             if (slurl != "last")
                 currentInfo.slurl = slurl;
@@ -886,7 +1115,7 @@ public class UpdateExperiencePostHandler : ReadBaseStreamHandler
             "<key>public_id</key><uuid>{0}</uuid>" +
             "<key>description</key><string>{1}</string>" +
             "<key>name</key><string>{2}</string>" +
-            "<key>quota</key><integer>{9}</integer>" +
+            "<key>quota</key><integer>128</integer>" + // was info.quota (default 16); SL's quota is 128
             "<key>slurl</key><string>{6}</string>" +
             "<key>maturity</key><integer>{7}</integer>" +
             "<key>expiration</key><integer>600</integer>" +
@@ -894,10 +1123,10 @@ public class UpdateExperiencePostHandler : ReadBaseStreamHandler
             "<key>group_id</key><uuid>{3}</uuid>" +
             "<key>properties</key><integer>{8}</integer>" +
             "<key>agent_id</key><uuid>{4}</uuid>" +
-            "</map></array></map></llsd>", 
-            currentInfo.public_id, currentInfo.description, 
-            currentInfo.name, currentInfo.group_id, currentInfo.owner_id, 
-            HttpUtility.HtmlEncode(extended_meta), currentInfo.slurl, currentInfo.maturity, currentInfo.properties, currentInfo.quota);
+            "</map></array></map></llsd>",
+            currentInfo.public_id, currentInfo.description,
+            currentInfo.name, currentInfo.group_id, currentInfo.owner_id,
+            HttpUtility.HtmlEncode(extended_meta), currentInfo.slurl, currentInfo.maturity, currentInfo.properties);
 
         return Encoding.UTF8.GetBytes(response_str);
     }
@@ -905,7 +1134,7 @@ public class UpdateExperiencePostHandler : ReadBaseStreamHandler
 
 public class IsExperienceContributorGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -979,7 +1208,7 @@ public class IsExperienceAdminGetHandler : BaseStreamHandler
 
 public class RegionExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -998,10 +1227,11 @@ public class RegionExperiencesGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] RegionExperiences request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] RegionExperiences request on {0}", path);
 
         UUID[] allowed = m_ExperienceModule.GetEstateAllowedExperiences();
         UUID[] key = m_ExperienceModule.GetEstateKeyExperiences();
+        UUID[] blocked = m_ExperienceModule.GetEstateBlockedExperiences();
 
         string response_str = "<llsd><map><key>allowed</key>";
         if (allowed.Length > 0)
@@ -1015,7 +1245,26 @@ public class RegionExperiencesGetHandler : BaseStreamHandler
         }
         else response_str += "<undef />";
 
-        response_str += "<key>blocked</key><undef /><key>default</key><uuid /><key>disabled</key><undef /><key>trusted</key>";
+        // The `blocked` list surfaces the estate's BlockedExperiences as a real array.
+        // It was hardcoded <undef/>, so the
+        // Region/Estate > Experiences Blocked editor always rendered empty even when experiences
+        // were region-blocked. `default`/`disabled` stay omitted-shaped (Tranquillity models
+        // neither; the panel reads them conditionally, so undef/empty is the correct "not set" wire).
+        // Error shape: this GET only reads estate lists and always emits a well-formed LLSD map, so
+        // it is already viewer-safe (never a parse-breaking response) — no error-case change needed.
+        response_str += "<key>blocked</key>";
+        if (blocked.Length > 0)
+        {
+            response_str += "<array>";
+            foreach (UUID id in blocked)
+            {
+                response_str += string.Format("<uuid>{0}</uuid>", id);
+            }
+            response_str += "</array>";
+        }
+        else response_str += "<undef />";
+
+        response_str += "<key>default</key><uuid /><key>disabled</key><undef /><key>trusted</key>";
 
         if (key.Length > 0)
         {
@@ -1036,7 +1285,7 @@ public class RegionExperiencesGetHandler : BaseStreamHandler
 
 public class GetExperienceInfoGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1054,11 +1303,11 @@ public class GetExperienceInfoGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] GetExperienceInfo request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] GetExperienceInfo request on {0}", path);
 
         NameValueCollection query = HttpUtility.ParseQueryString(httpRequest.Url.Query);
         string[] ids = query.GetValues("public_id");
-        //m_log.InfoFormat("[EXPERIENCE] GetExperienceInfo public_ids = {0}", string.Join(", ", ids));
+        //m_log.LogInformation("[EXPERIENCE] GetExperienceInfo public_ids = {0}", string.Join(", ", ids));
 
         string response_str = "<?xml version=\"1.0\" ?><llsd><map><key>experience_keys</key><array>";
 
@@ -1070,7 +1319,12 @@ public class GetExperienceInfoGetHandler : BaseStreamHandler
 
             if (info != null)
             {
-                string extended_meta = string.Format("<llsd><map><key>logo</key><uuid>{0}</uuid><key>marketplace</key><string /></map></llsd>", info.logo);
+                // This was hardcoding an EMPTY marketplace (dropping info.marketplace), so the
+                // profile floater's Marketplace panel never showed a store link. Emit the real
+                // value like FindExperienceByName/UpdateExperience do, logo and marketplace both.
+                // quota stays the hardcoded 128 below, consistent with the Find/Update handlers,
+                // which also emit 128.
+                string extended_meta = string.Format("<llsd><map><key>logo</key><uuid>{0}</uuid><key>marketplace</key>{1}</map></llsd>", info.logo, info.marketplace != string.Empty ? string.Format("<string>{0}</string>", info.marketplace) : "<string />");
 
                 response_str += string.Format("<map>" +
                     "<key>public_id</key><uuid>{0}</uuid>" +
@@ -1096,7 +1350,7 @@ public class GetExperienceInfoGetHandler : BaseStreamHandler
 
 public class GetCreatorExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1115,7 +1369,7 @@ public class GetCreatorExperiencesGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] GetCreatorExperiences request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] GetCreatorExperiences request on {0}", path);
 
         string response_str = "<llsd><map><key>experience_ids</key>";
 
@@ -1143,7 +1397,7 @@ public class GetCreatorExperiencesGetHandler : BaseStreamHandler
 
 public class GetAdminExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1162,7 +1416,7 @@ public class GetAdminExperiencesGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] GetAdminExperiences request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] GetAdminExperiences request on {0}", path);
 
         string response_str = "<llsd><map><key>experience_ids</key>";
 
@@ -1188,56 +1442,12 @@ public class GetAdminExperiencesGetHandler : BaseStreamHandler
     }
 }
 
-public class AgentExperiencesGetHandler : BaseStreamHandler
-{
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-    private UUID m_AgentID = UUID.Zero;
-    private IExperienceModule m_ExperienceModule = null;
-
-    public AgentExperiencesGetHandler(UUID agent_id, IExperienceModule experienceModule)
-        : this(string.Format("/caps/{0}", UUID.Random()), agent_id, experienceModule)
-    {
-    }
-
-    public AgentExperiencesGetHandler(string path, UUID agent_id, IExperienceModule experienceModule)
-        : base("GET", path, null, null)
-    {
-        m_AgentID = agent_id;
-        m_ExperienceModule = experienceModule;
-    }
-
-    protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
-    {
-        //m_log.InfoFormat("[EXPERIENCE] AgentExperiences request on {0}", path);
-
-        string response_str = "<llsd><map><key>experience_ids</key>";
-
-        UUID[] agent_experiences = m_ExperienceModule.GetAgentExperiences(m_AgentID);
-
-        if (agent_experiences.Length > 0)
-        {
-            response_str += "<array>";
-
-            foreach (UUID id in agent_experiences)
-                response_str += string.Format("<uuid>{0}</uuid>", id);
-
-            response_str += "</array>";
-        }
-        else
-        {
-            response_str += "<undef />";
-        }
-
-        response_str += "</map></llsd>";
-
-        return Encoding.UTF8.GetBytes(response_str);
-    }
-}
+// B1 — the former AgentExperiencesGetHandler (GET-only) was superseded by the module's
+// HandleAgentExperiences GET/POST delegate (RegisterCaps), which adds the Acquire (POST) path.
 
 public class GetExperiencesGetHandler : BaseStreamHandler
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private UUID m_AgentID = UUID.Zero;
     private IExperienceModule m_ExperienceModule = null;
@@ -1256,7 +1466,7 @@ public class GetExperiencesGetHandler : BaseStreamHandler
 
     protected override byte[] ProcessRequest(string path, Stream request, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.InfoFormat("[EXPERIENCE] GetExperiences request on {0}", path);
+        //m_log.LogInformation("[EXPERIENCE] GetExperiences request on {0}", path);
 
         string response_str = "<llsd><map><key>blocked</key>";
 

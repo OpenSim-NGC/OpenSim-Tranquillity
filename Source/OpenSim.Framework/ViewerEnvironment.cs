@@ -88,10 +88,30 @@ public class ViewerEnvironment
 
     public int version = 0;
 
+    /// <summary>
+    /// Load a legacy WindLight day cycle from an LLSD <b>array</b>. A body of any other shape is left alone:
+    /// this returns <c>void</c> and its existing contract for "cannot use this" is to leave <see cref="Cycle"/>
+    /// as it was, which is what the two already-guarded callers in <c>EnvironmentModule</c> assume.
+    ///
+    /// <para><b>ENV-1: the guard tests <c>array</c>, and that matters more than it looks.</b> It used to test
+    /// <c>osd</c> - the parameter rather than the cast result - and a non-array <see cref="OSD"/> is still
+    /// non-null, so <c>null</c> reached <c>DayCycle.FromWLOSD(OSDArray)</c>, which dereferences
+    /// <c>array.Count</c> on its first statement and threw. <b>That throw was load-bearing.</b> The legacy
+    /// WindLight setter (<c>EnvironmentModule.SetEnvironmentSettings</c>) parsed with the auto-detect entry,
+    /// held a bare <c>OSD</c> with no type check, and called <c>StoreOnRegion</c> - a write - immediately after
+    /// this call. The throw landed before that write, so nothing was corrupted; making
+    /// <c>DayCycle.FromWLOSD</c> null-tolerant, an obvious-looking hardening, would have removed the only thing
+    /// stopping a truncated request from storing a fresh <b>default</b> environment over the region's real one.</para>
+    ///
+    /// <para>Correcting this guard alone would have <i>armed</i> that, by turning the throw into a silent no-op -
+    /// so ENV-1 also added the type check at the setter, where the body is now refused at the boundary instead
+    /// of being stopped by a downstream accident. Found read-only in
+    /// <c>Docs/feature/ais-v3/AUDIT-1-MALFORMED-LLSD.md</c> §5.</para>
+    /// </summary>
     public void FromWLOSD(OSD osd)
     {
         OSDArray array = osd as OSDArray;
-        if(osd != null)
+        if(array != null)                       // ENV-1: the cast result, not the parameter
         {
             Cycle = new DayCycle();
             Cycle.FromWLOSD(array);

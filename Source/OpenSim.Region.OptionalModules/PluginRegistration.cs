@@ -40,6 +40,7 @@ public class PluginRegistration : IPluginRegistryProvider
         RegisterByName(registry, "/OpenSim/RegionModules", "AssetInfoModule", "OpenSim.Region.OptionalModules.Asset.AssetInfoModule", "AssetInfoModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "AnimationsCommandModule", "OpenSim.Region.OptionalModules.Avatar.Animations.AnimationsCommandModule", "AnimationsCommandModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "AppearanceInfoModule", "OpenSim.Region.OptionalModules.Avatar.Appearance.AppearanceInfoModule", "AppearanceInfoModule");
+        RegisterByName(registry, "/OpenSim/RegionModules", "ServerSideBakingModule", "OpenSim.Region.OptionalModules.Avatar.ServerSideBaking.ServerSideBakingModule", "ServerSideBakingModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "IRCBridgeModule", "OpenSim.Region.OptionalModules.Avatar.Chat.IRCBridgeModule", "IRCBridgeModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "ConciergeModule", "OpenSim.Region.OptionalModules.Avatar.Concierge.ConciergeModule", "ConciergeModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "FriendsCommandModule", "OpenSim.Region.OptionalModules.Avatar.Friends.FriendsCommandsModule", "FriendsCommandModule");

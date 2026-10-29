@@ -33,14 +33,13 @@ using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class ObjectAdd : INonSharedRegionModule
 {
-    // private static readonly ILog m_log =
-    //     LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private Scene m_scene;
 
     #region INonSharedRegionModule Members
@@ -85,7 +84,7 @@ public class ObjectAdd : INonSharedRegionModule
 
     public void RegisterCaps(UUID agentID, Caps caps)
     {
-        // m_log.InfoFormat("[OBJECTADD]: {0}", "/CAPS/OA/" + capuuid + "/");
+        // m_log.LogInformation("[OBJECTADD]: {0}", "/CAPS/OA/" + capuuid + "/");
 
         caps.RegisterSimpleHandler("ObjectAdd", new SimpleOSDMapHandler("POST", "/" + UUID.Random(),
             delegate (IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap map)

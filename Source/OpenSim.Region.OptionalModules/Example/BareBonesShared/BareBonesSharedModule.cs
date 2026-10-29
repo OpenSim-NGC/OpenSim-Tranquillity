@@ -26,11 +26,12 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 // You will need to uncomment these lines if you are adding a region module to some other assembly which does not already
 // specify its assembly.  Otherwise, the region modules in the assembly will not be picked up when OpenSimulator scans
 // the available DLLs
@@ -54,7 +55,7 @@ namespace OpenSim.Region.OptionalModules.Example.BareBonesShared;
 /// and include it in the addin.xml file for this assembly.
 public class BareBonesSharedModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public string Name { get { return "Bare Bones Shared Module"; } }
 
@@ -62,31 +63,31 @@ public class BareBonesSharedModule : ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-        m_log.DebugFormat("[BARE BONES SHARED]: INITIALIZED MODULE");
+        m_log.LogDebug("[BARE BONES SHARED]: INITIALIZED MODULE");
     }
 
     public void PostInitialise()
     {
-        m_log.DebugFormat("[BARE BONES SHARED]: POST INITIALIZED MODULE");
+        m_log.LogDebug("[BARE BONES SHARED]: POST INITIALIZED MODULE");
     }
 
     public void Close()
     {
-        m_log.DebugFormat("[BARE BONES SHARED]: CLOSED MODULE");
+        m_log.LogDebug("[BARE BONES SHARED]: CLOSED MODULE");
     }
 
     public void AddRegion(Scene scene)
     {
-        m_log.DebugFormat("[BARE BONES SHARED]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+        m_log.LogDebug("[BARE BONES SHARED]: REGION {0} ADDED", scene.RegionInfo.RegionName);
     }
 
     public void RemoveRegion(Scene scene)
     {
-        m_log.DebugFormat("[BARE BONES SHARED]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+        m_log.LogDebug("[BARE BONES SHARED]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
     }
 
     public void RegionLoaded(Scene scene)
     {
-        m_log.DebugFormat("[BARE BONES SHARED]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+        m_log.LogDebug("[BARE BONES SHARED]: REGION {0} LOADED", scene.RegionInfo.RegionName);
     }
 }

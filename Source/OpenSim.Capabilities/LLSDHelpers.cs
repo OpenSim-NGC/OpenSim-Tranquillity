@@ -30,13 +30,12 @@ using System.Reflection;
 using System.Xml;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework.Capabilities;
 
 public class LLSDHelpers
 {
-//        private static readonly log4net.ILog m_log
-//            = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-
     public static string SerialiseLLSDReply(object obj)
     {
         using(StringWriter sw = new StringWriter())
@@ -47,7 +46,7 @@ public class LLSDHelpers
             SerializeOSDType(writer, obj);
             writer.WriteEndElement();
             writer.Flush();
-        //m_log.DebugFormat("[LLSD Helpers]: Generated serialized LLSD reply {0}", sw.ToString());
+        //m_log.LogDebug("[LLSD Helpers]: Generated serialized LLSD reply {0}", sw.ToString());
 
             return sw.ToString();
         }
@@ -61,7 +60,7 @@ public class LLSDHelpers
             writer.Formatting = Formatting.None;
             SerializeOSDType(writer, obj);
             writer.Flush();
-        //m_log.DebugFormat("[LLSD Helpers]: Generated serialized LLSD reply {0}", sw.ToString());
+        //m_log.LogDebug("[LLSD Helpers]: Generated serialized LLSD reply {0}", sw.ToString());
 
             return sw.ToString();
         }

@@ -31,6 +31,8 @@ using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
@@ -73,7 +75,7 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
     public virtual void EnableSimulator(ulong handle, IPEndPoint endPoint, UUID avatarID, int regionSizeX, int regionSizeY)
     {
         if (DebugLevel > 0)
-            m_log.Debug($"{LogHeader} EnableSimulator. handle={handle}, endPoint={endPoint}, avatarID={avatarID}");
+            m_log.LogDebug($"{LogHeader} EnableSimulator. handle={handle}, endPoint={endPoint}, avatarID={avatarID}");
 
         osUTF8 sb = StartEvent("EnableSimulator");
         LLSDxmlEncode2.AddArrayAndMap("SimulatorInfo", sb);
@@ -91,7 +93,7 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
                             ulong regionHandle, int regionSizeX, int regionSizeY)
     {
         if (DebugLevel > 0)
-            m_log.Debug($"{LogHeader} EstablishAgentCommunication. handle={regionHandle}, endPoint={endPoint}, avatarID={avatarID}");
+            m_log.LogDebug($"{LogHeader} EstablishAgentCommunication. handle={regionHandle}, endPoint={endPoint}, avatarID={avatarID}");
 
         osUTF8 sb = StartEvent("EstablishAgentCommunication");
 
@@ -112,7 +114,7 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
                                     UUID avatarID, int regionSizeX, int regionSizeY)
     {
         if (DebugLevel > 0)
-            m_log.Debug($"{LogHeader} TeleportFinishEvent. handle={regionHandle}, endPoint={regionExternalEndPoint}, avatarID={avatarID}");
+            m_log.LogDebug($"{LogHeader} TeleportFinishEvent. handle={regionHandle}, endPoint={regionExternalEndPoint}, avatarID={avatarID}");
 
         // not sure why flags get overwritten here
         if ((flags & (uint)TeleportFlags.IsFlying) != 0)
@@ -143,7 +145,7 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
                             string capsURL, UUID avatarID, UUID sessionID, int regionSizeX, int regionSizeY)
     {
         if (DebugLevel > 0)
-            m_log.Debug($"{LogHeader} CrossRegion. handle={handle}, avatarID={avatarID}, regionSize={regionSizeX},{regionSizeY}>");
+            m_log.LogDebug($"{LogHeader} CrossRegion. handle={handle}, avatarID={avatarID}, regionSize={regionSizeX},{regionSizeY}>");
 
         osUTF8 sb = StartEvent("CrossedRegion");
 

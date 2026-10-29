@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.Assets;
@@ -54,6 +53,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Logging;
 using AssetLandmark = OpenSim.Framework.AssetLandmark;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
@@ -79,7 +79,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api;
 /// </summary>
 public class LSL_Api : ILSL_Api, IScriptApi
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private int m_llRequestAgentDataCacheTimeout;
     public int LlRequestAgentDataCacheTimeoutMs
@@ -1637,7 +1637,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
     public LSL_Integer llGetStatus(int status)
     {
-        // m_log.Debug(m_host.ToString() + " status is " + m_host.GetEffectiveObjectFlags().ToString());
+        // m_log.LogDebug(m_host.ToString() + " status is " + m_host.GetEffectiveObjectFlags().ToString());
         return status switch
         {
             ScriptBaseClass.STATUS_PHYSICS => (LSL_Integer)(IsPhysical() ? 1 : 0),
@@ -1785,7 +1785,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
             return;
 
         string requestFromIPAddress = m_UrlModule.GetHttpHeader(id, "x-remote-ip");
-        //m_log.Debug("IP from header='" + requestFromIPAddress + "' IP from endpoint='" + logonFromIPAddress + "'");
+        //m_log.LogDebug("IP from header='" + requestFromIPAddress + "' IP from endpoint='" + logonFromIPAddress + "'");
         if (requestFromIPAddress == null)
             return;
 
@@ -3421,6 +3421,8 @@ public class LSL_Api : ILSL_Api, IScriptApi
                         new LSL_String(
                         group.RootPart.UUID.ToString()) },
                         Array.Empty<DetectParams>()));
+                string rezzedKey = group.RootPart.UUID.ToString();
+                PostToOtherScriptEngines("object_rez", [m_host], () => new object[] { rezzedKey });
 
                 if (notAttachment)
                 {
@@ -3937,6 +3939,8 @@ public class LSL_Api : ILSL_Api, IScriptApi
                         new LSL_String(groot.UUID.ToString())
                     ],
                     Array.Empty<DetectParams>()));
+            string rezzedKey = groot.UUID.ToString();
+            PostToOtherScriptEngines("object_rez", [m_host], () => new object[] { rezzedKey });
 
             if(soundVol > 0 && !string.IsNullOrEmpty(sound) && m_SoundModule is not null)
             {
@@ -4012,7 +4016,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
     public virtual void llSleep(double sec)
     {
-//            m_log.Info("llSleep snoozing " + sec + "s.");
+//            m_log.LogInformation("llSleep snoozing " + sec + "s.");
 
         Sleep((int)(sec * 1000));
     }
@@ -4333,7 +4337,71 @@ public void llDetachFromAvatar()
                     new LSL_String(email.message),
                     new LSL_Integer(email.numLeft)},
                 Array.Empty<DetectParams>()));
+        PostToOtherScriptEngines("email", [m_host],
+                () => new object[] { email.time, email.sender, email.subject, email.message, email.numLeft });
+    }
 
+    /// <summary>
+    /// Offers an event that was just posted through this script's own engine to the region's other script engines,
+    /// for every script item of the given prims, each once. A region can run more than one script engine, and an
+    /// engine posts only to the scripts it runs, so without this another engine's scripts never get the event.
+    /// Which scripts SL names (SL wiki): object_rez "Triggers in all running scripts with an object_rez event, AND in
+    /// the same prim as the script calling llRezObject or llRezAtRoot."; email: "The email queue is associated with the
+    /// prim and any script in the prim can access it."; linkset_data "fires in all scripts in a linkset whenever the
+    /// datastore has been modified through a call to one of the llLinksetData functions."
+    /// Each item is offered to each other engine once (this script's own engine is not among them), by item, so no
+    /// engine's own prim or linkset rule widens it; an engine delivers only to the scripts it runs. Another engine gets
+    /// plain values, as core modules post to any engine, in an array of its own per post, since an engine may convert
+    /// arguments in place. An exception from an engine is logged once for this event and goes no further: its later
+    /// items, the engines after it and the calling script are not affected. A region with no other engine returns
+    /// after one module lookup.
+    /// </summary>
+    private void PostToOtherScriptEngines(string eventName, SceneObjectPart[] parts, Func<object[]> plainArgs)
+    {
+        IScriptModule[] modules = World?.RequestModuleInterfaces<IScriptModule>();
+        if (modules is null)
+            return;
+
+        // An engine may both register and stack itself as the region's IScriptModule; it is one engine.
+        List<IScriptEngine> engines = null;
+        foreach (IScriptModule m in modules)
+        {
+            if (m is IScriptEngine e && e != m_ScriptEngine && (engines is null || !engines.Contains(e)))
+                (engines ??= new List<IScriptEngine>()).Add(e);
+        }
+        if (engines is null)
+            return;
+
+        List<UUID> scriptItems = new List<UUID>();
+        foreach (SceneObjectPart part in parts)
+        {
+            foreach (TaskInventoryItem item in part.Inventory.GetInventoryItems())
+            {
+                if (item.Type == ScriptBaseClass.INVENTORY_SCRIPT)
+                    scriptItems.Add(item.ItemID);
+            }
+        }
+        if (scriptItems.Count == 0)
+            return;
+
+        foreach (IScriptEngine engine in engines)
+        {
+            Exception failure = null;
+            foreach (UUID itemID in scriptItems)
+            {
+                try
+                {
+                    engine.PostScriptEvent(itemID, new EventParams(eventName, plainArgs(), Array.Empty<DetectParams>()));
+                }
+                catch (Exception e)
+                {
+                    failure ??= e;
+                }
+            }
+
+            if (failure is not null)
+                m_log.LogError(failure, "[LSL API]: {0} failed to post {1} from prim {2}", engine.ScriptEngineName, eventName, m_host.LocalId);
+        }
     }
 
     public void llTargetedEmail(LSL_Integer target, LSL_String subject, LSL_String message)
@@ -5654,6 +5722,12 @@ public void llDetachFromAvatar()
 
         List<SceneObjectPart> parts = GetLinkParts(linknumber);
 
+        // SL (wiki llMessageLinked): "It triggers a link_message event with the same parameters num, str, and id in
+        // all scripts in the prim(s) described by link." A region can run more than one script engine, and each engine
+        // posts only to the scripts it runs, so the region's other engines are offered every targeted script item too.
+        List<IScriptEngine> otherEngines = OtherScriptEngines();
+        List<UUID> scriptItems = otherEngines is null ? null : new List<UUID>();
+
         UUID partItemID;
         foreach (SceneObjectPart part in parts)
         {
@@ -5674,9 +5748,65 @@ public void llDetachFromAvatar()
                     m_ScriptEngine.PostScriptEvent(partItemID,
                             new EventParams("link_message",
                             resobj, Array.Empty<DetectParams>()));
+
+                    scriptItems?.Add(partItemID);
                 }
             }
         }
+
+        if (scriptItems is null || scriptItems.Count == 0)
+            return;
+
+        int senderLinkNumber = m_host.ParentGroup.PrimCount == 1 ? 0 : m_host.LinkNum;
+        foreach (IScriptEngine engine in otherEngines)
+            PostLinkMessageTo(engine, scriptItems, senderLinkNumber, num, msg, id);
+    }
+
+    /// <summary>
+    /// The region's script engines other than this script's own, each once (an engine may both register and stack
+    /// itself as the region's IScriptModule), or null when there are none. Local ids and items are per region, so only
+    /// this region's engines are returned.
+    /// </summary>
+    private List<IScriptEngine> OtherScriptEngines()
+    {
+        IScriptModule[] modules = World?.RequestModuleInterfaces<IScriptModule>();
+        if (modules is null)
+            return null;
+
+        List<IScriptEngine> others = null;
+        foreach (IScriptModule m in modules)
+        {
+            if (m is IScriptEngine e && e != m_ScriptEngine && (others is null || !others.Contains(e)))
+                (others ??= new List<IScriptEngine>()).Add(e);
+        }
+        return others;
+    }
+
+    /// <summary>
+    /// Offers a link message to another engine for each targeted script item, once each; the engine delivers it only to
+    /// the items it runs. Another engine gets plain values (int sender, int num, string str, string id), as core modules
+    /// post to any engine, in an array of its own per post, since an engine may convert arguments in place. An exception
+    /// from that engine is logged once for this message and goes no further: its later items, the engines after it and
+    /// the sending script are not affected.
+    /// </summary>
+    private void PostLinkMessageTo(IScriptEngine engine, List<UUID> scriptItems, int sender, int num, string msg, string id)
+    {
+        Exception failure = null;
+        foreach (UUID itemID in scriptItems)
+        {
+            try
+            {
+                engine.PostScriptEvent(itemID,
+                        new EventParams("link_message", new object[] { sender, num, msg, id }, Array.Empty<DetectParams>()));
+            }
+            catch (Exception e)
+            {
+                failure ??= e;
+            }
+        }
+
+        if (failure is not null)
+            m_log.LogError(failure, "[LSL API]: {0} failed to post link_message from prim {1}", engine.ScriptEngineName, m_host.LocalId);
     }
 
     public void llPushObject(string target, LSL_Vector impulse, LSL_Vector ang_impulse, int local)
@@ -6521,7 +6651,7 @@ public void llDetachFromAvatar()
         for (int i = start; i <= end; i += stride, j++)
             res[j] = src.Data[i];
 
-        //m_log.Debug($" test {size} {j}");
+        //m_log.LogDebug($" test {size} {j}");
         return new LSL_List(res);
     }
 
@@ -6609,9 +6739,24 @@ public void llDetachFromAvatar()
             case "shout_range":
                 return m_shoutdistance.ToString();
 
+            case "grid":
+                return EnvGridName(World);
+
             default:
                 return "";
         }
+    }
+
+    /// <summary>
+    /// llGetEnv("grid") in both script engines: the grid name osGetGridName reads (Scene.SceneGridInfo.GridName,
+    /// from GridName or gridname in [Const], [GridInfo] or [SimulatorFeatures]). A grid with no name configured
+    /// returns "", as an unknown key does, not GridInfo's stand-in name for one.
+    /// </summary>
+    public static string EnvGridName(Scene scene)
+    {
+        const string unconfigured = "Another bad configured grid"; // GridInfo's stand-in when no name is configured
+        string name = scene?.SceneGridInfo?.GridName;
+        return string.IsNullOrEmpty(name) || name == unconfigured ? string.Empty : name;
     }
 
     /// <summary>
@@ -8636,7 +8781,14 @@ public void llDetachFromAvatar()
         ScriptSleep(m_sleepMsOnSendRemoteData);
         if (xmlrpcMod == null)
             return "";
-        return (xmlrpcMod.SendRemoteData(m_host.LocalId, m_item.ItemID, channel, dest, idata, sdata)).ToString();
+        UUID reqID = xmlrpcMod.SendRemoteData(m_host.LocalId, m_item.ItemID, channel, dest, idata, sdata);
+        if (reqID.IsZero())
+        {
+            // the module refuses only a destination the outbound URL filter disallows; reported as llHTTPRequest does
+            Error("llSendRemoteData", string.Format("Request to {0} disallowed by filter", dest));
+            return string.Empty;
+        }
+        return reqID.ToString();
     }
 
     public void llRemoteDataReply(string channel, string message_id, string sdata, int idata)
@@ -10762,14 +10914,18 @@ public void llDetachFromAvatar()
                            return new LSL_List();
                         }
 
-                        // not SL compatible since we don't have a independent flag to control active target but use the values of offset and rotation
-                        if(active == 1)
+                        // SL: "If the active value is 0 the sit target is deactivated. If it is nonzero the prim's sit
+                        // target is set to the indicated offset and rotation." and "Unlike llLinkSitTarget(), an offset
+                        // of <0.0, 0.0, 0.0> may be explicitly set". The region stores do not save
+                        // SceneObjectPart.SitTargetActive, so a target at a zero offset keeps a 1e-5 m offset here:
+                        // without it the target would be lost when the region restarts.
+                        if(active != 0)
                         {
                             if(offset.x == 0 && offset.y == 0 && offset.z == 0 && sitrot.s == 1.0)
-                                offset.z = 1e-5f; // hack
+                                offset.z = 1e-5f;
                             SitTarget(part,offset,sitrot);
                         }
-                        else if(active == 0)
+                        else
                             SitTarget(part, Vector3.Zero , Quaternion.Identity);
 
                         break;
@@ -12178,14 +12334,14 @@ public void llDetachFromAvatar()
                         res.Add(new LSL_Integer(0));
                         res.Add(new LSL_Float(0f)); // ambiance
                         res.Add(new LSL_Float(0f)); // clip
-                        res.Add(new LSL_Float(0f)); // flags
+                        res.Add(new LSL_Integer(0)); // flags
                     }
                     else
                     {
                         res.Add(new LSL_Integer(1));
                         res.Add(new LSL_Float(shape.ReflectionProbe.Ambiance)); // ambiance
                         res.Add(new LSL_Float(shape.ReflectionProbe.ClipDistance)); // clip
-                        res.Add(new LSL_Float(shape.ReflectionProbe.Flags)); // flags
+                        res.Add(new LSL_Integer(shape.ReflectionProbe.Flags)); // flags
                     }
                     break;
 
@@ -13486,7 +13642,7 @@ public void llDetachFromAvatar()
         }
         catch(Exception)
         {
-            //m_log.Error("[LSL_API]: llRequestSimulatorData" + e.ToString());
+            //m_log.LogError("[LSL_API]: llRequestSimulatorData" + e.ToString());
             return ScriptBaseClass.NULL_KEY;
         }
     }
@@ -14771,6 +14927,14 @@ public void llDetachFromAvatar()
                 return string.Empty;
             }
 
+            if (flag == (int)HttpRequestConstants.HTTP_MIMETYPE &&
+                !HttpRequestMimeType.IsValid(parameters.Data[i+1].ToString()))
+            {
+                // the request module refuses it too; this says why
+                Error("llHTTPRequest", HttpRequestMimeType.InvalidMessage);
+                return string.Empty;
+            }
+
             if (flag != (int)HttpRequestConstants.HTTP_CUSTOM_HEADER)
             {
                 param.Add(flag.ToString());       //Add parameter flag
@@ -15967,7 +16131,7 @@ public void llDetachFromAvatar()
         if (ossl != null)
         {
             ossl.CheckThreatLevel(ThreatLevel.High, "print");
-            m_log.Info("LSL print():" + str);
+            m_log.LogInformation("LSL print():" + str);
         }
     }
 
@@ -16222,7 +16386,7 @@ public void llDetachFromAvatar()
 
             Vector3 b1 = group.AbsolutePosition + new Vector3(minX, minY, minZ);
             Vector3 b2 = group.AbsolutePosition + new Vector3(maxX, maxY, maxZ);
-            //m_log.DebugFormat("[LLCASTRAY]: min<{0},{1},{2}>, max<{3},{4},{5}> = hitp<{6},{7},{8}>", b1.X,b1.Y,b1.Z,b2.X,b2.Y,b2.Z,intersection.ipoint.X,intersection.ipoint.Y,intersection.ipoint.Z);
+            //m_log.LogDebug("[LLCASTRAY]: min<{0},{1},{2}>, max<{3},{4},{5}> = hitp<{6},{7},{8}>", b1.X,b1.Y,b1.Z,b2.X,b2.Y,b2.Z,intersection.ipoint.X,intersection.ipoint.Y,intersection.ipoint.Z);
             if (!(intersection.ipoint.X >= b1.X && intersection.ipoint.X <= b2.X &&
                 intersection.ipoint.Y >= b1.Y && intersection.ipoint.Y <= b2.Y &&
                 intersection.ipoint.Z >= b1.Z && intersection.ipoint.Z <= b2.Z))
@@ -16394,6 +16558,8 @@ public void llDetachFromAvatar()
     }
 */
 
+    private const int CastRayMaxHits = 256;
+
     public LSL_List llCastRay(LSL_Vector start, LSL_Vector end, LSL_List options)
     {
         LSL_List list = new();
@@ -16419,15 +16585,16 @@ public void llDetachFromAvatar()
             if (options.GetIntegerItem(i) == ScriptBaseClass.RC_MAX_HITS)
                 count = options.GetIntegerItem(i + 1);
             else if (options.GetIntegerItem(i) == ScriptBaseClass.RC_DETECT_PHANTOM)
-                detectPhantom = (options.GetIntegerItem(i + 1) > 0);
+                detectPhantom = (options.GetIntegerItem(i + 1) != 0);
             else if (options.GetIntegerItem(i) == ScriptBaseClass.RC_DATA_FLAGS)
                 dataFlags = options.GetIntegerItem(i + 1);
             else if (options.GetIntegerItem(i) == ScriptBaseClass.RC_REJECT_TYPES)
                 rejectTypes = options.GetIntegerItem(i + 1);
         }
 
-        if (count > 16)
-            count = 16;
+        // The SL wiki gives RC_MAX_HITS a maximum of 256 (https://wiki.secondlife.com/wiki/LlCastRay).
+        if (count > CastRayMaxHits)
+            count = CastRayMaxHits;
 
         List<ContactResult> results = new();
 
@@ -16463,8 +16630,11 @@ public void llDetachFromAvatar()
             dist = (float)Math.Sqrt(dist);
             Vector3 direction = dir * (1.0f / dist);
 
-            // get some more contacts to sort ???
-            object physresults = World.RayCastFiltered(rayStart, direction, dist, 2 * count, rayfilter);
+            // Get some more contacts to sort, and one more for each prim of the host that is left out of the answer
+            // below, so that a hit the script does not get is not a place lost from the hits it asked for.
+            int hostHits = rejectHostGroup ? m_host.ParentGroup.PrimCount : (rejectHost ? 1 : 0);
+            object physresults = World.RayCastFiltered(rayStart, direction, dist,
+                Math.Min(CastRayMaxHits, 2 * count + hostHits), rayfilter);
 
             if (physresults != null)
             {
@@ -16829,7 +16999,7 @@ public void llDetachFromAvatar()
                             // For now, sculpt rendering is disabled in SkiaSharp-only mode
                             else if (omvPrim.Sculpt != null && omvPrim.Sculpt.Type != SculptType.Mesh && sculptAsset != null)
                             {
-                                m_log.WarnFormat("[LSL API] Sculpt rendering for prim {0} is not supported in SkiaSharp-only mode", 
+                                m_log.LogWarning("[LSL API] Sculpt rendering for prim {0} is not supported in SkiaSharp-only mode", 
                                     omvPrim.ID.ToString());
                             }
 
@@ -17657,6 +17827,8 @@ public void llDetachFromAvatar()
                 new LSL_String(
                 group.RootPart.UUID.ToString()) },
                 Array.Empty<DetectParams>()));
+        string rezzedKey = group.RootPart.UUID.ToString();
+        PostToOtherScriptEngines("object_rez", [m_host], () => new object[] { rezzedKey });
     }
 
     public LSL_Key llTransferLindenDollars(LSL_Key destination, LSL_Integer amount)
@@ -18140,7 +18312,7 @@ public void llDetachFromAvatar()
                     res.Add(new LSL_Integer(0));
                     res.Add(new LSL_Float(0f)); // ambiance
                     res.Add(new LSL_Float(0f)); // clip
-                    res.Add(new LSL_Float(0f)); // flags
+                    res.Add(new LSL_Integer(0)); // flags
                     break;
 
                 case ScriptBaseClass.PRIM_GLOW:
@@ -18601,7 +18773,7 @@ public void llDetachFromAvatar()
         client.OnScriptAnswer -= handleScriptExperienceAnswer;
         m_waitingForScriptExperienceAnswer = false;
 
-        m_log.InfoFormat("[EXPERIENCE] Script answer from {0} is {1}", client.AgentId, answer);
+        m_log.LogInformation("[EXPERIENCE] Script answer from {0} is {1}", client.AgentId, answer);
 
         if ((answer & ScriptBaseClass.PERMISSION_TAKE_CONTROLS) == 0)
             llReleaseControls();
@@ -18610,7 +18782,7 @@ public void llDetachFromAvatar()
 
         if (answer != 0)
         {
-            m_log.InfoFormat("[EXPERIENCE] Permissions granted by {0} to {1}", client.AgentId, m_item.ExperienceID);
+            m_log.LogInformation("[EXPERIENCE] Permissions granted by {0} to {1}", client.AgentId, m_item.ExperienceID);
 
             World.ExperienceModule.SetExperiencePermission(client.AgentId, m_item.ExperienceID, ExperiencePermission.Allowed);
             SendExperienceEvent(ExperienceEvent.Permissions);
@@ -18807,7 +18979,7 @@ public void llDetachFromAvatar()
             if (part.ParentGroup.IsAttachment)
                 return new LSL_Integer(ScriptBaseClass.SIT_INVALID_OBJECT);
 
-            if (part.SitTargetOrientationLL == Quaternion.Identity && part.SitTargetPosition == Vector3.Zero)
+            if (!part.IsSitTargetSet)
                 return new LSL_Integer(ScriptBaseClass.SIT_NO_SIT_TARGET);
 
             if (part.SitTargetAvatar != UUID.Zero)
@@ -20876,6 +21048,8 @@ public void llDetachFromAvatar()
         m_ScriptEngine.PostObjectEvent(
             rootPrim.LocalId,
             new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+        PostToOtherScriptEngines("linkset_data", rootPrim.ParentGroup.Parts,
+            () => new object[] { ScriptBaseClass.LINKSETDATA_RESET, string.Empty, string.Empty });
 
         rootPrim.ParentGroup.HasGroupChanged = true;
     }
@@ -20993,6 +21167,8 @@ public void llDetachFromAvatar()
             m_ScriptEngine.PostObjectEvent(
                 rootPrim.LocalId,
                 new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+            PostToOtherScriptEngines("linkset_data", rootPrim.ParentGroup.Parts,
+                () => new object[] { ScriptBaseClass.LINKSETDATA_UPDATE, name.m_string, value.m_string });
 
             rootPrim.ParentGroup.HasGroupChanged = true;
 
@@ -21047,6 +21223,8 @@ public void llDetachFromAvatar()
             m_ScriptEngine.PostObjectEvent(
                 m_host.LocalId, 
                 new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+            PostToOtherScriptEngines("linkset_data", rootPrim.ParentGroup.Parts,
+                () => new object[] { ScriptBaseClass.LINKSETDATA_MULTIDELETE, removed_keys, string.Empty });
 
             rootPrim.ParentGroup.HasGroupChanged = true;
 
@@ -21079,8 +21257,10 @@ public void llDetachFromAvatar()
             };
 
             m_ScriptEngine.PostObjectEvent(
-                rootPrim.LocalId, 
+                rootPrim.LocalId,
                 new EventParams("linkset_data", parameters, Array.Empty<DetectParams>()));
+            PostToOtherScriptEngines("linkset_data", rootPrim.ParentGroup.Parts,
+                () => new object[] { ScriptBaseClass.LINKSETDATA_DELETE, name.m_string, string.Empty });
 
             rootPrim.ParentGroup.HasGroupChanged = true;
 

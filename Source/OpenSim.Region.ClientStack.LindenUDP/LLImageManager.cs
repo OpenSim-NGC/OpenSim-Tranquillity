@@ -29,7 +29,7 @@ using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Interfaces;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.ClientStack.LindenUDP;
 
@@ -46,7 +46,7 @@ public class LLImageManager
         }
     }
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private bool m_shuttingdown;
     private AssetBase m_missingImage;
     private IAssetService m_assetCache;
@@ -78,7 +78,7 @@ public class LLImageManager
             m_missingImage = pAssetCache.Get("5748decc-f629-461c-9a36-a35a221fe21f");
 
         if (m_missingImage == null)
-            m_log.Error("[ClientView] - Couldn't set missing image asset, falling back to missing image packet. This is known to crash the client");
+            m_log.LogError("[ClientView] - Couldn't set missing image asset, falling back to missing image packet. This is known to crash the client");
 
         m_j2kDecodeModule = pJ2kDecodeModule;
     }
@@ -101,7 +101,7 @@ public class LLImageManager
             {
                 if (newRequest.DiscardLevel == -1 && newRequest.Priority == 0f)
                 {
-                    //m_log.Debug("[TEX]: (CAN) ID=" + newRequest.RequestedAssetID);
+                    //m_log.LogDebug("[TEX]: (CAN) ID=" + newRequest.RequestedAssetID);
 
                     try
                     {
@@ -112,11 +112,11 @@ public class LLImageManager
                 }
                 else
                 {
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[LL IMAGE MANAGER]: Received duplicate of existing request for {0}, start packet {1} from {2}",
 //                            newRequest.RequestedAssetID, newRequest.PacketNumber, m_client.Name);
 
-//                        m_log.DebugFormat("[TEX]: (UPD) ID={0}: D={1}, S={2}, P={3}",
+//                        m_log.LogDebug("[TEX]: (UPD) ID={0}: D={1}, S={2}, P={3}",
 //                            newRequest.RequestedAssetID, newRequest.DiscardLevel, newRequest.PacketNumber, newRequest.Priority);
 
                     //Check the packet sequence to make sure this isn't older than
@@ -145,16 +145,16 @@ public class LLImageManager
             {
                 if (newRequest.DiscardLevel == -1 && newRequest.Priority == 0f)
                 {
-                    //m_log.DebugFormat("[TEX]: (IGN) ID={0}: D={1}, S={2}, P={3}",
+                    //m_log.LogDebug("[TEX]: (IGN) ID={0}: D={1}, S={2}, P={3}",
                     //    newRequest.RequestedAssetID, newRequest.DiscardLevel, newRequest.PacketNumber, newRequest.Priority);
                 }
                 else
                 {
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[LL IMAGE MANAGER]: Received request for {0}, start packet {1} from {2}",
 //                            newRequest.RequestedAssetID, newRequest.PacketNumber, m_client.Name);
 
-                    //m_log.DebugFormat("[TEX]: (NEW) ID={0}: D={1}, S={2}, P={3}",
+                    //m_log.LogDebug("[TEX]: (NEW) ID={0}: D={1}, S={2}, P={3}",
                     //    newRequest.RequestedAssetID, newRequest.DiscardLevel, newRequest.PacketNumber, newRequest.Priority);
 
                     imgrequest = new J2KImage(this);
@@ -212,7 +212,7 @@ public class LLImageManager
                 // written. Undecoded textures should not be going into the priority
                 // queue, because a high priority undecoded texture will clog up the
                 // pipeline for a client
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[LL IMAGE MANAGER]: Exiting image queue processing early on encountering undecoded image {0}",
 //                        image.TextureID);
 
@@ -221,7 +221,7 @@ public class LLImageManager
         }
 
 //            if (packetsSent != 0)
-//                m_log.DebugFormat("[LL IMAGE MANAGER]: Processed {0} packets from image queue", packetsSent);
+//                m_log.LogDebug("[LL IMAGE MANAGER]: Processed {0} packets from image queue", packetsSent);
 
         return m_priorityQueue.Count > 0;
     }

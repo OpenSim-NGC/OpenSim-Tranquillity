@@ -31,24 +31,26 @@ using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
-
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Simulation;
 
 public class ObjectSimpleHandler : SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private ISimulationService m_SimulationService;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
     protected bool m_Proxy = false;
 
-    public ObjectSimpleHandler(ISimulationService service) : base("/object")
+    public ObjectSimpleHandler(ISimulationService service, ControlPlaneAccess controlPlaneAccess) : base("/object")
     {
         m_SimulationService = service;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
@@ -65,7 +67,7 @@ public class ObjectSimpleHandler : SimpleStreamHandler
         /*this things are ignored
         if (!Utils.GetParams(httpRequest.UriPath, out UUID objectID, out UUID regionID, out string action))
         {
-            m_log.InfoFormat("[OBJECT HANDLER]: Invalid parameters for object message {0}", httpRequest.UriPath);
+            m_log.LogInformation("[OBJECT HANDLER]: Invalid parameters for object message {0}", httpRequest.UriPath);
             httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
@@ -75,6 +77,9 @@ public class ObjectSimpleHandler : SimpleStreamHandler
         {
             case "POST":
             {
+                if (!m_ControlPlaneAccess.Authorize(httpRequest, httpResponse))
+                    return;
+
                 OSDMap args = Utils.DeserializeJSONOSMap(httpRequest);
                 if (args == null)
                 {
@@ -129,13 +134,13 @@ public class ObjectSimpleHandler : SimpleStreamHandler
         ISceneObject sog = null;
         try
         {
-            //m_log.DebugFormat("[OBJECT HANDLER]: received {0}", sogXmlStr);
+            //m_log.LogDebug("[OBJECT HANDLER]: received {0}", sogXmlStr);
             sog = s.DeserializeObject(sogXmlStr);
             sog.ExtraFromXmlString(extraStr);
         }
         catch (Exception ex)
         {
-            m_log.InfoFormat("[OBJECT HANDLER]: exception on deserializing scene object {0}", ex.Message);
+            m_log.LogInformation("[OBJECT HANDLER]: exception on deserializing scene object {0}", ex.Message);
             httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
             return;
         }
@@ -156,7 +161,7 @@ public class ObjectSimpleHandler : SimpleStreamHandler
                 }
                 catch (Exception ex)
                 {
-                    m_log.InfoFormat("[OBJECT HANDLER]: exception on setting state for scene object {0}", ex.Message);
+                    m_log.LogInformation("[OBJECT HANDLER]: exception on setting state for scene object {0}", ex.Message);
                     // ignore and continue
                 }
             }
@@ -170,7 +175,7 @@ public class ObjectSimpleHandler : SimpleStreamHandler
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[OBJECT HANDLER]: Exception in CreateObject: {0}", e.StackTrace);
+            m_log.LogDebug("[OBJECT HANDLER]: Exception in CreateObject: {0}", e.StackTrace);
             result = false;
         }
 

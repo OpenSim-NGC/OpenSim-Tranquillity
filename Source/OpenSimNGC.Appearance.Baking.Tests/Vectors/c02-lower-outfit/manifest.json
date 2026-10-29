@@ -1,0 +1,221 @@
+{
+  "id": "C02-lower-outfit",
+  "title": "Underpants, socks, shoes, pants, jacket: order and colour",
+  "rules": [
+    "R02",
+    "R03",
+    "R05"
+  ],
+  "note": "",
+  "channel": "Lower",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skin",
+      "label": "skin",
+      "params": {},
+      "textures": []
+    },
+    {
+      "kind": "Underpants",
+      "label": "underpants",
+      "params": {
+        "1054": 0.5
+      },
+      "textures": [
+        {
+          "slot": "LowerUnderpants",
+          "generator": "checkA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-underpants-LowerUnderpants.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Socks",
+      "label": "socks",
+      "params": {
+        "818": 0.5,
+        "1050": 0.5
+      },
+      "textures": [
+        {
+          "slot": "LowerSocks",
+          "generator": "halfA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-socks-LowerSocks.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Shoes",
+      "label": "shoes",
+      "params": {
+        "1052": 0.4
+      },
+      "textures": [
+        {
+          "slot": "LowerShoes",
+          "generator": "gradA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-shoes-LowerShoes.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Pants",
+      "label": "pants",
+      "params": {
+        "815": 0.7
+      },
+      "textures": [
+        {
+          "slot": "LowerPants",
+          "generator": "grad",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": false,
+          "file": "tex-pants-LowerPants.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Jacket",
+      "label": "jacket",
+      "params": {
+        "621": 0.6,
+        "623": 0.3
+      },
+      "textures": [
+        {
+          "slot": "LowerJacket",
+          "generator": "bandA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-jacket-LowerJacket.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "32789c5f8cfbc9746c2b41f5e299ccf6b017ef625a9d62a5bf8c07407e8635b1",
+    "morphSha256": "be050ff04cea2c5836e07dc46fe39be391120f27878c11a6f37a98ce3d0e3ed2",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.65,0.43,0.25,1.00); body_skingrain.tga"
+      },
+      {
+        "layer": "shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "highlight",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (1.00,1.00,1.00,0.00)"
+      },
+      {
+        "layer": "toenails",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "lowerbody_color.tga\u002Balpha"
+      },
+      {
+        "layer": "lower_bodypaint",
+        "status": "skipped",
+        "wearable": "Skin",
+        "detail": "skin: no LowerBodypaint texture on the wearable"
+      },
+      {
+        "layer": "freckles lower",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [freckles lower#777=skip]"
+      },
+      {
+        "layer": "lower_tattoo",
+        "status": "skipped",
+        "wearable": "Tattoo",
+        "detail": "no Tattoo worn"
+      },
+      {
+        "layer": "lower_universal_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "lower_underpants",
+        "status": "drawn",
+        "wearable": "Underpants",
+        "detail": "underpants: LowerUnderpants 64x64\u002Balpha -\u003E 64; colour (1.00,1.00,1.00,1.00); masks [Pants Length#1054=0.50\u002B, Pants Waist#1056=0.80\u002B, texture alpha*]"
+      },
+      {
+        "layer": "lower_socks",
+        "status": "drawn",
+        "wearable": "Socks",
+        "detail": "socks: LowerSocks 64x64\u002Balpha -\u003E 64; colour (0.50,1.00,1.00,1.00); masks [Socks Length bump#1050=0.50\u002B, texture alpha*]"
+      },
+      {
+        "layer": "lower_shoes",
+        "status": "drawn",
+        "wearable": "Shoes",
+        "detail": "shoes: LowerShoes 64x64\u002Balpha -\u003E 64; colour (1.00,1.00,1.00,1.00); masks [Shoe Height#1052=0.40\u002B, texture alpha*]"
+      },
+      {
+        "layer": "lower_clothes_shadow",
+        "status": "skipped",
+        "wearable": "Pants",
+        "detail": "pants: colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "lower_pants",
+        "status": "drawn",
+        "wearable": "Pants",
+        "detail": "pants: LowerPants 64x64 -\u003E 64; colour (1.00,1.00,1.00,1.00); masks [Waist Height Cloth#614=0.80\u002B, Pants Length Cloth#615=0.78\u002B]"
+      },
+      {
+        "layer": "lower_jacket",
+        "status": "drawn",
+        "wearable": "Jacket",
+        "detail": "jacket: LowerJacket 64x64\u002Balpha -\u003E 64; colour (1.00,1.00,1.00,1.00); masks [bottom length lower#621=0.60\u002B, open lower#623=0.30*, texture alpha*]"
+      },
+      {
+        "layer": "lower_pants",
+        "status": "morph",
+        "wearable": "Pants",
+        "detail": "pants: morph mask *= layer mask (mean 163.9)"
+      },
+      {
+        "layer": "lower alpha",
+        "status": "skipped",
+        "wearable": "Alpha",
+        "detail": "no Alpha worn"
+      }
+    ]
+  }
+}

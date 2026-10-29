@@ -26,20 +26,20 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.Framework.ServiceThrottle;
 
 public class ServiceThrottleModule : ISharedRegionModule, IServiceThrottleModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly List<Scene> m_scenes = new List<Scene>();
@@ -106,7 +106,7 @@ public class ServiceThrottleModule : ISharedRegionModule, IServiceThrottleModule
 
     public void OnRegionHandleRequest(IClientAPI client, UUID regionID)
     {
-        //m_log.DebugFormat("[SERVICE THROTTLE]: RegionHandleRequest {0}", regionID);
+        //m_log.LogDebug("[SERVICE THROTTLE]: RegionHandleRequest {0}", regionID);
         Action action = delegate
         {
             if(!client.IsActive || m_scenes.Count == 0 || m_scenes[0] == null )

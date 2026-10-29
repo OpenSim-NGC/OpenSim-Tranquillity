@@ -129,7 +129,14 @@ public class TestOSHttpResponse : IOSHttpResponse
     /// name</param>
     /// <param name="value">string containing the header field
     /// value</param>
-    public void AddHeader(string key, string value) { throw new NotImplementedException(); }
+    /// <summary>
+    /// The headers this response was given. Implemented rather than throwing (AIS-SEC-3): a handler that sets a
+    /// header on a real response must not fault inside a test, and a test that cares about the header - the
+    /// <c>Retry-After</c> on AIS's 503, for one - has no other way to see it.
+    /// </summary>
+    public readonly Dictionary<string, string> AddedHeaders = new();
+
+    public void AddHeader(string key, string value) { AddedHeaders[key] = value; }
 
     public void Send() { }
 }

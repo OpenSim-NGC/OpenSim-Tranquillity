@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -34,11 +33,13 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.Dialog;
 
 public class DialogModule : IDialogModule, INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Scene m_scene;
 
@@ -210,7 +211,7 @@ public class DialogModule : IDialogModule, INonSharedRegionModule
         if (cmdparams[0].ToLower().Equals("alert"))
         {
             message = CombineParams(cmdparams, 1);
-            m_log.InfoFormat("[DIALOG]: Sending general alert in region {0} with message {1}",
+            m_log.LogInformation("[DIALOG]: Sending general alert in region {0} with message {1}",
                     m_scene.RegionInfo.RegionName, message);
             SendGeneralAlert(message);
         }
@@ -219,7 +220,7 @@ public class DialogModule : IDialogModule, INonSharedRegionModule
             string firstName = cmdparams[1];
             string lastName = cmdparams[2];
             message = CombineParams(cmdparams, 3);
-            m_log.InfoFormat("[DIALOG]: Sending alert in region {0} to {1} {2} with message {3}",
+            m_log.LogInformation("[DIALOG]: Sending alert in region {0} to {1} {2} with message {3}",
                     m_scene.RegionInfo.RegionName, firstName, lastName,
                     message);
             SendAlertToUser(firstName, lastName, message, false);

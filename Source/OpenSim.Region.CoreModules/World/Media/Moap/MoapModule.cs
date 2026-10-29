@@ -27,7 +27,6 @@
 
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.Messages.Linden;
@@ -37,6 +36,7 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
@@ -44,7 +44,7 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap;
 
 public class MoapModule : INonSharedRegionModule, IMoapModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public string Name { get { return "MoapModule"; } }
     public Type ReplaceableInterface { get { return null; } }
@@ -66,7 +66,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
         if (config != null && !config.GetBoolean("Enabled", false))
             m_isEnabled = false;
 //            else
-//                m_log.Debug("[MOAP]: Initialised module.")l
+//                m_log.LogDebug("[MOAP]: Initialised module.")l
     }
 
     public void AddRegion(Scene scene)
@@ -100,7 +100,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
 
     public void OnRegisterCaps(UUID agentID, Caps caps)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[MOAP]: Registering ObjectMedia and ObjectMediaNavigate capabilities for agent {0}", agentID);
 
 
@@ -163,7 +163,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
             }
         }
 
-//            m_log.DebugFormat("[MOAP]: GetMediaEntry for {0} face {1} found {2}", part.Name, face, me);
+//            m_log.LogDebug("[MOAP]: GetMediaEntry for {0} face {1} found {2}", part.Name, face, me);
 
         return me;
     }
@@ -176,7 +176,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
     /// <param name="me">If null, then the media entry is cleared.</param>
     public void SetMediaEntry(SceneObjectPart part, int face, MediaEntry me)
     {
-//            m_log.DebugFormat("[MOAP]: SetMediaEntry for {0}, face {1}", part.Name, face);
+//            m_log.LogDebug("[MOAP]: SetMediaEntry for {0}, face {1}", part.Name, face);
 
         CheckFaceParam(part, face);
 
@@ -232,7 +232,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
     /// </summary>
     protected void HandleObjectMediaMessage(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agentID)
     {
-//            m_log.DebugFormat("[MOAP]: Got ObjectMedia path [{0}], raw request [{1}]", path, request);
+//            m_log.LogDebug("[MOAP]: Got ObjectMedia path [{0}], raw request [{1}]", path, request);
 
         try
         {
@@ -260,7 +260,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
             }
             else
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[MOAP]: ObjectMediaMessage has unrecognized ObjectMediaBlock of {0}",
                     omm.Request.GetType());
             }
@@ -285,7 +285,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
 
         if (null == part)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[MOAP]: Received a GET ObjectMediaRequest for prim {0} but this doesn't exist in region {1}",
                 primId, m_scene.RegionInfo.RegionName);
             return string.Empty;
@@ -334,7 +334,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
 
         string rawResp = OSDParser.SerializeLLSDXmlString(resp.Serialize());
 
-//            m_log.DebugFormat("[MOAP]: Got HandleObjectMediaRequestGet raw response is [{0}]", rawResp);
+//            m_log.LogDebug("[MOAP]: Got HandleObjectMediaRequestGet raw response is [{0}]", rawResp);
 
         return rawResp;
     }
@@ -352,24 +352,24 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
 
         if (null == part)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[MOAP]: Received an UPDATE ObjectMediaRequest for prim {0} but this doesn't exist in region {1}",
                 primId, m_scene.RegionInfo.RegionName);
             return false;
         }
 
-//            m_log.DebugFormat("[MOAP]: Received {0} media entries for prim {1}", omu.FaceMedia.Length, primId);
+//            m_log.LogDebug("[MOAP]: Received {0} media entries for prim {1}", omu.FaceMedia.Length, primId);
 //
 //            for (int i = 0; i < omu.FaceMedia.Length; i++)
 //            {
 //                MediaEntry me = omu.FaceMedia[i];
 //                string v = (null == me ? "null": OSDParser.SerializeLLSDXmlString(me.GetOSD()));
-//                m_log.DebugFormat("[MOAP]: Face {0} [{1}]", i, v);
+//                m_log.LogDebug("[MOAP]: Face {0} [{1}]", i, v);
 //            }
 
         if (omu.FaceMedia.Length > part.GetNumberOfSides())
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[MOAP]: Received {0} media entries from client for prim {1} {2} but this prim has only {3} faces.  Dropping request.",
                 omu.FaceMedia.Length, part.Name, part.UUID, part.GetNumberOfSides());
             return false;
@@ -379,7 +379,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
 
         if (null == media)
         {
-//                m_log.DebugFormat("[MOAP]: Setting all new media list for {0}", part.Name);
+//                m_log.LogDebug("[MOAP]: Setting all new media list for {0}", part.Name);
             part.Shape.Media = new PrimitiveBaseShape.MediaList(omu.FaceMedia);
 
             for (int i = 0; i < omu.FaceMedia.Length; i++)
@@ -390,7 +390,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
                     // overwritten.  Unfortunately, PrimitiveBaseShape does not allow us to change texture entry
                     // directly.
                     SetPartMediaFlags(part, i, true);
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[MOAP]: Media flags for face {0} is {1}",
 //                            i, part.Shape.Textures.FaceTextures[i].MediaFlags);
                 }
@@ -398,7 +398,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
         }
         else
         {
-//                m_log.DebugFormat("[MOAP]: Setting existing media list for {0}", part.Name);
+//                m_log.LogDebug("[MOAP]: Setting existing media list for {0}", part.Name);
 
             // We need to go through the media textures one at a time to make sure that we have permission
             // to change them
@@ -423,10 +423,10 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
 
                         SetPartMediaFlags(part, i, true);
 
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[MOAP]: Media flags for face {0} is {1}",
 //                            i, face.MediaFlags);
-//                        m_log.DebugFormat("[MOAP]: Set media entry for face {0} on {1}", i, part.Name);
+//                        m_log.LogDebug("[MOAP]: Set media entry for face {0} on {1}", i, part.Name);
                     }
                 }
             }
@@ -434,7 +434,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
             part.Shape.Textures = te;
 
 //                for (int i2 = 0; i2 < part.Shape.Textures.FaceTextures.Length; i2++)
-//                    m_log.DebugFormat("[MOAP]: FaceTexture[{0}] is {1}", i2, part.Shape.Textures.FaceTextures[i2]);
+//                    m_log.LogDebug("[MOAP]: FaceTexture[{0}] is {1}", i2, part.Shape.Textures.FaceTextures[i2]);
         }
 
         UpdateMediaUrl(part, agentId);
@@ -459,7 +459,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
     /// <returns></returns>
     protected void HandleObjectMediaNavigateMessage(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agentId)
     {
-//            m_log.DebugFormat("[MOAP]: Got ObjectMediaNavigate request [{0}]", request);
+//            m_log.LogDebug("[MOAP]: Got ObjectMediaNavigate request [{0}]", request);
 
         try
         {
@@ -478,7 +478,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
             {
                 if (null == part)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[MOAP]: Received an ObjectMediaNavigateMessage for prim {0} but this doesn't exist in region {1}",
                         primId, m_scene.RegionInfo.RegionName);
                 }
@@ -486,7 +486,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
                 if (!m_scene.Permissions.CanInteractWithPrimMedia(agentId, part.UUID, omn.Face))
                     break;
 
-                //m_log.DebugFormat(
+                //m_log.LogDebug(
                 //    "[MOAP]: Received request to update media entry for face {0} on prim {1} {2} to {3}",
                 //        omn.Face, part.Name, part.UUID, omn.URL);
 
@@ -505,7 +505,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
                 {
                     if (!CheckUrlAgainstWhitelist(omn.URL, me.WhiteList))
                     {
-                        //m_log.DebugFormat(
+                        //m_log.LogDebug(
                         //    "[MOAP]: Blocking change of face {0} on prim {1} {2} to {3} since it's not on the enabled whitelist",
                         //    omn.Face, part.Name, part.UUID, omn.URL);
                         break;
@@ -576,7 +576,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
             part.MediaUrl = string.Format("x-mv:{0:D10}/{1}", ++version, updateId);
         }
 
-        //m_log.DebugFormat("[MOAP]: Storing media url [{0}] in prim {1} {2}", part.MediaUrl, part.Name, part.UUID);
+        //m_log.LogDebug("[MOAP]: Storing media url [{0}] in prim {1} {2}", part.MediaUrl, part.Name, part.UUID);
     }
 
     /// <summary>
@@ -600,7 +600,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
             if (wlUrl.EndsWith("*"))
                 wlUrl = wlUrl.Remove(wlUrl.Length - 1);
 
-//                m_log.DebugFormat("[MOAP]: Checking whitelist URL pattern {0}", origWlUrl);
+//                m_log.LogDebug("[MOAP]: Checking whitelist URL pattern {0}", origWlUrl);
 
             // Handle a line starting wildcard slightly differently since this can only match the domain, not the path
             if (wlUrl.StartsWith("*"))
@@ -609,7 +609,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
 
                 if (url.Host.Contains(wlUrl))
                 {
-//                        m_log.DebugFormat("[MOAP]: Whitelist URL {0} matches {1}", origWlUrl, rawUrl);
+//                        m_log.LogDebug("[MOAP]: Whitelist URL {0} matches {1}", origWlUrl, rawUrl);
                     return true;
                 }
             }
@@ -619,7 +619,7 @@ public class MoapModule : INonSharedRegionModule, IMoapModule
 
                 if (urlToMatch.StartsWith(wlUrl))
                 {
-//                        m_log.DebugFormat("[MOAP]: Whitelist URL {0} matches {1}", origWlUrl, rawUrl);
+//                        m_log.LogDebug("[MOAP]: Whitelist URL {0} matches {1}", origWlUrl, rawUrl);
                     return true;
                 }
             }

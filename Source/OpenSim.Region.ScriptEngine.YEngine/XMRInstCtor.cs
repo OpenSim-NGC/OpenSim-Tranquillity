@@ -34,6 +34,7 @@ using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 
+using Microsoft.Extensions.Logging;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
@@ -289,7 +290,7 @@ public partial class XMRInstance
      */
     private string FetchSource(string cameFrom)
     {
-        m_log.Debug("[YEngine]: fetching source " + cameFrom);
+        m_log.LogDebug("[YEngine]: fetching source " + cameFrom);
         if(!cameFrom.StartsWith("asset://"))
             throw new Exception("unable to retrieve source from " + cameFrom);
 
@@ -376,14 +377,14 @@ public partial class XMRInstance
             catch(ScriptStateLoadException ssle)
             {
                 RecordStateLoadFailure(ssle.Reason);
-                m_log.WarnFormat("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
+                m_log.LogWarning("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
                     m_ItemID, ssle.Reason, m_StateFileName, ssle.Message);
                 ResetToDefaultStateAfterLoadFailure();
             }
             catch(Exception e)
             {
                 RecordStateLoadFailure(ScriptStateLoadFailureReason.Unknown);
-                m_log.WarnFormat("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
+                m_log.LogWarning("[YEngine]: unable to restore state for {0} ({1}) from {2}: {3}",
                     m_ItemID, ScriptStateLoadFailureReason.Unknown, m_StateFileName, e.Message);
                 ResetToDefaultStateAfterLoadFailure();
             }
@@ -430,7 +431,7 @@ public partial class XMRInstance
         }
         catch(Exception e)
         {
-            m_log.WarnFormat("[YEngine]: unable to delete bad state file {0}: {1}", m_StateFileName, e.Message);
+            m_log.LogWarning("[YEngine]: unable to delete bad state file {0}: {1}", m_StateFileName, e.Message);
         }
 
         eventCode = ScriptEventCode.None;  // not processing any event
@@ -757,12 +758,12 @@ public partial class XMRInstance
         {
             if(int.TryParse(schemaVersion, out int stateSchema) && stateSchema != stateSchemaVersion)
             {
-                m_log.WarnFormat("[YEngine]: state schema version mismatch for {0}: saved={1}, current={2}",
+                m_log.LogWarning("[YEngine]: state schema version mismatch for {0}: saved={1}, current={2}",
                     m_ItemID, stateSchema, stateSchemaVersion);
             }
             else if(!int.TryParse(schemaVersion, out _))
             {
-                m_log.WarnFormat("[YEngine]: state schema version malformed for {0}: {1}",
+                m_log.LogWarning("[YEngine]: state schema version malformed for {0}: {1}",
                     m_ItemID, schemaVersion);
             }
         }
@@ -770,7 +771,7 @@ public partial class XMRInstance
         string migration = scriptStateN.GetAttribute("MigrationVersion");
         if(!string.IsNullOrEmpty(migration) && int.TryParse(migration, out int stateMigration) && stateMigration != migrationVersion)
         {
-            m_log.WarnFormat("[YEngine]: state migration version mismatch for {0}: saved={1}, current={2}",
+            m_log.LogWarning("[YEngine]: state migration version mismatch for {0}: saved={1}, current={2}",
                 m_ItemID, stateMigration, migrationVersion);
         }
 
@@ -780,7 +781,7 @@ public partial class XMRInstance
             string currentGlobalsSig = BuildGlobalsSignature();
             if(globalsSig != currentGlobalsSig)
             {
-                m_log.WarnFormat("[YEngine]: globals signature mismatch for {0}", m_ItemID);
+                m_log.LogWarning("[YEngine]: globals signature mismatch for {0}", m_ItemID);
             }
         }
 
@@ -790,7 +791,7 @@ public partial class XMRInstance
             string currentApiFingerprint = BuildApiFingerprint();
             if(apiFingerprint != currentApiFingerprint)
             {
-                m_log.WarnFormat("[YEngine]: API fingerprint mismatch for {0}: saved={1}, current={2}",
+                m_log.LogWarning("[YEngine]: API fingerprint mismatch for {0}: saved={1}, current={2}",
                     m_ItemID, apiFingerprint, currentApiFingerprint);
             }
         }
@@ -1169,6 +1170,21 @@ public partial class XMRInstance
         return ReadXTypedValue(tag);
     }
 
+    // Allow-list of value types permitted when importing legacy XEngine-format
+    // script state from XML. The 'type' attribute in that XML is attacker-
+    // influenceable (it rides in on foreign objects / archives), so we must
+    // never resolve and instantiate an arbitrary named type. Only these known
+    // LSL / primitive value types are accepted; anything else degrades to null
+    // (the variable takes its default) rather than an arbitrary CreateInstance.
+    private static bool IsAllowedXStateType(Type t)
+    {
+        return t == typeof(int)    || t == typeof(double) || t == typeof(string) ||
+               t == typeof(bool)   || t == typeof(float)  || t == typeof(long)   ||
+               t == typeof(LSL_Integer) || t == typeof(LSL_Float)    ||
+               t == typeof(LSL_String)  || t == typeof(LSL_List)     ||
+               t == typeof(LSL_Vector)  || t == typeof(LSL_Rotation);
+    }
+
     private static object ReadXTypedValue(XmlNode tag)
     {
         Object varValue;
@@ -1193,7 +1209,7 @@ public partial class XMRInstance
 
             assembly = itemType + ", OpenSim.Region.ScriptEngine.Shared";
             itemT = Type.GetType(assembly);
-            if (itemT == null)
+            if (itemT == null || !IsAllowedXStateType(itemT))
                 return null;
 
             varValue = Activator.CreateInstance(itemT, args);
@@ -1203,6 +1219,8 @@ public partial class XMRInstance
         }
         else
         {
+            if (!IsAllowedXStateType(itemT))
+                return null;
             varValue = Convert.ChangeType(tag.InnerText, itemT);
         }
         return varValue;
@@ -1283,8 +1301,8 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
             }
             catch(Exception e)
             {
-                m_log.Warn("[YEngine]: RestoreDetectParams bad XML: " + detxml.ToString());
-                m_log.Warn("[YEngine]: ... " + e.ToString());
+                m_log.LogWarning("[YEngine]: RestoreDetectParams bad XML: " + detxml.ToString());
+                m_log.LogWarning("[YEngine]: ... " + e.ToString());
             }
         }
 
@@ -1334,12 +1352,15 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
 
             string assembly = itemType + ", OpenSim.Region.ScriptEngine.Shared";
             itemT = Type.GetType(assembly);
-            if(itemT == null)
+            if(itemT == null || !IsAllowedXStateType(itemT))
             {
                 return null;
             }
             return Activator.CreateInstance(itemT, args);
         }
+
+        if(!IsAllowedXStateType(itemT))
+            return null;
 
         return Convert.ChangeType(item.InnerText, itemT);
     }
@@ -1368,7 +1389,7 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
                 throw new ScriptStateLoadException(ScriptStateLoadFailureReason.MigrationVersionMismatch,
                     "incoming migration version " + mv + " but accept only " + migrationVersion);
 
-            m_log.WarnFormat("[YEngine]: state snapshot migration version mismatch for {0}: incoming={1}, current={2}; attempting best-effort restore",
+            m_log.LogWarning("[YEngine]: state snapshot migration version mismatch for {0}: incoming={1}, current={2}; attempting best-effort restore",
                 m_ItemID, mv, migrationVersion);
         }
 
@@ -1401,7 +1422,7 @@ private LinkedList<EventParams> RestoreEventQueue(XmlNode eventsN)
         if(versionMismatch)
         {
             RecordStateLoadRecovery(ScriptStateLoadFailureReason.MigrationVersionMismatch);
-            m_log.InfoFormat("[YEngine]: state snapshot for {0} successfully restored despite migration version mismatch (incoming={1}, current={2})",
+            m_log.LogInformation("[YEngine]: state snapshot for {0} successfully restored despite migration version mismatch (incoming={1}, current={2})",
                 m_ItemID, mv, migrationVersion);
         }
     }

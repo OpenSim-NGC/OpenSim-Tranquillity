@@ -29,7 +29,6 @@ using System.Collections.Concurrent;
 using System.Reflection;
 using System.Security;
 using System.Timers;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -38,6 +37,7 @@ using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using RegionFlags = OpenMetaverse.RegionFlags;
 using Timer = System.Timers.Timer;
 
@@ -45,7 +45,7 @@ namespace OpenSim.Region.CoreModules.World.Estate;
 
 public class EstateManagementModule : IEstateModule, INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Timer m_regionChangeTimer = new Timer();
     public Scene Scene { get; private set; }
@@ -359,7 +359,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             response = String.Empty;
 
             // make sure there's a log entry to document the change
-            m_log.InfoFormat("[ESTATE]: Estate Owner for {0} changed to {1} ({2} {3})", dbSettings.EstateName,
+            m_log.LogInformation("[ESTATE]: Estate Owner for {0} changed to {1} ({2} {3})", dbSettings.EstateName,
                              account.PrincipalID, account.FirstName, account.LastName);
 
             // propagate the change
@@ -404,7 +404,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                 response = String.Empty;
 
                 // make sure there's a log entry to document the change
-                m_log.InfoFormat("[ESTATE]: Estate {0} renamed from \"{1}\" to \"{2}\"", estateID, oldName, newName);
+                m_log.LogInformation("[ESTATE]: Estate {0} renamed from \"{1}\" to \"{2}\"", estateID, oldName, newName);
 
                // propagate the change
                 List<UUID> regions = Scene.GetEstateRegions(estateID);
@@ -437,7 +437,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             else if (Scene.EstateDataService.LinkRegion(regionInfo.RegionID, estateID))
             {
                 // make sure there's a log entry to document the change
-                m_log.InfoFormat("[ESTATE]: Region {0} ({1}) moved to Estate {2} ({3}).", regionInfo.RegionID, regionInfo.RegionName, estateID, dbSettings.EstateName);
+                m_log.LogInformation("[ESTATE]: Region {0} ({1}) moved to Estate {2} ({3}).", regionInfo.RegionID, regionInfo.RegionName, estateID, dbSettings.EstateName);
 
                 // propagate the change
                 OnEstateInfoChange?.Invoke(regionInfo.RegionID);
@@ -733,8 +733,8 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         if (Scene.PhysicsEnabled && Scene.PhysicsScene != null && lastwaterlevel != WaterHeight)
             Scene.PhysicsScene.SetWaterLevel(WaterHeight);
 
-        //m_log.Debug("[ESTATE]: UFS: " + UseFixedSun.ToString());
-        //m_log.Debug("[ESTATE]: SunHour: " + SunHour.ToString());
+        //m_log.LogDebug("[ESTATE]: UFS: " + UseFixedSun.ToString());
+        //m_log.LogDebug("[ESTATE]: SunHour: " + SunHour.ToString());
 
         SendRegionInfoPacketToAll();
         Scene.RegionInfo.RegionSettings.Save();
@@ -762,7 +762,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                 return;
             }
 
-            m_log.InfoFormat(
+            m_log.LogInformation(
                 "User {0} requested restart of region {1} in {2} seconds",
                 remoteClient.Name, Scene.Name, timeInSeconds);
                 
@@ -772,7 +772,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
 
     private void HandleChangeEstateCovenantRequest(IClientAPI remoteClient, UUID estateCovenantID)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ESTATE MANAGEMENT MODULE]: Handling request from {0} to change estate covenant to {1}",
 //                remoteClient.Name, estateCovenantID);
 
@@ -1185,8 +1185,11 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                     sendAllowedOrBanList[remote_client] = invoice;
             }
 
-            // last the ones only for owners of this region
-            if (!Scene.Permissions.CanIssueEstateCommand(agentID, true))
+            // last the ones only for owners of this region: manager add and remove (256, 512).
+            // A request without them was handled above and gets no owner-only refusal, so an
+            // estate manager who changes access, groups or bans is not told it failed.
+            // LL's viewer offers the manager list to the owner only (LLPanelEstateAccess::updateControls).
+            if ((estateAccessType & (256 | 512)) != 0 && !Scene.Permissions.CanIssueEstateCommand(agentID, true))
             {
                     remote_client.SendAlertMessage("Method EstateAccess Failed, you don't have permissions");
                     continue;
@@ -1281,6 +1284,17 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         }
     }
 
+    /// <summary>
+    /// Send the estate's allowed, trusted (key) and blocked Experience lists to a client,
+    /// as the reply to its estateexperiencedelta request.
+    /// </summary>
+    public void SendEstateExperienceLists(IClientAPI remoteClient, UUID invoice)
+    {
+        EstateSettings es = Scene.RegionInfo.EstateSettings;
+        remoteClient.SendEstateExperiences(invoice, es.AllowedExperiences, es.KeyExperiences,
+            es.BlockedExperiences, es.EstateID);
+    }
+
     private void execExpDeltaRequests(object o)
     {
         IClientAPI remote_client;
@@ -1313,13 +1327,8 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                     TriggerEstateInfoChange();
                 }
 
-                EstateSettings es = Scene.RegionInfo.EstateSettings;
                 foreach (KeyValuePair<IClientAPI, UUID> kvp in sendExperienceLists)
-                {
-                    IClientAPI cli = kvp.Key;
-                    UUID invoive = kvp.Value;
-                    cli.SendEstateExperiences(invoive, es.AllowedExperiences, es.KeyExperiences, es.EstateID);
-                }
+                    SendEstateExperienceLists(kvp.Key, kvp.Value);
 
                 sendExperienceLists.Clear();
                 otherEstates.Clear();
@@ -1481,6 +1490,62 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
                 }
 
                 thisSettings.RemoveAllowedExperience(experience);
+                changed[thisEstateID] = thisSettings;
+
+                if (needReply)
+                    sendExperienceLists[remote_client] = invoice;
+            }
+
+            // BLOCKED experience add/remove (viewer BLOCKED_ADD = 1<<6 = 64,
+            // BLOCKED_REMOVE = 1<<7 = 128 — previously received and DISCARDED). Mirrors the
+            // allowed branches; the block-wins tier of the admission ladder reads this list.
+            if ((estateAccessType & 64) != 0) // add blocked experience
+            {
+                if (thisSettings.BlockedExperiencesCount() >= (int)Constants.EstateAccessLimits.AllowedExperiences)
+                {
+                    if (!sentAllowedFull)
+                    {
+                        sentAllowedFull = true;
+                        remote_client.SendAlertMessage("Estate Blocked Experiences list is full");
+                    }
+                }
+                else
+                {
+                    if (doOtherEstates)
+                    {
+                        foreach (EstateSettings estateSettings in otherEstates)
+                        {
+                            if (!isadmin && !estateSettings.IsEstateManagerOrOwner(agentID))
+                                continue;
+                            if (estateSettings.BlockedExperiencesCount() >= (int)Constants.EstateAccessLimits.AllowedExperiences)
+                                continue;
+                            estateSettings.AddBlockedExperience(experience);
+                            changed[(int)estateSettings.EstateID] = estateSettings;
+                        }
+                    }
+
+                    thisSettings.AddBlockedExperience(experience);
+                    changed[thisEstateID] = thisSettings;
+
+                    if (needReply)
+                        sendExperienceLists[remote_client] = invoice;
+                }
+            }
+
+            if ((estateAccessType & 128) != 0) // remove blocked experience
+            {
+                if (doOtherEstates) // All estates
+                {
+                    foreach (EstateSettings estateSettings in otherEstates)
+                    {
+                        if (!isadmin && !estateSettings.IsEstateManagerOrOwner(agentID))
+                            continue;
+                        estateSettings.RemoveBlockedExperience(experience);
+                        changed[(int)estateSettings.EstateID] = estateSettings;
+                    }
+                }
+
+                thisSettings.RemoveBlockedExperience(experience);
                 changed[thisEstateID] = thisSettings;
 
                 if (needReply)
@@ -1663,7 +1728,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             TerrainUploader = null;
         }
 
-        m_log.DebugFormat("[CLIENT]: Terrain upload from {0} to {1} complete.", remoteClient.Name, Scene.Name);
+        m_log.LogDebug("[CLIENT]: Terrain upload from {0} to {1} complete.", remoteClient.Name, Scene.Name);
         remoteClient.SendAlertMessage("Terrain Upload Complete. Loading....");
 
         ITerrainModule terr = Scene.RequestModuleInterface<ITerrainModule>();
@@ -1680,28 +1745,28 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             }
             catch (IOException e)
             {
-                m_log.ErrorFormat("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
+                m_log.LogError("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
                 remoteClient.SendAlertMessage("There was an IO Exception loading your terrain.  Please check free space.");
 
                 return;
             }
             catch (SecurityException e)
             {
-                m_log.ErrorFormat("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
+                m_log.LogError("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
                 remoteClient.SendAlertMessage("There was a security Exception loading your terrain.  Please check the security on the simulator drive");
 
                 return;
             }
             catch (UnauthorizedAccessException e)
             {
-                m_log.ErrorFormat("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
+                m_log.LogError("[TERRAIN]: Error Saving a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
                 remoteClient.SendAlertMessage("There was a security Exception loading your terrain.  Please check the security on the simulator drive");
 
                 return;
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[TERRAIN]: Error loading a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
+                m_log.LogError("[TERRAIN]: Error loading a terrain file uploaded via the estate tools.  It gave us the following error: {0}", e.ToString());
                 remoteClient.SendAlertMessage("There was a general error loading your terrain.  Please fix the terrain file and try again");
             }
         }
@@ -1717,7 +1782,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         {
             if (TerrainUploader == null)
             {
-                m_log.DebugFormat(
+                m_log.LogDebug(
                     "[TERRAIN]: Started receiving terrain upload for region {0} from {1}",
                     Scene.Name, remote_client.Name);
 
@@ -1741,7 +1806,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
 
         if (terr != null)
         {
-//                m_log.Warn("[CLIENT]: Got Request to Send Terrain in region " + Scene.RegionInfo.RegionName);
+//                m_log.LogWarning("[CLIENT]: Got Request to Send Terrain in region " + Scene.RegionInfo.RegionName);
             if (File.Exists(Util.dataDir() + "/terrain.raw"))
             {
                 File.Delete(Util.dataDir() + "/terrain.raw");
@@ -1752,7 +1817,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             using(FileStream input = new FileStream(Util.dataDir() + "/terrain.raw",FileMode.Open))
             {
                 bdata = new byte[input.Length];
-                input.Read(bdata, 0, (int)input.Length);
+                input.ReadExactly(bdata);
             }
             if(bdata == null || bdata.Length == 0)
             {
@@ -1764,7 +1829,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             string xfername = (UUID.Random()).ToString();
             Scene.XferManager.AddNewFile(xfername, bdata);
 
-            m_log.DebugFormat("[CLIENT]: Sending terrain for region {0} to {1}", Scene.Name, remote_client.Name);
+            m_log.LogDebug("[CLIENT]: Sending terrain for region {0} to {1}", Scene.Name, remote_client.Name);
             remote_client.SendInitiateDownload(xfername, clientFileName);
         }
     }
@@ -1813,15 +1878,54 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         if (reportType != 0)
             remoteClient.SendLandStatReply(reportType, requestFlags, 0, new LandStatReportItem[0]);
 
-        IScriptModule scriptModule = Scene.RequestModuleInterface<IScriptModule>();
-        if (scriptModule == null)
+        // More than one script engine can be registered (YEngine + Phlox). The singular
+        // RequestModuleInterface<IScriptModule>() returns only the first-registered
+        // engine, so a single-engine query would omit every script owned by the other.
+        // Aggregate across ALL registered engines and merge per-object stats (a linkset
+        // can hold scripts in more than one engine).
+        IScriptModule[] scriptModules = Scene.RequestModuleInterfaces<IScriptModule>();
+        if (scriptModules == null || scriptModules.Length == 0)
+        {
             remoteClient.SendLandStatReply(reportType, requestFlags, 0, new LandStatReportItem[0]);
+            return;
+        }
 
-        ICollection<ScriptTopStatsData>  sceneData = scriptModule.GetTopObjectStats(
-                0.001f, 1024, out float totaltime, out float totalmemory);
+        Dictionary<uint, ScriptTopStatsData> mergedData = new Dictionary<uint, ScriptTopStatsData>();
+        foreach (IScriptModule sm in scriptModules)
+        {
+            if (sm == null)
+                continue;
+
+            ICollection<ScriptTopStatsData> part = sm.GetTopObjectStats(0.001f, 1024, out _, out _);
+            if (part == null)
+                continue;
+
+            foreach (ScriptTopStatsData d in part)
+            {
+                if (mergedData.TryGetValue(d.localID, out ScriptTopStatsData acc))
+                {
+                    acc.time += d.time;
+                    acc.memory += d.memory;
+                }
+                else
+                {
+                    mergedData[d.localID] = new ScriptTopStatsData
+                    {
+                        localID = d.localID,
+                        time = d.time,
+                        memory = d.memory
+                    };
+                }
+            }
+        }
+
+        ICollection<ScriptTopStatsData> sceneData = mergedData.Values;
 
         if(sceneData == null || sceneData.Count == 0)
+        {
             remoteClient.SendLandStatReply(0, requestFlags, 0, new LandStatReportItem[0]);
+            return;
+        }
 
         IUrlModule urlModule = Scene.RequestModuleInterface<IUrlModule>();
 

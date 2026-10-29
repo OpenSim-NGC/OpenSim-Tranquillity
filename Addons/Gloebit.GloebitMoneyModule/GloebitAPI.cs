@@ -26,12 +26,12 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using System.Web;
-using log4net;
-
 // TODO: convert OSDMaps to Dictionaries and UUIDs to GUIDs and remove requirement for OpenMetaverse libraries to make this more generic.
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 // TODO: consider making this a strict REST API using dictionary forms rather than objects and moving the object implementation
 //       to an API wrapper which uses this API.  The separation might make both easier to maintain as this is ported to
 //       new platforms.
@@ -40,7 +40,7 @@ namespace Gloebit.GloebitMoneyModule;
 
 
 public class GloebitAPI {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public readonly string m_key;
     private string m_keyAlias;
@@ -64,29 +64,16 @@ public class GloebitAPI {
     private class GloebitRequestState {
         
         // Web request variables
-        public HttpWebRequest request;
-        public Stream responseStream;
-        
-        // Variables for storing Gloebit response stream data asynchronously
-        public const int BUFFER_SIZE = 1024;    // size of buffer for max individual stream read events
-        public byte[] bufferRead;               // buffer read to by stream read events
-        public Decoder streamDecoder;           // Decoder for converting buffer to string in parts
-        public StringBuilder responseData;      // individual buffer reads compiled/appended to full data
+        public HttpRequestMessage request;
 
         public CompletionCallback continuation;
         
         // TODO: What to do when error states are reached since there is no longer a return?  Should we store an error state in a member variable?
         
         // Preferred constructor - use if we know the endpoint and agentID at creation time.
-        public GloebitRequestState(HttpWebRequest req, CompletionCallback continuation)
+        public GloebitRequestState(HttpRequestMessage req, CompletionCallback continuation)
         {
             request = req;
-            responseStream = null;
-            
-            bufferRead = new byte[BUFFER_SIZE];
-            streamDecoder = Encoding.UTF8.GetDecoder();     // Create Decoder for appropriate encoding type.
-            responseData = new StringBuilder(String.Empty);
-
             this.continuation = continuation;
         }
         
@@ -126,6 +113,7 @@ public class GloebitAPI {
     /// <param name="userName">string name of user on this app.</param>
     /// <param name="baseURI">URL where Gloebit can send the auth response back to this app.</param>
     public Uri BuildAuthorizationURI(GloebitUser user, string userName, Uri baseURI) {
+        string state = user.BeginAuthorization();
 
         //********* BUILD AUTHORIZE QUERY ARG STRING ***************//
         ////Dictionary<string, string> auth_params = new Dictionary<string, string>();
@@ -141,17 +129,16 @@ public class GloebitAPI {
         auth_params["response_type"] = "code";
         auth_params["user"] = userName;
         auth_params["uid"] = user.PrincipalID;
-        // TODO - make use of 'state' param for XSRF protection
-        // auth_params["state"] = ???;
+        auth_params["state"] = state;
 
         string query_string = BuildURLEncodedParamString(auth_params);
 
-        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.Authorize query_string: {0}", query_string);
+        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Authorize query_string: {0}", query_string);
 
         //********** BUILD FULL AUTHORIZE REQUEST URI **************//
 
         Uri request_uri = new Uri(m_url, String.Format("oauth2/authorize?{0}", query_string));
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.Authorize request_uri: {0}", request_uri);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.Authorize request_uri: {0}", request_uri);
         
         //*********** SEND AUTHORIZE REQUEST URI TO USER ***********//
         
@@ -169,7 +156,7 @@ public class GloebitAPI {
     /// <param name="auth_code">Authorization Code returned to the redirect_uri from the Gloebit Authorize endpoint.</param>
     public void ExchangeAccessToken(GloebitUser user, string auth_code, Uri baseURI) {
         
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.ExchangeAccessToken AgentID:{0}", user.PrincipalID);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.ExchangeAccessToken AgentID:{0}", user.PrincipalID);
         
         UUID agentID = UUID.Parse(user.PrincipalID);
         
@@ -183,16 +170,16 @@ public class GloebitAPI {
         auth_params["scope"] = "balance transact";
         auth_params["redirect_uri"] = BuildAuthCallbackURL(baseURI, user.PrincipalID).ToString();
         
-        HttpWebRequest request = BuildGloebitRequest("oauth2/access-token", "POST", null, "application/x-www-form-urlencoded", auth_params);
+        HttpRequestMessage request = BuildGloebitRequest("oauth2/access-token", "POST", null, "application/x-www-form-urlencoded", auth_params);
         if (request == null) {
             // ERROR
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.oauth2/access-token failed to create HttpWebRequest");
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.oauth2/access-token failed to create HttpWebRequest");
             // TODO: signal error
             return;
         }
         
         // **** Asynchronously make web request **** //
-        IAsyncResult r = request.BeginGetResponse(GloebitWebResponseCallback,
+        _ = SendGloebitRequestAsync(
             new GloebitRequestState(request,
                 delegate(OSDMap responseDataMap) {
                     // ************ PARSE AND HANDLE EXCHANGE ACCESS TOKEN RESPONSE ********* //
@@ -204,10 +191,10 @@ public class GloebitAPI {
                     if(!String.IsNullOrEmpty(token)) {
                         success = true;
                         user = GloebitUser.Authorize(m_key, agentID, token, app_user_id);
-                        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.CompleteExchangeAccessToken Success User:{0}", user);
+                        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.CompleteExchangeAccessToken Success User:{0}", user);
                     } else {
                         success = false;
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CompleteExchangeAccessToken error: {0}, reason: {1}", responseDataMap["error"], responseDataMap["reason"]);
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CompleteExchangeAccessToken error: {0}, reason: {1}", responseDataMap["error"], responseDataMap["reason"]);
                         // TODO: signal error;
                     }
                     m_asyncEndpointCallbacks.exchangeAccessTokenCompleted(success, user, responseDataMap);
@@ -238,23 +225,25 @@ public class GloebitAPI {
         
         //************ BUILD GET BALANCE GET REQUEST ********//
         
-        HttpWebRequest request = BuildGloebitRequest("balance", "GET", user);
+        using HttpRequestMessage request = BuildGloebitRequest("balance", "GET", user);
         if (request == null) {
             // ERROR
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.balance failed to create HttpWebRequest");
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.balance failed to create HttpWebRequest");
             return 0;
         }
         
         //************ PARSE AND HANDLE GET BALANCE RESPONSE *********//
         
-        HttpWebResponse response = (HttpWebResponse) request.GetResponse();
-        string status = response.StatusDescription;
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.balance status:{0}", status);
-        using(StreamReader response_stream = new StreamReader(response.GetResponseStream())) {
+        using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
+        using HttpResponseMessage response = client.Send(request);
+        response.EnsureSuccessStatusCode();
+        string status = response.ReasonPhrase;
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.balance status:{0}", status);
+        using(StreamReader response_stream = new StreamReader(response.Content.ReadAsStream())) {
             string response_str = response_stream.ReadToEnd();
 
             OSDMap responseData = (OSDMap)OSDParser.DeserializeJson(response_str);
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.balance responseData:{0}", responseData.ToString());
+            m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.balance responseData:{0}", responseData.ToString());
 
             if (responseData["success"]) {
                 double balance = responseData["balance"].AsReal();
@@ -266,12 +255,12 @@ public class GloebitAPI {
                     case "unknown token2":
                         // The token is invalid (probably the user revoked our app through the website)
                         // so force a reauthorization next time.
-                        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.GetBalance failed - Invalidating Token");
+                        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.GetBalance failed - Invalidating Token");
                         user.InvalidateToken();
                         invalidatedToken = true;
                         break;
                     default:
-                        m_log.ErrorFormat("Unknown error getting balance, reason: '{0}'", reason);
+                        m_log.LogError("Unknown error getting balance, reason: '{0}'", reason);
                         break;
                 }
                 return 0.0;
@@ -299,28 +288,28 @@ public class GloebitAPI {
     /// <returns>true if async transact web request was built and submitted successfully; false if failed to submit request;  If true, IAsyncEndpointCallback transactCompleted should eventually be called with additional details on state of request.</returns>
     public bool Transact(GloebitTransaction txn, string description, OSDMap descMap, GloebitUser payerUser, Uri baseURI) {
         
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.transact senderID:{0} senderName:{1} amount:{2} description:{3}", payerUser.PrincipalID, txn.PayerName, txn.Amount, description);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.transact senderID:{0} senderName:{1} amount:{2} description:{3}", payerUser.PrincipalID, txn.PayerName, txn.Amount, description);
         
         // ************ BUILD AND SEND TRANSACT POST REQUEST ************ //
 
         OSDMap transact_params = new OSDMap();
         PopulateTransactParamsBase(transact_params, txn, description, payerUser.GloebitID, descMap, baseURI);
         
-        HttpWebRequest request = BuildGloebitRequest("v2/transact", "POST", payerUser, "application/json", transact_params);
+        HttpRequestMessage request = BuildGloebitRequest("v2/transact", "POST", payerUser, "application/json", transact_params);
         if (request == null) {
             // ERROR
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.transact failed to create HttpWebRequest");
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.transact failed to create HttpWebRequest");
             return false;
             // TODO once we return, return error value
         }
                 
-        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact about to BeginGetResponse");
+        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Transact about to BeginGetResponse");
         // **** Asynchronously make web request **** //
-        IAsyncResult r = request.BeginGetResponse(GloebitWebResponseCallback,
+        _ = SendGloebitRequestAsync(
 			                                          new GloebitRequestState(request, 
 			                        delegate(OSDMap responseDataMap) {
                                     
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact response: {0}", responseDataMap);
+            m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Transact response: {0}", responseDataMap);
 
             //************ PARSE AND HANDLE TRANSACT-U2U RESPONSE *********//
 
@@ -374,7 +363,7 @@ public class GloebitAPI {
     /// <returns>true if async transactU2U web request was built and submitted successfully; false if failed to submit request;  If true, IAsyncEndpointCallback transactU2UCompleted should eventually be called with additional details on state of request.</returns>
     public bool TransactU2U(GloebitTransaction txn, string description, OSDMap descMap, GloebitUser sender, GloebitUser recipient, string recipientEmail, Uri baseURI) {
 
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U senderID:{0} senderName:{1} recipientID:{2} recipientName:{3} recipientEmail:{4} amount:{5} description:{6} baseURI:{7}", sender.PrincipalID, txn.PayerName, recipient.PrincipalID, txn.PayeeName, recipientEmail, txn.Amount, description, baseURI);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U senderID:{0} senderName:{1} recipientID:{2} recipientName:{3} recipientEmail:{4} amount:{5} description:{6} baseURI:{7}", sender.PrincipalID, txn.PayerName, recipient.PrincipalID, txn.PayeeName, recipientEmail, txn.Amount, description, baseURI);
         
         // ************ IDENTIFY GLOEBIT RECIPIENT ******** //
         // 1. If the recipient has authed ever, we'll have a recipient.GloebitID to use.
@@ -390,21 +379,21 @@ public class GloebitAPI {
         PopulateTransactParamsBase(transact_params, txn, description, sender.GloebitID, descMap, baseURI);
         PopulateTransactParamsU2U(transact_params, txn, recipient.GloebitID, recipientEmail);
         
-        HttpWebRequest request = BuildGloebitRequest("transact-u2u", "POST", sender, "application/json", transact_params);
+        HttpRequestMessage request = BuildGloebitRequest("transact-u2u", "POST", sender, "application/json", transact_params);
         if (request == null) {
             // ERROR
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U failed to create HttpWebRequest");
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U failed to create HttpWebRequest");
             return false;
             // TODO once we return, return error value
         }
 
-        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U about to BeginGetResponse");
+        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U about to BeginGetResponse");
         // **** Asynchronously make web request **** //
-        IAsyncResult r = request.BeginGetResponse(GloebitWebResponseCallback,
+        _ = SendGloebitRequestAsync(
 			                                          new GloebitRequestState(request, 
 			                        delegate(OSDMap responseDataMap) {
                                     
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U response: {0}", responseDataMap);
+            m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U response: {0}", responseDataMap);
 
             //************ PARSE AND HANDLE TRANSACT-U2U RESPONSE *********//
 
@@ -461,7 +450,7 @@ public class GloebitAPI {
     /// </returns>
     public bool TransactU2USync(GloebitTransaction txn, string description, OSDMap descMap, GloebitUser sender, GloebitUser recipient, string recipientEmail, Uri baseURI, out TransactionStage stage, out TransactionFailure failure)
     {
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync senderID:{0} senderName:{1} recipientID:{2} recipientName:{3} recipientEmail:{4} amount:{5} description:{6} baseURI:{7}", sender.PrincipalID, txn.PayerName, recipient.PrincipalID, txn.PayeeName, recipientEmail, txn.Amount, description, baseURI);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync senderID:{0} senderName:{1} recipientID:{2} recipientName:{3} recipientEmail:{4} amount:{5} description:{6} baseURI:{7}", sender.PrincipalID, txn.PayerName, recipient.PrincipalID, txn.PayeeName, recipientEmail, txn.Amount, description, baseURI);
         
         // ************ IDENTIFY GLOEBIT RECIPIENT ******** //
         // If the recipient has ever authorized, we have an AppUserID from Gloebit which will allow identification.
@@ -480,20 +469,22 @@ public class GloebitAPI {
         PopulateTransactParamsU2U(transact_params, txn, recipient.GloebitID, recipientEmail);
         ////PopulateTransactParams(transact_params, sender.GloebitID, txn, description, recipientEmail, recipient.GloebitID, descMap, baseURI);
         
-        HttpWebRequest request = BuildGloebitRequest("transact-u2u", "POST", sender, "application/json", transact_params);
+        using HttpRequestMessage request = BuildGloebitRequest("transact-u2u", "POST", sender, "application/json", transact_params);
         if (request == null) {
             // ERROR
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync failed to create HttpWebRequest");
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync failed to create HttpWebRequest");
             stage = TransactionStage.SUBMIT;
             failure = TransactionFailure.BUILD_WEB_REQUEST_FAILED;
             return false;
         }
         
-        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync about to GetResponse");
+        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync about to GetResponse");
         // **** Synchronously make web request **** //
-        HttpWebResponse response = (HttpWebResponse) request.GetResponse();
-        string status = response.StatusDescription;
-        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync status:{0}", status);
+        using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
+        using HttpResponseMessage response = client.Send(request);
+        response.EnsureSuccessStatusCode();
+        string status = response.ReasonPhrase;
+        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync status:{0}", status);
         // TODO: think we should set submitted here to status
         if (response.StatusCode == HttpStatusCode.OK) {
             // Successfully submitted transaction request to Gloebit
@@ -502,19 +493,19 @@ public class GloebitAPI {
             GloebitTransactionData.Instance.Store(txn);
             // TODO: should this alert that submission was successful?
         } else {
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync status not OK.  How to handle?");
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync status not OK.  How to handle?");
             stage = TransactionStage.SUBMIT;
             failure = TransactionFailure.SUBMISSION_FAILED;
             return false;
         }
         
         //************ PARSE AND HANDLE TRANSACT-U2U RESPONSE *********//
-        using(StreamReader response_stream = new StreamReader(response.GetResponseStream())) {
+        using(StreamReader response_stream = new StreamReader(response.Content.ReadAsStream())) {
             // **** Synchronously read response **** //
             string response_str = response_stream.ReadToEnd();
             
             OSDMap responseDataMap = (OSDMap)OSDParser.DeserializeJson(response_str);
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync responseData:{0}", responseDataMap.ToString());
+            m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U-Sync responseData:{0}", responseDataMap.ToString());
             
             // read response and store in txn
             PopulateTransactResponse(txn, responseDataMap);
@@ -644,7 +635,7 @@ public class GloebitAPI {
             status = responseDataMap["status"];
         }
         
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact(-U2U) response recieved success: {0} balance: {1} status: {2} reason: {3}", success, balance, status, reason);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.Transact(-U2U) response recieved success: {0} balance: {1} status: {2} reason: {3}", success, balance, status, reason);
         
         // Store response data in GloebitTransaction record
         txn.ResponseReceived = true;
@@ -776,11 +767,11 @@ public class GloebitAPI {
             case TransactionFailure.SUBSCRIPTION_AUTH_PENDING:
             case TransactionFailure.SUBSCRIPTION_AUTH_DECLINED:
                 // TODO: why are we explicitly logging this here?  Should this be moved to GMM?
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U Subscription-Auth issue: '{0}'", txn.ResponseReason);
+                m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.Transact-U2U Subscription-Auth issue: '{0}'", txn.ResponseReason);
                 break;
             default:
                 // TODO: why are we logging this here?  Should this be moved to GMM?
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.Transact(-U2U) Unknown error posting transaction, reason: '{0}'", txn.ResponseReason);
+                m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.Transact(-U2U) Unknown error posting transaction, reason: '{0}'", txn.ResponseReason);
                 break;
         }
     }
@@ -803,7 +794,7 @@ public class GloebitAPI {
     public bool CreateSubscription(GloebitSubscription subscription, Uri baseURI) {
         
         //TODO stop logging auth_code
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription GloebitSubscription:{0}", subscription);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription GloebitSubscription:{0}", subscription);
         
         // ************ BUILD EXCHANGE ACCESS TOKEN POST REQUEST ******** //
         OSDMap sub_params = new OSDMap();
@@ -813,7 +804,7 @@ public class GloebitAPI {
         
         sub_params["application-key"] = m_key;  // TODO: consider getting rid of this.
         if (m_key != subscription.AppKey) {
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription GloebitAPI.m_key:{0} differs from GloebitSubscription.AppKey:{1}", m_key, subscription.AppKey);
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription GloebitAPI.m_key:{0} differs from GloebitSubscription.AppKey:{1}", m_key, subscription.AppKey);
             return false;
         }
         sub_params["local-id"] = subscription.ObjectID;
@@ -821,21 +812,21 @@ public class GloebitAPI {
         sub_params["description"] = subscription.Description;
         // TODO: should we add additional-details to sub_params?
         
-        HttpWebRequest request = BuildGloebitRequest("create-subscription", "POST", null, "application/json", sub_params);
+        HttpRequestMessage request = BuildGloebitRequest("create-subscription", "POST", null, "application/json", sub_params);
         if (request == null) {
             // ERROR
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription failed to create HttpWebRequest");
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription failed to create HttpWebRequest");
             // TODO: signal error
             return false;
         }
         
-        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription about to BeginGetResponse");
+        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription about to BeginGetResponse");
         // **** Asynchronously make web request **** //
-        IAsyncResult r = request.BeginGetResponse(GloebitWebResponseCallback,
+        _ = SendGloebitRequestAsync(
 			                                          new GloebitRequestState(request, delegate(OSDMap responseDataMap) 
         {
                                     
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription response: {0}", responseDataMap);
+            m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription response: {0}", responseDataMap);
 
             //************ PARSE AND HANDLE CREATE SUBSCRIPTION RESPONSE *********//
 
@@ -843,7 +834,7 @@ public class GloebitAPI {
             bool success = (bool)responseDataMap["success"];
             string reason = responseDataMap["reason"];
             string status = responseDataMap["status"];
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription success: {0} reason: {1} status: {2}", success, reason, status);
+            m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription success: {0} reason: {1} status: {2}", success, reason, status);
             
             if (success)                        
             {
@@ -855,24 +846,24 @@ public class GloebitAPI {
 
                 if (status == "duplicate") 
                 {
-                    m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription duplicate request to create subscription");
+                    m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription duplicate request to create subscription");
                 }
             } 
             else 
             {
                 switch(reason) {
                     case "Unexpected DB insert integrity error.  Please try again.":
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription failed from {0}", reason);
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription failed from {0}", reason);
                         break;
                     case "different subscription exists with this app-subscription-id":
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription failed due to different subscription with same object id -- subID:{0} name:{1} desc:{2} ad:{3} enabled:{4} ctime:{5}",
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription failed due to different subscription with same object id -- subID:{0} name:{1} desc:{2} ad:{3} enabled:{4} ctime:{5}",
                                           responseDataMap["existing-subscription-id"], responseDataMap["existing-subscription-name"], responseDataMap["existing-subscription-description"], responseDataMap["existing-subscription-additional_details"], responseDataMap["existing-subscription-enabled"], responseDataMap["existing-subscription-ctime"]);
                         break;
                     case "Unknown DB Error":
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription failed from {0}", reason);
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscription failed from {0}", reason);
                         break;
                     default:
-                        m_log.ErrorFormat("Unknown error posting create subscription, reason: '{0}'", reason);
+                        m_log.LogError("Unknown error posting create subscription, reason: '{0}'", reason);
                         break;
                 }
             }
@@ -907,7 +898,7 @@ public class GloebitAPI {
     /// </returns>
     public bool CreateSubscriptionAuthorization(GloebitSubscription sub, GloebitUser sender, string senderName, Uri baseURI) {
 
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization subscriptionID:{0} senderID:{1} senderName:{2} baseURI:{3}", sub.SubscriptionID, sender.PrincipalID, senderName, baseURI);
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization subscriptionID:{0} senderID:{1} senderName:{2} baseURI:{3}", sub.SubscriptionID, sender.PrincipalID, senderName, baseURI);
         
         
         // ************ BUILD AND SEND CREATE SUBSCRIPTION AUTHORIZATION POST REQUEST ******** //
@@ -925,21 +916,21 @@ public class GloebitAPI {
         // TODO: should we add additional-details to sub_auth_params?
         sub_auth_params["subscription-id"] = sub.SubscriptionID;
         
-        HttpWebRequest request = BuildGloebitRequest("create-subscription-authorization", "POST", sender, "application/json", sub_auth_params);
+        HttpRequestMessage request = BuildGloebitRequest("create-subscription-authorization", "POST", sender, "application/json", sub_auth_params);
         if (request == null) {
             // ERROR
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization failed to create HttpWebRequest");
+            m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization failed to create HttpWebRequest");
             return false;
             // TODO once we return, return error value
         }
 
-        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization about to BeginGetResponse");
+        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization about to BeginGetResponse");
         // **** Asynchronously make web request **** //
-        IAsyncResult r = request.BeginGetResponse(GloebitWebResponseCallback,
+        _ = SendGloebitRequestAsync(
 			                                          new GloebitRequestState(request, 
 			                        delegate(OSDMap responseDataMap) {
                                     
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization response: {0}", responseDataMap);
+            m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization response: {0}", responseDataMap);
 
             //************ PARSE AND HANDLE CREATE SUBSCRIPTION AUTHORIZATION RESPONSE *********//
 
@@ -947,48 +938,48 @@ public class GloebitAPI {
             bool success = (bool)responseDataMap["success"];
             string reason = responseDataMap["reason"];
             string status = responseDataMap["status"];
-            m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization success: {0} reason: {1} status: {2}", success, reason, status);
+            m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization success: {0} reason: {1} status: {2}", success, reason, status);
             
             if (success) {
                 string subscriptionAuthIDStr = responseDataMap["id"];
                 // TODO: if we decide to store auths, this would be a place to do so.
                 if (status == "duplicate") {
-                    m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization duplicate request to create subscription");
+                    m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization duplicate request to create subscription");
                 } else if (status == "duplicate-and-already-approved-by-user") {
-                    m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization duplicate request to create subscription - subscription has already been approved by user.");
+                    m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization duplicate request to create subscription - subscription has already been approved by user.");
                 } else if (status == "duplicate-and-previously-declined-by-user") {
-                    m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization SUCCESS & FAILURE - user previously declined authorization -- consider if app should re-request or if that is harassing user or has Gloebit API reset this automatically?. status:{0} reason:{1}", status, reason);
+                    m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization SUCCESS & FAILURE - user previously declined authorization -- consider if app should re-request or if that is harassing user or has Gloebit API reset this automatically?. status:{0} reason:{1}", status, reason);
                 }
                 
                 string sPending = responseDataMap["pending"];
                 string sEnabled = responseDataMap["enabled"];
-                m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization SUCCESS pending:{0}, enabled:{1}.", sPending, sEnabled);
+                m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization SUCCESS pending:{0}, enabled:{1}.", sPending, sEnabled);
             } else {
                 switch(status) {
                     case "cannot-transact":
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED - no transact permissions on this user. status:{0} reason:{1}", status, reason);
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED - no transact permissions on this user. status:{0} reason:{1}", status, reason);
                         break;
                     case "subscription-not-found":
                     case "mismatched-application-key":
                     case "mis-matched-subscription-ids":
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED - could not properly identify subscription - status:{0} reason:{1}", status, reason);
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED - could not properly identify subscription - status:{0} reason:{1}", status, reason);
                         break;
                     case "subscription-disabled":
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED - app has disabled this subscription. status:{0} reason:{1}", status, reason);
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED - app has disabled this subscription. status:{0} reason:{1}", status, reason);
                         break;
                     case "duplicate-and-previously-declined-by-user":
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED - user previously declined authorization -- consider if app should re-request or if that is harassing user. status:{0} reason:{1}", status, reason);
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED - user previously declined authorization -- consider if app should re-request or if that is harassing user. status:{0} reason:{1}", status, reason);
                         break;
                     default:
                         switch(reason) {
                             case "Unexpected DB insert integrity error.  Please try again.":
-                                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED from {0}", reason);
+                                m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization FAILED from {0}", reason);
                                 break;
                             case "Unknown DB Error":
-                                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization failed from {0}", reason);
+                                m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.CreateSubscriptionAuthorization failed from {0}", reason);
                                 break;
                             default:
-                                m_log.ErrorFormat("Unknown error posting create subscription authorization, reason: '{0}'", reason);
+                                m_log.LogError("Unknown error posting create subscription authorization, reason: '{0}'", reason);
                                 break;
                         }
                         break;
@@ -1021,20 +1012,20 @@ public class GloebitAPI {
     // TODO: OSDMap or Dictionary for params
 
     /// <summary>
-    /// Build an HTTPWebRequest for a Gloebit endpoint.
+    /// Build an HTTP request for a Gloebit endpoint.
     /// </summary>
     /// <param name="relative_url">endpoint & query args.</param>
     /// <param name="method">HTTP method for request -- eg: "GET", "POST".</param>
     /// <param name="user">GloebitUser object for this authenticated user if one exists.</param>
     /// <param name="content_type">content type of post/put request  -- eg: "application/json", "application/x-www-form-urlencoded".</param>
     /// <param name="paramMap">parameter map for body of request.</param>
-    private HttpWebRequest BuildGloebitRequest(string relativeURL, string method, GloebitUser user, string contentType = "", OSDMap paramMap = null) {
+    private HttpRequestMessage BuildGloebitRequest(string relativeURL, string method, GloebitUser user, string contentType = "", OSDMap paramMap = null) {
         
         // combine Gloebit base url with endpoint and query args in relative url.
         Uri requestURI = new Uri(m_url, relativeURL);
     
         // Create http web request from URL
-        HttpWebRequest request = (HttpWebRequest) WebRequest.Create(requestURI);
+        HttpRequestMessage request = new(new HttpMethod(method), requestURI);
     
         // Add authorization header
         if (user != null && user.GloebitToken != "") {
@@ -1042,16 +1033,14 @@ public class GloebitAPI {
         }
     
         // Set request method and body
-        request.Method = method;
         switch (method) {
             case "GET":
-                m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.BuildGloebitRequest GET baseURL:{0} relativeURL:{1}, fullURL:{2}", m_url, relativeURL, requestURI);
+                m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.BuildGloebitRequest GET baseURL:{0} relativeURL:{1}, fullURL:{2}", m_url, relativeURL, requestURI);
                 break;
             case "POST":
             case "PUT":
                 string paramString = "";
                 byte[] postData = null;
-                request.ContentType = contentType;
             
                 // Build paramString in proper format
                 if (paramMap != null) {
@@ -1061,25 +1050,26 @@ public class GloebitAPI {
                         paramString = OSDParser.SerializeJsonString(paramMap);
                     } else {
                         // ERROR - we are not handling this content type properly
-                        m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.BuildGloebitRequest relativeURL:{0}, unrecognized content type:{1}", relativeURL, contentType);
+                        m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.BuildGloebitRequest relativeURL:{0}, unrecognized content type:{1}", relativeURL, contentType);
+                        request.Dispose();
                         return null;
                     }
             
                     // Byte encode paramString and write to requestStream
                     postData = System.Text.Encoding.UTF8.GetBytes(paramString);
-                    request.ContentLength = postData.Length;
-                    // TODO: look into BeginGetRequestStream()
-                    using (Stream s = request.GetRequestStream()) {
-                        s.Write(postData, 0, postData.Length);
-                    }
+                    request.Content = new ByteArrayContent(postData);
+                    request.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
                 } else {
                     // Probably should be a GET request if it has no paramMap
-                    m_log.WarnFormat("[GLOEBITMONEYMODULE] GloebitAPI.BuildGloebitRequest relativeURL:{0}, Empty paramMap on {1} request", relativeURL, method);
+                    m_log.LogWarning("[GLOEBITMONEYMODULE] GloebitAPI.BuildGloebitRequest relativeURL:{0}, Empty paramMap on {1} request", relativeURL, method);
+                    request.Content = new ByteArrayContent(Array.Empty<byte>());
+                    request.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
                 }
                 break;
             default:
                 // ERROR - we are not handling this request type properly
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.BuildGloebitRequest relativeURL:{0}, unrecognized web request method:{1}", relativeURL, method);
+                m_log.LogError("[GLOEBITMONEYMODULE] GloebitAPI.BuildGloebitRequest relativeURL:{0}, unrecognized web request method:{1}", relativeURL, method);
+                request.Dispose();
                 return null;
         }
         return request;
@@ -1091,7 +1081,7 @@ public class GloebitAPI {
     /// <param name="ParamMap">Parameters to be encoded.</param>
     private string BuildURLEncodedParamString(OSDMap paramMap) {
         // TODO: remove client_secret from this before logging
-        m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitAPI.BuildURLEncodedParamString building from paramMap:{0}:", paramMap);
+        m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitAPI.BuildURLEncodedParamString building from paramMap:{0}:", paramMap);
         StringBuilder paramBuilder = new StringBuilder();
         foreach (KeyValuePair<string, OSD> p in (OSDMap)paramMap) {
             if(paramBuilder.Length != 0) {
@@ -1107,104 +1097,25 @@ public class GloebitAPI {
     /***********************************************/
     
     /// <summary>
-    /// Handles asynchronous return from web request BeginGetResponse.
-    /// Retrieves response stream and asynchronously begins reading response stream.
+    /// Sends a request and invokes its continuation after a successful, valid JSON response.
     /// </summary>
-    /// <param name="ar">State details compiled as this web request is processed.</param>
-    public void GloebitWebResponseCallback(IAsyncResult ar) {
-        
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.GloebitWebResponseCallback");
-        
-        // Get the RequestState object from the async result.
-        GloebitRequestState myRequestState = (GloebitRequestState) ar.AsyncState;
-        HttpWebRequest req = myRequestState.request;
-        
-        // Call EndGetResponse, which produces the WebResponse object
-        //  that came from the request issued above.
+    private async Task SendGloebitRequestAsync(GloebitRequestState state)
+    {
+        using HttpRequestMessage request = state.request;
         try
         {
-            HttpWebResponse resp = (HttpWebResponse)req.EndGetResponse(ar);
-
-            //  Start reading data from the response stream.
-            // TODO: look into BeginGetResponseStream();
-            Stream responseStream = resp.GetResponseStream();
-            myRequestState.responseStream = responseStream;
-
-            // TODO: Do I need to check the CanRead property before reading?
-
-            //  Begin reading response into myRequestState.BufferRead
-            // TODO: May want to make use of iarRead for calls by syncronous functions
-            IAsyncResult iarRead = responseStream.BeginRead(myRequestState.bufferRead, 0, GloebitRequestState.BUFFER_SIZE, GloebitReadCallBack, myRequestState);
-
-            // TODO: on any failure/exception, propagate error up and provide to user in friendly error message.
+            using HttpClient client = WebUtil.GetLegacyHttpClient(100000);
+            using HttpResponseMessage response = await client.SendAsync(request).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            using StreamReader reader = new(await response.Content.ReadAsStreamAsync().ConfigureAwait(false), Encoding.UTF8);
+            string data = await reader.ReadToEndAsync().ConfigureAwait(false);
+            if (OSDParser.DeserializeJson(data) is not OSDMap responseData)
+                throw new InvalidDataException("Gloebit response is not a JSON object.");
+            state.continuation?.Invoke(responseData);
         }
-        catch (ArgumentNullException e) {
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.GloebitWebResponseCallback ArgumentNullException e:{0}", e.Message);
-        }
-        catch (WebException e) {
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.GloebitWebResponseCallback WebException e:{0} URI:{1}", e.Message, req.RequestUri);
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] response:{0}", e.Response);
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] e:{0}", e.ToString ());
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] source:{0}", e.Source);
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] stack_trace:{0}", e.StackTrace);
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] status:{0}", e.Status);
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] target_site:{0}", e.TargetSite);
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] data_count:{0}", e.Data.Count);
-        }
-        catch (InvalidOperationException e) {
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.GloebitWebResponseCallback InvalidOperationException e:{0}", e.Message);
-        }
-        catch (ArgumentException e) {
-            m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.GloebitWebResponseCallback ArgumentException e:{0}", e.Message);
-        }
-
-    }
-    
-    /// <summary>
-    /// Handles asynchronous return from web request response stream BeginRead().
-    /// Retrieves and stores buffered read, or closes stream and passes requestState to requestState.continuation().
-    /// </summary>
-    /// <param name="ar">State details compiled as this web request is processed.</param>
-    private void GloebitReadCallBack(IAsyncResult ar)
-    {
-        // m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitAPI.GloebitReadCallback");
-        
-        // Get the RequestState object from AsyncResult.
-        GloebitRequestState myRequestState = (GloebitRequestState)ar.AsyncState;
-        Stream responseStream = myRequestState.responseStream;
-        
-        // Handle data read.
-        int bytesRead = responseStream.EndRead( ar );
-        if (bytesRead > 0)
+        catch (Exception e)
         {
-            // Decode and store the bytesRead in responseData
-            Char[] charBuffer = new Char[GloebitRequestState.BUFFER_SIZE];
-            int len = myRequestState.streamDecoder.GetChars(myRequestState.bufferRead, 0, bytesRead, charBuffer, 0);
-            String str = new String(charBuffer, 0, len);
-            myRequestState.responseData.Append(str);
-            
-            // Continue reading data until
-            // responseStream.EndRead returns 0 for end of stream.
-            // TODO: should we be doing anything with result???
-            IAsyncResult result = responseStream.BeginRead(myRequestState.bufferRead, 0, GloebitRequestState.BUFFER_SIZE, GloebitReadCallBack, myRequestState);
-        }
-        else
-        {
-            // Done Reading
-            
-            // Close down the response stream.
-            responseStream.Close();
-            
-            if (myRequestState.responseData.Length <= 0) {
-                // TODO: Is this necessarily an error if we don't have data???
-                m_log.ErrorFormat("[GLOEBITMONEYMODULE] GloebitAPI.GloebitReadCallback error: No Data");
-                // TODO: signal error
-            }
-            
-            if (myRequestState.continuation != null) {
-                OSDMap responseDataMap = (OSDMap)OSDParser.DeserializeJson(myRequestState.responseData.ToString());
-                myRequestState.continuation(responseDataMap);
-            }
+            m_log.LogError(e, "[GLOEBITMONEYMODULE] Request to {Url} or completion callback failed", request.RequestUri);
         }
     }
     

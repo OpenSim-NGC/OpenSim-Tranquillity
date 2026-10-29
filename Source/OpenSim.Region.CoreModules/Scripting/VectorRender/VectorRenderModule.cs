@@ -31,11 +31,12 @@ using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
-using log4net;
 using System.Reflection;
 using CoreJ2K;
 using CoreJ2K.Configuration;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 //using Cairo;
 
 namespace OpenSim.Region.CoreModules.Scripting.VectorRender;
@@ -47,7 +48,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
 //        private static byte[] s_asset1Data;
 //        private static byte[] s_asset2Data;
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static object thisLock = new object();
     private static SKTypeface m_typeface = null; // SkiaSharp typeface for measurements
 
@@ -74,19 +75,30 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     /// MAX_DISCARD_LEVEL = 5 (indra/llimage/llimage.h:41), so 5 levels keeps every
     /// discard the viewer may ask for available in the codestream. It costs nothing --
     /// at 1024x1024 the output is smaller at 5 levels than at 4.
+    ///
+    /// The output must be the RAW CODESTREAM, not a JP2 file. CoreJ2K's default wraps the
+    /// codestream in JP2 boxes (jP, ftyp, jp2h, jp2c - the codestream itself started at byte 77 of every
+    /// dynamic texture this shipped), and the viewer's decoder is created for bare codestreams only
+    /// (opj_create_decompress(OPJ_CODEC_J2K), indra/llimagej2coj/llimagej2coj.cpp:311 and :385), so
+    /// opj_read_header failed on the signature box and every dynamic texture rendered as a flat grey prim
+    /// with a valid image on disk. WithFileFormat(false) is the same setting the server-side bake codec
+    /// uses (OpenSimNGC.Appearance.Baking/J2kCodec.cs, EncoderConfig), whose bakes the viewer renders.
     /// </remarks>
     private static J2KEncoderConfiguration BuildEncoderConfig(int width, int height)
     {
         return new J2KEncoderConfiguration()
             .WithTiles(t => t.SetSize(width, height))
             .WithWavelet(w => w.UseIrreversible97().WithDecompositionLevels(5))
-            .WithProgression(p => p.WithOrder(ProgressionOrder.LRCP).WithQualityLayers(0.1f, 0.5f, 1.0f));
+            .WithProgression(p => p.WithOrder(ProgressionOrder.LRCP).WithQualityLayers(0.1f, 0.5f, 1.0f))
+            .WithFileFormat(false);
     }
 
     private Scene m_scene;
     private IDynamicTextureManager m_textureManager;
 
     private string m_fontName = "Arial";
+
+    private OutboundUrlFilter m_outboundUrlFilter;
 
     public VectorRenderModule()
     {
@@ -134,7 +146,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     {
         if (m_textureManager == null)
         {
-            m_log.Warn("[VECTORRENDERMODULE]: No texture manager. Can't function");
+            m_log.LogWarning("[VECTORRENDERMODULE]: No texture manager. Can't function");
             return false;
         }
         // XXX: This isn't actually being done asynchronously!
@@ -197,7 +209,11 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
         {
             m_fontName = cfg.GetString("font_name", m_fontName);
         }
-        m_log.DebugFormat("[VECTORRENDERMODULE]: using font \"{0}\" for text rendering.", m_fontName);
+        m_log.LogDebug("[VECTORRENDERMODULE]: using font \"{0}\" for text rendering.", m_fontName);
+
+        // The Image command fetches a URL the script chose, so it gets llHTTPRequest's filter: same [Network]
+        // keys, same defaults.
+        m_outboundUrlFilter = new OutboundUrlFilter("Script vector render module", config);
 
         // We won't dispose of these explicitly since this module is only removed when the entire simulator
         // is shut down.
@@ -437,7 +453,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[VECTORRENDERMODULE]: Image Encoding Failed.  Exception {0}{1}",
                     e.Message, e.StackTrace);
             }
@@ -465,7 +481,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
         catch (Exception)
         {
             //Ckrinke: Add a WriteLine to remove the warning about 'e' defined but not used
-            // m_log.Debug("Problem with Draw. Please verify parameters." + e.ToString());
+            // m_log.LogDebug("Problem with Draw. Please verify parameters." + e.ToString());
             parsed = -1;
         }
 
@@ -556,7 +572,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
             {
                 string nextLine = line.TrimStart();
 
-//                    m_log.DebugFormat("[VECTOR RENDER MODULE]: Processing line '{0}'", nextLine);
+//                    m_log.LogDebug("[VECTOR RENDER MODULE]: Processing line '{0}'", nextLine);
 
                 if (nextLine.StartsWith("Text") && nextLine.Length > 5)
                 {
@@ -571,7 +587,10 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                             Color = drawColor,
                             IsAntialias = true
                         };
-                        canvas.DrawText(nextLine, startPoint.X, startPoint.Y, SKTextAlign.Left, myFont, textPaint);
+                        // The pen position is the TOP-LEFT of the text, as System.Drawing's DrawString took it
+                        // and as every script written against upstream expects; SkiaSharp's DrawText takes the
+                        // BASELINE, which put "MoveTo 20,20; Text Hello" with its glyphs ABOVE y=20. Ascent is negative.
+                        canvas.DrawText(nextLine, startPoint.X, startPoint.Y - myFont.Metrics.Ascent, SKTextAlign.Left, myFont, textPaint);
                         textPaint.Dispose();
                     }
                     continue;
@@ -635,7 +654,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                     {
                         var srcRect = SKRect.Create(0, 0, image.Width, image.Height);
                         var dstRect = SKRect.Create(startPoint.X, startPoint.Y, x, y);
-                        canvas.DrawImage(image, srcRect, dstRect);
+                        canvas.DrawImage(image, srcRect, dstRect, SKSamplingOptions.Default);
                         image.Dispose();
                     }
                     else
@@ -693,14 +712,15 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                     SKPoint[] points = null;
                     GetParams(partsDelimiter, ref nextLine, 11, ref points);
                     var fillPaint = new SKPaint { Color = drawColor, Style = SKPaintStyle.Fill };
-                    using (var path = new SKPath())
+                    using (var builder = new SKPathBuilder())
                     {
                         if (points != null && points.Length > 0)
                         {
-                            path.MoveTo(points[0]);
+                            builder.MoveTo(points[0]);
                             for (int i = 1; i < points.Length; i++)
-                                path.LineTo(points[i]);
-                            path.Close();
+                                builder.LineTo(points[i]);
+                            builder.Close();
+                            using var path = builder.Detach();
                             canvas.DrawPath(path, fillPaint);
                         }
                     }
@@ -710,14 +730,15 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                 {
                     SKPoint[] points = null;
                     GetParams(partsDelimiter, ref nextLine, 7, ref points);
-                    using (var path = new SKPath())
+                    using (var builder = new SKPathBuilder())
                     {
                         if (points != null && points.Length > 0)
                         {
-                            path.MoveTo(points[0]);
+                            builder.MoveTo(points[0]);
                             for (int i = 1; i < points.Length; i++)
-                                path.LineTo(points[i]);
-                            path.Close();
+                                builder.LineTo(points[i]);
+                            builder.Close();
+                            using var path = builder.Detach();
                             canvas.DrawPath(path, drawPaint);
                         }
                     }
@@ -943,7 +964,7 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
                 SKPoint point = new SKPoint(x, y);
                 points[i / 2] = point;
 
-//                    m_log.DebugFormat("[VECTOR RENDER MODULE]: Got point {0}", points[i / 2]);
+//                    m_log.LogDebug("[VECTOR RENDER MODULE]: Got point {0}", points[i / 2]);
             }
         }
     }
@@ -952,19 +973,29 @@ public class VectorRenderModule : ISharedRegionModule, IDynamicTextureRender
     {
         try
         {
-            var handler = new HttpClientHandler();
+            // A refused URL is drawn as the same error box as an unreachable one.
+            if (Uri.TryCreate(url, UriKind.Absolute, out Uri uri) && !m_outboundUrlFilter.CheckAllowed(uri))
+            {
+                m_log.LogWarning("[VECTORRENDERMODULE]: Image {0} disallowed by filter", url);
+                return null;
+            }
+
+            // Redirects are followed by the filtering handler (the default handler's 50 hops, each one checked)
+            // instead of by the handler itself, which would follow them unchecked. A connection straight to the
+            // target goes only to an address the filter allows; one to the default proxy is left alone.
+            if (uri is null)
+                return null;
+
+            var handler = new OutboundUrlFilterRedirectHandler(
+                m_outboundUrlFilter, m_outboundUrlFilter.CreateHandler(System.Net.Http.HttpClient.DefaultProxy), 50);
             using (var client = new System.Net.Http.HttpClient(handler))
             {
                 using (var response = client.GetAsync(url).Result)
                 {
                     if (response.IsSuccessStatusCode)
                     {
-                        using (var s = response.Content.ReadAsStreamAsync().Result)
-                        {
-                            var data = new byte[s.Length];
-                            s.Read(data, 0, (int)s.Length);
-                            return SKImage.FromEncodedData(data);
-                        }
+                        var data = response.Content.ReadAsByteArrayAsync().Result;
+                        return SKImage.FromEncodedData(data);
                     }
                 }
             }

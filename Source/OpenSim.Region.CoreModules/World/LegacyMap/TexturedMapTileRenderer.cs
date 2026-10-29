@@ -28,18 +28,19 @@
 using SkiaSharp;
 using CoreJ2K;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.LegacyMap;
 
 // Hue, Saturation, Value; used for color-interpolation
 struct HSV {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public float h;
     public float s;
@@ -77,10 +78,10 @@ struct HSV {
     // (for info about algorithm, see http://en.wikipedia.org/wiki/HSL_and_HSV)
     public SKColor toColor()
     {
-        if (s < 0f) m_log.Debug("S < 0: " + s);
-        else if (s > 1f) m_log.Debug("S > 1: " + s);
-        if (v < 0f) m_log.Debug("V < 0: " + v);
-        else if (v > 1f) m_log.Debug("V > 1: " + v);
+        if (s < 0f) m_log.LogDebug("S < 0: " + s);
+        else if (s > 1f) m_log.LogDebug("S > 1: " + s);
+        if (v < 0f) m_log.LogDebug("V < 0: " + v);
+        else if (v > 1f) m_log.LogDebug("V > 1: " + v);
 
         float f = h / 60f;
         int sector = (int)f % 6;
@@ -121,7 +122,7 @@ public class TexturedMapTileRenderer : IMapTileTerrainRenderer
 {
     #region Constants
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string LogHeader = "[TEXTURED MAPTILE RENDERER]";
 
     // some hardcoded terrain UUIDs that work with SL 1.20 (the four default textures and "Blank").
@@ -196,11 +197,11 @@ public class TexturedMapTileRenderer : IMapTileTerrainRenderer
     private SKBitmap fetchTexture(UUID id)
     {
         AssetBase asset = m_scene.AssetService.Get(id.ToString());
-        m_log.DebugFormat("{0} Fetched texture {1}, found: {2}", LogHeader, id, asset != null);
+        m_log.LogDebug("{0} Fetched texture {1}, found: {2}", LogHeader, id, asset != null);
 
         if (asset != null && (asset.Data == null || asset.Data.Length == 0))
         {
-            m_log.WarnFormat("{0} Asset data is empty for texture {1}", LogHeader, id);
+            m_log.LogWarning("{0} Asset data is empty for texture {1}", LogHeader, id);
             return null;
         }   
 
@@ -212,7 +213,7 @@ public class TexturedMapTileRenderer : IMapTileTerrainRenderer
         }
         catch (Exception)
         {
-            m_log.ErrorFormat("[MAPTILE]: CoreJ2k was unable to decode this.   Asset Data is empty for {0}", id);
+            m_log.LogError("[MAPTILE]: CoreJ2k was unable to decode this.   Asset Data is empty for {0}", id);
 
         }
 
@@ -296,13 +297,13 @@ public class TexturedMapTileRenderer : IMapTileTerrainRenderer
     public void TerrainToBitmap(SKBitmap mapbmp)
     {
         int tc = Environment.TickCount;
-        m_log.DebugFormat("{0} Generating Maptile Step 1: Terrain", LogHeader);
+        m_log.LogDebug("{0} Generating Maptile Step 1: Terrain", LogHeader);
 
         ITerrainChannel hm = m_scene.Heightmap;
 
         if (mapbmp.Width != hm.Width || mapbmp.Height != hm.Height)
         {
-            m_log.ErrorFormat("{0} TerrainToBitmap. Passed bitmap wrong dimensions. passed=<{1},{2}>, size=<{3},{4}>",
+            m_log.LogError("{0} TerrainToBitmap. Passed bitmap wrong dimensions. passed=<{1},{2}>, size=<{3},{4}>",
                 "[TEXTURED MAPTILE RENDERER]", mapbmp.Width, mapbmp.Height, hm.Width, hm.Height);
         }
 
@@ -437,6 +438,6 @@ public class TexturedMapTileRenderer : IMapTileTerrainRenderer
             }
         }
 
-        m_log.Debug("[TEXTURED MAPTILE RENDERER]: Generating Maptile Step 1: Done in " + (Environment.TickCount - tc) + " ms");
+        m_log.LogDebug("[TEXTURED MAPTILE RENDERER]: Generating Maptile Step 1: Done in " + (Environment.TickCount - tc) + " ms");
     }
 }

@@ -33,11 +33,6 @@ class Program
 
     public static int Main(string[] args)
     {
-        var logconfigOption = new Option<string>("--logconfig")
-        {
-            Description = "Instruct log4net to use this file as configuration file.",
-            DefaultValueFactory = ParseResult => "OpenSim.Server.GridServer.dll.config",
-        };
         var inifileOption = new Option<List<string>>("--inifile")
         {
             Description = "Specify the location of zero or more .ini file(s) to read."
@@ -63,7 +58,6 @@ class Program
 
         RootCommand rootCommand = new RootCommand("Launch the OpenSim Grid Server");
 
-        rootCommand.Options.Add(logconfigOption);
         rootCommand.Options.Add(inifileOption);
         rootCommand.Options.Add(inimasterOption);
         rootCommand.Options.Add(inidirectoryOption);
@@ -83,7 +77,6 @@ class Program
         else
         {
             rootCommand.SetAction(parseResult => Configure( 
-                logConfig: parseResult.GetValue(logconfigOption), 
                 iniFile: parseResult.GetValue(inifileOption), 
                 iniMaster: parseResult.GetValue(inimasterOption), 
                 iniDirectory: parseResult.GetValue(inidirectoryOption), 
@@ -98,18 +91,15 @@ class Program
     }
 
     static void Configure(
-        string logConfig, 
         List<string> iniFile, 
         string iniMaster, 
         string iniDirectory, 
         string consoleType
         )
     {
-        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
-        var logPath = Environment.GetEnvironmentVariable("LOGDIR");
-        if (string.IsNullOrWhiteSpace(logPath) is false)
-            log4NetBootstrapper.LogPath = logPath;
-        string effectiveLogConfig = log4NetBootstrapper.Configure(logConfig, "OpenSim.Server.GridServer.dll.config");
+        string logPath = Environment.GetEnvironmentVariable("LOGDIR");
+        if (string.IsNullOrWhiteSpace(logPath))
+            logPath = ".";
 
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
@@ -179,14 +169,20 @@ class Program
                 AsImplementedInterfaces().
                 SingleInstance();
         })
-        .ConfigureLogging(loggingBuilder =>
+        .ConfigureLogging((context, loggingBuilder) =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
-            loggingBuilder.AddConsole();
+            loggingBuilder.AddOpenSimLogging(
+                "OpenSim.Server.GridServer",
+                logPath,
+                context.Configuration["Startup:logfile"],
+                context.Configuration["Startup:StatsLogFile"]);
+
+            LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })
         .ConfigureServices(services =>
         {
+
             // GridServer currently serves all HTTP through the legacy BaseHttpServer
             // (via service connectors), not ASP.NET controllers, so Kestrel/MVC is
             // disabled to avoid a port clash on the [Network] port. Re-enable together

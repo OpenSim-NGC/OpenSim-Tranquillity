@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -36,13 +35,14 @@ using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Land;
 
 public class RemoteLandServicesConnector :
         LandServicesConnector, ISharedRegionModule, ILandService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
@@ -70,7 +70,7 @@ public class RemoteLandServicesConnector :
 
                 m_Enabled = true;
 
-                m_log.Info("[LAND CONNECTOR]: Remote Land connector enabled");
+                m_log.LogInformation("[LAND CONNECTOR]: Remote Land connector enabled");
             }
         }
     }

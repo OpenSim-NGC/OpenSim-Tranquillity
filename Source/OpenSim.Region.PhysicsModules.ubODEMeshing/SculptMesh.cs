@@ -29,7 +29,7 @@ using SkiaSharp;
 
 using OpenMetaverse;
 
-namespace PrimMesher;
+namespace OpenSim.Region.PhysicsModules.ubODEMeshing.PrimMesher;
 
 public class SculptMesh
 {

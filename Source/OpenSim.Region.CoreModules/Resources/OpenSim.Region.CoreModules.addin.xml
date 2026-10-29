@@ -119,6 +119,7 @@
         <RegionModule id="MoapModule" class="OpenSim.Region.CoreModules.World.Media.Moap.MoapModule" />
         <RegionModule id="BuySellModule" class="OpenSim.Region.CoreModules.World.Objects.BuySell.BuySellModule" />
         <RegionModule id="ObjectCommandsModule" class="OpenSim.Region.CoreModules.World.Objects.Commands.ObjectCommandsModule" />
+        <RegionModule id="BlockedOwnerModule" class="OpenSim.Region.CoreModules.World.Objects.BlockedOwners.BlockedOwnerModule" />
 	    <RegionModule id="DefaultPermissionsModule" class="OpenSim.Region.CoreModules.World.Permissions.DefaultPermissionsModule" />  
         <RegionModule id="RegionCommandsModule" class="OpenSim.Region.CoreModules.World.Objects.Commands.RegionCommandsModule" />
         <RegionModule id="RestartModule" class="OpenSim.Region.CoreModules.World.Region.RestartModule" />

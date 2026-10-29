@@ -26,7 +26,7 @@
  */
 
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -36,7 +36,7 @@ namespace OpenSim.Framework;
 /// </summary>
 public class DotNetCorePluginLoader<T> : IDisposable where T : class, IPlugin
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly IPluginDiscovery m_discovery;
     private readonly List<T> m_loadedPlugins = new List<T>();
@@ -67,11 +67,11 @@ public class DotNetCorePluginLoader<T> : IDisposable where T : class, IPlugin
 
         if (typeHint == null)
         {
-            m_log.WarnFormat("[PLUGIN-LOADER]: Load called for {0} without type hint", extensionPoint);
+            m_log.LogWarning("[PLUGIN-LOADER]: Load called for {0} without type hint", extensionPoint);
             return;
         }
 
-        m_log.InfoFormat("[PLUGIN-LOADER]: Loading extension point {0}", extensionPoint);
+        m_log.LogInformation("[PLUGIN-LOADER]: Loading extension point {0}", extensionPoint);
 
         try
         {
@@ -80,11 +80,11 @@ public class DotNetCorePluginLoader<T> : IDisposable where T : class, IPlugin
 
             if (nodes.Count == 0)
             {
-                m_log.InfoFormat("[PLUGIN-LOADER]: No plugins found for {0}", extensionPoint);
+                m_log.LogInformation("[PLUGIN-LOADER]: No plugins found for {0}", extensionPoint);
                 return;
             }
 
-            m_log.InfoFormat("[PLUGIN-LOADER]: Found {0} candidates for {1}", nodes.Count, extensionPoint);
+            m_log.LogInformation("[PLUGIN-LOADER]: Found {0} candidates for {1}", nodes.Count, extensionPoint);
 
             // Instantiate plugins
             var instantiated = new List<T>();
@@ -92,23 +92,23 @@ public class DotNetCorePluginLoader<T> : IDisposable where T : class, IPlugin
             {
                 try
                 {
-                    m_log.DebugFormat("[PLUGIN-LOADER]: Instantiating plugin {0}", node.TypeName);
+                    m_log.LogDebug("[PLUGIN-LOADER]: Instantiating plugin {0}", node.TypeName);
                     object instance = node.CreateInstance();
                     
                     if (instance is T typedInstance)
                     {
                         instantiated.Add(typedInstance);
-                        m_log.DebugFormat("[PLUGIN-LOADER]: Successfully instantiated {0}", node.TypeName);
+                        m_log.LogDebug("[PLUGIN-LOADER]: Successfully instantiated {0}", node.TypeName);
                     }
                     else
                     {
-                        m_log.WarnFormat("[PLUGIN-LOADER]: Plugin {0} does not implement {1}",
+                        m_log.LogWarning("[PLUGIN-LOADER]: Plugin {0} does not implement {1}",
                             node.TypeName, typeof(T).Name);
                     }
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[PLUGIN-LOADER]: Failed to instantiate {0}: {1}",
+                    m_log.LogError("[PLUGIN-LOADER]: Failed to instantiate {0}: {1}",
                         node.TypeName, e.Message);
                 }
             }
@@ -118,23 +118,23 @@ public class DotNetCorePluginLoader<T> : IDisposable where T : class, IPlugin
             {
                 try
                 {
-                    m_log.DebugFormat("[PLUGIN-LOADER]: Initializing plugin {0}", plugin.GetType().Name);
+                    m_log.LogDebug("[PLUGIN-LOADER]: Initializing plugin {0}", plugin.GetType().Name);
                     m_initialiser.Initialise(plugin);
                     m_loadedPlugins.Add(plugin);
-                    m_log.DebugFormat("[PLUGIN-LOADER]: Successfully initialized {0}", plugin.GetType().Name);
+                    m_log.LogDebug("[PLUGIN-LOADER]: Successfully initialized {0}", plugin.GetType().Name);
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[PLUGIN-LOADER]: Failed to initialize {0}: {1}",
+                    m_log.LogError("[PLUGIN-LOADER]: Failed to initialize {0}: {1}",
                         plugin.GetType().Name, e.Message);
                 }
             }
 
-            m_log.InfoFormat("[PLUGIN-LOADER]: Loaded {0} plugins for {1}", m_loadedPlugins.Count, extensionPoint);
+            m_log.LogInformation("[PLUGIN-LOADER]: Loaded {0} plugins for {1}", m_loadedPlugins.Count, extensionPoint);
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[PLUGIN-LOADER]: Exception loading {0}: {1}", extensionPoint, e.Message);
+            m_log.LogError("[PLUGIN-LOADER]: Exception loading {0}: {1}", extensionPoint, e.Message);
         }
     }
 
@@ -150,20 +150,20 @@ public class DotNetCorePluginLoader<T> : IDisposable where T : class, IPlugin
 
         if (typeHint == null)
         {
-            m_log.WarnFormat("[PLUGIN-LOADER]: LoadFromRegistry called for {0} without type hint", extensionPoint);
+            m_log.LogWarning("[PLUGIN-LOADER]: LoadFromRegistry called for {0} without type hint", extensionPoint);
             return;
         }
 
-        m_log.InfoFormat("[PLUGIN-LOADER]: Loading from registry for {0}", extensionPoint);
+        m_log.LogInformation("[PLUGIN-LOADER]: Loading from registry for {0}", extensionPoint);
 
         var plugins = registry.GetPlugins(extensionPoint);
         if (plugins.Count == 0)
         {
-            m_log.InfoFormat("[PLUGIN-LOADER]: No plugins registered for {0}", extensionPoint);
+            m_log.LogInformation("[PLUGIN-LOADER]: No plugins registered for {0}", extensionPoint);
             return;
         }
 
-        m_log.InfoFormat("[PLUGIN-LOADER]: Found {0} registered plugins for {1}", plugins.Count, extensionPoint);
+        m_log.LogInformation("[PLUGIN-LOADER]: Found {0} registered plugins for {1}", plugins.Count, extensionPoint);
 
         // Instantiate and initialize registered plugins
         foreach (var descriptor in plugins)
@@ -172,29 +172,29 @@ public class DotNetCorePluginLoader<T> : IDisposable where T : class, IPlugin
             {
                 if (!typeHint.IsAssignableFrom(descriptor.PluginType))
                 {
-                    m_log.WarnFormat("[PLUGIN-LOADER]: Plugin {0} does not implement {1}",
+                    m_log.LogWarning("[PLUGIN-LOADER]: Plugin {0} does not implement {1}",
                         descriptor.PluginType.Name, typeHint.Name);
                     continue;
                 }
 
-                m_log.DebugFormat("[PLUGIN-LOADER]: Instantiating registered plugin {0}", descriptor.PluginType.Name);
+                m_log.LogDebug("[PLUGIN-LOADER]: Instantiating registered plugin {0}", descriptor.PluginType.Name);
                 var instance = (T)Activator.CreateInstance(descriptor.PluginType, true);
 
-                m_log.DebugFormat("[PLUGIN-LOADER]: Initializing plugin {0}", descriptor.PluginType.Name);
+                m_log.LogDebug("[PLUGIN-LOADER]: Initializing plugin {0}", descriptor.PluginType.Name);
                 m_initialiser.Initialise(instance);
                 m_loadedPlugins.Add(instance);
 
-                m_log.InfoFormat("[PLUGIN-LOADER]: Successfully loaded registered plugin {0} ({1})",
+                m_log.LogInformation("[PLUGIN-LOADER]: Successfully loaded registered plugin {0} ({1})",
                     descriptor.Name, descriptor.PluginType.Name);
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[PLUGIN-LOADER]: Failed to load registered plugin {0}: {1}",
+                m_log.LogError("[PLUGIN-LOADER]: Failed to load registered plugin {0}: {1}",
                     descriptor.PluginType.Name, e.Message);
             }
         }
 
-        m_log.InfoFormat("[PLUGIN-LOADER]: Loaded {0} plugins from registry for {1}", 
+        m_log.LogInformation("[PLUGIN-LOADER]: Loaded {0} plugins from registry for {1}", 
             m_loadedPlugins.Count, extensionPoint);
     }
 
@@ -228,7 +228,7 @@ public class DotNetCorePluginLoader<T> : IDisposable where T : class, IPlugin
 /// </summary>
 public static class DotNetCorePluginLoaderFactory
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Create a plugin loader using the DotNetCorePlugins discovery backend

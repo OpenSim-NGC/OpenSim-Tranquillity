@@ -1,6 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <AssemblyTitle>Warp3D</AssemblyTitle>
     <Company>http://utopiaskye.com</Company>
     <SignAssembly>true</SignAssembly>
@@ -8,10 +7,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="SkiaSharp" Version="3.119.2" />
-    <PackageReference Include="CoreJ2K.Skia" Version="2.1.2.38" />
-    <PackageReference Include="OpenMetaverse.Rendering.Meshmerizer" Version="1.0.6" />
+    <PackageReference Include="SkiaSharp" Version="4.153.1" />
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.13" />
+    <PackageReference Include="CoreJ2K.Skia" Version="2.4.1.108" />
   </ItemGroup>
 
 </Project>

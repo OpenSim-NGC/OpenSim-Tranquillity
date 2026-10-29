@@ -28,7 +28,8 @@
 using System.Reflection;
 using System.Xml;
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.Framework.Scenes.Serialization;
 
@@ -37,7 +38,7 @@ namespace OpenSim.Region.Framework.Scenes.Serialization;
 /// </summary>
 public class SceneXmlLoader
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     #region old xml format
     public static void LoadPrimsFromXml(Scene scene, string fileName, bool newIDS, Vector3 loadOffset)
@@ -133,7 +134,7 @@ public class SceneXmlLoader
     // Called by scene serializer (save xml2)
     public static void SaveNamedPrimsToXml2(Scene scene, string primName, string fileName)
     {
-        m_log.InfoFormat(
+        m_log.LogInformation(
             "[SERIALISER]: Saving prims with name {0} in xml2 format for region {1} to {2}",
             primName, scene.RegionInfo.RegionName, fileName);
 

@@ -30,14 +30,16 @@ using System.Net;
 using System.Reflection;
 using System.Text;
 using OSHttpServer;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Servers.HttpServer;
 
 public class PollServiceHttpRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public readonly PollServiceEventArgs PollServiceArgs;
     public readonly IHttpRequest Request;
@@ -86,7 +88,7 @@ public class PollServiceHttpRequest
 
         try
         {
-            //m_log.Info("[BASE HTTP SERVER]: Doing HTTP Grunt work with response");
+            //m_log.LogInformation("[BASE HTTP SERVER]: Doing HTTP Grunt work with response");
             if(responsedata["int_response_code"] != null)
                 responsecode = (int)responsedata["int_response_code"];
 
@@ -201,10 +203,10 @@ public class PollServiceHttpRequest
             {
                 // only mute connection reset by peer so we are not totally blind for now
                 if(((System.Net.Sockets.SocketException)ex).SocketErrorCode != System.Net.Sockets.SocketError.ConnectionReset)
-                     m_log.Warn("[POLL SERVICE WORKER THREAD]: Error ", ex);
+                     m_log.LogWarning(ex, "[POLL SERVICE WORKER THREAD]: Error ");
             }
             else
-                m_log.Warn("[POLL SERVICE WORKER THREAD]: Error ", ex);
+                m_log.LogWarning(ex, "[POLL SERVICE WORKER THREAD]: Error ");
         }
 
         PollServiceArgs.RequestsHandled++;

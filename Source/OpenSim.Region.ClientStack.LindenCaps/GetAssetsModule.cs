@@ -27,7 +27,6 @@
 
 using System.Collections;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Capabilities.Handlers;
@@ -36,15 +35,13 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class GetAssetsModule : INonSharedRegionModule
 {
-//        private static readonly ILog m_log =
-//            LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
     private Scene m_scene;
     private bool m_Enabled;
 
@@ -65,7 +62,7 @@ public class GetAssetsModule : INonSharedRegionModule
         public OSHttpResponse osresponse;
     }
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static IAssetService m_assetService = null;
     private static GetAssetsHandler m_getAssetHandler;

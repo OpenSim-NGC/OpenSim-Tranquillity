@@ -43,11 +43,12 @@ public class SimulationServiceInConnector : ServiceConnector
     {
         m_LocalSimulationService = scene.RequestModuleInterface<ISimulationService>();
         m_LocalSimulationService = m_LocalSimulationService.GetInnerService();
+        ControlPlaneAccess controlPlaneAccess = new ControlPlaneAccess(config);
 
         // This one MUST be a stream handler because compressed fatpacks
         // are pure binary and shoehorning that into a string with UTF-8
         // encoding breaks it
-        server.AddSimpleStreamHandler(new AgentSimpleHandler(m_LocalSimulationService), true);
-        server.AddSimpleStreamHandler(new ObjectSimpleHandler(m_LocalSimulationService), true);
+        server.AddSimpleStreamHandler(new AgentSimpleHandler(m_LocalSimulationService, controlPlaneAccess), true);
+        server.AddSimpleStreamHandler(new ObjectSimpleHandler(m_LocalSimulationService, controlPlaneAccess), true);
     }
 }

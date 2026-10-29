@@ -27,11 +27,12 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Agent.Xfer;
 
@@ -40,7 +41,7 @@ public class XferModule : INonSharedRegionModule, IXfer
     private Scene m_scene;
     private Dictionary<string, FileData> NewFiles = new Dictionary<string, FileData>();
     private Dictionary<ulong, XferDownLoad> Transfers = new Dictionary<ulong, XferDownLoad>();
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private object  timeTickLock = new object();
     private int  lastTimeTick = 0;
@@ -282,7 +283,7 @@ public class XferModule : INonSharedRegionModule, IXfer
                 }
             }
             else
-                m_log.WarnFormat("[Xfer]: {0} not found", fileName);
+                m_log.LogWarning("[Xfer]: {0} not found", fileName);
         }
     }
 
@@ -329,6 +330,12 @@ public class XferModule : INonSharedRegionModule, IXfer
         private int burstSize; // additional packets, so can be zero
         private int retries;
 
+        /// <summary>
+        /// Data bytes in each SendXferPacket, as LL's sender uses (llxfer.cpp, LL_XFER_CHUNK_SIZE = 1000).
+        /// Packet N carries the data from N * PacketPayload; packet 0 also starts with the 4-byte total length.
+        /// </summary>
+        public const int PacketPayload = 1000;
+
         public XferDownLoad(string fileName, byte[] data, ulong xferID, IClientAPI client, int burstsz)
         {
             FileName = fileName;
@@ -367,12 +374,11 @@ public class XferModule : INonSharedRegionModule, IXfer
                 }
                 else
                 {
-                    // payload of 1024bytes
-                    LastPacket = Data.Length >> 10;
-                    lastBytes = Data.Length & 0x3ff;
+                    LastPacket = Data.Length / PacketPayload;
+                    lastBytes = Data.Length % PacketPayload;
                     if(lastBytes == 0)
                     {
-                        lastBytes = 1024;
+                        lastBytes = PacketPayload;
                         LastPacket--;
                     }
                 }
@@ -411,11 +417,11 @@ public class XferModule : INonSharedRegionModule, IXfer
             }
             else
             {
-                pktsize = 1024;
+                pktsize = PacketPayload;
                 pktid = (uint)pkt;
             }
 
-            remoteClient.SendXferPacket(XferID, pktid, Data, pkt << 10, pktsize, true);
+            remoteClient.SendXferPacket(XferID, pktid, Data, pkt * PacketPayload, pktsize, true);
 
             lastSentPacket = pkt;
         }

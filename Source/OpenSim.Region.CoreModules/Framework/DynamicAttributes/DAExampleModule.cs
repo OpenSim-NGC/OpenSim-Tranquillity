@@ -26,18 +26,20 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes;
 
 public class DAExampleModule : INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private readonly bool ENABLED = false;   // enable for testing
 
@@ -60,7 +62,7 @@ public class DAExampleModule : INonSharedRegionModule
             m_scene.EventManager.OnSceneGroupMove += OnSceneGroupMove;
             m_dialogMod = m_scene.RequestModuleInterface<IDialogModule>();
 
-            m_log.DebugFormat("[DA EXAMPLE MODULE]: Added region {0}", m_scene.Name);
+            m_log.LogDebug("[DA EXAMPLE MODULE]: Added region {0}", m_scene.Name);
         }
     }
 
@@ -108,7 +110,7 @@ public class DAExampleModule : INonSharedRegionModule
         sop.ParentGroup.HasGroupChanged = true;
 
         string msg = string.Format("{0} {1} moved {2} times", sop.Name, sop.UUID, newValue);
-        m_log.DebugFormat("[DA EXAMPLE MODULE]: {0}", msg);
+        m_log.LogDebug("[DA EXAMPLE MODULE]: {0}", msg);
         m_dialogMod.SendGeneralAlert(msg);
 
         return true;

@@ -13,8 +13,8 @@ It is intended to be the shared data-model foundation used by the rest of the NG
 ## Package Summary
 
 - Package ID: `OpenSim.Data.Model`
-- Target framework: `.NET 8` (`net8.0`)
-- Database provider: Pomelo MySQL (`Pomelo.EntityFrameworkCore.MySql`)
+- Target framework: `.NET 8` (`net10.0`)
+- Database provider: Microting MySQL (`Microting.EntityFrameworkCore.MySql`, a maintained Pomelo fork)
 - EF Core: `Microsoft.EntityFrameworkCore`
 
 ## Included Contexts

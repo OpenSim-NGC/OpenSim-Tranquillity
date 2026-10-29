@@ -1,0 +1,204 @@
+{
+  "id": "B11-upper-layer-stack",
+  "title": "Skin, undershirt, gloves, shirt, jacket: layer order",
+  "rules": [
+    "R02",
+    "R03",
+    "R05"
+  ],
+  "note": "",
+  "channel": "Upper",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skin",
+      "label": "skin",
+      "params": {},
+      "textures": []
+    },
+    {
+      "kind": "Undershirt",
+      "label": "undershirt",
+      "params": {
+        "821": 0.5
+      },
+      "textures": [
+        {
+          "slot": "UpperUndershirt",
+          "generator": "checkA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-undershirt-UpperUndershirt.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Gloves",
+      "label": "gloves",
+      "params": {
+        "1058": 0.5
+      },
+      "textures": [
+        {
+          "slot": "UpperGloves",
+          "generator": "halfA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-gloves-UpperGloves.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Shirt",
+      "label": "shirt",
+      "params": {
+        "800": 0.5
+      },
+      "textures": [
+        {
+          "slot": "UpperShirt",
+          "generator": "gradA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-shirt-UpperShirt.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Jacket",
+      "label": "jacket",
+      "params": {
+        "831": 1,
+        "832": 0.2,
+        "833": 0.2,
+        "1020": 0.7
+      },
+      "textures": [
+        {
+          "slot": "UpperJacket",
+          "generator": "bandA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-jacket-UpperJacket.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "e44f7a8dadee0717b586b306aef9274c299e34eb61b728932a6995c59f3e8134",
+    "morphSha256": "b7ae2e81596038ed81c794aa6d31c37ea1024908231e2859b33e6c0488618e27",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.65,0.43,0.25,1.00); body_skingrain.tga"
+      },
+      {
+        "layer": "nipples",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "upperbody_color.tga\u002Balpha"
+      },
+      {
+        "layer": "shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "highlight",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (1.00,1.00,1.00,0.00)"
+      },
+      {
+        "layer": "upper_bodypaint",
+        "status": "skipped",
+        "wearable": "Skin",
+        "detail": "skin: no UpperBodypaint texture on the wearable"
+      },
+      {
+        "layer": "freckles upper",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [freckles upper#776=skip]"
+      },
+      {
+        "layer": "upper_tattoo",
+        "status": "skipped",
+        "wearable": "Tattoo",
+        "detail": "no Tattoo worn"
+      },
+      {
+        "layer": "upper_universal_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "upper_undershirt",
+        "status": "drawn",
+        "wearable": "Undershirt",
+        "detail": "undershirt: UpperUndershirt 64x64\u002Balpha -\u003E 64; colour (0.50,1.00,1.00,1.00); masks [Sleeve Length#1042=0.40\u002B, Bottom#1044=0.80*, Collar Front#1046=0.80*, Collar Back#1048=0.80*, texture alpha*]"
+      },
+      {
+        "layer": "Nail Polish",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Nail Polish#710=skip]"
+      },
+      {
+        "layer": "upper_gloves",
+        "status": "drawn",
+        "wearable": "Gloves",
+        "detail": "gloves: UpperGloves 64x64\u002Balpha -\u003E 64; colour (1.00,1.00,1.00,1.00); masks [Glove Length#1058=0.50\u002B, Glove Fingers#1060=1.00*, texture alpha*]"
+      },
+      {
+        "layer": "upper_clothes_shadow",
+        "status": "skipped",
+        "wearable": "Shirt",
+        "detail": "shirt: colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "drawn",
+        "wearable": "Shirt",
+        "detail": "shirt: UpperShirt 64x64\u002Balpha -\u003E 64; colour (1.00,1.00,1.00,1.00); masks [Sleeve Length Cloth#600=0.43\u002B, Shirt Bottom Cloth#601=0.80*, Collar Front Height Cloth#602=0.80*, Collar Back Height Cloth#778=0.80*, texture alpha*]"
+      },
+      {
+        "layer": "upper_jacket",
+        "status": "drawn",
+        "wearable": "Jacket",
+        "detail": "jacket: UpperJacket 64x64\u002Balpha -\u003E 64; colour (1.00,0.20,0.20,1.00); masks [jacket Sleeve Length#1020=0.70\u002B, jacket Collar Front#1022=0.00*, jacket Collar Back#1024=0.00*, bottom length upper#620=0.80*, open upper#622=0.80*, texture alpha*]"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "morph",
+        "wearable": "Shirt",
+        "detail": "shirt: morph mask *= layer mask (mean 63.8)"
+      },
+      {
+        "layer": "upper alpha",
+        "status": "skipped",
+        "wearable": "Alpha",
+        "detail": "no Alpha worn"
+      }
+    ]
+  }
+}

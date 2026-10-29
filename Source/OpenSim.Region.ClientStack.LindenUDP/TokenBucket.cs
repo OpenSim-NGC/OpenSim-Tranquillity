@@ -28,7 +28,7 @@
 using System.Reflection;
 using OpenSim.Framework;
 
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.ClientStack.LindenUDP;
 
@@ -38,7 +38,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP;
 /// </summary>
 public class TokenBucket
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static Int32 m_counter = 0;
 
@@ -290,7 +290,7 @@ public class TokenBucket
         // with no drip rate...
         if (DripRate == 0)
         {
-            m_log.WarnFormat("[TOKENBUCKET] something odd is happening and drip rate is 0 for {0}", m_counter);
+            m_log.LogWarning("[TOKENBUCKET] something odd is happening and drip rate is 0 for {0}", m_counter);
             return;
         }
 
@@ -311,7 +311,7 @@ public class TokenBucket
 
 public class AdaptiveTokenBucket : TokenBucket
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public bool AdaptiveEnabled { get; set; }
 
@@ -378,7 +378,7 @@ public class AdaptiveTokenBucket : TokenBucket
     /// </summary>
     public void ExpirePackets(Int32 count)
     {
-        // m_log.WarnFormat("[ADAPTIVEBUCKET] drop {0} by {1} expired packets",AdjustedDripRate,count);
+        // m_log.LogWarning("[ADAPTIVEBUCKET] drop {0} by {1} expired packets",AdjustedDripRate,count);
         if (m_enabled)
             AdjustedDripRate = (Int64)(AdjustedDripRate / Math.Pow(2, count));
     }

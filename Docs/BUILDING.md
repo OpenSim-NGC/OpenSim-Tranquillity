@@ -21,12 +21,15 @@ get or update source from git
 If no configuration is specified the default is a release build. If no platform is specified default 
 is the platform being used for the compilation.
 
-The output from the publish will be in build/<Configuration>/net8.0/<platform>/
+The output from the publish will be in build/<Configuration>/net10.0/<platform>/
 
 Where Configuration is either Debug or Release and Platform is either linux-x64 or win-x64 as shown above.
 
 For testing workflows (including YEngine state-load telemetry configuration and commands),
 see Docs/TESTING.txt.
+
+For the completed solution warning cleanup, verification commands and excluded-project backlog, see
+[WarningCleanup.md](WarningCleanup.md).
 
 ## Plugin discovery
 

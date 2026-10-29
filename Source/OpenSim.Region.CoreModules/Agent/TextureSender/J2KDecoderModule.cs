@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using System.Text;
-using log4net;
 using Nini.Config;
 using CoreJ2K;
 using OpenMetaverse;
@@ -36,18 +35,25 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Agent.TextureSender;
 
 public delegate void J2KDecodeDelegate(UUID assetID);
 
 public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>Temporarily holds deserialized layer data information in memory</summary>
     private readonly ExpiringCache<UUID, J2KLayerInfo[]> m_decodedCache = new ExpiringCache<UUID, J2KLayerInfo[]>();
     /// <summary>List of client methods to notify of results of decode</summary>
     private readonly Dictionary<UUID, List<DecodedCallback>> m_notifyList = new Dictionary<UUID, List<DecodedCallback>>();
+    /// <summary>
+    /// Asset cache name prefix for a texture's layer table. Builds that guessed the table for every
+    /// texture stored it under "j2k"; a new prefix keeps those guessed tables from being read back.
+    /// </summary>
+    private const string LayerCachePrefix = "j2klayers";
     /// <summary>Cache that will store decoded JPEG2000 layer boundary data</summary>
     private IAssetCache m_cache;
     private IAssetCache Cache
@@ -122,7 +128,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
         // If it's cached, return the cached results
         if (m_decodedCache.TryGetValue(assetID, out result))
         {
-            //m_log.DebugFormat(
+            //m_log.LogDebug(
             //      "[J2KDecoderModule]: Returning existing cached {0} layers j2k decode for {1}",
             //      result.Length, assetID);
 
@@ -185,19 +191,19 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
                 }
                 else
                 {
-                    m_log.Warn("[J2KDecoderModule]: CoreJ2K conversion to SKBitmap failed");
+                    m_log.LogWarning("[J2KDecoderModule]: CoreJ2K conversion to SKImage failed");
                     return null;
                 }
             }
             else
             {
-                m_log.Warn("[J2KDecoderModule]: CoreJ2K decode returned null");
+                m_log.LogWarning("[J2KDecoderModule]: CoreJ2K decode returned null");
                 return null;
             }
         }
         catch (Exception ex)
         {
-            m_log.Warn("[J2KDecoderModule]: CoreJ2K decode exception: " + ex.Message);
+            m_log.LogWarning("[J2KDecoderModule]: CoreJ2K decode exception: " + ex.Message);
             return null;
         }
     }
@@ -215,7 +221,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
     /// <returns>true if decode was successful.  false otherwise.</returns>
     private bool DoJ2KDecode(UUID assetID, byte[] j2kData, out J2KLayerInfo[] layers, out int components)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[J2KDecoderModule]: Doing J2K decoding of {0} bytes for asset {1}", j2kData.Length, assetID);
 
         bool decodedSuccessfully = true;
@@ -229,8 +235,13 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
                 var j2k = J2kImage.FromBytes(j2kData);
                 if (j2k != null)
                 {
-                    // Extract layer information from CoreJ2K - create default layers for now
-                    layers = CreateDefaultLayers(j2kData.Length);
+                    // Read the layer boundaries from the packet heads
+                    layers = J2KLayerBoundaryReader.Read(j2kData);
+                    if (layers == null)
+                    {
+                        m_log.LogWarning("[J2KDecoderModule]: Failed to decode layer data for texture " + assetID + ", guessing sane defaults");
+                        layers = CreateDefaultLayers(j2kData.Length);
+                    }
                     components = j2k.NumberOfComponents;
                     decodedSuccessfully = true;
                     // Cache decoded layers
@@ -238,14 +249,14 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
                 }
                 else
                 {
-                    m_log.Warn("[J2KDecoderModule]: CoreJ2K failed to decode texture " + assetID);
+                    m_log.LogWarning("[J2KDecoderModule]: CoreJ2K failed to decode texture " + assetID);
                     layers = CreateDefaultLayers(j2kData.Length);
                     decodedSuccessfully = false;
                 }
             }
             catch (Exception ex)
             {
-                m_log.Warn("[J2KDecoderModule]: CoreJ2K exception decoding texture " + assetID + ": " + ex.Message);
+                m_log.LogWarning("[J2KDecoderModule]: CoreJ2K exception decoding texture " + assetID + ": " + ex.Message);
                 layers = CreateDefaultLayers(j2kData.Length);
                 components = 0;
                 decodedSuccessfully = false;
@@ -300,7 +311,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
 
         if (Cache != null)
         {
-            string assetID = "j2k" + AssetId.ToString();
+            string assetID = LayerCachePrefix + AssetId.ToString();
 
             AssetBase layerDecodeAsset = new AssetBase(assetID, assetID, (sbyte)AssetType.Notecard, m_CreatorID.ToString());
             layerDecodeAsset.Local = true;
@@ -334,7 +345,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
         }
         else if (Cache != null)
         {
-            string assetName = "j2k" + AssetId.ToString();
+            string assetName = LayerCachePrefix + AssetId.ToString();
             AssetBase layerDecodeAsset;
             Cache.Get(assetName, out layerDecodeAsset);
 
@@ -347,7 +358,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
 
                 if (lines.Length == 0)
                 {
-                    m_log.Warn("[J2KDecodeCache]: Expiring corrupted layer data (empty) " + assetName);
+                    m_log.LogWarning("[J2KDecodeCache]: Expiring corrupted layer data (empty) " + assetName);
                     Cache.Expire(assetName);
                     return false;
                 }
@@ -368,7 +379,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
                         }
                         catch (FormatException)
                         {
-                            m_log.Warn("[J2KDecodeCache]: Expiring corrupted layer data (format) " + assetName);
+                            m_log.LogWarning("[J2KDecodeCache]: Expiring corrupted layer data (format) " + assetName);
                             Cache.Expire(assetName);
                             return false;
                         }
@@ -379,7 +390,7 @@ public class J2KDecoderModule : ISharedRegionModule, IJ2KDecoder
                     }
                     else
                     {
-                        m_log.Warn("[J2KDecodeCache]: Expiring corrupted layer data (layout) " + assetName);
+                        m_log.LogWarning("[J2KDecodeCache]: Expiring corrupted layer data (layout) " + assetName);
                         Cache.Expire(assetName);
                         return false;
                     }

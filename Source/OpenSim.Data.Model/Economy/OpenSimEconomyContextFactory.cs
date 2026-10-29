@@ -28,7 +28,7 @@ public class OpenSimEconomyContextFactory : IDesignTimeDbContextFactory<OpenSimE
         var connectionString = configuration.GetConnectionString("OpenSimEconomyConnection") ??
             throw new InvalidOperationException("Connection string 'OpenSimEconomyConnection' not found.");
 
-        // Configure DbContext to use MySQL with Pomelo provider
+        // Configure DbContext to use MySQL with the Microting (Pomelo fork) provider
         optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
             mySqlOptions => mySqlOptions.MigrationsAssembly(typeof(OpenSimEconomyContext).Assembly.FullName));
 

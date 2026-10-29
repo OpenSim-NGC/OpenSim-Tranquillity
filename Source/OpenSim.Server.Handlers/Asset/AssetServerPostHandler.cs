@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Net;
 using System.Xml.Serialization;
@@ -34,30 +33,43 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Framework;
 using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Asset;
 
 public class AssetServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAssetService m_AssetService;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
 
     public AssetServerPostHandler(IAssetService service) :
-            base("POST", "/assets")
+        this(service, null, new ControlPlaneAccess(null))
     {
-        m_AssetService = service;
     }
 
     public AssetServerPostHandler(IAssetService service, IServiceAuth auth) :
+        this(service, auth, new ControlPlaneAccess(null))
+    {
+    }
+
+    public AssetServerPostHandler(IAssetService service, IServiceAuth auth, ControlPlaneAccess controlPlaneAccess) :
         base("POST", "/assets", auth)
     {
         m_AssetService = service;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override byte[] ProcessRequest(string path, Stream request,
             IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
+        // Deferred pending replacement authentication/authorization for assets and inventory.
+        // if (!m_ControlPlaneAccess.AuthorizeControlPlaneMutation(httpRequest, httpResponse, "POST /assets"))
+        //     return Array.Empty<byte>();
+
         AssetBase asset;
         XmlSerializer xs = new XmlSerializer(typeof(AssetBase));
 
@@ -71,7 +83,7 @@ public class AssetServerPostHandler : BaseStreamHandler
             return null;
         }
 
-        m_log.Info($"[AssetServerPost]: From {httpRequest.RemoteIPEndPoint} Asset {asset.ID}: " +
+        m_log.LogInformation($"[AssetServerPost]: From {httpRequest.RemoteIPEndPoint} Asset {asset.ID}: " +
             $"Name = {asset.Metadata.Name},Type = {(OpenMetaverse.AssetType)asset.Metadata.Type}, " +
             $"CreatorID = {asset.Metadata.CreatorID}, Description = {asset.Metadata.Description}");
 

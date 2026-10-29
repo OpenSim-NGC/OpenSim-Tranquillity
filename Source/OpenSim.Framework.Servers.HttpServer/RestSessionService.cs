@@ -30,7 +30,8 @@ using System.Reflection;
 using System.Text;
 using System.Xml;
 using System.Xml.Serialization;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Servers.HttpServer;
 
@@ -68,42 +69,8 @@ public class SynchronousRestSessionObjectPoster<TRequest, TResponse>
         sobj.AvatarID = aid;
         sobj.Body = obj;
 
-        Type type = typeof(RestSessionObject<TRequest>);
-
-        WebRequest request = WebRequest.Create(requestUrl);
-        request.Method = verb;
-        request.ContentType = "text/xml";
-        request.Timeout = 20000;
-
-        using (MemoryStream buffer = new MemoryStream())
-        {
-            XmlWriterSettings settings = new XmlWriterSettings();
-            settings.Encoding = Encoding.UTF8;
-
-            using (XmlWriter writer = XmlWriter.Create(buffer, settings))
-            {
-                XmlSerializer serializer = new XmlSerializer(type);
-                serializer.Serialize(writer, sobj);
-                writer.Flush();
-            }
-
-            int length = (int)buffer.Length;
-            request.ContentLength = length;
-
-            using (Stream requestStream = request.GetRequestStream())
-                requestStream.Write(buffer.ToArray(), 0, length);
-        }
-
-        TResponse deserial = default(TResponse);
-        using (WebResponse resp = request.GetResponse())
-        {
-            XmlSerializer deserializer = new XmlSerializer(typeof(TResponse));
-
-            using (Stream respStream = resp.GetResponseStream())
-                deserial = (TResponse)deserializer.Deserialize(respStream);
-        }
-
-        return deserial;
+        return WebUtil.SendXmlRequestAsync<RestSessionObject<TRequest>, TResponse>(
+            verb, requestUrl, sobj, 20000).GetAwaiter().GetResult();
     }
 }
 
@@ -118,63 +85,18 @@ public class RestSessionObjectPosterResponse<TRequest, TResponse>
 
     public void BeginPostObject(string verb, string requestUrl, TRequest obj, string sid, string aid)
     {
-        RestSessionObject<TRequest> sobj = new RestSessionObject<TRequest>();
-        sobj.SessionID = sid;
-        sobj.AvatarID = aid;
-        sobj.Body = obj;
-
-        Type type = typeof(RestSessionObject<TRequest>);
-
-        WebRequest request = WebRequest.Create(requestUrl);
-        request.Method = verb;
-        request.ContentType = "text/xml";
-        request.Timeout = 10000;
-
-        using (MemoryStream buffer = new MemoryStream())
-        {
-            XmlWriterSettings settings = new XmlWriterSettings();
-            settings.Encoding = Encoding.UTF8;
-
-            using (XmlWriter writer = XmlWriter.Create(buffer, settings))
-            {
-                XmlSerializer serializer = new XmlSerializer(type);
-                serializer.Serialize(writer, sobj);
-                writer.Flush();
-            }
-
-            int length = (int)buffer.Length;
-            request.ContentLength = length;
-
-            using (Stream requestStream = request.GetRequestStream())
-                requestStream.Write(buffer.ToArray(), 0, length);
-        }
-
-        // IAsyncResult result = request.BeginGetResponse(AsyncCallback, request);
-        request.BeginGetResponse(AsyncCallback, request);
+        _ = PostObjectAsync(verb, requestUrl, obj, sid, aid);
     }
 
-    private void AsyncCallback(IAsyncResult result)
+    public Task PostObjectAsync(string verb, string requestUrl, TRequest obj, string sid, string aid)
     {
-        WebRequest request = (WebRequest)result.AsyncState;
-        using (WebResponse resp = request.EndGetResponse(result))
+        RestSessionObject<TRequest> sobj = new() { SessionID = sid, AvatarID = aid, Body = obj };
+        return RestObjectPoster.PostObjectAsync(verb, requestUrl, sobj, 10000, stream =>
         {
-            TResponse deserial;
-            XmlSerializer deserializer = new XmlSerializer(typeof(TResponse));
-            Stream stream = resp.GetResponseStream();
-
-            // This is currently a bad debug stanza since it gobbles us the response...
-            //                StreamReader reader = new StreamReader(stream);
-            //                m_log.DebugFormat("[REST OBJECT POSTER RESPONSE]: Received {0}", reader.ReadToEnd());
-
-            deserial = (TResponse)deserializer.Deserialize(stream);
-            if (stream != null)
-                stream.Close();
-
-            if (deserial != null && ResponseCallback != null)
-            {
-                ResponseCallback(deserial);
-            }
-        }
+            TResponse deserial = (TResponse)new XmlSerializer(typeof(TResponse)).Deserialize(stream);
+            if (deserial != null)
+                ResponseCallback?.Invoke(deserial);
+        });
     }
 }
 
@@ -183,8 +105,7 @@ public delegate bool CheckIdentityMethod(string sid, string aid);
 public class RestDeserialiseSecureHandler<TRequest, TResponse> : BaseOutputStreamHandler, IStreamHandler
     where TRequest : new()
 {
-    private static readonly ILog m_log
-        = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private RestDeserialiseMethod<TRequest, TResponse> m_method;
     private CheckIdentityMethod m_smethod;
@@ -214,7 +135,7 @@ public class RestDeserialiseSecureHandler<TRequest, TResponse> : BaseOutputStrea
             }
             catch (Exception e)
             {
-                m_log.Error("[REST]: Deserialization problem. Ignoring request. " + e);
+                m_log.LogError("[REST]: Deserialization problem. Ignoring request. " + e);
                 fail = true;
             }
         }
@@ -238,8 +159,7 @@ public delegate bool CheckTrustedSourceMethod(IPEndPoint peer);
 public class RestDeserialiseTrustedHandler<TRequest, TResponse> : BaseOutputStreamHandler, IStreamHandler
     where TRequest : new()
 {
-    private static readonly ILog m_log
-        = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// The operation to perform once trust has been established.
@@ -274,7 +194,7 @@ public class RestDeserialiseTrustedHandler<TRequest, TResponse> : BaseOutputStre
             }
             catch (Exception e)
             {
-                m_log.Error("[REST]: Deserialization problem. Ignoring request. " + e);
+                m_log.LogError("[REST]: Deserialization problem. Ignoring request. " + e);
                 fail = true;
             }
         }

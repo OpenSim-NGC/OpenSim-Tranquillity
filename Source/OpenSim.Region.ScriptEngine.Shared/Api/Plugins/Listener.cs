@@ -28,11 +28,14 @@
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 
 public class Listener
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     public AsyncCommandManager m_CmdManager;
 

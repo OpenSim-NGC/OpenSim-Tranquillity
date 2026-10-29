@@ -26,18 +26,20 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Server.Handlers.Authentication;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Authentication;
 
 public class AuthenticationServiceInConnectorModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Enabled = false;
 
     private IConfigSource m_Config;
@@ -54,7 +56,7 @@ public class AuthenticationServiceInConnectorModule : ISharedRegionModule
             m_Enabled = moduleConfig.GetBoolean("AuthenticationServiceInConnector", false);
             if (m_Enabled)
             {
-                m_log.Info("[AUTHENTICATION IN CONNECTOR]: Authentication Service In Connector enabled");
+                m_log.LogInformation("[AUTHENTICATION IN CONNECTOR]: Authentication Service In Connector enabled");
             }
 
         }
@@ -100,7 +102,7 @@ public class AuthenticationServiceInConnectorModule : ISharedRegionModule
         {
             m_Registered = true;
 
-            m_log.Info("[AUTHENTICATION IN CONNECTOR]: Starting...");
+            m_log.LogInformation("[AUTHENTICATION IN CONNECTOR]: Starting...");
 
             new AuthenticationServiceConnector(m_Config, MainServer.Instance.DefaultServer, "AuthenticationService");
         }

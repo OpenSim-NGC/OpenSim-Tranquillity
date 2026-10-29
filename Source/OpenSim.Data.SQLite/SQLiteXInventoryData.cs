@@ -29,6 +29,9 @@ using System.Data;
 using System.Data.SQLite;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.SQLite;
 
 /// <summary>
@@ -36,7 +39,7 @@ namespace OpenSim.Data.SQLite;
 /// </summary>
 public class SQLiteXInventoryData : IXInventoryData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private SqliteFolderHandler m_Folders;
     private SqliteItemHandler m_Items;
@@ -295,7 +298,7 @@ public class SqliteInventoryHandler<T> : SQLiteGenericTableHandler<T> where T: c
 
     protected bool IncrementFolderVersion(string folderID)
     {
-//            m_log.DebugFormat("[MYSQL ITEM HANDLER]: Incrementing version on folder {0}", folderID);
+//            m_log.LogDebug("[MYSQL ITEM HANDLER]: Incrementing version on folder {0}", folderID);
 //            Util.PrintCallStack();
 
         using (SQLiteCommand cmd = new SQLiteCommand())

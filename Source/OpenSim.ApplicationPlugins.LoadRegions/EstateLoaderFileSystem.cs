@@ -26,17 +26,18 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.ApplicationPlugins.LoadRegions;
 
 public class EstateLoaderFileSystem : IEstateLoader
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IConfigSource m_configSource;
 
@@ -74,7 +75,7 @@ public class EstateLoaderFileSystem : IEstateLoader
         }
         catch
         {
-            m_log.Error("[ESTATE LOADER FILE SYSTEM]: could not open " + estateConfigPath);
+            m_log.LogError("[ESTATE LOADER FILE SYSTEM]: could not open " + estateConfigPath);
             return;
         }
 
@@ -82,7 +83,7 @@ public class EstateLoaderFileSystem : IEstateLoader
         if (iniFiles == null || iniFiles.Length == 0)
             return;
 
-        m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loading estate config files from {0}", estateConfigPath);
+        m_log.LogInformation("[ESTATE LOADER FILE SYSTEM]: Loading estate config files from {0}", estateConfigPath);
 
         List<int> existingEstates;
 
@@ -90,7 +91,7 @@ public class EstateLoaderFileSystem : IEstateLoader
 
         foreach (string file in iniFiles)
         {
-            m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loading config file {0}", file);
+            m_log.LogInformation("[ESTATE LOADER FILE SYSTEM]: Loading config file {0}", file);
 
             IConfigSource source = null;
             try
@@ -99,7 +100,7 @@ public class EstateLoaderFileSystem : IEstateLoader
             }
             catch
             {
-                m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: failed to parse file {0}", file);
+                m_log.LogWarning("[ESTATE LOADER FILE SYSTEM]: failed to parse file {0}", file);
             }
 
             if(source == null)
@@ -114,7 +115,7 @@ public class EstateLoaderFileSystem : IEstateLoader
 
                 if (estateName.Length > 64) // need check this and if utf8 is valid
                 {
-                    m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} is too large, ignoring", estateName);
+                    m_log.LogWarning("[ESTATE LOADER FILE SYSTEM]: Estate name {0} is too large, ignoring", estateName);
                     continue;
                 }
 
@@ -141,13 +142,13 @@ public class EstateLoaderFileSystem : IEstateLoader
                     if (EstateID < 100)
                     {
                         // EstateID Cannot be less than 100
-                        m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is less that 100, ignoring", estateName);
+                        m_log.LogWarning("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is less that 100, ignoring", estateName);
                         continue;
                     }
                     else if(existingEstateIDs.Contains(EstateID))
                     {
                         // Specified EstateID Exists
-                        m_log.WarnFormat("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is already in use, ignoring", estateName);
+                        m_log.LogWarning("[ESTATE LOADER FILE SYSTEM]: Estate name {0} specified estateID that is already in use, ignoring", estateName);
                         continue;
                     }
                 }
@@ -161,7 +162,7 @@ public class EstateLoaderFileSystem : IEstateLoader
                 // Persistence does not seem to effect the need to save a new estate
                 m_application.EstateDataService.StoreEstateSettings(estateSettings);
 
-                m_log.InfoFormat("[ESTATE LOADER FILE SYSTEM]: Loaded config for estate {0}", estateName);
+                m_log.LogInformation("[ESTATE LOADER FILE SYSTEM]: Loaded config for estate {0}", estateName);
             }
         }
     }

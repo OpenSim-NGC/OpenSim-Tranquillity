@@ -32,7 +32,8 @@ using OpenSim.Region.ScriptEngine.Interfaces;
 using OpenSim.Region.ScriptEngine.Shared.Api.Plugins;
 using ScriptTimer = OpenSim.Region.ScriptEngine.Shared.Api.Plugins.ScriptTimer;
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.ScriptEngine.Shared.Api;
 
@@ -41,7 +42,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Api;
 /// </summary>
 public class AsyncCommandManager
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static Thread cmdHandlerThread;
     private static int cmdHandlerThreadCycleSleepms;
@@ -231,7 +232,7 @@ public class AsyncCommandManager
             }
             catch (Exception e)
             {
-                m_log.Error("[ASYNC COMMAND MANAGER]: Exception in command handler pass: ", e);
+                m_log.LogError(e, "[ASYNC COMMAND MANAGER]: Exception in command handler pass: ");
             }
         }
     }
@@ -268,7 +269,7 @@ public class AsyncCommandManager
     public static void RemoveScript(IScriptEngine engine, uint localID, UUID itemID)
     {
         // Remove a specific script
-//            m_log.DebugFormat("[ASYNC COMMAND MANAGER]: Removing facilities for script {0}", itemID);
+//            m_log.LogDebug("[ASYNC COMMAND MANAGER]: Removing facilities for script {0}", itemID);
 
         lock (staticLock)
         {

@@ -27,10 +27,11 @@
 
 using System.Net;
 using System.Net.Sockets;
-using log4net;
 using OpenSim.Framework;
 using OpenMetaverse;
 using OpenMetaverse.Packets;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.ClientStack.LindenUDP;
 
@@ -48,7 +49,7 @@ public readonly struct IncomingPacket(LLClientView client, Packet packet)
 /// </summary>
 public abstract class OpenSimUDPBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// This method is called when an incoming packet is received
@@ -192,7 +193,7 @@ public abstract class OpenSimUDPBase
     {
         if (!m_IsRunningInbound)
         {
-            m_log.DebugFormat("[UDPBASE]: Starting inbound UDP loop");
+            m_log.LogDebug("[UDPBASE]: Starting inbound UDP loop");
 
             const int SIO_UDP_CONNRESET = -1744830452;
 
@@ -207,7 +208,7 @@ public abstract class OpenSimUDPBase
             }
             catch (SocketException)
             {
-                m_log.Debug("[UDPBASE]: Failed to increase default TTL");
+                m_log.LogDebug("[UDPBASE]: Failed to increase default TTL");
             }
 
             try
@@ -216,7 +217,7 @@ public abstract class OpenSimUDPBase
             }
             catch
             {
-                m_log.Debug("[UDPBASE]: SIO_UDP_CONNRESET flag not supported on this platform, ignoring");
+                m_log.LogDebug("[UDPBASE]: SIO_UDP_CONNRESET flag not supported on this platform, ignoring");
             }
 
             // On at least Mono 3.2.8, multiple UDP sockets can bind to the same port by default.  At the moment
@@ -252,7 +253,7 @@ public abstract class OpenSimUDPBase
     /// </summary>
     public virtual void StartOutbound()
     {
-        m_log.DebugFormat("[UDPBASE]: Starting outbound UDP loop");
+        m_log.LogDebug("[UDPBASE]: Starting outbound UDP loop");
 
         m_IsRunningOutbound = true;
     }
@@ -261,7 +262,7 @@ public abstract class OpenSimUDPBase
     {
         if (m_IsRunningInbound)
         {
-            m_log.DebugFormat("[UDPBASE]: Stopping inbound UDP loop");
+            m_log.LogDebug("[UDPBASE]: Stopping inbound UDP loop");
 
             m_IsRunningInbound = false;
             InboundCancellationSource.Cancel();
@@ -272,7 +273,7 @@ public abstract class OpenSimUDPBase
 
     public virtual void StopOutbound()
     {
-        m_log.DebugFormat("[UDPBASE]: Stopping outbound UDP loop");
+        m_log.LogDebug("[UDPBASE]: Stopping outbound UDP loop");
 
         m_IsRunningOutbound = false;
     }
@@ -325,7 +326,7 @@ public abstract class OpenSimUDPBase
             }
             catch (Exception e)
             {
-                m_log.Error($"[UDPBASE]: Error processing UDP receiveFrom. Exception ", e);
+                m_log.LogError(e, $"[UDPBASE]: Error processing UDP receiveFrom. Exception ");
             }
         }
     }
@@ -347,7 +348,7 @@ public abstract class OpenSimUDPBase
         }
         catch (SocketException e)
         {
-            m_log.WarnFormat("[UDPBASE]: sync send SocketException {0} {1}", buf.RemoteEndPoint, e.Message);
+            m_log.LogWarning("[UDPBASE]: sync send SocketException {0} {1}", buf.RemoteEndPoint, e.Message);
         }
         catch (ObjectDisposedException) { }
     }

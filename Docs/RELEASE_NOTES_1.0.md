@@ -85,6 +85,20 @@ functions, updated constants, and a number of stability fixes.
 
 ## Networking & Services
 
+- Script HTTP requests now follow the operating system's TLS policy rather than
+  explicitly enabling TLS 1.0/1.1. Legacy TLS-only endpoints may no longer connect;
+  upgrade those endpoints rather than re-enabling deprecated protocols.
+- Migrated legacy HTTP downloads and module requests retain system/environment
+  proxies; existing direct grid-service and script proxy policies are unchanged.
+  Shared pooled connections retain a three-minute default lifetime. An explicit
+  `[Startup] DnsTimeout` now controls connection lifetime (milliseconds), not a
+  process-wide DNS-cache TTL; `-1` disables expiration and `0` disables reuse.
+- HELO and welcome-message HTTPS fetches verify certificate chains and hostnames
+  even when shared `NoVerifyCertChain`/`NoVerifyCertHostname` bypasses are enabled.
+  This retains Robust's previous validation and also enforces it in region hosting.
+- Remote console request failures now print to stderr. A failed poll reports that
+  polling stopped; reconnect to resume. Failed commands are not automatically retried.
+
 - Honor HTTP client stream timeouts during XML deserialization to avoid buffering
   entire responses into memory.
 - Split user-profile request queues into local vs. HG; added a
@@ -119,6 +133,20 @@ functions, updated constants, and a number of stability fixes.
 - Additional mantis fixes: 9218, 9219.
 - Added YEngine state-load failure instrumentation to inform the phase-2 state
   migration work.
+- Fixed ten stream reads that assumed a single read returns every requested byte.
+  A short read previously left the remainder of the buffer zero-filled, which
+  could truncate a cloned HTTP request body, an estate terrain download, a web
+  stats log tail or a map tile signature check. Web stats log tails also tolerate
+  concurrent truncation and close their shared-read file stream on every path.
+- Phlox's `LSLList` now overrides `GetHashCode` to agree with its `Equals`, so
+  equal lists hash alike and can be found in a dictionary or set. SLua tables
+  retain Lua reference identity for separately constructed list keys.
+- Corrected 26 logging templates whose placeholders did not match their
+  arguments, preserving previously supplied diagnostic values across framework,
+  region, service, physics, voice and optional-module logging.
+- Updated vector and quaternion helper calls to honor their readonly-reference
+  contracts explicitly, avoiding hidden temporary values in scene, physics,
+  caps and Phlox paths.
 
 ---
 

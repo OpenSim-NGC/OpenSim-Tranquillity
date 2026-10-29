@@ -31,6 +31,7 @@ public interface IExperienceModule
 
     UUID[] GetEstateAllowedExperiences();
     UUID[] GetEstateKeyExperiences();
+    UUID[] GetEstateBlockedExperiences();
 
     bool IsExperienceEnabled(UUID experience_id);
 

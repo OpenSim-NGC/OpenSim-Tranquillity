@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using OpenSim.Framework;
 using OpenSim.Services.Connectors.Friends;
@@ -33,12 +32,13 @@ using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors.Hypergrid;
 
 public class HGFriendsServicesConnector : FriendsSimConnector
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
@@ -97,14 +97,14 @@ public class HGFriendsServicesConnector : FriendsSimConnector
                     return perms;
                 }
                 else
-                    m_log.DebugFormat("[HGFRIENDS CONNECTOR]: GetFriendPerms {0} received null response",
+                    m_log.LogDebug("[HGFRIENDS CONNECTOR]: GetFriendPerms {0} received null response",
                         PrincipalID);
 
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
         }
 
         return 0;
@@ -133,7 +133,7 @@ public class HGFriendsServicesConnector : FriendsSimConnector
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
             return false;
         }
 
@@ -148,11 +148,11 @@ public class HGFriendsServicesConnector : FriendsSimConnector
                 return success;
             }
             else
-                m_log.DebugFormat("[HGFRIENDS CONNECTOR]: StoreFriend {0} {1} received null response",
+                m_log.LogDebug("[HGFRIENDS CONNECTOR]: StoreFriend {0} {1} received null response",
                     PrincipalID, Friend);
         }
         else
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: StoreFriend received null reply");
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: StoreFriend received null reply");
 
         return false;
 
@@ -179,7 +179,7 @@ public class HGFriendsServicesConnector : FriendsSimConnector
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
             return false;
         }
 
@@ -195,11 +195,11 @@ public class HGFriendsServicesConnector : FriendsSimConnector
                     return false;
             }
             else
-                m_log.DebugFormat("[HGFRIENDS CONNECTOR]: reply data does not contain result field");
+                m_log.LogDebug("[HGFRIENDS CONNECTOR]: reply data does not contain result field");
 
         }
         else
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: received empty reply");
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: received empty reply");
 
         return false;
 
@@ -225,7 +225,7 @@ public class HGFriendsServicesConnector : FriendsSimConnector
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
             return false;
         }
 
@@ -241,11 +241,11 @@ public class HGFriendsServicesConnector : FriendsSimConnector
                     return false;
             }
             else
-                m_log.DebugFormat("[HGFRIENDS CONNECTOR]: reply data does not contain result field");
+                m_log.LogDebug("[HGFRIENDS CONNECTOR]: reply data does not contain result field");
 
         }
         else
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: received empty reply");
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: received empty reply");
 
         return false;
 
@@ -279,7 +279,7 @@ public class HGFriendsServicesConnector : FriendsSimConnector
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
             return friendsOnline;
         }
 
@@ -299,7 +299,7 @@ public class HGFriendsServicesConnector : FriendsSimConnector
             }
         }
         else
-            m_log.DebugFormat("[HGFRIENDS CONNECTOR]: Received empty reply from remote StatusNotify");
+            m_log.LogDebug("[HGFRIENDS CONNECTOR]: Received empty reply from remote StatusNotify");
 
         return friendsOnline;
 

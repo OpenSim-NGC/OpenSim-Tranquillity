@@ -1,0 +1,66 @@
+{
+  "id": "E03-hair-bald-transparent",
+  "title": "Hair texture fully transparent: drawn but transparent",
+  "rules": [
+    "R11",
+    "R18"
+  ],
+  "note": "",
+  "channel": "Hair",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Hair",
+      "label": "hair",
+      "params": {},
+      "textures": [
+        {
+          "slot": "Hair",
+          "generator": "alpha0",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-hair-Hair.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "b29db9ee102907e6cf264eb9f58415c1f138e17b96847099d5945c91909af820",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": "Hair",
+        "detail": "hair: Hair 64x64\u002Balpha -\u003E 64; colour (0.35,0.21,0.06,1.00)"
+      },
+      {
+        "layer": "hair_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "hair texture alpha layer",
+        "status": "mask",
+        "wearable": "Hair",
+        "detail": "hair: alpha *= Hair (64x64)"
+      },
+      {
+        "layer": "hair alpha",
+        "status": "skipped",
+        "wearable": "Alpha",
+        "detail": "no Alpha worn"
+      }
+    ]
+  }
+}

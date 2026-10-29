@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AIS v3 mutation response envelope: every meta key the viewer reads (AIS-V3-SPEC.md 1c, llaisapi.cpp:1101-1177).
+     Empty-bodied but every key present with its LLSD type. _embedded carries the created objects, keyed by uuid,
+     and the viewer only accepts those whose ids are listed in _created_items / _created_categories. -->
+<llsd>
+<map>
+  <key>_categories_removed</key><array></array>
+  <key>_category_items_removed</key><array></array>
+  <key>_removed_items</key><array></array>
+  <key>_broken_links_removed</key><array></array>
+  <key>_created_items</key><array></array>
+  <key>_created_categories</key><array></array>
+  <key>_updated_category_versions</key>
+  <map>
+    <key>11111111-1111-4111-8111-111111111111</key><integer>7</integer>
+  </map>
+  <key>_embedded</key>
+  <map>
+    <key>categories</key><map></map>
+    <key>items</key><map></map>
+    <key>links</key><map></map>
+  </map>
+</map>
+</llsd>

@@ -66,6 +66,7 @@ public class XInventoryItem
     public UUID avatarID;
     public UUID parentFolderID;
     public int inventoryGroupPermissions;
+    public UUID experienceID;
 
     public XInventoryItem Clone()
     {

@@ -127,6 +127,15 @@ public interface IWorldComm
     /// </param>
     void DeliverMessageTo(UUID target, int channel, Vector3 pos, string name, UUID id, string msg);
 
+    /// <summary>
+    /// Raised after DeliverMessage or DeliverMessageTo has offered a message to the listens this module holds,
+    /// so that another script engine on the region, which keeps its own listens, can offer it to those too.
+    /// The message carries the chat type, channel, sender name and key, text and the sender's position
+    /// (zero when the caller gave none); for DeliverMessageTo the type is Direct and Destination is the target.
+    /// Not raised when DeliverMessageTo sends channel 0 to an avatar: that goes out as scene chat (Scene.SimChat).
+    /// </summary>
+    event Action<OSChatMessage> OnMessageDelivered;
+
     void ListenControl(UUID itemID, int handle, int active);
     void ListenRemove(UUID itemID, int handle);
     void DeleteListener(UUID itemID);

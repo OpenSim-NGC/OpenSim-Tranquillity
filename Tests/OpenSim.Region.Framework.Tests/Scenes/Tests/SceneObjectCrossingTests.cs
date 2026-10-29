@@ -41,7 +41,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 {
     public class SceneObjectCrossingTests : OpenSimTestCase
     {
-        protected SceneObjectCrossingTests()
+        public SceneObjectCrossingTests()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
             Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
@@ -212,7 +212,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                 TestClient sceneATc = ((TestClient)sp1SceneAPostReCross.ControllingClient);
                 sceneATc.CompleteMovement();
 
-                sp1SceneAPostReCross.IsChildAgent.Should().BeTrue("sp1SceneAPostCross.IsChildAgent unexpectedly true");
+                sp1SceneAPostReCross.IsChildAgent.Should().BeFalse("sp1SceneAPostCross.IsChildAgent unexpectedly true");
                 sp1SceneAPostReCross.IsSatOnObject.Should().BeTrue("");
                 //Assert.False(sp1SceneAPostReCross.IsChildAgent, "sp1SceneAPostCross.IsChildAgent unexpectedly true");
                 //Assert.True(sp1SceneAPostReCross.IsSatOnObject);

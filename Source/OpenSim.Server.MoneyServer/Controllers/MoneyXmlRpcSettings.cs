@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.MoneyServer.Controllers;
 
 public sealed class MoneyXmlRpcSettings

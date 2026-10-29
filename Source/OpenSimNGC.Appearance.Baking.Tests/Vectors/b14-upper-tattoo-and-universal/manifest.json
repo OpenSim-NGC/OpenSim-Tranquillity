@@ -1,0 +1,164 @@
+{
+  "id": "B14-upper-tattoo-and-universal",
+  "title": "Tattoo and universal tattoo on the upper body",
+  "rules": [
+    "R03",
+    "R05"
+  ],
+  "note": "",
+  "channel": "Upper",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skin",
+      "label": "skin",
+      "params": {},
+      "textures": []
+    },
+    {
+      "kind": "Tattoo",
+      "label": "tat",
+      "params": {
+        "1065": 0.3
+      },
+      "textures": [
+        {
+          "slot": "UpperTattoo",
+          "generator": "checkA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-tat-UpperTattoo.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Universal",
+      "label": "uni",
+      "params": {
+        "1233": 0.1
+      },
+      "textures": [
+        {
+          "slot": "UpperUniversalTattoo",
+          "generator": "bandA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-uni-UpperUniversalTattoo.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "91fbc63ae2e781a0bcd64c48e4a767cee42d73cbe07c53a9ff2fc76b00e332a6",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.65,0.43,0.25,1.00); body_skingrain.tga"
+      },
+      {
+        "layer": "nipples",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "upperbody_color.tga\u002Balpha"
+      },
+      {
+        "layer": "shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "highlight",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (1.00,1.00,1.00,0.00)"
+      },
+      {
+        "layer": "upper_bodypaint",
+        "status": "skipped",
+        "wearable": "Skin",
+        "detail": "skin: no UpperBodypaint texture on the wearable"
+      },
+      {
+        "layer": "freckles upper",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [freckles upper#776=skip]"
+      },
+      {
+        "layer": "upper_tattoo",
+        "status": "drawn",
+        "wearable": "Tattoo",
+        "detail": "tat: UpperTattoo 64x64\u002Balpha -\u003E 64; colour (0.30,1.00,1.00,1.00)"
+      },
+      {
+        "layer": "upper_universal_tattoo",
+        "status": "drawn",
+        "wearable": "Universal",
+        "detail": "uni: UpperUniversalTattoo 64x64\u002Balpha -\u003E 64; colour (1.00,0.10,1.00,1.00)"
+      },
+      {
+        "layer": "upper_undershirt",
+        "status": "skipped",
+        "wearable": "Undershirt",
+        "detail": "no Undershirt worn"
+      },
+      {
+        "layer": "Nail Polish",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Nail Polish#710=skip]"
+      },
+      {
+        "layer": "upper_gloves",
+        "status": "skipped",
+        "wearable": "Gloves",
+        "detail": "no Gloves worn"
+      },
+      {
+        "layer": "upper_clothes_shadow",
+        "status": "skipped",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "skipped",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn"
+      },
+      {
+        "layer": "upper_jacket",
+        "status": "skipped",
+        "wearable": "Jacket",
+        "detail": "no Jacket worn"
+      },
+      {
+        "layer": "upper_clothes",
+        "status": "morph",
+        "wearable": "Shirt",
+        "detail": "no Shirt worn: mask left at 255"
+      },
+      {
+        "layer": "upper alpha",
+        "status": "skipped",
+        "wearable": "Alpha",
+        "detail": "no Alpha worn"
+      }
+    ]
+  }
+}

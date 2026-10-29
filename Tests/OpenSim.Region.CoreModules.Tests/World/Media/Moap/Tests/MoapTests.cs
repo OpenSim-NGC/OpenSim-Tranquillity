@@ -35,8 +35,8 @@ namespace OpenSim.Region.CoreModules.World.Media.Moap.Tests;
 
 public class MoapTests : OpenSimTestCase
 {
-    protected TestScene m_scene;
-    protected MoapModule m_module;
+    protected TestScene m_scene = null!;
+    protected MoapModule m_module = null!;
 
     public override void SetUp()
     {

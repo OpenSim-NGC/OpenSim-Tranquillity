@@ -26,6 +26,8 @@
  */
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public sealed class BSTerrainMesh : BSTerrainPhys
@@ -87,7 +89,7 @@ public sealed class BSTerrainMesh : BSTerrainPhys
         {
             // DISASTER!!
             m_physicsScene.DetailLog("{0},BSTerrainMesh.create,failedConversionOfHeightmap,id={1}", BSScene.DetailLogZero, ID);
-            m_physicsScene.Logger.ErrorFormat("{0} Failed conversion of heightmap to mesh! base={1}", LogHeader, TerrainBase);
+            m_physicsScene.Logger.LogError("{0} Failed conversion of heightmap to mesh! base={1}", LogHeader, TerrainBase);
             // Something is very messed up and a crash is in our future.
             return;
         }
@@ -100,7 +102,7 @@ public sealed class BSTerrainMesh : BSTerrainPhys
         {
             // DISASTER!!
             m_physicsScene.DetailLog("{0},BSTerrainMesh.create,failedCreationOfShape,id={1}", BSScene.DetailLogZero, ID);
-            m_physicsScene.Logger.ErrorFormat("{0} Failed creation of terrain mesh! base={1}", LogHeader, TerrainBase);
+            m_physicsScene.Logger.LogError("{0} Failed creation of terrain mesh! base={1}", LogHeader, TerrainBase);
             // Something is very messed up and a crash is in our future.
             return;
         }
@@ -112,7 +114,7 @@ public sealed class BSTerrainMesh : BSTerrainPhys
         if (!m_terrainBody.HasPhysicalBody)
         {
             // DISASTER!!
-            m_physicsScene.Logger.ErrorFormat("{0} Failed creation of terrain body! base={1}", LogHeader, TerrainBase);
+            m_physicsScene.Logger.LogError("{0} Failed creation of terrain body! base={1}", LogHeader, TerrainBase);
             // Something is very messed up and a crash is in our future.
             return;
         }
@@ -173,7 +175,7 @@ public sealed class BSTerrainMesh : BSTerrainPhys
         catch
         {
             // Sometimes they give us wonky values of X and Y. Give a warning and return something.
-            m_physicsScene.Logger.WarnFormat("{0} Bad request for terrain height. terrainBase={1}, pos={2}",
+            m_physicsScene.Logger.LogWarning("{0} Bad request for terrain height. terrainBase={1}, pos={2}",
                                                 LogHeader, TerrainBase, pos);
             ret = BSTerrainManager.HEIGHT_GETHEIGHT_RET;
         }
@@ -261,7 +263,7 @@ public sealed class BSTerrainMesh : BSTerrainPhys
         catch (Exception e)
         {
             if (physicsScene != null)
-                physicsScene.Logger.ErrorFormat("{0} Failed conversion of heightmap to mesh. For={1}/{2}, e={3}",
+                physicsScene.Logger.LogError("{0} Failed conversion of heightmap to mesh. For={1}/{2}, e={3}",
                                                 LogHeader, physicsScene.RegionName, extentBase, e);
         }
 
@@ -414,7 +416,7 @@ public sealed class BSTerrainMesh : BSTerrainPhys
         catch (Exception e)
         {
             if (physicsScene != null)
-                physicsScene.Logger.ErrorFormat("{0} Failed conversion of heightmap to mesh. For={1}/{2}, e={3}",
+                physicsScene.Logger.LogError("{0} Failed conversion of heightmap to mesh. For={1}/{2}, e={3}",
                                                 LogHeader, physicsScene.RegionName, extentBase, e);
         }
 

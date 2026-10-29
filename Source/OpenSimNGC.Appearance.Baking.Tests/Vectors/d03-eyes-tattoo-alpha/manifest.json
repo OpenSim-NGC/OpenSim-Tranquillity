@@ -1,0 +1,100 @@
+{
+  "id": "D03-eyes-tattoo-alpha",
+  "title": "Universal eye tattoo and eyes alpha wearable",
+  "rules": [
+    "R03",
+    "R13"
+  ],
+  "note": "",
+  "channel": "Eyes",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Eyes",
+      "label": "eyes",
+      "params": {},
+      "textures": [
+        {
+          "slot": "EyesIris",
+          "generator": "grad",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": false,
+          "file": "tex-eyes-EyesIris.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Universal",
+      "label": "uni",
+      "params": {
+        "924": 0.5
+      },
+      "textures": [
+        {
+          "slot": "EyesTattoo",
+          "generator": "checkA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-uni-EyesTattoo.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    },
+    {
+      "kind": "Alpha",
+      "label": "alpha",
+      "params": {},
+      "textures": [
+        {
+          "slot": "EyesAlpha",
+          "generator": "halfA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-alpha-EyesAlpha.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "376e9661eb6a39adcced354b31aea95673640ca27f1a0c2e1fcab421dc65588b",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "whites",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "eyewhite.tga"
+      },
+      {
+        "layer": "iris",
+        "status": "drawn",
+        "wearable": "Eyes",
+        "detail": "eyes: EyesIris 64x64 -\u003E 64; colour (0.20,0.10,0.02,1.00)"
+      },
+      {
+        "layer": "eyes_tattoo",
+        "status": "drawn",
+        "wearable": "Universal",
+        "detail": "uni: EyesTattoo 64x64\u002Balpha -\u003E 64; colour (0.50,1.00,1.00,1.00)"
+      },
+      {
+        "layer": "eyes alpha",
+        "status": "mask",
+        "wearable": "Alpha",
+        "detail": "alpha: alpha *= EyesAlpha (64x64)"
+      }
+    ]
+  }
+}

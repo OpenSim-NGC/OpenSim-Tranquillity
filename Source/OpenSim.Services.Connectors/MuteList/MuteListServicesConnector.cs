@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -33,11 +32,13 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
 
@@ -60,7 +61,7 @@ public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
         IConfig gridConfig = source.Configs["MuteListService"];
         if (gridConfig == null)
         {
-            m_log.Error("[MUTELIST CONNECTOR]: MuteListService missing from configuration");
+            m_log.LogError("[MUTELIST CONNECTOR]: MuteListService missing from configuration");
             throw new Exception("MuteList connector init error");
         }
 
@@ -69,7 +70,7 @@ public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
 
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[MUTELIST CONNECTOR]: No Server URI named in section GridUserService");
+            m_log.LogError("[MUTELIST CONNECTOR]: No Server URI named in section GridUserService");
             throw new Exception("MuteList connector init error");
         }
         m_ServerURI = serviceURI + "/mutelist";
@@ -77,6 +78,30 @@ public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
     }
 
     #region IMuteListService
+    /// <summary>
+    /// The list with a timeout of its own for this one request. A failure or a timeout throws; a reply is read
+    /// as <see cref="MuteListRequest(UUID, uint)"/> reads it.
+    /// </summary>
+    public Byte[] MuteListRequest(UUID agentID, uint crc, int timeoutSeconds)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["METHOD"] = "get";
+        sendData["agentid"] = agentID.ToString();
+        sendData["mutecrc"] = crc.ToString();
+
+        string reply = SynchronousRestFormsRequester.MakeRequest("POST", m_ServerURI,
+                            ServerUtils.BuildQueryString(sendData), timeoutSeconds, m_Auth);
+        if (reply == string.Empty)
+            return null;
+        Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
+        if (!replyData.ContainsKey("result"))
+            return null;
+        string datastr = replyData["result"].ToString();
+        if (String.IsNullOrWhiteSpace(datastr))
+            return null;
+        return Convert.FromBase64String(datastr);
+    }
+
     public Byte[] MuteListRequest(UUID agentID, uint crc)
     {
         Dictionary<string, object> sendData = new Dictionary<string, object>();
@@ -100,14 +125,14 @@ public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
                     return Convert.FromBase64String(datastr);
                 }
                 else
-                    m_log.DebugFormat("[MUTELIST CONNECTOR]: get reply data does not contain result field");
+                    m_log.LogDebug("[MUTELIST CONNECTOR]: get reply data does not contain result field");
             }
             else
-                m_log.DebugFormat("[MUTELIST CONNECTOR]: get received empty reply");
+                m_log.LogDebug("[MUTELIST CONNECTOR]: get received empty reply");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
+            m_log.LogDebug("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
         }
 
         return null;
@@ -157,11 +182,11 @@ public class MuteListServicesConnector : BaseServiceConnector, IMuteListService
                 return false;
             }
             else
-                m_log.DebugFormat("[MUTELIST CONNECTOR]: {0} received empty reply", meth);
+                m_log.LogDebug("[MUTELIST CONNECTOR]: {0} received empty reply", meth);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
+            m_log.LogDebug("[MUTELIST CONNECTOR]: Exception when contacting server at {0}: {1}", m_ServerURI, e.Message);
         }
 
         return false;

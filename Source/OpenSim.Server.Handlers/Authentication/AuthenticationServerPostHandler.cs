@@ -26,7 +26,6 @@
  */
 
 using Nini.Config;
-using log4net;
 using System.Reflection;
 using System.Xml;
 using OpenSim.Server.Base;
@@ -36,11 +35,13 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Authentication;
 
 public class AuthenticationServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAuthenticationService m_AuthenticationService;
 
@@ -67,7 +68,7 @@ public class AuthenticationServerPostHandler : BaseStreamHandler
     protected override byte[] ProcessRequest(string path, Stream request,
             IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-//            m_log.Error("[XXX]: Authenticating...");
+//            m_log.LogError("[XXX]: Authenticating...");
         string[] p = SplitParams(path);
 
         if (p.Length > 0)
@@ -85,7 +86,7 @@ public class AuthenticationServerPostHandler : BaseStreamHandler
                 long length = request.Length;
                 if (length > 16384)
                     length = 16384;
-                request.Read(buffer, 0, (int)length);
+                request.ReadExactly(buffer, 0, (int)length);
 
                 return DoEncryptedMethods(buffer);
             }
@@ -243,8 +244,8 @@ public class AuthenticationServerPostHandler : BaseStreamHandler
 
         if (!m_AuthenticationService.SetAuthInfo(existingInfo))
         {
-            m_log.ErrorFormat(
-                "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0} {1} {2}",
+            m_log.LogError(
+                "[AUTHENTICATION SERVER POST HANDLER]: Authentication info store failed for account {0}",
                 existingInfo.PrincipalID);
 
             return FailureResult();

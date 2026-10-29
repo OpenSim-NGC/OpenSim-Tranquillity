@@ -31,6 +31,9 @@ using OpenMetaverse;
 using Npgsql;
 using NpgsqlTypes;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.PGSQL;
 
 /// <summary>
@@ -38,7 +41,7 @@ namespace OpenSim.Data.PGSQL;
 /// </summary>
 public class PGSQLManager
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Connection string for ADO.net

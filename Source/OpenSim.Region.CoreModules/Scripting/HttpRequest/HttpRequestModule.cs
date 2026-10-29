@@ -37,6 +37,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using System.Security.Authentication;
 
+using Microsoft.Extensions.Logging;
 /*****************************************************
  *
  * ScriptsHttpRequests
@@ -57,7 +58,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
         public float control;
     }
 
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(HttpRequestModule));
 
     private static HttpClient VeriFyCertClient = null;
     private static HttpClient VeriFyNoCertClient = null;
@@ -147,7 +148,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         PooledConnectionLifetime = TimeSpan.FromMinutes(3)
                     };
                     //shhnc.SslOptions.ClientCertificates = null,
-                    shhnc.SslOptions.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Tls13;
+                    shhnc.SslOptions.EnabledSslProtocols = SslProtocols.None;
                     shhnc.SslOptions.CertificateRevocationCheckMode = X509RevocationMode.NoCheck;
                     shhnc.SslOptions.RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
                     {
@@ -161,6 +162,9 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         shhnc.Proxy = proxy;
                         shhnc.UseProxy = true;
                     }
+                    // Connect only to addresses the filter allows, on every request and redirect; a connection to the
+                    // proxy is left alone.
+                    shhnc.ConnectCallback = ConnectToAllowedAddress;
 
                     VeriFyNoCertClient = new HttpClient(shhnc)
                     {
@@ -185,7 +189,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                     };
 
                     //shhnc.SslOptions.ClientCertificates = null,
-                    shh.SslOptions.EnabledSslProtocols = SslProtocols.Tls | SslProtocols.Tls11 | SslProtocols.Tls12 | SslProtocols.Tls13;
+                    shh.SslOptions.EnabledSslProtocols = SslProtocols.None;
                     shh.SslOptions.CertificateRevocationCheckMode = X509RevocationMode.NoCheck;
                     shh.SslOptions.RemoteCertificateValidationCallback = (message, cert, chain, errors) =>
                     {
@@ -199,6 +203,7 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         shh.Proxy = proxy;
                         shh.UseProxy = true;
                     }
+                    shh.ConnectCallback = ConnectToAllowedAddress;
                     VeriFyCertClient = new HttpClient(shh)
                     {
                         Timeout = TimeSpan.FromMilliseconds(httpTimeout),
@@ -367,6 +372,14 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
                         break;
 
                     case (int)HttpRequestConstants.HTTP_MIMETYPE:
+                        // Sent as the Content-Type line without validation (SendRequest), so a line break here
+                        // would inject header lines. Refused as an initial-check failure, before anything is queued.
+                        if (!HttpRequestMimeType.IsValid(parameters[i + 1]))
+                        {
+                            m_log.LogWarning("[{0}]: request from item {1} refused: {2}",
+                                m_name, itemID, HttpRequestMimeType.InvalidMessage);
+                            return UUID.Zero;
+                        }
                         htc.HttpMIMEType = parameters[i + 1];
                         break;
 
@@ -439,6 +452,14 @@ public class HttpRequestModule : INonSharedRegionModule, IHttpRequestModule
     public bool CheckAllowed(Uri url)
     {
         return m_outboundUrlFilter.CheckAllowed(url);
+    }
+
+    /// <summary>
+    /// The connect step of the shared clients: only to an address the current filter allows.
+    /// </summary>
+    private static ValueTask<Stream> ConnectToAllowedAddress(SocketsHttpConnectionContext context, CancellationToken cancellationToken)
+    {
+        return m_outboundUrlFilter.ConnectToAllowedAddress(context, cancellationToken);
     }
 
     public void StopHttpRequest(uint localID, UUID m_itemID)
@@ -663,7 +684,7 @@ public class HttpRequestClass : IHttpServiceRequest
         catch (HttpRequestException e)
         {              
             Status = e.StatusCode is null ? 499 : (int)e.StatusCode;
-            ResponseBody = e.Message;
+            ResponseBody = OutboundUrlFilterRefusedException.Unwrap(e).Message;
         }
         //catch (Exception e)
         catch
@@ -726,7 +747,7 @@ public class HttpRequestClass : IHttpServiceRequest
                                     Redirects++;
                                     ResponseBody = null;
 
-                                    //m_log.DebugFormat("Redirecting to [{0}]", Url);
+                                    //m_log.LogDebug("Redirecting to [{0}]", Url);
 
                                     Process();
                                 }

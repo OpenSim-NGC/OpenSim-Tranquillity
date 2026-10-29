@@ -1,5 +1,4 @@
 ﻿using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -10,11 +9,13 @@ using Caps = OpenSim.Framework.Capabilities.Caps;
 using OpenSim.Framework;
 using System.Net;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.ClientStack.LindenCaps;
 
 public class DisplayNameModule : IDisplayNameModule, INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IEventQueue m_EventQueue = null;
 
@@ -37,7 +38,7 @@ public class DisplayNameModule : IDisplayNameModule, INonSharedRegionModule
         if (!m_Enabled)
             return;
 
-        m_log.Info("[DISPLAY NAMES] Plugin enabled!");
+        m_log.LogInformation("[DISPLAY NAMES] Plugin enabled!");
     }
 
     public void AddRegion(Scene scene)
@@ -66,7 +67,7 @@ public class DisplayNameModule : IDisplayNameModule, INonSharedRegionModule
         m_EventQueue = scene.RequestModuleInterface<IEventQueue>();
         if (m_EventQueue is null)
         {
-            m_log.Info("[DISPLAY NAMES]: Module disabled becuase IEventQueue was not found!");
+            m_log.LogInformation("[DISPLAY NAMES]: Module disabled becuase IEventQueue was not found!");
             return;
         }
 
@@ -161,9 +162,9 @@ public class DisplayNameModule : IDisplayNameModule, INonSharedRegionModule
                 userData.NameChanged = DateTime.UtcNow;
 
                 if (resetting)
-                    m_log.InfoFormat("[DISPLAY NAMES] {0} {1} reset their display name", userData.FirstName, userData.LastName);
+                    m_log.LogInformation("[DISPLAY NAMES] {0} {1} reset their display name", userData.FirstName, userData.LastName);
                 else
-                    m_log.InfoFormat("[DISPLAY NAMES] {0} {1} changed their display name to {2}", userData.FirstName, userData.LastName, userData.DisplayName);
+                    m_log.LogInformation("[DISPLAY NAMES] {0} {1} changed their display name to {2}", userData.FirstName, userData.LastName, userData.DisplayName);
 
                 DateTime next_update = DateTime.UtcNow.AddDays(7);
 

@@ -31,8 +31,9 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.PhysicsModules.ubODE;
 
@@ -65,7 +66,7 @@ public class ODERayCastRequestManager
     /// ODE near callback delegate
     /// </summary>
     private readonly UBOdeNative.NearCallback nearCallback;
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private readonly List<ContactResult> m_contactResults = new(ResultsMaxCount);
     private readonly object m_contactResultsLock = new();
     private RayFilterFlags CurrentRayFilter;
@@ -364,7 +365,7 @@ public class ODERayCastRequestManager
             }
             catch (Exception e)
             {
-                m_log.WarnFormat("[PHYSICS Ray]: Unable to Space collide test an object: {0}", e.Message);
+                m_log.LogWarning("[PHYSICS Ray]: Unable to Space collide test an object: {0}", e.Message);
             }
             return;
         }
@@ -376,7 +377,7 @@ public class ODERayCastRequestManager
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
+            m_log.LogWarning("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
             return;
         }
 
@@ -461,7 +462,7 @@ public class ODERayCastRequestManager
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
+            m_log.LogWarning("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
             return;
         }
 
@@ -529,7 +530,7 @@ public class ODERayCastRequestManager
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
+            m_log.LogWarning("[PHYSICS Ray]: Unable to collide test an object: {0}", e.Message);
             return;
         }
 

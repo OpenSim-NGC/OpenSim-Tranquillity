@@ -32,14 +32,15 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
 public class HGGroupsServiceRobustConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private HGGroupsService m_GroupsService;
     private string m_ConfigName = "Groups";
@@ -57,7 +58,7 @@ public class HGGroupsServiceRobustConnector : ServiceConnector
         if (configName != String.Empty)
             m_ConfigName = configName;
 
-        m_log.DebugFormat("[Groups.RobustHGConnector]: Starting with config name {0}", m_ConfigName);
+        m_log.LogDebug("[Groups.RobustHGConnector]: Starting with config name {0}", m_ConfigName);
 
         string homeURI = Util.GetConfigVarFromSections<string>(config, "HomeURI",
             new string[] { "Startup", "Hypergrid", m_ConfigName}, string.Empty);
@@ -90,21 +91,23 @@ public class HGGroupsServiceRobustConnector : ServiceConnector
 
         m_GroupsService = new HGGroupsService(config, im, users, homeURI);
 
-        server.AddStreamHandler(new HGGroupsServicePostHandler(m_GroupsService));
+        server.AddStreamHandler(new HGGroupsServicePostHandler(m_GroupsService, new ControlPlaneAccess(config)));
     }
 
 }
 
 public class HGGroupsServicePostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private HGGroupsService m_GroupsService;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
 
-    public HGGroupsServicePostHandler(HGGroupsService service) :
+    public HGGroupsServicePostHandler(HGGroupsService service, ControlPlaneAccess controlPlaneAccess) :
         base("POST", "/hg-groups")
     {
         m_GroupsService = service;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override byte[] ProcessRequest(string path, Stream requestData,
@@ -116,7 +119,7 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
 
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -129,16 +132,20 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
             string method = request["METHOD"].ToString();
             request.Remove("METHOD");
 
-            m_log.DebugFormat("[Groups.RobustHGConnector]: {0}", method);
+            m_log.LogDebug("[Groups.RobustHGConnector]: {0}", method);
             switch (method)
             {
                 case "POSTGROUP":
+                    if (!m_ControlPlaneAccess.Authorize(httpRequest, httpResponse))
+                        return Array.Empty<byte>();
                     return HandleAddGroupProxy(request);
                 case "REMOVEAGENTFROMGROUP":
                     return HandleRemoveAgentFromGroup(request);
                 case "GETGROUP":
                     return HandleGetGroup(request);
                 case "ADDNOTICE":
+                    if (!m_ControlPlaneAccess.Authorize(httpRequest, httpResponse))
+                        return Array.Empty<byte>();
                     return HandleAddNotice(request);
                 case "VERIFYNOTICE":
                     return HandleVerifyNotice(request);
@@ -150,11 +157,11 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
                     return HandleGetRoleMembers(request);
 
             }
-            m_log.DebugFormat("[Groups.RobustHGConnector]: unknown method request: {0}", method);
+            m_log.LogDebug("[Groups.RobustHGConnector]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.Error(string.Format("[Groups.RobustHGConnector]: Exception {0} ", e.Message), e);
+            m_log.LogError(e, string.Format("[Groups.RobustHGConnector]: Exception {0} ", e.Message));
         }
 
         return FailureResult();
@@ -188,7 +195,7 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -211,7 +218,7 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
                 result["RESULT"] = "true";
         }
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
     }
 
@@ -243,7 +250,7 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -279,7 +286,7 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -313,7 +320,7 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -347,7 +354,7 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -386,7 +393,7 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 
@@ -403,13 +410,13 @@ public class HGGroupsServicePostHandler : BaseStreamHandler
             UUID groupID = new UUID(request["GroupID"].ToString());
 
             bool success = m_GroupsService.VerifyNotice(noticeID, groupID);
-            //m_log.DebugFormat("[XXX]: VerifyNotice returned {0}", success);
+            //m_log.LogDebug("[XXX]: VerifyNotice returned {0}", success);
             result["RESULT"] = success.ToString();
         }
 
         string xmlString = ServerUtils.BuildXmlResponse(result);
 
-        //m_log.DebugFormat("[XXX]: resp string: {0}", xmlString);
+        //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
         return Util.UTF8NoBomEncoding.GetBytes(xmlString);
     }
 

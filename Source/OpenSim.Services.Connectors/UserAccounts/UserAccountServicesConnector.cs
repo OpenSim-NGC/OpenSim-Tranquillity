@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -33,12 +32,13 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
@@ -62,7 +62,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
         IConfig assetConfig = source.Configs["UserAccountService"];
         if (assetConfig == null)
         {
-            m_log.Error("[ACCOUNT CONNECTOR]: UserAccountService missing from OpenSim.ini");
+            m_log.LogError("[ACCOUNT CONNECTOR]: UserAccountService missing from OpenSim.ini");
             throw new Exception("User account connector init error");
         }
 
@@ -70,14 +70,14 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
 
         if (string.IsNullOrWhiteSpace(serviceURI))
         {
-            m_log.Error("[ACCOUNT CONNECTOR]: UserAccountServerURI not found in section UserAccountService");
+            m_log.LogError("[ACCOUNT CONNECTOR]: UserAccountServerURI not found in section UserAccountService");
             throw new Exception("User account connector init error");
         }
 
         OSHHTPHost tmp = new OSHHTPHost(serviceURI, true);
         if (!tmp.IsResolvedHost)
         {
-            m_log.ErrorFormat("[ACCOUNT CONNECTOR]: {0}", tmp.IsValidHost ? "Could not resolve UserAccountServerURI" : "UserAccountServerURI is a invalid host");
+            m_log.LogError("[ACCOUNT CONNECTOR]: {0}", tmp.IsValidHost ? "Could not resolve UserAccountServerURI" : "UserAccountServerURI is a invalid host");
             throw new Exception("User account connector init error");
         }
 
@@ -117,7 +117,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
 
     public virtual UserAccount GetUserAccount(UUID scopeID, UUID userID)
     {
-        //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetUserAccount {0}", userID);
+        //m_log.LogDebug("[ACCOUNTS CONNECTOR]: GetUserAccount {0}", userID);
         Dictionary<string, object> sendData = new Dictionary<string, object>();
         //sendData["SCOPEID"] = scopeID.ToString();
         sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
@@ -144,7 +144,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
         string reply = string.Empty;
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/accounts";
-        // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
         try
         {
             reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -153,13 +153,13 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
                     m_Auth);
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccounts received null or empty reply");
+                m_log.LogDebug("[ACCOUNT CONNECTOR]: GetUserAccounts received null or empty reply");
                 return null;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
         }
 
         List<UserAccount> accounts = new List<UserAccount>();
@@ -174,7 +174,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
             }
 
             Dictionary<string, object>.ValueCollection accountList = replyData.Values;
-            //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
+            //m_log.LogDebug("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
             foreach (object acc in accountList)
             {
                 if (acc is Dictionary<string, object>)
@@ -183,12 +183,12 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
                     accounts.Add(pinfo);
                 }
                 else
-                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccounts received invalid response type {0}",
+                    m_log.LogDebug("[ACCOUNT CONNECTOR]: GetUserAccounts received invalid response type {0}",
                         acc.GetType());
             }
         }
         else
-            m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetUserAccounts received null response");
+            m_log.LogDebug("[ACCOUNTS CONNECTOR]: GetUserAccounts received null response");
 
         return accounts;
     }
@@ -228,7 +228,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
         string reply = string.Empty;
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/accounts";
-        // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
         try
         {
             reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -237,13 +237,13 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
                     m_Auth);
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received null or empty reply");
+                m_log.LogDebug("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received null or empty reply");
                 return null;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
         }
 
         List<UserAccount> accounts = new List<UserAccount>();
@@ -265,7 +265,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
             }
 
             Dictionary<string, object>.ValueCollection accountList = replyData.Values;
-            //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
+            //m_log.LogDebug("[ACCOUNTS CONNECTOR]: GetAgents returned {0} elements", pinfosList.Count);
             foreach (object acc in accountList)
             {
                 if (acc is Dictionary<string, object>)
@@ -274,12 +274,12 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
                     accounts.Add(pinfo);
                 }
                 else
-                    m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received invalid response type {0}",
+                    m_log.LogDebug("[ACCOUNT CONNECTOR]: GetMultiUserAccounts received invalid response type {0}",
                         acc.GetType());
             }
         }
         else
-            m_log.DebugFormat("[ACCOUNTS CONNECTOR]: GetMultiUserAccounts received null response");
+            m_log.LogDebug("[ACCOUNTS CONNECTOR]: GetMultiUserAccounts received null response");
 
         return accounts;
     }
@@ -291,7 +291,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
 
     public bool SetDisplayName(UUID agentID, string displayName)
     {
-        //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: SetDisplayName {0}", agentID);
+        //m_log.LogDebug("[ACCOUNTS CONNECTOR]: SetDisplayName {0}", agentID);
         Dictionary<string, object> sendData = new Dictionary<string, object>();
         sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
         sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
@@ -322,7 +322,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
         {
             if (kvp.Value == null)
             {
-                m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Null value for {0}", kvp.Key);
+                m_log.LogDebug("[ACCOUNTS CONNECTOR]: Null value for {0}", kvp.Key);
                 continue;
             }
             sendData[kvp.Key] = kvp.Value.ToString();
@@ -366,7 +366,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
         string reply = string.Empty;
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/accounts";
-        // m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
+        // m_log.LogDebug("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
         try
         {
             reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -375,13 +375,13 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
                     m_Auth);
             if (string.IsNullOrEmpty(reply))
             {
-                m_log.DebugFormat("[ACCOUNT CONNECTOR]: GetUserAccount received null or empty reply");
+                m_log.LogDebug("[ACCOUNT CONNECTOR]: GetUserAccount received null or empty reply");
                 return null;
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
         }
 
         Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
@@ -403,7 +403,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
     {
         string reqString = ServerUtils.BuildQueryString(sendData);
         string uri = m_ServerURI + "/accounts";
-        //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
+        //m_log.LogDebug("[ACCOUNTS CONNECTOR]: queryString = {0}", reqString);
         try
         {
             string reply = SynchronousRestFormsRequester.MakeRequest("POST",
@@ -412,7 +412,7 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
                     m_Auth);
             if (reply != string.Empty)
             {
-                //m_log.DebugFormat("[ACCOUNTS CONNECTOR]: reply = {0}", reply);
+                //m_log.LogDebug("[ACCOUNTS CONNECTOR]: reply = {0}", reply);
                 Dictionary<string, object> replyData = ServerUtils.ParseXmlResponse(reply);
 
                 if (replyData.ContainsKey("result"))
@@ -423,15 +423,15 @@ public class UserAccountServicesConnector : BaseServiceConnector, IUserAccountSe
                         return false;
                 }
                 else
-                    m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Set or Create UserAccount reply data does not contain result field");
+                    m_log.LogDebug("[ACCOUNTS CONNECTOR]: Set or Create UserAccount reply data does not contain result field");
 
             }
             else
-                m_log.DebugFormat("[ACCOUNTS CONNECTOR]: Set or Create UserAccount received empty reply");
+                m_log.LogDebug("[ACCOUNTS CONNECTOR]: Set or Create UserAccount received empty reply");
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[ACCOUNT CONNECTOR]: Exception when contacting user accounts server at {0}: {1}", uri, e.Message);
         }
 
         return false;

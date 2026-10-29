@@ -38,7 +38,7 @@ namespace OpenSim.Region.CoreModules.Avatar.Inventory.Transfer.Tests;
 
 public class InventoryTransferModuleTests : OpenSimTestCase
 {
-    protected TestScene m_scene;
+    protected TestScene m_scene = null!;
 
     public override void SetUp()
     {
@@ -173,7 +173,7 @@ public class InventoryTransferModuleTests : OpenSimTestCase
             = UserInventoryHelpers.CreateInventoryItem(
                 m_scene, "givenObj", itemId, assetId, giverSp.UUID, InventoryType.Object);
 
-        GridInstantMessage receivedIm = null;
+        GridInstantMessage? receivedIm = null;
         receiverClient.OnReceivedInstantMessage += im => receivedIm = im;
 
         byte[] giveImBinaryBucket = new byte[17];
@@ -199,6 +199,7 @@ public class InventoryTransferModuleTests : OpenSimTestCase
 
         // These details might not all be correct.
         // Session ID is now the created item ID (!)
+        Assert.NotNull(receivedIm);
         GridInstantMessage rejectIm
             = new GridInstantMessage(
                 m_scene,
@@ -365,7 +366,7 @@ public class InventoryTransferModuleTests : OpenSimTestCase
             = UserInventoryHelpers.CreateInventoryFolder(
                 m_scene.InventoryService, giverSp.UUID, folderId, "f1", true);
 
-        GridInstantMessage receivedIm = null;
+        GridInstantMessage? receivedIm = null;
         receiverClient.OnReceivedInstantMessage += im => receivedIm = im;
 
         byte[] giveImBinaryBucket = new byte[17];
@@ -392,6 +393,7 @@ public class InventoryTransferModuleTests : OpenSimTestCase
 
         // These details might not all be correct.
         // Session ID is now the created item ID (!)
+        Assert.NotNull(receivedIm);
         GridInstantMessage rejectIm
             = new GridInstantMessage(
                 m_scene,

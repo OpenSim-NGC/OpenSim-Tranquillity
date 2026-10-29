@@ -29,7 +29,7 @@ using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Shared;
-//using log4net;
+using Microsoft.Extensions.Logging;
 
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 using LSL_Rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
@@ -47,7 +47,7 @@ public partial class Yengine
 
     private void InitEvents()
     {
-        m_log.Info("[YEngine] Hooking up to server events");
+        m_log.LogInformation("[YEngine] Hooking up to server events");
         EventManager eManager = this.World.EventManager;
         eManager.OnAttach += attach;
         eManager.OnObjectGrab += touch_start;

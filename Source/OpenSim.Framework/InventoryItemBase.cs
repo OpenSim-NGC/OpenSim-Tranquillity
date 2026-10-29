@@ -390,6 +390,24 @@ public class InventoryItemBase : InventoryNodeBase, ICloneable
     }
     protected int m_creationDate = (int)(DateTime.UtcNow - new DateTime(1970, 1, 1)).TotalSeconds;
 
+    /// <value>
+    /// The Experience a script item was compiled into, or UUID.Zero. The same link as
+    /// TaskInventoryItem.ExperienceID, kept while the script is in a user's inventory.
+    /// </value>
+    public UUID ExperienceID
+    {
+        get
+        {
+            return m_experienceID;
+        }
+
+        set
+        {
+            m_experienceID = value;
+        }
+    }
+    protected UUID m_experienceID = UUID.Zero;
+
     public InventoryItemBase()
     {
     }

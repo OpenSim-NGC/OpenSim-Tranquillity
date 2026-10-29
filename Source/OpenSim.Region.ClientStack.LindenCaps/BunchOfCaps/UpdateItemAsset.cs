@@ -8,6 +8,7 @@ using OpenSim.Framework;
 using OpenSim.Framework.Capabilities;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Framework.Servers.HttpServer;
+using Microsoft.Extensions.Logging;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
@@ -49,7 +50,7 @@ public partial class BunchOfCaps
 
     private void UpdateInventoryItemAsset(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap map, byte atype, bool taskSript = false)
     {
-        m_log.Debug("[CAPS]: UpdateInventoryItemAsset Request in region: " + m_regionName + "\n");
+        m_log.LogDebug("[CAPS]: UpdateInventoryItemAsset Request in region: " + m_regionName + "\n");
 
         httpResponse.StatusCode = (int)HttpStatusCode.OK;
 
@@ -115,7 +116,7 @@ public partial class BunchOfCaps
         
         m_HostCapsObj.HttpListener.AddSimpleStreamHandler(uploaderHandler);
 
-        // m_log.InfoFormat("[CAPS]: UpdateAgentInventoryAsset response: {0}",
+        // m_log.LogInformation("[CAPS]: UpdateAgentInventoryAsset response: {0}",
         //                             LLSDHelpers.SerialiseLLSDReply(uploadResponse)));
 
         httpResponse.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(uploadResponse));
@@ -148,8 +149,8 @@ public partial class BunchOfCaps
 
         try
         {
-            //m_log.Debug("[CAPS]: ScriptTaskInventory Request in region: " + m_regionName);
-            //m_log.DebugFormat("[CAPS]: request: {0}, path: {1}, param: {2}", request, path, param);
+            //m_log.LogDebug("[CAPS]: ScriptTaskInventory Request in region: " + m_regionName);
+            //m_log.LogDebug("[CAPS]: request: {0}, path: {1}, param: {2}", request, path, param);
 
             UUID itemID = UUID.Zero;
             UUID objectID = UUID.Zero;
@@ -223,7 +224,7 @@ public partial class BunchOfCaps
 
             m_HostCapsObj.HttpListener.AddSimpleStreamHandler(uploaderHandler);
 
-            // m_log.InfoFormat("[CAPS]: " +
+            // m_log.LogInformation("[CAPS]: " +
             //    "ScriptTaskInventory response: {0}",
             //       LLSDHelpers.SerialiseLLSDReply(uploadResponse)));
 
@@ -231,7 +232,7 @@ public partial class BunchOfCaps
         }
         catch (Exception e)
         {
-            m_log.Error("[UpdateScriptTaskInventory]: " + e.ToString());
+            m_log.LogError("[UpdateScriptTaskInventory]: " + e.ToString());
         }
     }
     /// <summary>
@@ -420,7 +421,7 @@ public partial class BunchOfCaps
                     Util.SaveAssetToFile("updatedtaskscript" + Random.Shared.Next(1, 1000) + ".dat", data);
                 }
 
-                // m_log.InfoFormat("[CAPS]: TaskInventoryScriptUpdater.uploaderCaps res: {0}", res);
+                // m_log.LogInformation("[CAPS]: TaskInventoryScriptUpdater.uploaderCaps res: {0}", res);
                 response.RawBuffer = Util.UTF8NBGetbytes(res);
             }
             catch

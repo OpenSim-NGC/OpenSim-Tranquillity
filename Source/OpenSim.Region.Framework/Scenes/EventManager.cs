@@ -26,11 +26,11 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Client;
 using OpenSim.Region.Framework.Interfaces;
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
@@ -41,7 +41,7 @@ namespace OpenSim.Region.Framework.Scenes;
 /// </summary>
 public class EventManager
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Triggered on each sim frame.
@@ -449,7 +449,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerNewScript failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -484,7 +484,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerUpdateScript failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -521,6 +521,52 @@ public class EventManager
     /// </remarks>
     public delegate void ScriptControlEvent(UUID item, UUID avatarID, uint held, uint changed);
     public event ScriptControlEvent OnScriptControlEvent;
+
+    /// <summary>
+    /// Triggered when one or more scripts stop holding taken controls on an avatar: the script's own release
+    /// (llReleaseControls, llTakeControls with pass_on and not accept) and every release the core makes (the viewer's
+    /// release keys, ClearControls on a crossing, a stand-up, a permission revoke or script removal, the avatar
+    /// leaving the region, an incoming agent update that no longer carries the registration).
+    /// </summary>
+    /// <remarks>
+    /// Raised only when a registration was actually removed, with exactly the removed script item ids, after
+    /// <see cref="ScenePresence"/> has released its registrations lock, so a handler may call
+    /// <see cref="ScenePresence.HasScriptControls"/>. Triggered by <see cref="TriggerScriptControlsReleased"/>.
+    /// </remarks>
+    public delegate void ScriptControlsReleased(UUID agentId, UUID[] scriptItemIds);
+    public event ScriptControlsReleased OnScriptControlsReleased;
+
+    /// <summary>
+    /// Triggered when the core ends a script's permission grant because the avatar who gave it may no longer be
+    /// reached through the script's Experience: the avatar blocked the Experience (reason 4,
+    /// XP_ERROR_NOT_PERMITTED) or entered a parcel where it cannot run (reason 17, XP_ERROR_NOT_PERMITTED_LAND).
+    /// </summary>
+    /// <remarks>
+    /// Raised once per script item, after the item's PermsGranter and PermsMask have been cleared and
+    /// experience_permissions_denied has been posted to every script module. revokedMask is the mask the grant
+    /// had. Any script engine can subscribe and release what it keeps for the grant (taken controls, a saved
+    /// grant); an engine ignores items it does not run. Triggered by <see cref="TriggerExperiencePermissionsRevoked"/>
+    /// in OpenSim.Region.ClientStack.LindenCaps.ExperienceModule.
+    /// </remarks>
+    public delegate void ExperiencePermissionsRevoked(UUID partId, UUID itemId, UUID granterId, UUID experienceId, int revokedMask, int reason);
+    public event ExperiencePermissionsRevoked OnExperiencePermissionsRevoked;
+
+    /// <summary>
+    /// Triggered when the core takes permissions away from a script item without the script asking: the avatar
+    /// stood up from the object, detached it, used Release Keys, or revoked animation permissions from the viewer
+    /// (SceneObjectPartInventory.RemoveScriptsPermissions).
+    /// SL llSetCameraParams: "The PERMISSION_CONTROL_CAMERA permission is automatically revoked when the avatar stands
+    /// up from or detaches the object".
+    /// </summary>
+    /// <remarks>
+    /// Raised once per script item whose grant changed, after the item's PermsMask (and PermsGranter, when nothing is
+    /// left) have been updated and any taken controls released. removedMask holds the bits the item lost; granterId
+    /// is the avatar who had granted them. No script event is posted, so an engine that keeps the grant in its own
+    /// saved state can subscribe and note the change; an engine ignores items it does not run. Triggered by
+    /// <see cref="TriggerScriptPermissionsRemoved"/>.
+    /// </remarks>
+    public delegate void ScriptPermissionsRemoved(UUID partId, UUID itemId, UUID granterId, int removedMask);
+    public event ScriptPermissionsRemoved OnScriptPermissionsRemoved;
 
     /// <summary>
     /// TODO: Should be triggered when a physics object starts moving.
@@ -715,6 +761,16 @@ public class EventManager
     public delegate void AvatarKillData(uint KillerLocalID, ScenePresence avatar);
     public event AvatarKillData OnAvatarKilled;
 
+    /// <summary>
+    /// Damage is about to be applied to a presence: the batch is MUTABLE - a handler
+    /// (the script engine's on_damage) may rewrite each entry's Amount before it lands. Raised
+    /// synchronously from ScenePresence.ApplyDamage; handlers must return before the damage applies.
+    /// </summary>
+    public delegate void AvatarDamageData(ScenePresence avatar, List<DamageEntry> batch);
+    public event AvatarDamageData OnAvatarDamage;
+    /// <summary>The batch has been applied; Amount is what landed. final_damage hangs here.</summary>
+    public event AvatarDamageData OnAvatarDamageApplied;
+
     /*
     public delegate void ScriptTimerEvent(uint localID, double timerinterval);
     /// <summary>
@@ -804,6 +860,54 @@ public class EventManager
     /// </remarks>
     public delegate void ParcelPrimCountTainted();
     public event ParcelPrimCountTainted OnParcelPrimCountTainted;
+
+    /// <summary>
+    /// Triggered when a scene object's position lands on a different parcel than the last one recorded for it.
+    /// </summary>
+    /// <remarks>
+    /// Raised for every kind of move (position setter, physics, keyframed motion, edits) whether or not anyone
+    /// is in the region, and once when the object is added to the scene (rez, region start, arrival), with
+    /// <c>oldParcel</c> null. Not raised for attachments. <c>oldParcel</c> is the parcel object recorded at the
+    /// previous crossing, which may since have been joined away.
+    /// Triggered in <see cref="SceneObjectGroup.CheckParcelCrossing"/>.
+    /// </remarks>
+    public event GroupCrossedToNewParcel OnGroupCrossedToNewParcel;
+    public delegate void GroupCrossedToNewParcel(SceneObjectGroup group, ILandObject oldParcel, ILandObject newParcel);
+
+    /// <summary>
+    /// Triggered when the owner or the group of a scene object that is in the scene changes.
+    /// </summary>
+    /// <remarks>
+    /// Raised from SceneObjectGroup.SetOwnerId, SetOwner and SetGroup (god set owner, deed to group, set group,
+    /// buy as original, llAttachToAvatarTemp), only when the root part's owner or group actually changed.
+    /// </remarks>
+    public event ObjectOwnerOrGroupChanged OnObjectOwnerOrGroupChanged;
+    public delegate void ObjectOwnerOrGroupChanged(SceneObjectGroup group, UUID oldOwner, UUID newOwner, UUID oldGroup, UUID newGroup);
+
+    /// <summary>
+    /// Triggered when a scene object starts to leave this region by a region crossing or an object teleport to
+    /// another region (<see cref="SceneObjectGroup.inTransit"/> has just been set).
+    /// </summary>
+    /// <remarks>
+    /// Raised on the thread that started the crossing, before the transfer starts, so a script engine can hold the
+    /// object's scripts before their state is captured. Every begin is followed by exactly one
+    /// <see cref="OnGroupEndInTransit"/> for the same group. Not raised for attachments, or for a teleport inside the
+    /// region. Halcyon raised the same pair (SceneObjectGroup.StartTransit and EndTransit).
+    /// </remarks>
+    public event GroupBeginInTransit OnGroupBeginInTransit;
+    public delegate void GroupBeginInTransit(SceneObjectGroup group);
+
+    /// <summary>
+    /// Triggered when a crossing that <see cref="OnGroupBeginInTransit"/> announced has ended.
+    /// </summary>
+    /// <remarks>
+    /// <c>crossed</c> is true when the object reached the other region: its copy here has been removed. When false the
+    /// object stays in this region: it has been put back inside the region and <see cref="SceneObjectGroup.inTransit"/>
+    /// is clear again, unless the crossing deleted or returned it (die or return at the region's edge), in which case
+    /// the group is deleted. Raised on the crossing's own thread.
+    /// </remarks>
+    public event GroupEndInTransit OnGroupEndInTransit;
+    public delegate void GroupEndInTransit(SceneObjectGroup group, bool crossed);
 
     public event GetScriptRunning OnGetScriptRunning;
 
@@ -1069,7 +1173,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1090,7 +1194,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerGetScriptRunning failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1111,7 +1215,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnScriptChangedEvent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1132,7 +1236,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnClientMovement failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1153,7 +1257,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerPermissionError failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1174,7 +1278,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnPluginConsole failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1195,7 +1299,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnFrame failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1216,7 +1320,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnNewClient failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1237,7 +1341,7 @@ public class EventManager
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat(
+                        m_log.LogError(
                             "[EVENT MANAGER]: Delegate for TriggerOnNewClient (IClientCore) failed - continuing.  {0} {1}",
                             e.Message, e.StackTrace);
                     }
@@ -1259,7 +1363,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnClientLogin failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1281,7 +1385,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnNewPresence failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1298,13 +1402,13 @@ public class EventManager
             {
                 try
                 {
-//                        m_log.ErrorFormat("[EVENT MANAGER]: OnRemovePresenceDelegate: {0}",d.Target.ToString());
+//                        m_log.LogError("[EVENT MANAGER]: OnRemovePresenceDelegate: {0}",d.Target.ToString());
                     d(agentId);
-//                        m_log.ErrorFormat("[EVENT MANAGER]: OnRemovePresenceDelegate done ");
+//                        m_log.LogError("[EVENT MANAGER]: OnRemovePresenceDelegate done ");
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnRemovePresence failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1325,7 +1429,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnBackup failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1346,7 +1450,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerParcelPrimCountUpdate failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1367,7 +1471,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerMoneyTransfer failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1387,7 +1491,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerTerrainUpdate failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1408,7 +1512,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerTerrainTick failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1429,7 +1533,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TerrainCheckUpdates failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1450,7 +1554,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerTerrainTainted failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1471,7 +1575,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerParcelPrimCountAdd failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1492,7 +1596,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerObjectAddedToScene failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1515,7 +1619,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerDeRezRequested failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1538,7 +1642,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerObjectBeingRemovedFromScene failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1559,7 +1663,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerObjectAddedToPhysicalScene failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1580,7 +1684,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerObjectRemovedFromPhysicalScene failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1601,7 +1705,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerShutdown failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1622,7 +1726,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerObjectGrab failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1643,7 +1747,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerObjectGrabbing failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1664,7 +1768,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerObjectDeGrab failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1685,7 +1789,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScriptReset failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1706,7 +1810,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerRezScript failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1727,7 +1831,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerStartScript failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1748,7 +1852,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerStopScript failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1769,10 +1873,10 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerRemoveScript failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
-                    m_log.ErrorFormat(Environment.StackTrace);
+                    m_log.LogError(Environment.StackTrace);
                 }
             }
         }
@@ -1794,7 +1898,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerGroupMove failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1820,7 +1924,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerGroupSpinStart failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1846,7 +1950,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerGroupSpin failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1869,7 +1973,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerGroupGrab failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1890,7 +1994,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerLandObjectAdded failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1911,7 +2015,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerLandObjectRemoved failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1937,7 +2041,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerAvatarEnteringNewParcel failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1958,7 +2062,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerAvatarAppearanceChanged failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -1979,7 +2083,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerCrossAgentToNewRegion failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2000,7 +2104,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerIncomingInstantMessage failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2021,7 +2125,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2038,14 +2142,14 @@ public class EventManager
             {
                 try
                 {
-//                        m_log.ErrorFormat("[EVENT MANAGER]: TriggerClientClosed: {0}", d.Target.ToString());
+//                        m_log.LogError("[EVENT MANAGER]: TriggerClientClosed: {0}", d.Target.ToString());
                     d(ClientID, scene);
-//                        m_log.ErrorFormat("[EVENT MANAGER]: TriggerClientClosed done ");
+//                        m_log.LogError("[EVENT MANAGER]: TriggerClientClosed done ");
 
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerClientClosed failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2066,7 +2170,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnMakeChildAgent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2087,7 +2191,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnMakeRootAgent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2108,7 +2212,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnIncomingSceneObject failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2129,7 +2233,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnRegisterCaps failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2150,7 +2254,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnDeregisterCaps failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2171,7 +2275,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnNewInventoryItemUploadComplete failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2192,7 +2296,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerLandBuy failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2213,7 +2317,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerValidateLandBuy failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2234,7 +2338,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerAtTargetEvent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2255,7 +2359,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerNotAtTargetEvent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2276,7 +2380,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerAtRotTargetEvent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2297,7 +2401,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerNotAtRotTargetEvent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2318,7 +2422,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerMovingStartEvent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2339,7 +2443,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerMovingEndEvent failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2366,10 +2470,38 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerRequestChangeWaterHeight failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
+            }
+        }
+    }
+
+    public void TriggerAvatarDamage(ScenePresence avatar, List<DamageEntry> batch)
+    {
+        AvatarDamageData handler = OnAvatarDamage;
+        if (handler == null) return;
+        foreach (AvatarDamageData d in handler.GetInvocationList())
+        {
+            try { d(avatar, batch); }
+            catch (Exception e)
+            {
+                m_log.LogError("[EVENT MANAGER]: Delegate for TriggerAvatarDamage failed - continuing.  {0} {1}", e.Message, e.StackTrace);
+            }
+        }
+    }
+
+    public void TriggerAvatarDamageApplied(ScenePresence avatar, List<DamageEntry> batch)
+    {
+        AvatarDamageData handler = OnAvatarDamageApplied;
+        if (handler == null) return;
+        foreach (AvatarDamageData d in handler.GetInvocationList())
+        {
+            try { d(avatar, batch); }
+            catch (Exception e)
+            {
+                m_log.LogError("[EVENT MANAGER]: Delegate for TriggerAvatarDamageApplied failed - continuing.  {0} {1}", e.Message, e.StackTrace);
             }
         }
     }
@@ -2387,7 +2519,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerAvatarKill failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2408,7 +2540,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerSignificantClientMovement failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2429,7 +2561,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnChatFromWorld failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2450,7 +2582,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnChatFromClient failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2471,7 +2603,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnChatBroadcast failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2492,8 +2624,71 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerControlEvent failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerScriptControlsReleased(UUID agentId, UUID[] scriptItemIds)
+    {
+        ScriptControlsReleased handlerScriptControlsReleased = OnScriptControlsReleased;
+        if (handlerScriptControlsReleased != null)
+        {
+            foreach (ScriptControlsReleased d in handlerScriptControlsReleased.GetInvocationList())
+            {
+                try
+                {
+                    d(agentId, scriptItemIds);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerScriptControlsReleased failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerExperiencePermissionsRevoked(UUID partId, UUID itemId, UUID granterId, UUID experienceId, int revokedMask, int reason)
+    {
+        ExperiencePermissionsRevoked handlerExperiencePermissionsRevoked = OnExperiencePermissionsRevoked;
+        if (handlerExperiencePermissionsRevoked != null)
+        {
+            foreach (ExperiencePermissionsRevoked d in handlerExperiencePermissionsRevoked.GetInvocationList())
+            {
+                try
+                {
+                    d(partId, itemId, granterId, experienceId, revokedMask, reason);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerExperiencePermissionsRevoked failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerScriptPermissionsRemoved(UUID partId, UUID itemId, UUID granterId, int removedMask)
+    {
+        ScriptPermissionsRemoved handlerScriptPermissionsRemoved = OnScriptPermissionsRemoved;
+        if (handlerScriptPermissionsRemoved != null)
+        {
+            foreach (ScriptPermissionsRemoved d in handlerScriptPermissionsRemoved.GetInvocationList())
+            {
+                try
+                {
+                    d(partId, itemId, granterId, removedMask);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerScriptPermissionsRemoved failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -2513,7 +2708,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerNoticeNoLandDataFromStorage failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2534,7 +2729,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerIncomingLandDataFromStorage failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2555,7 +2750,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerSetAllowForcefulBan failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2576,7 +2771,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerRequestParcelPrimCountUpdate failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2597,8 +2792,92 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerParcelPrimCountTainted failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerGroupCrossedToNewParcel(SceneObjectGroup group, ILandObject oldParcel, ILandObject newParcel)
+    {
+        GroupCrossedToNewParcel handler = OnGroupCrossedToNewParcel;
+        if (handler is not null)
+        {
+            foreach (GroupCrossedToNewParcel d in handler.GetInvocationList())
+            {
+                try
+                {
+                    d(group, oldParcel, newParcel);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerGroupCrossedToNewParcel failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerGroupBeginInTransit(SceneObjectGroup group)
+    {
+        GroupBeginInTransit handler = OnGroupBeginInTransit;
+        if (handler is not null)
+        {
+            foreach (GroupBeginInTransit d in handler.GetInvocationList())
+            {
+                try
+                {
+                    d(group);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerGroupBeginInTransit failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerGroupEndInTransit(SceneObjectGroup group, bool crossed)
+    {
+        GroupEndInTransit handler = OnGroupEndInTransit;
+        if (handler is not null)
+        {
+            foreach (GroupEndInTransit d in handler.GetInvocationList())
+            {
+                try
+                {
+                    d(group, crossed);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerGroupEndInTransit failed - continuing.  {0} {1}",
+                        e.Message, e.StackTrace);
+                }
+            }
+        }
+    }
+
+    public void TriggerObjectOwnerOrGroupChanged(SceneObjectGroup group, UUID oldOwner, UUID newOwner, UUID oldGroup, UUID newGroup)
+    {
+        ObjectOwnerOrGroupChanged handler = OnObjectOwnerOrGroupChanged;
+        if (handler is not null)
+        {
+            foreach (ObjectOwnerOrGroupChanged d in handler.GetInvocationList())
+            {
+                try
+                {
+                    d(group, oldOwner, newOwner, oldGroup, newGroup);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(
+                        "[EVENT MANAGER]: Delegate for TriggerObjectOwnerOrGroupChanged failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -2637,7 +2916,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerEstateToolsSunUpdate failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2658,7 +2937,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnAttach failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2681,7 +2960,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOarFileLoaded failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2702,7 +2981,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOarFileSaved failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2723,7 +3002,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerEmptyScriptCompileQueue failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2744,7 +3023,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScriptCollidingStart failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2765,7 +3044,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScriptColliding failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2786,7 +3065,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScriptCollidingEnd failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2807,7 +3086,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScriptLandCollidingStart failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2828,7 +3107,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScriptLandColliding failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2849,7 +3128,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScriptLandCollidingEnd failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2870,7 +3149,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerSetRootAgentScene failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2891,7 +3170,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnRegionUp failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2912,7 +3191,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnSceneObjectLoaded failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2933,7 +3212,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPreSave failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2954,7 +3233,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPartCopy failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2975,7 +3254,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerSceneObjectPartUpdated failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -2996,7 +3275,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerScenePresenceUpdated failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -3018,7 +3297,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerOnSceneObjectPartCopy failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
@@ -3033,20 +3312,20 @@ public class EventManager
         {
             foreach (Action<Scene> d in handler.GetInvocationList())
             {
-                m_log.InfoFormat("[EVENT MANAGER]: TriggerSceneShuttingDown invoke {0}", d.Method.Name.ToString());
+                m_log.LogInformation("[EVENT MANAGER]: TriggerSceneShuttingDown invoke {0}", d.Method.Name.ToString());
                 try
                 {
                     d(s);
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[EVENT MANAGER]: Delegate for TriggerSceneShuttingDown failed - continuing.  {0} {1}",
                         e.Message, e.StackTrace);
                 }
             }
         }
-        m_log.Info("[EVENT MANAGER]: TriggerSceneShuttingDown done");
+        m_log.LogInformation("[EVENT MANAGER]: TriggerSceneShuttingDown done");
     }
 
     public void TriggerOnRegionStarted(Scene scene)
@@ -3063,7 +3342,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for RegionStarted failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for RegionStarted failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3084,7 +3363,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for OnRegionHeartbeatStart failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for OnRegionHeartbeatStart failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3105,7 +3384,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for OnRegionHeartbeatEnd failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for OnRegionHeartbeatEnd failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3126,7 +3405,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for OnRegionLoginsStatusChange failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for OnRegionLoginsStatusChange failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3147,7 +3426,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for OnRegionReadyStatusChange failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for OnRegionReadyStatusChange failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3168,7 +3447,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for PrimsLoaded failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for PrimsLoaded failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3189,7 +3468,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for TeleportStart failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for TeleportStart failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3210,7 +3489,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for TeleportFail failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for TeleportFail failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3233,7 +3512,7 @@ public class EventManager
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[EVENT MANAGER]: Delegate for ExtraSettingChanged failed - continuing {0} - {1}",
+                    m_log.LogError("[EVENT MANAGER]: Delegate for ExtraSettingChanged failed - continuing {0} - {1}",
                         e.Message, e.StackTrace);
                 }
             }
@@ -3259,7 +3538,7 @@ public class EventManager
     //                    }
     //                    catch (Exception e)
     //                    {
-    //                        m_log.ErrorFormat("[EVENT MANAGER]: Delegate for TriggerUuidGather failed - continuing {0} - {1}",
+    //                        m_log.LogError("[EVENT MANAGER]: Delegate for TriggerUuidGather failed - continuing {0} - {1}",
     //                            e.Message, e.StackTrace);
     //                    }
     //                }

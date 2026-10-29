@@ -27,13 +27,14 @@
 using System.Reflection;
 
 using Nini.Config;
-using log4net;
 using OpenMetaverse;
 
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
 using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Services.HypergridService;
 
@@ -44,8 +45,7 @@ namespace OpenSim.Services.HypergridService;
 /// </summary>
 public class HGRemoteAssetService : IAssetService
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
         MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_HomeURL;
@@ -58,7 +58,7 @@ public class HGRemoteAssetService : IAssetService
 
     public HGRemoteAssetService(IConfigSource config, string configName)
     {
-        m_log.Debug("[HGRemoteAsset Service]: Starting");
+        m_log.LogDebug("[HGRemoteAsset Service]: Starting");
         IConfig assetConfig = config.Configs[configName];
         if (assetConfig == null)
             throw new Exception("No HGAssetService configuration");

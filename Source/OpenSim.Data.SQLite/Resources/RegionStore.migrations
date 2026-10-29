@@ -423,3 +423,24 @@ COMMIT;
 BEGIN;
 ALTER TABLE `prims` ADD COLUMN `StartStr` TEXT;
 COMMIT;
+
+:VERSION 44         #----- add script experience link to primitems
+BEGIN;
+ALTER TABLE primitems ADD COLUMN experienceID char(36) NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000';
+COMMIT;
+
+:VERSION 45         #----- add the sit target state to prims
+# NULL: the state follows the sit target offset and rotation, as for every row saved before this step.
+BEGIN;
+ALTER TABLE prims ADD COLUMN SitTargetActive integer default NULL;
+COMMIT;
+
+:VERSION 46         #----- add the region extra settings table, as the MySQL and PostgreSQL region stores have
+BEGIN;
+CREATE TABLE IF NOT EXISTS regionextra (
+  RegionID char(36) NOT NULL,
+  Name varchar(32) NOT NULL,
+  value text,
+  PRIMARY KEY (RegionID, Name)
+);
+COMMIT;

@@ -27,9 +27,7 @@
 
 #pragma warning disable IDE1006
 
-using key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
-using rotation = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Quaternion;
-using vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
+using LSL_Vector = OpenSim.Region.ScriptEngine.Shared.LSL_Types.Vector3;
 using LSL_List = OpenSim.Region.ScriptEngine.Shared.LSL_Types.list;
 using LSL_String = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
@@ -305,7 +303,7 @@ public interface IOSSL_Api
     //ApiDesc Draw a given image from URL or asset uuid with given width and height at the current draw position.
         string osDrawImage(string drawList, int width, int height, string image);
     //ApiDesc Returns a vector containing the horizontal and vertical dimensions in pixels of the specified text, if drawn in the specified font and at the specified point size. The horizontal extent is returned in the .x component of the vector, and the vertical extent is returned in .y. The .z component is not used. 
-        vector osGetDrawStringSize(string contentType, string text, string fontName, int fontSize);
+        LSL_Vector osGetDrawStringSize(string contentType, string text, string fontName, int fontSize);
 
     //ApiDesc Set the water height of the region.
           void osSetRegionWaterHeight(double height);
@@ -334,15 +332,15 @@ public interface IOSSL_Api
 
     // Parcel commands
     //ApiDesc Returns the number of visitors to the region since start.
-   LSL_Integer osGetParcelDwell(vector pos);
+   LSL_Integer osGetParcelDwell(LSL_Vector pos);
     //ApiDesc Joins a parcel with another based on positions within both parcels as vectors.
-          void osParcelJoin(vector pos1, vector pos2);
+          void osParcelJoin(LSL_Vector pos1, LSL_Vector pos2);
     //ApiDesc Subdivides a parcel as rectangle given a start and end position as vector.
-          void osParcelSubdivide(vector pos1, vector pos2);
+          void osParcelSubdivide(LSL_Vector pos1, LSL_Vector pos2);
     //ApiDesc Sets PARCEl_FLAGS for a parcel given a vector inside the parcel.
-          void osSetParcelDetails(vector pos, LSL_List rules);
+          void osSetParcelDetails(LSL_Vector pos, LSL_List rules);
     //ApiDesc DEPRECATED. Use osSetParcelDetails instead.
-          void osParcelSetDetails(vector pos, LSL_List rules); // Deprecated
+          void osParcelSetDetails(LSL_Vector pos, LSL_List rules); // Deprecated
 
     //ApiDesc Returns the name of the active script engine.
         string osGetScriptEngineName();
@@ -355,7 +353,7 @@ public interface IOSSL_Api
         string osGetPhysicsEngineName();
 
     //ApiDesc Directly send a message as dataserver event to a given object by its key.
-          void osMessageObject(key objectUUID, string message);
+          void osMessageObject(LSL_Key objectUUID, string message);
 
     //ApiDesc Creates a new notecard in the primitive inventory with given contents.
           void osMakeNotecard(string notecardName, LSL_String contents);
@@ -447,21 +445,21 @@ public interface IOSSL_Api
    LSL_Integer osIsNpc(LSL_Key npc);
 
     //ApiDesc Creates a new NPC with a given name at a given position using a supplied notecard for appearance.
-           key osNpcCreate(string user, string name, vector position, string notecard);
+           LSL_Key osNpcCreate(string user, string name, LSL_Vector position, string notecard);
     //ApiDesc Creates a new NPC with a given name at a given position using a supplied notecard for appearance and additional options.
-           key osNpcCreate(string user, string name, vector position, string notecard, int options);
+           LSL_Key osNpcCreate(string user, string name, LSL_Vector position, string notecard, int options);
     //ApiDesc Creates a new notecard with a given name from a given NPC (key).
-       LSL_Key osNpcSaveAppearance(key npc, LSL_String notecard);
+       LSL_Key osNpcSaveAppearance(LSL_Key npc, LSL_String notecard);
     //ApiDesc Creates a new notecard with a given name from a given NPC (key) with the option to include HUDs.
-       LSL_Key osNpcSaveAppearance(key npc, LSL_String notecard, LSL_Integer includeHuds);
+       LSL_Key osNpcSaveAppearance(LSL_Key npc, LSL_String notecard, LSL_Integer includeHuds);
     //ApiDesc Loads a given appearance notecard to a given NPC (key).
-          void osNpcLoadAppearance(key npc, string notecard);
+          void osNpcLoadAppearance(LSL_Key npc, string notecard);
     //ApiDesc Returns the position of a given NPC (key).
-        vector osNpcGetPos(key npc);
+        LSL_Vector osNpcGetPos(LSL_Key npc);
     //ApiDesc Moves a given NPC (key) to a position.
-          void osNpcMoveTo(key npc, vector position);
+          void osNpcMoveTo(LSL_Key npc, LSL_Vector position);
     //ApiDesc Sets a target for a given NPC (key) to move towards.
-          void osNpcMoveToTarget(key npc, vector target, int options);
+          void osNpcMoveToTarget(LSL_Key npc, LSL_Vector target, int options);
 
     /// <summary>
     /// Get the owner of the NPC
@@ -471,13 +469,13 @@ public interface IOSSL_Api
     /// The owner of the NPC for an owned NPC.  The NPC's agent id for an unowned NPC.  UUID.Zero if the key is not an npc.
     /// </returns>
     //ApiDesc Returns the owner key of a given NPC. NULL_KEY if the NPC is unowned.
-       LSL_Key osNpcGetOwner(key npc);
+       LSL_Key osNpcGetOwner(LSL_Key npc);
  
     //ApiDesc Returns the current rotation of a given NPC (key).
-      rotation osNpcGetRot(key npc);
+      LSL_Rotation osNpcGetRot(LSL_Key npc);
 
     //ApiDesc Sets the rotation of a given NPC (key).
-          void osNpcSetRot(LSL_Key npc, rotation rot);
+          void osNpcSetRot(LSL_Key npc, LSL_Rotation rot);
     //ApiDesc Removes the target a given NPC (key) is moving towards.
           void osNpcStopMoveToTarget(LSL_Key npc);
     //ApiDesc Sets a given NPC (key) profile about text to a given string.
@@ -485,19 +483,19 @@ public interface IOSSL_Api
     //ApiDesc Sets a given NPC (key) profile image to a given image (asset UUID).
           void osNpcSetProfileImage(LSL_Key npc, string image);
     //ApiDesc Instructs a given NPC (key) to say a given message.
-          void osNpcSay(key npc, string message);
+          void osNpcSay(LSL_Key npc, string message);
     //ApiDesc Instructs a given NPC (key) to say a given message on a given channel.
-          void osNpcSay(key npc, int channel, string message);
+          void osNpcSay(LSL_Key npc, int channel, string message);
     //ApiDesc Instructs a given NPC (key) to say to a given avatar (key) a given message on a given channel.
           void osNpcSayTo(LSL_Key npc, LSL_Key target, int channel, string msg);
     //ApiDesc Instructs a given NPC (key) to shout a given message on a given channel.
-          void osNpcShout(key npc, int channel, string message);
+          void osNpcShout(LSL_Key npc, int channel, string message);
     //ApiDesc Instructs a given NPC (key) to sit on a given object (UUID).
-          void osNpcSit(key npc, key target, int options);
+          void osNpcSit(LSL_Key npc, LSL_Key target, int options);
     //ApiDesc Instructs a given NPC (key) to stand up.
           void osNpcStand(LSL_Key npc);
     //ApiDesc Removes a given NPC (key).
-          void osNpcRemove(key npc);
+          void osNpcRemove(LSL_Key npc);
     //ApiDesc Instructs a given NPC (key) to play a given animation (name) from the inventory of the object containing the script.
           void osNpcPlayAnimation(LSL_Key npc, string animation);
     //ApiDesc Instructs a given NPC (key) to stop playing a given animation (name).
@@ -505,16 +503,16 @@ public interface IOSSL_Api
     //ApiDesc Instructs a given NPC (key) to touch a given object (UUID) and link.
           void osNpcTouch(LSL_Key npcLSL_Key, LSL_Key object_key, LSL_Integer link_num);
     //ApiDesc Instructs a given NPC (key) to whisper a given message on a given channel.
-          void osNpcWhisper(key npc, int channel, string message);
+          void osNpcWhisper(LSL_Key npc, int channel, string message);
 
     //ApiDesc Save appearance of object owner to a notecard in the primitive inventory.
        LSL_Key osOwnerSaveAppearance(LSL_String notecard);
     //ApiDesc Save appearance of object owner (with the choice to include Huds or no) to a notecard in the primitive inventory.
        LSL_Key osOwnerSaveAppearance(LSL_String notecard, LSL_Integer includeHuds);
     //ApiDesc Save appearance of an avatar to a notecard in the primitive inventory.
-       LSL_Key osAgentSaveAppearance(key agentId, LSL_String notecard);
+       LSL_Key osAgentSaveAppearance(LSL_Key agentId, LSL_String notecard);
     //ApiDesc Save appearance of an avatar (with the choice to include Huds or no) to a notecard in the primitive inventory.
-       LSL_Key osAgentSaveAppearance(key agentId, LSL_String notecard, LSL_Integer includeHuds);
+       LSL_Key osAgentSaveAppearance(LSL_Key agentId, LSL_String notecard, LSL_Integer includeHuds);
 
     //ApiDesc Returns the gender of a given avatar as string. 
     LSL_String osGetGender(LSL_Key rawAvatarId);
@@ -525,7 +523,7 @@ public interface IOSSL_Api
     //ApiDesc Returns a list of statistics regarding the region and simulator from the stats reporter module.
       LSL_List osGetRegionStats();
     //ApiDesc Returns the x and y size of the region as vector. z is unused.
-        vector osGetRegionSize();
+        LSL_Vector osGetRegionSize();
 
     //ApiDesc Returns the current memory usage of the simulator in bytes.
            int osGetSimulatorMemory();
@@ -540,17 +538,17 @@ public interface IOSSL_Api
     //ApiDesc Sets a modifier for the movement speed of the object owner.
           void osSetOwnerSpeed(LSL_Float SpeedModifier);
     //ApiDesc Returns the current health of a given avatar.
-     LSL_Float osGetHealth(key agentId);
+     LSL_Float osGetHealth(LSL_Key agentId);
     //ApiDesc Heals a given avatar by a given amount.
-          void osCauseHealing(key agentId, LSL_Float healing);
+          void osCauseHealing(LSL_Key agentId, LSL_Float healing);
     //ApiDesc Sets the health of a given avatar to a given amount.
-          void osSetHealth(key agentId, LSL_Float health);
+          void osSetHealth(LSL_Key agentId, LSL_Float health);
     //ApiDesc Sets the rate of healing for a given avatar to a given amount.
-          void osSetHealRate(key agentId, LSL_Float health);
+          void osSetHealRate(LSL_Key agentId, LSL_Float health);
     //ApiDesc Returns the rate of healing for a given avatar.
-     LSL_Float osGetHealRate(key agentId);
+     LSL_Float osGetHealRate(LSL_Key agentId);
     //ApiDesc Subtracts health from a given avatar by a given amount.
-          void osCauseDamage(key avatar, LSL_Float damage);
+          void osCauseDamage(LSL_Key avatar, LSL_Float damage);
     //ApiDesc Forces a given avatar to sit bypassing permissions.
           void osForceOtherSit(string avatar);
     //ApiDesc Forces a given avatar to sit on a given target (object UUID) bypassing permissions.
@@ -645,7 +643,7 @@ public interface IOSSL_Api
     /// <param name="rot"></param>
     /// <returns></returns>
     //ApiDesc Attempts to drop the attachment the script is in to a given position on the ground.
-          void osDropAttachmentAt(vector pos, rotation rot);
+          void osDropAttachmentAt(LSL_Vector pos, LSL_Rotation rot);
 
     /// <summary>
     /// Attempts to drop an attachment at the specified coordinates.
@@ -654,7 +652,7 @@ public interface IOSSL_Api
     /// <param name="rot"></param>
     /// <returns></returns>
     //ApiDesc Attempts to drop the attachment the script is in to a given position on the ground bypassing script permissions.
-          void osForceDropAttachmentAt(vector pos, rotation rot);
+          void osForceDropAttachmentAt(LSL_Vector pos, LSL_Rotation rot);
 
     /// <summary>
     /// Identical to llListen except for a bitfield which indicates which
@@ -696,16 +694,16 @@ public interface IOSSL_Api
     //ApiDesc Unsets the inertia data of the object containing the script.
           void osClearInertia();
     //ApiDesc Sets the inertia data for the object containing the script.
-          void osSetInertia(LSL_Float mass, vector centerOfMass, vector principalInertiaScaled,  rotation rot);
+          void osSetInertia(LSL_Float mass, LSL_Vector centerOfMass, LSL_Vector principalInertiaScaled,  LSL_Rotation rot);
     //ApiDesc Sets the inertia data for the object containing the script based on a box shape bounding box calculation.
-          void osSetInertiaAsBox(LSL_Float mass, vector boxSize, vector centerOfMass, rotation rot);
+          void osSetInertiaAsBox(LSL_Float mass, LSL_Vector boxSize, LSL_Vector centerOfMass, LSL_Rotation rot);
     //ApiDesc Sets the inertia data for the object containing the script based on a spherical bounding box calculation.
-          void osSetInertiaAsSphere(LSL_Float mass,  LSL_Float radius, vector centerOfMass);
+          void osSetInertiaAsSphere(LSL_Float mass,  LSL_Float radius, LSL_Vector centerOfMass);
     //ApiDesc Sets the inertia data for the object containing the script based on a cylindrical bounding box calculation.
-          void osSetInertiaAsCylinder(LSL_Float mass,  LSL_Float radius, LSL_Float length, vector centerOfMass,rotation lslrot);
+          void osSetInertiaAsCylinder(LSL_Float mass,  LSL_Float radius, LSL_Float length, LSL_Vector centerOfMass,LSL_Rotation lslrot);
  
     //ApiDesc Teleport a given primitive (object UUID) to a given position and rotation.
-   LSL_Integer osTeleportObject(LSL_Key objectUUID, vector targetPos, rotation targetrotation, LSL_Integer flags);
+   LSL_Integer osTeleportObject(LSL_Key objectUUID, LSL_Vector targetPos, LSL_Rotation targetrotation, LSL_Integer flags);
     //ApiDesc Return the link number of a given primitive in the linkset by name.
    LSL_Integer osGetLinkNumber(LSL_String name);
 
@@ -713,11 +711,11 @@ public interface IOSSL_Api
      LSL_Float osRound(LSL_Float value, LSL_Integer digits);
 
     //ApiDesc Returns the squared values of a vector multiplied with each other.
-     LSL_Float osVecMagSquare(vector a);
+     LSL_Float osVecMagSquare(LSL_Vector a);
     //ApiDesc Returns the difference of two squared vectors.
-     LSL_Float osVecDistSquare(vector a, vector b);
+     LSL_Float osVecDistSquare(LSL_Vector a, LSL_Vector b);
     //ApiDesc Returns the angle between two vectors.
-     LSL_Float osAngleBetween(vector a, vector b);
+     LSL_Float osAngleBetween(LSL_Vector a, LSL_Vector b);
 
     //ApiDesc Sets the sound volume of a given link.
           void osAdjustSoundVolume(LSL_Integer linknum, LSL_Float volume);
@@ -740,9 +738,9 @@ public interface IOSSL_Api
     //ApiDesc Trigger a given preloaded sound with volume for a given link.
           void osTriggerSound(LSL_Integer linknum, LSL_String sound, LSL_Float volume);
     //ApiDesc Trigger a given preloaded sound with volume and axis-aligned bounding box for a given link.
-          void osTriggerSoundLimited(LSL_Integer linknum, LSL_String sound, LSL_Float volume, vector top_north_east, vector bottom_south_west);
+          void osTriggerSoundLimited(LSL_Integer linknum, LSL_String sound, LSL_Float volume, LSL_Vector top_north_east, LSL_Vector bottom_south_west);
     //ApiDesc Trigger a given preloaded sound at a position
-          void osTriggerSoundAtPos(LSL_String sound, vector position, LSL_Float gain);
+          void osTriggerSoundAtPos(LSL_String sound, LSL_Vector position, LSL_Float gain);
     //ApiDesc Detected params return of triggered user event of their set country.
     LSL_String osDetectedCountry(LSL_Integer number);
     //ApiDesc Returns the country of a user.
@@ -774,13 +772,13 @@ public interface IOSSL_Api
     //ApiDesc Returns an integer whether two float values are within a given margin equal.
    LSL_Integer osApproxEquals(LSL_Float a, LSL_Float b, LSL_Float margin);
     //ApiDesc Returns an integer whether two vectors are within floating point precision equal.
-   LSL_Integer osApproxEquals(vector va, vector vb);
+   LSL_Integer osApproxEquals(LSL_Vector va, LSL_Vector vb);
     //ApiDesc Returns an integer whether two vectors are within a given margin equal.
-   LSL_Integer osApproxEquals(vector va, vector vb, LSL_Float margin);
+   LSL_Integer osApproxEquals(LSL_Vector va, LSL_Vector vb, LSL_Float margin);
     //ApiDesc Returns an integer whether two rotations are within floating point precision equal.
-   LSL_Integer osApproxEquals(rotation ra, rotation rb);
+   LSL_Integer osApproxEquals(LSL_Rotation ra, LSL_Rotation rb);
     //ApiDesc Returns an integer whether two rotations are within a given margin equal.
-   LSL_Integer osApproxEquals(rotation ra, rotation rb, LSL_Float margin);
+   LSL_Integer osApproxEquals(LSL_Rotation ra, LSL_Rotation rb, LSL_Float margin);
     //ApiDesc Returns the last owner (key) of a given inventory item (name or key) of the object containing the script.
        LSL_Key osGetInventoryLastOwner(LSL_String itemNameOrId);
     //ApiDesc Returns the key of a given inventory item of the object containing the script. Not the asset UUID.
@@ -821,7 +819,7 @@ public interface IOSSL_Api
     //ApiDesc Returns a spherical interpolation of two rotations shifted by amount.
   LSL_Rotation osSlerp(LSL_Rotation a, LSL_Rotation b, LSL_Float amount);
     //ApiDesc Returns a spherical interpolation of two vectors shifted by amount.
-        vector osSlerp(vector a, vector b, LSL_Float amount);
+        LSL_Vector osSlerp(LSL_Vector a, LSL_Vector b, LSL_Float amount);
 
     //ApiDesc Resets all scripts in the inventory of a link, the entire linkset or itself.
           void osResetAllScripts(LSL_Integer AllLinkset);
@@ -837,17 +835,17 @@ public interface IOSSL_Api
     //ApiDesc Returns the max distance for allowing avatars to sit on a given link.
      LSL_Float osGetLinkSitActiveRange(LSL_Integer linkNumber);
     //ApiDesc Returns the position of the sit target of the object containing the script.
-        vector osGetSitTargetPos();
+        LSL_Vector osGetSitTargetPos();
     //ApiDesc Returns the rotation of the sit target of the object containing the script.
-      rotation osGetSitTargetRot();
+      LSL_Rotation osGetSitTargetRot();
     //ApiDesc Sets the stand offset from the position of the object containing the script.
-          void osSetStandTarget(vector v);
+          void osSetStandTarget(LSL_Vector v);
     //ApiDesc Sets the stand offset from the position of a given link.
-          void osSetLinkStandTarget(LSL_Integer linkNumber, vector v);
+          void osSetLinkStandTarget(LSL_Integer linkNumber, LSL_Vector v);
     //ApiDesc Returns the stand offset of the object containing the script.
-        vector osGetStandTarget();
+        LSL_Vector osGetStandTarget();
     //ApiDesc Returns the stand offset of a given link.
-        vector osGetLinkStandTarget(LSL_Integer linkNumber);
+        LSL_Vector osGetLinkStandTarget(LSL_Integer linkNumber);
     //ApiDesc Removes the object animations and returns the count of removed animations.
    LSL_Integer osClearObjectAnimations();
 
@@ -875,7 +873,7 @@ public interface IOSSL_Api
           void osLinkParticleSystem(LSL_Integer linknumber, LSL_List rules);
 
     //ApiDesc Sets the look at direction of a NPC to a given object (key) and offset.
-   LSL_Integer osNpcLookAt(LSL_Key npckey, LSL_Integer type, LSL_Key objkey, vector offset);
+   LSL_Integer osNpcLookAt(LSL_Key npckey, LSL_Integer type, LSL_Key objkey, LSL_Vector offset);
 
     //ApiDesc Returns the type of a given avatar (key).
    LSL_Integer osAvatarType(LSL_Key avkey);
@@ -910,9 +908,9 @@ public interface IOSSL_Api
     //ApiDesc Decrypt an encrypted text using osAESEncryptTo() and the same Key (secret) and Initialization Vector (ivString) used in the encryption. Returns the decrypted text.
     LSL_String osAESDecryptFrom(string secret, string encryptedText, string ivString);
     //ApiDesc Returns the color vector of a given link and face.
-        vector osGetLinkColor(LSL_Integer linknum, LSL_Integer face);
+        LSL_Vector osGetLinkColor(LSL_Integer linknum, LSL_Integer face);
     //ApiDesc Returns the color vector of a given color temperature.
-        vector osTemperature2sRGB(LSL_Float dtemp);
+        LSL_Vector osTemperature2sRGB(LSL_Float dtemp);
 
          /// <summary>
          /// osListFindListNext identical to llListFindListNext but with search limited to sublist from start to end (excluded) 
@@ -932,7 +930,7 @@ public interface IOSSL_Api
     //ApiDesc Returns a float that is at index(>=0) in src or 0 if that is not a float
      LSL_Float osListAsFloat(LSL_List src, int index);
     //ApiDesc Returns a vector that is at index(>=0) in src or Zero vector if that is not a vector
-        vector osListAsVector(LSL_List src, int index);
+        LSL_Vector osListAsVector(LSL_List src, int index);
     //ApiDesc Returns a rotation that is at index(>=0) in src or zero rotation if that is not a vector
   LSL_Rotation osListAsRotation(LSL_List src, int index);
     //ApiDesc Returns a Perlin Noise2D 

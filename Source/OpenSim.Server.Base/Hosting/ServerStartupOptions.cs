@@ -21,12 +21,6 @@ namespace OpenSim.Server.Base.Hosting;
 public class ServerStartupOptions
 {
     /// <summary>
-    /// Path to the log4net configuration file.
-    /// Defaults to the assembly name with a <c>.dll.config</c> extension when empty.
-    /// </summary>
-    public string LogConfig { get; init; } = string.Empty;
-
-    /// <summary>
     /// Zero or more explicit <c>.ini</c> files to load in addition to the master.
     /// Applied in order after <see cref="IniMaster"/>.
     /// </summary>

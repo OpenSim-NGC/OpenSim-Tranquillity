@@ -33,14 +33,15 @@ using OpenSim.Server.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.OfflineIM;
 
 public class OfflineIMServiceRemoteConnector : IOfflineIMService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = string.Empty;
     private IServiceAuth m_Auth;
@@ -49,7 +50,7 @@ public class OfflineIMServiceRemoteConnector : IOfflineIMService
     public OfflineIMServiceRemoteConnector(string url)
     {
         m_ServerURI = url;
-        m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0}", m_ServerURI);
+        m_log.LogDebug("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0}", m_ServerURI);
     }
 
     public OfflineIMServiceRemoteConnector(IConfigSource config)
@@ -57,7 +58,7 @@ public class OfflineIMServiceRemoteConnector : IOfflineIMService
         IConfig cnf = config.Configs["Messaging"];
         if (cnf == null)
         {
-            m_log.WarnFormat("[OfflineIM.V2.RemoteConnector]: Missing Messaging configuration");
+            m_log.LogWarning("[OfflineIM.V2.RemoteConnector]: Missing Messaging configuration");
             return;
         }
 
@@ -73,7 +74,7 @@ public class OfflineIMServiceRemoteConnector : IOfflineIMService
                 break;
         }
         ///
-        m_log.DebugFormat("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0} with auth {1}",
+        m_log.LogDebug("[OfflineIM.V2.RemoteConnector]: Offline IM server at {0} with auth {1}",
             m_ServerURI, (m_Auth == null ? "None" : m_Auth.GetType().ToString()));
     }
 
@@ -97,9 +98,9 @@ public class OfflineIMServiceRemoteConnector : IOfflineIMService
             if (result == "NULL" || result.Equals("false", StringComparison.InvariantCultureIgnoreCase))
             {
                 if (ret.TryGetValue("REASON", out object rso))
-                    m_log.Debug($"[OfflineIM.V2.RemoteConnector]: GetMessages for {principalID} failed: {rso}");
+                    m_log.LogDebug($"[OfflineIM.V2.RemoteConnector]: GetMessages for {principalID} failed: {rso}");
                 else
-                    m_log.Debug($"[OfflineIM.V2.RemoteConnector]: GetMessages for {principalID} failed: Unknown error");
+                    m_log.LogDebug($"[OfflineIM.V2.RemoteConnector]: GetMessages for {principalID} failed: Unknown error");
                 return ims;
             }
         }

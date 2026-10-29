@@ -27,14 +27,14 @@
 
 using System.Reflection;
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.Framework.Scenes;
 
 public class MovementAnimationOverrides
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private object MAOLock = new object();
     private Dictionary<string, UUID> m_overrides = new Dictionary<string, UUID>();
@@ -49,7 +49,7 @@ public class MovementAnimationOverrides
             return;
         }
 
-        m_log.DebugFormat("Setting override for {0} to {1}", state, animID);
+        m_log.LogDebug("Setting override for {0} to {1}", state, animID);
 
         lock (MAOLock)
             m_overrides[state] = animID;

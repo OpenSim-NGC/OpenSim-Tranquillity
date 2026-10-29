@@ -27,9 +27,6 @@
 
 using OpenMetaverse;
 
-//using System.Reflection;
-//using log4net;
-
 namespace OpenSim.Region.ClientStack.LindenUDP;
 
 /// <summary>
@@ -58,8 +55,6 @@ public sealed class UnackedPacketCollection
             FromResend = fromResend;
         }
     }
-
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>Holds the actual unacked packet data, sorted by sequence number</summary>
     private SortedDictionary<uint, OutgoingPacket> m_packets = new SortedDictionary<uint, OutgoingPacket>();
@@ -198,9 +193,6 @@ public sealed class UnackedPacketCollection
             }
         }
 
-        // if (expiredPackets != null)
-        //     m_log.DebugFormat("[UNACKED PACKET COLLECTION]: Found {0} expired packets on timeout of {1}", expiredPackets.Count, timeoutMS);
-
         return expiredPackets;
     }
 
@@ -231,7 +223,7 @@ public sealed class UnackedPacketCollection
         // Process all the pending removes, including updating statistics and round-trip times
         while (m_pendingAcknowledgements.TryDequeue(out PendingAck pendingAcknowledgement))
         {
-            //m_log.DebugFormat("[UNACKED PACKET COLLECTION]: Processing ack {0}", pendingAcknowledgement.SequenceNumber);
+            //m_log.LogDebug("[UNACKED PACKET COLLECTION]: Processing ack {0}", pendingAcknowledgement.SequenceNumber);
             if (m_packets.TryGetValue(pendingAcknowledgement.SequenceNumber, out OutgoingPacket ackedPacket))
             {
                 m_packets.Remove(pendingAcknowledgement.SequenceNumber);

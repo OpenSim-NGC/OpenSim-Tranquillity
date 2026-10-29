@@ -51,7 +51,8 @@ public class TestsAssetCache : ISharedRegionModule, IAssetCache
 
     public void Initialise(IConfigSource source)
     {
-        m_Cache = MemoryCache.Default;
+        // One cache per instance: MemoryCache.Default is process-wide, and tests reuse the same asset ids.
+        m_Cache = new MemoryCache(Name);
         m_Enabled = true;
     }
 
@@ -93,8 +94,8 @@ public class TestsAssetCache : ISharedRegionModule, IAssetCache
     {
         if (asset != null)
         {
-            //CacheItemPolicy policy = new CacheItemPolicy();
-            //m_Cache.Set(asset.ID, asset, policy);
+            CacheItemPolicy policy = new CacheItemPolicy();
+            m_Cache.Set(asset.ID, asset, policy);
         }
     }
 
@@ -105,31 +106,31 @@ public class TestsAssetCache : ISharedRegionModule, IAssetCache
 
     public bool Get(string id, out AssetBase asset)
     {
-        //asset = (AssetBase)m_Cache.Get(id);
-        asset = null;
+        asset = (AssetBase)m_Cache.Get(id);
         return true;
     }
 
     public bool GetFromMemory(string id, out AssetBase asset)
     {
-        //asset = (AssetBase)m_Cache.Get(id);
-        asset = null;
+        asset = (AssetBase)m_Cache.Get(id);
         return true;
     }
 
     public AssetBase GetCached(string id)
     {
-        //return (AssetBase)m_Cache.Get(id);
-        return null;
+        return (AssetBase)m_Cache.Get(id);
     }
 
     public void Expire(string id)
     {
-        //m_Cache.Remove(id);
+        m_Cache.Remove(id);
     }
 
     public void Clear()
     {
+        MemoryCache old = m_Cache;
+        m_Cache = new MemoryCache(Name);
+        old.Dispose();
     }
 
     /*

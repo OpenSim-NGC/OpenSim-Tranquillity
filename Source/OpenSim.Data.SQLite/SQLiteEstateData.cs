@@ -27,17 +27,17 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using System.Data.SQLite;
 using OpenMetaverse;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.SQLite;
 
 public class SQLiteEstateStore : IEstateDataStore
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private SQLiteConnection m_connection;
     private string m_connectionString;
@@ -66,7 +66,7 @@ public class SQLiteEstateStore : IEstateDataStore
 
         m_connectionString = connectionString;
 
-        m_log.Info("[ESTATE DB]: Sqlite - connecting: "+m_connectionString);
+        m_log.LogInformation("[ESTATE DB]: Sqlite - connecting: "+m_connectionString);
 
         m_connection = new SQLiteConnection(m_connectionString);
         m_connection.Open();
@@ -116,7 +116,7 @@ public class SQLiteEstateStore : IEstateDataStore
         }
         catch (SQLiteException)
         {
-            m_log.Error("[SQLITE]: There was an issue loading the estate settings.  This can happen the first time running OpenSimulator with CSharpSqlite the first time.  OpenSimulator will probably crash, restart it and it should be good to go.");
+            m_log.LogError("[SQLITE]: There was an issue loading the estate settings.  This can happen the first time running OpenSimulator with CSharpSqlite the first time.  OpenSimulator will probably crash, restart it and it should be good to go.");
         }
 
         if (r != null && r.Read())
@@ -156,6 +156,9 @@ public class SQLiteEstateStore : IEstateDataStore
         es.EstateManagers = LoadUUIDList(es.EstateID, "estate_managers");
         es.EstateAccess = LoadUUIDList(es.EstateID, "estate_users");
         es.EstateGroups = LoadUUIDList(es.EstateID, "estate_groups");
+        es.AllowedExperiences = LoadUUIDList(es.EstateID, "estate_allowed_experiences");
+        es.KeyExperiences = LoadUUIDList(es.EstateID, "estate_key_experiences");
+        es.BlockedExperiences = LoadUUIDList(es.EstateID, "estate_blocked_experiences");
         return es;
     }
 
@@ -173,6 +176,9 @@ public class SQLiteEstateStore : IEstateDataStore
         es.EstateManagers = LoadUUIDList(es.EstateID, "estate_managers");
         es.EstateAccess = LoadUUIDList(es.EstateID, "estate_users");
         es.EstateGroups = LoadUUIDList(es.EstateID, "estate_groups");
+        es.AllowedExperiences = LoadUUIDList(es.EstateID, "estate_allowed_experiences");
+        es.KeyExperiences = LoadUUIDList(es.EstateID, "estate_key_experiences");
+        es.BlockedExperiences = LoadUUIDList(es.EstateID, "estate_blocked_experiences");
 
         return es;
     }
@@ -258,6 +264,9 @@ public class SQLiteEstateStore : IEstateDataStore
         SaveUUIDList(es.EstateID, "estate_managers", es.EstateManagers);
         SaveUUIDList(es.EstateID, "estate_users", es.EstateAccess);
         SaveUUIDList(es.EstateID, "estate_groups", es.EstateGroups);
+        SaveUUIDList(es.EstateID, "estate_allowed_experiences", es.AllowedExperiences);
+        SaveUUIDList(es.EstateID, "estate_key_experiences", es.KeyExperiences);
+        SaveUUIDList(es.EstateID, "estate_blocked_experiences", es.BlockedExperiences);
     }
 
     private void LoadBanList(EstateSettings es)
@@ -288,10 +297,15 @@ public class SQLiteEstateStore : IEstateDataStore
         r.Close();
     }
 
+    // The delete and the inserts of one list run in one transaction: a failed insert leaves the old list
+    // in place (the transaction is rolled back when it is disposed without Commit), and SQLite commits
+    // once per list instead of once per row.
     private void SaveBanList(EstateSettings es)
     {
+        using (SQLiteTransaction transaction = m_connection.BeginTransaction())
         using (SQLiteCommand cmd = (SQLiteCommand)m_connection.CreateCommand())
         {
+            cmd.Transaction = transaction;
             cmd.CommandText = "delete from estateban where EstateID = :EstateID";
             cmd.Parameters.AddWithValue(":EstateID", es.EstateID.ToString());
 
@@ -311,13 +325,18 @@ public class SQLiteEstateStore : IEstateDataStore
                 cmd.ExecuteNonQuery();
                 cmd.Parameters.Clear();
             }
+
+            transaction.Commit();
         }
     }
 
+    // One transaction per list, as in SaveBanList.
     void SaveUUIDList(uint EstateID, string table, UUID[] data)
     {
+        using (SQLiteTransaction transaction = m_connection.BeginTransaction())
         using (SQLiteCommand cmd = (SQLiteCommand)m_connection.CreateCommand())
         {
+            cmd.Transaction = transaction;
             cmd.CommandText = "delete from "+table+" where EstateID = :EstateID";
             cmd.Parameters.AddWithValue(":EstateID", EstateID.ToString());
 
@@ -335,6 +354,8 @@ public class SQLiteEstateStore : IEstateDataStore
                 cmd.ExecuteNonQuery();
                 cmd.Parameters.Clear();
             }
+
+            transaction.Commit();
         }
     }
 
@@ -497,7 +518,21 @@ public class SQLiteEstateStore : IEstateDataStore
 
     public List<UUID> GetRegions(int estateID)
     {
-        return new List<UUID>();
+        List<UUID> result = new List<UUID>();
+
+        using (SQLiteCommand cmd = (SQLiteCommand)m_connection.CreateCommand())
+        {
+            cmd.CommandText = "select RegionID from estate_map where EstateID = :EstateID";
+            cmd.Parameters.AddWithValue(":EstateID", estateID);
+
+            using (IDataReader r = cmd.ExecuteReader())
+            {
+                while (r.Read())
+                    result.Add(new UUID(r["RegionID"].ToString()));
+            }
+        }
+
+        return result;
     }
 
     public bool DeleteEstate(int estateID)

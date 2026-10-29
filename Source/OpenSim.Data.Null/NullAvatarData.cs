@@ -33,6 +33,9 @@ public class NullAvatarData : IAvatarData
 {
     private static Dictionary<UUID, AvatarBaseData> m_DataByUUID = new Dictionary<UUID, AvatarBaseData>();
 
+    // Shared by every instance in the process; serialise every access, including the edit of a stored row.
+    private static readonly object s_lock = new object();
+
     public NullAvatarData(string connectionString, string realm)
     {
     }
@@ -42,8 +45,13 @@ public class NullAvatarData : IAvatarData
         if (field == "PrincipalID")
         {
             if (UUID.TryParse(val, out UUID id))
-                if (m_DataByUUID.TryGetValue(id, out AvatarBaseData abd))
-                    return new AvatarBaseData[] { abd };
+            {
+                lock (s_lock)
+                {
+                    if (m_DataByUUID.TryGetValue(id, out AvatarBaseData abd))
+                        return new AvatarBaseData[] { abd };
+                }
+            }
         }
 
         // Fail
@@ -52,17 +60,21 @@ public class NullAvatarData : IAvatarData
 
     public bool Store(AvatarBaseData data)
     {
-        m_DataByUUID[data.PrincipalID] = data;
+        lock (s_lock)
+            m_DataByUUID[data.PrincipalID] = data;
         return true;
     }
 
     public bool Delete(UUID principalID, string name)
     {
-        if (m_DataByUUID.TryGetValue(principalID, out AvatarBaseData abd))
+        lock (s_lock)
         {
-            return abd.Data.Remove(name);
+            if (m_DataByUUID.TryGetValue(principalID, out AvatarBaseData abd))
+            {
+                return abd.Data.Remove(name);
+            }
+            return false;
         }
-        return false;
     }
 
     public bool Delete(string field, string val)
@@ -70,7 +82,10 @@ public class NullAvatarData : IAvatarData
         if (field == "PrincipalID")
         {
             if (UUID.TryParse(val, out UUID id))
-                return m_DataByUUID.Remove(id);
+            {
+                lock (s_lock)
+                    return m_DataByUUID.Remove(id);
+            }
         }
         return false;
     }

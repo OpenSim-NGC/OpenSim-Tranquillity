@@ -31,11 +31,14 @@ using System.Data.SQLite;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.SQLite;
 
 public class SQLiteGenericTableHandler<T> : SQLiteFramework where T: class, new()
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Dictionary<string, FieldInfo> m_Fields =
             new Dictionary<string, FieldInfo>();

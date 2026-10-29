@@ -586,8 +586,16 @@ public class SerialiserTests : OpenSimTestCase
             <OtherParts />
         </SceneObjectGroup>";
 
-    protected Scene m_scene;
-    protected SerialiserModule m_serialiserModule;
+    protected Scene m_scene = null!;
+    protected SerialiserModule m_serialiserModule = null!;
+
+    // Formerly NUnit [SetUp]; the xunit migration (#197) dropped the attribute and nothing called it, so every test
+    // here ran with m_scene null. Wired back through OpenSimTestCase.SetUp() (Docs/feature/repo-audit/T1-TEST-FIXTURES.md).
+    public override void SetUp()
+    {
+        base.SetUp();
+        Init();
+    }
 
     private void Init()
     {
@@ -722,9 +730,9 @@ public class SerialiserTests : OpenSimTestCase
         xtr.ReadStartElement("SceneObjectPart");
 
         UUID uuid = UUID.Zero;
-        string name = null;
+        string? name = null;
         UUID creatorId = UUID.Zero;
-        DAMap daMap = null;
+        DAMap? daMap = null;
 
         while (xtr.Read() && xtr.Name != "SceneObjectPart")
         {
@@ -833,9 +841,9 @@ public class SerialiserTests : OpenSimTestCase
         xtr.ReadStartElement("SceneObjectPart");
 
         UUID uuid = UUID.Zero;
-        string name = null;
+        string? name = null;
         UUID creatorId = UUID.Zero;
-        DAMap daMap = null;
+        DAMap? daMap = null;
 
         while (xtr.Read() && xtr.Name != "SceneObjectPart")
         {

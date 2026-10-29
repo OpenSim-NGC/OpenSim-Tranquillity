@@ -27,10 +27,12 @@
 
 using OpenSim.Region.Framework.Scenes;
 using OpenMetaverse;
-using log4net;
 using System.Reflection;
 using OpenSim.Framework.Serialization;
 using SkiaSharp;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.CoreModules.World.Archiver;
 
@@ -39,7 +41,7 @@ namespace OpenSim.Region.CoreModules.World.Archiver;
 /// </summary>
 public class DearchiveScenesInfo
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// One region in the archive.
@@ -175,7 +177,7 @@ public class DearchiveScenesInfo
             }
             else
             {
-                m_log.WarnFormat("[ARCHIVER]: Not loading archived region {0} because there's no existing region at location {1},{2}",
+                m_log.LogWarning("[ARCHIVER]: Not loading archived region {0} because there's no existing region at location {1},{2}",
                     archivedRegion.Directory, location.X, location.Y);
             }
         }

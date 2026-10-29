@@ -69,7 +69,7 @@ public sealed class RegionRuntime : IRegionRuntime
             if (_initialized)
                 return;
 
-            // Apply process-level defaults (culture, ServicePointManager, thread
+            // Apply process-level defaults (culture, HTTP transport, thread
             // pool) that previously executed at the top of Application.Main().
             _processSetupService.Apply(new ProcessSetupOptions
             {
@@ -168,8 +168,6 @@ public sealed class RegionRuntime : IRegionRuntime
             startup.Set("inidirectory", options.IniDirectory);
         if (!string.IsNullOrWhiteSpace(options.ConsoleType))
             startup.Set("console", options.ConsoleType);
-        if (!string.IsNullOrWhiteSpace(options.LogConfig))
-            startup.Set("logconfig", options.LogConfig);
         startup.Set("background", options.Background);
 
         // Multiple --inifile values: the first is `inifile`, the rest are

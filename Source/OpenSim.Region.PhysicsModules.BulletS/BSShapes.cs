@@ -32,6 +32,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using OpenSim.Region.PhysicsModules.Meshing;
 using OpenSim.Region.PhysicsModules.ConvexDecompositionDotNet;
 
+using Microsoft.Extensions.Logging;
 using OMV = OpenMetaverse;
 
 namespace OpenSim.Region.PhysicsModules.BulletS;
@@ -239,7 +240,7 @@ public abstract class BSShape
         if (prim.PrimAssetState == BSPhysObject.PrimAssetCondition.Fetched)
         {
             prim.PrimAssetState = BSPhysObject.PrimAssetCondition.FailedMeshing;
-            physicsScene.Logger.WarnFormat("{0} Fetched asset would not mesh. prim={1}, texture={2}",
+            physicsScene.Logger.LogWarning("{0} Fetched asset would not mesh. prim={1}, texture={2}",
                                             LogHeader, UsefulPrimInfo(physicsScene, prim), prim.BaseShape.SculptTexture);
             physicsScene.DetailLog("{0},BSShape.VerifyMeshCreated,setFailed,prim={1},tex={2}",
                                             prim.LocalID, UsefulPrimInfo(physicsScene, prim), prim.BaseShape.SculptTexture);
@@ -296,7 +297,7 @@ public abstract class BSShape
                 else
                 {
                     xprim.PrimAssetState = BSPhysObject.PrimAssetCondition.FailedAssetFetch;
-                    physicsScene.Logger.ErrorFormat("{0} Physical object requires asset but no asset provider. Name={1}",
+                    physicsScene.Logger.LogError("{0} Physical object requires asset but no asset provider. Name={1}",
                                                 LogHeader, physicsScene.PhysicsSceneName);
                 }
             }
@@ -304,14 +305,14 @@ public abstract class BSShape
             {
                 if (prim.PrimAssetState == BSPhysObject.PrimAssetCondition.FailedAssetFetch)
                 {
-                    physicsScene.Logger.WarnFormat("{0} Mesh failed to fetch asset. prim={1}, texture={2}",
+                    physicsScene.Logger.LogWarning("{0} Mesh failed to fetch asset. prim={1}, texture={2}",
                                                 LogHeader, UsefulPrimInfo(physicsScene, prim), prim.BaseShape.SculptTexture);
                     physicsScene.DetailLog("{0},BSShape.VerifyMeshCreated,wasFailed,prim={1},tex={2}",
                                                 prim.LocalID, UsefulPrimInfo(physicsScene, prim), prim.BaseShape.SculptTexture);
                 }
                 if (prim.PrimAssetState == BSPhysObject.PrimAssetCondition.FailedMeshing)
                 {
-                    physicsScene.Logger.WarnFormat("{0} Mesh asset would not mesh. prim={1}, texture={2}",
+                    physicsScene.Logger.LogWarning("{0} Mesh asset would not mesh. prim={1}, texture={2}",
                                                 LogHeader, UsefulPrimInfo(physicsScene, prim), prim.BaseShape.SculptTexture);
                     physicsScene.DetailLog("{0},BSShape.VerifyMeshCreated,wasFailedMeshing,prim={1},tex={2}",
                                                 prim.LocalID, UsefulPrimInfo(physicsScene, prim), prim.BaseShape.SculptTexture);
@@ -423,7 +424,7 @@ public class BSShapeNative : BSShape
         }
         if (!newShape.HasPhysicalShape)
         {
-            physicsScene.Logger.ErrorFormat("{0} BuildPhysicalNativeShape failed. ID={1}, shape={2}",
+            physicsScene.Logger.LogError("{0} BuildPhysicalNativeShape failed. ID={1}, shape={2}",
                                     LogHeader, prim.LocalID, shapeType);
         }
         newShape.shapeType = shapeType;
@@ -615,7 +616,7 @@ public class BSShapeMesh : BSShape
             {
                 // Force the asset condition to 'failed' so we won't try to keep fetching and processing this mesh.
                 prim.PrimAssetState = BSPhysObject.PrimAssetCondition.FailedMeshing;
-                physicsScene.Logger.DebugFormat("{0} All mesh triangles degenerate. Prim={1}", LogHeader, UsefulPrimInfo(physicsScene, prim) );
+                physicsScene.Logger.LogDebug("{0} All mesh triangles degenerate. Prim={1}", LogHeader, UsefulPrimInfo(physicsScene, prim) );
                 physicsScene.DetailLog("{0},BSShapeMesh.CreatePhysicalMesh,allDegenerate,key={1}", prim.LocalID, newMeshKey);
             }
         }
@@ -989,7 +990,7 @@ public class BSShapeCompound : BSShape
                 if (!physicsScene.PE.IsCompound(physShapeInfo))
                 {
                     // Failed the sanity check!!
-                    physicsScene.Logger.ErrorFormat("{0} Attempt to free a compound shape that is not compound!! type={1}, ptr={2}",
+                    physicsScene.Logger.LogError("{0} Attempt to free a compound shape that is not compound!! type={1}, ptr={2}",
                                                 LogHeader, physShapeInfo.shapeType, physShapeInfo.AddrString);
                     physicsScene.DetailLog("{0},BSShapeCollection.DereferenceCompound,notACompoundShape,type={1},ptr={2}",
                                                 BSScene.DetailLogZero, physShapeInfo.shapeType, physShapeInfo.AddrString);
@@ -1084,7 +1085,7 @@ public class BSShapeCompound : BSShape
                             }
                             else
                             {
-                                physicsScene.Logger.WarnFormat("{0} DereferenceAnonCollisionShape. Did not find shape. {1}",
+                                physicsScene.Logger.LogWarning("{0} DereferenceAnonCollisionShape. Did not find shape. {1}",
                                     LogHeader, pShape);
                             }
                         }

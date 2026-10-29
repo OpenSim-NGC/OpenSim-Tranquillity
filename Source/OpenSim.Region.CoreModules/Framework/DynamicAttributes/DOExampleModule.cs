@@ -26,12 +26,14 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.CoreModules.Framework.DynamicAttributes;
 
@@ -50,7 +52,7 @@ public class DOExampleModule : INonSharedRegionModule
         }
     }
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly bool ENABLED = false;   // enable for testing
 
@@ -104,7 +106,7 @@ public class DOExampleModule : INonSharedRegionModule
         {
             movesSoFar = attrs["moves"].AsInteger();
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[DO EXAMPLE MODULE]: Found saved moves {0} for {1} in {2}", movesSoFar, so.Name, m_scene.Name);
         }
 

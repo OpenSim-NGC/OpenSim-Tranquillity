@@ -32,9 +32,9 @@ using OpenSim.Framework;
 using OpenSim.Services.Base;
 using OpenSim.Services.Interfaces;
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Services.InventoryService;
@@ -45,7 +45,7 @@ namespace OpenSim.Services.InventoryService;
 /// </summary>
 public class LibraryService : ServiceBase, ILibraryService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly UUID libOwner = Constants.m_MrOpenSimID;
     private const string m_LibraryRootFolderIDstr = "00000112-000f-0000-0000-000100bba000";
@@ -94,7 +94,7 @@ public class LibraryService : ServiceBase, ILibraryService
             pLibName = libConfig.GetString("LibraryName", pLibName);
         }
 
-        m_log.Debug("[LIBRARY]: Starting library service...");
+        m_log.LogDebug("[LIBRARY]: Starting library service...");
 
         m_LibraryRootFolder = new InventoryFolderImpl();
         m_LibraryRootFolder.Owner = libOwner;
@@ -136,7 +136,7 @@ public class LibraryService : ServiceBase, ILibraryService
     /// <param name="assets"></param>
     protected void LoadLibraries(string librariesControlPath)
     {
-        m_log.InfoFormat("[LIBRARY INVENTORY]: Loading library control file {0}", librariesControlPath);
+        m_log.LogInformation("[LIBRARY INVENTORY]: Loading library control file {0}", librariesControlPath);
         LoadFromFile(librariesControlPath, "Libraries control", ReadLibraryFromConfig);
     }
 
@@ -179,11 +179,11 @@ public class LibraryService : ServiceBase, ILibraryService
         {
             libraryFolders.Add(folderInfo.ID, folderInfo);
             parentFolder.AddChildFolder(folderInfo);
-            //m_log.InfoFormat("[LIBRARY INVENTORY]: Adding folder {0} ({1})", folderInfo.name, folderInfo.folderID);
+            //m_log.LogInformation("[LIBRARY INVENTORY]: Adding folder {0} ({1})", folderInfo.name, folderInfo.folderID);
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[LIBRARY INVENTORY]: Couldn't add folder {0} ({1}) since parent folder with ID {2} does not exist!",
                 folderInfo.Name, folderInfo.ID, folderInfo.ParentID);
         }
@@ -222,12 +222,12 @@ public class LibraryService : ServiceBase, ILibraryService
             }
             else
             {
-                m_log.WarnFormat("[LIBRARY INVENTORY] Item {1} [{0}] not added, duplicate item", item.ID, item.Name);
+                m_log.LogWarning("[LIBRARY INVENTORY] Item {1} [{0}] not added, duplicate item", item.ID, item.Name);
             }
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[LIBRARY INVENTORY]: Couldn't add item {0} ({1}) since parent folder with ID {2} does not exist!",
                 item.Name, item.ID, item.Folder);
         }
@@ -256,12 +256,12 @@ public class LibraryService : ServiceBase, ILibraryService
             }
             catch (XmlException e)
             {
-                m_log.ErrorFormat("[LIBRARY INVENTORY]: Error loading {0} : {1}", path, e);
+                m_log.LogError("[LIBRARY INVENTORY]: Error loading {0} : {1}", path, e);
             }
         }
         else
         {
-            m_log.ErrorFormat("[LIBRARY INVENTORY]: {0} file {1} does not exist!", fileDescription, path);
+            m_log.LogError("[LIBRARY INVENTORY]: {0} file {1} does not exist!", fileDescription, path);
         }
     }
 

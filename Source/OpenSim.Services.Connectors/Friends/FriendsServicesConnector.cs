@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
@@ -35,12 +34,13 @@ using FriendInfo = OpenSim.Services.Interfaces.FriendInfo;
 using OpenSim.Server.Base;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors.Friends;
 
 public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI = String.Empty;
@@ -64,7 +64,7 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
         IConfig gridConfig = source.Configs["FriendsService"];
         if (gridConfig == null)
         {
-            m_log.Error("[FRIENDS SERVICE CONNECTOR]: FriendsService missing from OpenSim.ini");
+            m_log.LogError("[FRIENDS SERVICE CONNECTOR]: FriendsService missing from OpenSim.ini");
             throw new Exception("Friends connector init error");
         }
 
@@ -73,7 +73,7 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
 
         if (serviceURI.Length == 0)
         {
-            m_log.Error("[FRIENDS SERVICE CONNECTOR]: No Server URI named in section FriendsService");
+            m_log.LogError("[FRIENDS SERVICE CONNECTOR]: No Server URI named in section FriendsService");
             throw new Exception("Friends connector init error");
         }
         m_ServerURI = serviceURI;
@@ -124,7 +124,7 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
 
                     List<FriendInfo> finfos = new List<FriendInfo>();
                     Dictionary<string, object>.ValueCollection finfosList = replyData.Values;
-                    //m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: get neighbours returned {0} elements", rinfosList.Count);
+                    //m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: get neighbours returned {0} elements", rinfosList.Count);
                     foreach (object f in finfosList)
                     {
                         if (f is Dictionary<string, object>)
@@ -133,7 +133,7 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
                             finfos.Add(finfo);
                         }
                         else
-                            m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: GetFriends {0} received invalid response type {1}",
+                            m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: GetFriends {0} received invalid response type {1}",
                                 PrincipalID, f.GetType());
                     }
 
@@ -141,14 +141,14 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
                     return finfos.ToArray();
                 }
                 else
-                    m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: GetFriends {0} received null response",
+                    m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: GetFriends {0} received null response",
                         PrincipalID);
 
             }
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
         }
 
         return new FriendInfo[0];
@@ -170,7 +170,7 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
             return false;
         }
 
@@ -185,11 +185,11 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
                 return success;
             }
             else
-                m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: StoreFriend {0} {1} received null response",
+                m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: StoreFriend {0} {1} received null response",
                     PrincipalID, Friend);
         }
         else
-            m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: StoreFriend received null reply");
+            m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: StoreFriend received null reply");
 
         return false;
 
@@ -225,7 +225,7 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
+            m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: Exception when contacting friends server at {0}: {1}", uri, e.Message);
             return false;
         }
 
@@ -240,11 +240,11 @@ public class FriendsServicesConnector : BaseServiceConnector, IFriendsService
                 return success;
             }
             else
-                m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: DeleteFriend {0} {1} received null response",
+                m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: DeleteFriend {0} {1} received null response",
                     PrincipalID, Friend);
         }
         else
-            m_log.DebugFormat("[FRIENDS SERVICE CONNECTOR]: DeleteFriend received null reply");
+            m_log.LogDebug("[FRIENDS SERVICE CONNECTOR]: DeleteFriend received null reply");
 
         return false;
     }

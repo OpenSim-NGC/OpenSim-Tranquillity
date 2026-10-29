@@ -30,11 +30,13 @@ using System.Collections.Frozen;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework;
 
 public static class SLUtil
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Asset types used only in OpenSim.

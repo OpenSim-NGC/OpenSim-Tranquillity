@@ -29,16 +29,17 @@ using System.Data;
 using System.IO.Compression;
 using System.Reflection;
 using System.Security.Cryptography;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
 public class PGSQLXAssetData : IXAssetDataPlugin
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected virtual Assembly Assembly
     {
@@ -77,15 +78,15 @@ public class PGSQLXAssetData : IXAssetDataPlugin
     /// <param name="connect">connect string</param>
     public void Initialise(string connect)
     {
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: THIS PLUGIN IS STRICTLY EXPERIMENTAL.");
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: DO NOT USE FOR ANY DATA THAT YOU DO NOT MIND LOSING.");
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: DATABASE TABLES CAN CHANGE AT ANY TIME, CAUSING EXISTING DATA TO BE LOST.");
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[PGSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[PGSQL XASSETDATA]: THIS PLUGIN IS STRICTLY EXPERIMENTAL.");
+        m_log.LogError("[PGSQL XASSETDATA]: DO NOT USE FOR ANY DATA THAT YOU DO NOT MIND LOSING.");
+        m_log.LogError("[PGSQL XASSETDATA]: DATABASE TABLES CAN CHANGE AT ANY TIME, CAUSING EXISTING DATA TO BE LOST.");
+        m_log.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[PGSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[PGSQL XASSETDATA]: ***********************************************************");
 
         m_connectionString = connect;
         m_database = new PGSQLManager(m_connectionString);
@@ -125,7 +126,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
     /// <remarks>On failure : throw an exception and attempt to reconnect to database</remarks>
     public AssetBase GetAsset(UUID assetID)
     {
-//            m_log.DebugFormat("[PGSQL XASSET DATA]: Looking for asset {0}", assetID);
+//            m_log.LogDebug("[PGSQL XASSET DATA]: Looking for asset {0}", assetID);
 
         AssetBase asset = null;
         lock (m_dbLock)
@@ -177,7 +178,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                                             //                                        int compressedLength = asset.Data.Length;
                                             asset.Data = outputStream.ToArray();
                                         }
-                                        //                                        m_log.DebugFormat(
+                                        //                                        m_log.LogDebug(
                                         //                                            "[XASSET DB]: Decompressed {0} {1} to {2} bytes from {3}",
                                         //                                            asset.ID, asset.Name, asset.Data.Length, compressedLength);
                                     }
@@ -189,7 +190,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                     }
                     catch (Exception e)
                     {
-                        m_log.Error(string.Format("[PGSQL XASSET DATA]: Failure fetching asset {0}", assetID), e);
+                        m_log.LogError(e, string.Format("[PGSQL XASSET DATA]: Failure fetching asset {0}", assetID));
                     }
                 }
             }
@@ -205,7 +206,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
     /// <remarks>On failure : Throw an exception and attempt to reconnect to database</remarks>
     public void StoreAsset(AssetBase asset)
     {
-//            m_log.DebugFormat("[XASSETS DB]: Storing asset {0} {1}", asset.Name, asset.ID);
+//            m_log.LogDebug("[XASSETS DB]: Storing asset {0} {1}", asset.Name, asset.ID);
 
         if (!UUID.TryParse(asset.ID, out UUID asset_id))
             return;
@@ -222,7 +223,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                     if (asset.Name.Length > 64)
                     {
                         assetName = asset.Name.Substring(0, 64);
-                        m_log.WarnFormat(
+                        m_log.LogWarning(
                             "[XASSET DB]: Name '{0}' for asset {1} truncated from {2} to {3} characters on add",
                             asset.Name, asset.ID, asset.Name.Length, assetName.Length);
                     }
@@ -231,7 +232,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                     if (asset.Description.Length > 64)
                     {
                         assetDescription = asset.Description.Substring(0, 64);
-                        m_log.WarnFormat(
+                        m_log.LogWarning(
                             "[XASSET DB]: Description '{0}' for asset {1} truncated from {2} to {3} characters on add",
                             asset.Description, asset.ID, asset.Description.Length, assetDescription.Length);
                     }
@@ -251,7 +252,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
 
                     byte[] hash = hasher.ComputeHash(asset.Data);
 
-                    //m_log.DebugFormat(
+                    //m_log.LogDebug(
                     //      "[XASSET DB]: Compressed data size for {0} {1}, hash {2} is {3}",
                     //      asset.ID, asset.Name, hash, compressedData.Length);
 
@@ -291,7 +292,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat("[ASSET DB]: PGSQL failure creating asset metadata {0} with name \"{1}\". Error: {2}",
+                        m_log.LogError("[ASSET DB]: PGSQL failure creating asset metadata {0} with name \"{1}\". Error: {2}",
                             asset.FullID, asset.Name, e.Message);
 
                         transaction.Rollback();
@@ -315,7 +316,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                         }
                         catch (Exception e)
                         {
-                            m_log.ErrorFormat("[XASSET DB]: PGSQL failure creating asset data {0} with name \"{1}\". Error: {2}",
+                            m_log.LogError("[XASSET DB]: PGSQL failure creating asset data {0} with name \"{1}\". Error: {2}",
                                 asset.FullID, asset.Name, e.Message);
 
                             transaction.Rollback();
@@ -369,7 +370,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[XASSET PGSQL DB]: Failure updating access_time for asset {0} with name {1} : {2}",
                         assetMetadata.ID, assetMetadata.Name, e.Message);
                 }
@@ -387,7 +388,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
     /// <returns></returns>
     private bool ExistsData(NpgsqlConnection dbcon, NpgsqlTransaction transaction, byte[] hash)
     {
-//            m_log.DebugFormat("[ASSETS DB]: Checking for asset {0}", uuid);
+//            m_log.LogDebug("[ASSETS DB]: Checking for asset {0}", uuid);
 
         bool exists = false;
 
@@ -401,14 +402,14 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                 {
                     if (dbReader.Read())
                     {
-                        // m_log.DebugFormat("[ASSETS DB]: Found asset {0}", uuid);
+                        // m_log.LogDebug("[ASSETS DB]: Found asset {0}", uuid);
                         exists = true;
                     }
                 }
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[XASSETS DB]: PGSql failure in ExistsData fetching hash {0}.  Exception {1}{2}",
                     hash, e.Message, e.StackTrace);
             }
@@ -461,7 +462,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
     /// <returns>true if it exists, false otherwise.</returns>
     public bool ExistsAsset(UUID uuid)
     {
-        // m_log.DebugFormat("[ASSETS DB]: Checking for asset {0}", uuid);
+        // m_log.LogDebug("[ASSETS DB]: Checking for asset {0}", uuid);
 
         bool assetExists = false;
 
@@ -480,14 +481,14 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                         {
                             if (dbReader.Read())
                             {
-//                                    m_log.DebugFormat("[ASSETS DB]: Found asset {0}", uuid);
+//                                    m_log.LogDebug("[ASSETS DB]: Found asset {0}", uuid);
                                 assetExists = true;
                             }
                         }
                     }
                     catch (Exception e)
                     {
-                        m_log.Error($"[XASSETS DB]: PGSql failure fetching asset {uuid}", e);
+                        m_log.LogError(e, $"[XASSETS DB]: PGSql failure fetching asset {uuid}");
                     }
                 }
             }
@@ -547,7 +548,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                     }
                     catch (Exception e)
                     {
-                        m_log.Error("[XASSETS DB]: PGSql failure fetching asset set" + Environment.NewLine + e.ToString());
+                        m_log.LogError("[XASSETS DB]: PGSql failure fetching asset set" + Environment.NewLine + e.ToString());
                     }
                }
             }
@@ -558,7 +559,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
 
     public bool Delete(string id)
     {
-//            m_log.DebugFormat("[XASSETS DB]: Deleting asset {0}", id);
+//            m_log.LogDebug("[XASSETS DB]: Deleting asset {0}", id);
 
         lock (m_dbLock)
         {

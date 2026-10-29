@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using Nini.Config;
 using OpenMetaverse;
 
 using OpenSim.Region.CoreModules.Avatar.Attachments;
@@ -43,7 +44,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
     public class OSSL_NpcApiAppearanceTest : OpenSimTestCase
     {
         protected Scene m_scene;
-        protected XEngine.XEngine m_engine;
+        protected MockScriptEngine m_engine;
 
         public override void SetUp()
         {
@@ -65,7 +66,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             SceneHelpers.SetupSceneModules(
                 m_scene, initConfigSource, new AvatarFactoryModule(), new AttachmentsModule(), new NPCModule());
 
-            m_engine = new XEngine.XEngine();
+            m_engine = new MockScriptEngine();
             m_engine.Initialise(initConfigSource);
             m_engine.AddRegion(m_scene);
         }
@@ -96,12 +97,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Try creating a bot using the appearance in the notecard.
             string npcRaw = osslApi.osNpcCreate("Jane", "Doe", new LSL_Types.Vector3(128, 128, 128), notecardName);
-            // TODO: Fix this assertion
+            Assert.NotNull(npcRaw);
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
+            Assert.NotNull(npc);
+            Assert.Equal(newHeight, npc.Appearance.AvatarHeight);
         }
 
         [Fact]
@@ -157,12 +158,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             // Try creating a bot using the existing avatar's appearance
             string npcRaw = osslApi.osNpcCreate("Jane", "Doe", new LSL_Types.Vector3(128, 128, 128), sp.UUID.ToString());
-            // TODO: Fix this assertion
+            Assert.NotNull(npcRaw);
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
+            Assert.NotNull(npc);
+            Assert.Equal(newHeight, npc.Appearance.AvatarHeight);
         }
 
         [Fact]
@@ -200,8 +201,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
+            Assert.NotNull(npc);
+            Assert.Equal(secondHeight, npc.Appearance.AvatarHeight);
         }
 
         [Fact]
@@ -244,8 +245,8 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            // TODO: Fix this assertion
-            Assert.Equal(,);
+            Assert.NotNull(npc);
+            Assert.Equal(firstHeight, npc.Appearance.AvatarHeight);
         }
 
         /// <summary>
@@ -292,14 +293,14 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             // Should still be around
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            // TODO: Fix this assertion
+            Assert.NotNull(npc);
 
             osslApi.osNpcRemove(npcRaw);
 
             npc = m_scene.GetScenePresence(npcId);
 
             // Now the owner deleted it and it's gone
-            // TODO: Fix this assertion
+            Assert.Null(npc);
         }
 
         /// <summary>
@@ -335,7 +336,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             UUID npcId = new UUID(npcRaw);
             ScenePresence npc = m_scene.GetScenePresence(npcId);
-            // TODO: Fix this assertion
+            Assert.Null(npc);
         }
     }
 }

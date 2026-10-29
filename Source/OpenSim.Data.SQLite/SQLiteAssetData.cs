@@ -27,11 +27,12 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using System.Data.SQLite;
 
 using OpenMetaverse;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.SQLite;
 
@@ -40,7 +41,7 @@ namespace OpenSim.Data.SQLite;
 /// </summary>
 public class SQLiteAssetData : AssetDataBase
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private const string SelectAssetSQL = "select * from assets where UUID=:UUID";
     private const string SelectAssetMetadataSQL = "select Name, Description, Type, Temporary, asset_flags, UUID, CreatorID from assets limit :start, :count";
@@ -130,7 +131,7 @@ public class SQLiteAssetData : AssetDataBase
         if (asset.Name.Length > AssetBase.MAX_ASSET_NAME)
         {
             assetName = asset.Name.Substring(0, AssetBase.MAX_ASSET_NAME);
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ASSET DB]: Name '{0}' for asset {1} truncated from {2} to {3} characters on add",
                 asset.Name, asset.ID, asset.Name.Length, assetName.Length);
         }
@@ -139,12 +140,12 @@ public class SQLiteAssetData : AssetDataBase
         if (asset.Description.Length > AssetBase.MAX_ASSET_DESC)
         {
             assetDescription = asset.Description.Substring(0, AssetBase.MAX_ASSET_DESC);
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[ASSET DB]: Description '{0}' for asset {1} truncated from {2} to {3} characters on add",
                 asset.Description, asset.ID, asset.Description.Length, assetDescription.Length);
         }
 
-        //m_log.Info("[ASSET DB]: Creating Asset " + asset.FullID.ToString());
+        //m_log.LogInformation("[ASSET DB]: Creating Asset " + asset.FullID.ToString());
         if (AssetsExist(new[] { asset.FullID })[0])
         {
             //LogAssetLoad(asset);
@@ -202,7 +203,7 @@ public class SQLiteAssetData : AssetDataBase
 //
 //            int assetLength = (asset.Data != null) ? asset.Data.Length : 0;
 //
-//            m_log.Debug("[ASSET DB]: " +
+//            m_log.LogDebug("[ASSET DB]: " +
 //                                     string.Format("Loaded {5} {4} Asset: [{0}][{3}] \"{1}\":{2} ({6} bytes)",
 //                                                   asset.FullID, asset.Name, asset.Description, asset.Type,
 //                                                   temporary, local, assetLength));

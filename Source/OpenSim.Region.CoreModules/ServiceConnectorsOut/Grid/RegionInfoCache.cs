@@ -27,6 +27,7 @@
 using System.Runtime.InteropServices;
 using OpenSim.Framework;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using Timer = System.Threading.Timer;
 using ReaderWriterLockSlim = System.Threading.ReaderWriterLockSlim;
@@ -35,7 +36,7 @@ namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Grid;
 
 public class RegionInfoCache
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    // private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private const int CACHE_EXPIRATION_SECONDS = 120; // 2 minutes  opensim regions change a lot
     private const int CACHE_PURGE_TIME = 60000; // milliseconds
     public const ulong HANDLEMASK = 0xffffff00ffffff00ul;

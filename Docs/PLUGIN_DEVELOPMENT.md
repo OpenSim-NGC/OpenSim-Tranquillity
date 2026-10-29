@@ -185,19 +185,11 @@ Minimal `csproj` pattern:
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <AssemblyTitle>OpenSim.Region.ExampleModule</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="Nini" HintPath="../../Library/Nini.dll" />
-    <Reference Include="OpenMetaverse" HintPath="../../Library/OpenMetaverse.dll" />
-    <Reference Include="OpenMetaverseTypes" HintPath="../../Library/OpenMetaverse.Types.dll" />
   </ItemGroup>
 
   <ItemGroup>
@@ -206,6 +198,9 @@ Minimal `csproj` pattern:
   </ItemGroup>
 </Project>
 ```
+
+The TargetFramework and a few references common across all the projects will come from 
+Directory.Build.props
 
 ### Option B: Addons tree plugin
 
@@ -226,12 +221,10 @@ Minimal `csproj` pattern:
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <AssemblyTitle>OpenSim.Addons.ExampleModule</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.0" />
     <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
   </ItemGroup>
 

@@ -36,20 +36,25 @@
  */
 
 using System.Reflection;
-using log4net;
+using System.Security.Cryptography;
+using System.Text;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace Gloebit.GloebitMoneyModule; 
 
 // TODO: Should we consider renaming to GloebitAppUser?
 public class GloebitUser {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public string AppKey;
     public string PrincipalID;
     public string GloebitID;
     public string GloebitToken;
     public string LastSessionID;
+    public string PendingAuthState;
 
     // TODO - update userMap to be a proper LRU Cache
     private static Dictionary<string, GloebitUser> s_userMap = new Dictionary<string, GloebitUser>();
@@ -65,6 +70,7 @@ public class GloebitUser {
         this.GloebitID = gloebitID;
         this.GloebitToken = token;
         this.LastSessionID = sessionID;
+        this.PendingAuthState = string.Empty;
     }
 
     private GloebitUser(GloebitUser copyFrom) {
@@ -73,12 +79,14 @@ public class GloebitUser {
         this.GloebitID = copyFrom.GloebitID;
         this.GloebitToken = copyFrom.GloebitToken;
         this.LastSessionID = copyFrom.LastSessionID;
+        this.PendingAuthState = copyFrom.PendingAuthState ?? string.Empty;
     }
 
     private void UpdateFrom(GloebitUser updateFrom) {
         this.GloebitID = updateFrom.GloebitID;
         this.GloebitToken = updateFrom.GloebitToken;
         this.LastSessionID = updateFrom.LastSessionID;
+        this.PendingAuthState = updateFrom.PendingAuthState ?? string.Empty;
     }
 
     public static GloebitUser Get(UUID appKey, UUID agentID) {
@@ -94,7 +102,7 @@ public class GloebitUser {
     }
         
     public static GloebitUser Get(string appKeyStr, string agentIdStr) {
-        m_log.Info("[GLOEBITMONEYMODULE] in GloebitUser.Get");
+        m_log.LogInformation("[GLOEBITMONEYMODULE] in GloebitUser.Get");
 
         GloebitUser u;
         lock(s_userMap) {
@@ -102,24 +110,24 @@ public class GloebitUser {
         }
 
         if (u == null) {
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] Looking for prior user for {0}", agentIdStr);
+            m_log.LogDebug("[GLOEBITMONEYMODULE] Looking for prior user for {0}", agentIdStr);
             string[] keys = new string[2]{"AppKey", "PrincipalID"};
             string[] values = new string[2]{appKeyStr, agentIdStr};
             GloebitUser[] users;
             try {
                 users = GloebitUserData.Instance.Get(keys, values);
             } catch(Exception e) {
-                m_log.WarnFormat("[GLOEBITMONEYMODULE] failed GloebitUser.Get because {0}", e);
+                m_log.LogWarning("[GLOEBITMONEYMODULE] failed GloebitUser.Get because {0}", e);
                 users = new GloebitUser[0];
             }
 
             switch(users.Length) {
             case 1:
                 u = users[0];
-                m_log.DebugFormat("[GLOEBITMONEYMODULE] FOUND USER TOKEN! {0} valid token? {1} --- SesionID{2}", u.PrincipalID, !String.IsNullOrEmpty(u.GloebitToken), u.LastSessionID);
+                m_log.LogDebug("[GLOEBITMONEYMODULE] FOUND USER TOKEN! {0} valid token? {1} --- SesionID{2}", u.PrincipalID, !String.IsNullOrEmpty(u.GloebitToken), u.LastSessionID);
                 break;
             case 0:
-                m_log.DebugFormat("[GLOEBITMONEYMODULE] CREATING NEW USER {0}", agentIdStr);
+                m_log.LogDebug("[GLOEBITMONEYMODULE] CREATING NEW USER {0}", agentIdStr);
                 u = new GloebitUser(appKeyStr, agentIdStr, String.Empty, String.Empty, String.Empty);
                 break;
             default:
@@ -149,7 +157,7 @@ public class GloebitUser {
     }
 
     public static void InvalidateCache(UUID agentID) {
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] in GloebitUser.InvalidateCache");
+        m_log.LogInformation("[GLOEBITMONEYMODULE] in GloebitUser.InvalidateCache");
         string agentIdStr = agentID.ToString();
         lock(s_userMap) {
             s_userMap.Remove(agentIdStr);
@@ -157,22 +165,22 @@ public class GloebitUser {
     }
 
     public bool IsNewSession(UUID newSessionID) {
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] in IsNewSession for last:{0} current:{1}", this.LastSessionID, newSessionID.ToString());
+        m_log.LogInformation("[GLOEBITMONEYMODULE] in IsNewSession for last:{0} current:{1}", this.LastSessionID, newSessionID.ToString());
         string newSessionIDStr = newSessionID.ToString();
         if (this.LastSessionID == newSessionIDStr) {
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] User is not new session");
+            m_log.LogDebug("[GLOEBITMONEYMODULE] User is not new session");
             return false;
         }
         // Before we return true, Ensure our cache is up to date
         GloebitUser.InvalidateCache(UUID.Parse(this.PrincipalID));
         GloebitUser u_from_db = GloebitUser.Get(this.AppKey, UUID.Parse(this.PrincipalID));
         if (u_from_db.LastSessionID == newSessionIDStr) {
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] User Cache was out of date.  Updated cache.  User is not new session");
+            m_log.LogDebug("[GLOEBITMONEYMODULE] User Cache was out of date.  Updated cache.  User is not new session");
             // cache was out of date.  update local user copy form db
             this.UpdateFrom(u_from_db);
             return false;
         } else {
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] User is New Session");
+            m_log.LogDebug("[GLOEBITMONEYMODULE] User is New Session");
             // we have a new session.  Store it and return true.
 
             // Code to ensure we update user in cache
@@ -181,7 +189,7 @@ public class GloebitUser {
                 s_userMap.TryGetValue(this.PrincipalID, out u);
             }
             if (u == null) {
-                m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitUser.IsNewSession() Did not find User in s_userMap to update.  User logged out.");
+                m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitUser.IsNewSession() Did not find User in s_userMap to update.  User logged out.");
                 u = u_from_db;  // User logged out.  Still want to store token.  Don't want to add back to map.
             }
             lock (u.userLock) {
@@ -201,6 +209,56 @@ public class GloebitUser {
         return !String.IsNullOrEmpty(this.GloebitToken);
     }
 
+    public string BeginAuthorization()
+    {
+        string state = UUID.Random().ToString();
+        GloebitUser u;
+        lock (s_userMap) {
+            s_userMap.TryGetValue(PrincipalID, out u);
+        }
+        if (u == null)
+            u = this;
+
+        lock (u.userLock) {
+            u.PendingAuthState = state;
+            if (!GloebitUserData.Instance.Store(u))
+                throw new Exception(String.Format("[GLOEBITMONEYMODULE] GloebitUser.BeginAuthorization Failed to store user {0}", PrincipalID));
+            this.UpdateFrom(u);
+        }
+        return state;
+    }
+
+    public bool ConsumeAuthorizationState(string state)
+    {
+        if (String.IsNullOrEmpty(state) || String.IsNullOrEmpty(PendingAuthState))
+            return false;
+
+        GloebitUser u;
+        lock (s_userMap) {
+            s_userMap.TryGetValue(PrincipalID, out u);
+        }
+        if (u == null)
+            u = this;
+
+        lock (u.userLock) {
+            if (!FixedTimeEquals(u.PendingAuthState, state))
+                return false;
+
+            u.PendingAuthState = String.Empty;
+            if (!GloebitUserData.Instance.Store(u))
+                throw new Exception(String.Format("[GLOEBITMONEYMODULE] GloebitUser.ConsumeAuthorizationState Failed to store user {0}", PrincipalID));
+            this.UpdateFrom(u);
+            return true;
+        }
+    }
+
+    private static bool FixedTimeEquals(string expected, string actual)
+    {
+        byte[] expectedBytes = Encoding.UTF8.GetBytes(expected ?? string.Empty);
+        byte[] actualBytes = Encoding.UTF8.GetBytes(actual ?? string.Empty);
+        return expectedBytes.Length == actualBytes.Length && CryptographicOperations.FixedTimeEquals(expectedBytes, actualBytes);
+    }
+
     // TODO: Why is this static?
     public static GloebitUser Authorize(string appKeyStr, UUID agentId, string token, string gloebitID) {
         string agentIdStr = agentId.ToString();
@@ -213,7 +271,7 @@ public class GloebitUser {
             s_userMap.TryGetValue(agentIdStr, out u);
         }
         if (u == null) {
-            m_log.DebugFormat("[GLOEBITMONEYMODULE] GloebitUser.Authorize() Did not find User in s_userMap.  User logged out.");
+            m_log.LogDebug("[GLOEBITMONEYMODULE] GloebitUser.Authorize() Did not find User in s_userMap.  User logged out.");
             u = localUser;  // User logged out.  Still want to store token.  Don't want to add back to map.
         }
         lock (u.userLock) {
@@ -230,7 +288,7 @@ public class GloebitUser {
     }
 
     public void InvalidateToken() {
-        m_log.InfoFormat("[GLOEBITMONEYMODULE] GloebitUser.InvalidateToken() {0}, valid token? {1}", PrincipalID, !String.IsNullOrEmpty(GloebitToken));
+        m_log.LogInformation("[GLOEBITMONEYMODULE] GloebitUser.InvalidateToken() {0}, valid token? {1}", PrincipalID, !String.IsNullOrEmpty(GloebitToken));
 
         if(!String.IsNullOrEmpty(GloebitToken)) {
             GloebitUser u;

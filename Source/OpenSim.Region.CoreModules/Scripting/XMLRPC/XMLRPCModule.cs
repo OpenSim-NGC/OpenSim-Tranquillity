@@ -28,7 +28,6 @@
 using System.Collections;
 using System.Net;
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -39,6 +38,7 @@ using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
 /*****************************************************
  *
  * XMLRPCModule
@@ -76,7 +76,7 @@ namespace OpenSim.Region.CoreModules.Scripting.XMLRPC;
 
 public class XMLRPCModule : ISharedRegionModule, IXMLRPC
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_name = "XMLRPCModule";
 
@@ -95,6 +95,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
     private int RemoteReplyScriptTimeout = 9000;
     private int RemoteReplyScriptWait = 300;
     private object XMLRPCListLock = new object();
+    private OutboundUrlFilter m_outboundUrlFilter;
 
     #region ISharedRegionModule Members
 
@@ -117,6 +118,10 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
             {
             }
         }
+
+        // llSendRemoteData goes where the script says, so it gets llHTTPRequest's filter: same [Network] keys,
+        // same defaults.
+        m_outboundUrlFilter = new OutboundUrlFilter("Script XML-RPC module", config);
     }
 
     public void PostInitialise()
@@ -125,7 +130,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         {
             // Start http server
             // Attach xmlrpc handlers
-            //                m_log.InfoFormat(
+            //                m_log.LogInformation(
             //                    "[XML RPC MODULE]: Starting up XMLRPC Server on port {0} for llRemoteData commands.",
             //                    m_remoteDataPort);
 
@@ -211,7 +216,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         // This should no longer happen, but the check is reasonable anyway
         if (null == m_openChannels)
         {
-            m_log.Warn("[XML RPC MODULE]: Attempt to open channel before initialization is complete");
+            m_log.LogWarning("[XML RPC MODULE]: Attempt to open channel before initialization is complete");
             return newChannel;
         }
 
@@ -298,7 +303,7 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         }
         else
         {
-            m_log.Warn("[XML RPC MODULE]: Channel or message_id not found");
+            m_log.LogWarning("[XML RPC MODULE]: Channel or message_id not found");
         }
     }
 
@@ -327,6 +332,11 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
         }
     }
 
+    /// <summary>
+    /// Takes the next request for a script: every region's script engine pumps poll this one
+    /// module, so the request is moved to the awaiting-reply list here, under the lock, and no
+    /// other pump can take it as well. RemoveCompletedRequest afterwards has nothing left to do.
+    /// </summary>
     public IXmlRpcRequestInfo GetNextCompletedRequest()
     {
         if (m_rpcPending != null)
@@ -339,7 +349,12 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
 
                     if (m_rpcPending.TryGetValue(luid, out tmpReq))
                     {
-                        if (!tmpReq.IsProcessed()) return tmpReq;
+                        if (!tmpReq.IsProcessed())
+                        {
+                            m_rpcPending.Remove(luid);
+                            m_rpcPendingResponses.Add(luid, tmpReq);
+                            return tmpReq;
+                        }
                     }
                 }
             }
@@ -357,18 +372,28 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
                 m_rpcPending.Remove(id);
                 m_rpcPendingResponses.Add(id, tmp);
             }
-            else
+            else if (!m_rpcPendingResponses.ContainsKey(id))
             {
-                m_log.Error("[XML RPC MODULE]: UNABLE TO REMOVE COMPLETED REQUEST");
+                m_log.LogError("[XML RPC MODULE]: UNABLE TO REMOVE COMPLETED REQUEST");
             }
         }
     }
 
+    /// <returns>The request id, or UUID.Zero if the outbound URL filter refuses <paramref name="dest"/>.</returns>
     public UUID SendRemoteData(uint localID, UUID itemID, string channel, string dest, int idata, string sdata)
     {
+        if (Uri.TryCreate(dest, UriKind.Absolute, out Uri destUri) && !m_outboundUrlFilter.CheckAllowed(destUri))
+        {
+            m_log.LogWarning("[XML RPC MODULE]: llSendRemoteData to {0} from item {1} disallowed by filter", dest, itemID);
+            return UUID.Zero;
+        }
+
         SendRemoteDataRequest req = new SendRemoteDataRequest(
             localID, itemID, channel, dest, idata, sdata
-            );
+            )
+        {
+            UrlFilter = m_outboundUrlFilter
+        };
         m_pendingSRDResponses.Add(req.GetReqID(), req);
         req.Process();
         return req.ReqID;
@@ -386,8 +411,12 @@ public class XMLRPCModule : ISharedRegionModule, IXMLRPC
 
                     if (m_pendingSRDResponses.TryGetValue(luid, out tmpReq))
                     {
+                        // Taken here, under the lock, so only one script engine pump delivers it.
                         if (tmpReq.Finished)
+                        {
+                            m_pendingSRDResponses.Remove(luid);
                             return tmpReq;
+                        }
                     }
                 }
             }
@@ -603,7 +632,7 @@ public class RPCChannelInfo
 
 public class SendRemoteDataRequest: IServiceRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public string Channel;
     public string DestURL;
@@ -634,6 +663,12 @@ public class SendRemoteDataRequest: IServiceRequest
         set { _reqID = value; }
     }
     public XmlRpcRequest Request;
+
+    /// <summary>
+    /// Checks the destination and every redirect. Without one the request is not sent.
+    /// </summary>
+    public OutboundUrlFilter UrlFilter;
+
     public int ResponseIdata;
     public string ResponseSdata;
     public string Sdata;
@@ -684,7 +719,33 @@ public class SendRemoteDataRequest: IServiceRequest
         HttpClient hclient = null;
         try
         {
-            hclient = WebUtil.GetNewGlobalHttpClient(-1);
+            // A handler that follows redirects itself and filters every hop, over a handler that connects only to
+            // addresses the filter allows; otherwise as WebUtil.GetNewGlobalHttpClient(-1), whose handler follows
+            // up to 10 unfiltered. The new handler takes the shared no-redirect handler's proxy and options, so a
+            // proxy carries the same requests as before.
+            SocketsHttpHandler shared = WebUtil.SharedSocketsHttpHandlerNoRedir;
+            SocketsHttpHandler inner = new()
+            {
+                AllowAutoRedirect = false,
+                AutomaticDecompression = DecompressionMethods.None,
+                ConnectTimeout = shared.ConnectTimeout,
+                PreAuthenticate = false,
+                UseCookies = false,
+                UseProxy = shared.UseProxy,
+                MaxConnectionsPerServer = shared.MaxConnectionsPerServer,
+                PooledConnectionIdleTimeout = shared.PooledConnectionIdleTimeout,
+                PooledConnectionLifetime = shared.PooledConnectionLifetime,
+                SslOptions = shared.SslOptions,
+            };
+            if (shared.UseProxy)
+                inner.Proxy = shared.Proxy;
+            UrlFilter.ApplyTo(inner);
+            hclient = new HttpClient(new OutboundUrlFilterRedirectHandler(UrlFilter, inner, 10), true)
+            {
+                Timeout = TimeSpan.FromMilliseconds(30000),
+                MaxResponseContentBufferSize = 250 * 1024 * 1024,
+            };
+            hclient.DefaultRequestHeaders.ExpectContinue = false;
             XmlRpcResponse resp = req.Send(DestURL, hclient);
             if (resp != null)
             {
@@ -722,8 +783,8 @@ public class SendRemoteDataRequest: IServiceRequest
         catch (Exception we)
         {
             Sdata = we.Message;
-            m_log.Warn("[SendRemoteDataRequest]: Request failed");
-            m_log.Warn(we.StackTrace);
+            m_log.LogWarning("[SendRemoteDataRequest]: Request failed");
+            m_log.LogWarning(we.StackTrace);
         }
         finally
         {

@@ -46,11 +46,6 @@ public class OpenSimConsoleClient
 
     static int Main(string[] args)
     {
-        var logconfigOption = new Option<string>("--logconfig")
-        {
-            Description = "Instruct log4net to use this file as configuration file.",
-            DefaultValueFactory = _ => "OpenSim.ConsoleClient.dll.config",
-        };
         var inifileOption = new Option<List<string>>("--inifile")
         {
             Description = "Specify the location of zero or more .ini file(s) to read."
@@ -86,7 +81,6 @@ public class OpenSimConsoleClient
 
         RootCommand rootCommand = new RootCommand("OpenSim Remote Console Client");
 
-        rootCommand.Options.Add(logconfigOption);
         rootCommand.Options.Add(inifileOption);
         rootCommand.Options.Add(inimasterOption);
         rootCommand.Options.Add(consoleOption);
@@ -106,7 +100,6 @@ public class OpenSimConsoleClient
         }
 
         rootCommand.SetAction(parseResult => Run(
-            logConfig: parseResult.GetValue(logconfigOption),
             iniFiles: parseResult.GetValue(inifileOption),
             iniMaster: parseResult.GetValue(inimasterOption),
             consoleType: parseResult.GetValue(consoleOption),
@@ -119,7 +112,6 @@ public class OpenSimConsoleClient
     }
 
     static void Run(
-        string logConfig,
         List<string> iniFiles,
         string iniMaster,
         string consoleType,
@@ -128,9 +120,7 @@ public class OpenSimConsoleClient
         string user,
         string pass)
     {
-        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
-        log4NetBootstrapper.Configure(logConfig, "OpenSim.ConsoleClient.dll.config");
-
+        // Request failures go to stderr even when no logging host is configured.
         IConfigSource config = LoadConfig(iniMaster, iniFiles);
         IConfig startupConfig = config.Configs["Startup"];
 

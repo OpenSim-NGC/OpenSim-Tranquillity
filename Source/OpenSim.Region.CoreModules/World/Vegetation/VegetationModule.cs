@@ -26,18 +26,19 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.Vegetation;
 
 public class VegetationModule : INonSharedRegionModule, IVegetationModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Scene m_scene;
 
@@ -89,7 +90,7 @@ public class VegetationModule : INonSharedRegionModule, IVegetationModule
     {
         if (Array.IndexOf(creationCapabilities, (PCode)shape.PCode) < 0)
         {
-            m_log.DebugFormat("[VEGETATION]: PCode {0} not handled by {1}", shape.PCode, Name);
+            m_log.LogDebug("[VEGETATION]: PCode {0} not handled by {1}", shape.PCode, Name);
             return null;
         }
 

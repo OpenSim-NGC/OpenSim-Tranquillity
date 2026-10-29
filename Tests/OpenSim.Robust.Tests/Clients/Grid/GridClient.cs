@@ -42,10 +42,6 @@ namespace Robust.Tests
 {
     public class GridClient
     {
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
-
         [Fact]
         public void Grid_001()
         {

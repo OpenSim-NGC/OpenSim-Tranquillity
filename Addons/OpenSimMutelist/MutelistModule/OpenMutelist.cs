@@ -24,7 +24,6 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-using log4net;
 using Nini.Config;
 using Nwc.XmlRpc;
 using OpenMetaverse;
@@ -38,11 +37,13 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Xml;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.InstantMessage;
 
 public class MuteListModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool enabled = true;
     private List<Scene> m_SceneList = new List<Scene>();
@@ -80,12 +81,12 @@ public class MuteListModule : ISharedRegionModule
         m_MuteListURL = cnf.GetString("MuteListURL", "");
         if (m_MuteListURL == "")
         {
-            m_log.Error("[OS MUTELIST] Module was enabled, but no URL is given, disabling");
+            m_log.LogError("[OS MUTELIST] Module was enabled, but no URL is given, disabling");
             enabled = false;
             return;
         }
 
-        m_log.Info("[OS MUTELIST] Mute list enabled");
+        m_log.LogInformation("[OS MUTELIST] Mute list enabled");
     }
 
     public void AddRegion(Scene scene)
@@ -175,11 +176,12 @@ public class MuteListModule : ISharedRegionModule
         try
         {
             XmlRpcRequest Req = new XmlRpcRequest(method, SendParams);
-            Resp = Req.Send(server, 30000);
+            using HttpClient client = WebUtil.GetLegacyHttpClient(30000);
+            Resp = Req.Send(server, client);
         }
-        catch (WebException ex)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or WebException)
         {
-            m_log.ErrorFormat("[OS MUTELIST]: Unable to connect to mutelist " +
+            m_log.LogError("[OS MUTELIST]: Unable to connect to mutelist " +
                     "server {0}.  Exception {1}", m_MuteListURL, ex);
 
             Hashtable ErrorHash = new Hashtable();
@@ -191,7 +193,7 @@ public class MuteListModule : ISharedRegionModule
         }
         catch (SocketException ex)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                     "[OS MUTELIST]: Unable to connect to mutelist server {0}. Method {1}, params {2}. " +
                     "Exception {3}", m_MuteListURL, method, ReqParams, ex);
 
@@ -204,7 +206,7 @@ public class MuteListModule : ISharedRegionModule
         }
         catch (XmlException ex)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                     "[OS MUTELIST]: Unable to connect to mutelist server {0}. Method {1}, params {2}. " +
                     "Exception {3}", m_MuteListURL, method, ReqParams, ex);
 
@@ -254,7 +256,7 @@ public class MuteListModule : ISharedRegionModule
         if (xfer == null)
             return;
 
-        m_log.DebugFormat("[OS MUTELIST] Got mute list request");
+        m_log.LogDebug("[OS MUTELIST] Got mute list request");
 
         string filename = "mutes" + client.AgentId.ToString();
 
@@ -298,7 +300,7 @@ public class MuteListModule : ISharedRegionModule
 
     private void OnUpdateMuteListEntry(IClientAPI client, UUID MuteID, string Name, int type, uint flags)
     {
-        m_log.DebugFormat("[OS MUTELIST] Got mute list update request");
+        m_log.LogDebug("[OS MUTELIST] Got mute list update request");
 
         Hashtable ReqHash = new Hashtable();
         ReqHash["avataruuid"] = client.AgentId.ToString();
@@ -322,7 +324,7 @@ public class MuteListModule : ISharedRegionModule
 
     private void OnRemoveMuteListEntry(IClientAPI client, UUID MuteID, string Name)
     {
-        m_log.DebugFormat("[OS MUTELIST] Got mute list removal request");
+        m_log.LogDebug("[OS MUTELIST] Got mute list removal request");
 
         Hashtable ReqHash = new Hashtable();
         ReqHash["avataruuid"] = client.AgentId.ToString();

@@ -18,17 +18,19 @@
 
 using System.Data.SqlTypes;
 using System.Reflection;
-using log4net;
 using MySqlConnector;
 using OpenSim.Data.MySQL;
 using OpenSim.Data.PGSQL;
 using OpenSim.Data.SQLite;
 
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace Gloebit.GloebitMoneyModule;
 
 class GloebitTransactionData {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static IGloebitTransactionData m_impl;
 
@@ -88,7 +90,7 @@ class GloebitTransactionData {
         
         public override bool Store(GloebitTransaction txn)
         {
-            //            m_log.DebugFormat("[MYSQL GENERIC TABLE HANDLER]: Store(T row) invoked");
+            //            m_log.LogDebug("[MYSQL GENERIC TABLE HANDLER]: Store(T row) invoked");
 
             try
             {
@@ -141,14 +143,14 @@ class GloebitTransactionData {
             }
             catch(Exception e)
             {
-                m_log.DebugFormat("[MYSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
+                m_log.LogDebug("[MYSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
                 return false;
             }
         }
     }
 
     private class PGSQLImpl : PGSQLGenericTableHandler<GloebitTransaction>, IGloebitTransactionData {
-        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
         public PGSQLImpl(string connectionString)
             : base(connectionString, "GloebitTransactions", "GloebitTransactionsPGSQL")
@@ -165,14 +167,14 @@ class GloebitTransactionData {
                 if (txn.finishedTime == null) {
                     txn.finishedTime = SqlDateTime.MinValue.Value;
                 }
-                //m_log.InfoFormat("GloebitTransactionData.PGSQLImpl: storing transaction type:{0}, SaleType:{2}, PayerEndingBalance:{3}, cTime:{4}, enactedTime:{5}, finishedTime:{6}", txn.TransactionType, txn.SaleType, txn.PayerEndingBalance, txn.cTime, txn.enactedTime, txn.finishedTime);
+                //m_log.LogInformation("GloebitTransactionData.PGSQLImpl: storing transaction type:{0}, SaleType:{2}, PayerEndingBalance:{3}, cTime:{4}, enactedTime:{5}, finishedTime:{6}", txn.TransactionType, txn.SaleType, txn.PayerEndingBalance, txn.cTime, txn.enactedTime, txn.finishedTime);
                 // call parent
                 return base.Store(txn);
 		        } catch(System.OverflowException e) {
-                m_log.ErrorFormat("GloebitTransactionData.PGSQLImpl: Failure storing transaction type:{0}, SaleType:{1}, PayerEndingBalance:{2}, cTime:{3}, enactedTime:{4}, finishedTime:{5}, stacktrace:{6}", txn.TransactionType, txn.SaleType, txn.PayerEndingBalance, txn.cTime, txn.enactedTime, txn.finishedTime, e);
+                m_log.LogError("GloebitTransactionData.PGSQLImpl: Failure storing transaction type:{0}, SaleType:{1}, PayerEndingBalance:{2}, cTime:{3}, enactedTime:{4}, finishedTime:{5}, stacktrace:{6}", txn.TransactionType, txn.SaleType, txn.PayerEndingBalance, txn.cTime, txn.enactedTime, txn.finishedTime, e);
 		            return false;
 		        } catch(Exception e) {
-                m_log.DebugFormat("[PGSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
+                m_log.LogDebug("[PGSQL GENERIC TABLE HANDLER]: Failed to store data: {0}", e);
                 return false;
             }
         }

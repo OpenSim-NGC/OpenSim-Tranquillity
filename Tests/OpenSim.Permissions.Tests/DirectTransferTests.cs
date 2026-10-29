@@ -39,6 +39,11 @@ namespace OpenSim.Tests.Permissions
     /// </summary>
     public class DirectTransferTests
     {
+        public DirectTransferTests()
+        {
+            SetUp();
+        }
+
 
         public void SetUp()
         {
@@ -90,11 +95,11 @@ namespace OpenSim.Tests.Permissions
             int nObjects = Common.TheScene.GetSceneObjectGroups().Count;
             // Rez it and check perms in scene too
             Common.TheScene.RezObject(Common.TheAvatars[1].ControllingClient, item.ID, UUID.Zero, Vector3.One, Vector3.Zero, UUID.Zero, 0, false, false, false, UUID.Zero);
-            Assert.True(Common.TheScene.GetSceneObjectGroups().Count));
+            Assert.Equal(nObjects + 1, Common.TheScene.GetSceneObjectGroups().Count);
 
             SceneObjectGroup box = Common.TheScene.GetSceneObjectGroups().Find(sog => sog.OwnerID == Common.TheAvatars[1].UUID && sog.Name == name);
             Common.TheInstance.PrintPerms(box);
-            // TODO: Fix this assertion
+            Assert.NotNull(box);
 
             // Check Owner permissions
             Common.TheInstance.AssertPermissions(mask, (PermissionMask)box.EffectiveOwnerPerms, box.OwnerID.ToString().Substring(34) + " : " + box.Name);

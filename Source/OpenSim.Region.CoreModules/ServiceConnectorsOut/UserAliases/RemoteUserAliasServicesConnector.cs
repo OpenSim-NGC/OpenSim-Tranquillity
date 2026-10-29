@@ -26,7 +26,6 @@
  */
 
 using Nini.Config;
-using log4net;
 using System.Reflection;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -34,13 +33,14 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases;
 
 public class RemoteUserAliasServicesConnector : UserAliasServicesConnector,
         ISharedRegionModule, IUserAliasService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
@@ -66,7 +66,7 @@ public class RemoteUserAliasServicesConnector : UserAliasServicesConnector,
                 IConfig userConfig = source.Configs["UserAliasService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[USER CONNECTOR]: UserAliasService missing from OpenSim.ini");
+                    m_log.LogError("[USER CONNECTOR]: UserAliasService missing from OpenSim.ini");
                     return;
                 }
 
@@ -74,7 +74,7 @@ public class RemoteUserAliasServicesConnector : UserAliasServicesConnector,
 
                 base.Initialise(source);
 
-                m_log.Info("[USER CONNECTOR]: Remote user aliases enabled");
+                m_log.LogInformation("[USER CONNECTOR]: Remote user aliases enabled");
             }
         }
     }

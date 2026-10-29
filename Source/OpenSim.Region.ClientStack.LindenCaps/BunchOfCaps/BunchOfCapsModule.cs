@@ -29,6 +29,8 @@ using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
@@ -57,7 +59,7 @@ public class BunchOfCapsConfigOptions
 
 public class BunchOfCapsModule : INonSharedRegionModule
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_Scene;
     private BunchOfCapsConfigOptions ConfigOptions = new();

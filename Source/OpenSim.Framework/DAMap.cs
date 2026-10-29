@@ -30,6 +30,8 @@ using System.Xml.Schema;
 using System.Xml.Serialization;
 using OpenMetaverse.StructuredData;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Framework;
 
 /// <summary>
@@ -44,7 +46,7 @@ namespace OpenSim.Framework;
 /// </remarks>
 public class DAMap : IXmlSerializable
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly int MIN_NAMESPACE_LENGTH = 4;
 
@@ -240,7 +242,7 @@ public class DAMap : IXmlSerializable
 
             nsMap = (OSDMap)m_map[ns];
 
-//                m_log.DebugFormat("[DA MAP]: Setting store to {0}:{1}", ns, storeName);
+//                m_log.LogDebug("[DA MAP]: Setting store to {0}:{1}", ns, storeName);
             nsMap[storeName] = store;
         }
     }

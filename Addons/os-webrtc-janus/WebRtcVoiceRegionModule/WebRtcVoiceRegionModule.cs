@@ -39,8 +39,9 @@ using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
-using log4net;
 using Nini.Config;
+using Microsoft.Extensions.Logging;
+
 namespace osWebRtcVoice;
 
 /// <summary>
@@ -57,7 +58,7 @@ namespace osWebRtcVoice;
 /// </summary>
 public class WebRtcVoiceRegionModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static readonly string logHeader = "[REGION WEBRTC VOICE]";
 
     private static byte[] llsdUndefAnswerBytes = Util.UTF8.GetBytes("<llsd><undef /></llsd>"); 
@@ -79,7 +80,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
             {
                 _MessageDetails = m_Config.GetBoolean("MessageDetails", false);
 
-                m_log.Info($"{logHeader}: enabled");
+                m_log.LogInformation($"{logHeader}: enabled");
             }
         }
     }
@@ -152,7 +153,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
     // </summary>
     public void OnRegisterCaps(Scene scene, UUID agentID, Caps caps)
     {
-        m_log.Debug(
+        m_log.LogDebug(
             $"{logHeader}: OnRegisterCaps called with agentID {agentID} caps {caps} in scene {scene.Name}");
 
         caps.RegisterSimpleHandler("ProvisionVoiceAccountRequest",
@@ -190,14 +191,14 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         IWebRtcVoiceService voiceService = scene.RequestModuleInterface<IWebRtcVoiceService>();
         if (voiceService is null)
         {
-            m_log.Error($"{logHeader}[ProvisionVoice]: voice service not loaded");
+            m_log.LogError($"{logHeader}[ProvisionVoice]: voice service not loaded");
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
 
         if(request.HttpMethod != "POST")
         {
-            m_log.DebugFormat($"[{logHeader}][ProvisionVoice]: Not a POST request. Agent={agentID}");
+            m_log.LogDebug($"[{logHeader}][ProvisionVoice]: Not a POST request. Agent={agentID}");
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
@@ -206,7 +207,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         OSDMap map = BodyToMap(request, "ProvisionVoiceAccountRequest");
         if (map is null)
         {
-            m_log.Error($"{logHeader}[ProvisionVoice]: No request data found. Agent={agentID}");
+            m_log.LogError($"{logHeader}[ProvisionVoice]: No request data found. Agent={agentID}");
             response.StatusCode = (int)HttpStatusCode.NoContent;
             return;
         }
@@ -216,14 +217,14 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         {
             if (vstosd is OSDString vst && !((string)vst).Equals("webrtc", StringComparison.OrdinalIgnoreCase))
             {
-                m_log.Warn($"{logHeader}[ProvisionVoice]: voice_server_type is not 'webrtc'. Request: {map}");
+                m_log.LogWarning($"{logHeader}[ProvisionVoice]: voice_server_type is not 'webrtc'. Request: {map}");
                 response.RawBuffer = llsdUndefAnswerBytes;
                 response.StatusCode = (int)HttpStatusCode.OK;
                 return;
             }
         }
 
-        if (_MessageDetails) m_log.DebugFormat($"{logHeader}[ProvisionVoice]: request: {map}");
+        if (_MessageDetails) m_log.LogDebug($"{logHeader}[ProvisionVoice]: request: {map}");
 
         if (map.TryGetString("channel_type", out string channelType))
         {
@@ -232,14 +233,14 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
             {
                 if (!scene.RegionInfo.EstateSettings.AllowVoice)
                 {
-                    m_log.Debug($"{logHeader}[ProvisionVoice]:region \"{scene.Name}\": voice not enabled in estate settings");
+                    m_log.LogDebug($"{logHeader}[ProvisionVoice]:region \"{scene.Name}\": voice not enabled in estate settings");
                     response.RawBuffer = llsdUndefAnswerBytes;
                     response.StatusCode = (int)HttpStatusCode.NotImplemented;
                     return;
                 }
                 if (scene.LandChannel == null)
                 {
-                    m_log.Error($"{logHeader}[ProvisionVoice] region \"{scene.Name}\" land data not yet available");
+                    m_log.LogError($"{logHeader}[ProvisionVoice] region \"{scene.Name}\" land data not yet available");
                     response.RawBuffer = llsdUndefAnswerBytes;
                     response.StatusCode = (int)HttpStatusCode.NotImplemented;
                     return;
@@ -247,7 +248,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
 
                 if(!scene.TryGetScenePresence(agentID, out ScenePresence sp))
                 {
-                    m_log.Debug($"{logHeader}[ProvisionVoice]:avatar not found");
+                    m_log.LogDebug($"{logHeader}[ProvisionVoice]:avatar not found");
                     response.RawBuffer = llsdUndefAnswerBytes;
                     response.StatusCode = (int)HttpStatusCode.NotFound;
                     return;
@@ -273,7 +274,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
 
                     if (!scene.RegionInfo.EstateSettings.TaxFree && (land.Flags & (uint)ParcelFlags.AllowVoiceChat) == 0)
                     {
-                        m_log.Debug($"{logHeader}[ProvisionVoice]:parcel voice not allowed");
+                        m_log.LogDebug($"{logHeader}[ProvisionVoice]:parcel voice not allowed");
                         response.RawBuffer = llsdUndefAnswerBytes;
                         response.StatusCode = (int)HttpStatusCode.Forbidden;
                         return;
@@ -286,7 +287,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
                     else if(parcel.IsRestrictedFromLand(agentID) || parcel.IsBannedFromLand(agentID))
                     {
                         // check Z distance?
-                        m_log.Debug($"{logHeader}[ProvisionVoice]:agent not allowed on parcel");
+                        m_log.LogDebug($"{logHeader}[ProvisionVoice]:agent not allowed on parcel");
                         response.RawBuffer = llsdUndefAnswerBytes;
                         response.StatusCode = (int)HttpStatusCode.Forbidden;
                         return;
@@ -300,7 +301,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
 
         if(resp is not null)
         {
-            if (_MessageDetails) m_log.DebugFormat($"{logHeader}[ProvisionVoice]: response: {resp}");
+            if (_MessageDetails) m_log.LogDebug($"{logHeader}[ProvisionVoice]: response: {resp}");
 
             // TODO: check for errors and package the response
 
@@ -311,7 +312,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         }
         else
         {
-            m_log.DebugFormat($"{logHeader}[ProvisionVoice]: got null response");
+            m_log.LogDebug($"{logHeader}[ProvisionVoice]: got null response");
             response.StatusCode = (int)HttpStatusCode.OK;
         }
         return;
@@ -322,14 +323,14 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         IWebRtcVoiceService voiceService = scene.RequestModuleInterface<IWebRtcVoiceService>();
         if (voiceService is null)
         {
-            m_log.ErrorFormat($"{logHeader}[VoiceSignalingRequest]: avatar \"{agentID}\": no voice service");
+            m_log.LogError($"{logHeader}[VoiceSignalingRequest]: avatar \"{agentID}\": no voice service");
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
 
         if(request.HttpMethod != "POST")
         {
-            m_log.Error($"[{logHeader}][VoiceSignaling]: Not a POST request. Agent={agentID}");
+            m_log.LogError($"[{logHeader}][VoiceSignaling]: Not a POST request. Agent={agentID}");
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
@@ -338,7 +339,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         OSDMap map = BodyToMap(request, "VoiceSignalingRequest");
         if (map is null)
         {
-            m_log.ErrorFormat($"{logHeader}[VoiceSignalingRequest]: No request data found. Agent={agentID}");
+            m_log.LogError($"{logHeader}[VoiceSignalingRequest]: No request data found. Agent={agentID}");
             response.StatusCode = (int)HttpStatusCode.NoContent;
             return;
         }
@@ -356,7 +357,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
 
         OSDMap resp = voiceService.VoiceSignalingRequest(map, agentID, scene.RegionInfo.RegionID);
 
-        if (_MessageDetails) m_log.Debug($"{logHeader}[VoiceSignalingRequest]: Response: {resp}");
+        if (_MessageDetails) m_log.LogDebug($"{logHeader}[VoiceSignalingRequest]: Response: {resp}");
 
         // TODO: check for errors and package the response
 
@@ -376,7 +377,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
     /// <param name="scene"></param>
     public void ChatSessionRequest(IOSHttpRequest request, IOSHttpResponse response, UUID agentID, Scene scene)
     {
-        m_log.DebugFormat("{0}: ChatSessionRequest received for agent {1} in scene {2}", logHeader, agentID, scene.RegionInfo.RegionName);
+        m_log.LogDebug("{0}: ChatSessionRequest received for agent {1} in scene {2}", logHeader, agentID, scene.RegionInfo.RegionName);
         if (request.HttpMethod != "POST")
         {
             response.StatusCode = (int)HttpStatusCode.NotFound;
@@ -385,7 +386,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
 
         if (!scene.TryGetScenePresence(agentID, out ScenePresence sp) || sp.IsDeleted)
         {
-            m_log.Warn($"{logHeader} ChatSessionRequest: scene presence not found or deleted for agent {agentID}");
+            m_log.LogWarning($"{logHeader} ChatSessionRequest: scene presence not found or deleted for agent {agentID}");
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
@@ -393,23 +394,23 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
         OSDMap reqmap = BodyToMap(request, "[ChatSessionRequest]");
         if (reqmap is null)
         {
-            m_log.Warn($"{logHeader} ChatSessionRequest: message body not parsable in request for agent {agentID}");
+            m_log.LogWarning($"{logHeader} ChatSessionRequest: message body not parsable in request for agent {agentID}");
             response.StatusCode = (int)HttpStatusCode.NoContent;
             return;
         }
 
-        m_log.Debug($"{logHeader} ChatSessionRequest");
+        m_log.LogDebug($"{logHeader} ChatSessionRequest");
 
         if (!reqmap.TryGetString("method", out string method))
         {
-            m_log.Warn($"{logHeader} ChatSessionRequest: missing required 'method' field in request for agent {agentID}");
+            m_log.LogWarning($"{logHeader} ChatSessionRequest: missing required 'method' field in request for agent {agentID}");
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
 
         if (!reqmap.TryGetUUID("session-id", out UUID sessionID))
         {
-            m_log.Warn($"{logHeader} ChatSessionRequest: missing required 'session-id' field in request for agent {agentID}");
+            m_log.LogWarning($"{logHeader} ChatSessionRequest: missing required 'session-id' field in request for agent {agentID}");
             response.StatusCode = (int)HttpStatusCode.NotFound;
             return;
         }
@@ -436,7 +437,7 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
                 IEventQueue queue = scene.RequestModuleInterface<IEventQueue>();
                 if (queue is null)
                 {
-                    m_log.ErrorFormat("{0}: no event queue for scene {1}", logHeader, scene.RegionInfo.RegionName);
+                    m_log.LogError("{0}: no event queue for scene {1}", logHeader, scene.RegionInfo.RegionName);
                     response.StatusCode = (int)HttpStatusCode.InternalServerError;
                 }
                 else
@@ -477,14 +478,14 @@ public class WebRtcVoiceRegionModule : ISharedRegionModule
             {
                 OSD tmp = OSDParser.DeserializeLLSDXml(inputStream);
                 if (_MessageDetails)
-                    m_log.Debug($"{pCaller} BodyToMap: Request: {tmp}");
+                    m_log.LogDebug($"{pCaller} BodyToMap: Request: {tmp}");
                 if(tmp is OSDMap map)
                     return map;
             }
         }
         catch
         {
-            m_log.Debug($"{pCaller} BodyToMap: Fail to decode LLSDXml request");
+            m_log.LogDebug($"{pCaller} BodyToMap: Fail to decode LLSDXml request");
         }
         return null;
     }

@@ -2,15 +2,13 @@ using OpenMetaverse;
 
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.HypergridService;
 
 public class UserAccountCache : IUserAccountService
 {
     private const double CACHE_EXPIRATION_SECONDS = 120000.0; // 33 hours!
-
-//        private static readonly ILog m_log =
-//                LogManager.GetLogger(
-//                MethodBase.GetCurrentMethod().DeclaringType);
 
     private ExpiringCache<UUID, UserAccount> m_UUIDCache;
 
@@ -37,7 +35,7 @@ public class UserAccountCache : IUserAccountService
         // Cache even null accounts
         m_UUIDCache.AddOrUpdate(userID, account, CACHE_EXPIRATION_SECONDS);
 
-        //m_log.DebugFormat("[USER CACHE]: cached user {0}", userID);
+        //m_log.LogDebug("[USER CACHE]: cached user {0}", userID);
     }
 
     public UserAccount Get(UUID userID, out bool inCache)
@@ -46,7 +44,7 @@ public class UserAccountCache : IUserAccountService
         inCache = false;
         if (m_UUIDCache.TryGetValue(userID, out account))
         {
-            //m_log.DebugFormat("[USER CACHE]: Account {0} {1} found in cache", account.FirstName, account.LastName);
+            //m_log.LogDebug("[USER CACHE]: Account {0} {1} found in cache", account.FirstName, account.LastName);
             inCache = true;
             return account;
         }

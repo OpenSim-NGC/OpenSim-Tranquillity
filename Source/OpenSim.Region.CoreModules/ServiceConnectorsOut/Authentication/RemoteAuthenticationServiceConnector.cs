@@ -26,20 +26,21 @@
  */
 
 using Nini.Config;
-using log4net;
 using System.Reflection;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Authentication;
 
 public class RemoteAuthenticationServicesConnector : AuthenticationServicesConnector,
         ISharedRegionModule, IAuthenticationService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
@@ -65,7 +66,7 @@ public class RemoteAuthenticationServicesConnector : AuthenticationServicesConne
                 IConfig userConfig = source.Configs["AuthenticationService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
+                    m_log.LogError("[AUTH CONNECTOR]: AuthenticationService missing from OpenSim.ini");
                     return;
                 }
 
@@ -73,7 +74,7 @@ public class RemoteAuthenticationServicesConnector : AuthenticationServicesConne
 
                 base.Initialise(source);
 
-                m_log.Info("[AUTH CONNECTOR]: Remote Authentication enabled");
+                m_log.LogInformation("[AUTH CONNECTOR]: Remote Authentication enabled");
             }
         }
     }

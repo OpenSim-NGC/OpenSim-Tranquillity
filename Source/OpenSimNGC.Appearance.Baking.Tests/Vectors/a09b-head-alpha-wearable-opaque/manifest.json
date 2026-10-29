@@ -1,0 +1,173 @@
+{
+  "id": "A09b-head-alpha-wearable-opaque",
+  "title": "Alpha wearable whose texture has no alpha channel leaves the alpha unchanged",
+  "rules": [
+    "R13"
+  ],
+  "note": "",
+  "channel": "Head",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skin",
+      "label": "skin",
+      "params": {},
+      "textures": []
+    },
+    {
+      "kind": "Alpha",
+      "label": "alpha",
+      "params": {},
+      "textures": [
+        {
+          "slot": "HeadAlpha",
+          "generator": "grad",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": false,
+          "file": "tex-alpha-HeadAlpha.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "ee6d11242ed0e768a024150a4105c712b1bb3de28d51248d54c91d915e8841cd",
+    "morphSha256": "ad7facb2586fc6e966c004d7d1d16b024f5805ff7cb47c7a85dabd8b48892ca7",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.65,0.43,0.25,1.00); head_skingrain.tga"
+      },
+      {
+        "layer": "headcolor",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "head_color.tga\u002Balpha"
+      },
+      {
+        "layer": "shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "highlight",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (1.00,1.00,1.00,0.00)"
+      },
+      {
+        "layer": "rosyface",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.78,0.28,0.28,0.00)"
+      },
+      {
+        "layer": "lips",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.86,0.45,0.45,0.00)"
+      },
+      {
+        "layer": "freckles",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Freckles#165=skip]"
+      },
+      {
+        "layer": "eyebrows",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.35,0.21,0.06,0.00)"
+      },
+      {
+        "layer": "lipstick",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Lipstick#701=skip]"
+      },
+      {
+        "layer": "lipgloss",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Lipgloss#702=skip]"
+      },
+      {
+        "layer": "blush",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Blush#704=skip]"
+      },
+      {
+        "layer": "Outer Eye Shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Outer Shadow#707=skip]"
+      },
+      {
+        "layer": "Inner Eye Shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Inner Shadow#709=skip]"
+      },
+      {
+        "layer": "eyeliner",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Eyeliner#703=skip]"
+      },
+      {
+        "layer": "facialhair",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [Sideburns#1005=skip, Moustache#1007=skip, Soulpatch#1009=skip, Chin Curtains#1011=skip]"
+      },
+      {
+        "layer": "head_bodypaint",
+        "status": "skipped",
+        "wearable": "Skin",
+        "detail": "skin: no HeadBodypaint texture on the wearable"
+      },
+      {
+        "layer": "head_tattoo",
+        "status": "skipped",
+        "wearable": "Tattoo",
+        "detail": "no Tattoo worn"
+      },
+      {
+        "layer": "head_universal_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "facialhair",
+        "status": "morph",
+        "wearable": "Hair",
+        "detail": "once (plain layer): morph mask *= layer mask (mean 0.0)"
+      },
+      {
+        "layer": "eyelash alpha",
+        "status": "mask",
+        "wearable": null,
+        "detail": "alpha *= head_alpha.tga"
+      },
+      {
+        "layer": "head alpha",
+        "status": "mask",
+        "wearable": "Alpha",
+        "detail": "alpha: HeadAlpha has no alpha channel (opaque)"
+      }
+    ]
+  }
+}

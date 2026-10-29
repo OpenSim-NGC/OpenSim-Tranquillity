@@ -1068,6 +1068,17 @@ public interface IClientAPI
     /// <param name="textureEntry"></param>
     void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hoverheight);
 
+    /// <summary>
+    /// As <see cref="SendAppearance(UUID,byte[],byte[],float)"/>, plus the LL viewer's <c>AppearanceData</c> block
+    /// for an avatar this simulator baked (viewer contract V4/V5).
+    /// </summary>
+    /// <param name="cofVersion">
+    /// The Current Outfit folder version the sim baked at, or <b>negative</b> for "this sim did not bake this
+    /// avatar", which sends the count-0 form that every release before server-side baking sent. The four-argument
+    /// overload is exactly this one with a negative version.
+    /// </param>
+    void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hoverheight, int cofVersion);
+
     void SendCachedTextureResponse(ISceneEntity avatar, int serial, List<CachedTextureResponseArg> cachedTextures);
 
     /// <summary>
@@ -1268,7 +1279,7 @@ public interface IClientAPI
     void SendDetailedEstateData(UUID invoice, string estateName, uint estateID, uint parentEstate, uint estateFlags,
                                 uint sunPosition, UUID covenant, uint covenantChanged, string abuseEmail, UUID estateOwner);
 
-    void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, uint estateID);
+    void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, UUID[] blocked, uint estateID);
 
     /// <summary>
     /// Send land properties to the client.

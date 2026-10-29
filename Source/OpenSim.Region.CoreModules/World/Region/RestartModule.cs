@@ -27,21 +27,20 @@
 
 using System.Reflection;
 using System.Timers;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using Timer = System.Timers.Timer;
 
 namespace OpenSim.Region.CoreModules.World.Region;
 
 public class RestartModule : INonSharedRegionModule, IRestartModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Scene m_Scene;
     protected Timer m_CountdownTimer = null;
@@ -134,7 +133,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
 
         if (m_Scene.GetScenePresences().Count == 0)
         {
-            m_log.InfoFormat("No avatars in region {0}, restarting now...", m_Scene.Name);
+            m_log.LogInformation("No avatars in region {0}, restarting now...", m_Scene.Name);
 
             CreateMarkerFile();
             m_Scene.RestartNow();
@@ -214,7 +213,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
                 client.SendAlertMessage(msg_id, msg_id, extra);
             });
 
-            m_log.InfoFormat("{0} will restart in {1} seconds", m_Scene.Name, currentAlert);    
+            m_log.LogInformation("{0} will restart in {1} seconds", m_Scene.Name, currentAlert);
         }
 
         return currentAlert - nextAlert;
@@ -237,7 +236,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
         }
         else
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[RESTART MODULE]: Tried to set restart timer to {0} in {1}, which is not a valid interval",
                 intervalSeconds, m_Scene.Name);
         }
@@ -352,7 +351,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
 
     int CountAgents()
     {
-        m_log.Info("[RESTART MODULE]: Counting affected avatars");
+        m_log.LogInformation("[RESTART MODULE]: Counting affected avatars");
         int agents = 0;
 
         if (m_rebootAll)
@@ -375,7 +374,7 @@ public class RestartModule : INonSharedRegionModule, IRestartModule
             }
         }
 
-        m_log.InfoFormat("[RESTART MODULE]: Avatars in region: {0}", agents);
+        m_log.LogInformation("[RESTART MODULE]: Avatars in region: {0}", agents);
 
         return agents;
     }

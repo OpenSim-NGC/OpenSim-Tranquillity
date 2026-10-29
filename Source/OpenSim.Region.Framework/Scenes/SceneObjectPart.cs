@@ -37,9 +37,8 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Region.PhysicsModules.SharedBase;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
-
-using log4net;
 
 namespace OpenSim.Region.Framework.Scenes;
 
@@ -110,7 +109,7 @@ public class SceneObjectPart : EntityBase, IDisposable
                 scriptEvents.collision_start | scriptEvents.collision_end
                 );
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Dynamic attributes can be created and deleted as required.
@@ -151,15 +150,69 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// <summary>
     /// Is an explicit sit target set for this part?
     /// </summary>
+    /// <remarks>
+    /// SetSitTarget records the answer explicitly: SL PRIM_SIT_TARGET "If it is nonzero the prim's sit target is set
+    /// to the indicated offset and rotation" and "Unlike llLinkSitTarget(), an offset of &lt;0.0, 0.0, 0.0&gt; may be
+    /// explicitly set". Otherwise, and after the offset or rotation is assigned on its own, a target is set when the
+    /// offset is not zero or the rotation is not the identity, as before.
+    /// </remarks>
     public bool IsSitTargetSet
     {
         get
         {
+            bool? active = m_sitTargetActive;
+            if (active.HasValue)
+                return active.Value;
+
             // assume SitTargetOrientation is normalized (as needed elsewhere)
             if (!SitTargetPosition.IsZero() || !SitTargetOrientation.IsIdentityOrZero())
                 return true;
             return false;
         }
+    }
+
+    /// <summary>
+    /// The sit target's on/off state, independent of its offset and rotation. Reads IsSitTargetSet; assigning it
+    /// records the state explicitly, so a target at a zero offset can be active.
+    /// </summary>
+    /// <remarks>
+    /// The XML serializer keeps it (crossings, take and rez, archives), and the region stores keep it in the prims
+    /// column SitTargetActive. Both save it only when SitTargetActiveIsExplicit; otherwise a loaded object has the
+    /// state derived from its offset and rotation.
+    /// </remarks>
+    [XmlIgnore]
+    public bool SitTargetActive
+    {
+        get { return IsSitTargetSet; }
+        set { m_sitTargetActive = value; }
+    }
+
+    /// <summary>
+    /// True when SitTargetActive was set explicitly to a state the offset and rotation alone would not give
+    /// (an active target at a zero offset and identity rotation). Only then do the serializer and the region stores
+    /// write it.
+    /// </summary>
+    [XmlIgnore]
+    public bool SitTargetActiveIsExplicit
+    {
+        get
+        {
+            bool? active = m_sitTargetActive;
+            if (!active.HasValue)
+                return false;
+            bool derived = !SitTargetPosition.IsZero() || !SitTargetOrientation.IsIdentityOrZero();
+            return active.Value != derived;
+        }
+    }
+
+    /// <summary>
+    /// Sets the sit target's state, offset and rotation together (SL PRIM_SIT_TARGET).
+    /// </summary>
+    public void SetSitTarget(bool active, Vector3 offset, Quaternion orientation)
+    {
+        m_sitTargetPosition = offset;
+        m_sitTargetOrientation = orientation;
+        m_sitTargetActive = active;
     }
 
     #region Fields
@@ -281,6 +334,14 @@ public class SceneObjectPart : EntityBase, IDisposable
     protected float m_APIDDamp = 0;
     protected float m_APIDStrength = 0;
 
+    // When the physics scene has a rotation target (PhysicsScene.SupportsRotationTarget), the root actor that was last
+    // given one and what it was given. The target is the actor's; core's own look-at controller does not run for it.
+    private readonly object m_rotTargetLock = new();
+    private PhysicsActor m_rotTargetActor;
+    private Quaternion m_rotTargetGiven;
+    private float m_rotTargetStrength;
+    private float m_rotTargetDamping;
+
     /// <summary>
     /// This part's inventory
     /// </summary>
@@ -308,9 +369,9 @@ public class SceneObjectPart : EntityBase, IDisposable
     private Dictionary<UUID, scriptEvents> m_scriptEvents = new Dictionary<UUID, scriptEvents>();
     private Quaternion m_sitTargetOrientation = Quaternion.Identity;
     private Vector3 m_sitTargetPosition;
+    private bool? m_sitTargetActive; // null: derived from the offset and rotation (IsSitTargetSet)
     private bool m_scriptedSitOnly = false;
     private bool m_allowUnsit = true;
-    private UUID m_experienceUsedForSit = UUID.Zero;
     private string m_sitAnimation = "SIT";
     private UndoRedoState m_UndoRedo = null;
     private readonly object m_UndoLock = new object();
@@ -383,7 +444,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     //            Console.WriteLine(
     //                "[SCENE OBJECT PART]: Destructor called for {0}, local id {1}, parent {2} {3}",
     //                Name, LocalId, ParentGroup.Name, ParentGroup.LocalId);
-    //            m_log.DebugFormat(
+    //            m_log.LogDebug(
     //                "[SCENE OBJECT PART]: Destructor called for {0}, local id {1}, parent {2} {3}",
     //                Name, LocalId, ParentGroup.Name, ParentGroup.LocalId);
     //        }
@@ -842,7 +903,7 @@ public class SceneObjectPart : EntityBase, IDisposable
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[SCENEOBJECTPART]: GROUP POSITION. {0}", e);
+                    m_log.LogError("[SCENEOBJECTPART]: GROUP POSITION. {0}", e);
                 }
             }
         }
@@ -948,19 +1009,19 @@ public class SceneObjectPart : EntityBase, IDisposable
                     if (_parentID == 0)
                     {
                         actor.Orientation = value;
-                        //m_log.Info("[PART]: RO1:" + actor.Orientation.ToString());
+                        //m_log.LogInformation("[PART]: RO1:" + actor.Orientation.ToString());
                     }
                     else
                     {
                         // Child prim we have to calculate it's world rotationwel
                         Quaternion resultingrotation = GetWorldRotation();
                         actor.Orientation = resultingrotation;
-                        //m_log.Info("[PART]: RO2:" + actor.Orientation.ToString());
+                        //m_log.LogInformation("[PART]: RO2:" + actor.Orientation.ToString());
                     }
                 }
                 catch (Exception ex)
                 {
-                    m_log.Error("[SCENEOBJECTPART]: ROTATIONOFFSET" + ex.Message);
+                    m_log.LogError("[SCENEOBJECTPART]: ROTATIONOFFSET" + ex.Message);
                 }
             }
         }
@@ -999,12 +1060,22 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// <summary>Update angular velocity and schedule terse update.</summary>
     public void UpdateAngularVelocity(Vector3 avel)
     {
+        if (ParentGroup.RecordScriptOmega(this, avel))
+            return; // a rotate-drag owns the spin; it is applied again when the drag ends
+
         if(m_angularVelocity.NotEqual(avel))
-        {
-            AngularVelocity = avel;
-            ScheduleTerseUpdate();
-            ParentGroup.HasGroupChanged = true;
-        }
+            ApplyAngularVelocity(avel);
+    }
+
+    /// <summary>
+    /// Write the angular velocity to the actor whatever the part's own copy holds, and schedule a terse update.
+    /// The copy is refreshed from the actor only when it is read, so it can equal a value the actor no longer has.
+    /// </summary>
+    internal void ApplyAngularVelocity(Vector3 avel)
+    {
+        AngularVelocity = avel;
+        ScheduleTerseUpdate();
+        ParentGroup.HasGroupChanged = true;
     }
 
     /// <summary>Get or set angular velocity. Does not schedule update.</summary>
@@ -1124,7 +1195,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         {
             //                if (ParentGroup != null)
             //                {
-            //                    m_log.DebugFormat(
+            //                    m_log.LogDebug(
             //                        "[SCENE OBJECT PART]: Setting linknum of {0}@{1} to {2} from {3}",
             //                        Name, AbsolutePosition, value, m_linkNum);
             //                    Util.PrintCallStack();
@@ -1268,7 +1339,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set
         {
-            //                m_log.DebugFormat("[SOP]: Setting CreateSelected to {0} for {1} {2}", value, Name, UUID);
+            //                m_log.LogDebug("[SOP]: Setting CreateSelected to {0} for {1} {2}", value, Name, UUID);
             m_createSelected = value;
         }
     }
@@ -1309,7 +1380,8 @@ public class SceneObjectPart : EntityBase, IDisposable
         set
         {
             m_sitTargetOrientation = value;
-            //                m_log.DebugFormat("[SCENE OBJECT PART]: Set sit target orientation {0} for {1} {2}", m_sitTargetOrientation, Name, LocalId);
+            m_sitTargetActive = null;
+            //                m_log.LogDebug("[SCENE OBJECT PART]: Set sit target orientation {0} for {1} {2}", m_sitTargetOrientation, Name, LocalId);
         }
     }
 
@@ -1321,7 +1393,8 @@ public class SceneObjectPart : EntityBase, IDisposable
         set
         {
             m_sitTargetPosition = value;
-            //                m_log.DebugFormat("[SCENE OBJECT PART]: Set sit target position to {0} for {1} {2}", m_sitTargetPosition, Name, LocalId);
+            m_sitTargetActive = null;
+            //                m_log.LogDebug("[SCENE OBJECT PART]: Set sit target position to {0} for {1} {2}", m_sitTargetPosition, Name, LocalId);
         }
     }
 
@@ -1356,6 +1429,15 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// The two SIT_FLAG_* bits the sit path cannot act on yet - SIT_FLAG_NO_COLLIDE (0x10) and
+    /// SIT_FLAG_NO_DAMAGE (0x20) - stored so llGetLinkSitFlags reads back what llSetLinkSitFlags set.
+    /// ALLOW_UNSIT and SCRIPTED_ONLY live in AllowUnsit / ScriptedSitOnly, which ScenePresence honours;
+    /// SIT_TARGET is read-only, derived from IsSitTargetSet. Not persisted, like its siblings.
+    /// </summary>
+    [XmlIgnore]
+    public int SitFlagsStored { get; set; }
+
     [XmlIgnore]
     public bool ScriptedSitOnly
     {
@@ -1366,16 +1448,6 @@ public class SceneObjectPart : EntityBase, IDisposable
 
             if (ParentGroup != null)
                 ParentGroup.HasGroupChanged = true;
-        }
-    }
-
-    [XmlIgnore]
-    public UUID ExperienceUsedForSit
-    {
-        get { return m_experienceUsedForSit; }
-        set
-        {
-            m_experienceUsedForSit = value;
         }
     }
 
@@ -1521,7 +1593,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         get { return m_flags; }
         set
         {
-            //m_log.DebugFormat("[SOP]: Setting flags for {0} {1} to {2}", UUID, Name, value);
+            //m_log.LogDebug("[SOP]: Setting flags for {0} {1} to {2}", UUID, Name, value);
             m_flags = value & ~(PrimFlags.Touch | PrimFlags.Money | PrimFlags.AllowInventoryDrop);
         }
     }
@@ -1660,10 +1732,8 @@ public class SceneObjectPart : EntityBase, IDisposable
                 }
                 if (ParentGroup.IsAttachment)
                 {
-                    ScenePresence avatar = m_scene.GetScenePresence(ParentGroup.AttachedAvatar);
-                    PhysicsActor pa = avatar?.PhysicsActor;
-                    if (pa != null)
-                        pa.Buoyancy = value;
+                    // A part's own m_scene is never set; the group's is. The wearer's presence takes the value.
+                    ParentGroup.SetWearerBuoyancy(value);
                 }
                 else if (PhysActor != null)
                     PhysActor.Buoyancy = value;
@@ -2006,6 +2076,33 @@ public class SceneObjectPart : EntityBase, IDisposable
         client.SendObjectPropertiesReply(this);
     }
 
+    /// <summary>
+    /// Push full ObjectProperties to everyone in the region.
+    ///
+    /// <para>
+    /// The touch and sit labels a viewer shows in its context menu come from the FULL
+    /// ObjectProperties reply - <c>LLSelectMgr::processObjectProperties</c> fills
+    /// <c>LLSelectNode::mTouchName</c> (llselectmgr.cpp:6110) and the menu reads it
+    /// (llviewermenu.cpp:3096-3101). The region only sends that on select
+    /// (<c>Scene.PacketHandlers.cs:223</c>); a right-click sends
+    /// <c>RequestObjectPropertiesFamily</c>, whose reply carries no touch name at all. So a script
+    /// that changes the label after the viewer last selected the object has no way to be seen
+    /// unless the region pushes the properties itself.
+    /// </para>
+    /// </summary>
+    public void SendPropertiesToAllClients()
+    {
+        SceneObjectGroup group = ParentGroup;
+        if (group is null || group.IsDeleted || group.Scene is null)
+            return;
+
+        group.Scene.ForEachClient(delegate (IClientAPI client)
+        {
+            try { client.SendObjectPropertiesReply(this); }
+            catch { /* one client's failure must not stop the rest */ }
+        });
+    }
+
     // TODO: unused:
     // private void handleTimerAccounting(uint localID, double interval)
     // {
@@ -2042,13 +2139,13 @@ public class SceneObjectPart : EntityBase, IDisposable
     {
         if ((m_flags & flag) == 0)
         {
-            //m_log.Debug("Adding flag: " + ((PrimFlags) flag).ToString());
+            //m_log.LogDebug("Adding flag: " + ((PrimFlags) flag).ToString());
             m_flags |= flag;
 
             if (flag == PrimFlags.TemporaryOnRez)
                 ResetExpire();
         }
-        // m_log.Debug("Aprev: " + prevflag.ToString() + " curr: " + Flags.ToString());
+        // m_log.LogDebug("Aprev: " + prevflag.ToString() + " curr: " + Flags.ToString());
     }
 
     public void AddNewParticleSystem(Primitive.ParticleSystem pSystem, bool expire)
@@ -2335,6 +2432,10 @@ public class SceneObjectPart : EntityBase, IDisposable
 
         dupe.m_sittingAvatars = new HashSet<ScenePresence>();
         dupe.SitTargetAvatar = UUID.Zero;
+
+        // MemberwiseClone shares the vehicle record; the copy gets its own (VehicleData holds only values)
+        if (m_vehicleParams != null)
+            dupe.m_vehicleParams = new SOPVehicle { vd = m_vehicleParams.vd };
         // safeguard  actual copy is done in sog.copy
         dupe.KeyframeMotion = null;
         dupe.PayPrice = (int[])PayPrice.Clone();
@@ -3031,12 +3132,13 @@ public class SceneObjectPart : EntityBase, IDisposable
     {
         // Note: This is only being called on the root prim at this time.
 
-        m_log.ErrorFormat(
+        m_log.LogError(
             "[SCENE OBJECT PART]: Physical object {0}, localID {1} went out of bounds at {2} in {3}.  Stopping at {4} and making non-physical.",
             Name, LocalId, pos, ParentGroup.Scene.Name, AbsolutePosition);
 
-        RemFlag(PrimFlags.Physics);
-        DoPhysicsPropertyUpdate(false, true);
+        // The whole object, as llSetStatus(STATUS_PHYSICS, FALSE) does: every part's flag, the region's
+        // physical-prim count, and the parts' actor events
+        ParentGroup.ScriptSetPhysicsStatus(false);
     }
 
     public void PhysicsRequestingTerseUpdate()
@@ -3053,6 +3155,10 @@ public class SceneObjectPart : EntityBase, IDisposable
                 return;
             }
             //ParentGroup.RootPart.m_groupPosition = newpos;
+
+            // physics moves the body without the position setter; the group's parcel follows the root
+            if (_parentID == 0)
+                ParentGroup.CheckParcelCrossing();
         }
 
         ScheduleTerseUpdate();
@@ -3173,7 +3279,7 @@ public class SceneObjectPart : EntityBase, IDisposable
             scale.Y = Utils.Clamp(scale.Y, minsize, maxsize);
             scale.Z = Utils.Clamp(scale.Z, minsize, maxsize);
         }
-        //            m_log.DebugFormat("[SCENE OBJECT PART]: Resizing {0} {1} to {2}", Name, LocalId, scale);
+        //            m_log.LogDebug("[SCENE OBJECT PART]: Resizing {0} {1} to {2}", Name, LocalId, scale);
 
         Scale = scale;
 
@@ -3203,7 +3309,7 @@ public class SceneObjectPart : EntityBase, IDisposable
 
         if (APIDStrength <= 0)
         {
-            m_log.WarnFormat("[SceneObjectPart] Invalid rotation strength {0}", APIDStrength);
+            m_log.LogWarning("[SceneObjectPart] Invalid rotation strength {0}", APIDStrength);
             return;
         }
 
@@ -3237,8 +3343,12 @@ public class SceneObjectPart : EntityBase, IDisposable
         if (ParentGroup.RootPart != this && ParentGroup.UsesPhysics)
             ParentGroup.StopLookAt();
 
-        // just in case do this always
-        if (APIDActive)
+        // just in case do this always, but a rotate-drag owns the spin: the look-at is only switched off
+        bool spinning = ParentGroup.IsSpinning;
+
+        // a target the actor holds is switched off, which stops the turn; a rotate-drag's target stays
+        bool switchedOff = !spinning && ReleaseRotationTarget();
+        if (APIDActive && !spinning && !switchedOff)
             AngularVelocity = Vector3.Zero;
 
         APIDActive = false;
@@ -4017,7 +4127,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     public void SetGroup(UUID groupID, IClientAPI client)
     {
         // Scene.AddNewPrims() calls with client == null so can't use this.
-        // m_log.DebugFormat(
+        // m_log.LogDebug(
         //      "[SCENE OBJECT PART]: Setting group for {0} to {1} for {2}",
         //      Name, groupID, OwnerID);
 
@@ -4055,7 +4165,7 @@ public class SceneObjectPart : EntityBase, IDisposable
     /// <param name="events"></param>
     public void SetScriptEvents(UUID scriptid, ulong events)
     {
-        //            m_log.DebugFormat(
+        //            m_log.LogDebug(
         //                "[SCENE OBJECT PART]: Set script events for script with id {0} on {1}/{2} to {3} in {4}",
         //                scriptid, Name, ParentGroup.Name, events, ParentGroup.Scene.Name);
         // scriptEvents oldparts;
@@ -4382,7 +4492,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         // Get our plane normals
         for (int i = 0; i < 6; i++)
         {
-            //m_log.Info("[FACECALCULATION]: FaceA[" + i + "]=" + FaceA[i] + " FaceB[" + i + "]=" + FaceB[i] + " FaceC[" + i + "]=" + FaceC[i] + " FaceD[" + i + "]=" + FaceD[i]);
+            //m_log.LogInformation("[FACECALCULATION]: FaceA[" + i + "]=" + FaceA[i] + " FaceB[" + i + "]=" + FaceB[i] + " FaceC[" + i + "]=" + FaceC[i] + " FaceD[" + i + "]=" + FaceD[i]);
 
             // Our Plane direction
             AmBa = FaceA[i] - FaceB[i];
@@ -4393,7 +4503,7 @@ public class SceneObjectPart : EntityBase, IDisposable
             // normalize the cross product to get the normal.
             normals[i] = cross / cross.Length();
 
-            //m_log.Info("[NORMALS]: normals[ " + i + "]" + normals[i].ToString());
+            //m_log.LogInformation("[NORMALS]: normals[ " + i + "]" + normals[i].ToString());
             //distance[i] = (normals[i].X * AmBa.X + normals[i].Y * AmBa.Y + normals[i].Z * AmBa.Z) * -1;
         }
 
@@ -4509,9 +4619,9 @@ public class SceneObjectPart : EntityBase, IDisposable
                     result.HitTF = true;
                     result.ipoint = q;
                     result.face = i;
-                    //m_log.Info("[FACE]:" + i.ToString());
-                    //m_log.Info("[POINT]: " + q.ToString());
-                    //m_log.Info("[DIST]: " + distance2.ToString());
+                    //m_log.LogInformation("[FACE]:" + i.ToString());
+                    //m_log.LogInformation("[POINT]: " + q.ToString());
+                    //m_log.LogInformation("[DIST]: " + distance2.ToString());
                     if (faceCenters)
                     {
                         result.normal = AAfacenormals[i] * AXrot;
@@ -4825,7 +4935,7 @@ public class SceneObjectPart : EntityBase, IDisposable
             ScheduleFullUpdate();
         }
 
-        //            m_log.DebugFormat("[SCENE OBJECT PART]: Updated PrimFlags on {0} {1} to {2}", Name, LocalId, Flags);
+        //            m_log.LogDebug("[SCENE OBJECT PART]: Updated PrimFlags on {0} {1} to {2}", Name, LocalId, Flags);
     }
 
     /// <summary>
@@ -4860,7 +4970,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[SCENE]: caught exception meshing object {0}. Object set to phantom. e={1}", m_uuid, e);
+            m_log.LogError("[SCENE]: caught exception meshing object {0}. Object set to phantom. e={1}", m_uuid, e);
             pa = null;
         }
 
@@ -4900,6 +5010,10 @@ public class SceneObjectPart : EntityBase, IDisposable
                 RemFlag(PrimFlags.CameraDecoupled);
             // we are going to tell rest of code about physics so better have this here
             PhysActor = pa;
+
+            // A motion that is already running has not told this new actor yet (the object's physics was rebuilt).
+            if (isroot)
+                KeyframeMotion?.UpdatePhysicsHint();
 
             //                DoPhysicsPropertyUpdate(isPhysical, true);
             // lets expand it here just with what it really needs to do
@@ -5281,7 +5395,7 @@ public class SceneObjectPart : EntityBase, IDisposable
         }
         else
         {
-            //                m_log.DebugFormat(
+            //                m_log.LogDebug(
             //                    "[SCENE OBJECT PART]: Scheduling part {0} {1} for full update in aggregateScriptEvents()", Name, LocalId);
             UpdatePhysicsSubscribedEvents();
             ScheduleFullUpdate();
@@ -5447,6 +5561,38 @@ public class SceneObjectPart : EntityBase, IDisposable
     {
         try
         {
+            // Whether the physics engine turns the root toward a rotation target itself, asked at most once per frame
+            // and only when there is something to turn toward.
+            bool? engineHasTarget = null;
+            bool EngineHasTarget() => engineHasTarget ??= ParentGroup.Scene?.PhysicsScene?.SupportsRotationTarget() == true;
+
+            // A rotate-drag holds the root's angular target: the viewer's rotation, with the look-at a script
+            // set kept (APIDTarget, APIDStrength) and used again when the drag ends.
+            if (ParentGroup.TryGetSpinTarget(out Quaternion dragTarget))
+            {
+                PhysicsActor root = ParentGroup.RootPart.PhysActor;
+                if (root is not null && root.IsPhysical)
+                {
+                    Quaternion current = GetWorldRotation();
+
+                    // q and -q are one rotation: aim at the one that is the short way round
+                    if (Quaternion.Dot(current, dragTarget) < 0f)
+                        dragTarget = new Quaternion(-dragTarget.X, -dragTarget.Y, -dragTarget.Z, -dragTarget.W);
+
+                    if (EngineHasTarget())
+                    {
+                        GiveRotationTarget(root, dragTarget, SceneObjectGroup.SpinTargetSeconds, SceneObjectGroup.SpinTargetSeconds);
+                        ParentGroup.QueueForUpdateCheck(); // the next frame sees a replaced actor
+                    }
+                    else
+                        SteerToward(dragTarget, SceneObjectGroup.SpinStrength);
+
+                    return;
+                }
+
+                ParentGroup.EndSpin(); // no body to turn any more
+            }
+
             if (APIDActive)
             {
                 PhysicsActor pa = ParentGroup.RootPart.PhysActor;
@@ -5456,32 +5602,124 @@ public class SceneObjectPart : EntityBase, IDisposable
                     return;
                 }
 
-                Quaternion currRot = GetWorldRotation();
-                currRot.Normalize();
+                if (EngineHasTarget())
+                {
+                    // a request the engine cannot use is a look-at that ends, as one that is too weak does
+                    if (!IsFiniteRotationRequest(APIDTarget, APIDStrength, APIDDamp))
+                    {
+                        StopLookAt();
+                        return;
+                    }
 
-                // difference between current orientation and desired orientation
-                Quaternion dR = currRot / APIDTarget;
-
-                // find axis and angle of rotation to rotate to desired orientation
-                dR.GetAxisAngle(out Vector3 axis, out float angle);
-                axis *= currRot;
-
-                // clamp strength to avoid overshoot
-                float strength = 1.0f / APIDStrength;
-                if (strength > 1.0) strength = 1.0f;
-
-                // set angular velocity to rotate to desired orientation
-                // with velocity proportional to strength and angle
-                AngularVelocity = axis * angle * strength * (float)Math.PI;
-
-                // This ensures that we'll check this object on the next iteration
-                ParentGroup.QueueForUpdateCheck();
+                    GiveRotationTarget(pa, APIDTarget, APIDStrength, APIDDamp);
+                    ParentGroup.QueueForUpdateCheck();
+                }
+                else
+                    SteerToward(APIDTarget, APIDStrength);
             }
         }
         catch (Exception ex)
         {
-            m_log.Error("[Physics] " + ex);
+            m_log.LogError("[Physics] " + ex);
         }
+    }
+
+    private static bool IsFiniteRotationRequest(Quaternion target, float strength, float damping)
+        => float.IsFinite(target.X) && float.IsFinite(target.Y) && float.IsFinite(target.Z) && float.IsFinite(target.W)
+            && float.IsFinite(strength) && float.IsFinite(damping);
+
+    /// <summary>
+    /// Whether the root's actor holds a rotation target that core gave it.
+    /// </summary>
+    internal bool HasGivenRotationTarget
+    {
+        get { lock (m_rotTargetLock) return m_rotTargetActor is not null; }
+    }
+
+    /// <summary>
+    /// Give the root actor a rotation target to turn toward: the target, strength and damping, then the switch. An actor
+    /// that has the target already is given only what changed, and one that replaced it is given the whole.
+    /// </summary>
+    private void GiveRotationTarget(PhysicsActor pa, Quaternion target, float strength, float damping)
+    {
+        lock (m_rotTargetLock)
+        {
+            if (!ReferenceEquals(m_rotTargetActor, pa))
+            {
+                pa.APIDTarget = target;
+                pa.APIDStrength = strength;
+                pa.APIDDamping = damping;
+                pa.APIDActive = true;
+                m_rotTargetActor = pa;
+                m_rotTargetGiven = target;
+                m_rotTargetStrength = strength;
+                m_rotTargetDamping = damping;
+                return;
+            }
+
+            if (m_rotTargetGiven.X != target.X || m_rotTargetGiven.Y != target.Y || m_rotTargetGiven.Z != target.Z || m_rotTargetGiven.W != target.W)
+            {
+                pa.APIDTarget = target;
+                m_rotTargetGiven = target;
+            }
+
+            if (m_rotTargetStrength != strength)
+            {
+                pa.APIDStrength = strength;
+                m_rotTargetStrength = strength;
+            }
+
+            if (m_rotTargetDamping != damping)
+            {
+                pa.APIDDamping = damping;
+                m_rotTargetDamping = damping;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Switch off the rotation target core gave the root actor, which stops the turn.
+    /// </summary>
+    /// <returns>true if there was one</returns>
+    internal bool ReleaseRotationTarget()
+    {
+        lock (m_rotTargetLock)
+        {
+            PhysicsActor pa = m_rotTargetActor;
+            if (pa is null)
+                return false;
+
+            m_rotTargetActor = null;
+            pa.APIDActive = false;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Set the root's angular velocity to turn it toward a rotation, in proportion to the angle left to turn.
+    /// </summary>
+    private void SteerToward(Quaternion target, float lookAtStrength)
+    {
+        Quaternion currRot = GetWorldRotation();
+        currRot.Normalize();
+
+        // difference between current orientation and desired orientation
+        Quaternion dR = currRot / target;
+
+        // find axis and angle of rotation to rotate to desired orientation
+        dR.GetAxisAngle(out Vector3 axis, out float angle);
+        axis *= currRot;
+
+        // clamp strength to avoid overshoot
+        float strength = 1.0f / lookAtStrength;
+        if (strength > 1.0) strength = 1.0f;
+
+        // set angular velocity to rotate to desired orientation
+        // with velocity proportional to strength and angle
+        AngularVelocity = axis * angle * strength * (float)Math.PI;
+
+        // This ensures that we'll check this object on the next iteration
+        ParentGroup.QueueForUpdateCheck();
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

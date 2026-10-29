@@ -35,14 +35,15 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
 public class GroupsServiceHGConnectorModule : ISharedRegionModule, IGroupsServicesConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool m_Enabled = false;
     private IGroupsServicesConnector m_LocalGroupsConnector;
@@ -79,7 +80,7 @@ public class GroupsServiceHGConnectorModule : ISharedRegionModule, IGroupsServic
 
         m_Enabled = true;
 
-        m_log.DebugFormat("[Groups]: Initializing {0} with LocalService {1}", this.Name, m_ServiceLocation);
+        m_log.LogDebug("[Groups]: Initializing {0} with LocalService {1}", this.Name, m_ServiceLocation);
     }
 
     public string Name
@@ -97,7 +98,7 @@ public class GroupsServiceHGConnectorModule : ISharedRegionModule, IGroupsServic
         if (!m_Enabled)
             return;
 
-        m_log.DebugFormat("[Groups]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
+        m_log.LogDebug("[Groups]: Registering {0} with {1}", this.Name, scene.RegionInfo.RegionName);
         scene.RegisterModuleInterface<IGroupsServicesConnector>(this);
         m_Scenes.Add(scene);
 
@@ -659,14 +660,14 @@ public class GroupsServiceHGConnectorModule : ISharedRegionModule, IGroupsServic
         ExtendedGroupRecord group = m_LocalGroupsConnector.GetGroupRecord(UUID.Zero.ToString(), groupID, string.Empty);
         if (group == null)
         {
-            //m_log.DebugFormat("[XXX]: IsLocal? group {0} not found -- no.", groupID);
+            //m_log.LogDebug("[XXX]: IsLocal? group {0} not found -- no.", groupID);
             return false;
         }
 
         serviceLocation = group.ServiceLocation;
         name = group.GroupName;
         bool isLocal = (group.ServiceLocation.Length == 0);
-        //m_log.DebugFormat("[XXX]: IsLocal? {0}", isLocal);
+        //m_log.LogDebug("[XXX]: IsLocal? {0}", isLocal);
         return isLocal;
     }
 

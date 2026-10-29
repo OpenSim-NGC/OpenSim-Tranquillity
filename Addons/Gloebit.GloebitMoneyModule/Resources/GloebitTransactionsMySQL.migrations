@@ -50,3 +50,12 @@ BEGIN;
 ALTER TABLE `GloebitTransactions` DROP COLUMN `LocalID`;
 
 COMMIT;
+
+
+:VERSION 3		# -------------------------
+
+BEGIN;
+
+ALTER TABLE `GloebitTransactions` ADD COLUMN `CallbackKey` CHAR(36) NULL;
+
+COMMIT;

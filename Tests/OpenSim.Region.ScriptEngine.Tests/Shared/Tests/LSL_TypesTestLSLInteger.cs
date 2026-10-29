@@ -40,7 +40,12 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         /// <summary>
         /// Sets up dictionaries and arrays used in the tests.
         /// </summary>
-        [OneTimeSetUp]
+        public LSL_TypesTestLSLInteger()
+        {
+            // xunit builds a new instance for every test, so the NUnit one-time setup runs here.
+            SetUpDataSets();
+        }
+
         public void SetUpDataSets()
         {
             m_doubleIntSet = new Dictionary<double, int>();

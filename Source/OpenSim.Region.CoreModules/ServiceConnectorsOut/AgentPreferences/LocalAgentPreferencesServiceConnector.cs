@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -35,11 +34,14 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.AgentPreferences;
 
 public class LocalAgentPreferencesServicesConnector : ISharedRegionModule, IAgentPreferencesService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAgentPreferencesService m_AgentPreferencesService;
     private bool m_Enabled = false;
@@ -67,7 +69,7 @@ public class LocalAgentPreferencesServicesConnector : ISharedRegionModule, IAgen
                 IConfig userConfig = source.Configs["AgentPreferencesService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
+                    m_log.LogError("[AGENT PREFERENCES CONNECTOR]: AgentPreferencesService missing from OpenSim.ini");
                     return;
                 }
 
@@ -75,7 +77,7 @@ public class LocalAgentPreferencesServicesConnector : ISharedRegionModule, IAgen
 
                 if (String.IsNullOrEmpty(serviceDll))
                 {
-                    m_log.Error("[AGENT PREFERENCES CONNECTOR]: No AgentPreferencesModule named in section AgentPreferencesService");
+                    m_log.LogError("[AGENT PREFERENCES CONNECTOR]: No AgentPreferencesModule named in section AgentPreferencesService");
                     return;
                 }
 
@@ -84,11 +86,11 @@ public class LocalAgentPreferencesServicesConnector : ISharedRegionModule, IAgen
 
                 if (m_AgentPreferencesService == null)
                 {
-                    m_log.Error("[AGENT PREFERENCES CONNECTOR]: Can't load agent preferences service");
+                    m_log.LogError("[AGENT PREFERENCES CONNECTOR]: Can't load agent preferences service");
                     return;
                 }
                 m_Enabled = true;
-                m_log.Info("[AGENT PREFERENCES CONNECTOR]: Local agent preferences connector enabled");
+                m_log.LogInformation("[AGENT PREFERENCES CONNECTOR]: Local agent preferences connector enabled");
             }
         }
     }

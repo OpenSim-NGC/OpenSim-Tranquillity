@@ -26,10 +26,10 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Scenes;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.CoreModules.Agent.AssetTransaction;
@@ -53,7 +53,7 @@ public class AssetXferUploader
             new UUID("1578a2b1-5179-4b53-b618-fe00ca5a5594"),
             };
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Upload state.
@@ -137,7 +137,7 @@ public class AssetXferUploader
     /// <returns>True if the transfer is complete, false otherwise or if the xferID was not valid</returns>
     public bool HandleXferPacket(ulong xferID, uint packetID, byte[] data)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ASSET XFER UPLOADER]: Received packet {0} for xfer {1} (data length {2})",
 //                packetID, xferID, data.Length);
 
@@ -195,7 +195,7 @@ public class AssetXferUploader
         IClientAPI remoteClient, UUID assetID, UUID transaction, sbyte type, byte[] data, bool storeLocal,
         bool tempFile)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ASSET XFER UPLOADER]: Initialised xfer from {0}, asset {1}, transaction {2}, type {3}, storeLocal {4}, tempFile {5}, already received data length {6}",
 //                remoteClient.Name, assetID, transaction, type, storeLocal, tempFile, data.Length);
 
@@ -203,7 +203,7 @@ public class AssetXferUploader
         {
             if (m_uploadState != UploadState.New)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[ASSET XFER UPLOADER]: Tried to start upload of asset {0}, transaction {1} for {2} but this is already in state {3}.  Aborting.",
                     assetID, transaction, remoteClient.Name, m_uploadState);
 
@@ -238,7 +238,7 @@ public class AssetXferUploader
     {
         XferID = Util.GetNextXferID();
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ASSET XFER UPLOADER]: Requesting Xfer of asset {0}, type {1}, transfer id {2} from {3}",
 //                m_asset.FullID, m_asset.Type, XferID, ourClient.Name);
 
@@ -273,7 +273,7 @@ public class AssetXferUploader
             ourClient.SendAssetUploadCompleteMessage(m_asset.Type, sucess, m_asset.FullID);
         }
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[ASSET XFER UPLOADER]: Uploaded asset {0} for transaction {1}",
             m_asset.FullID, m_transactionID);
 
@@ -333,7 +333,12 @@ public class AssetXferUploader
         }
     }
 
-    public void RequestUpdateInventoryItem(IClientAPI remoteClient, InventoryItemBase item)
+    /// <summary>
+    /// A19: returns <b>false when the update was refused</b> - <see cref="ValidateAssets"/> said no, so the asset
+    /// was not stored and the item was not repointed. When the xfer has not completed yet there is nothing to
+    /// validate and this returns true; the refusal, if one comes, arrives on the alert-message path as before.
+    /// </summary>
+    public bool RequestUpdateInventoryItem(IClientAPI remoteClient, InventoryItemBase item)
     {
         // We must lock to avoid a race with a separate thread uploading the asset.
         lock (this)
@@ -355,7 +360,7 @@ public class AssetXferUploader
 
             if (m_uploadState == UploadState.Complete)
             {
-                CompleteItemUpdate(item);
+                return CompleteItemUpdate(item);
             }
             else
             {
@@ -370,7 +375,7 @@ public class AssetXferUploader
                 }
 
 
-                //                    m_log.DebugFormat(
+                //                    m_log.LogDebug(
                 //                        "[ASSET XFER UPLOADER]: Holding update inventory item request {0} for {1} pending completion of asset xfer for transaction {2}",
                 //                        item.Name, remoteClient.Name, transactionID);
 
@@ -378,6 +383,9 @@ public class AssetXferUploader
                 m_updateItemData = item;
             }
         }
+
+        // Still uploading: nothing has been validated, so this is not a refusal.
+        return true;
     }
 
     public void RequestUpdateTaskInventoryItem(IClientAPI remoteClient, TaskInventoryItem taskItem)
@@ -408,7 +416,7 @@ public class AssetXferUploader
     /// <param name="item"></param>
     private bool CompleteItemUpdate(InventoryItemBase item)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ASSET XFER UPLOADER]: Storing asset {0} for earlier item update for {1} for {2}",
 //                m_asset.FullID, item.Name, ourClient.Name);
 
@@ -442,7 +450,7 @@ public class AssetXferUploader
     /// <param name="taskItem"></param>
     private bool CompleteTaskItemUpdate(TaskInventoryItem taskItem)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[ASSET XFER UPLOADER]: Storing asset {0} for earlier task item update for {1} for {2}",
 //                m_asset.FullID, taskItem.Name, ourClient.Name);
 
@@ -491,7 +499,7 @@ public class AssetXferUploader
             Flags = wearableType,
             CreationDate = Util.UnixTimeSinceEpoch()
         };
-        m_log.DebugFormat("[XFER]: Created item {0} with asset {1}",
+        m_log.LogDebug("[XFER]: Created item {0} with asset {1}",
                 item.ID, item.AssetID);
 
         // special AnimationSet case
@@ -505,6 +513,34 @@ public class AssetXferUploader
 
         m_transactions.RemoveXferUploader(m_transactionID);
         return true;
+    }
+
+    /// <summary>
+    /// A19: whether a texture is one the grid's library holds with full rights, and may therefore be referenced by
+    /// anyone's wearable. The owner is read off <c>ILibraryService.LibraryRootFolder.Owner</c> rather than
+    /// hardcoded, so a grid supplying its own library owner still works - the same rule
+    /// <c>AISv3Module.LibraryOwnerOf</c> uses. Returns false when the region has no library service, which leaves
+    /// the previous behaviour exactly as it was.
+    /// </summary>
+    private bool IsLibraryTexture(UUID textureId, uint requiredPerms)
+        => IsLibraryTexture(
+            textureId,
+            m_Scene?.LibraryService?.LibraryRootFolder?.Owner ?? UUID.Zero,
+            requiredPerms,
+            (owner, asset) => m_Scene.InventoryService.GetAssetPermissions(owner, asset));
+
+    /// <summary>
+    /// The rule itself, with the two lookups injected so it is a plain unit test: no <c>Scene</c>, no inventory
+    /// service. A texture is acceptable when the LIBRARY owner holds it with the same full rights the resident
+    /// would have needed. Anything else - another resident's texture, a texture nobody holds - is unchanged.
+    /// </summary>
+    public static bool IsLibraryTexture(UUID textureId, UUID libraryOwner, uint requiredPerms, Func<UUID, UUID, int> permissionsOf)
+    {
+        if (libraryOwner.IsZero() || permissionsOf is null)
+            return false;
+
+        uint perms = (uint)permissionsOf(libraryOwner, textureId);
+        return (perms & requiredPerms) == requiredPerms;
     }
 
     private uint ValidateAssets()
@@ -567,7 +603,20 @@ public class AssetXferUploader
 
                             if ((perms & texturesfullPermMask) != texturesfullPermMask)
                             {
-                                m_log.ErrorFormat("[ASSET UPLOADER]: REJECTED update with texture {0} from {1} because they do not own the texture", tx, ourClient.AgentId);
+                                // A19: a LIBRARY texture is not the resident's and never will be, and asking
+                                // GetAssetPermissions for it under the resident's id returns nothing - so the check
+                                // above rejects every wearable built on one. SL allows library textures in
+                                // wearables, the library is readable by everyone by construction, and this grid
+                                // ships one; a resident who picks a library texture in the appearance editor got a
+                                // 200 and a silently unsaved item. Ask again as the library's owner: a texture that
+                                // resolves there with the same full rights is one anybody may reference.
+                                if (IsLibraryTexture(tx, texturesfullPermMask))
+                                {
+                                    textures--;
+                                    continue;
+                                }
+
+                                m_log.LogError("[ASSET UPLOADER]: REJECTED update with texture {0} from {1} because they do not own the texture", tx, ourClient.AgentId);
                                 return 0;
                             }
                             else

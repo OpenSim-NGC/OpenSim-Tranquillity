@@ -28,7 +28,6 @@
 using System.Reflection;
 using System.Text;
 
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization.External;
@@ -36,12 +35,14 @@ using OpenSim.Framework.Serialization.External;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Framework.InventoryAccess;
 
 public class HGAssetMapper
 {
     #region Fields
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // This maps between inventory server urls and inventory server clients
 //        private Dictionary<string, InventoryClient> m_inventoryServers = new Dictionary<string, InventoryClient>();
@@ -79,9 +80,9 @@ public class HGAssetMapper
             meta = m_scene.AssetService.GetMetadata(url + assetIDstr);
 
             if (meta != null)
-                m_log.DebugFormat("[HG ASSET MAPPER]: Fetched metadata for asset {0} of type {1} from {2} ", assetIDstr, meta.Type, url);
+                m_log.LogDebug("[HG ASSET MAPPER]: Fetched metadata for asset {0} of type {1} from {2} ", assetIDstr, meta.Type, url);
             else
-                m_log.DebugFormat("[HG ASSET MAPPER]: Unable to fetched metadata for asset {0} from {1} ", assetIDstr, url);
+                m_log.LogDebug("[HG ASSET MAPPER]: Unable to fetched metadata for asset {0} from {1} ", assetIDstr, url);
         }
         return meta;
     }
@@ -95,7 +96,7 @@ public class HGAssetMapper
     {
         if (asset == null)
         {
-            m_log.Warn("[HG ASSET MAPPER]: Tried to post asset to remote server, but asset not in local cache.");
+            m_log.LogWarning("[HG ASSET MAPPER]: Tried to post asset to remote server, but asset not in local cache.");
             return false;
         }
 
@@ -128,12 +129,12 @@ public class HGAssetMapper
         if (string.IsNullOrEmpty(id))
         {
             if (verbose)
-                m_log.DebugFormat("[HG ASSET MAPPER]: Asset server {0} did not accept {1}", url, asset.ID);
+                m_log.LogDebug("[HG ASSET MAPPER]: Asset server {0} did not accept {1}", url, asset.ID);
             return false;
         }
 
         if (verbose)
-            m_log.DebugFormat("[HG ASSET MAPPER]: Posted copy of asset {0} from local asset server to {1}", asset1.ID, url);
+            m_log.LogDebug("[HG ASSET MAPPER]: Posted copy of asset {0} from local asset server to {1}", asset1.ID, url);
         return true;
     }
 
@@ -178,10 +179,10 @@ public class HGAssetMapper
     // TODO: unused
     // private void Dump(Dictionary<UUID, bool> lst)
     // {
-    //     m_log.Debug("XXX -------- UUID DUMP ------- XXX");
+    //     m_log.LogDebug("XXX -------- UUID DUMP ------- XXX");
     //     foreach (KeyValuePair<UUID, bool> kvp in lst)
-    //         m_log.Debug(" >> " + kvp.Key + " (texture? " + kvp.Value + ")");
-    //     m_log.Debug("XXX -------- UUID DUMP ------- XXX");
+    //         m_log.LogDebug(" >> " + kvp.Key + " (texture? " + kvp.Value + ")");
+    //     m_log.LogDebug("XXX -------- UUID DUMP ------- XXX");
     // }
 
     #endregion
@@ -195,7 +196,7 @@ public class HGAssetMapper
         // but not all...
         if(string.IsNullOrEmpty(userAssetURL))
         {
-            m_log.Debug($"[HG ASSET MAPPER]: Problems getting item asset {assetID}. Asset server unknown");
+            m_log.LogDebug($"[HG ASSET MAPPER]: Problems getting item asset {assetID}. Asset server unknown");
             return;
         }
 
@@ -203,7 +204,7 @@ public class HGAssetMapper
         uuidGatherer.AddForInspection(assetID);
         uuidGatherer.GatherAll();
 
-        m_log.Debug($"[HG ASSET MAPPER]: Preparing to get {uuidGatherer.GatheredUuids.Count} assets");
+        m_log.LogDebug($"[HG ASSET MAPPER]: Preparing to get {uuidGatherer.GatheredUuids.Count} assets");
         bool success = true;
         foreach (UUID uuid in uuidGatherer.GatheredUuids.Keys)
         {
@@ -215,9 +216,9 @@ public class HGAssetMapper
 
         // maybe all pieces got here...
         if (!success)
-            m_log.Debug($"[HG ASSET MAPPER]: Problems getting item asset {assetID} from asset server {userAssetURL}");
+            m_log.LogDebug($"[HG ASSET MAPPER]: Problems getting item asset {assetID} from asset server {userAssetURL}");
         else
-            m_log.Debug($"[HG ASSET MAPPER]: Successfully got item asset {assetID} from asset server {userAssetURL}");
+            m_log.LogDebug($"[HG ASSET MAPPER]: Successfully got item asset {assetID} from asset server {userAssetURL}");
     }
 
     public void Post(UUID assetID, UUID ownerID, string userAssetURL)
@@ -225,10 +226,10 @@ public class HGAssetMapper
         AssetBase asset = m_scene.AssetService.Get(assetID.ToString());
         if (asset == null)
         {
-            m_log.DebugFormat("[HG ASSET MAPPER POST]: Something wrong with asset {0}, it could not be found", assetID);
+            m_log.LogDebug("[HG ASSET MAPPER POST]: Something wrong with asset {0}, it could not be found", assetID);
             return;
         }
-        m_log.DebugFormat("[HG ASSET MAPPER  POST]: Starting to send asset {0} to asset server {1}", assetID, userAssetURL);
+        m_log.LogDebug("[HG ASSET MAPPER  POST]: Starting to send asset {0} to asset server {1}", assetID, userAssetURL);
 
         // Find all the embedded assets
         HGUuidGatherer uuidGatherer = new HGUuidGatherer(m_scene.AssetService, string.Empty);
@@ -253,7 +254,7 @@ public class HGAssetMapper
         }
         catch
         {
-            m_log.DebugFormat("[HG ASSET MAPPER POST]: Problems sending asset {0} to asset server {1}", assetID, userAssetURL);
+            m_log.LogDebug("[HG ASSET MAPPER POST]: Problems sending asset {0} to asset server {1}", assetID, userAssetURL);
             return;
         }
 
@@ -294,11 +295,9 @@ public class HGAssetMapper
             }
             catch (Exception e)
             {
-                m_log.Error(
-                    string.Format(
+                m_log.LogError(e, string.Format(
                         "[HG ASSET MAPPER POST]: Failed to post asset {0} (type {1}, length {2}) referenced from {3} to {4} with exception  ",
-                        asset.ID, asset.Type, asset.Data.Length, assetID, userAssetURL),
-                    e);
+                        asset.ID, asset.Type, asset.Data.Length, assetID, userAssetURL));
 
                 // For debugging purposes for now we will continue to throw the exception up the stack as was already happening.  However, after
                 // debugging we may want to simply report the failure if we can tell this is due to a failure
@@ -320,7 +319,7 @@ public class HGAssetMapper
                 if (j < i)
                     sb.Append(',');
             }
-            m_log.Debug(sb.ToString());
+            m_log.LogDebug(sb.ToString());
             sb.Clear();
         }
         if (existSet.Count > 0)
@@ -335,7 +334,7 @@ public class HGAssetMapper
                 if (--i > 0)
                     sb.Append(',');
             }
-            m_log.Debug(sb.ToString());
+            m_log.LogDebug(sb.ToString());
             sb.Clear();
         }
         if (posted.Count > 0)
@@ -350,13 +349,13 @@ public class HGAssetMapper
                 if (j < i)
                     sb.Append(',');
             }
-            m_log.Debug(sb.ToString());
+            m_log.LogDebug(sb.ToString());
         }
 
         if (!success)
-            m_log.DebugFormat("[HG ASSET MAPPER POST]: Problems sending asset {0} to asset server {1}", assetID, userAssetURL);
+            m_log.LogDebug("[HG ASSET MAPPER POST]: Problems sending asset {0} to asset server {1}", assetID, userAssetURL);
         else
-            m_log.DebugFormat("[HG ASSET MAPPER POST]: Successfully sent asset {0} to asset server {1}", assetID, userAssetURL);
+            m_log.LogDebug("[HG ASSET MAPPER POST]: Successfully sent asset {0} to asset server {1}", assetID, userAssetURL);
     }
 
     #endregion

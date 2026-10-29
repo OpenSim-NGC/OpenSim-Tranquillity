@@ -29,7 +29,6 @@ using System.IO.Compression;
 using System.Reflection;
 using System.Text;
 using System.Xml.Linq;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
@@ -39,11 +38,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Scenes.Serialization;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.Inventory.Archiver;
 
 public class InventoryArchiveReadRequest
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// The maximum major version of archive that we can read.  Minor versions shouldn't need a max number since version
@@ -193,7 +194,7 @@ public class InventoryArchiveReadRequest
             if (folderCandidates.Count == 0)
             {
                 // Possibly provide an option later on to automatically create this folder if it does not exist
-                m_log.ErrorFormat("[INVENTORY ARCHIVER]: Inventory path {0} does not exist", m_invPath);
+                m_log.LogError("[INVENTORY ARCHIVER]: Inventory path {0} does not exist", m_invPath);
 
                 return m_loadedNodes;
             }
@@ -222,7 +223,7 @@ public class InventoryArchiveReadRequest
             archive.Close();
             LoadInventoryLinks();
 
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[INVENTORY ARCHIVER]: Successfully loaded {0} assets with {1} failures",
                 m_successfulAssetRestores, m_failedAssetRestores);
 
@@ -273,13 +274,13 @@ public class InventoryArchiveReadRequest
     {
         string iarPathExisting = iarPath;
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[INVENTORY ARCHIVER]: Loading folder {0} {1}", rootDestFolder.Name, rootDestFolder.ID);
 
         InventoryFolderBase destFolder
             = ResolveDestinationFolder(rootDestFolder, ref iarPathExisting, resolvedFolders);
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[INVENTORY ARCHIVER]: originalArchivePath [{0}], section already loaded [{1}]",
 //                iarPath, iarPathExisting);
 
@@ -318,11 +319,11 @@ public class InventoryArchiveReadRequest
 
         while (archivePath.Length > 0)
         {
-//                m_log.DebugFormat("[INVENTORY ARCHIVER]: Trying to resolve destination folder {0}", archivePath);
+//                m_log.LogDebug("[INVENTORY ARCHIVER]: Trying to resolve destination folder {0}", archivePath);
 
             if (resolvedFolders.ContainsKey(archivePath))
             {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[INVENTORY ARCHIVER]: Found previously created folder from archive path {0}", archivePath);
                 return resolvedFolders[archivePath];
             }
@@ -355,7 +356,7 @@ public class InventoryArchiveReadRequest
                 }
                 else
                 {
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[INVENTORY ARCHIVER]: Found no previously created folder for archive path {0}",
 //                            originalArchivePath);
                     archivePath = string.Empty;
@@ -396,7 +397,7 @@ public class InventoryArchiveReadRequest
 
         for (int i = 0; i < rawDirsToCreate.Length; i++)
         {
-//                m_log.DebugFormat("[INVENTORY ARCHIVER]: Creating folder {0} from IAR", rawDirsToCreate[i]);
+//                m_log.LogDebug("[INVENTORY ARCHIVER]: Creating folder {0} from IAR", rawDirsToCreate[i]);
 
             if (!rawDirsToCreate[i].Contains(ArchiveConstants.INVENTORY_NODE_NAME_COMPONENT_SEPARATOR))
                 continue;
@@ -418,7 +419,7 @@ public class InventoryArchiveReadRequest
 
             // Record that we have now created this folder
             iarPathExisting += rawDirsToCreate[i] + "/";
-            m_log.DebugFormat("[INVENTORY ARCHIVER]: Created folder {0} from IAR", iarPathExisting);
+            m_log.LogDebug("[INVENTORY ARCHIVER]: Created folder {0} from IAR", iarPathExisting);
             resolvedFolders[iarPathExisting] = destFolder;
 
             if (0 == i)
@@ -445,7 +446,7 @@ public class InventoryArchiveReadRequest
         UUID ospResolvedId = OspResolver.ResolveOspa(item.CreatorId, m_UserAccountService);
         if (UUID.Zero != ospResolvedId) // The user exists in this grid
         {
-//                m_log.DebugFormat("[INVENTORY ARCHIVER]: Found creator {0} via OSPA resolution", ospResolvedId);
+//                m_log.LogDebug("[INVENTORY ARCHIVER]: Found creator {0} via OSPA resolution", ospResolvedId);
 
 //                item.CreatorIdAsUuid = ospResolvedId;
 
@@ -480,7 +481,7 @@ public class InventoryArchiveReadRequest
         {
             m_creatorIdForAssetId[item.AssetID] = item.CreatorIdAsUuid;
             if (!m_InventoryService.AddItem(item))
-                m_log.WarnFormat("[INVENTORY ARCHIVER]: Unable to save item {0} in folder {1}", item.Name, item.Folder);
+                m_log.LogWarning("[INVENTORY ARCHIVER]: Unable to save item {0} in folder {1}", item.Name, item.Folder);
         }
 
         return item;
@@ -501,7 +502,7 @@ public class InventoryArchiveReadRequest
 
         if (indx < 32)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                "[INVENTORY ARCHIVER]: Could not find extension information in asset path {0} since it's missing the separator {1}.  Skipping",
                 assetPath, ArchiveConstants.ASSET_EXTENSION_SEPARATOR);
 
@@ -511,7 +512,7 @@ public class InventoryArchiveReadRequest
         string extension = filename[indx..];
         if (!ArchiveConstants.EXTENSION_TO_ASSET_TYPE.TryGetValue(extension, out sbyte assetType))
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                "[INVENTORY ARCHIVER]: Tried to dearchive data with path {0} with an unknown type extension {1}",
                 assetPath, extension);
             return false;
@@ -523,7 +524,7 @@ public class InventoryArchiveReadRequest
 
         if (assetType == (sbyte)AssetType.Unknown)
         {
-            m_log.WarnFormat("[INVENTORY ARCHIVER]: Importing {0} byte asset {1} with unknown type", data.Length, assetId);
+            m_log.LogWarning("[INVENTORY ARCHIVER]: Importing {0} byte asset {1} with unknown type", data.Length, assetId);
             return false;
         }
 
@@ -555,7 +556,7 @@ public class InventoryArchiveReadRequest
                 return false;
         }
 
-        //m_log.DebugFormat("[INVENTORY ARCHIVER]: Importing asset {0}, type {1}", uuid, assetType);
+        //m_log.LogDebug("[INVENTORY ARCHIVER]: Importing asset {0}, type {1}", uuid, assetType);
 
         AssetBase asset = new AssetBase(assetId, "From IAR", assetType, UUID.Zero.ToString());
         asset.Data = data;
@@ -587,7 +588,7 @@ public class InventoryArchiveReadRequest
         }
 
         ControlFileLoaded = true;
-        m_log.InfoFormat("[INVENTORY ARCHIVER]: Loading IAR with version {0}", version);
+        m_log.LogInformation("[INVENTORY ARCHIVER]: Loading IAR with version {0}", version);
     }
 
     /// <summary>
@@ -647,7 +648,7 @@ public class InventoryArchiveReadRequest
             {
                 it.AssetID = m_itemIDs[target];
                 if(!m_InventoryService.AddItem(it))
-                    m_log.WarnFormat("[INVENTORY ARCHIVER]: Unable to save item {0} in folder {1}",it.Name,it.Folder);
+                    m_log.LogWarning("[INVENTORY ARCHIVER]: Unable to save item {0} in folder {1}",it.Name,it.Folder);
                 else
                 {
                     m_successfulItemRestores++;
@@ -687,7 +688,7 @@ public class InventoryArchiveReadRequest
             m_failedAssetRestores++;
 
         if ((m_successfulAssetRestores) % 50 == 0)
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[INVENTORY ARCHIVER]: Loaded {0} assets...",
                 m_successfulAssetRestores);
 

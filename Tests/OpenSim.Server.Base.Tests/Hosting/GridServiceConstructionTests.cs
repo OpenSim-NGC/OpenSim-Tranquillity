@@ -52,8 +52,8 @@ public sealed class GridServiceConstructionTests
 
     private sealed class ThrowingStartupFailureCoordinator : IStartupFailureCoordinator
     {
-        public void ThrowFatal(string message, Exception exception = null) => throw new InvalidOperationException("Constructor must not report fatal failures.");
-        public void RequestStop(string message, Exception exception = null) => throw new InvalidOperationException("Constructor must not request stop.");
+        public void ThrowFatal(string message, Exception? exception = null) => throw new InvalidOperationException("Constructor must not report fatal failures.");
+        public void RequestStop(string message, Exception? exception = null) => throw new InvalidOperationException("Constructor must not request stop.");
     }
 
     private sealed class ThrowingGridServerRuntime : IGridServerRuntime

@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenSim.Framework;
@@ -34,13 +33,14 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 using OpenSim.Services.Connectors.Simulation;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.Simulation;
 
 public class RemoteSimulationConnectorModule : ISharedRegionModule, ISimulationService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private bool initialized = false;
     protected bool m_enabled = false;
@@ -69,7 +69,7 @@ public class RemoteSimulationConnectorModule : ISharedRegionModule, ISimulationS
 
                 m_enabled = true;
 
-                m_log.Info("[REMOTE SIMULATION CONNECTOR]: Remote simulation enabled.");
+                m_log.LogInformation("[REMOTE SIMULATION CONNECTOR]: Remote simulation enabled.");
             }
         }
     }
@@ -155,7 +155,7 @@ public class RemoteSimulationConnectorModule : ISharedRegionModule, ISimulationS
         if (destination == null)
         {
             reason = "Given destination was null";
-            m_log.DebugFormat("[REMOTE SIMULATION CONNECTOR]: CreateAgent was given a null destination");
+            m_log.LogDebug("[REMOTE SIMULATION CONNECTOR]: CreateAgent was given a null destination");
             return false;
         }
 
@@ -254,7 +254,7 @@ public class RemoteSimulationConnectorModule : ISharedRegionModule, ISimulationS
         // Try local first
         if (m_localBackend.CreateObject(destination, newPosition, sog, isLocalCall))
         {
-            //m_log.Debug("[REST COMMS]: LocalBackEnd SendCreateObject succeeded");
+            //m_log.LogDebug("[REST COMMS]: LocalBackEnd SendCreateObject succeeded");
             return true;
         }
 

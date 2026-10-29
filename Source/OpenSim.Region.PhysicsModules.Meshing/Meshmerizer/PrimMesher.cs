@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-namespace PrimMesher;
+namespace OpenSim.Region.PhysicsModules.Meshing.PrimMesher;
 
 public struct Quat
 {

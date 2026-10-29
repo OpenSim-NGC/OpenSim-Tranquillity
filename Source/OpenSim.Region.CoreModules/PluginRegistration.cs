@@ -141,6 +141,7 @@ public class PluginRegistration : IPluginRegistryProvider
         RegisterByName(registry, "/OpenSim/RegionModules", "MoapModule", "OpenSim.Region.CoreModules.World.Media.Moap.MoapModule", "MoapModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "BuySellModule", "OpenSim.Region.CoreModules.World.Objects.BuySell.BuySellModule", "BuySellModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "ObjectCommandsModule", "OpenSim.Region.CoreModules.World.Objects.Commands.ObjectCommandsModule", "ObjectCommandsModule");
+        RegisterByName(registry, "/OpenSim/RegionModules", "BlockedOwnerModule", "OpenSim.Region.CoreModules.World.Objects.BlockedOwners.BlockedOwnerModule", "BlockedOwnerModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "DefaultPermissionsModule", "OpenSim.Region.CoreModules.World.Permissions.DefaultPermissionsModule", "DefaultPermissionsModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "RegionCommandsModule", "OpenSim.Region.CoreModules.World.Objects.Commands.RegionCommandsModule", "RegionCommandsModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "RestartModule", "OpenSim.Region.CoreModules.World.Region.RestartModule", "RestartModule");

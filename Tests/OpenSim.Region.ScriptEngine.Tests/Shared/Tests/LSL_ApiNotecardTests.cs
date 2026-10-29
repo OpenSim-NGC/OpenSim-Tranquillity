@@ -1,3 +1,4 @@
+using Nini.Config;
 using OpenMetaverse;
 
 using OpenSim.Framework;
@@ -20,14 +21,24 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private TaskInventoryItem m_scriptItem;
         private LSL_Api m_lslApi;
 
-        [OneTimeSetUp]
+        public LSL_ApiNotecardTests()
+        {
+            // xunit builds a new instance for every test, so the NUnit one-time setup runs here.
+            TestFixtureSetUp();
+        }
+
         public void TestFixtureSetUp()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
             Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
         }
 
-        [OneTimeTearDown]
+        public override void Dispose()
+        {
+            TestFixureTearDown();
+            base.Dispose();
+        }
+
         public void TestFixureTearDown()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
@@ -95,18 +106,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private void AssertValidNotecardLine(string ncName, int lineNumber, string assertLine)
         {
             string key = m_lslApi.llGetNotecardLine(ncName, lineNumber);
-            Assert.True(key)));
+            Assert.NotEqual(UUID.Zero.ToString(), key);
 
-            Assert.Equal(,);
-            Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
+            Assert.Equal(1, m_engine.PostedEvents.Count);
+            Assert.True(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 
             List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-            Assert.Equal(,);
+            Assert.Equal(1, events.Count);
             EventParams eventParams = events[0];
 
-            Assert.Equal(,);
-            Assert.True(eventParams.Params[0].ToString()));
-            Assert.True(eventParams.Params[1].ToString()));
+            Assert.Equal("dataserver", eventParams.EventName);
+            Assert.Equal(key, eventParams.Params[0].ToString());
+            Assert.Equal(assertLine, eventParams.Params[1].ToString());
 
             m_engine.ClearPostedEvents();
         }
@@ -114,9 +125,9 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private void AssertInValidNotecardLine(string ncName, int lineNumber)
         {
             string key = m_lslApi.llGetNotecardLine(ncName, lineNumber);
-            Assert.Equal(,));
+            Assert.Equal(UUID.Zero.ToString(), key);
 
-            Assert.Equal(,);
+            Assert.Equal(0, m_engine.PostedEvents.Count);
         }
 
 //        [Fact]
@@ -129,25 +140,25 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //
 //            {
 //                // Check that the initial number of URLs is correct
-//                Assert.True(m_lslApi.llGetFreeURLs().value));
+//                Assert.Equal(m_urlModule.TotalUrls - 1, m_lslApi.llGetFreeURLs().value);
 //            }
 //
 //            {
 //                // Check releasing a non-url
 //                m_lslApi.llReleaseURL("GARBAGE");
-//                Assert.True(m_lslApi.llGetFreeURLs().value));
+//                Assert.Equal(m_urlModule.TotalUrls - 1, m_lslApi.llGetFreeURLs().value);
 //            }
 //
 //            {
 //                // Check releasing a non-existing url
 //                m_lslApi.llReleaseURL("http://example.com");
-//                Assert.True(m_lslApi.llGetFreeURLs().value));
+//                Assert.Equal(m_urlModule.TotalUrls - 1, m_lslApi.llGetFreeURLs().value);
 //            }
 //
 //            {
 //                // Check URL release
 //                m_lslApi.llReleaseURL(returnedUri);
-//                Assert.True(m_lslApi.llGetFreeURLs().value));
+//                Assert.Equal(m_urlModule.TotalUrls, m_lslApi.llGetFreeURLs().value);
 //
 //                HttpWebRequest webRequest = (HttpWebRequest)WebRequest.Create(returnedUri);
 //
@@ -170,7 +181,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //            {
 //                // Check releasing the same URL again
 //                m_lslApi.llReleaseURL(returnedUri);
-//                Assert.True(m_lslApi.llGetFreeURLs().value));
+//                Assert.Equal(m_urlModule.TotalUrls, m_lslApi.llGetFreeURLs().value);
 //            }
 //        }
 //
@@ -180,28 +191,28 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //            TestHelpers.InMethod();
 //
 //            string requestId = m_lslApi.llRequestURL();
-//            Assert.True(requestId)));
+//            Assert.NotEqual(UUID.Zero.ToString(), requestId);
 //            string returnedUri;
 //
 //            {
 //                // Check that URL is correctly set up
-//                Assert.True(m_lslApi.llGetFreeURLs().value));
+//                Assert.Equal(m_urlModule.TotalUrls - 1, m_lslApi.llGetFreeURLs().value);
 //
 //                Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 //
 //                List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-//                Assert.Equal(,);
+//                Assert.Equal(1, events.Count);
 //                EventParams eventParams = events[0];
-//                Assert.Equal(,);
+//                Assert.Equal("http_request", eventParams.EventName);
 //
 //                UUID returnKey;
 //                string rawReturnKey = eventParams.Params[0].ToString();
 //                string method = eventParams.Params[1].ToString();
 //                returnedUri = eventParams.Params[2].ToString();
 //
-//                Assert.That(UUID.TryParse(rawReturnKey, out returnKey));
-//                Assert.Equal(,);
-//                Assert.That(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute));
+//                Assert.True(UUID.TryParse(rawReturnKey, out returnKey));
+//                Assert.Equal(ScriptBaseClass.URL_REQUEST_GRANTED, method);
+//                Assert.True(Uri.IsWellFormedUriString(returnedUri, UriKind.Absolute));
 //            }
 //
 //            {
@@ -220,18 +231,18 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                Assert.That(m_engine.PostedEvents.ContainsKey(m_scriptItem.ItemID));
 //
 //                List<EventParams> events = m_engine.PostedEvents[m_scriptItem.ItemID];
-//                Assert.Equal(,);
+//                Assert.Equal(1, events.Count);
 //                EventParams eventParams = events[0];
-//                Assert.Equal(,);
+//                Assert.Equal("http_request", eventParams.EventName);
 //
 //                UUID returnKey;
 //                string rawReturnKey = eventParams.Params[0].ToString();
 //                string method = eventParams.Params[1].ToString();
 //                string body = eventParams.Params[2].ToString();
 //
-//                Assert.That(UUID.TryParse(rawReturnKey, out returnKey));
-//                Assert.Equal(,);
-//                Assert.Equal(,);
+//                Assert.True(UUID.TryParse(rawReturnKey, out returnKey));
+//                Assert.Equal("GET", method);
+//                Assert.Equal("", body);
 //            }
 //        }
 //
@@ -245,7 +256,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 //                {
 //                    using (StreamReader reader = new StreamReader(stream))
 //                    {
-//                        Assert.True(reader.ReadToEnd()));
+//                        Assert.Equal(expectedResponse, reader.ReadToEnd());
 //                    }
 //                }
 //            }

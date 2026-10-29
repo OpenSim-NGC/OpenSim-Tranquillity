@@ -29,14 +29,16 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.PhysicsModules.SharedBase;
 using Nini.Config;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public class ExtendedPhysics : INonSharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static string LogHeader = "[EXTENDED PHYSICS]";
 
     // =============================================================
@@ -87,10 +89,10 @@ public class ExtendedPhysics : INonSharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("{0} Initialization error: {0}", LogHeader, e);
+            m_log.LogError("{0} Initialization error: {0}", LogHeader, e);
         }
 
-        m_log.InfoFormat("{0} module {1} enabled", LogHeader, (Enabled ? "is" : "is not"));
+        m_log.LogInformation("{0} module {1} enabled", LogHeader, (Enabled ? "is" : "is not"));
     }
 
     public void Close()
@@ -124,7 +126,7 @@ public class ExtendedPhysics : INonSharedRegionModule
         Comms = BaseScene.RequestModuleInterface<IScriptModuleComms>();
         if (Comms == null)
         {
-            m_log.WarnFormat("{0} ScriptModuleComms interface not defined", LogHeader);
+            m_log.LogWarning("{0} ScriptModuleComms interface not defined", LogHeader);
             Enabled = false;
 
             return;
@@ -182,7 +184,7 @@ public class ExtendedPhysics : INonSharedRegionModule
         {
             if (GetRootPhysActor(hostId, out PhysicsActor rootPhysActor))
             {
-                m_log.DebugFormat("{0} physDisableDeactivation: hostId={1}, scriptId={2}, val={3}", LogHeader, hostId, scriptId, disable);
+                m_log.LogDebug("{0} physDisableDeactivation: hostId={1}, scriptId={2}, val={3}", LogHeader, hostId, scriptId, disable);
                 object[] parms2 = { rootPhysActor, null, disable };
                 ret = MakeIntError(rootPhysActor.Extension(PhysFunctDisableDeactivation, parms2));
             }
@@ -316,19 +318,19 @@ public class ExtendedPhysics : INonSharedRegionModule
                 }
                 else
                 {
-                    m_log.WarnFormat("{0} physSetLinksetType: root part does not have a physics actor. rootName={1}, hostID={2}",
+                    m_log.LogWarning("{0} physSetLinksetType: root part does not have a physics actor. rootName={1}, hostID={2}",
                                         LogHeader, rootPart.Name, hostID);
                 }
             }
             else
             {
-                m_log.WarnFormat("{0} physSetLinksetType: root part does not exist. RequestingPartName={1}, hostID={2}",
+                m_log.LogWarning("{0} physSetLinksetType: root part does not exist. RequestingPartName={1}, hostID={2}",
                                     LogHeader, requestingPart.Name, hostID);
             }
         }
         else
         {
-            m_log.WarnFormat("{0} physSetLinsetType: cannot find script object in scene. hostID={1}", LogHeader, hostID);
+            m_log.LogWarning("{0} physSetLinsetType: cannot find script object in scene. hostID={1}", LogHeader, hostID);
         }
         return ret;
     }
@@ -347,7 +349,7 @@ public class ExtendedPhysics : INonSharedRegionModule
         }
         else
         {
-            m_log.WarnFormat("{0} physGetLinsetType: cannot find script object in scene. hostID={1}", LogHeader, hostID);
+            m_log.LogWarning("{0} physGetLinsetType: cannot find script object in scene. hostID={1}", LogHeader, hostID);
         }
         return ret;
     }
@@ -542,24 +544,24 @@ public class ExtendedPhysics : INonSharedRegionModule
                     }
                     else
                     {
-                        m_log.WarnFormat("{0} GetRootAndChildPhysActors: Root part does not have a physics actor. rootName={1}, hostID={2}",
+                        m_log.LogWarning("{0} GetRootAndChildPhysActors: Root part does not have a physics actor. rootName={1}, hostID={2}",
                                         LogHeader, rootPart.Name, hostID);
                     }
                 }
                 else
                 {
-                    m_log.WarnFormat("{0} GetRootAndChildPhysActors: Root part does not exist. RequestingPartName={1}, hostID={2}",
+                    m_log.LogWarning("{0} GetRootAndChildPhysActors: Root part does not exist. RequestingPartName={1}, hostID={2}",
                                     LogHeader, requestingPart.Name, hostID);
                 }
             }
             else
             {
-                m_log.WarnFormat("{0} GetRootAndChildPhysActors: Containing group missing or deleted. hostID={1}", LogHeader, hostID);
+                m_log.LogWarning("{0} GetRootAndChildPhysActors: Containing group missing or deleted. hostID={1}", LogHeader, hostID);
             }
         }
         else
         {
-            m_log.WarnFormat("{0} GetRootAndChildPhysActors: cannot find script object in scene. hostID={1}", LogHeader, hostID);
+            m_log.LogWarning("{0} GetRootAndChildPhysActors: cannot find script object in scene. hostID={1}", LogHeader, hostID);
         }
 
         return ret;
@@ -588,19 +590,19 @@ public class ExtendedPhysics : INonSharedRegionModule
                 }
                 else
                 {
-                    m_log.WarnFormat("{0} GetRootAndChildPhysActors: Link part has no physical actor. rootName={1}, hostID={2}, linknum={3}",
+                    m_log.LogWarning("{0} GetRootAndChildPhysActors: Link part has no physical actor. rootName={1}, hostID={2}, linknum={3}",
                                         LogHeader, rootPart.Name, hostID, linkNum);
                 }
             }
             else
             {
-                m_log.WarnFormat("{0} GetRootAndChildPhysActors: Could not find linknum part. rootName={1}, hostID={2}, linknum={3}",
+                m_log.LogWarning("{0} GetRootAndChildPhysActors: Could not find linknum part. rootName={1}, hostID={2}, linknum={3}",
                                     LogHeader, rootPart.Name, hostID, linkNum);
             }
         }
         else
         {
-            m_log.WarnFormat("{0} GetRootAndChildPhysActors: Root part does not have a physics actor. rootName={1}, hostID={2}",
+            m_log.LogWarning("{0} GetRootAndChildPhysActors: Root part does not have a physics actor. rootName={1}, hostID={2}",
                             LogHeader, rootPart.Name, hostID);
         }
 

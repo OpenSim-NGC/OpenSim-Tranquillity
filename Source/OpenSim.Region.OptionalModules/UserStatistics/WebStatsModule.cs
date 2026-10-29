@@ -28,7 +28,6 @@
 using System.Collections;
 using System.Reflection;
 using System.Text;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -39,6 +38,7 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using System.Data.SQLite;
 
+using Microsoft.Extensions.Logging;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 
 using OSD = OpenMetaverse.StructuredData.OSD;
@@ -48,8 +48,7 @@ namespace OpenSim.Region.UserStatistics;
 
 public class WebStatsModule : ISharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static SQLiteConnection dbConn;
 
@@ -336,7 +335,7 @@ public class WebStatsModule : ISharedRegionModule
 
     private void OnRegisterCaps(UUID agentID, Caps caps)
     {
-//            m_log.DebugFormat("[WEB STATS MODULE]: OnRegisterCaps: agentID {0} caps {1}", agentID, caps);
+//            m_log.LogDebug("[WEB STATS MODULE]: OnRegisterCaps: agentID {0} caps {1}", agentID, caps);
 
         string capsPath = "/" + UUID.Random();
         caps.RegisterHandler(
@@ -371,7 +370,7 @@ public class WebStatsModule : ISharedRegionModule
 
     private void OnMakeRootAgent(ScenePresence agent)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[WEB STATS MODULE]: Looking for session {0} for {1} in {2}",
 //                agent.ControllingClient.SessionId, agent.Name, agent.Scene.Name);
 
@@ -416,36 +415,36 @@ public class WebStatsModule : ISharedRegionModule
         int sizeOfChar = encoding.GetByteCount("\n");
         byte[] buffer = encoding.GetBytes("\n");
         string logfile = Util.logFile();
-        FileStream fs = new FileStream(logfile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        using FileStream fs = new FileStream(logfile, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
         Int64 tokenCount = 0;
         Int64 endPosition = fs.Length / sizeOfChar;
 
         for (Int64 position = sizeOfChar; position < endPosition; position += sizeOfChar)
         {
+            if (position > fs.Length)
+                break;
+
             fs.Seek(-position, SeekOrigin.End);
-            fs.Read(buffer, 0, buffer.Length);
+            if (fs.ReadAtLeast(buffer, buffer.Length, throwOnEndOfStream: false) < buffer.Length)
+                break;
 
             if (encoding.GetString(buffer) == "\n")
             {
                 tokenCount++;
                 if (tokenCount == amount)
                 {
-                    byte[] returnBuffer = new byte[fs.Length - fs.Position];
-                    fs.Read(returnBuffer, 0, returnBuffer.Length);
-                    fs.Close();
-                    fs.Dispose();
-                    return encoding.GetString(returnBuffer);
+                    using MemoryStream tail = new MemoryStream();
+                    fs.CopyTo(tail);
+                    return encoding.GetString(tail.GetBuffer(), 0, (int)tail.Length);
                 }
             }
         }
 
         // handle case where number of tokens in file is less than numberOfTokens
         fs.Seek(0, SeekOrigin.Begin);
-        buffer = new byte[fs.Length];
-        fs.Read(buffer, 0, buffer.Length);
-        fs.Close();
-        fs.Dispose();
-        return encoding.GetString(buffer);
+        using MemoryStream contents = new MemoryStream();
+        fs.CopyTo(contents);
+        return encoding.GetString(contents.GetBuffer(), 0, (int)contents.Length);
     }
 
     /// <summary>
@@ -460,7 +459,7 @@ public class WebStatsModule : ISharedRegionModule
     private string ViewerStatsReport(string request, string path, string param,
                                   UUID agentID, Caps caps)
     {
-//            m_log.DebugFormat("[WEB STATS MODULE]: Received viewer starts report from {0}", agentID);
+//            m_log.LogDebug("[WEB STATS MODULE]: Received viewer starts report from {0}", agentID);
 
         UpdateUserStats(ParseViewerStats(request, agentID), dbConn);
 
@@ -480,13 +479,13 @@ public class WebStatsModule : ISharedRegionModule
             {
                 if (!m_sessions.ContainsKey(agentID))
                 {
-                    m_log.WarnFormat("[WEB STATS MODULE]: no session for stat disclosure for agent {0}", agentID);
+                    m_log.LogWarning("[WEB STATS MODULE]: no session for stat disclosure for agent {0}", agentID);
                     return new UserSession();
                 }
 
                 uid = m_sessions[agentID];
 
-//                    m_log.DebugFormat("[WEB STATS MODULE]: Got session {0} for {1}", uid.session_id, agentID);
+//                    m_log.LogDebug("[WEB STATS MODULE]: Got session {0} for {1}", uid.session_id, agentID);
             }
             else
             {
@@ -558,7 +557,7 @@ public class WebStatsModule : ISharedRegionModule
             usd.d_texture_kb = (float)downloads_map["texture_kbytes"].AsReal();
             usd.d_world_kb = (float)downloads_map["workd_kbytes"].AsReal();
 
-//                m_log.DebugFormat("[WEB STATS MODULE]: mmap[\"session_id\"] = [{0}]", mmap["session_id"].AsUUID());
+//                m_log.LogDebug("[WEB STATS MODULE]: mmap[\"session_id\"] = [{0}]", mmap["session_id"].AsUUID());
 
             usd.session_id = mmap["session_id"].AsUUID();
 
@@ -610,7 +609,7 @@ public class WebStatsModule : ISharedRegionModule
         uid.session_data = usd;
         m_sessions[agentID] = uid;
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[WEB STATS MODULE]: Parse data for {0} {1}, session {2}", uid.name_f, uid.name_l, uid.session_id);
 
         return uid;
@@ -618,7 +617,7 @@ public class WebStatsModule : ISharedRegionModule
 
     private void UpdateUserStats(UserSession uid, SQLiteConnection db)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[WEB STATS MODULE]: Updating user stats for {0} {1}, session {2}", uid.name_f, uid.name_l, uid.session_id);
 
         if (uid.session_id.IsZero())
@@ -684,9 +683,9 @@ public class WebStatsModule : ISharedRegionModule
 //                        foreach (SQLiteParameter sp in spc)
 //                            parameters.AppendFormat("{0}={1},", sp.ParameterName, sp.Value);
 //
-//                        m_log.DebugFormat("[WEB STATS MODULE]: Parameters {0}", parameters);
+//                        m_log.LogDebug("[WEB STATS MODULE]: Parameters {0}", parameters);
 
-//                    m_log.DebugFormat("[WEB STATS MODULE]: Database stats update for {0}", uid.session_data.agent_id);
+//                    m_log.LogDebug("[WEB STATS MODULE]: Database stats update for {0}", uid.session_data.agent_id);
 
                 updatecmd.ExecuteNonQuery();
             }

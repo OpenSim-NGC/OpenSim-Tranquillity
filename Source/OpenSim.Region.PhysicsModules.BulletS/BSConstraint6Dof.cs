@@ -26,6 +26,8 @@
  */
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 public class BSConstraint6Dof : BSConstraint
@@ -75,7 +77,7 @@ public class BSConstraint6Dof : BSConstraint
             world.physicsScene.DetailLog("{0},BS6DOFConstraint,badBodyPtr,wID={1}, rID={2}, rBody={3}, cID={4}, cBody={5}",
                             BSScene.DetailLogZero, world.worldID,
                             obj1.ID, obj1.AddrString, obj2.ID, obj2.AddrString);
-            world.physicsScene.Logger.ErrorFormat("{0} Attempt to build 6DOF constraint with missing bodies: wID={1}, rID={2}, rBody={3}, cID={4}, cBody={5}",
+            world.physicsScene.Logger.LogError("{0} Attempt to build 6DOF constraint with missing bodies: wID={1}, rID={2}, rBody={3}, cID={4}, cBody={5}",
                             LogHeader, world.worldID, obj1.ID, obj1.AddrString, obj2.ID, obj2.AddrString);
             m_enabled = false;
         }
@@ -91,7 +93,7 @@ public class BSConstraint6Dof : BSConstraint
 
             if (!m_constraint.HasPhysicalConstraint)
             {
-                world.physicsScene.Logger.ErrorFormat("{0} Failed creation of 6Dof constraint. rootID={1}, childID={2}",
+                world.physicsScene.Logger.LogError("{0} Failed creation of 6Dof constraint. rootID={1}, childID={2}",
                                 LogHeader, obj1.ID, obj2.ID);
                 m_enabled = false;
             }

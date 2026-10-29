@@ -661,6 +661,10 @@ public class NPCAvatar : IClientAPI, INPC
     {
     }
 
+    public virtual void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hover, int cofVersion)
+    {
+    }
+
     public virtual void SendAppearance(UUID agentID, byte[] visualParams, byte[] textureEntry, float hover)
     {
     }
@@ -1090,7 +1094,7 @@ public class NPCAvatar : IClientAPI, INPC
     {
     }
 
-    public void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, uint estateID)
+    public void SendEstateExperiences(UUID invoice, UUID[] allowed, UUID[] key, UUID[] blocked, uint estateID)
     {
     }
 

@@ -27,6 +27,9 @@
 
 using MySqlConnector;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.MySQL;
 
 /// <summary>
@@ -34,7 +37,7 @@ namespace OpenSim.Data.MySQL;
 /// </summary>
 public class MySqlFramework
 {
-    private static readonly log4net.ILog m_log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
     protected string m_connectionString = String.Empty;
     protected MySqlTransaction m_trans = null;
@@ -97,15 +100,15 @@ public class MySqlFramework
             }
             catch (Exception e)
             {
-                m_log.Error(e.Message, e);
-                m_log.Error(Environment.StackTrace.ToString());
+                m_log.LogError(e, e.Message);
+                m_log.LogError(Environment.StackTrace.ToString());
                 cmd.Connection = null;
                 return 0;
             }
         }
         catch (Exception e)
         {
-            m_log.Error(e.Message, e);
+            m_log.LogError(e, e.Message);
             return 0;
         }
     }

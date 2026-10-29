@@ -29,9 +29,11 @@ using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Reflection;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Services.Interfaces;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Framework.Serialization.External;
 
@@ -40,7 +42,7 @@ namespace OpenSim.Framework.Serialization.External;
 /// </summary>
 public class ExternalRepresentationUtils
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Populate a node with data read from xml using a dictinoary of processors
@@ -57,8 +59,8 @@ public class ExternalRepresentationUtils
             processors,
             xtr,
             (o, nodeName, e) => {
-                m_log.Debug(string.Format("[ExternalRepresentationUtils]: Error while parsing element {0} ",
-                    nodeName), e);
+                m_log.LogDebug(e, string.Format("[ExternalRepresentationUtils]: Error while parsing element {0} ",
+                    nodeName));
             });
     }
 
@@ -89,12 +91,12 @@ public class ExternalRepresentationUtils
         {
             nodeName = xtr.Name;
 
-            // m_log.DebugFormat("[ExternalRepresentationUtils]: Processing node: {0}", nodeName);
+            // m_log.LogDebug("[ExternalRepresentationUtils]: Processing node: {0}", nodeName);
 
             Action<NodeType, XmlReader> p = null;
             if (processors.TryGetValue(xtr.Name, out p))
             {
-                // m_log.DebugFormat("[ExternalRepresentationUtils]: Found processor for {0}", nodeName);
+                // m_log.LogDebug("[ExternalRepresentationUtils]: Found processor for {0}", nodeName);
 
                 try
                 {
@@ -107,13 +109,13 @@ public class ExternalRepresentationUtils
 
                     if (xtr.EOF)
                     {
-                        m_log.Debug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to unexpected end of XML");
+                        m_log.LogDebug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to unexpected end of XML");
                         break;
                     }
 
                     if (++numErrors == 10)
                     {
-                        m_log.Debug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to too many parsing errors");
+                        m_log.LogDebug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to too many parsing errors");
                         break;
                     }
 
@@ -123,13 +125,13 @@ public class ExternalRepresentationUtils
             }
             else
             {
-                // m_log.DebugFormat("[ExternalRepresentationUtils]: found unknown element \"{0}\"", nodeName);
+                // m_log.LogDebug("[ExternalRepresentationUtils]: found unknown element \"{0}\"", nodeName);
                 xtr.ReadOuterXml(); // ignore
             }
 
             if (timer.Elapsed.TotalSeconds >= 60)
             {
-                m_log.Debug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to timeout");
+                m_log.LogDebug("[ExternalRepresentationUtils]: Aborting ExecuteReadProcessors due to timeout");
                 errors = true;
                 break;
             }
@@ -231,7 +233,7 @@ public class ExternalRepresentationUtils
 
     protected static void TransformXml(XmlReader reader, XmlWriter writer, string sceneName, string homeURI, IUserAccountService userAccountService, UUID scopeID)
     {
-        //            m_log.DebugFormat("[HG ASSET MAPPER]: Transforming XML");
+        //            m_log.LogDebug("[HG ASSET MAPPER]: Transforming XML");
 
         int sopDepth = -1;
         UserAccount creator = null;
@@ -261,7 +263,7 @@ public class ExternalRepresentationUtils
                     break;
 
                 case XmlNodeType.Element:
-                    //                    m_log.DebugFormat("Depth {0} at element {1}", reader.Depth, reader.Name);
+                    //                    m_log.LogDebug("Depth {0} at element {1}", reader.Depth, reader.Name);
 
                     writer.WriteStartElement(reader.Prefix, reader.LocalName, reader.NamespaceURI);
 
@@ -278,7 +280,7 @@ public class ExternalRepresentationUtils
                         if (sopDepth < 0)
                         {
                             sopDepth = reader.Depth;
-                            //                            m_log.DebugFormat("[HG ASSET MAPPER]: Set sopDepth to {0}", sopDepth);
+                            //                            m_log.LogDebug("[HG ASSET MAPPER]: Set sopDepth to {0}", sopDepth);
                         }
                     }
                     else
@@ -334,20 +336,20 @@ public class ExternalRepresentationUtils
 
                     if (reader.IsEmptyElement)
                     {
-                        //                        m_log.DebugFormat("[HG ASSET MAPPER]: Writing end for empty element {0}", reader.Name);
+                        //                        m_log.LogDebug("[HG ASSET MAPPER]: Writing end for empty element {0}", reader.Name);
                         writer.WriteEndElement();
                     }
 
                     break;
 
                 case XmlNodeType.EndElement:
-                    //                    m_log.DebugFormat("Depth {0} at EndElement", reader.Depth);
+                    //                    m_log.LogDebug("Depth {0} at EndElement", reader.Depth);
                     if (sopDepth == reader.Depth)
                     {
                         if (!hasCreatorData && creator != null)
                             writer.WriteElementString(reader.Prefix, "CreatorData", reader.NamespaceURI, string.Format("{0};{1} {2}", homeURI, creator.FirstName, creator.LastName));
 
-                        //                        m_log.DebugFormat("[HG ASSET MAPPER]: Reset sopDepth");
+                        //                        m_log.LogDebug("[HG ASSET MAPPER]: Reset sopDepth");
                         sopDepth = -1;
                         creator = null;
                         hasCreatorData = false;
@@ -373,7 +375,7 @@ public class ExternalRepresentationUtils
                     break;
 
                 default:
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[HG ASSET MAPPER]: Unrecognized node {0} in asset XML transform in {1}",
                         reader.NodeType, sceneName);
                     break;

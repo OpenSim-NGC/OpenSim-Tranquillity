@@ -31,11 +31,14 @@ using System.Net;
 using Nini.Config;
 using System.Net.Http.Headers;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.ServiceAuth;
 
 public class BasicHttpAuthentication : IServiceAuth
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public string Name { get { return "BasicHttp"; } }
 
@@ -57,18 +60,18 @@ public class BasicHttpAuthentication : IServiceAuth
         byte[] encData_byte = Util.UTF8.GetBytes(str);
 
         m_CredentialsB64 = Convert.ToBase64String(encData_byte);
-        //m_log.DebugFormat("[HTTP BASIC AUTH]: {0} {1} [{2}]", m_Username, m_Password, section);
+        //m_log.LogDebug("[HTTP BASIC AUTH]: {0} {1} [{2}]", m_Username, m_Password, section);
     }
 
     public void AddAuthorization(NameValueCollection headers)
     {
-        //m_log.DebugFormat("[HTTP BASIC AUTH]: Adding authorization for {0}", remove_me);
+        //m_log.LogDebug("[HTTP BASIC AUTH]: Adding authorization for {0}", remove_me);
         headers["Authorization"] = "Basic " + m_CredentialsB64;
     }
 
     public void AddAuthorization(HttpRequestHeaders headers)
     {
-        //m_log.DebugFormat("[HTTP BASIC AUTH]: Adding authorization for {0}", remove_me);
+        //m_log.LogDebug("[HTTP BASIC AUTH]: Adding authorization for {0}", remove_me);
         headers.TryAddWithoutValidation("Authorization","Basic " + m_CredentialsB64);
     }
 
@@ -89,7 +92,7 @@ public class BasicHttpAuthentication : IServiceAuth
 
     public bool Authenticate(NameValueCollection requestHeaders, AddHeaderDelegate d, out HttpStatusCode statusCode)
     {
-//            m_log.DebugFormat("[HTTP BASIC AUTH]: Authenticate in {0}", "BasicHttpAuthentication");
+//            m_log.LogDebug("[HTTP BASIC AUTH]: Authenticate in {0}", "BasicHttpAuthentication");
 
         string value = requestHeaders.Get("Authorization");
         if (value != null)

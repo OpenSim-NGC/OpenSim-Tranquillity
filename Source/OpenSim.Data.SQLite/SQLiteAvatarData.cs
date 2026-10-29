@@ -28,6 +28,9 @@
 using OpenMetaverse;
 using System.Data.SQLite;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.SQLite;
 
 /// <summary>
@@ -36,7 +39,7 @@ namespace OpenSim.Data.SQLite;
 public class SQLiteAvatarData : SQLiteGenericTableHandler<AvatarBaseData>,
         IAvatarData
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public SQLiteAvatarData(string connectionString, string realm) :
             base(connectionString, realm, "Avatar")

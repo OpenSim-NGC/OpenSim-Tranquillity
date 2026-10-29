@@ -74,8 +74,15 @@ public class InventoryArchiveLoadTests : InventoryArchiveTestCase
         Assert.True(readResult);
         Assert.NotNull(coa);
 
+        Assert.Equal(2, coa.Count);
+
         List<SceneObjectGroup> coaObjects = coa.Objects;
-        Assert.Single(coaObjects);
+        Assert.Equal(UUID.Parse("00000000-0000-0000-0000-000000000120"), coaObjects[0].UUID);
+        Assert.Equal(new Vector3(15, 30, 45), coaObjects[0].AbsolutePosition);
+
+        Assert.Equal(UUID.Parse("00000000-0000-0000-0000-000000000140"), coaObjects[1].UUID);
+        Assert.Equal(new Vector3(25, 50, 75), coaObjects[1].AbsolutePosition);
+
         Assert.Equal(1, coaObjects[0].PrimCount);
 
         Assert.NotNull(coaObjects[0]);
@@ -99,7 +106,7 @@ public class InventoryArchiveLoadTests : InventoryArchiveTestCase
             = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaLL1.PrincipalID, m_item1Name);
 
         Assert.NotNull(foundItem1);
-        Assert.Equal(m_uaLL1.Name, foundItem1.CreatorId);
+        Assert.Equal(m_uaLL1.PrincipalID.ToString(), foundItem1.CreatorId);
         Assert.Equal(m_uaLL1.PrincipalID, foundItem1.CreatorIdAsUuid);
         Assert.Equal(m_uaLL1.PrincipalID, foundItem1.Owner);
 
@@ -159,7 +166,7 @@ public class InventoryArchiveLoadTests : InventoryArchiveTestCase
             = InventoryArchiveUtils.FindItemByPath(m_scene.InventoryService, m_uaMT.PrincipalID, m_item1Name);
 
         Assert.NotNull(foundItem1);
-        Assert.Equal(m_uaMT.Name, foundItem1.CreatorId);
+        Assert.Equal(m_uaMT.PrincipalID.ToString(), foundItem1.CreatorId);
         Assert.Equal(m_uaMT.PrincipalID, foundItem1.CreatorIdAsUuid);
 
         AssetBase asset1 = m_scene.AssetService.Get(foundItem1.AssetID.ToString());

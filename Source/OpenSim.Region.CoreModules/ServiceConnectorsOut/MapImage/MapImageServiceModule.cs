@@ -28,7 +28,6 @@
 using System.Reflection;
 using System.Timers;
 
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
@@ -38,12 +37,13 @@ using OpenSim.Server.Base;
 using OpenMetaverse;
 using SkiaSharp;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.MapImage;
 
 public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static string LogHeader = "[MAP IMAGE SERVICE MODULE]:";
 
     private bool m_enabled = false;
@@ -83,14 +83,14 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
         int refreshminutes = Convert.ToInt32(config.GetString("RefreshTime"));
         if (refreshminutes < 0)
         {
-            m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: Negative refresh time given in config. Module disabled.");
+            m_log.LogWarning("[MAP IMAGE SERVICE MODULE]: Negative refresh time given in config. Module disabled.");
             return;
         }
 
         string service = config.GetString("LocalServiceModule", string.Empty);
         if (service.Length == 0)
         {
-            m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: No service dll given in config. Unable to proceed.");
+            m_log.LogWarning("[MAP IMAGE SERVICE MODULE]: No service dll given in config. Unable to proceed.");
             return;
         }
 
@@ -98,7 +98,7 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
         m_MapService = ServerUtils.LoadPlugin<IMapImageService>(service, args);
         if (m_MapService == null)
         {
-            m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: Unable to load LocalServiceModule from {0}. MapService module disabled. Please fix the configuration.", service);
+            m_log.LogWarning("[MAP IMAGE SERVICE MODULE]: Unable to load LocalServiceModule from {0}. MapService module disabled. Please fix the configuration.", service);
             return;
         }
 
@@ -114,12 +114,12 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
             m_refreshTimer.Elapsed += new ElapsedEventHandler(HandleMaptileRefresh);
 
 
-            m_log.InfoFormat("[MAP IMAGE SERVICE MODULE]: enabled with refresh time {0} min and service object {1}",
+            m_log.LogInformation("[MAP IMAGE SERVICE MODULE]: enabled with refresh time {0} min and service object {1}",
                          refreshminutes, service);
         }
         else
         {
-            m_log.InfoFormat("[MAP IMAGE SERVICE MODULE]: enabled with no refresh and service object {0}", service);
+            m_log.LogInformation("[MAP IMAGE SERVICE MODULE]: enabled with no refresh and service object {0}", service);
         }
         m_enabled = true;
     }
@@ -169,7 +169,7 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
         if (m_lastrefresh > 0 && Util.EnvironmentTickCountSubtract(m_lastrefresh) < m_refreshtime)
             return;
 
-        m_log.DebugFormat("[MAP IMAGE SERVICE MODULE]: map refresh!");
+        m_log.LogDebug("[MAP IMAGE SERVICE MODULE]: map refresh!");
         lock (m_scenes)
         {
             foreach (IScene scene in m_scenes.Values)
@@ -180,7 +180,7 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
                 }
                 catch (Exception ex)
                 {
-                    m_log.WarnFormat("[MAP IMAGE SERVICE MODULE]: something bad happened {0}", ex.Message);
+                    m_log.LogWarning("[MAP IMAGE SERVICE MODULE]: something bad happened {0}", ex.Message);
                 }
             }
         }
@@ -193,13 +193,13 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
     ///</summary>
     public void UploadMapTile(IScene scene)
     {
-        m_log.DebugFormat("{0}: upload maptile for {1}", LogHeader, scene.RegionInfo.RegionName);
+        m_log.LogDebug("{0}: upload maptile for {1}", LogHeader, scene.RegionInfo.RegionName);
 
         // Create a JPG map tile and upload it to the AddMapTile API
         IMapImageGenerator tileGenerator = scene.RequestModuleInterface<IMapImageGenerator>();
         if (tileGenerator == null)
         {
-            m_log.WarnFormat("{0} Cannot upload map tile without an ImageGenerator", LogHeader);
+            m_log.LogWarning("{0} Cannot upload map tile without an ImageGenerator", LogHeader);
             return;
         }
 
@@ -224,21 +224,21 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
     {
         if (mapTile == null)
         {
-            m_log.WarnFormat("{0} Cannot upload null image", LogHeader);
+            m_log.LogWarning("{0} Cannot upload null image", LogHeader);
             return;
         }
 
         // If the region/maptile is legacy sized, just upload the one tile like it has always been done
         if (mapTile.Width == Constants.RegionSize && mapTile.Height == Constants.RegionSize)
         {
-            m_log.DebugFormat("{0} Upload maptile for {1}", LogHeader, scene.Name);
+            m_log.LogDebug("{0} Upload maptile for {1}", LogHeader, scene.Name);
             ConvertAndUploadMaptile(scene, mapTile,
                                     scene.RegionInfo.RegionLocX, scene.RegionInfo.RegionLocY,
                                     scene.RegionInfo.RegionName);
         }
         else
         {
-            m_log.DebugFormat("{0} Upload {1} maptiles for {2}", LogHeader,
+            m_log.LogDebug("{0} Upload {1} maptiles for {2}", LogHeader,
                 (mapTile.Width * mapTile.Height) / (Constants.RegionSize * Constants.RegionSize),
                 scene.Name);
 
@@ -261,7 +261,7 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
                     SKBitmap subMapTile = new SKBitmap();
                     if (!mapTile.ExtractSubset(subMapTile, subset))
                     {
-                        m_log.WarnFormat("{0} Failed to extract sub-tile at {1},{2}", LogHeader, left, top);
+                        m_log.LogWarning("{0} Failed to extract sub-tile at {1},{2}", LogHeader, left, top);
                         continue;
                     }
 
@@ -270,7 +270,7 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
                                                 scene.RegionInfo.RegionLocY + (yy / Constants.RegionSize),
                                                 scene.Name))
                     {
-                        m_log.DebugFormat("{0} Upload maptileS for {1} aborted!", LogHeader, scene.Name);
+                        m_log.LogDebug("{0} Upload maptileS for {1} aborted!", LogHeader, scene.Name);
                         return; // abort rest;
                     }
                 }
@@ -293,20 +293,20 @@ public class MapImageServiceModule : IMapImageUploadModule, ISharedRegionModule
         }
         catch (Exception e)
         {
-            m_log.WarnFormat("{0} Failed encoding SKBitmap to JPEG for region {1}: {2}", LogHeader, regionName, e.Message);
+            m_log.LogWarning("{0} Failed encoding SKBitmap to JPEG for region {1}: {2}", LogHeader, regionName, e.Message);
             return false;
         }
 
         if (jpgData == Utils.EmptyBytes)
         {
-            m_log.WarnFormat("{0} Tile image generation failed for region {1}", LogHeader, regionName);
+            m_log.LogWarning("{0} Tile image generation failed for region {1}", LogHeader, regionName);
             return false;
         }
 
         string reason = string.Empty;
         if (!m_MapService.AddMapTile((int)locX, (int)locY, jpgData, scene.RegionInfo.ScopeID, out reason))
         {
-            m_log.DebugFormat("{0} Unable to upload tile image for {1} at {2}-{3}: {4}", LogHeader,
+            m_log.LogDebug("{0} Unable to upload tile image for {1} at {2}-{3}: {4}", LogHeader,
                 regionName, locX, locY, reason);
             return false;
         }

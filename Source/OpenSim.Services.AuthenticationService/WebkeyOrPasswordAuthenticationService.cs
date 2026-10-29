@@ -27,16 +27,18 @@
 
 using OpenMetaverse;
 using OpenSim.Services.Interfaces;
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Data;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Services.AuthenticationService;
 
 public class WebkeyOrPasswordAuthenticationService : AuthenticationServiceBase, IAuthenticationService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Dictionary<string, IAuthenticationService> m_svcChecks
         = new Dictionary<string, IAuthenticationService>();
@@ -64,20 +66,20 @@ public class WebkeyOrPasswordAuthenticationService : AuthenticationServiceBase, 
         {
             if (data.Data.ContainsKey("webLoginKey"))
             {
-                m_log.DebugFormat("[AUTH SERVICE]: Attempting web key authentication for PrincipalID {0}", principalID);
+                m_log.LogDebug("[AUTH SERVICE]: Attempting web key authentication for PrincipalID {0}", principalID);
                 result = m_svcChecks["web_login_key"].Authenticate(principalID, password, lifetime, out realID);
                 if (result.Length == 0)
                 {
-                    m_log.DebugFormat("[AUTH SERVICE]: Web Login failed for PrincipalID {0}", principalID);
+                    m_log.LogDebug("[AUTH SERVICE]: Web Login failed for PrincipalID {0}", principalID);
                 }
             }
             if (result.Length == 0 && data.Data.ContainsKey("passwordHash") && data.Data.ContainsKey("passwordSalt"))
             {
-                m_log.DebugFormat("[AUTH SERVICE]: Attempting password authentication for PrincipalID {0}", principalID);
+                m_log.LogDebug("[AUTH SERVICE]: Attempting password authentication for PrincipalID {0}", principalID);
                 result = m_svcChecks["password"].Authenticate(principalID, password, lifetime, out realID);
                 if (result.Length == 0)
                 {
-                    m_log.DebugFormat("[AUTH SERVICE]: Password login failed for PrincipalID {0}", principalID);
+                    m_log.LogDebug("[AUTH SERVICE]: Password login failed for PrincipalID {0}", principalID);
                 }
             }
 
@@ -85,12 +87,12 @@ public class WebkeyOrPasswordAuthenticationService : AuthenticationServiceBase, 
 
             if (result.Length == 0)
             {
-                m_log.DebugFormat("[AUTH SERVICE]: Both password and webLoginKey-based authentication failed for PrincipalID {0}", principalID);
+                m_log.LogDebug("[AUTH SERVICE]: Both password and webLoginKey-based authentication failed for PrincipalID {0}", principalID);
             }
         }
         else
         {
-            m_log.DebugFormat("[AUTH SERVICE]: PrincipalID {0} or its data not found", principalID);
+            m_log.LogDebug("[AUTH SERVICE]: PrincipalID {0} or its data not found", principalID);
         }
 
 

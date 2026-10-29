@@ -29,8 +29,8 @@ using System.Globalization;
 using System.Net;
 using System.Reflection;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
+using Microsoft.Extensions.Logging;
 //using OpenSim.Framework.Console;
 
 namespace OpenSim.Framework;
@@ -45,7 +45,7 @@ public class ConfigurationMember
 
     #endregion
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private int cE = 0;
 
     private string configurationDescription = String.Empty;
@@ -117,7 +117,7 @@ public class ConfigurationMember
         }
         else
         {
-            m_log.Info(
+            m_log.LogInformation(
                 "Required fields for adding a configuration option is invalid. Will not add this option (" +
                 option.configurationKey + ")");
         }
@@ -158,31 +158,31 @@ public class ConfigurationMember
     public void performConfigurationRetrieve()
     {
         if (cE > 1)
-            m_log.Error("READING CONFIGURATION COUT: " + cE.ToString());
+            m_log.LogError("READING CONFIGURATION COUT: " + cE.ToString());
 
 
         configurationPlugin = LoadConfigDll(configurationPluginFilename);
         configurationOptions.Clear();
         if (loadFunction == null)
         {
-            m_log.Error("Load Function for '" + configurationDescription +
+            m_log.LogError("Load Function for '" + configurationDescription +
                         "' is null. Refusing to run configuration.");
             return;
         }
 
         if (resultFunction == null)
         {
-            m_log.Error("Result Function for '" + configurationDescription +
+            m_log.LogError("Result Function for '" + configurationDescription +
                         "' is null. Refusing to run configuration.");
             return;
         }
 
-        //m_log.Debug("[CONFIG]: Calling Configuration Load Function...");
+        //m_log.LogDebug("[CONFIG]: Calling Configuration Load Function...");
         loadFunction();
 
         if (configurationOptions.Count <= 0)
         {
-            m_log.Error("[CONFIG]: No configuration options were specified for '" + configurationOptions +
+            m_log.LogError("[CONFIG]: No configuration options were specified for '" + configurationOptions +
                         "'. Refusing to continue configuration.");
             return;
         }
@@ -190,7 +190,7 @@ public class ConfigurationMember
         bool useFile = true;
         if (configurationPlugin == null)
         {
-            m_log.Error("[CONFIG]: Configuration Plugin NOT LOADED!");
+            m_log.LogError("[CONFIG]: Configuration Plugin NOT LOADED!");
             return;
         }
 
@@ -204,10 +204,10 @@ public class ConfigurationMember
             }
             catch (XmlException e)
             {
-                m_log.WarnFormat("[CONFIG] Not using {0}: {1}",
+                m_log.LogWarning("[CONFIG] Not using {0}: {1}",
                         configurationFilename,
                         e.Message.ToString());
-                //m_log.Error("Error loading " + configurationFilename + ": " + e.ToString());
+                //m_log.LogError("Error loading " + configurationFilename + ": " + e.ToString());
                 useFile = false;
             }
         }
@@ -215,11 +215,11 @@ public class ConfigurationMember
         {
             if (configurationFromXMLNode != null)
             {
-                m_log.Info("Loading from XML Node, will not save to the file");
+                m_log.LogInformation("Loading from XML Node, will not save to the file");
                 configurationPlugin.LoadDataFromString(configurationFromXMLNode.OuterXml);
             }
 
-            m_log.Info("XML Configuration Filename is not valid; will not save to the file.");
+            m_log.LogInformation("XML Configuration Filename is not valid; will not save to the file.");
             useFile = false;
         }
 
@@ -456,7 +456,7 @@ public class ConfigurationMember
 
                     if (!resultFunction(configOption.configurationKey, return_result))
                     {
-                        m_log.Info(
+                        m_log.LogInformation(
                             "The handler for the last configuration option denied that input, please try again.");
                         convertSuccess = false;
                         ignoreNextFromConfig = true;
@@ -466,7 +466,7 @@ public class ConfigurationMember
                 {
                     if (configOption.configurationUseDefaultNoPrompt)
                     {
-                        m_log.Error(string.Format(
+                        m_log.LogError(string.Format(
                                         "[CONFIG]: [{3}]:[{1}] is not valid default for parameter [{0}].\nThe configuration result must be parsable to {2}.\n",
                                         configOption.configurationKey, console_result, errorMessage,
                                         configurationFilename));
@@ -474,7 +474,7 @@ public class ConfigurationMember
                     }
                     else
                     {
-                        m_log.Warn(string.Format(
+                        m_log.LogWarning(string.Format(
                                        "[CONFIG]: [{3}]:[{1}] is not a valid value [{0}].\nThe configuration result must be parsable to {2}.\n",
                                        configOption.configurationKey, console_result, errorMessage,
                                        configurationFilename));

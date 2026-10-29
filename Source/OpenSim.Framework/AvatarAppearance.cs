@@ -28,9 +28,10 @@
 using System.Reflection;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
-using log4net;
 using System.Text;
 using System.Runtime.InteropServices;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -46,7 +47,7 @@ public class AvatarAppearance
     const float AVBOXMINY = 0.3f;
     const float AVBOXMINZ = 1.2f;
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // this is viewer capabilities and weared things dependent
     // should be only used as initial default value ( V1 viewers )
@@ -85,6 +86,52 @@ public class AvatarAppearance
         set { m_visualparams = value; }
     }
 
+    /// <summary>
+    /// Index of the <c>AppearanceMessage_Version</c> visual parameter (<c>avatar_lad.xml</c> id 11000) in the
+    /// wire array — the same slot <see cref="VPElement._APPEARANCEMESSAGE_VERSION"/> names.
+    /// </summary>
+    public const int APPEARANCE_VERSION_PARAM_INDEX = (int)VPElement._APPEARANCEMESSAGE_VERSION;
+
+    /// <summary>
+    /// A copy of <paramref name="visualParams"/> with the appearance-version parameter set to
+    /// <paramref name="version"/>, for an avatar this simulator baked.
+    ///
+    /// <para>
+    /// The viewer reads the appearance version from two places and <b>prefers the parameter</b>:
+    /// <c>resolve_appearance_version</c> takes <c>mParamAppearanceVersion</c> when it is set and only falls back
+    /// to the <c>AppearanceData</c> field otherwise (<c>llvoavatar.cpp:9663-9690</c>). Worse, when both are
+    /// present and they <i>disagree</i> it logs "inconsistent appearance_version settings" and returns false, and
+    /// the caller then discards the entire appearance message — "bad appearance version info, discarding"
+    /// (<c>:9720-9723</c>). The avatar never gets its TextureEntry, so it never fetches a bake and never leaves
+    /// the cloud state.
+    /// </para>
+    ///
+    /// <para>
+    /// The parameter is transmitted as a byte mapped through the parameter's own range, and id 11000 is declared
+    /// <c>value_min="0" value_max="255"</c> (<c>avatar_lad.xml</c>), so <c>U8_to_F32</c> is the identity there
+    /// (<c>llvoavatar.cpp:9628-9630</c>, <c>:9650-9658</c>): the byte must literally equal the version in the
+    /// <c>AppearanceData</c> block, which for a server bake is 1.
+    /// </para>
+    ///
+    /// <para>
+    /// Never mutates its argument. A flag-off region must keep sending the avatar's own stored parameters
+    /// untouched, and this value is not part of the avatar's appearance — it is a property of the message.
+    /// An array too short to hold the slot is returned as-is: the viewer will not find the parameter among the
+    /// transmitted blocks either, and an absent parameter with a present field resolves to the field.
+    /// </para>
+    /// </summary>
+    public static byte[] WithAppearanceVersion(byte[] visualParams, byte version)
+    {
+        if (visualParams is null || visualParams.Length <= APPEARANCE_VERSION_PARAM_INDEX)
+            return visualParams;
+        if (visualParams[APPEARANCE_VERSION_PARAM_INDEX] == version)
+            return visualParams;
+
+        byte[] copy = (byte[])visualParams.Clone();
+        copy[APPEARANCE_VERSION_PARAM_INDEX] = version;
+        return copy;
+    }
+
     public Vector3 AvatarSize
     {
         get { return m_avatarSize; }
@@ -105,7 +152,7 @@ public class AvatarAppearance
         get { return m_texture; }
         set
         {
-//                m_log.DebugFormat("[AVATAR APPEARANCE]: Set TextureEntry to {0}", value);
+//                m_log.LogDebug("[AVATAR APPEARANCE]: Set TextureEntry to {0}", value);
             m_texture = value;
         }
     }
@@ -132,7 +179,7 @@ public class AvatarAppearance
 
     public AvatarAppearance()
     {
-//            m_log.WarnFormat("[AVATAR APPEARANCE]: create empty appearance");
+//            m_log.LogWarning("[AVATAR APPEARANCE]: create empty appearance");
 
         m_serial = 0;
         SetDefaultWearables();
@@ -145,7 +192,7 @@ public class AvatarAppearance
 
     public AvatarAppearance(OSDMap map)
     {
-//            m_log.WarnFormat("[AVATAR APPEARANCE]: create appearance from OSDMap");
+//            m_log.LogWarning("[AVATAR APPEARANCE]: create appearance from OSDMap");
 
         Unpack(map);
 //            SetHeight(); done in Unpack
@@ -153,7 +200,7 @@ public class AvatarAppearance
 
     public AvatarAppearance(AvatarWearable[] wearables, Primitive.TextureEntry textureEntry, byte[] visualParams)
     {
-//            m_log.WarnFormat("[AVATAR APPEARANCE] create initialized appearance");
+//            m_log.LogWarning("[AVATAR APPEARANCE] create initialized appearance");
 
         m_serial = 0;
 
@@ -190,7 +237,7 @@ public class AvatarAppearance
 
     public AvatarAppearance(AvatarAppearance appearance, bool copyWearables, bool copyBaked)
     {
-//            m_log.WarnFormat("[AVATAR APPEARANCE] create from an existing appearance");
+//            m_log.LogWarning("[AVATAR APPEARANCE] create from an existing appearance");
 
         if (appearance == null)
         {
@@ -288,7 +335,7 @@ public class AvatarAppearance
     /// </summary>
     public void ResetAppearance()
     {
-//            m_log.WarnFormat("[AVATAR APPEARANCE]: Reset appearance");
+//            m_log.LogWarning("[AVATAR APPEARANCE]: Reset appearance");
 
         m_serial = 0;
 
@@ -396,7 +443,7 @@ public class AvatarAppearance
                 if (visualParams[i] != m_visualparams[i])
                 {
                     // DEBUG ON
-                    // m_log.WarnFormat("[AVATARAPPEARANCE] vparams changed [{0}] {1} ==> {2}",
+                    // m_log.LogWarning("[AVATARAPPEARANCE] vparams changed [{0}] {1} ==> {2}",
                     //        i,m_visualparams[i],visualParams[i]);
                     // DEBUG OFF
                     m_visualparams[i] = visualParams[i];
@@ -469,7 +516,7 @@ public class AvatarAppearance
     public void SetWearable(int wearableId, AvatarWearable wearable)
     {
 // DEBUG ON
-//          m_log.WarnFormat("[AVATARAPPEARANCE] set wearable {0} --> {1}:{2}",wearableId,wearable.ItemID,wearable.AssetID);
+//          m_log.LogWarning("[AVATARAPPEARANCE] set wearable {0} --> {1}:{2}",wearableId,wearable.ItemID,wearable.AssetID);
 // DEBUG OFF
         if (wearableId >= m_wearables.Length)
         {
@@ -534,7 +581,7 @@ public class AvatarAppearance
 
     internal void AppendAttachment(AvatarAttachment attach)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //   "[AVATAR APPEARNCE]: Appending itemID={0}, assetID={1} at {2}",
         //    attach.ItemID, attach.AssetID, attach.AttachPoint);
 
@@ -559,7 +606,7 @@ public class AvatarAppearance
 
     internal void ReplaceAttachment(AvatarAttachment attach)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[AVATAR APPEARANCE]: Replacing itemID={0}, assetID={1} at {2}",
         //    attach.ItemID, attach.AssetID, attach.AttachPoint);
 
@@ -586,7 +633,7 @@ public class AvatarAppearance
     /// </returns>
     public bool SetAttachment(int attachpoint, UUID item, UUID asset)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[AVATAR APPEARANCE]: Setting attachment at {0} with item ID {1}, asset ID {2}",
         //    attachpoint, item, asset);
 
@@ -607,13 +654,13 @@ public class AvatarAppearance
             AvatarAttachment existingAttachment = GetAttachmentForItem(item);
             if (existingAttachment != null)
             {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[AVATAR APPEARANCE]: Found existing attachment for {0}, asset {1} at point {2}",
 //                        existingAttachment.ItemID, existingAttachment.AssetID, existingAttachment.AttachPoint);
 
                 if (!existingAttachment.AssetID.IsZero() && existingAttachment.AttachPoint == (attachpoint & 0x7F))
                 {
-                    m_log.Debug($"[AVATAR APPEARANCE]: Ignoring attach of an already attached item {item} at point {attachpoint}");
+                    m_log.LogDebug($"[AVATAR APPEARANCE]: Ignoring attach of an already attached item {item} at point {attachpoint}");
                     return false;
                 }
                 else
@@ -898,7 +945,7 @@ public class AvatarAppearance
 
         if(data == null)
         {
-            m_log.Warn("[AVATAR APPEARANCE]: data to unpack is null");
+            m_log.LogWarning("[AVATAR APPEARANCE]: data to unpack is null");
             return;
         }
 
@@ -996,7 +1043,7 @@ public class AvatarAppearance
             }
             else
             {
-                m_log.Warn("[AVATAR APPEARANCE]: failed to unpack visual parameters");
+                m_log.LogWarning("[AVATAR APPEARANCE]: failed to unpack visual parameters");
             }
 
             // Attachments
@@ -1008,7 +1055,7 @@ public class AvatarAppearance
                     AvatarAttachment att = new AvatarAttachment((OSDMap)attachs[i]);
                     AppendAttachment(att);
 
-                    //m_log.DebugFormat(
+                    //m_log.LogDebug(
                     //    "[AVATAR APPEARANCE]: Unpacked attachment itemID {0}, assetID {1}, point {2}",
                     //    att.ItemID, att.AssetID, att.AttachPoint);
                 }
@@ -1016,7 +1063,7 @@ public class AvatarAppearance
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[AVATAR APPEARANCE]: unpack failed badly: {0}{1}", e.Message, e.StackTrace);
+            m_log.LogError("[AVATAR APPEARANCE]: unpack failed badly: {0}{1}", e.Message, e.StackTrace);
         }
     }
 

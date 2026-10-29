@@ -1,0 +1,143 @@
+{
+  "id": "C04-lower-alpha",
+  "title": "Lower alpha wearable",
+  "rules": [
+    "R13"
+  ],
+  "note": "",
+  "channel": "Lower",
+  "size": 64,
+  "overlayParams": null,
+  "wearables": [
+    {
+      "kind": "Skin",
+      "label": "skin",
+      "params": {},
+      "textures": []
+    },
+    {
+      "kind": "Alpha",
+      "label": "alpha",
+      "params": {},
+      "textures": [
+        {
+          "slot": "LowerAlpha",
+          "generator": "halfA",
+          "width": 64,
+          "height": 64,
+          "hasAlpha": true,
+          "file": "tex-alpha-LowerAlpha.rgba",
+          "textureId": "ordinary"
+        }
+      ]
+    }
+  ],
+  "result": {
+    "invisible": false,
+    "nothingDrawn": false,
+    "rgbaSha256": "4168c7b6fe60a880d04d5e92a64bc866c8599f3ab8e5d35f8d97be92e78848db",
+    "morphSha256": "f47a8ec3e9aff2318d896942282ad4fe37d6391c82914f54a5da8a37de1300c6",
+    "files": [
+      "out.rgba",
+      "out.morph"
+    ],
+    "layerStatus": [
+      {
+        "layer": "base",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "colour (0.65,0.43,0.25,1.00); body_skingrain.tga"
+      },
+      {
+        "layer": "shadow",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (0.00,0.00,0.00,0.00)"
+      },
+      {
+        "layer": "highlight",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "colour alpha 0 (1.00,1.00,1.00,0.00)"
+      },
+      {
+        "layer": "toenails",
+        "status": "drawn",
+        "wearable": null,
+        "detail": "lowerbody_color.tga\u002Balpha"
+      },
+      {
+        "layer": "lower_bodypaint",
+        "status": "skipped",
+        "wearable": "Skin",
+        "detail": "skin: no LowerBodypaint texture on the wearable"
+      },
+      {
+        "layer": "freckles lower",
+        "status": "skipped",
+        "wearable": null,
+        "detail": "every mask parameter skipped [freckles lower#777=skip]"
+      },
+      {
+        "layer": "lower_tattoo",
+        "status": "skipped",
+        "wearable": "Tattoo",
+        "detail": "no Tattoo worn"
+      },
+      {
+        "layer": "lower_universal_tattoo",
+        "status": "skipped",
+        "wearable": "Universal",
+        "detail": "no Universal worn"
+      },
+      {
+        "layer": "lower_underpants",
+        "status": "skipped",
+        "wearable": "Underpants",
+        "detail": "no Underpants worn"
+      },
+      {
+        "layer": "lower_socks",
+        "status": "skipped",
+        "wearable": "Socks",
+        "detail": "no Socks worn"
+      },
+      {
+        "layer": "lower_shoes",
+        "status": "skipped",
+        "wearable": "Shoes",
+        "detail": "no Shoes worn"
+      },
+      {
+        "layer": "lower_clothes_shadow",
+        "status": "skipped",
+        "wearable": "Pants",
+        "detail": "no Pants worn"
+      },
+      {
+        "layer": "lower_pants",
+        "status": "skipped",
+        "wearable": "Pants",
+        "detail": "no Pants worn"
+      },
+      {
+        "layer": "lower_jacket",
+        "status": "skipped",
+        "wearable": "Jacket",
+        "detail": "no Jacket worn"
+      },
+      {
+        "layer": "lower_pants",
+        "status": "morph",
+        "wearable": "Pants",
+        "detail": "no Pants worn: mask left at 255"
+      },
+      {
+        "layer": "lower alpha",
+        "status": "mask",
+        "wearable": "Alpha",
+        "detail": "alpha: alpha *= LowerAlpha (64x64)"
+      }
+    ]
+  }
+}

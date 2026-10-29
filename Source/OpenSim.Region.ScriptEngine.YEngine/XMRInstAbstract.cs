@@ -1471,8 +1471,10 @@ public abstract class XMRInstAbstract: ScriptBaseClass
         DELEGATE,
         SDTCLOBJ,
         SYSCHAR,
-        SYSERIAL,
-        THROWNEX
+        SYSERIAL,   // legacy BinaryFormatter blob - REFUSED on read (never deserialized)
+        THROWNEX,   // legacy BinaryFormatter blob - REFUSED on read (never deserialized)
+        THROWNEX2,  // safe ScriptThrownException: only the (separately-sent) thrown value
+        SYSUNSUP    // marker for a system type we refuse to serialize without BinaryFormatter
     }
 
     /**
@@ -1703,26 +1705,24 @@ public abstract class XMRInstAbstract: ScriptBaseClass
         }
         else if(graph is ScriptThrownException ScriptThrownExceptiongraph)
         {
-            MemoryStream memoryStream = new MemoryStream();
-            System.Runtime.Serialization.Formatters.Binary.BinaryFormatter bformatter =
-                    new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-            bformatter.Serialize(memoryStream, graph);
-            byte[] rawBytes = memoryStream.ToArray();
-            mow.Write((byte)Ser.THROWNEX);
-            mow.Write((int)rawBytes.Length);
-            mow.Write(rawBytes);
+            // No BinaryFormatter. The only field that matters is the thrown LSL
+            // value, which is sent explicitly (and recursively) right after the
+            // opcode. The base Exception message/stack is not used by scripts
+            // (xmrExceptionThrownValue() returns 'thrown'), so it is dropped.
+            mow.Write((byte)Ser.THROWNEX2);
             SendObjValue(ScriptThrownExceptiongraph.thrown);
         }
         else
         {
-            MemoryStream memoryStream = new MemoryStream();
-            System.Runtime.Serialization.Formatters.Binary.BinaryFormatter bformatter =
-                    new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-            bformatter.Serialize(memoryStream, graph);
-            byte[] rawBytes = memoryStream.ToArray();
-            mow.Write((byte)Ser.SYSERIAL);
-            mow.Write(rawBytes.Length);
-            mow.Write(rawBytes);
+            // No BinaryFormatter. Every system type the VM can normally hold
+            // (bool/char/int/float/double/string plus all LSL/XMR types) is
+            // already handled by an explicit opcode above. Anything reaching
+            // here is an unsupported type: emit a refusal marker so the SAVE
+            // still succeeds, but on restore the value cannot be reconstructed
+            // and the script restarts clean rather than us ever deserializing
+            // arbitrary bytes. Reference idents stay consistent because the
+            // object was already registered in migrateOutObjects above.
+            mow.Write((byte)Ser.SYSUNSUP);
         }
     }
 
@@ -1806,7 +1806,11 @@ public abstract class XMRInstAbstract: ScriptBaseClass
             return typeof(LSL_Vector);
         if(str == "xa")
             return typeof(XMR_Array);
-        return Type.GetType(str, true);
+        // No arbitrary type resolution from the migration stream. Only the
+        // fixed short-code types above are permitted; anything else aborts the
+        // restore (caught by LoadScriptState -> script restarts clean) instead
+        // of resolving an attacker-named type via Type.GetType.
+        throw new Exception("YEngine migration: refusing to resolve unlisted type code '" + str + "'");
     }
 
     /**
@@ -1980,28 +1984,25 @@ public abstract class XMRInstAbstract: ScriptBaseClass
                 return clobj;
 
             case Ser.SYSERIAL:
-            {
-                int rawLength = mir.ReadInt32();
-                byte[] rawBytes = mir.ReadBytes(rawLength);
-                MemoryStream memoryStream = new MemoryStream(rawBytes);
-                System.Runtime.Serialization.Formatters.Binary.BinaryFormatter bformatter =
-                        new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-                object graph = bformatter.Deserialize(memoryStream);
-                this.migrateInObjects.Add(ident, graph);
-                return graph;
-            }
-
             case Ser.THROWNEX:
+            case Ser.SYSUNSUP:
+                // Legacy BinaryFormatter opcodes (SYSERIAL/THROWNEX) and the
+                // unsupported-type marker (SYSUNSUP) are never deserialized.
+                // Aborting here is caught by LoadScriptState, which resets the
+                // script to its default state and posts state_entry - i.e. the
+                // script restarts clean rather than us deserializing arbitrary,
+                // possibly foreign, bytes. This is the whole point of the change.
+                throw new Exception("YEngine migration: refusing legacy/unsupported BinaryFormatter value (script will restart clean)");
+
+            case Ser.THROWNEX2:
             {
-                int rawLength = mir.ReadInt32();
-                byte[] rawBytes = mir.ReadBytes(rawLength);
-                MemoryStream memoryStream = new MemoryStream(rawBytes);
-                System.Runtime.Serialization.Formatters.Binary.BinaryFormatter bformatter =
-                        new System.Runtime.Serialization.Formatters.Binary.BinaryFormatter();
-                object graph = bformatter.Deserialize(memoryStream);
-                this.migrateInObjects.Add(ident, graph);
-                ((ScriptThrownException)graph).thrown = RecvObjValue();
-                return graph;
+                // Reconstruct the exception wrapper, register it BEFORE reading
+                // the thrown value so reference idents match the writer, then
+                // fill in the (separately-encoded) thrown LSL value.
+                ScriptThrownException ste = (ScriptThrownException)ScriptThrownException.Wrap(0);
+                this.migrateInObjects.Add(ident, ste);
+                ste.thrown = RecvObjValue();
+                return ste;
             }
 
             default:

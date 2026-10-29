@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Interfaces;
@@ -34,11 +33,14 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Inventory;
 
 public class InventoryServiceInConnectorModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Enabled = false;
 
     private IConfigSource m_Config;
@@ -55,7 +57,7 @@ public class InventoryServiceInConnectorModule : ISharedRegionModule
             m_Enabled = moduleConfig.GetBoolean("InventoryServiceInConnector", false);
             if (m_Enabled)
             {
-                m_log.Info("[INVENTORY IN CONNECTOR]: Inventory Service In Connector enabled");
+                m_log.LogInformation("[INVENTORY IN CONNECTOR]: Inventory Service In Connector enabled");
             }
         }
     }
@@ -87,7 +89,7 @@ public class InventoryServiceInConnectorModule : ISharedRegionModule
         {
             m_Registered = true;
 
-            m_log.Info("[RegionInventoryService]: Starting...");
+            m_log.LogInformation("[RegionInventoryService]: Starting...");
 
             Object[] args = new Object[] { m_Config, MainServer.Instance, "HGInventoryService" };
 

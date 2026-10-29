@@ -310,10 +310,9 @@ public class SceneHelpers
     /// <param name="testScene"></param>
     private static LocalPresenceServicesConnector StartPresenceService()
     {
-        // Unfortunately, some services share data via statics, so we need to null every time to stop interference
-        // between tests.
-        // This is a massive non-obvious pita.
-        NullPresenceData.Instance = null;
+        // NullPresenceData keeps one store for the process (NullPresenceData.Instance), as in a standalone. It is
+        // not replaced here: test classes set up scenes in parallel, and replacing it threw for, and dropped the
+        // presences of, every other scene. Sessions are random, so earlier tests' rows do not collide.
 
         IConfigSource config = new IniConfigSource();
         config.AddConfig("Modules");

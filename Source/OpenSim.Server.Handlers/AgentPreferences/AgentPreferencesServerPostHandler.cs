@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Xml;
 using OpenSim.Server.Base;
@@ -35,11 +34,13 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.AgentPreferences;
 
 public class AgentPreferencesServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAgentPreferencesService m_AgentPreferencesService;
 
@@ -57,7 +58,7 @@ public class AgentPreferencesServerPostHandler : BaseStreamHandler
         sr.Close();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -78,11 +79,11 @@ public class AgentPreferencesServerPostHandler : BaseStreamHandler
                 case "getagentlang":
                     return GetAgentLang(request);
             }
-            m_log.DebugFormat("[AGENT PREFERENCES HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[AGENT PREFERENCES HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[AGENT PREFERENCES HANDLER]: Exception {0}", e);
+            m_log.LogDebug("[AGENT PREFERENCES HANDLER]: Exception {0}", e);
         }
 
         return FailureResult();

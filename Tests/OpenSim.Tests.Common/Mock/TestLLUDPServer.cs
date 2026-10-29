@@ -32,6 +32,8 @@ using OpenMetaverse.Packets;
 using OpenSim.Framework;
 using OpenSim.Region.ClientStack.LindenUDP;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Tests.Common;
 
 /// <summary>
@@ -86,7 +88,7 @@ public class TestLLUDPServer : LLUDPServer
 ////        {
 ////            numBytes = 0;
 ////
-////            //m_log.Debug("Queue size " + m_chunksToLoad.Count);
+////            //m_log.LogDebug("Queue size " + m_chunksToLoad.Count);
 ////
 ////            if (m_chunksToLoad.Count <= 0)
 ////                return false;

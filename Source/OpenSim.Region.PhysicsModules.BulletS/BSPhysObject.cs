@@ -28,6 +28,8 @@ using OMV = OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.PhysicsModules.SharedBase;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.PhysicsModules.BulletS;
 
 /*
@@ -288,7 +290,7 @@ public abstract class BSPhysObject : PhysicsActor
         set {
             RawRotationalVelocity = value;
             Util.ClampV(RawRotationalVelocity, BSParam.MaxAngularVelocity);
-            // m_log.DebugFormat("{0}: RotationalVelocity={1}", LogHeader, _rotationalVelocity);
+            // m_log.LogDebug("{0}: RotationalVelocity={1}", LogHeader, _rotationalVelocity);
             PhysScene.TaintedObject(LocalID, TypeName + ".setRotationalVelocity", delegate()
             {
                 ForceRotationalVelocity = RawRotationalVelocity;

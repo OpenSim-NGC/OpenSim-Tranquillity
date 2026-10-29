@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
@@ -35,11 +34,14 @@ using OpenSim.Server.Base;
 using OpenSim.Server.Handlers.Base;
 
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Simulation;
 
 public class SimulationServiceInConnectorModule : ISharedRegionModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Enabled = false;
 
     private IConfigSource m_Config;
@@ -57,7 +59,7 @@ public class SimulationServiceInConnectorModule : ISharedRegionModule
             m_Enabled = moduleConfig.GetBoolean("SimulationServiceInConnector", false);
             if (m_Enabled)
             {
-                m_log.Info("[SIM SERVICE]: SimulationService IN connector enabled");
+                m_log.LogInformation("[SIM SERVICE]: SimulationService IN connector enabled");
 
             }
         }
@@ -102,7 +104,7 @@ public class SimulationServiceInConnectorModule : ISharedRegionModule
         {
             m_Registered = true;
 
-            m_log.Info("[SIM SERVICE]: Starting...");
+            m_log.LogInformation("[SIM SERVICE]: Starting...");
 
             Object[] args = new Object[] { m_Config, MainServer.Instance.DefaultServer, scene };
 

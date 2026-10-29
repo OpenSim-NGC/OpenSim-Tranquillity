@@ -20,6 +20,7 @@ using OpenSim.Server.MoneyServer.Models;
 using Microsoft.AspNetCore.Builder;
 using OpenSim.Server.MoneyServer.Controllers;
 using Microsoft.Extensions.Configuration.Json;
+using OpenSim.Framework;
 
 namespace OpenSim.Server.MoneyServer;
 
@@ -29,11 +30,6 @@ class Program
 
     public static int Main(string[] args)
     {
-        var logconfigOption = new Option<string>("--logconfig")
-        {
-            Description = "Instruct log4net to use this file as configuration file.",
-            DefaultValueFactory = ParseResult => "OpenSim.Server.MoneyServer.dll.config",
-        };
         var inifileOption = new Option<List<string>>("--inifile")
         {
             Description = "Specify the location of zero or more .ini file(s) to read."
@@ -59,7 +55,6 @@ class Program
 
         RootCommand rootCommand = new RootCommand("Launch the OpenSim Money Server");
 
-        rootCommand.Options.Add(logconfigOption);
         rootCommand.Options.Add(inifileOption);
         rootCommand.Options.Add(inimasterOption);
         rootCommand.Options.Add(inidirectoryOption);
@@ -80,7 +75,6 @@ class Program
         {
             rootCommand.SetAction(parseResult => Configure(new ServerStartupOptions
                 {
-                    LogConfig    = parseResult.GetValue(logconfigOption),
                     IniFiles     = parseResult.GetValue(inifileOption) ?? [],
                     IniMaster    = parseResult.GetValue(inimasterOption),
                     IniDirectory = parseResult.GetValue(inidirectoryOption),
@@ -97,11 +91,9 @@ class Program
     static void Configure(ServerStartupOptions options)
     {
         
-        ILog4NetBootstrapper log4NetBootstrapper = new Log4NetBootstrapper();
-        var logPath = Environment.GetEnvironmentVariable("LOGDIR");
-        if (string.IsNullOrWhiteSpace(logPath) is false)
-            log4NetBootstrapper.LogPath = logPath;
-        string effectiveLogConfig = log4NetBootstrapper.Configure(options.LogConfig, "OpenSim.Server.MoneyServer.dll.config");
+        string logPath = Environment.GetEnvironmentVariable("LOGDIR");
+        if (string.IsNullOrWhiteSpace(logPath))
+            logPath = ".";
 
         IHostBuilder builder = Host.CreateDefaultBuilder();
 
@@ -154,11 +146,16 @@ class Program
             registryBuilder.RegisterType<MoneyXmlRpcController>().AsSelf().SingleInstance();
             registryBuilder.RegisterType<MoneyDBService>().As<IMoneyDBService>().AsSelf().SingleInstance();
         })
-        .ConfigureLogging(loggingBuilder =>
+        .ConfigureLogging((context, loggingBuilder) =>
         {
             loggingBuilder.ClearProviders();
-            loggingBuilder.AddLog4Net(log4NetConfigFile: effectiveLogConfig);
-            loggingBuilder.AddConsole();
+            loggingBuilder.AddOpenSimLogging(
+                "OpenSim.Server.MoneyServer",
+                logPath,
+                context.Configuration["Startup:logfile"],
+                context.Configuration["Startup:StatsLogFile"]);
+
+            LoggerProvider.LoggerFactory = loggingBuilder.Services.BuildServiceProvider().GetRequiredService<ILoggerFactory>();
         })
         .ConfigureServices(services =>
         {

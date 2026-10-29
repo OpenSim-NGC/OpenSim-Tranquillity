@@ -28,7 +28,6 @@
 // based on XMREngine from Mike Rieker (DreamNation), Melanie Thielker and meta7
 // but with several changes to be more cross platform.
 
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
@@ -46,6 +45,7 @@ using System.Text;
 using System.Timers;
 using System.Xml;
 
+using Microsoft.Extensions.Logging;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
 using LSL_Key = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLString;
@@ -58,9 +58,9 @@ using SceneScriptEvents = OpenSim.Region.Framework.Scenes.scriptEvents;
 
 namespace OpenSim.Region.ScriptEngine.Yengine;
 
-public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModule
+public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModule, IScriptStateProvider
 {
-    public static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    public static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static readonly DetectParams[] zeroDetectParams = Array.Empty<DetectParams>();
     private static ArrayList noScriptErrors = new();
@@ -186,9 +186,9 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         m_ConfigSource = config;
 
         ////foreach (IConfig icfg in config.Configs) {
-        ////    m_log.Debug("[YEngine]: Initialise: configs[" + icfg.Name + "]");
+        ////    m_log.LogDebug("[YEngine]: Initialise: configs[" + icfg.Name + "]");
         ////    foreach (string key in icfg.GetKeys ()) {
-        ////        m_log.Debug("[YEngine]: Initialise:     " + key + "=" + icfg.GetExpanded (key));
+        ////        m_log.LogDebug("[YEngine]: Initialise:     " + key + "=" + icfg.GetExpanded (key));
         ////    }
         ////}
 
@@ -196,11 +196,11 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         m_Config = config.Configs["YEngine"];
         if(m_Config == null)
         {
-            m_log.Info("[YEngine]: no config, assuming disabled");
+            m_log.LogInformation("[YEngine]: no config, assuming disabled");
             return;
         }
         m_Enabled = m_Config.GetBoolean("Enabled", false);
-        m_log.InfoFormat("[YEngine]: config enabled={0}", m_Enabled);
+        m_log.LogInformation("[YEngine]: config enabled={0}", m_Enabled);
         if(!m_Enabled)
             return;
 
@@ -218,7 +218,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         m_StackSize = m_Config.GetInt("ScriptStackSize", 2048) << 10;
         m_HeapSize = m_Config.GetInt("ScriptHeapSize", 1024) << 10;
 
-        m_log.InfoFormat("[YEngine]: state load metrics enabled={0}, periodic={1}",
+        m_log.LogInformation("[YEngine]: state load metrics enabled={0}, periodic={1}",
             m_StateLoadMetricsEnabled, m_StateLoadMetricsPeriodic);
 
         // Verify that our ScriptEventCode's match OpenSim's scriptEvent's.
@@ -229,7 +229,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
             string oscode = Enum.GetName(typeof(SceneScriptEvents), 1UL << i);
             if(mycode != oscode)
             {
-                m_log.ErrorFormat($"[YEngine]: {i} mycode={mycode}, oscode={oscode}");
+                m_log.LogError($"[YEngine]: {i} mycode={mycode}, oscode={oscode}");
                 err = true;
             }
         }
@@ -258,7 +258,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
                 m_workersPrio = ThreadPriority.Highest;
                 break;
             default:
-                m_log.ErrorFormat("[YEngine] Invalid thread priority: '{0}'. Assuming Normal", priority);
+                m_log.LogError("[YEngine] Invalid thread priority: '{0}'. Assuming Normal", priority);
                 break;
         }
 
@@ -304,9 +304,9 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
 
         string sceneName = m_Scene.Name;
 
-        m_log.InfoFormat("[YEngine]: Enabled for region {0}", sceneName);
+        m_log.LogInformation("[YEngine]: Enabled for region {0}", sceneName);
 
-        m_log.InfoFormat("[YEngine]: {0}.{1}MB stacksize, {2}.{3}MB heapsize",
+        m_log.LogInformation("[YEngine]: {0}.{1}MB stacksize, {2}.{3}MB heapsize",
                 (m_StackSize >> 20).ToString(),
                 (((m_StackSize % 0x100000) * 1000)
                         >> 20).ToString("D3"),
@@ -330,7 +330,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         Dictionary<string, Type> apiCtxTypes = new();
         foreach(string api in am.GetApis())
         {
-            m_log.Debug("[YEngine]: adding api " + api);
+            m_log.LogDebug("[YEngine]: adding api " + api);
             IScriptApi scriptApi = am.CreateApi(api);
             Type apiCtxType = scriptApi.GetType();
             if(api == "LSL")
@@ -414,8 +414,8 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
                 }
                 catch(Exception e)
                 {
-                    m_log.Error("[YEngine]: failed to add comms function " + mi.Name);
-                    m_log.Error("[YEngine]: - " + e.ToString());
+                    m_log.LogError("[YEngine]: failed to add comms function " + mi.Name);
+                    m_log.LogError("[YEngine]: - " + e.ToString());
                 }
             }
 
@@ -433,8 +433,8 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
                 }
                 catch(Exception e)
                 {
-                    m_log.Error("[YEngine]: failed to add comms constant " + kvp.Key);
-                    m_log.Error("[YEngine]: - " + e.Message);
+                    m_log.LogError("[YEngine]: failed to add comms constant " + kvp.Key);
+                    m_log.LogError("[YEngine]: - " + e.Message);
                 }
             }
         }
@@ -748,10 +748,10 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
 
     public void StartProcessing()
     {
-        m_log.Debug("[YEngine]: StartProcessing entry");
+        m_log.LogDebug("[YEngine]: StartProcessing entry");
         m_StartProcessing = true;
         ResumeThreads();
-        m_log.Debug("[YEngine]: StartProcessing return");
+        m_log.LogDebug("[YEngine]: StartProcessing return");
         m_Scene.EventManager.TriggerEmptyScriptCompileQueue(0, "");
     }
 
@@ -764,7 +764,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     {
         if(args.Length < 2)
         {
-            m_log.Info("[YEngine]: missing command, try 'yeng help'");
+            m_log.LogInformation("[YEngine]: missing command, try 'yeng help'");
             return;
         }
 
@@ -788,28 +788,28 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
             }
         }
 
-        m_log.InfoFormat("[YEngine] ****Region: {0}", m_Scene.RegionInfo.RegionName);
+        m_log.LogInformation("[YEngine] ****Region: {0}", m_Scene.RegionInfo.RegionName);
 
         switch(cmd)
         {
             case "cvv":
-                m_log.InfoFormat("[YEngine]: compiled version value = {0}",
+                m_log.LogInformation("[YEngine]: compiled version value = {0}",
                                 ScriptCodeGen.COMPILED_VERSION_VALUE);
                 break;
 
             case "help":
             case "?":
-                m_log.Info("[YEngine]: yeng reset [allregions] | [-help ...]");
-                m_log.Info("[YEngine]: yeng resume [allregions] - resume script processing");
-                m_log.Info("[YEngine]: yeng suspend [allregions] - suspend script processing");
-                m_log.Info("[YEngine]: yeng ls [-help ...]");
-                m_log.Info("[YEngine]: yeng cvv - show compiler version value");
-                //m_log.Info("[YEngine]: yeng mvv [<newvalue>] - show migration version value");
-                m_log.Info("[YEngine]: yeng mvv - show migration version value");
-                m_log.Info("[YEngine]: yeng stateload [show|reset] - show/reset state-load failure metrics");
-                m_log.Info("[YEngine]: yeng tracecalls [yes | no]");
-                m_log.Info("[YEngine]: yeng verbose [yes | no]");
-                //m_log.Info("[YEngine]: yeng pev [-help ...] - post event");
+                m_log.LogInformation("[YEngine]: yeng reset [allregions] | [-help ...]");
+                m_log.LogInformation("[YEngine]: yeng resume [allregions] - resume script processing");
+                m_log.LogInformation("[YEngine]: yeng suspend [allregions] - suspend script processing");
+                m_log.LogInformation("[YEngine]: yeng ls [-help ...]");
+                m_log.LogInformation("[YEngine]: yeng cvv - show compiler version value");
+                //m_log.LogInformation("[YEngine]: yeng mvv [<newvalue>] - show migration version value");
+                m_log.LogInformation("[YEngine]: yeng mvv - show migration version value");
+                m_log.LogInformation("[YEngine]: yeng stateload [show|reset] - show/reset state-load failure metrics");
+                m_log.LogInformation("[YEngine]: yeng tracecalls [yes | no]");
+                m_log.LogInformation("[YEngine]: yeng verbose [yes | no]");
+                //m_log.LogInformation("[YEngine]: yeng pev [-help ...] - post event");
                 break;
 
             case "ls":
@@ -817,7 +817,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
                 break;
 
             case "mvv":
-                m_log.InfoFormat("[YEngine]: migration version value = {0}", XMRInstance.migrationVersion);
+                m_log.LogInformation("[YEngine]: migration version value = {0}", XMRInstance.migrationVersion);
                 break;
 
             case "stateload":
@@ -837,29 +837,29 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
                 break;
 
             case "resume":
-                m_log.Info("[YEngine]: resuming scripts");
+                m_log.LogInformation("[YEngine]: resuming scripts");
                 ResumeThreads();
                 break;
 
             case "suspend":
-                m_log.Info("[YEngine]: suspending scripts");
+                m_log.LogInformation("[YEngine]: suspending scripts");
                 SuspendThreads();
                 break;
 
             case "tracecalls":
                 if(args.Length > firstPerRegionarg)
                     m_TraceCalls = args[firstPerRegionarg].StartsWith("y", StringComparison.InvariantCultureIgnoreCase);
-                m_log.Info("[YEngine]: tracecalls " + (m_TraceCalls ? "yes" : "no"));
+                m_log.LogInformation("[YEngine]: tracecalls " + (m_TraceCalls ? "yes" : "no"));
                 break;
 
             case "verbose":
                 if(args.Length > firstPerRegionarg)
                     m_Verbose = args[firstPerRegionarg].StartsWith("y", StringComparison.InvariantCultureIgnoreCase);
-                m_log.Info("[YEngine]: verbose " + (m_Verbose ? "yes" : "no"));
+                m_log.LogInformation("[YEngine]: verbose " + (m_Verbose ? "yes" : "no"));
                 break;
 
             default:
-                m_log.ErrorFormat("[YEngine]: unknown command \"{0}\", try 'yeng help'", cmd);
+                m_log.LogError("[YEngine]: unknown command \"{0}\", try 'yeng help'", cmd);
                 break;
         }
     }
@@ -892,7 +892,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
 
     public void SaveAllState()
     {
-        m_log.Error("[YEngine]: YEngine.SaveAllState() called!!");
+        m_log.LogError("[YEngine]: YEngine.SaveAllState() called!!");
     }
 
 #pragma warning disable 0067
@@ -1269,8 +1269,33 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     //  script      = script source code
     //  startParam  = value passed to 'on_rez' event handler
     //  postOnRez   = true to post an 'on_rez' event to script on load
-    //  defEngine   = default script engine
+    //  defEngine   = engine selected by the scene (saved-state owner or default)
     //  stateSource = post this event to script on load
+
+    public bool HasSavedScriptState(UUID itemID, UUID assetID)
+    {
+        try
+        {
+            using FileStream stream = XMRInstance.OpenSavedState(m_ScriptBasePath, itemID);
+            using XmlReader reader = XmlReader.Create(stream, new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit });
+            reader.MoveToContent();
+            return reader.Name == "ScriptState" && reader.GetAttribute("Asset") == assetID.ToString();
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or XmlException)
+        {
+            m_log.LogError("[YEngine]: Cannot check saved state for {0} under {1}; retaining YEngine ownership for normal state loading: {2}",
+                itemID, m_ScriptBasePath, e.Message);
+            return true;
+        }
+    }
 
     public void OnRezScript(uint localID, UUID itemID, string script,
             int startParam, bool postOnRez, string defEngine, int stateSource)
@@ -1326,15 +1351,15 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
 
             // Requested engine not defined, warn on console.
             // Then we try to handle it if we're the default engine, else we ignore it.
-            //m_log.Warn("[YEngine]: " + itemID.ToString() + " requests undefined/disabled engine " + engineName);
-            //m_log.Info("[YEngine]: - " + part.GetWorldPosition());
-            //m_log.Info("[YEngine]: first line: " + firstline);
+            //m_log.LogWarning("[YEngine]: " + itemID.ToString() + " requests undefined/disabled engine " + engineName);
+            //m_log.LogInformation("[YEngine]: - " + part.GetWorldPosition());
+            //m_log.LogInformation("[YEngine]: first line: " + firstline);
             if(defEngine != ScriptEngineName)
             {
-                //m_log.Info("[YEngine]: leaving it to the default script engine (" + defEngine + ") to process it");
+                //m_log.LogInformation("[YEngine]: leaving it to the default script engine (" + defEngine + ") to process it");
                 return;
             }
-            // m_log.Info("[YEngine]: will attempt to processing it anyway as default script engine");
+            // m_log.LogInformation("[YEngine]: will attempt to processing it anyway as default script engine");
 
             langsrt = "";
         }
@@ -1446,7 +1471,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
                 foreach(Object err in errors)
                 {
                     if(m_ScriptDebug)
-                        m_log.DebugFormat("[YEngine]:   {0}", err.ToString());
+                        m_log.LogDebug("[YEngine]:   {0}", err.ToString());
                 }
             }
             lock(m_ScriptErrors)
@@ -1944,15 +1969,15 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     {
         if(!m_StateLoadMetricsEnabled)
         {
-            m_log.Info("[YEngine]: state load metrics disabled by config");
+            m_log.LogInformation("[YEngine]: state load metrics disabled by config");
             return;
         }
 
         string report = XMRInstance.GetStateLoadFailureMetricsReport(resetAfterRead);
-        m_log.InfoFormat("[YEngine]: state-load-failure-metrics {0}", report);
+        m_log.LogInformation("[YEngine]: state-load-failure-metrics {0}", report);
 
         string recoveryReport = XMRInstance.GetStateLoadRecoveryMetricsReport(resetAfterRead);
-        m_log.InfoFormat("[YEngine]: state-load-recovery-metrics {0}", recoveryReport);
+        m_log.LogInformation("[YEngine]: state-load-recovery-metrics {0}", recoveryReport);
 
         if(resetAfterRead)
             m_LastReportedStateLoadFailureTotal = XMRInstance.GetStateLoadFailureTotalCount();
@@ -1961,22 +1986,25 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     /**
      * @brief Retrieve errors generated by a previous call to OnRezScript().
      *        We are guaranteed this routine will not be called before the
-     *        corresponding OnRezScript() has returned.  It blocks until the
-     *        compile has completed.
+     *        corresponding OnRezScript() has returned, and OnRezScript()
+     *        compiles synchronously (RegisterInstance -> LoadThreadWork), so
+     *        for a script this engine took the errors are already posted.
+     *        No entry means OnRezScript() declined the item (a script for
+     *        another engine in the same region): return an empty list at
+     *        once. SceneObjectPartInventory.GetScriptErrors() asks every
+     *        engine in turn, so waiting here for an entry that will never be
+     *        posted would hang the caller (a script save from the viewer) and
+     *        the engines after this one would never be asked.
      */
     public ArrayList GetScriptErrors(UUID itemID)
     {
-        ArrayList errors;
-
         lock(m_ScriptErrors)
         {
-            while(!m_ScriptErrors.TryGetValue(itemID, out errors))
-            {
-                Monitor.Wait(m_ScriptErrors);
-            }
+            if(!m_ScriptErrors.TryGetValue(itemID, out ArrayList errors))
+                return new ArrayList();
             m_ScriptErrors.Remove(itemID);
+            return errors;
         }
-        return errors;
     }
 
     /**
@@ -2132,12 +2160,12 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     public void TraceCalls(string format, params object[] args)
     {
         if(m_TraceCalls)
-            m_log.DebugFormat(format, args);
+            m_log.LogDebug(format, args);
     }
     public void Verbose(string format, params object[] args)
     {
         if(m_Verbose)
-            m_log.DebugFormat(format, args);
+            m_log.LogDebug(format, args);
     }
 
     /**
@@ -2145,7 +2173,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
      */
     public static Thread StartMyThread(ThreadStart start, string name, ThreadPriority priority, int stackSize)
     {
-        m_log.Debug("[YEngine]: starting thread " + name);
+        m_log.LogDebug("[YEngine]: starting thread " + name);
         Thread thread = WorkManager.StartThread(start, name, priority, stackSize);
         return thread;
     }

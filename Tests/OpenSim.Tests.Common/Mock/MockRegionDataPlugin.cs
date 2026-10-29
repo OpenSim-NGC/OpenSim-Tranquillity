@@ -31,6 +31,8 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Data.Null;
 
 public class NullDataService : ISimulationDataService
@@ -157,7 +159,7 @@ public class NullDataService : ISimulationDataService
 /// </summary>
 public class NullDataStore : ISimulationDataStore
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected Dictionary<UUID, RegionSettings> m_regionSettings = new Dictionary<UUID, RegionSettings>();
     protected Dictionary<UUID, SceneObjectPart> m_sceneObjectParts = new Dictionary<UUID, SceneObjectPart>();
@@ -217,7 +219,7 @@ public class NullDataStore : ISimulationDataStore
         // Therefore, we need to store parts rather than groups.
         foreach (SceneObjectPart prim in obj.Parts)
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[MOCK REGION DATA PLUGIN]: Storing part {0} {1} in object {2} {3} in region {4}",
 //                    prim.Name, prim.UUID, obj.Name, obj.UUID, regionUUID);
 
@@ -233,7 +235,7 @@ public class NullDataStore : ISimulationDataStore
         {
             if (part.ParentGroup.UUID == obj)
             {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[MOCK REGION DATA PLUGIN]: Removing part {0} {1} as part of object {2} from {3}",
 //                        part.Name, part.UUID, obj, regionUUID);
                 m_sceneObjectParts.Remove(part.UUID);
@@ -255,7 +257,7 @@ public class NullDataStore : ISimulationDataStore
         {
             if (prim.IsRoot)
             {
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[MOCK REGION DATA PLUGIN]: Loading root part {0} {1} in {2}", prim.Name, prim.UUID, regionUUID);
                 objects[prim.UUID] = new SceneObjectGroup(prim);
             }
@@ -280,7 +282,7 @@ public class NullDataStore : ISimulationDataStore
                 }
                 else
                 {
-//                        m_log.WarnFormat(
+//                        m_log.LogWarning(
 //                            "[MOCK REGION DATA PLUGIN]: Database contains an orphan child prim {0} {1} in region {2} pointing to missing parent {3}.  This prim will not be loaded.",
 //                            prim.Name, prim.UUID, regionUUID, prim.ParentUUID);
                 }

@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using CoreJ2K;
 using CoreJ2K.Configuration;
@@ -36,6 +35,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
 using SkiaSharp;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.World.LegacyMap;
 
@@ -61,8 +62,7 @@ public struct DrawStruct
 
 public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
     private IConfigSource m_config;
@@ -168,7 +168,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
         }
         catch (Exception ex)
         {
-            m_log.Error($"Failed creating terrain map tile: {ex}");
+            m_log.LogError($"Failed creating terrain map tile: {ex}");
             return null;
         }
     }
@@ -189,7 +189,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
         }
         catch (Exception e) // LEGIT: Catching problems with image encoding
         {
-            m_log.Error("Failed generating terrain map: " + e);
+            m_log.LogError("Failed generating terrain map: " + e);
         }
 
         return null;
@@ -291,7 +291,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
 
         if (asset == null || asset.Data == null || asset.Data.Length == 0)
         {
-            m_log.WarnFormat("[MAPTILE]: Static map image texture {0} not found for {1}", id, m_scene.Name);
+            m_log.LogWarning("[MAPTILE]: Static map image texture {0} not found for {1}", id, m_scene.Name);
             return null;
         }
 
@@ -303,7 +303,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
         }
         catch (Exception)
         {
-            m_log.ErrorFormat("[MAPTILE]: CoreJ2k was unable to decode this.   Asset Data is empty for {0}", id);
+            m_log.LogError("[MAPTILE]: CoreJ2k was unable to decode this.   Asset Data is empty for {0}", id);
 
         }
         
@@ -316,7 +316,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
         int tc = 0;
         ITerrainChannel hm = whichScene.Heightmap;
         tc = Environment.TickCount;
-        m_log.Debug("[MAPTILE]: Generating Maptile Step 2: Object Volume Profile");
+        m_log.LogDebug("[MAPTILE]: Generating Maptile Step 2: Object Volume Profile");
         EntityBase[] objs = whichScene.GetEntities();
         List<float> z_sortheights = new List<float>();
         List<uint> z_localIDs = new List<uint>();
@@ -594,7 +594,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
                                     // {
                                     //     for (wy = mapdrawstartY; wy < mapdrawendY; wy++)
                                     //     {
-                                    //         m_log.InfoFormat("[MAPDEBUG]: {0},{1}({2})", wx, (255 - wy),wy);
+                                    //         m_log.LogInformation("[MAPDEBUG]: {0},{1}({2})", wx, (255 - wy),wy);
                                     //         try
                                     //         {
                                     //             // Remember, flip the y!
@@ -625,7 +625,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
                 using (var surface = SKSurface.Create(new SKImageInfo(mapbmp.Width, mapbmp.Height)))
                 using (var canvas = surface.Canvas)
                 {
-                    canvas.DrawBitmap(mapbmp, 0, 0);
+                    canvas.DrawBitmap(mapbmp, 0, 0, SKSamplingOptions.Default);
 
                     for (int s = 0; s < sortedZHeights.Length; s++)
                     {
@@ -634,8 +634,9 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
                             DrawStruct rectDrawStruct = z_sort[sortedlocalIds[s]];
                             for (int r = 0; r < rectDrawStruct.trns.Length; r++)
                             {
-                                using var path = new SKPath();
-                                path.AddPoly(rectDrawStruct.trns[r].pts, true);
+                                using var builder = new SKPathBuilder();
+                                builder.AddPoly(rectDrawStruct.trns[r].pts, true);
+                                using var path = builder.Detach();
                                 canvas.DrawPath(path, rectDrawStruct.brush);
                             }
                         }
@@ -656,7 +657,7 @@ public class MapImageModule : IMapImageGenerator, INonSharedRegionModule
                 ds.brush.Dispose();
         }
 
-        m_log.Debug("[MAPTILE]: Generating Maptile Step 2: Done in " + (Environment.TickCount - tc) + " ms");
+        m_log.LogDebug("[MAPTILE]: Generating Maptile Step 2: Done in " + (Environment.TickCount - tc) + " ms");
 
         return mapbmp;
     }

@@ -53,11 +53,11 @@ namespace OpenSim.Region.Framework.Tests
             TaskInventoryHelpers.AddSceneObject(scene.AssetService, sop1, "tso", taskSceneObjectItemId, user1.PrincipalID);
 
             TaskInventoryItem addedItem = sop1.Inventory.GetInventoryItem(taskSceneObjectItemId);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.Equal(,);
-            Assert.True(addedItem.InvType)InventoryType.Object));
-            Assert.True(addedItem.Type)AssetType.Object));
+            Assert.Equal(taskSceneObjectItemId, addedItem.ItemID);
+            Assert.Equal(user1.PrincipalID, addedItem.OwnerID);
+            Assert.Equal(sop1.UUID, addedItem.ParentID);
+            Assert.Equal((int)InventoryType.Object, addedItem.InvType);
+            Assert.Equal((int)AssetType.Object, addedItem.Type);
         }
 
         [Fact]
@@ -86,15 +86,15 @@ namespace OpenSim.Region.Framework.Tests
 
             SceneObjectGroup rezzedObject = scene.GetSceneObjectGroup("tso");
 
-            // TODO: Fix this assertion
-            Assert.Equal(,);
+            Assert.NotNull(rezzedObject);
+            Assert.Equal(rezPos, rezzedObject.AbsolutePosition);
 
             // Velocity doesn't get applied, probably because there is no physics in tests (yet)
-            //Assert.Equal(,);
-            Assert.Equal(,);
+            //Assert.Equal(rezVel, rezzedObject.Velocity);
+            Assert.Equal(Vector3.Zero, rezzedObject.Velocity);
 
             // Confusingly, this isn't the rezzedObject.Rotation
-            Assert.Equal(,);
+            Assert.Equal(rezRot, rezzedObject.RootPart.RotationOffset);
         }
 
         /// <summary>
@@ -126,7 +126,72 @@ namespace OpenSim.Region.Framework.Tests
 
             InventoryItemBase ncUserItem
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, user1.PrincipalID, "Objects/ncItem");
-            Assert.True(ncUserItem);
+            Assert.NotNull(ncUserItem);
+        }
+
+        /// <summary>
+        /// MoveTaskInventoryItemsAllOrNone gives every listed item or none. Each item is checked and copied before
+        /// any is added, so an item that loses Transfer while the first one is being added is still given.
+        /// </summary>
+        [Fact]
+        public void TestMoveTaskInventoryItemsAllOrNoneGivesTheWholeListWhenAnItemChangesDuringTheGive()
+        {
+            TestHelpers.InMethod();
+
+            Scene scene = new SceneHelpers().SetupScene();
+            UserAccount owner = UserAccountHelpers.CreateUserWithInventory(scene, "Owner", "Test", 0x10, "pw");
+            UserAccount receiver = UserAccountHelpers.CreateUserWithInventory(scene, "Receiver", "Test", 0x20, "pw");
+            SceneObjectPart sop1 = SceneHelpers.CreateSceneObject(1, owner.PrincipalID).RootPart;
+            TaskInventoryItem item1 = TaskInventoryHelpers.AddNotecard(
+                scene.AssetService, sop1, "nc1", TestHelpers.ParseTail(0x801), TestHelpers.ParseTail(0x901), "one");
+            TaskInventoryItem item2 = TaskInventoryHelpers.AddNotecard(
+                scene.AssetService, sop1, "nc2", TestHelpers.ParseTail(0x802), TestHelpers.ParseTail(0x902), "two");
+
+            // The first item's arrival takes Transfer away from the second, as an edit made during the give would.
+            bool changed = false;
+            scene.EventManager.OnNewInventoryItemUploadComplete += (item, _) =>
+            {
+                if (changed || item.Owner != receiver.PrincipalID) return;
+                changed = true;
+                item2.CurrentPermissions &= ~(uint)OpenSim.Framework.PermissionMask.Transfer;
+            };
+
+            UUID folderID = scene.MoveTaskInventoryItemsAllOrNone(
+                receiver.PrincipalID, "box", sop1, new List<UUID> { item1.ItemID, item2.ItemID }, out string message);
+
+            Assert.True(changed);
+            Assert.NotEqual(UUID.Zero, folderID);
+            Assert.Null(message);
+            List<InventoryItemBase> given = scene.InventoryService.GetFolderItems(receiver.PrincipalID, folderID);
+            Assert.Equal(new[] { "nc1", "nc2" }, given.Select(i => i.Name).OrderBy(n => n));
+        }
+
+        /// <summary>
+        /// An item that cannot be given stops the whole list: nothing is given, no folder is made, and the reason
+        /// is returned. The receiver is not in the region.
+        /// </summary>
+        [Fact]
+        public void TestMoveTaskInventoryItemsAllOrNoneGivesNothingWhenAnItemCannotBeGiven()
+        {
+            TestHelpers.InMethod();
+
+            Scene scene = new SceneHelpers().SetupScene();
+            UserAccount owner = UserAccountHelpers.CreateUserWithInventory(scene, "Owner", "Test", 0x10, "pw");
+            UserAccount receiver = UserAccountHelpers.CreateUserWithInventory(scene, "Receiver", "Test", 0x20, "pw");
+            SceneObjectPart sop1 = SceneHelpers.CreateSceneObject(1, owner.PrincipalID).RootPart;
+            TaskInventoryItem item1 = TaskInventoryHelpers.AddNotecard(
+                scene.AssetService, sop1, "nc1", TestHelpers.ParseTail(0x801), TestHelpers.ParseTail(0x901), "one");
+            TaskInventoryItem item2 = TaskInventoryHelpers.AddNotecard(
+                scene.AssetService, sop1, "nc2", TestHelpers.ParseTail(0x802), TestHelpers.ParseTail(0x902), "two");
+            item2.CurrentPermissions &= ~(uint)OpenSim.Framework.PermissionMask.Transfer;
+
+            UUID folderID = scene.MoveTaskInventoryItemsAllOrNone(
+                receiver.PrincipalID, "box", sop1, new List<UUID> { item1.ItemID, item2.ItemID }, out string message);
+
+            Assert.Equal(UUID.Zero, folderID);
+            Assert.Equal("Item doesn't have the Transfer permission.", message);
+            Assert.DoesNotContain(scene.InventoryService.GetInventorySkeleton(receiver.PrincipalID), f => f.Name == "box");
+            Assert.Null(InventoryArchiveUtils.FindItemByPath(scene.InventoryService, receiver.PrincipalID, "Notecards/nc1"));
         }
 
         /// <summary>
@@ -156,7 +221,7 @@ namespace OpenSim.Region.Framework.Tests
 
             InventoryItemBase ncUserItem
                 = InventoryArchiveUtils.FindItemByPath(scene.InventoryService, user1.PrincipalID, "Notecards/ncItem");
-            Assert.True(ncUserItem);
+            Assert.NotNull(ncUserItem);
         }
     }
 }

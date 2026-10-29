@@ -133,3 +133,31 @@ BEGIN TRANSACTION;
 ALTER TABLE "public"."estate_settings"
     ADD COLUMN "AllowEnviromentOverride" bool NOT NULL;
 COMMIT;
+
+:VERSION 16
+BEGIN TRANSACTION;
+
+CREATE TABLE IF NOT EXISTS "public"."estate_allowed_experiences" (
+	"EstateID" int4 NOT NULL,
+	"uuid" uuid NOT NULL
+)
+WITH (OIDS=FALSE);
+
+CREATE INDEX IF NOT EXISTS "ix_estate_allowed_experiences" ON "public"."estate_allowed_experiences" USING btree("EstateID" "pg_catalog"."int4_ops" ASC NULLS LAST);
+
+CREATE TABLE IF NOT EXISTS "public"."estate_key_experiences" (
+	"EstateID" int4 NOT NULL,
+	"uuid" uuid NOT NULL
+)
+WITH (OIDS=FALSE);
+
+CREATE INDEX IF NOT EXISTS "ix_estate_key_experiences" ON "public"."estate_key_experiences" USING btree("EstateID" "pg_catalog"."int4_ops" ASC NULLS LAST);
+
+CREATE TABLE IF NOT EXISTS "public"."estate_blocked_experiences" (
+	"EstateID" int4 NOT NULL,
+	"uuid" uuid NOT NULL
+)
+WITH (OIDS=FALSE);
+
+CREATE INDEX IF NOT EXISTS "ix_estate_blocked_experiences" ON "public"."estate_blocked_experiences" USING btree("EstateID" "pg_catalog"."int4_ops" ASC NULLS LAST);
+COMMIT;

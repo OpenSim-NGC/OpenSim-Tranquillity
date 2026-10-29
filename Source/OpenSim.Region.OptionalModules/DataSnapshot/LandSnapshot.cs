@@ -27,7 +27,6 @@
 
 using System.Reflection;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 
@@ -37,6 +36,8 @@ using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Services.Interfaces;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.DataSnapshot.Providers;
 
 public class LandSnapshot : IDataSnapshotProvider
@@ -44,7 +45,7 @@ public class LandSnapshot : IDataSnapshotProvider
     private Scene m_scene = null;
     private DataSnapshotManager m_parent = null;
     //private Dictionary<int, Land> m_landIndexed = new Dictionary<int, Land>();
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private bool m_stale = true;
 
     #region Dead code
@@ -79,7 +80,7 @@ public class LandSnapshot : IDataSnapshotProvider
 
     public void PrepareData()
     {
-        m_log.Info("[EXTERNALDATA]: Generating land data.");
+        m_log.LogInformation("[EXTERNALDATA]: Generating land data.");
 
         m_landIndexed.Clear();
 
@@ -275,7 +276,7 @@ public class LandSnapshot : IDataSnapshotProvider
                         }
                         catch (Exception)
                         {
-                            //m_log.Info("[DATASNAPSHOT]: Cannot find owner name; ignoring this parcel");
+                            //m_log.LogInformation("[DATASNAPSHOT]: Cannot find owner name; ignoring this parcel");
                         }
 
                     }
@@ -402,7 +403,7 @@ public class LandSnapshot : IDataSnapshotProvider
     // another, smaller rectangular parcel). Both will have the same initial coordinates.
     private void findPointInParcel(ILandObject land, ref uint refX, ref uint refY)
     {
-        m_log.DebugFormat("[DATASNAPSHOT] trying {0}, {1}", refX, refY);
+        m_log.LogDebug("[DATASNAPSHOT] trying {0}, {1}", refX, refY);
         // the point we started with already is in the parcel
         if (land.ContainsPoint((int)refX, (int)refY)) return;
 

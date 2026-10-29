@@ -1,6 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
     <AssemblyTitle>OpenSim.Region.OptionalModules</AssemblyTitle>
     <Product>OpenSim.Region.OptionalModules.Properties</Product>
     <Description>Optional modules for OpenSim</Description>
@@ -32,11 +31,13 @@
     <ProjectReference Include="../../Source/OpenSim.Services.Base/OpenSim.Services.Base.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.Connectors/OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="../../Source/OpenSim.Services.Interfaces/OpenSim.Services.Interfaces.csproj" />
+    <ProjectReference Include="../../Source/OpenSimNGC.Appearance.Baking/OpenSimNGC.Appearance.Baking.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="log4net" Version="3.3.1" />
-    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.8" />
-    <PackageReference Include="System.Data.SQLite" Version="2.0.3" />
+<ItemGroup>
+    <PackageReference Include="System.Configuration.ConfigurationManager" Version="10.0.13" />
+    <!-- System.Data.SQLite (+ native SQLite/e_sqlite3) backs both WebStats and the Phlox bot persistence DB -->
+    <PackageReference Include="System.Data.SQLite" Version="2.0.4" />
+    <PackageReference Include="SQLite" Version="3.54.1" />
   </ItemGroup>
 </Project>

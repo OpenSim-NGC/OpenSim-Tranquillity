@@ -31,11 +31,14 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Server.Handlers.Profiles;
 
 public class UserProfilesConnector: ServiceConnector
 {
-//        static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Our Local Module
     public IUserProfilesService ServiceModule
@@ -80,7 +83,7 @@ public class UserProfilesConnector: ServiceConnector
         Object[] args = new Object[] { config, ConfigName };
         ServiceModule = ServerUtils.LoadPlugin<IUserProfilesService>(service, args);
 
-        JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule);
+        JsonRpcProfileHandlers handler = new JsonRpcProfileHandlers(ServiceModule, new ControlPlaneAccess(config));
 
         Server.AddJsonRPCHandler("avatarclassifiedsrequest", handler.AvatarClassifiedsRequest);
         Server.AddJsonRPCHandler("classified_update", handler.ClassifiedUpdate);

@@ -37,8 +37,8 @@ namespace OpenSim.Region.CoreModules.Asset.Tests;
 /// </summary>
 public class FlotsamAssetCacheTests : OpenSimTestCase
 {
-    protected TestScene? m_scene;
-    protected FlotsamAssetCache? m_cache;
+    protected TestScene m_scene = null!;
+    protected FlotsamAssetCache m_cache = null!;
 
     public override void SetUp()
     {
@@ -67,7 +67,7 @@ public class FlotsamAssetCacheTests : OpenSimTestCase
         asset.ID = TestHelpers.ParseTail(0x1).ToString();
 
         // Check we don't get anything before the asset is put in the cache
-        AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
+        AssetBase? retrievedAsset = m_cache.Get(asset.ID.ToString());
         Assert.Null(retrievedAsset);
 
         m_cache.Store(asset);
@@ -75,7 +75,7 @@ public class FlotsamAssetCacheTests : OpenSimTestCase
         // Check that asset is now in cache
         retrievedAsset = m_cache.Get(asset.ID.ToString());
         Assert.NotNull(retrievedAsset);
-        Assert.Equal(asset.ID, retrievedAsset.ID);
+        Assert.Equal(asset.ID, retrievedAsset!.ID);
     }
 
     [Fact]
@@ -91,7 +91,7 @@ public class FlotsamAssetCacheTests : OpenSimTestCase
 
         m_cache.Expire(asset.ID);
 
-        AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
+        AssetBase? retrievedAsset = m_cache.Get(asset.ID.ToString());
         Assert.Null(retrievedAsset);
     }
 
@@ -108,7 +108,7 @@ public class FlotsamAssetCacheTests : OpenSimTestCase
 
         m_cache.Clear();
 
-        AssetBase retrievedAsset = m_cache.Get(asset.ID.ToString());
+        AssetBase? retrievedAsset = m_cache.Get(asset.ID.ToString());
         Assert.Null(retrievedAsset);
     }
 }

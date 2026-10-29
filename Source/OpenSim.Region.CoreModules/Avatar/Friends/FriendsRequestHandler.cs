@@ -32,10 +32,11 @@ using System.Xml;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.CoreModules.Avatar.Friends;
 
@@ -43,9 +44,10 @@ namespace OpenSim.Region.CoreModules.Avatar.Friends;
 //    public class FriendsRequestHandler : BaseStreamHandlerBasicDOSProtector
 public class FriendsSimpleRequestHandler : SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private FriendsModule m_FriendsModule;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
     /*
     public FriendsRequestHandler(FriendsModule fmodule)
             : base("POST", "/friends", new BasicDosProtectorOptions()
@@ -58,9 +60,10 @@ public class FriendsSimpleRequestHandler : SimpleStreamHandler
                                             ThrottledAction = BasicDOSProtector.ThrottleAction.DoThrottledMethod
                                         })
     */
-    public FriendsSimpleRequestHandler(FriendsModule fmodule) : base("/friends")
+    public FriendsSimpleRequestHandler(FriendsModule fmodule, ControlPlaneAccess controlPlaneAccess) : base("/friends")
     {
         m_FriendsModule = fmodule;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
@@ -77,10 +80,13 @@ public class FriendsSimpleRequestHandler : SimpleStreamHandler
             return;
         }
 
+        if (!m_ControlPlaneAccess.Authorize(httpRequest, httpResponse))
+            return;
+
         httpResponse.KeepAlive = false;
         httpResponse.StatusCode = (int)HttpStatusCode.OK;
         httpResponse.ContentType = "text/xml";
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -124,7 +130,7 @@ public class FriendsSimpleRequestHandler : SimpleStreamHandler
         }
         catch (Exception e)
         {
-            m_log.Debug("[FRIENDS]: Exception {0}" + e.ToString());
+            m_log.LogDebug("[FRIENDS]: Exception {0}" + e.ToString());
             httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
 
         }

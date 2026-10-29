@@ -148,12 +148,12 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
             string llsdresponse = dorequest(handler, request);
 
-            Assert.True(llsdresponse != null);
-            Assert.True(llsdresponse != string.Empty);
-            Assert.True(llsdresponse.Contains(m_userID.ToString()));
+            Assert.True(llsdresponse != null, "Incorrect null response");
+            Assert.True(llsdresponse != string.Empty, "Incorrect empty response");
+            Assert.True(llsdresponse.Contains(m_userID.ToString()), "Response should contain userID");
 
             string descendents = "descendents</key><integer>" + m_rootDescendents + "</integer>";
-            Assert.True(llsdresponse.Contains(descendents));
+            Assert.True(llsdresponse.Contains(descendents), "Incorrect number of descendents");
             Console.WriteLine(llsdresponse);
         }
 
@@ -161,6 +161,8 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
         public void Test_002_MultipleFolders()
         {
             TestHelpers.InMethod();
+
+            Init();
 
             FetchInvDescHandler handler = new FetchInvDescHandler(m_scene.InventoryService, null, m_scene);
 
@@ -177,18 +179,20 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Console.WriteLine(llsdresponse);
 
             string descendents = "descendents</key><integer>" + m_rootDescendents + "</integer>";
-            Assert.True(llsdresponse.Contains(descendents));
+            Assert.True(llsdresponse.Contains(descendents), "Incorrect number of descendents for root folder");
             descendents = "descendents</key><integer>2</integer>";
-            Assert.True(llsdresponse.Contains(descendents));
+            Assert.True(llsdresponse.Contains(descendents), "Incorrect number of descendents for Notecard folder");
 
-            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"));
-            Assert.True(llsdresponse.Contains("20000000-0000-0000-0000-000000000002"));
+            Assert.True(llsdresponse.Contains("10000000-0000-0000-0000-000000000001"), "Notecard 1 is missing from response");
+            Assert.True(llsdresponse.Contains("20000000-0000-0000-0000-000000000002"), "Notecard 2 is missing from response");
         }
 
         [Fact]
         public void Test_003_Links()
         {
             TestHelpers.InMethod();
+
+            Init();
 
             FetchInvDescHandler handler = new FetchInvDescHandler(m_scene.InventoryService, null, m_scene);
 
@@ -200,37 +204,39 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             Console.WriteLine(llsdresponse);
 
             string descendents = "descendents</key><integer>2</integer>";
-            Assert.True(llsdresponse.Contains(descendents));
+            Assert.True(llsdresponse.Contains(descendents), "Incorrect number of descendents for Test Folder");
 
             // Make sure that the note card link is included
-            Assert.True(llsdresponse.Contains("Link to notecard"));
+            Assert.True(llsdresponse.Contains("Link to notecard"), "Link to notecard is missing");
 
             //Make sure the notecard item itself is included
-            Assert.True(llsdresponse.Contains("Test Notecard 2")) is missing");
+            Assert.True(llsdresponse.Contains("Test Notecard 2"), "Notecard 2 item (the source) is missing");
 
             // Make sure that the source item is before the link item
             int pos1 = llsdresponse.IndexOf("Test Notecard 2");
             int pos2 = llsdresponse.IndexOf("Link to notecard");
-            Assert.Less(pos1, pos2, "Source of link is after link");
+            Assert.True(pos1 < pos2, "Source of link is after link");
 
             // Make sure the folder link is included
-            Assert.True(llsdresponse.Contains("Link to Objects folder"));
+            Assert.True(llsdresponse.Contains("Link to Objects folder"), "Link to Objects folder is missing");
 
 /* contents of link folder are not supposed to be listed
             // Make sure the objects inside the Objects folder are included
             // Note: I'm not entirely sure this is needed, but that's what I found in the implementation
-            Assert.True(llsdresponse.Contains("Some Object")) is missing");
+            Assert.True(llsdresponse.Contains("Some Object"), "Some Object item (contents of the source) is missing");
 */
             // Make sure that the source item is before the link item
             pos1 = llsdresponse.IndexOf("Some Object");
             pos2 = llsdresponse.IndexOf("Link to Objects folder");
-            Assert.Less(pos1, pos2, "Contents of source of folder link is after folder link");
+            Assert.True(pos1 < pos2, "Contents of source of folder link is after folder link");
         }
 
         [Fact]
         public void Test_004_DuplicateFolders()
         {
             TestHelpers.InMethod();
+
+            Init();
 
             FetchInvDescHandler handler = new FetchInvDescHandler(m_scene.InventoryService, null, m_scene);
 
@@ -256,14 +262,14 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
             string notecards_folder = "<key>folder_id</key><uuid>" + m_notecardsFolder + "</uuid>";
             string notecards_category = "<key>category_id</key><uuid>" + m_notecardsFolder + "</uuid>";
 
-            Assert.That(llsdresponse.Contains(root_folder), "Missing root folder");
-            Assert.That(llsdresponse.Contains(notecards_folder), "Missing notecards folder");
+            Assert.True(llsdresponse.Contains(root_folder), "Missing root folder");
+            Assert.True(llsdresponse.Contains(notecards_folder), "Missing notecards folder");
             int count = Regex.Matches(llsdresponse, root_folder).Count;
-            Assert.Equal(1, count, "More than 1 root folder in response");
+            Assert.Equal(1, count);
             count = Regex.Matches(llsdresponse, notecards_folder).Count;
-            Assert.Equal(1, count, "More than 1 notecards folder in response");
+            Assert.Equal(1, count);
             count = Regex.Matches(llsdresponse, notecards_category).Count;
-            Assert.Equal(1, count, "More than 1 notecards folder in response"); // Notecards will also be a category on root
+            Assert.Equal(1, count); // Notecards will also be a category on root
         }
 
         [Fact]
@@ -282,10 +288,10 @@ namespace OpenSim.Capabilities.Handlers.FetchInventory.Tests
 
             string llsdresponse = dorequest(handler, request);
 
-            Assert.True(llsdresponse != null);
-            Assert.True(llsdresponse != string.Empty);
+            Assert.True(llsdresponse != null, "Incorrect null response");
+            Assert.True(llsdresponse != string.Empty, "Incorrect empty response");
             // we do return a answer now
-            //Assert.True(llsdresponse.Contains("bad_folders</key><array><uuid>00000000-0000-0000-0000-000000000000"));
+            //Assert.True(llsdresponse.Contains("bad_folders</key><array><uuid>00000000-0000-0000-0000-000000000000"), "Folder Zero should be a bad folder");
 
             Console.WriteLine(llsdresponse);
         }

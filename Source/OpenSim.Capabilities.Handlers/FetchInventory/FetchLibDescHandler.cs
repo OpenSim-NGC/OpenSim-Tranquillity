@@ -28,13 +28,13 @@
 using System.Net;
 using System.Reflection;
 using System.Text;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Framework.Capabilities;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 
@@ -42,7 +42,7 @@ namespace OpenSim.Capabilities.Handlers;
 
 public class FetchLibDescHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly byte[] EmptyResponse = Util.UTF8NBGetbytes("<llsd><map><key>folders</key><array /></map></llsd>");
     private readonly ILibraryService m_LibraryService;
@@ -58,7 +58,7 @@ public class FetchLibDescHandler
 
     public void FetchRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, ExpiringKey<UUID> BadRequests, UUID agentID)
     {
-        //m_log.DebugFormat("[XXX]: FetchLibDescendentsRequest in {0}, {1}", (m_Scene == null) ? "none" : m_Scene.Name, request);
+        //m_log.LogDebug("[XXX]: FetchLibDescendentsRequest in {0}, {1}", (m_Scene == null) ? "none" : m_Scene.Name, request);
         if (m_LibraryService == null || m_LibraryService.LibraryRootFolder == null)
         {
             httpResponse.StatusCode = (int)HttpStatusCode.ServiceUnavailable;
@@ -106,7 +106,7 @@ public class FetchLibDescHandler
                     }
                     catch (Exception e)
                     {
-                        m_log.Debug("[WEB FETCH INV DESC HANDLER]: caught exception doing OSD deserialize" + e.Message);
+                        m_log.LogDebug("[WEB FETCH INV DESC HANDLER]: caught exception doing OSD deserialize" + e.Message);
                         continue;
                     }
                     folders.Add(llsdRequest);
@@ -118,7 +118,7 @@ public class FetchLibDescHandler
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[FETCH LIB DESC]: fail parsing request: {0}", e.Message);
+            m_log.LogError("[FETCH LIB DESC]: fail parsing request: {0}", e.Message);
             httpResponse.RawBuffer = EmptyResponse;
             return;
         }
@@ -150,7 +150,7 @@ public class FetchLibDescHandler
             {
                 if (limit < 0)
                     osu.AppendASCII(" ...");
-                m_log.Warn(osu.ToString());
+                m_log.LogWarning(osu.ToString());
             }
 
             osu.Clear();
@@ -170,7 +170,7 @@ public class FetchLibDescHandler
         UUID requester = folders[0].owner_id;
 
         List<InventoryCollection> invcollSet = Fetch(folders, bad_folders);
-        //m_log.DebugFormat("[XXX]: Got {0} folders from a request of {1}", invcollSet.Count, folders.Count);
+        //m_log.LogDebug("[XXX]: Got {0} folders from a request of {1}", invcollSet.Count, folders.Count);
 
         int invcollSetCount = 0;
         if (invcollSet != null)
@@ -264,7 +264,7 @@ public class FetchLibDescHandler
             }
             if(limit < 0)
                 sb.Append(" ...");
-            m_log.Warn(osStringBuilderCache.GetStringAndRelease(sb));
+            m_log.LogWarning(osStringBuilderCache.GetStringAndRelease(sb));
         }
 
         httpResponse.RawBuffer = LLSDxmlEncode2.EndToBytes(lastresponse);
@@ -272,7 +272,7 @@ public class FetchLibDescHandler
 
     private List<InventoryCollection> Fetch(List<LLSDFetchInventoryDescendents> fetchFolders, List<UUID> bad_folders)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[FETCH LIB DESC HANDLER]: Fetching {0} folders", fetchFolders.Count);
         // FIXME MAYBE: We're not handling sortOrder!
         int cntr = fetchFolders.Count;
@@ -328,7 +328,7 @@ public class FetchLibDescHandler
                     };
                     Collection.Descendents = Collection.Items.Count + Collection.Folders.Count;
                     result.Add(Collection);
-                    //m_log.DebugFormat("[XXX]: Added libfolder {0} ({1}) {2}", ret.Collection.FolderID, ret.Collection.OwnerID);
+                    //m_log.LogDebug("[XXX]: Added libfolder {0} ({1}) {2}", ret.Collection.FolderID, ret.Collection.OwnerID);
                 }
                 else
                     bad_folders.Add(f.folder_id);

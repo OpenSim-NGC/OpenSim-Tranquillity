@@ -30,9 +30,10 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using OpenMetaverse;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Chat;
 
@@ -41,7 +42,7 @@ public class IRCConnector
 
     #region Global (static) state
 
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // Local constants
 
@@ -72,12 +73,12 @@ public class IRCConnector
 
     static IRCConnector()
     {
-        m_log.DebugFormat("[IRC-Connector]: Static initialization started");
+        m_log.LogDebug("[IRC-Connector]: Static initialization started");
         m_watchdog = new System.Timers.Timer(WD_INTERVAL);
         m_watchdog.Elapsed += new ElapsedEventHandler(WatchdogHandler);
         m_watchdog.AutoReset = true;
         m_watchdog.Start();
-        m_log.DebugFormat("[IRC-Connector]: Static initialization complete");
+        m_log.LogDebug("[IRC-Connector]: Static initialization complete");
     }
 
     #endregion
@@ -229,7 +230,7 @@ public class IRCConnector
         else
             m_nick = m_baseNick;
 
-        m_log.InfoFormat("[IRC-Connector-{0}]: Initialization complete", idn);
+        m_log.LogInformation("[IRC-Connector-{0}]: Initialization complete", idn);
 
     }
 
@@ -263,7 +264,7 @@ public class IRCConnector
 
     public void Close()
     {
-        m_log.InfoFormat("[IRC-Connector-{0}] Closing", idn);
+        m_log.LogInformation("[IRC-Connector-{0}] Closing", idn);
 
         lock (msyncConnect)
         {
@@ -275,7 +276,7 @@ public class IRCConnector
 
                 if (Connected)
                 {
-                    m_log.DebugFormat("[IRC-Connector-{0}] Closing interface", idn);
+                    m_log.LogDebug("[IRC-Connector-{0}] Closing interface", idn);
 
                     // Cleanup the IRC session
 
@@ -304,7 +305,7 @@ public class IRCConnector
             }
         }
 
-        m_log.InfoFormat("[IRC-Connector-{0}] Closed", idn);
+        m_log.LogInformation("[IRC-Connector-{0}] Closed", idn);
 
     }
 
@@ -323,7 +324,7 @@ public class IRCConnector
         if(_icc_ < ICCD_PERIOD)
             return;
 
-        m_log.DebugFormat("[IRC-Connector-{0}]: Connection request for {1} on {2}:{3}", idn, m_nick, m_server, m_ircChannel);
+        m_log.LogDebug("[IRC-Connector-{0}]: Connection request for {1} on {2}:{3}", idn, m_nick, m_server, m_ircChannel);
 
         _icc_ = 0;
 
@@ -342,7 +343,7 @@ public class IRCConnector
                 m_reader = new StreamReader(m_stream);
                 m_writer = new StreamWriter(m_stream);
 
-                m_log.InfoFormat("[IRC-Connector-{0}]: Connected to {1}:{2}", idn, m_server, m_port);
+                m_log.LogInformation("[IRC-Connector-{0}]: Connected to {1}:{2}", idn, m_server, m_port);
 
                 WorkManager.StartThread(ListenerRun, "IRCConnectionListenerThread", false, false);
 
@@ -356,7 +357,7 @@ public class IRCConnector
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("[IRC-Connector-{0}] cannot connect {1} to {2}:{3}: {4}",
+                m_log.LogError("[IRC-Connector-{0}] cannot connect {1} to {2}:{3}: {4}",
                                   idn, m_nick, m_server, m_port, e.Message);
                 // It might seem reasonable to reset connected and pending status here
                 // Seeing as we know that the login has failed, but if we do that, then
@@ -374,7 +375,7 @@ public class IRCConnector
 
     public void Reconnect()
     {
-        m_log.DebugFormat("[IRC-Connector-{0}]: Reconnect request for {1} on {2}:{3}", idn, m_nick, m_server, m_ircChannel);
+        m_log.LogDebug("[IRC-Connector-{0}]: Reconnect request for {1} on {2}:{3}", idn, m_nick, m_server, m_ircChannel);
 
         // Don't do this if a Connect is in progress...
 
@@ -384,7 +385,7 @@ public class IRCConnector
             if (m_connected)
             {
 
-                m_log.InfoFormat("[IRC-Connector-{0}] Resetting connector", idn);
+                m_log.LogInformation("[IRC-Connector-{0}] Resetting connector", idn);
 
                 // Mark as disconnected. This will allow the listener thread
                 // to exit if still in-flight.
@@ -421,7 +422,7 @@ public class IRCConnector
     public void PrivMsg(string pattern, string from, string region, string msg)
     {
 
-        // m_log.DebugFormat("[IRC-Connector-{0}] PrivMsg to IRC from {1}: <{2}>", idn, from,
+        // m_log.LogDebug("[IRC-Connector-{0}] PrivMsg to IRC from {1}: <{2}>", idn, from,
         //     String.Format(pattern, m_ircChannel, from, region, msg));
 
         // One message to the IRC server
@@ -430,17 +431,17 @@ public class IRCConnector
         {
             m_writer.WriteLine(pattern, m_ircChannel, from, region, msg);
             m_writer.Flush();
-            // m_log.DebugFormat("[IRC-Connector-{0}]: PrivMsg from {1} in {2}: {3}", idn, from, region, msg);
+            // m_log.LogDebug("[IRC-Connector-{0}]: PrivMsg from {1} in {2}: {3}", idn, from, region, msg);
         }
         catch (IOException)
         {
-            m_log.ErrorFormat("[IRC-Connector-{0}]: PrivMsg I/O Error: disconnected from IRC server", idn);
+            m_log.LogError("[IRC-Connector-{0}]: PrivMsg I/O Error: disconnected from IRC server", idn);
             Reconnect();
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[IRC-Connector-{0}]: PrivMsg exception : {1}", idn, ex.Message);
-            m_log.Debug(ex);
+            m_log.LogError("[IRC-Connector-{0}]: PrivMsg exception : {1}", idn, ex.Message);
+            m_log.LogDebug(ex, ex.Message);
         }
 
     }
@@ -448,23 +449,23 @@ public class IRCConnector
     public void Send(string msg)
     {
 
-        // m_log.DebugFormat("[IRC-Connector-{0}] Send to IRC : <{1}>", idn,  msg);
+        // m_log.LogDebug("[IRC-Connector-{0}] Send to IRC : <{1}>", idn,  msg);
 
         try
         {
             m_writer.WriteLine(msg);
             m_writer.Flush();
-            // m_log.DebugFormat("[IRC-Connector-{0}] Sent command string: {1}", idn, msg);
+            // m_log.LogDebug("[IRC-Connector-{0}] Sent command string: {1}", idn, msg);
         }
         catch (IOException)
         {
-            m_log.ErrorFormat("[IRC-Connector-{0}] Disconnected from IRC server.(Send)", idn);
+            m_log.LogError("[IRC-Connector-{0}] Disconnected from IRC server.(Send)", idn);
             Reconnect();
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[IRC-Connector-{0}] Send exception trap: {0}", idn, ex.Message);
-            m_log.Debug(ex);
+            m_log.LogError("[IRC-Connector-{0}] Send exception trap: {0}", idn, ex.Message);
+            m_log.LogDebug(ex, ex.Message);
         }
 
     }
@@ -486,7 +487,7 @@ public class IRCConnector
 
                 Watchdog.UpdateThread();
 
-                // m_log.Info("[IRCConnector]: " + inputLine);
+                // m_log.LogInformation("[IRCConnector]: " + inputLine);
 
                 if (inputLine.Contains("PRIVMSG"))
                 {
@@ -518,8 +519,8 @@ public class IRCConnector
         }
         catch (Exception /*e*/)
         {
-            // m_log.ErrorFormat("[IRC-Connector-{0}]: ListenerRun exception trap: {1}", idn, e.Message);
-            // m_log.Debug(e);
+            // m_log.LogError("[IRC-Connector-{0}]: ListenerRun exception trap: {1}", idn, e.Message);
+            // m_log.LogDebug(e);
         }
 
         // This is potentially circular, but harmless if so.
@@ -540,7 +541,7 @@ public class IRCConnector
         //examines IRC commands and extracts any private messages
         // which will then be reboadcast in the Sim
 
-        // m_log.InfoFormat("[IRC-Connector-{0}]: ExtractMsg: {1}", idn, input);
+        // m_log.LogInformation("[IRC-Connector-{0}]: ExtractMsg: {1}", idn, input);
 
         Dictionary<string, string> result = null;
         MatchCollection matches = RE.Matches(input);
@@ -548,10 +549,10 @@ public class IRCConnector
         // Get some direct matches $1 $4 is a
         if ((matches.Count == 0) || (matches.Count != 1) || (matches[0].Groups.Count != 5))
         {
-            // m_log.Info("[IRCConnector]: Number of matches: " + matches.Count);
+            // m_log.LogInformation("[IRCConnector]: Number of matches: " + matches.Count);
             // if (matches.Count > 0)
             // {
-            //     m_log.Info("[IRCConnector]: Number of groups: " + matches[0].Groups.Count);
+            //     m_log.LogInformation("[IRCConnector]: Number of groups: " + matches[0].Groups.Count);
             // }
             return null;
         }
@@ -580,7 +581,7 @@ public class IRCConnector
         }
         catch (Exception ex) // IRC gate should not crash Sim
         {
-            m_log.ErrorFormat("[IRC-Connector-{0}]: BroadcastSim Exception Trap: {1}\n{2}", idn, ex.Message, ex.StackTrace);
+            m_log.LogError("[IRC-Connector-{0}]: BroadcastSim Exception Trap: {1}\n{2}", idn, ex.Message, ex.StackTrace);
         }
     }
 
@@ -613,7 +614,7 @@ public class IRCConnector
         cmd = commArgs[0];
         parms = commArgs[1];
 
-        // m_log.DebugFormat("[IRC-Connector-{0}] prefix = <{1}> cmd = <{2}>", idn, pfx, cmd);
+        // m_log.LogDebug("[IRC-Connector-{0}] prefix = <{1}> cmd = <{2}>", idn, pfx, cmd);
 
         switch (cmd)
         {
@@ -627,7 +628,7 @@ public class IRCConnector
                 break;
             case "004": // Server information
 
-                m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                 commArgs = parms.Split(CS_SPACE);
                 c_server = commArgs[1];
                 m_server = c_server;
@@ -637,7 +638,7 @@ public class IRCConnector
 
                 m_writer.WriteLine(String.Format("JOIN {0}", m_ircChannel));
                 m_writer.Flush();
-                m_log.InfoFormat("[IRC-Connector-{0}]: sent request to join {1} ", idn, m_ircChannel);
+                m_log.LogInformation("[IRC-Connector-{0}]: sent request to join {1} ", idn, m_ircChannel);
 
                 break;
             case "005": // Server information
@@ -656,10 +657,10 @@ public class IRCConnector
             case "366": // End-of-Name list marker
             case "372": // MOTD body
             case "375": // MOTD start
-                // m_log.InfoFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
+                // m_log.LogInformation("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
                 break;
             case "376": // MOTD end
-                // m_log.InfoFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
+                // m_log.LogInformation("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
                 motd = true;
                 break;
             case "451": // Not registered
@@ -667,7 +668,7 @@ public class IRCConnector
             case "433": // Nickname in use
                 // Gen a new name
                 m_nick = m_baseNick + Random.Shared.Next(1, 99);
-                m_log.ErrorFormat("[IRC-Connector-{0}]: [{1}] IRC SERVER reports NicknameInUse, trying {2}", idn, cmd, m_nick);
+                m_log.LogError("[IRC-Connector-{0}]: [{1}] IRC SERVER reports NicknameInUse, trying {2}", idn, cmd, m_nick);
                 // Retry
                 m_writer.WriteLine(String.Format("NICK {0}", m_nick));
                 m_writer.Flush();
@@ -677,24 +678,24 @@ public class IRCConnector
                 m_writer.Flush();
                 break;
             case "479": // Bad channel name, etc. This will never work, so disable the connection
-                m_log.ErrorFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE, 2)[1]);
-                m_log.ErrorFormat("[IRC-Connector-{0}] [{1}] Connector disabled", idn, cmd);
+                m_log.LogError("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE, 2)[1]);
+                m_log.LogError("[IRC-Connector-{0}] [{1}] Connector disabled", idn, cmd);
                 m_enabled = false;
                 m_connected = false;
                 m_pending = false;
                 break;
             case "NOTICE":
-                // m_log.WarnFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
+                // m_log.LogWarning("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE,2)[1]);
                 break;
             case "ERROR":
-                m_log.ErrorFormat("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE, 2)[1]);
+                m_log.LogError("[IRC-Connector-{0}] [{1}] {2}", idn, cmd, parms.Split(CS_SPACE, 2)[1]);
                 if (parms.Contains("reconnect too fast"))
                     ICCD_PERIOD++;
                 m_pending = false;
                 Reconnect();
                 break;
             case "PING":
-                m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                 m_writer.WriteLine(String.Format("PONG {0}", parms));
                 m_writer.Flush();
                 break;
@@ -702,35 +703,35 @@ public class IRCConnector
                 break;
             case "JOIN":
 
-                m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                 eventIrcJoin(pfx, cmd, parms);
                 break;
             case "PART":
-                m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                 eventIrcPart(pfx, cmd, parms);
                 break;
             case "MODE":
-                m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                 eventIrcMode(pfx, cmd, parms);
                 break;
             case "NICK":
-                m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                 eventIrcNickChange(pfx, cmd, parms);
                 break;
             case "KICK":
-                m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                 eventIrcKick(pfx, cmd, parms);
                 break;
             case "QUIT":
-                m_log.DebugFormat("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] [{1}] parms = <{2}>", idn, cmd, parms);
                 eventIrcQuit(pfx, cmd, parms);
                 break;
             default:
-                m_log.DebugFormat("[IRC-Connector-{0}] Command '{1}' ignored, parms = {2}", idn, cmd, parms);
+                m_log.LogDebug("[IRC-Connector-{0}] Command '{1}' ignored, parms = {2}", idn, cmd, parms);
                 break;
         }
 
-        // m_log.DebugFormat("[IRC-Connector-{0}] prefix = <{1}> cmd = <{2}> complete", idn, pfx, cmd);
+        // m_log.LogDebug("[IRC-Connector-{0}] prefix = <{1}> cmd = <{2}> complete", idn, pfx, cmd);
 
     }
 
@@ -745,11 +746,11 @@ public class IRCConnector
 
         if(IrcChannel == m_ircChannel)
         {
-            m_log.InfoFormat("[IRC-Connector-{0}] Joined requested channel {1} at {2}", idn, IrcChannel,m_server);
+            m_log.LogInformation("[IRC-Connector-{0}] Joined requested channel {1} at {2}", idn, IrcChannel,m_server);
             m_pending = false;
         }
         else
-            m_log.InfoFormat("[IRC-Connector-{0}] Joined unknown channel {1} at {2}", idn, IrcChannel,m_server);
+            m_log.LogInformation("[IRC-Connector-{0}] Joined unknown channel {1} at {2}", idn, IrcChannel,m_server);
         BroadcastSim(IrcUser, "/me joins {0}", IrcChannel);
     }
 
@@ -759,7 +760,7 @@ public class IRCConnector
         string IrcUser = prefix.Split('!')[0];
         string IrcChannel = args[0];
 
-        m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCPart {1}:{2}", idn, m_server, m_ircChannel);
+        m_log.LogDebug("[IRC-Connector-{0}] Event: IRCPart {1}:{2}", idn, m_server, m_ircChannel);
         BroadcastSim(IrcUser, "/me parts {0}", IrcChannel);
     }
 
@@ -768,7 +769,7 @@ public class IRCConnector
         string[] args = parms.Split(CS_SPACE, 2);
         string UserMode = args[1];
 
-        m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCMode {1}:{2}", idn, m_server, m_ircChannel);
+        m_log.LogDebug("[IRC-Connector-{0}] Event: IRCMode {1}:{2}", idn, m_server, m_ircChannel);
         if (UserMode.Substring(0, 1) == ":")
         {
             UserMode = UserMode.Remove(0, 1);
@@ -781,7 +782,7 @@ public class IRCConnector
         string UserOldNick = prefix.Split('!')[0];
         string UserNewNick = args[0].Remove(0, 1);
 
-        m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCNickChange {1}:{2}", idn, m_server, m_ircChannel);
+        m_log.LogDebug("[IRC-Connector-{0}] Event: IRCNickChange {1}:{2}", idn, m_server, m_ircChannel);
         BroadcastSim(UserOldNick, "/me is now known as {0}", UserNewNick);
     }
 
@@ -793,7 +794,7 @@ public class IRCConnector
         string UserKicked = args[1];
         string KickMessage = args[2];
 
-        m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCKick {1}:{2}", idn, m_server, m_ircChannel);
+        m_log.LogDebug("[IRC-Connector-{0}] Event: IRCKick {1}:{2}", idn, m_server, m_ircChannel);
         BroadcastSim(UserKicker, "/me kicks kicks {0} off {1} saying \"{2}\"", UserKicked, IrcChannel, KickMessage);
 
         if (UserKicked == m_nick)
@@ -808,7 +809,7 @@ public class IRCConnector
         string IrcUser = prefix.Split('!')[0];
         string QuitMessage = parms;
 
-        m_log.DebugFormat("[IRC-Connector-{0}] Event: IRCQuit {1}:{2}", idn, m_server, m_ircChannel);
+        m_log.LogDebug("[IRC-Connector-{0}] Event: IRCQuit {1}:{2}", idn, m_server, m_ircChannel);
         BroadcastSim(IrcUser, "/me quits saying \"{0}\"", QuitMessage);
     }
 
@@ -823,7 +824,7 @@ public class IRCConnector
     protected static void WatchdogHandler(Object source, ElapsedEventArgs args)
     {
 
-        // m_log.InfoFormat("[IRC-Watchdog] Status scan, pdk = {0}, icc = {1}", _pdk_, _icc_);
+        // m_log.LogInformation("[IRC-Watchdog] Status scan, pdk = {0}, icc = {1}", _pdk_, _icc_);
 
         _pdk_ = (_pdk_ + 1) % PING_PERIOD;    // cycle the ping trigger
         _icc_++;    // increment the inter-consecutive-connect-delay counter
@@ -832,7 +833,7 @@ public class IRCConnector
             foreach (IRCConnector connector in m_connectors)
             {
 
-                // m_log.InfoFormat("[IRC-Watchdog] Scanning {0}", connector);
+                // m_log.LogInformation("[IRC-Watchdog] Scanning {0}", connector);
 
                 if (connector.Enabled)
                 {
@@ -840,12 +841,12 @@ public class IRCConnector
                     {
                         try
                         {
-                            // m_log.DebugFormat("[IRC-Watchdog] Connecting {1}:{2}", connector.idn, connector.m_server, connector.m_ircChannel);
+                            // m_log.LogDebug("[IRC-Watchdog] Connecting {1}:{2}", connector.idn, connector.m_server, connector.m_ircChannel);
                             connector.Connect();
                         }
                         catch (Exception e)
                         {
-                            m_log.ErrorFormat("[IRC-Watchdog] Exception on connector {0}: {1} ", connector.idn, e.Message);
+                            m_log.LogError("[IRC-Watchdog] Exception on connector {0}: {1} ", connector.idn, e.Message);
                         }
                     }
                     else
@@ -855,7 +856,7 @@ public class IRCConnector
                         {
                             if (connector.m_timeout == 0)
                             {
-                                m_log.ErrorFormat("[IRC-Watchdog] Login timed-out for connector {0}, reconnecting", connector.idn);
+                                m_log.LogError("[IRC-Watchdog] Login timed-out for connector {0}, reconnecting", connector.idn);
                                 connector.Reconnect();
                             }
                             else
@@ -875,8 +876,8 @@ public class IRCConnector
                             }
                             catch (Exception e)
                             {
-                                m_log.ErrorFormat("[IRC-PingRun] Exception on connector {0}: {1} ", connector.idn, e.Message);
-                                m_log.Debug(e);
+                                m_log.LogError("[IRC-PingRun] Exception on connector {0}: {1} ", connector.idn, e.Message);
+                                m_log.LogDebug(e, e.Message);
                                 connector.Reconnect();
                             }
                         }
@@ -885,7 +886,7 @@ public class IRCConnector
                 }
             }
 
-        // m_log.InfoFormat("[IRC-Watchdog] Status scan completed");
+        // m_log.LogInformation("[IRC-Watchdog] Status scan completed");
 
     }
 

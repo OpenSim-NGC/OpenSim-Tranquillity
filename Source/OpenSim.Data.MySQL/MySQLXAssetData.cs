@@ -29,16 +29,17 @@ using System.Data;
 using System.IO.Compression;
 using System.Reflection;
 using System.Security.Cryptography;
-using log4net;
 using MySqlConnector;
 using OpenMetaverse;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.MySQL;
 
 public class MySQLXAssetData : IXAssetDataPlugin
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected virtual Assembly Assembly
     {
@@ -70,15 +71,15 @@ public class MySQLXAssetData : IXAssetDataPlugin
     /// <param name="connect">connect string</param>
     public void Initialise(string connect)
     {
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: THIS PLUGIN IS STRICTLY EXPERIMENTAL.");
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: DO NOT USE FOR ANY DATA THAT YOU DO NOT MIND LOSING.");
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: DATABASE TABLES CAN CHANGE AT ANY TIME, CAUSING EXISTING DATA TO BE LOST.");
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: ***********************************************************");
-        m_log.ErrorFormat("[MYSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[MYSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[MYSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[MYSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[MYSQL XASSETDATA]: THIS PLUGIN IS STRICTLY EXPERIMENTAL.");
+        m_log.LogError("[MYSQL XASSETDATA]: DO NOT USE FOR ANY DATA THAT YOU DO NOT MIND LOSING.");
+        m_log.LogError("[MYSQL XASSETDATA]: DATABASE TABLES CAN CHANGE AT ANY TIME, CAUSING EXISTING DATA TO BE LOST.");
+        m_log.LogError("[MYSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[MYSQL XASSETDATA]: ***********************************************************");
+        m_log.LogError("[MYSQL XASSETDATA]: ***********************************************************");
 
         m_connectionString = connect;
 
@@ -118,7 +119,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
     /// <remarks>On failure : throw an exception and attempt to reconnect to database</remarks>
     public AssetBase GetAsset(UUID assetID)
     {
-//            m_log.DebugFormat("[MYSQL XASSET DATA]: Looking for asset {0}", assetID);
+//            m_log.LogDebug("[MYSQL XASSET DATA]: Looking for asset {0}", assetID);
 
         AssetBase asset = null;
         int accessTime = 0;
@@ -156,7 +157,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                 }
                 catch (Exception e)
                 {
-                    m_log.Error(string.Format("[MYSQL XASSET DATA]: Failure fetching asset {0}", assetID), e);
+                    m_log.LogError(e, string.Format("[MYSQL XASSET DATA]: Failure fetching asset {0}", assetID));
                 }
             }
             dbcon.Close();
@@ -185,7 +186,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
 //                                               int compressedLength = asset.Data.Length;
                     asset.Data = outputStream.ToArray();
                 }
-//                                        m_log.DebugFormat(
+//                                        m_log.LogDebug(
 //                                            "[XASSET DB]: Decompressed {0} {1} to {2} bytes from {3}",
 //                                            asset.ID, asset.Name, asset.Data.Length, compressedLength);
             }                             
@@ -200,7 +201,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
     /// <remarks>On failure : Throw an exception and attempt to reconnect to database</remarks>
     public void StoreAsset(AssetBase asset)
     {
-//            m_log.DebugFormat("[XASSETS DB]: Storing asset {0} {1}", asset.Name, asset.ID);
+//            m_log.LogDebug("[XASSETS DB]: Storing asset {0} {1}", asset.Name, asset.ID);
 
         using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
         {
@@ -212,7 +213,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                 if (asset.Name.Length > AssetBase.MAX_ASSET_NAME)
                 {
                     assetName = asset.Name.Substring(0, AssetBase.MAX_ASSET_NAME);
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[XASSET DB]: Name '{0}' for asset {1} truncated from {2} to {3} characters on add",
                         asset.Name, asset.ID, asset.Name.Length, assetName.Length);
                 }
@@ -221,7 +222,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                 if (asset.Description.Length > AssetBase.MAX_ASSET_DESC)
                 {
                     assetDescription = asset.Description.Substring(0, AssetBase.MAX_ASSET_DESC);
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[XASSET DB]: Description '{0}' for asset {1} truncated from {2} to {3} characters on add",
                         asset.Description, asset.ID, asset.Description.Length, assetDescription.Length);
                 }
@@ -267,7 +268,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                 }
                 catch (Exception e)
                 {
-                    m_log.ErrorFormat("[ASSET DB]: MySQL failure creating asset metadata {0} with name \"{1}\". Error: {2}",
+                    m_log.LogError("[ASSET DB]: MySQL failure creating asset metadata {0} with name \"{1}\". Error: {2}",
                         asset.FullID, asset.Name, e.Message);
 
                     transaction.Rollback();
@@ -291,7 +292,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                     }
                     catch (Exception e)
                     {
-                        m_log.ErrorFormat("[XASSET DB]: MySQL failure creating asset data {0} with name \"{1}\". Error: {2}",
+                        m_log.LogError("[XASSET DB]: MySQL failure creating asset data {0} with name \"{1}\". Error: {2}",
                             asset.FullID, asset.Name, e.Message);
 
                         transaction.Rollback();
@@ -340,7 +341,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
             }
             catch (Exception)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[XASSET MYSQL DB]: Failure updating access_time for asset {0} with name {1}",
                     assetMetadata.ID, assetMetadata.Name);
             }
@@ -358,7 +359,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
     /// <returns></returns>
     private bool ExistsData(MySqlConnection dbcon, MySqlTransaction transaction, byte[] hash)
     {
-//            m_log.DebugFormat("[ASSETS DB]: Checking for asset {0}", uuid);
+//            m_log.LogDebug("[ASSETS DB]: Checking for asset {0}", uuid);
 
         bool exists = false;
 
@@ -372,14 +373,14 @@ public class MySQLXAssetData : IXAssetDataPlugin
                 {
                     if (dbReader.Read())
                     {
-//                                    m_log.DebugFormat("[ASSETS DB]: Found asset {0}", uuid);
+//                                    m_log.LogDebug("[ASSETS DB]: Found asset {0}", uuid);
                         exists = true;
                     }
                 }
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[XASSETS DB]: MySql failure in ExistsData fetching hash {0}.  Exception {1}{2}",
                     hash, e.Message, e.StackTrace);
             }
@@ -472,7 +473,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                 }
                 catch (Exception e)
                 {
-                    m_log.Error("[XASSETS DB]: MySql failure fetching asset set" + Environment.NewLine + e.ToString());
+                    m_log.LogError("[XASSETS DB]: MySql failure fetching asset set" + Environment.NewLine + e.ToString());
                 }
             }
             dbcon.Close();
@@ -483,7 +484,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
 
     public bool Delete(string id)
     {
-//            m_log.DebugFormat("[XASSETS DB]: Deleting asset {0}", id);
+//            m_log.LogDebug("[XASSETS DB]: Deleting asset {0}", id);
 
         using (MySqlConnection dbcon = new MySqlConnection(m_connectionString))
         {

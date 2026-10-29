@@ -1,4 +1,3 @@
-using log4net;
 using System.Reflection;
 using System.Xml;
 using OpenSim.Server.Base;
@@ -8,11 +7,13 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Experience;
 
 public class ExperienceServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IExperienceService m_service;
 
@@ -30,7 +31,7 @@ public class ExperienceServerPostHandler : BaseStreamHandler
             body = sr.ReadToEnd();
         body = body.Trim();
 
-        //m_log.InfoFormat("[EXPERIENCE POST HANDLER]: {0}", body);
+        //m_log.LogInformation("[EXPERIENCE POST HANDLER]: {0}", body);
 
         string method = string.Empty;
 
@@ -64,11 +65,11 @@ public class ExperienceServerPostHandler : BaseStreamHandler
                 case "accesskvdatabase":
                     return AccessKeyValueDatabase(request);
             }
-            m_log.DebugFormat("[EXPERIENCE HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[EXPERIENCE HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.DebugFormat("[EXPERIENCE HANDLER]: Exception in method {0}: {1}", method, e);
+            m_log.LogDebug("[EXPERIENCE HANDLER]: Exception in method {0}: {1}", method, e);
         }
 
         return FailureResult();

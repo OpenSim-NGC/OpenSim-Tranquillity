@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 using System.Reflection;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -43,7 +43,7 @@ public class BasicDOSProtector
     private readonly Dictionary<string, int> _tempBlocked;  // blocked list
     private readonly Dictionary<string, int> _sessions;
     private readonly System.Timers.Timer _forgetTimer;  // Cleanup timer
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private readonly System.Threading.ReaderWriterLockSlim _blockLockSlim = new System.Threading.ReaderWriterLockSlim();
     private readonly System.Threading.ReaderWriterLockSlim _sessionLockSlim = new System.Threading.ReaderWriterLockSlim();
     public BasicDOSProtector(BasicDosProtectorOptions options)
@@ -82,7 +82,7 @@ public class BasicDOSProtector
             }
             foreach (string str in removes)
             {
-                m_log.Info($"[{_options.ReportingName}] client: {str} is no longer blocked.");
+                m_log.LogInformation($"[{_options.ReportingName}] client: {str} is no longer blocked.");
             }
             _blockLockSlim.EnterReadLock();
             if (_tempBlocked.Count > 0)
@@ -154,7 +154,7 @@ public class BasicDOSProtector
                                          Util.EnvironmentTickCount() +
                                          (int) _options.ForgetTimeSpan.TotalMilliseconds);
                         _forgetTimer.Enabled = true;
-                        m_log.Warn($"[{_options.ReportingName}]: client: {clientstring} is blocked for {_options.ForgetTimeSpan.TotalMilliseconds}ms based on concurrency, X-ForwardedForAllowed status is {_options.AllowXForwardedFor}, endpoint:{_options.AllowXForwardedFor}");
+                        m_log.LogWarning($"[{_options.ReportingName}]: client: {clientstring} is blocked for {_options.ForgetTimeSpan.TotalMilliseconds}ms based on concurrency, X-ForwardedForAllowed status is {_options.AllowXForwardedFor}, endpoint:{_options.AllowXForwardedFor}");
 
                     }
                     else
@@ -235,7 +235,7 @@ public class BasicDOSProtector
                         _tempBlocked[clientstring] = Util.EnvironmentTickCount() + (int)_options.ForgetTimeSpan.TotalMilliseconds;
                     _blockLockSlim.ExitWriteLock();
 
-                    m_log.Warn($"[{_options.ReportingName}]: client: {clientstring} is blocked for {_options.ForgetTimeSpan.TotalMilliseconds}ms, X-ForwardedForAllowed status is {_options.AllowXForwardedFor}, endpoint:{endpoint}");
+                    m_log.LogWarning($"[{_options.ReportingName}]: client: {clientstring} is blocked for {_options.ForgetTimeSpan.TotalMilliseconds}ms, X-ForwardedForAllowed status is {_options.AllowXForwardedFor}, endpoint:{endpoint}");
                     return false;
                 }
                 //else

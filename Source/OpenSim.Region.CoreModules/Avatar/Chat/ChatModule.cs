@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -34,12 +33,13 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatar.Chat;
 
 public class ChatModule : ISharedRegionModule
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected const int DEBUG_CHANNEL = 2147483647;
 
@@ -66,7 +66,7 @@ public class ChatModule : ISharedRegionModule
         {
             if (!m_config.GetBoolean("enabled", true))
             {
-                m_log.Info("[CHAT]: plugin disabled by configuration");
+                m_log.LogInformation("[CHAT]: plugin disabled by configuration");
                 m_enabled = false;
                 return;
             }
@@ -98,7 +98,7 @@ public class ChatModule : ISharedRegionModule
             }
         }
 
-        m_log.InfoFormat("[CHAT]: Initialized for {0} w:{1} s:{2} S:{3}", scene.RegionInfo.RegionName,
+        m_log.LogInformation("[CHAT]: Initialized for {0} w:{1} s:{2} S:{3}", scene.RegionInfo.RegionName,
                          m_whisperdistance, m_saydistance, m_shoutdistance);
     }
 
@@ -170,7 +170,7 @@ public class ChatModule : ISharedRegionModule
         // sanity check:
         if (c.Sender == null)
         {
-            m_log.ErrorFormat("[CHAT]: OnChatFromClient from {0} has empty Sender field!", sender);
+            m_log.LogError("[CHAT]: OnChatFromClient from {0} has empty Sender field!", sender);
             return;
         }
 
@@ -212,7 +212,7 @@ public class ChatModule : ISharedRegionModule
 
         if(!m_scenes.Contains(scene))
         {
-            m_log.WarnFormat("[CHAT]: message from unkown scene {0} ignored",
+            m_log.LogWarning("[CHAT]: message from unkown scene {0} ignored",
                                  scene.RegionInfo.RegionName);
             return;
         }
@@ -259,7 +259,7 @@ public class ChatModule : ISharedRegionModule
         if (message.Length > 1100)
             message = message.Substring(0, 1000);
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[CHAT]: DCTA: fromID {0} fromName {1}, region{2}, cType {3}, sType {4}",
         //    fromID, fromName, scene.RegionInfo.RegionName, c.Type, sourceType);
 
@@ -277,11 +277,26 @@ public class ChatModule : ISharedRegionModule
             }
         }
 
+        // Object chat on DEBUG_CHANNEL is for the object's OWNER: script errors and the API's
+        // "no permission / not found" lines. The SL wiki says the sim broadcasts and "most viewers filter
+        // out messages received on DEBUG_CHANNEL from objects owned by others" - not every viewer
+        // does, and a bystander can get the script-warning box for someone else's prim.
+        // The sim filters, so the outcome does not depend on the viewer. Avatar-sourced DEBUG_CHANNEL chat
+        // (a viewer typing /2147483647) is untouched, as is every other channel. Scripted listens are
+        // unaffected: the script engine subscribes to OnChatFromWorld itself, beside this module.
+        UUID debugOwnerOnly = UUID.Zero;
+        if (c.Type == ChatTypeEnum.DebugChannel && sourceType == ChatSourceType.Object
+            && c.SenderObject is SceneObjectPart debugPart)
+            debugOwnerOnly = debugPart.ParentGroup.OwnerID;
+
         Vector3 regionPos = new Vector3(scene.RegionInfo.WorldLocX, scene.RegionInfo.WorldLocY, 0);
         scene.ForEachScenePresence(
             delegate(ScenePresence presence)
             {
                 if (destination.IsNotZero() && presence.UUID.NotEqual(destination))
+                    return;
+
+                if (debugOwnerOnly.IsNotZero() && presence.UUID.NotEqual(debugOwnerOnly))
                     return;
 
                 if(presence.IsChildAgent)
@@ -360,7 +375,7 @@ public class ChatModule : ISharedRegionModule
             ownerID = UUID.Zero;
         }
 
-        // m_log.DebugFormat("[CHAT] Broadcast: fromID {0} fromName {1}, cType {2}, sType {3}", fromID, fromName, cType, sourceType);
+        // m_log.LogDebug("[CHAT] Broadcast: fromID {0} fromName {1}, cType {2}, sType {3}", fromID, fromName, cType, sourceType);
         Scene scene = c.Scene as Scene;
         if (scene != null)
         {

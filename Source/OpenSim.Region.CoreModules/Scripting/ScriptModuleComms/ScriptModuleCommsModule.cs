@@ -27,18 +27,19 @@
 
 using System.Reflection;
 using Nini.Config;
-using log4net;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using OpenMetaverse;
 using System.Linq.Expressions;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.Scripting.ScriptModuleComms;
 
 public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComms
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static string LogHeader = "[MODULE COMMS]";
 
     private Dictionary<string,object> m_constants = new Dictionary<string,object>();
@@ -85,7 +86,7 @@ public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComm
         m_scriptModule = scene.RequestModuleInterface<IScriptModule>();
 
         if (m_scriptModule != null)
-            m_log.Info("[MODULE COMMANDS]: Script engine found, module active");
+            m_log.LogInformation("[MODULE COMMANDS]: Script engine found, module active");
     }
 
     public string Name
@@ -143,7 +144,7 @@ public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComm
         MethodInfo mi = GetMethodInfoFromType(target.GetType(), meth, true);
         if (mi == null)
         {
-            m_log.WarnFormat("{0} Failed to register method {1}", LogHeader, meth);
+            m_log.LogWarning("{0} Failed to register method {1}", LogHeader, meth);
             return;
         }
 
@@ -158,7 +159,7 @@ public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComm
 
     public void RegisterScriptInvocation(object target, MethodInfo mi)
     {
-//            m_log.DebugFormat("[MODULE COMMANDS] Register method {0} from type {1}", mi.Name, (target is Type) ? ((Type)target).Name : target.GetType().Name);
+//            m_log.LogDebug("[MODULE COMMANDS] Register method {0} from type {1}", mi.Name, (target is Type) ? ((Type)target).Name : target.GetType().Name);
 
         Type delegateType = typeof(void);
         List<Type> typeArgs = mi.GetParameters()
@@ -178,7 +179,7 @@ public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComm
             }
             catch (Exception e)
             {
-                m_log.ErrorFormat("{0} Failed to create function signature. Most likely more than 5 parameters. Method={1}. Error={2}",
+                m_log.LogError("{0} Failed to create function signature. Most likely more than 5 parameters. Method={1}. Error={2}",
                     LogHeader, mi.Name, e);
             }
         }
@@ -209,7 +210,7 @@ public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComm
         {
             MethodInfo mi = GetMethodInfoFromType(target, method, false);
             if (mi == null)
-                m_log.WarnFormat("[MODULE COMMANDS] Failed to register method {0}", method);
+                m_log.LogWarning("[MODULE COMMANDS] Failed to register method {0}", method);
             else
                 RegisterScriptInvocation(target, mi);
         }
@@ -268,7 +269,7 @@ public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComm
                 else if (sid.ReturnType == typeof(void))
                     return "modInvokeN";
 
-                m_log.WarnFormat("[MODULE COMMANDS] failed to find match for {0} with return type {1}",fname,sid.ReturnType.Name);
+                m_log.LogWarning("[MODULE COMMANDS] failed to find match for {0} with return type {1}",fname,sid.ReturnType.Name);
             }
         }
 
@@ -328,7 +329,7 @@ public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComm
     /// </summary>
     public void RegisterConstant(string cname, object value)
     {
-//            m_log.DebugFormat("[MODULE COMMANDS] register constant <{0}> with value {1}",cname,value.ToString());
+//            m_log.LogDebug("[MODULE COMMANDS] register constant <{0}> with value {1}",cname,value.ToString());
         lock (m_constants)
         {
             m_constants.Add(cname,value);
@@ -354,7 +355,7 @@ public class ScriptModuleCommsModule : INonSharedRegionModule, IScriptModuleComm
     /// </summary>
     public object LookupModConstant(string cname)
     {
-        // m_log.DebugFormat("[MODULE COMMANDS] lookup constant <{0}>",cname);
+        // m_log.LogDebug("[MODULE COMMANDS] lookup constant <{0}>",cname);
 
         lock (m_constants)
         {

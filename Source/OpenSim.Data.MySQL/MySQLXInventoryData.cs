@@ -29,6 +29,9 @@ using System.Data;
 using OpenMetaverse;
 using MySqlConnector;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Data.MySQL;
 
 /// <summary>
@@ -121,7 +124,7 @@ public class MySQLXInventoryData : IXInventoryData
 
 public class MySqlItemHandler : MySqlInventoryHandler<XInventoryItem>
 {
-    //private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public MySqlItemHandler(string c, string t, string m) : base(c, t, m)
     {
@@ -246,7 +249,7 @@ public class MySqlItemHandler : MySqlInventoryHandler<XInventoryItem>
 
 public class MySqlFolderHandler : MySqlInventoryHandler<XInventoryFolder>
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public MySqlFolderHandler(string c, string t, string m) : base(c, t, m)
     {
@@ -299,7 +302,7 @@ public class MySqlInventoryHandler<T> : MySQLGenericTableHandler<T> where T: cla
 
     protected bool IncrementFolderVersion(string folderID)
     {
-//            m_log.DebugFormat("[MYSQL FOLDER HANDLER]: Incrementing version on folder {0}", folderID);
+//            m_log.LogDebug("[MYSQL FOLDER HANDLER]: Incrementing version on folder {0}", folderID);
 //            Util.PrintCallStack();
 
         using (MySqlConnection dbcon = new(m_connectionString))

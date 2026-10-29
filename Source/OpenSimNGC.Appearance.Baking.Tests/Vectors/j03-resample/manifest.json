@@ -1,0 +1,154 @@
+{
+  "id": "J03-resample",
+  "title": "Single-channel resampling cases",
+  "rules": [
+    "R15"
+  ],
+  "inputRule": "input byte at (x, y) = (x*37 \u002B y*91 \u002B (x*y mod 17)) mod 256, row-major",
+  "cases": [
+    {
+      "n": 0,
+      "srcW": 64,
+      "srcH": 64,
+      "dstW": 32,
+      "dstH": 32,
+      "input": "rs-00-in.bin",
+      "output": "rs-00-out.bin"
+    },
+    {
+      "n": 1,
+      "srcW": 64,
+      "srcH": 64,
+      "dstW": 16,
+      "dstH": 16,
+      "input": "rs-01-in.bin",
+      "output": "rs-01-out.bin"
+    },
+    {
+      "n": 2,
+      "srcW": 64,
+      "srcH": 64,
+      "dstW": 64,
+      "dstH": 64,
+      "input": "rs-02-in.bin",
+      "output": "rs-02-out.bin"
+    },
+    {
+      "n": 3,
+      "srcW": 60,
+      "srcH": 60,
+      "dstW": 40,
+      "dstH": 40,
+      "input": "rs-03-in.bin",
+      "output": "rs-03-out.bin"
+    },
+    {
+      "n": 4,
+      "srcW": 30,
+      "srcH": 30,
+      "dstW": 64,
+      "dstH": 64,
+      "input": "rs-04-in.bin",
+      "output": "rs-04-out.bin"
+    },
+    {
+      "n": 5,
+      "srcW": 7,
+      "srcH": 7,
+      "dstW": 64,
+      "dstH": 64,
+      "input": "rs-05-in.bin",
+      "output": "rs-05-out.bin"
+    },
+    {
+      "n": 6,
+      "srcW": 128,
+      "srcH": 128,
+      "dstW": 100,
+      "dstH": 100,
+      "input": "rs-06-in.bin",
+      "output": "rs-06-out.bin"
+    },
+    {
+      "n": 7,
+      "srcW": 1,
+      "srcH": 1,
+      "dstW": 8,
+      "dstH": 8,
+      "input": "rs-07-in.bin",
+      "output": "rs-07-out.bin"
+    },
+    {
+      "n": 8,
+      "srcW": 48,
+      "srcH": 32,
+      "dstW": 16,
+      "dstH": 16,
+      "input": "rs-08-in.bin",
+      "output": "rs-08-out.bin"
+    },
+    {
+      "n": 9,
+      "srcW": 100,
+      "srcH": 80,
+      "dstW": 64,
+      "dstH": 64,
+      "input": "rs-09-in.bin",
+      "output": "rs-09-out.bin"
+    },
+    {
+      "n": 10,
+      "srcW": 64,
+      "srcH": 64,
+      "dstW": 3,
+      "dstH": 3,
+      "input": "rs-10-in.bin",
+      "output": "rs-10-out.bin"
+    },
+    {
+      "n": 11,
+      "srcW": 64,
+      "srcH": 64,
+      "dstW": 48,
+      "dstH": 48,
+      "input": "rs-11-in.bin",
+      "output": "rs-11-out.bin"
+    },
+    {
+      "n": 12,
+      "srcW": 2,
+      "srcH": 2,
+      "dstW": 5,
+      "dstH": 5,
+      "input": "rs-12-in.bin",
+      "output": "rs-12-out.bin"
+    },
+    {
+      "n": 13,
+      "srcW": 100,
+      "srcH": 100,
+      "dstW": 64,
+      "dstH": 64,
+      "input": "rs-13-in.bin",
+      "output": "rs-13-out.bin"
+    },
+    {
+      "n": 14,
+      "srcW": 64,
+      "srcH": 32,
+      "dstW": 64,
+      "dstH": 16,
+      "input": "rs-14-in.bin",
+      "output": "rs-14-out.bin"
+    },
+    {
+      "n": 15,
+      "srcW": 256,
+      "srcH": 256,
+      "dstW": 8,
+      "dstH": 8,
+      "input": "rs-15-in.bin",
+      "output": "rs-15-out.bin"
+    }
+  ]
+}

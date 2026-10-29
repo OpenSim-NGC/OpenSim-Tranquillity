@@ -34,27 +34,27 @@ public class JPEG : GenericSystemDrawing, ITerrainLoader
 {
     #region ITerrainLoader Members
 
-    public string FileExtension
+    public new string FileExtension
     {
         get { return ".jpg"; }
     }
 
-    public ITerrainChannel LoadFile(string filename)
+    public override ITerrainChannel LoadFile(string filename)
     {
         throw new NotImplementedException();
     }
 
-    public ITerrainChannel LoadFile(string filename, int x, int y, int fileWidth, int fileHeight, int w, int h)
+    public override ITerrainChannel LoadFile(string filename, int x, int y, int fileWidth, int fileHeight, int w, int h)
     {
         throw new NotImplementedException();
     }
 
-    public ITerrainChannel LoadStream(Stream stream)
+    public override ITerrainChannel LoadStream(Stream stream)
     {
         throw new NotImplementedException();
     }
 
-    public void SaveFile(string filename, ITerrainChannel map)
+    public override void SaveFile(string filename, ITerrainChannel map)
     {
         using (SKBitmap colours = CreateBitmapFromMap(map))
         using (SKFileWStream stream = new SKFileWStream(filename))
@@ -70,7 +70,7 @@ public class JPEG : GenericSystemDrawing, ITerrainLoader
     /// </summary>
     /// <param name="stream">The target stream</param>
     /// <param name="map">The terrain channel being saved</param>
-    public void SaveStream(Stream stream, ITerrainChannel map)
+    public override void SaveStream(Stream stream, ITerrainChannel map)
     {
         using (SKBitmap colours = CreateBitmapFromMap(map))
         using (SKWStream skStream = new SKManagedWStream(stream))
@@ -81,7 +81,7 @@ public class JPEG : GenericSystemDrawing, ITerrainLoader
         }
     }
 
-    public virtual void SaveFile(ITerrainChannel m_channel, string filename,
+    public override void SaveFile(ITerrainChannel m_channel, string filename,
                          int offsetX, int offsetY,
                          int fileWidth, int fileHeight,
                          int regionSizeX, int regionSizeY)
@@ -179,7 +179,7 @@ public class JPEG : GenericSystemDrawing, ITerrainLoader
     }
 
     //Returns true if this extension is supported for terrain save-tile
-    public bool SupportsTileSave()
+    public override bool SupportsTileSave()
     {
         return true;
     }

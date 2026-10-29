@@ -34,6 +34,7 @@ using OpenSim.Region.PhysicsModules.SharedBase;
 using SkiaSharp;
 using System.Runtime.CompilerServices;
 using System.Xml;
+using Microsoft.Extensions.Logging;
 using PermissionMask = OpenSim.Framework.PermissionMask;
 
 namespace OpenSim.Region.Framework.Scenes;
@@ -144,6 +145,12 @@ public enum scriptEvents : ulong
     linkset_data = 1UL << 41,
     experience_permissions = 1UL << 42,
     experience_permissions_denied = 1UL << 43,
+    // So a script's on_damage / final_damage / on_death / game_control handlers show in
+    // the part's aggregated mask (what 'phlox status' prints). path_update already had bit 40.
+    on_damage = 1UL << 44,
+    final_damage = 1UL << 45,
+    on_death = 1UL << 46,
+    game_control = 1UL << 47,
 
     anytouch = touch | touch_end | touch_start,
     anyTarget = at_target | not_at_target | at_rot_target | not_at_rot_target,
@@ -254,7 +261,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             }
             m_hasGroupChanged = value;
 
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[SCENE OBJECT GROUP]: HasGroupChanged set to {0} for {1} {2}", m_hasGroupChanged, Name, LocalId);
         }
 
@@ -312,10 +319,108 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
     public bool IsAttachment
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get;
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set;
+        get { return m_isAttachment; }
+        set
+        {
+            m_isAttachment = value;
+            // an attachment has no parcel; a later drop to the ground records a first parcel again
+            if (value)
+                ForgetParcel();
+        }
     }
+    private bool m_isAttachment;
+
+    #region Parcel tracking
+
+    private const int NoParcel = int.MinValue;
+
+    // runtime only, never persisted: the parcel last recorded for this object, see CheckParcelCrossing
+    private bool m_parcelTracking;
+    private int m_currentParcelLocalID = NoParcel;
+    private ILandObject m_currentParcel;
+
+    /// <summary>
+    /// The parcel last recorded for this object by <see cref="CheckParcelCrossing"/>, or null.
+    /// </summary>
+    public ILandObject CurrentParcel
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get { return m_currentParcel; }
+    }
+
+    private void ForgetParcel()
+    {
+        m_currentParcel = null;
+        m_currentParcelLocalID = NoParcel;
+    }
+
+    /// <summary>
+    /// Called by the scene graph once the object is in the scene: from now on parcel crossings and owner or
+    /// group changes are reported, and the first parcel is recorded now.
+    /// </summary>
+    internal void StartParcelTracking()
+    {
+        // an object arriving from another region may be the same instance; its old record means nothing here
+        ForgetParcel();
+        m_parcelTracking = true;
+        CheckParcelCrossing();
+    }
+
+    /// <summary>
+    /// Records the parcel under the object's position and raises
+    /// <see cref="EventManager.OnGroupCrossedToNewParcel"/> if it differs from the last one recorded.
+    /// </summary>
+    /// <remarks>
+    /// One land lookup and one integer compare; the event is raised only on an actual change.
+    /// Does nothing for attachments, deleted objects and objects not (yet) in the scene.
+    /// </remarks>
+    public void CheckParcelCrossing()
+    {
+        if (!m_parcelTracking || m_isAttachment || IsDeleted)
+            return;
+
+        Scene scene = m_scene;
+        ILandChannel land = scene?.LandChannel;
+        if (land is null)
+            return;
+
+        Vector3 pos = m_rootPart.GroupPosition;
+        ILandObject parcel;
+        try
+        {
+            parcel = land.GetLandObjectClippedXY(pos.X, pos.Y);
+        }
+        catch
+        {
+            // land is being replaced (oar load); the next move records it
+            return;
+        }
+
+        LandData ldata = parcel?.LandData;
+        if (ldata is null || ldata.LocalID == m_currentParcelLocalID)
+            return;
+
+        ILandObject oldParcel = m_currentParcel;
+        m_currentParcel = parcel;
+        m_currentParcelLocalID = ldata.LocalID;
+
+        scene.EventManager.TriggerGroupCrossedToNewParcel(this, oldParcel, parcel);
+    }
+
+    private void TriggerOwnerOrGroupChanged(UUID oldOwner, UUID oldGroup)
+    {
+        if (!m_parcelTracking || IsDeleted || m_scene is null)
+            return;
+
+        UUID newOwner = m_rootPart.OwnerID;
+        UUID newGroup = m_rootPart.GroupID;
+        if (oldOwner.Equals(newOwner) && oldGroup.Equals(newGroup))
+            return;
+
+        m_scene.EventManager.TriggerObjectOwnerOrGroupChanged(this, oldOwner, newOwner, oldGroup, newGroup);
+    }
+
+    #endregion
 
     /// <summary>
     /// What experience temp attached this item
@@ -437,6 +542,22 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
     protected ulong m_regionHandle;
     protected SceneObjectPart m_rootPart;
     // private Dictionary<UUID, scriptEvents> m_scriptEvents = new Dictionary<UUID, scriptEvents>();
+
+    // Phlox: tracks whether this group was moving on the previous heartbeat so
+    // Scene.CheckMovingTransitions() can fire moving_start/moving_end on general
+    // (non-keyframed) movement. Added with the Phlox port.
+    public bool WasMoving { get; set; }
+
+    // Phlox seam: linkset data is per-linkset (per-group) in SL, but Tranquillity
+    // stores it natively on the root SceneObjectPart and serializes/persists it there.
+    // Expose a group-level accessor that delegates to the root part so the SL/Phlox
+    // call sites see a group-level store while persistence rides Tranquillity's
+    // existing per-part path (no parallel store).
+    public LinksetData LinksetData
+    {
+        get { return RootPart?.LinksetData; }
+        set { if (RootPart is not null) RootPart.LinksetData = value; }
+    }
 
     private Dictionary<int, scriptPosTarget> m_targets = new();
     private Dictionary<int, scriptRotTarget> m_rotTargets = new();
@@ -668,13 +789,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                 if (!inTransit)
                 {
                     inTransit = true;
-                    SceneObjectGroup sog = this;
-
-                    Util.FireAndForget(delegate
-                    {
-                        sog = CrossAsync(sog, val, null);
-                        CrossAsyncCompleted(sog);
-                    }, null, "ObjCross-"+sog.UUID.ToString(), false);
+                    StartCrossing(val, null, "ObjCross-" + UUID.ToString());
                 }
                 return;
             }
@@ -723,7 +838,37 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             }
 
             Scene?.EventManager.TriggerParcelPrimCountTainted();
+
+            CheckParcelCrossing();
         }
+    }
+
+    /// <summary>
+    /// Run a crossing (or an object teleport to another region) whose caller has just set <see cref="inTransit"/>,
+    /// on its own thread. It is announced with EventManager.OnGroupBeginInTransit before that thread starts, and its
+    /// end with OnGroupEndInTransit once it is over: crossed when the object left (CrossAsync returns null), not
+    /// crossed when it stays here, after CrossAsyncCompleted has put it back in the region.
+    /// </summary>
+    private void StartCrossing(Vector3 val, TeleportObjectData tpdata, string threadName)
+    {
+        SceneObjectGroup sog = this;
+        Scene scene = m_scene;
+        scene.EventManager.TriggerGroupBeginInTransit(sog);
+
+        Util.FireAndForget(delegate
+        {
+            bool crossed = false;
+            try
+            {
+                SceneObjectGroup stayed = CrossAsync(sog, val, tpdata);
+                crossed = stayed is null;
+                CrossAsyncCompleted(stayed);
+            }
+            finally
+            {
+                scene.EventManager.TriggerGroupEndInTransit(sog, crossed);
+            }
+        }, null, threadName, false);
     }
 
     private SceneObjectGroup CrossAsync(SceneObjectGroup sog, Vector3 val, TeleportObjectData tpdata)
@@ -743,7 +888,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                 }
                 catch (Exception)
                 {
-                    m_log.Warn("[SCENE]: exception when trying to remove the prim that crossed the border.");
+                    m_log.LogWarning("[SCENE]: exception when trying to remove the prim that crossed the border.");
                 }
                 return sog;
             }
@@ -760,7 +905,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                 }
                 catch (Exception)
                 {
-                    m_log.Warn("[SCENE]: exception when trying to return the prim that crossed the border.");
+                    m_log.LogWarning("[SCENE]: exception when trying to return the prim that crossed the border.");
                 }
                 return sog;
             }
@@ -815,7 +960,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             if(!entityTransfer.checkAgentAccessToRegion(av, destination, newpos, ctx, out reason))
                 return sog;
 
-            m_log.Debug($"[SCENE OBJECT]: Avatar {av.Name} needs to be crossed to {destination.RegionName}");
+            m_log.LogDebug($"[SCENE OBJECT]: Avatar {av.Name} needs to be crossed to {destination.RegionName}");
         }
 
         // We unparent the SP quietly so that it won't
@@ -920,7 +1065,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                 ScenePresence av = avinfo.av;
                 av.IsInLocalTransit = true;
                 av.IsInTransit = true;
-                m_log.Debug($"[SCENE OBJECT]: Crossing avatar {av.Name} to {val}");
+                m_log.LogDebug($"[SCENE OBJECT]: Crossing avatar {av.Name} to {val}");
 
                 if(av.m_crossingFlags > 0)
                     entityTransfer.CrossAgentToNewRegionAsync(av, newpos, destination, false, ctx);
@@ -938,7 +1083,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                     // In any case
                     av.IsInTransit = false;
                     av.m_crossingFlags = 0;
-                    m_log.Debug($"[SCENE OBJECT]: Crossing agent {av.Firstname} {av.Lastname} completed.");
+                    m_log.LogDebug($"[SCENE OBJECT]: Crossing agent {av.Firstname} {av.Lastname} completed.");
                 }
                 else
                 {
@@ -974,7 +1119,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                                 av.SendAttachmentsToAgentNF(oav); // not ok
                             }
                         });
-                    m_log.Debug($"[SCENE OBJECT]: Crossing agent {av.Firstname} {av.Lastname} failed.");
+                    m_log.LogDebug($"[SCENE OBJECT]: Crossing agent {av.Firstname} {av.Lastname} failed.");
                 }
             }
 
@@ -1053,6 +1198,9 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         sog.inTransit = false;
         AttachToBackup();
         sog.ScheduleGroupForUpdate(PrimUpdateFlags.FullUpdatewithAnimMatOvr);
+
+        // the object was clamped back into the region, maybe onto another parcel
+        sog.CheckParcelCrossing();
     }
 
     private class TeleportObjectData
@@ -1183,12 +1331,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             sourceID = sourceID
         };
 
-        SceneObjectGroup sog = this;
-        Util.FireAndForget(delegate
-        {
-            sog = CrossAsync(sog, targetPosition, tdata);
-            CrossAsyncCompleted(sog);
-        }, null, "ObjTeleport-" + sog.UUID.ToString(), false);
+        StartCrossing(targetPosition, tdata, "ObjTeleport-" + UUID.ToString());
         return 0;
     }
 
@@ -1490,13 +1633,13 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
 
     public void LoadScriptState(XmlReader reader)
     {
-//            m_log.DebugFormat("[SCENE OBJECT GROUP]: Looking for script state for {0}", Name);
+//            m_log.LogDebug("[SCENE OBJECT GROUP]: Looking for script state for {0}", Name);
 
         while (true)
         {
             if (reader.Name.Equals("SavedScriptState") && reader.NodeType == XmlNodeType.Element)
             {
-//                    m_log.DebugFormat("[SCENE OBJECT GROUP]: Loading script state for {0}", Name);
+//                    m_log.LogDebug("[SCENE OBJECT GROUP]: Loading script state for {0}", Name);
                 m_savedScriptState ??= new Dictionary<UUID, string>();
 
                 string uuid = reader.GetAttribute("UUID");
@@ -1507,13 +1650,13 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
 
                 if (!string.IsNullOrEmpty(uuid))
                 {
-//                        m_log.DebugFormat("[SCENE OBJECT GROUP]: Found state for item ID {0} in object {1}", uuid, Name);
+//                        m_log.LogDebug("[SCENE OBJECT GROUP]: Found state for item ID {0} in object {1}", uuid, Name);
                     if (UUID.TryParse(uuid, out UUID itemid) && itemid.IsNotZero())
                         m_savedScriptState[itemid] = innerXml;
                 }
                 else
                 {
-                    m_log.Warn($"[SCENE OBJECT GROUP]: SavedScriptState element had no UUID in object {Name} id: {UUID}");
+                    m_log.LogWarning($"[SCENE OBJECT GROUP]: SavedScriptState element had no UUID in object {Name} id: {UUID}");
                 }
             }
             else
@@ -1568,7 +1711,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
                 part.LocalId = m_scene.AllocateLocalId();
 
             part.ParentID = m_rootPart.LocalId;
-            //m_log.DebugFormat("[SCENE]: Given local id {0} to part {1}, linknum {2}, parent {3} {4}", part.LocalId, part.UUID, part.LinkNum, part.ParentID, part.ParentUUID);
+            //m_log.LogDebug("[SCENE]: Given local id {0} to part {1}, linknum {2}, parent {3} {4}", part.LocalId, part.UUID, part.LinkNum, part.ParentID, part.ParentUUID);
         }
 
         ApplyPhysics();
@@ -1776,7 +1919,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         else if (maxZ > lower)
             offsetHeight = 0.5f * boundingBox.Z - maxZ;
 
-       // m_log.InfoFormat("BoundingBox is {0} , {1} , {2} ", boundingBox.X, boundingBox.Y, boundingBox.Z);
+       // m_log.LogInformation("BoundingBox is {0} , {1} , {2} ", boundingBox.X, boundingBox.Y, boundingBox.Z);
         return boundingBox;
     }
 
@@ -2154,7 +2297,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
     public virtual void OnGrabPart(SceneObjectPart part, Vector3 offsetPos, IClientAPI remoteClient)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE OBJECT GROUP]: Processing OnGrabPart for {0} on {1} {2}, offsetPos {3}",
 //                remoteClient.Name, part.Name, part.LocalId, offsetPos);
 
@@ -2342,6 +2485,9 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
     public void SetOwnerId(UUID userId)
     {
+            UUID oldOwner = m_rootPart.OwnerID;
+            UUID oldGroup = m_rootPart.GroupID;
+
             ForEachPart(delegate(SceneObjectPart part)
             {
                 if (part.OwnerID.NotEqual(userId))
@@ -2351,6 +2497,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
                     part.OwnerID = userId;
                 }
             });
+
+            TriggerOwnerOrGroupChanged(oldOwner, oldGroup);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2371,14 +2519,14 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     {
         if (!Backup)
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[WATER WARS]: Ignoring backup of {0} {1} since object is not marked to be backed up", Name, UUID);
             return;
         }
 
         if (IsDeleted || inTransit || UUID.IsZero())
         {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[WATER WARS]: Ignoring backup of {0} {1} since object is marked as already deleted", Name, UUID);
             return;
         }
@@ -2423,7 +2571,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
                             }
 
                             DetachFromBackup();
-                            m_log.Debug(
+                            m_log.LogDebug(
                                 $"[SCENE OBJECT GROUP]: Returning object {RootPart.UUID} due to parcel autoreturn");
                             m_scene.AddReturn(OwnerID.Equals(GroupID) ? LastOwnerID : OwnerID, Name, AbsolutePosition, "parcel autoreturn");
                             m_scene.DeRezObjects(null, new List<uint>() { RootPart.LocalId }, UUID.Zero,
@@ -2477,7 +2625,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         }
         catch (Exception e)
         {
-            m_log.Error($"[SCENE]: Storing of {Name}, {UUID} in {m_scene.RegionInfo.RegionName} failed: {e.Message}", e);
+            m_log.LogError(e, $"[SCENE]: Storing of {Name}, {UUID} in {m_scene.RegionInfo.RegionName} failed: {e.Message}");
         }
     }
 
@@ -2560,6 +2708,10 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         // a copy is not in transit hopefully
         dupe.inTransit = false;
+
+        // a copy is not in the scene yet; adding it records its first parcel
+        dupe.m_parcelTracking = false;
+        dupe.ForgetParcel();
 
         // new group as no sitting avatars
         dupe.m_sittingAvatars = new List<ScenePresence>();
@@ -2699,6 +2851,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
      // This is used by both Double-Click Auto-Pilot and llMoveToTarget() in an attached object
     public void MoveToTarget(Vector3 target, float tau)
     {
+        // A tau of 0 or less does nothing, and leaves an earlier target as it is: "Calling llMoveToTarget with a
+        // tau of 0.0 or less will silently fail, and do nothing" (SL wiki llMoveToTarget). StopMoveToTarget stops.
         if(tau > 0)
         {
             if (IsAttachment)
@@ -2709,17 +2863,25 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             }
             else
             {
-                PhysicsActor pa = RootPart.PhysActor;
-                if (pa is not null)
+                lock (m_grabLock)
                 {
-                    pa.PIDTarget = target;
-                    pa.PIDTau = tau;
-                    pa.PIDActive = true;
+                    PhysicsActor pa = RootPart.PhysActor;
+                    if (pa is not null)
+                    {
+                        // remembered so a drag can put it back; while a drag holds the target it is only remembered
+                        m_scriptMoveActive = true;
+                        m_scriptMoveTarget = target;
+                        m_scriptMoveTau = tau;
+                        if (m_grabbed)
+                            return;
+
+                        pa.PIDTarget = target;
+                        pa.PIDTau = tau;
+                        pa.PIDActive = true;
+                    }
                 }
             }
         }
-        else
-            StopMoveToTarget();
     }
 
     public void StopMoveToTarget()
@@ -2731,9 +2893,16 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         }
         else
         {
-            PhysicsActor pa = RootPart.PhysActor;
-            if (pa is not null)
-                pa.PIDActive = false;
+            lock (m_grabLock)
+            {
+                m_scriptMoveActive = false;
+                if (m_grabbed)
+                    return; // the drag holds the target; nothing is put back when it ends
+
+                PhysicsActor pa = RootPart.PhysActor;
+                if (pa is not null)
+                    pa.PIDActive = false;
+            }
 
             RootPart.ScheduleTerseUpdate(); // send a stop information
         }
@@ -2782,7 +2951,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         SceneObjectPart rootpart = m_rootPart;
         if (rootpart is not null)
         {
-            if (rootpart.PhysActor is not null)
+            // a target core gave the actor is switched off by the part, unless a rotate-drag holds it
+            if (rootpart.PhysActor is not null && !rootpart.HasGivenRotationTarget)
             {
                 rootpart.PhysActor.APIDActive = false;
             }
@@ -2798,28 +2968,45 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// <param name="tau">Number of seconds over which to reach target</param>
     public void SetHoverHeight(float height, PIDHoverType hoverType, float tau)
     {
-        PhysicsActor pa = null;
-        if(IsAttachment)
-            {
-                ScenePresence avatar = m_scene.GetScenePresence(AttachedAvatar);
-                if (avatar is not null)
-                    pa = avatar.PhysicsActor;
-            }
-        else
-            pa = RootPart.PhysActor;
+        if (IsAttachment)
+        {
+            // While worn the prims have no actor; the wearer's presence holds the hover and gives it to the
+            // avatar's actor, now and after any later actor is made.
+            m_scene?.GetScenePresence(AttachedAvatar)?.SetAttachmentHover(this, height, hoverType, tau);
+            return;
+        }
+
+        PhysicsActor pa = RootPart.PhysActor;
 
         if (pa is not null)
         {
-            if (height != 0f)
+            lock (m_grabLock)
             {
-                pa.PIDHoverHeight = height;
-                pa.PIDHoverType = hoverType;
-                pa.PIDHoverTau = tau;
-                pa.PIDHoverActive = true;
-            }
-            else
-            {
-                pa.PIDHoverActive = false;
+                if (!IsAttachment)
+                {
+                    // remembered so a drag can put it back; while a drag is held it is only remembered
+                    m_scriptHoverActive = height != 0f;
+                    if (m_scriptHoverActive)
+                    {
+                        m_scriptHoverHeight = height;
+                        m_scriptHoverType = hoverType;
+                        m_scriptHoverTau = tau;
+                    }
+                    if (m_grabbed)
+                        return;
+                }
+
+                if (height != 0f)
+                {
+                    pa.PIDHoverHeight = height;
+                    pa.PIDHoverType = hoverType;
+                    pa.PIDHoverTau = tau;
+                    pa.PIDHoverActive = true;
+                }
+                else
+                {
+                    pa.PIDHoverActive = false;
+                }
             }
         }
     }
@@ -2833,6 +3020,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     {
         SceneObjectPart rpart = RootPart;
         UUID oldowner = rpart.OwnerID;
+        UUID oldgroup = rpart.GroupID;
         ForEachPart(delegate(SceneObjectPart part)
         {
             if(part.GroupID.NotEqual(part.OwnerID))
@@ -2852,6 +3040,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         }
 
         rpart.ScheduleFullUpdate();
+
+        TriggerOwnerOrGroupChanged(oldowner, oldgroup);
     }
 
     /// <summary>
@@ -2958,7 +3148,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     public void ScheduleGroupForFullUpdate()
     {
         //            if (IsAttachment)
-        //                m_log.DebugFormat("[SOG]: Scheduling full update for {0} {1}", Name, LocalId);
+        //                m_log.LogDebug("[SOG]: Scheduling full update for {0} {1}", Name, LocalId);
         if (Scene.GetNumberOfClients() == 0)
             return;
 
@@ -2976,7 +3166,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     public void ScheduleGroupForFullAnimUpdate()
     {
         //            if (IsAttachment)
-        //                m_log.DebugFormat("[SOG]: Scheduling full update for {0} {1}", Name, LocalId);
+        //                m_log.LogDebug("[SOG]: Scheduling full update for {0} {1}", Name, LocalId);
         if (Scene.GetNumberOfClients() == 0)
             return;
 
@@ -3007,7 +3197,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     public void ScheduleGroupForUpdate(PrimUpdateFlags update)
     {
         //if (IsAttachment)
-        //    m_log.DebugFormat("[SOG]: Scheduling full update for {0} {1}", Name, LocalId);
+        //    m_log.LogDebug("[SOG]: Scheduling full update for {0} {1}", Name, LocalId);
         if (Scene.GetNumberOfClients() == 0)
             return;
 
@@ -3034,7 +3224,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// </remarks>
     public void ScheduleGroupForTerseUpdate()
     {
-//            m_log.DebugFormat("[SOG]: Scheduling terse update for {0} {1}", Name, UUID);
+//            m_log.LogDebug("[SOG]: Scheduling terse update for {0} {1}", Name, UUID);
 
         SceneObjectPart[] parts = m_parts.GetArray();
         for (int i = 0; i < parts.Length; i++)
@@ -3174,7 +3364,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     // The group being linked need not be a linkset -- it can have just one prim.
     public void LinkToGroup(SceneObjectGroup objectGroup, bool insert)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE OBJECT GROUP]: Linking group with root part {0}, {1} to group with root part {2}, {3}",
 //                objectGroup.RootPart.Name, objectGroup.RootPart.UUID, RootPart.Name, RootPart.UUID);
 
@@ -3188,7 +3378,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         if ((m_scene.m_linksetCapacity > 0) &&
             (PrimCount + objectGroup.PrimCount) > m_scene.m_linksetCapacity)
         {
-            m_log.DebugFormat(
+            m_log.LogDebug(
                 "[SCENE OBJECT GROUP]: Cannot link group with root" +
                 " part {0}, {1} ({2} prims) to group with root part" +
                 " {3}, {4} ({5} prims) because the new linkset" +
@@ -3432,7 +3622,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         }
         else
         {
-            m_log.Warn($"[SCENE OBJECT GROUP]: DelinkFromGroup(): prim {partID} not found in object {UUID}");
+            m_log.LogWarning($"[SCENE OBJECT GROUP]: DelinkFromGroup(): prim {partID} not found in object {UUID}");
             return null;
         }
     }
@@ -3451,7 +3641,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// <returns>The object group of the newly delinked prim.</returns>
     public SceneObjectGroup DelinkFromGroup(SceneObjectPart linkPart, bool sendEvents)
     {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[SCENE OBJECT GROUP]: Delinking part {0}, {1} from group with root part {2}, {3}",
 //                    linkPart.Name, linkPart.UUID, RootPart.Name, RootPart.UUID);
 
@@ -3506,6 +3696,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             linkPart.PhysActor = null;
         }
 
+        GiveDelinkedPartTheLinksetMotion(linkPart, worldPos);
+
         // We need to reset the child part's position
         // ready for life as a separate object after being a part of another object
 
@@ -3542,10 +3734,39 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         return objectGroup;
     }
 
+    /// <summary>
+    /// Sets the velocity and angular velocity a part leaves a physical linkset with. The part's new physics actor
+    /// is made from these when it is added to the scene as a group of its own.
+    /// </summary>
+    /// <remarks>
+    /// The part moves as it did in the linkset: at the root's velocity plus the root's spin crossed with the part's
+    /// offset from the root's centre of mass (from the root's position when the physics engine reports no centre
+    /// of mass), and it keeps the root's angular velocity. A linkset that is not physical, or a root with no physics
+    /// actor, leaves the part as it is.
+    /// </remarks>
+    /// <param name="linkPart">The part being delinked, already out of the physics scene.</param>
+    /// <param name="worldPos">The part's world position in the linkset.</param>
+    private void GiveDelinkedPartTheLinksetMotion(SceneObjectPart linkPart, Vector3 worldPos)
+    {
+        PhysicsActor rootPa = m_rootPart.PhysActor;
+        if (linkPart == m_rootPart || rootPa is null || !rootPa.IsPhysical)
+            return;
+
+        Vector3 velocity = m_rootPart.Velocity;
+        Vector3 angularVelocity = m_rootPart.AngularVelocity;
+
+        Vector3 pivot = rootPa.CenterOfMass;
+        if (pivot == Vector3.Zero || Util.IsNanOrInfinity(pivot))
+            pivot = m_rootPart.AbsolutePosition;
+
+        linkPart.Velocity = velocity + Vector3.Cross(angularVelocity, worldPos - pivot);
+        linkPart.AngularVelocity = angularVelocity;
+    }
+
 /* working on it
     public void DelinkFromGroup(List<SceneObjectPart> linkParts, bool sendEvents)
     {
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[SCENE OBJECT GROUP]: Delinking part {0}, {1} from group with root part {2}, {3}",
 //                    linkPart.Name, linkPart.UUID, RootPart.Name, RootPart.UUID);
 
@@ -3716,20 +3937,42 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
     double lastTouchTime = 0;
 
+    // Click-and-drag of a physical object. The viewer sends ObjectGrabUpdate only while the mouse moves, so a drag
+    // steers the root actor with its move-to-target (a velocity of distance / tau, gravity not applied) instead of
+    // pushing it: a push per update is a spring with no damper that does nothing while the mouse is still.
+    private const float GrabTau = 0.25f;
+    private readonly object m_grabLock = new();
+    private bool m_grabbed;
+    private UUID m_grabAgent;
+    private Vector3 m_grabAnchor;
+    private PhysicsActor m_grabActor;
+
+    // What scripts last set on the root actor (llMoveToTarget, llSetHoverHeight), put back when a drag ends.
+    private bool m_scriptMoveActive;
+    private Vector3 m_scriptMoveTarget;
+    private float m_scriptMoveTau;
+    private bool m_scriptHoverActive;
+    private float m_scriptHoverHeight;
+    private float m_scriptHoverTau;
+    private PIDHoverType m_scriptHoverType;
+
     /// <summary>
-    /// If object is physical, apply force to move it around
+    /// If object is physical, steer it to the cursor with the physics actor's move-to-target
     /// If object is not physical, just put it at the resulting location
     /// </summary>
     /// <param name="partID">Part ID to check for grab</param>
-    /// <param name="offset">Always seems to be 0,0,0, so ignoring</param>
-    /// <param name="pos">New position.  We do the math here to turn it into a force</param>
+    /// <param name="offset">Not used: the offset of the grabbed point from the root is taken from the first update of a drag</param>
+    /// <param name="pos">New position of the grabbed point</param>
     /// <param name="remoteClient"></param>
     public void GrabMovement(UUID partID, Vector3 offset, Vector3 pos, IClientAPI remoteClienth)
     {
         if (m_scene.EventManager.TriggerGroupMove(UUID, pos))
         {
             if (BlockGrabOverride)
+            {
+                EndGrab();
                 return;
+            }
 
             SceneObjectPart part = GetPart(partID);
 
@@ -3737,19 +3980,27 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
                 return;
 
             if (part.BlockGrab)
+            {
+                EndGrab();
                 return;
+            }
 
             PhysicsActor pa = m_rootPart.PhysActor;
 
             if (pa is not null && pa.IsPhysical)
             {
-                // empirically convert distance diference to a impulse
-                Vector3 grabforce = pos - AbsolutePosition;
-                grabforce *= pa.Mass * 0.1f;
-                pa.AddForce(grabforce, false);
+                if (IsPhysicalDragRefused())
+                {
+                    EndGrab();
+                    return;
+                }
+
+                SteerGrab(pa, pos, remoteClienth is null ? UUID.Zero : remoteClienth.AgentId);
             }
             else
             {
+                EndGrab();
+
                 if(IsAttachment)
                     return;
 
@@ -3775,63 +4026,290 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     }
 
     /// <summary>
-    /// If object is physical, prepare for spinning torques (set flag to save old orientation)
+    /// Whether a drag or a turn of the physical root body is refused, for the mouse drag and the rotate-drag alike.
+    /// A drag moves the root's body, so the root's block applies whichever part was grabbed.
     /// </summary>
-    /// <param name="rotation">Rotation.  We do the math here to turn it into a torque</param>
-    /// <param name="remoteClient"></param>
-    public void SpinStart(IClientAPI remoteClient)
+    private bool IsPhysicalDragRefused()
+        => m_rootPart.BlockGrab || IsSelected || IsAttachment
+            || m_rootPart.VehicleType != (int)Vehicle.TYPE_NONE || GetSittingAvatarsCount() > 0;
+
+    /// <summary>
+    /// Point the root actor's move-to-target at the dragged point. The first update of a drag also takes the target
+    /// from any script and sets the drag's tau.
+    /// </summary>
+    private void SteerGrab(PhysicsActor pa, Vector3 pos, UUID agent)
     {
-        if (BlockGrabOverride || m_rootPart.BlockGrab)
-                return;
-        if (m_scene.EventManager.TriggerGroupSpinStart(UUID))
+        if (!pos.IsFinite())
+            return;
+
+        lock (m_grabLock)
         {
-            PhysicsActor pa = m_rootPart.PhysActor;
-            if (pa is not null)
+            bool wasHeld = m_grabbed;
+            if (!wasHeld || m_grabAgent != agent)
+                m_grabAnchor = AbsolutePosition - pos; // keeps the grabbed point under the cursor instead of the centre
+
+            Vector3 target = pos + m_grabAnchor;
+            if (wasHeld && ReferenceEquals(m_grabActor, pa))
             {
-                if (pa.IsPhysical)
-                {
-                    m_rootPart.IsWaitingForFirstSpinUpdatePacket = true;
-                }
+                m_grabAgent = agent;
+                pa.PIDTarget = target;
+                return;
+            }
+
+            // a new drag, or the root's actor was replaced and the new one is switched on
+            m_grabbed = true;
+            m_grabAgent = agent;
+            m_grabActor = pa;
+
+            // only what the actor still has active is put back: a record left from an actor that has since been replaced is dropped
+            m_scriptMoveActive &= pa.PIDActive;
+            m_scriptHoverActive &= pa.PIDHoverActive;
+            if (m_scriptHoverActive)
+                pa.PIDHoverActive = false; // a hover can override the target's height
+            if (m_scriptMoveActive)
+                pa.PIDActive = false; // so an engine that reads tau when the target is switched on takes the drag's
+
+            pa.PIDTau = GrabTau;
+            pa.PIDTarget = target;
+            pa.PIDActive = true;
+
+            if (!wasHeld)
+            {
+                m_scene.EventManager.OnRemovePresence += GrabHolderRemoved;
+                m_scene.EventManager.OnMakeChildAgent += GrabHolderMadeChild;
             }
         }
     }
 
     /// <summary>
-    /// If object is physical, apply torque to spin it around
+    /// The viewer let go (ObjectDeGrab) or grabbed again (ObjectGrab, which means the earlier release was lost).
+    /// Only the agent that holds the drag can end it.
     /// </summary>
-    /// <param name="rotation">Rotation.  We do the math here to turn it into a torque</param>
+    public void ReleaseGrab(UUID agent)
+    {
+        lock (m_grabLock)
+        {
+            if (m_grabbed && m_grabAgent == agent)
+                EndGrab();
+        }
+    }
+
+    private void GrabHolderRemoved(UUID agentId) => ReleaseGrab(agentId);
+
+    private void GrabHolderMadeChild(ScenePresence presence)
+    {
+        if (presence is not null)
+            ReleaseGrab(presence.UUID);
+    }
+
+    /// <summary>
+    /// End a drag: the move-to-target is switched off, or put back to what a script had set, and so is a script's hover.
+    /// The velocity the object has is left alone and gravity acts again.
+    /// </summary>
+    private void EndGrab()
+    {
+        lock (m_grabLock)
+        {
+            if (!m_grabbed)
+                return;
+
+            PhysicsActor pa = m_grabActor;
+            DropGrabState();
+            if (pa is null)
+                return;
+
+            if (m_scriptMoveActive)
+            {
+                pa.PIDTarget = m_scriptMoveTarget;
+                pa.PIDTau = m_scriptMoveTau;
+                pa.PIDActive = true;
+            }
+            else
+                pa.PIDActive = false;
+
+            if (m_scriptHoverActive)
+            {
+                pa.PIDHoverHeight = m_scriptHoverHeight;
+                pa.PIDHoverType = m_scriptHoverType;
+                pa.PIDHoverTau = m_scriptHoverTau;
+                pa.PIDHoverActive = true;
+            }
+        }
+    }
+
+    private void DropGrabState()
+    {
+        m_grabbed = false;
+        m_grabAgent = UUID.Zero;
+        m_grabActor = null;
+        m_scene.EventManager.OnRemovePresence -= GrabHolderRemoved;
+        m_scene.EventManager.OnMakeChildAgent -= GrabHolderMadeChild;
+    }
+
+    // Ctrl-Shift drag (rotate-drag) of a physical object. The viewer sends the rotation it wants, absolute, each time the
+    // mouse moves, so the turn steers the root with the look-at controller (SceneObjectPart.UpdateLookAt, the one
+    // llRotLookAt uses) toward that rotation instead of pushing it with an angular force per update.
+    internal const float SpinStrength = 1.0f; // llRotLookAt strength: a time constant of 1/pi s, no overshoot at the heartbeat's rate
+    internal const float SpinTargetSeconds = 0.1f; // strength and damping given to an engine with a rotation target: a short lag behind the mouse
+    private readonly object m_spinLock = new();
+    private bool m_spinning;
+    private UUID m_spinAgent;
+    private Quaternion m_spinTarget = Quaternion.Identity;
+
+    // The last llTargetOmega on the root, put back when a turn ends. While a turn is held it is only remembered.
+    private bool m_scriptOmegaSet;
+    private Vector3 m_scriptOmega;
+
+    /// <summary>
+    /// A new start by the agent that holds a turn means the earlier stop never arrived, so that turn ends. The turn
+    /// itself begins with the first update, which carries the rotation to steer to.
+    /// </summary>
+    public void SpinStart(IClientAPI remoteClient)
+    {
+        if (BlockGrabOverride || m_rootPart.BlockGrab)
+            return;
+
+        if (m_scene.EventManager.TriggerGroupSpinStart(UUID))
+            ReleaseSpin(remoteClient is null ? UUID.Zero : remoteClient.AgentId);
+    }
+
+    /// <summary>
+    /// Whether a rotate-drag holds the root, and the rotation it steers to. Read once a frame by the look-at controller.
+    /// </summary>
+    internal bool TryGetSpinTarget(out Quaternion target)
+    {
+        lock (m_spinLock)
+        {
+            target = m_spinTarget;
+            return m_spinning;
+        }
+    }
+
+    internal bool IsSpinning
+    {
+        get { lock (m_spinLock) return m_spinning; }
+    }
+
+    /// <summary>
+    /// What a script last set with llTargetOmega on the root. While a turn is held it is remembered and not applied.
+    /// </summary>
+    /// <returns>true if it was only remembered</returns>
+    internal bool RecordScriptOmega(SceneObjectPart part, Vector3 omega)
+    {
+        if (part != m_rootPart)
+            return false;
+
+        lock (m_spinLock)
+        {
+            PhysicsActor pa = part.PhysActor;
+            m_scriptOmegaSet = pa is not null && pa.IsPhysical && omega != Vector3.Zero;
+            m_scriptOmega = omega;
+            return m_spinning;
+        }
+    }
+
+    /// <summary>
+    /// The viewer let go (ObjectSpinStop), grabbed again or started a new turn. Only the agent that holds the turn can end it.
+    /// </summary>
+    public void ReleaseSpin(UUID agent)
+    {
+        lock (m_spinLock)
+        {
+            if (m_spinning && m_spinAgent == agent)
+                EndSpin();
+        }
+    }
+
+    private void SpinHolderRemoved(UUID agentId) => ReleaseSpin(agentId);
+
+    private void SpinHolderMadeChild(ScenePresence presence)
+    {
+        if (presence is not null)
+            ReleaseSpin(presence.UUID);
+    }
+
+    /// <summary>
+    /// End a turn: the controller stops and so does the spin it left. A script's look-at, which the turn took over, runs
+    /// again from the next frame and a script's llTargetOmega is applied again.
+    /// </summary>
+    internal void EndSpin()
+    {
+        lock (m_spinLock)
+        {
+            if (!m_spinning)
+                return;
+
+            m_spinning = false;
+            m_spinAgent = UUID.Zero;
+            m_scene.EventManager.OnRemovePresence -= SpinHolderRemoved;
+            m_scene.EventManager.OnMakeChildAgent -= SpinHolderMadeChild;
+
+            // an engine with a rotation target stops the turn when the target is switched off
+            bool switchedOff = m_rootPart.ReleaseRotationTarget();
+
+            PhysicsActor pa = m_rootPart.PhysActor;
+            if (pa is null || !pa.IsPhysical)
+                return;
+
+            if (!switchedOff)
+                m_rootPart.AngularVelocity = Vector3.Zero;
+
+            if (m_scriptOmegaSet)
+                m_rootPart.ApplyAngularVelocity(m_scriptOmega); // not compared with the part's copy, which may be stale
+            else
+                m_rootPart.ScheduleTerseUpdate();
+
+            QueueForUpdateCheck(); // a script's look-at picks up again
+        }
+    }
+
+    /// <summary>
+    /// Take the rotation the viewer asks for as the controller's target. The first update of a turn starts it.
+    /// </summary>
+    private void SteerSpin(Quaternion rotation, UUID agent)
+    {
+        if (!float.IsFinite(rotation.X) || !float.IsFinite(rotation.Y) || !float.IsFinite(rotation.Z) || !float.IsFinite(rotation.W))
+            return;
+
+        float length = MathF.Sqrt(rotation.X * rotation.X + rotation.Y * rotation.Y + rotation.Z * rotation.Z + rotation.W * rotation.W);
+        if (length < 1e-6f)
+            return;
+
+        lock (m_spinLock)
+        {
+            if (!m_spinning)
+            {
+                m_spinning = true;
+                m_scene.EventManager.OnRemovePresence += SpinHolderRemoved;
+                m_scene.EventManager.OnMakeChildAgent += SpinHolderMadeChild;
+            }
+
+            m_spinAgent = agent;
+            m_spinTarget = new Quaternion(rotation.X / length, rotation.Y / length, rotation.Z / length, rotation.W / length);
+        }
+
+        QueueForUpdateCheck(); // the controller runs from the update list
+    }
+
+    /// <summary>
+    /// If object is physical, steer it to the rotation the viewer asks for
+    /// If object is not physical, just put it at that rotation
+    /// </summary>
+    /// <param name="newOrientation">The absolute rotation the viewer wants, sent each time the mouse moves</param>
     /// <param name="remoteClient"></param>
     public void SpinMovement(Quaternion newOrientation, IClientAPI remoteClient)
-    {
-        // The incoming newOrientation, sent by the client, "seems" to be the
-        // desired target orientation. This needs further verification; in particular,
-        // one would expect that the initial incoming newOrientation should be
-        // fairly close to the original prim's physical orientation,
-        // m_rootPart.PhysActor.Orientation. This however does not seem to be the
-        // case (might just be an issue with different quaternions representing the
-        // same rotation, or it might be a coordinate system issue).
-        //
-        // Since it's not clear what the relationship is between the PhysActor.Orientation
-        // and the incoming orientations sent by the client, we take an alternative approach
-        // of calculating the delta rotation between the orientations being sent by the
-        // client. (Since a spin is invoked by ctrl+shift+drag in the client, we expect
-        // a steady stream of several new orientations coming in from the client.)
-        // This ensures that the delta rotations are being calculated from self-consistent
-        // pairs of old/new rotations. Given the delta rotation, we apply a torque around
-        // the delta rotation axis, scaled by the object mass times an arbitrary scaling
-        // factor (to ensure the resulting torque is not "too strong" or "too weak").
-        //
-        // Ideally we need to calculate (probably iteratively) the exact torque or series
-        // of torques needed to arrive exactly at the destination orientation. However, since
-        // it is not yet clear how to map the destination orientation (provided by the viewer)
-        // into PhysActor orientations (needed by the physics engine), we omit this step.
-        // This means that the resulting torque will at least be in the correct direction,
-        // but it will result in over-shoot or under-shoot of the target orientation.
-        // For the end user, this means that ctrl+shift+drag can be used for relative,
-        // but not absolute, adjustments of orientation for physical prims.
+        => SpinMovement(m_rootPart.UUID, newOrientation, remoteClient);
 
+    /// <param name="partID">The part that was grabbed</param>
+    /// <param name="newOrientation">The absolute rotation the viewer wants, sent each time the mouse moves</param>
+    /// <param name="remoteClient"></param>
+    public void SpinMovement(UUID partID, Quaternion newOrientation, IClientAPI remoteClient)
+    {
         if (BlockGrabOverride || m_rootPart.BlockGrab)
-                return;
+        {
+            EndSpin();
+            return;
+        }
 
         if (m_scene.EventManager.TriggerGroupSpin(UUID, newOrientation))
         {
@@ -3839,39 +4317,21 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
             if (pa is not null && pa.IsPhysical)
             {
-                if (m_rootPart.IsWaitingForFirstSpinUpdatePacket)
+                SceneObjectPart part = GetPart(partID);
+                if (part is null)
+                    return;
+
+                if (part.BlockGrab || IsPhysicalDragRefused())
                 {
-                  // first time initialization of "old" orientation for calculation of delta rotations
-                    m_rootPart.SpinOldOrientation = newOrientation;
-                    m_rootPart.IsWaitingForFirstSpinUpdatePacket = false;
+                    EndSpin();
+                    return;
                 }
-                else
-                {
-                    // save and update old orientation
-                    Quaternion old = m_rootPart.SpinOldOrientation;
-                    m_rootPart.SpinOldOrientation = newOrientation;
-                    //m_log.Error("[SCENE OBJECT GROUP]: Old orientation is " + old);
-                    //m_log.Error("[SCENE OBJECT GROUP]: Incoming new orientation is " + newOrientation);
 
-                    // compute difference between previous old rotation and new incoming rotation
-                    Quaternion minimalRotationFromQ1ToQ2 = newOrientation * Quaternion.Inverse(old);
-
-                    minimalRotationFromQ1ToQ2.GetAxisAngle(out Vector3 spinforce, out float rotationAngle);
-                    if(Math.Abs(rotationAngle)< 0.001)
-                        return;
-
-                    spinforce.Normalize();
-
-                    //m_log.Error("SCENE OBJECT GROUP]: rotation axis is " + rotationAxis);
-                    if(rotationAngle > 0)
-                        spinforce = spinforce * pa.Mass * 0.1f; // 0.1 is an arbitrary torque scaling factor
-                    else
-                       spinforce = spinforce * pa.Mass * -0.1f; // 0.1 is an arbitrary torque scaling
-                    pa.AddAngularForce(spinforce,true);
-                }
+                SteerSpin(newOrientation, remoteClient is null ? UUID.Zero : remoteClient.AgentId);
             }
             else
             {
+                EndSpin();
                 NonPhysicalSpinMovement(newOrientation);
             }
         }
@@ -4052,7 +4512,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         uint lockBit = RootPart.OwnerMask & (uint)(PermissionMask.Move);
         RootPart.OwnerMask = (RootPart.OwnerMask & lockBit) | ((newOwnerMask | foldedPerms) & lockMask);
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE OBJECT GROUP]: RootPart.OwnerMask now {0} for {1} in {2}",
 //                (OpenMetaverse.PermissionMask)RootPart.OwnerMask, Name, Scene.Name);
         InvalidateEffectivePerms();
@@ -4122,7 +4582,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// <param name="scale"></param>
     public void GroupResize(Vector3 scale)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE OBJECT GROUP]: Group resizing {0} {1} from {2} to {3}", Name, LocalId, RootPart.Scale, scale);
 
         if (Scene is null)
@@ -4249,7 +4709,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
     public bool GroupResize(double fscale)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[SCENE OBJECT GROUP]: Group resizing {0} {1} from {2} to {3}", Name, LocalId, RootPart.Scale, fscale);
 
         if (Scene is null || IsDeleted || inTransit || fscale < 0)
@@ -5123,7 +5583,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         TotalMass = GetMass();
         CenterOfMass = GetCenterOfMass() - AbsolutePosition;
-        CenterOfMass *= Quaternion.Conjugate(RootPart.RotationOffset);
+        Quaternion rootRotation = RootPart.RotationOffset;
+        CenterOfMass *= Quaternion.Conjugate(in rootRotation);
         Inertia = Vector3.Zero;
         aux =  Vector4.Zero;
     }
@@ -5154,6 +5615,9 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     /// <param name="client"></param>
     public void SetGroup(UUID GroupID, IClientAPI client)
     {
+        UUID oldOwner = m_rootPart.OwnerID;
+        UUID oldGroup = m_rootPart.GroupID;
+
         SceneObjectPart[] parts = m_parts.GetArray();
         for (int i = 0; i < parts.Length; i++)
         {
@@ -5167,6 +5631,8 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         // Don't trigger the update here - otherwise some client issues occur when multiple updates are scheduled
         // for the same object with very different properties.  The caller must schedule the update.
         //ScheduleGroupForFullUpdate();
+
+        TriggerOwnerOrGroupChanged(oldOwner, oldGroup);
     }
 
     public void TriggerScriptChangedEvent(Changed val)
@@ -5348,14 +5814,15 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
     public void SetBuoyancy(float fvalue)
     {
         if(IsAttachment)
-        {
-            ScenePresence avatar = m_scene.GetScenePresence(AttachedAvatar);
-            PhysicsActor pa = avatar?.PhysicsActor;
-            if( pa is not null )
-                pa.Buoyancy = fvalue;
-        }
+            SetWearerBuoyancy(fvalue);
         else
             RootPart.Buoyancy = fvalue;
+    }
+
+    /// <summary>Set the buoyancy of the avatar wearing this attachment, on behalf of this attachment.</summary>
+    internal void SetWearerBuoyancy(float fvalue)
+    {
+        m_scene?.GetScenePresence(AttachedAvatar)?.SetAttachmentBuoyancy(this, fvalue);
     }
 
     public override string ToString()

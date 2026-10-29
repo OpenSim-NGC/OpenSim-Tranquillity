@@ -31,7 +31,6 @@ public class HttpRequest : IHttpRequest
     private Uri m_uri = null;
     private string m_uriPath;
     public IHttpClientContext m_context;
-    IPEndPoint m_remoteIPEndPoint = null;
 
     public HttpRequest(IHttpClientContext pContext)
     {
@@ -231,10 +230,11 @@ public class HttpRequest : IHttpRequest
             AcceptTypes.CopyTo(request.AcceptTypes, 0);
         }
 
-        var buffer = new byte[m_body.Length];
-        m_body.Read(buffer, 0, (int)m_body.Length);
+        long bodyPosition = m_body.Position;
+        m_body.Position = 0;
         request.Body = new MemoryStream();
-        request.Body.Write(buffer, 0, buffer.Length);
+        m_body.CopyTo(request.Body);
+        m_body.Position = bodyPosition;
         request.Body.Seek(0, SeekOrigin.Begin);
         request.Body.Flush();
 
@@ -281,25 +281,7 @@ public class HttpRequest : IHttpRequest
     {
         get
         {
-            if(m_remoteIPEndPoint == null)
-            {
-                string addr = m_headers["x-forwarded-for"];
-                if(!string.IsNullOrEmpty(addr))
-                {
-                    int port = m_context.LocalIPEndPoint.Port;
-                    try
-                    {
-                        m_remoteIPEndPoint = new IPEndPoint(IPAddress.Parse(addr), port);
-                    }
-                    catch
-                    {
-                        m_remoteIPEndPoint = null;
-                    }
-                }
-            }
-            m_remoteIPEndPoint ??= m_context.LocalIPEndPoint;
-
-            return m_remoteIPEndPoint;
+            return m_context.LocalIPEndPoint;
         }
     }
     /*

@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
@@ -35,12 +34,14 @@ using OpenSim.Services.Interfaces;
 
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsOut.UserAliases;
 
 public class LocalUserAliasServicesConnector : ISharedRegionModule, IUserAliasService
 {
-    private static readonly ILog m_log =
-            LogManager.GetLogger(
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(
             MethodBase.GetCurrentMethod().DeclaringType);
 
     public IUserAliasService UserAliasService { get; private set; }
@@ -70,7 +71,7 @@ public class LocalUserAliasServicesConnector : ISharedRegionModule, IUserAliasSe
                 IConfig userConfig = source.Configs["UserAliasService"];
                 if (userConfig == null)
                 {
-                    m_log.Error("[LOCAL USER ALIAS SERVICE CONNECTOR]: UserAliasService missing from OpenSim.ini");
+                    m_log.LogError("[LOCAL USER ALIAS SERVICE CONNECTOR]: UserAliasService missing from OpenSim.ini");
                     return;
                 }
 
@@ -78,7 +79,7 @@ public class LocalUserAliasServicesConnector : ISharedRegionModule, IUserAliasSe
 
                 if (serviceDll.Length == 0)
                 {
-                    m_log.Error("[LOCAL USER ALIAS SERVICE CONNECTOR]: No LocalServiceModule named in section UserAliasService");
+                    m_log.LogError("[LOCAL USER ALIAS SERVICE CONNECTOR]: No LocalServiceModule named in section UserAliasService");
                     return;
                 }
 
@@ -87,14 +88,14 @@ public class LocalUserAliasServicesConnector : ISharedRegionModule, IUserAliasSe
 
                 if (UserAliasService == null)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[USER ALIAS SERVICE CONNECTOR]: Cannot load user account alias specified as {0}", serviceDll);
                     return;
                 }
 
                 m_Enabled = true;
 
-                m_log.Info("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
+                m_log.LogInformation("[LOCAL USER ACCOUNT SERVICE CONNECTOR]: Local user connector enabled");
             }
         }
     }
@@ -130,7 +131,7 @@ public class LocalUserAliasServicesConnector : ISharedRegionModule, IUserAliasSe
         if (!m_Enabled)
             return;
 
-        m_log.InfoFormat("[LOCAL USER ALIAS SERVICE CONNECTOR]: Enabled local user aliases for region {0}", scene.RegionInfo.RegionName);
+        m_log.LogInformation("[LOCAL USER ALIAS SERVICE CONNECTOR]: Enabled local user aliases for region {0}", scene.RegionInfo.RegionName);
     }
 
     #endregion

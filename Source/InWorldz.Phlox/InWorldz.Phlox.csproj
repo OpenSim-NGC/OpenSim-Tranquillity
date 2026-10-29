@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <AssemblyName>InWorldz.Phlox</AssemblyName>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Deterministic>true</Deterministic>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <PreserveCompilationContext>false</PreserveCompilationContext>
+    <ErrorOnDuplicatePublishOutputFiles>false</ErrorOnDuplicatePublishOutputFiles>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    <TieredCompilationQuickJit>false</TieredCompilationQuickJit>
+    <NoWarn>CA1416,SYSLIB0011,SYSLIB0014,SYSLIB0039</NoWarn>
+  </PropertyGroup>
+
+  <!-- ANTLR3-generated sources and the duplicate grammar/generated/ copies are
+       superseded by the ANTLR4 visitors compiled from Compiler/ and ByteCompiler/. -->
+  <ItemGroup>
+    <Compile Remove="grammar\generated\**\*.cs" />
+    <Compile Remove="Compiler\Def.cs" />
+    <Compile Remove="Compiler\Types.cs" />
+    <Compile Remove="Compiler\Analyze.cs" />
+    <Compile Remove="Compiler\Gen.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="protobuf-net" Version="3.4.40" />
+    <PackageReference Include="Antlr4.Runtime.Standard" Version="4.13.1" />
+    <PackageReference Include="StringTemplate4" Version="4.0.8" />
+  </ItemGroup>
+
+  <!-- C5 via develop's Library/C5.dll (single identity - avoids the dual-C5 TypeLoadException). -->
+  <ItemGroup>
+    <Reference Include="C5" HintPath="..\..\Library\C5.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\OpenSim.Framework\OpenSim.Framework.csproj" />
+    <ProjectReference Include="..\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
+  </ItemGroup>
+
+</Project>

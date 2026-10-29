@@ -27,13 +27,13 @@
 
 using System.Reflection;
 using System.Text;
-using log4net;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 using OpenSim.Framework;
 using OpenSim.Framework.Capabilities;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 
@@ -41,7 +41,7 @@ namespace OpenSim.Capabilities.Handlers;
 
 public class FetchInvDescHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly byte[] EmptyResponse = Util.UTF8NBGetbytes("<llsd><map><key>folders</key><array /></map></llsd>");
     private readonly IInventoryService m_InventoryService;
@@ -62,7 +62,7 @@ public class FetchInvDescHandler
 
     public void FetchInventoryDescendentsRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, ExpiringKey<UUID> BadRequests)
     {
-        //m_log.DebugFormat("[XXX]: FetchInventoryDescendentsRequest in {0}, {1}", (m_Scene == null) ? "none" : m_Scene.Name, request);
+        //m_log.LogDebug("[XXX]: FetchInventoryDescendentsRequest in {0}, {1}", (m_Scene == null) ? "none" : m_Scene.Name, request);
 
         List<LLSDFetchInventoryDescendents> folders;
         List<UUID> bad_folders = new();
@@ -105,7 +105,7 @@ public class FetchInvDescHandler
                     }
                     catch (Exception e)
                     {
-                        m_log.Debug("[WEB FETCH INV DESC HANDLER]: caught exception doing OSD deserialize" + e.Message);
+                        m_log.LogDebug("[WEB FETCH INV DESC HANDLER]: caught exception doing OSD deserialize" + e.Message);
                         continue;
                     }
                     folders.Add(llsdRequest);
@@ -116,7 +116,7 @@ public class FetchInvDescHandler
         }
         catch (Exception e)
         {
-            m_log.Error("[FETCH INV DESC]: fail parsing request: " + e.Message);
+            m_log.LogError("[FETCH INV DESC]: fail parsing request: " + e.Message);
             httpResponse.RawBuffer = EmptyResponse;
             return;
         }
@@ -148,7 +148,7 @@ public class FetchInvDescHandler
             {
                 if (limit < 0)
                     osu.AppendASCII(" ...");
-                m_log.Warn(osu.ToString());
+                m_log.LogWarning(osu.ToString());
             }
 
             osu.Clear();
@@ -168,7 +168,7 @@ public class FetchInvDescHandler
         UUID requester = folders[0].owner_id;
 
         List<InventoryCollection> invcollSet = Fetch(folders, bad_folders);
-        //m_log.DebugFormat("[XXX]: Got {0} folders from a request of {1}", invcollSet.Count, folders.Count);
+        //m_log.LogDebug("[XXX]: Got {0} folders from a request of {1}", invcollSet.Count, folders.Count);
 
         int invcollSetCount = 0;
         if (invcollSet is not null)
@@ -263,7 +263,7 @@ public class FetchInvDescHandler
             }
             if(limit < 0)
                 sb.Append(" ...");
-            m_log.Warn(osStringBuilderCache.GetStringAndRelease(sb));
+            m_log.LogWarning(osStringBuilderCache.GetStringAndRelease(sb));
         }
 
         httpResponse.RawBuffer = LLSDxmlEncode2.EndToBytes(lastresponse);
@@ -290,14 +290,14 @@ public class FetchInvDescHandler
                 Collection.Descendents = Collection.Items.Count + Collection.Folders.Count;
                 result.Add(Collection);
 
-                //m_log.DebugFormat("[XXX]: Added libfolder {0} ({1}) {2}", ret.Collection.FolderID, ret.Collection.OwnerID);
+                //m_log.LogDebug("[XXX]: Added libfolder {0} ({1}) {2}", ret.Collection.FolderID, ret.Collection.OwnerID);
             }
         }
     }
 
     private List<InventoryCollection> Fetch(List<LLSDFetchInventoryDescendents> fetchFolders, List<UUID> bad_folders)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[WEB FETCH INV DESC HANDLER]: Fetching {0} folders for owner {1}", fetchFolders.Count, fetchFolders[0].owner_id);
 
         // FIXME MAYBE: We're not handling sortOrder!
@@ -348,7 +348,7 @@ public class FetchInvDescHandler
 
         if(otherFolders.Count > 0)
         { 
-            //m_log.DebugFormat("[XXX]: {0}", string.Join(",", fids));
+            //m_log.LogDebug("[XXX]: {0}", string.Join(",", fids));
 
             InventoryCollection[] fetchedContents = m_InventoryService.GetMultipleFoldersContent(otherFolders[0].owner_id, otherIDs.ToArray());
 
@@ -432,7 +432,7 @@ public class FetchInvDescHandler
         List<UUID> itemIDs = new();
         foreach (InventoryItemBase item in contents.Items)
         {
-            //m_log.DebugFormat("[XXX]:   {0} {1}", item.Name, item.AssetType);
+            //m_log.LogDebug("[XXX]:   {0} {1}", item.Name, item.AssetType);
             if (item.AssetType == (int)AssetType.Link)
                 itemIDs.Add(item.AssetID);
         }
@@ -455,7 +455,7 @@ public class FetchInvDescHandler
                     if (linkedItem is not null && linkedItem.AssetType != (int)AssetType.Link)
                     {
                         linkedItems.Add(linkedItem);
-                        //m_log.DebugFormat("[WEB FETCH INV DESC HANDLER]: Added {0} {1} {2}", linkedItem.Name, linkedItem.AssetType, linkedItem.Folder);
+                        //m_log.LogDebug("[WEB FETCH INV DESC HANDLER]: Added {0} {1} {2}", linkedItem.Name, linkedItem.AssetType, linkedItem.Folder);
                     }
                 }
                 // insert them

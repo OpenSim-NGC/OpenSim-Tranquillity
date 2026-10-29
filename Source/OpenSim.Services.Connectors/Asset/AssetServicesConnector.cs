@@ -25,18 +25,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Services.Interfaces;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.Connectors;
 
 public class AssetServicesConnector : BaseServiceConnector, IAssetService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public readonly object ConnectorLock = new object();
 
@@ -73,7 +74,7 @@ public class AssetServicesConnector : BaseServiceConnector, IAssetService
         IConfig assetConfig = source.Configs["AssetService"];
         if (assetConfig == null)
         {
-            m_log.Error("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
+            m_log.LogError("[ASSET CONNECTOR]: AssetService missing from OpenSim.ini");
             throw new Exception("Asset connector init error");
         }
 
@@ -85,14 +86,14 @@ public class AssetServicesConnector : BaseServiceConnector, IAssetService
         }
         if (string.IsNullOrEmpty(m_ServerURI))
         {
-            m_log.Error("[ASSET CONNECTOR]: AssetServerURI not defined in section AssetService");
+            m_log.LogError("[ASSET CONNECTOR]: AssetServerURI not defined in section AssetService");
             throw new Exception("Asset connector init error");
         }
 
         OSHHTPHost m_GridAssetsURL = new OSHHTPHost(m_ServerURI, true);
         if(!m_GridAssetsURL.IsResolvedHost)
         {
-            m_log.Error("[ASSET CONNECTOR]: Could not parse or resolve AssetServerURI");
+            m_log.LogError("[ASSET CONNECTOR]: Could not parse or resolve AssetServerURI");
             throw new Exception("Asset connector init error");
         }
 
@@ -321,7 +322,7 @@ public class AssetServicesConnector : BaseServiceConnector, IAssetService
             if (asset.FullID.IsZero())
             {
                 asset.FullID = UUID.Random();
-                m_log.Warn($"[Assets] Zero ID: {asset.Name}");
+                m_log.LogWarning($"[Assets] Zero ID: {asset.Name}");
             }
             asset.ID = asset.FullID.ToString();
         }
@@ -331,7 +332,7 @@ public class AssetServicesConnector : BaseServiceConnector, IAssetService
                 asset.FullID = uuid;
             else
             {
-                m_log.Warn($"[Assets] Invalid UUID on ID: {asset.ID}");
+                m_log.LogWarning($"[Assets] Invalid UUID on ID: {asset.ID}");
                 asset.FullID = UUID.Random();
                 asset.ID = asset.FullID.ToString();
             }

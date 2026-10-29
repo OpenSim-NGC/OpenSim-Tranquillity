@@ -35,6 +35,17 @@ public class AvatarServiceBase : ServiceBase
 {
     protected IAvatarData m_Database = null;
 
+    /// <summary>
+    /// Test seam: a service over a supplied data layer, bypassing plugin loading. Production always uses the
+    /// <see cref="IConfigSource"/> constructor; this exists so the delete-and-preserve behaviour of
+    /// <c>SetAvatar</c> can be exercised against a faithful in-memory row table.
+    /// </summary>
+    protected AvatarServiceBase(IConfigSource config, IAvatarData database)
+        : base(config)
+    {
+        m_Database = database ?? throw new ArgumentNullException(nameof(database));
+    }
+
     public AvatarServiceBase(IConfigSource config)
         : base(config)
     {

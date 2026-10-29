@@ -32,14 +32,15 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Server.Base;
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
 public class GroupsServiceRemoteConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private string m_ServerURI;
     private IServiceAuth m_Auth;
@@ -67,7 +68,7 @@ public class GroupsServiceRemoteConnector
         }
         ///
 
-        m_log.DebugFormat("[Groups.RemoteConnector]: Groups server at {0}, authentication {1}",
+        m_log.LogDebug("[Groups.RemoteConnector]: Groups server at {0}, authentication {1}",
             m_ServerURI, (m_Auth == null ? "None" : m_Auth.GetType().ToString()));
     }
 

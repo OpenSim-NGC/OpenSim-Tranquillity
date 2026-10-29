@@ -29,11 +29,14 @@ using System.Xml;
 using System.Text.RegularExpressions;
 using Nini.Config;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.Console;
 
 public class Commands : ICommands
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Encapsulates a command that can be invoked from the console
@@ -172,7 +175,7 @@ public class Commands : ICommands
             if (!dict.ContainsKey(helpPart))
                 break;
 
-            //m_log.Debug("Found {0}", helpParts[0]);
+            //m_log.LogDebug(helpParts[0], "Found {0}");
 
             if (dict[helpPart] is Dictionary<string, Object>)
                 dict = (Dictionary<string, object>)dict[helpPart];
@@ -343,7 +346,7 @@ public class Commands : ICommands
                 m_modulesCommands[module] = commands;
             }
 
-//                m_log.DebugFormat("[COMMAND CONSOLE]: Adding to category {0} command {1}", module, command);
+//                m_log.LogDebug("[COMMAND CONSOLE]: Adding to category {0} command {1}", module, command);
             commands.Add(info);
         }
     }
@@ -711,7 +714,7 @@ public class Parser
 /// </summary>
 public class CommandConsole : ConsoleBase, ICommandConsole
 {
-    //        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    //        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public event OnOutputDelegate OnOutput;
     public static event OnCntrCCelegate OnCntrC;

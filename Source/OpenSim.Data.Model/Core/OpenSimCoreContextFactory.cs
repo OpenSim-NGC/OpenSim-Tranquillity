@@ -28,7 +28,7 @@ public class OpenSimCoreContextFactory : IDesignTimeDbContextFactory<OpenSimCore
         var connectionString = configuration.GetConnectionString("OpenSimCoreConnection") ??
             throw new InvalidOperationException("Connection string 'OpenSimCoreConnection' not found.");
 
-        // Configure DbContext to use MySQL with Pomelo provider
+        // Configure DbContext to use MySQL with the Microting (Pomelo fork) provider
         optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
             mySqlOptions => mySqlOptions.MigrationsAssembly(typeof(OpenSimCoreContext).Assembly.FullName));
 

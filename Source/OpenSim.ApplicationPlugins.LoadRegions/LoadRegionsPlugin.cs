@@ -26,15 +26,16 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.ApplicationPlugins.LoadRegions;
 
 public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public event NewRegionCreated OnNewRegionCreated;
     private NewRegionCreated m_newRegionCreatedHandler;
@@ -59,7 +60,7 @@ public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
 
     public void Initialise()
     {
-        m_log.Error("[LOAD REGIONS PLUGIN]: " + Name + " cannot be default-initialized!");
+        m_log.LogError("[LOAD REGIONS PLUGIN]: " + Name + " cannot be default-initialized!");
         throw new PluginNotInitialisedException(Name);
     }
 
@@ -71,20 +72,20 @@ public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
 
     public void PostInitialise()
     {
-        //m_log.Info("[LOADREGIONS]: Load Regions addin being initialised");
+        //m_log.LogInformation("[LOADREGIONS]: Load Regions addin being initialised");
 
         IEstateLoader estateLoader = null;
         IRegionLoader regionLoader;
         if (m_openSim.ConfigSource.Configs["Startup"].GetString("region_info_source", "filesystem") == "filesystem")
         {
-            m_log.Info("[LOAD REGIONS PLUGIN]: Loading region configurations from filesystem");
+            m_log.LogInformation("[LOAD REGIONS PLUGIN]: Loading region configurations from filesystem");
             regionLoader = new RegionLoaderFileSystem();
 
             estateLoader = new EstateLoaderFileSystem(m_openSim);
         }
         else
         {
-            m_log.Info("[LOAD REGIONS PLUGIN]: Loading region configurations from web");
+            m_log.LogInformation("[LOAD REGIONS PLUGIN]: Loading region configurations from web");
             regionLoader = new RegionLoaderWebServer();
         }
 
@@ -99,20 +100,20 @@ public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
         regionLoader.SetIniConfigSource(m_openSim.ConfigSource);
         RegionInfo[] regionsToLoad = regionLoader.LoadRegions();
 
-        m_log.Info("[LOAD REGIONS PLUGIN]: Loading specific shared modules...");
-        //m_log.Info("[LOAD REGIONS PLUGIN]: DynamicTextureModule...");
+        m_log.LogInformation("[LOAD REGIONS PLUGIN]: Loading specific shared modules...");
+        //m_log.LogInformation("[LOAD REGIONS PLUGIN]: DynamicTextureModule...");
         //m_openSim.ModuleLoader.LoadDefaultSharedModule(new DynamicTextureModule());
-        //m_log.Info("[LOAD REGIONS PLUGIN]: LoadImageURLModule...");
+        //m_log.LogInformation("[LOAD REGIONS PLUGIN]: LoadImageURLModule...");
         //m_openSim.ModuleLoader.LoadDefaultSharedModule(new LoadImageURLModule());
-        //m_log.Info("[LOAD REGIONS PLUGIN]: XMLRPCModule...");
+        //m_log.LogInformation("[LOAD REGIONS PLUGIN]: XMLRPCModule...");
         //m_openSim.ModuleLoader.LoadDefaultSharedModule(new XMLRPCModule());
-//            m_log.Info("[LOADREGIONSPLUGIN]: AssetTransactionModule...");
+//            m_log.LogInformation("[LOADREGIONSPLUGIN]: AssetTransactionModule...");
 //            m_openSim.ModuleLoader.LoadDefaultSharedModule(new AssetTransactionModule());
-        m_log.Info("[LOAD REGIONS PLUGIN]: Done.");
+        m_log.LogInformation("[LOAD REGIONS PLUGIN]: Done.");
 
         if (!CheckRegionsForSanity(regionsToLoad))
         {
-            m_log.Error("[LOAD REGIONS PLUGIN]: Halting startup due to conflicts in region configurations");
+            m_log.LogError("[LOAD REGIONS PLUGIN]: Halting startup due to conflicts in region configurations");
             Environment.Exit(1);
         }
 
@@ -121,7 +122,7 @@ public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
         for (int i = 0; i < regionsToLoad.Length; i++)
         {
             IScene scene;
-            m_log.Debug("[LOAD REGIONS PLUGIN]: Creating Region: " + regionsToLoad[i].RegionName + " (ThreadID: " +
+            m_log.LogDebug("[LOAD REGIONS PLUGIN]: Creating Region: " + regionsToLoad[i].RegionName + " (ThreadID: " +
                         Thread.CurrentThread.ManagedThreadId.ToString() +
                         ")");
 
@@ -166,7 +167,7 @@ public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
         {
             if (region.RegionID.IsZero())
             {
-                m_log.ErrorFormat(
+                m_log.LogError(
                     "[LOAD REGIONS PLUGIN]: Region {0} has invalid UUID {1}",
                     region.RegionName, region.RegionID);
                 return false;
@@ -179,7 +180,7 @@ public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
             {
                 if (regions[i].RegionID == regions[j].RegionID)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[LOAD REGIONS PLUGIN]: Regions {0} and {1} have the same UUID {2}",
                         regions[i].RegionName, regions[j].RegionName, regions[i].RegionID);
                     return false;
@@ -187,14 +188,14 @@ public class LoadRegionsPlugin : IApplicationPlugin, IRegionCreator
                 else if (
                     regions[i].RegionLocX == regions[j].RegionLocX && regions[i].RegionLocY == regions[j].RegionLocY)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[LOAD REGIONS PLUGIN]: Regions {0} and {1} have the same grid location ({2}, {3})",
                         regions[i].RegionName, regions[j].RegionName, regions[i].RegionLocX, regions[i].RegionLocY);
                     return false;
                 }
                 else if (regions[i].InternalEndPoint.Port == regions[j].InternalEndPoint.Port)
                 {
-                    m_log.ErrorFormat(
+                    m_log.LogError(
                         "[LOAD REGIONS PLUGIN]: Regions {0} and {1} have the same internal IP port {2}",
                         regions[i].RegionName, regions[j].RegionName, regions[i].InternalEndPoint.Port);
                     return false;

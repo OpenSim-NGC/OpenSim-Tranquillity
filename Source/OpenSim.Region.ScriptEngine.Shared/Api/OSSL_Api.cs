@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using Nini.Config;
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
@@ -44,6 +43,7 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Security.Cryptography;
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using LSL_Float = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLFloat;
 using LSL_Integer = OpenSim.Region.ScriptEngine.Shared.LSL_Types.LSLInteger;
@@ -136,7 +136,7 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
     public const string GridInfoServiceConfigSectionName = "GridInfoService";
 
     // shared things
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private static readonly object m_OSSLLock = new();
     private static bool m_doneSharedInit = false;
@@ -189,7 +189,7 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
             if (m_osslconfig.GetBoolean("AllowOSFunctions", true))
             {
                 m_OSFunctionsEnabled = true;
-                // m_log.Warn("[OSSL] OSSL FUNCTIONS ENABLED");
+                // m_log.LogWarning("[OSSL] OSSL FUNCTIONS ENABLED");
             }
 
             m_PermissionErrortoOwner = m_osslconfig.GetBoolean("PermissionErrorToOwner", m_PermissionErrortoOwner);
@@ -408,7 +408,7 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
                             }
                         }
                         if (error)
-                            m_log.WarnFormat("[OSSLENABLE]: error parsing line Allow_{0} = {1}", function, ownerPerm);
+                            m_log.LogWarning("[OSSLENABLE]: error parsing line Allow_{0} = {1}", function, ownerPerm);
                     }
                     error = false;
                     if (!string.IsNullOrWhiteSpace(creatorPerm))
@@ -432,7 +432,7 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
                             }
                         }
                         if (error)
-                            m_log.WarnFormat("[OSSLENABLE]: error parsing line Creators_{0} = {1}", function, creatorPerm);
+                            m_log.LogWarning("[OSSLENABLE]: error parsing line Creators_{0} = {1}", function, creatorPerm);
                     }
                     // both empty fallback as disabled
                 }
@@ -2112,8 +2112,6 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
 
     private void MessageObject(UUID objUUID, string message)
     {
-        object[] resobj = new object[] { new LSL_String(m_host.UUID.ToString()), new LSL_String(message) };
-
         SceneObjectPart sceneOP = World.GetSceneObjectPart(objUUID);
 
         if (sceneOP == null) // prior to patching, PostObjectEvent() would cause a throw exception to be shouted instead.
@@ -2122,9 +2120,9 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
             return;
         }
 
-        m_ScriptEngine.PostObjectEvent(
-            sceneOP.LocalId, new EventParams(
-                "dataserver", resobj, Array.Empty<DetectParams>()));
+        // Every script in that prim gets it, whichever engine of the region runs it (OpenSim wiki osMessageObject:
+        // "All scripts with dataserver event will receive it"); the sender's prim key is the query key.
+        Plugins.Dataserver.PostToEveryEngine(m_ScriptEngine, sceneOP.LocalId, m_host.UUID.ToString(), message);
     }
 
 
@@ -2273,7 +2271,7 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
             {
                 string line = NotecardCache.GetLine(assetID, count) + "\n";
 
-//                m_log.DebugFormat("[OSSL]: From notecard {0} loading line {1}", notecardNameOrUuid, line);
+//                m_log.LogDebug("[OSSL]: From notecard {0} loading line {1}", notecardNameOrUuid, line);
 
                 notecardData.Append(line);
             }
@@ -2468,7 +2466,7 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
             }
             catch (Exception /*e*/)
             {
-                // m_log.Warn("[osAvatarName2Key] UserAgentServiceConnector - Unable to connect to destination grid ", e);
+                // m_log.LogWarning(e, "[osAvatarName2Key] UserAgentServiceConnector - Unable to connect to destination grid ");
             }
         }
 
@@ -4250,7 +4248,7 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
 
         if (newItem is null)
         {
-            m_log.ErrorFormat(
+            m_log.LogError(
                 "[OSSL API]: Could not create user inventory item {0} for {1}, attach point {2} in {3}: {4}",
                 itemName, m_host.Name, attachmentPoint, World.Name, message);
             m_LSL_Api.llSay(0, message);

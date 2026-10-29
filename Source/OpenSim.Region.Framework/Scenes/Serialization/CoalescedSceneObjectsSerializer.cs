@@ -28,9 +28,10 @@
 using System.Reflection;
 using System.Text;
 using System.Xml;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.Framework.Scenes.Serialization;
 
@@ -39,7 +40,7 @@ namespace OpenSim.Region.Framework.Scenes.Serialization;
 /// </summary>
 public class CoalescedSceneObjectsSerializer
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// Serialize coalesced objects to Xml
@@ -72,7 +73,7 @@ public class CoalescedSceneObjectsSerializer
 
                 List<SceneObjectGroup> coaObjects = coa.Objects;
 
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[COALESCED SCENE OBJECTS SERIALIZER]: Writing {0} objects for coalesced object",
 //                        coaObjects.Count);
 
@@ -90,7 +91,7 @@ public class CoalescedSceneObjectsSerializer
                 {
                     SceneObjectGroup obj = coaObjects[i];
 
-//                        m_log.DebugFormat(
+//                        m_log.LogDebug(
 //                            "[COALESCED SCENE OBJECTS SERIALIZER]: Writing offset for object {0}, {1}",
 //                            i, obj.Name);
 
@@ -117,7 +118,7 @@ public class CoalescedSceneObjectsSerializer
 
     public static bool TryFromXml(string xml, out CoalescedSceneObjects coa)
     {
-        //            m_log.DebugFormat("[COALESCED SCENE OBJECTS SERIALIZER]: TryFromXml() deserializing {0}", xml);
+        //            m_log.LogDebug("[COALESCED SCENE OBJECTS SERIALIZER]: TryFromXml() deserializing {0}", xml);
 
         coa = null;
 
@@ -131,7 +132,7 @@ public class CoalescedSceneObjectsSerializer
 
                 if (reader.Name != "CoalescedObject")
                 {
-                    // m_log.DebugFormat(
+                    // m_log.LogDebug(
                     //     "[COALESCED SCENE OBJECTS SERIALIZER]: TryFromXml() root element was {0} so returning false",
                     //     reader.Name);
 
@@ -161,7 +162,7 @@ public class CoalescedSceneObjectsSerializer
                 {
                     // XXX: Possibly we should fail outright here rather than continuing if a particular component of the
                     // coalesced object fails to load.
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[COALESCED SCENE OBJECTS SERIALIZER]: Deserialization of xml for component {0} failed.  Continuing.",
                         i);
                 }
@@ -171,7 +172,7 @@ public class CoalescedSceneObjectsSerializer
         }
         catch (Exception e)
         {
-            m_log.Error("[COALESCED SCENE OBJECTS SERIALIZER]: Deserialization of xml failed ", e);
+            m_log.LogError(e, "[COALESCED SCENE OBJECTS SERIALIZER]: Deserialization of xml failed ");
             Util.LogFailedXML("[COALESCED SCENE OBJECTS SERIALIZER]:", xml);
             return false;
         }
@@ -181,7 +182,7 @@ public class CoalescedSceneObjectsSerializer
 
     public static bool TryFromXmlData(byte[] data, out CoalescedSceneObjects coa)
     {
-        // m_log.DebugFormat("[COALESCED SCENE OBJECTS SERIALIZER]: TryFromXml() deserializing {0}", xml);
+        // m_log.LogDebug("[COALESCED SCENE OBJECTS SERIALIZER]: TryFromXml() deserializing {0}", xml);
 
         coa = null;
         try
@@ -233,7 +234,7 @@ public class CoalescedSceneObjectsSerializer
                 {
                     // XXX: Possibly we should fail outright here rather than continuing if a particular component of the
                     // coalesced object fails to load.
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[COALESCED SCENE OBJECTS SERIALIZER]: Deserialization of xml for component {0} failed.  Continuing.",
                         i);
                 }
@@ -243,7 +244,7 @@ public class CoalescedSceneObjectsSerializer
         }
         catch (Exception e)
         {
-            m_log.Error("[COALESCED SCENE OBJECTS SERIALIZER]: Deserialization of binary xml failed ", e);
+            m_log.LogError(e, "[COALESCED SCENE OBJECTS SERIALIZER]: Deserialization of binary xml failed ");
             return false;
         }
 

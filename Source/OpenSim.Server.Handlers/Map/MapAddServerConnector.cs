@@ -29,7 +29,6 @@ using System.Reflection;
 using System.Net;
 
 using Nini.Config;
-using log4net;
 using OpenMetaverse;
 
 using OpenSim.Framework;
@@ -39,13 +38,14 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.Handlers.Base;
 
+using Microsoft.Extensions.Logging;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 
 namespace OpenSim.Server.Handlers.MapImage;
 
 public class MapAddServiceConnector : ServiceConnector
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IMapImageService m_MapService;
     private IGridService m_GridService;
@@ -71,9 +71,9 @@ public class MapAddServiceConnector : ServiceConnector
             m_GridService = ServerUtils.LoadPlugin<IGridService>(gridService, args);
 
         if (m_GridService != null)
-            m_log.InfoFormat("[MAP IMAGE HANDLER]: GridService check is ON");
+            m_log.LogInformation("[MAP IMAGE HANDLER]: GridService check is ON");
         else
-            m_log.InfoFormat("[MAP IMAGE HANDLER]: GridService check is OFF");
+            m_log.LogInformation("[MAP IMAGE HANDLER]: GridService check is OFF");
 
         bool proxy = serverConfig.GetBoolean("HasProxy", false);
         IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
@@ -83,7 +83,7 @@ public class MapAddServiceConnector : ServiceConnector
 
 class MapServerPostHandler : SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private IMapImageService m_MapService;
     private IGridService m_GridService;
     bool m_Proxy;
@@ -98,7 +98,7 @@ class MapServerPostHandler : SimpleStreamHandler
 
     protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        //m_log.DebugFormat("[MAP SERVICE IMAGE HANDLER]: Received {0}", path);
+        //m_log.LogDebug("[MAP SERVICE IMAGE HANDLER]: Received {0}", path);
 
         int x = 0, y = 0;
         UUID scopeID = UUID.Zero;
@@ -137,7 +137,7 @@ class MapServerPostHandler : SimpleStreamHandler
 
         try
         {
-            m_log.DebugFormat("[MAP ADD SERVER CONNECTOR]: Received map data for region at {0}-{1}", x, y);
+            m_log.LogDebug("[MAP ADD SERVER CONNECTOR]: Received map data for region at {0}-{1}", x, y);
 
             //string type = "image/jpeg";
             //if (request.ContainsKey("TYPE"))
@@ -151,14 +151,14 @@ class MapServerPostHandler : SimpleStreamHandler
                 {
                     if (r.ExternalEndPoint.Address.ToString() != ipAddr.ToString())
                     {
-                        m_log.WarnFormat("[MAP IMAGE HANDLER]: IP address {0} may be trying to impersonate region in IP {1}", ipAddr, r.ExternalEndPoint.Address);
+                        m_log.LogWarning("[MAP IMAGE HANDLER]: IP address {0} may be trying to impersonate region in IP {1}", ipAddr, r.ExternalEndPoint.Address);
                         httpResponse.RawBuffer = Util.ResultFailureMessage("IP address of caller does not match IP address of registered region");
                         //return;
                     }
                 }
                 else
                 {
-                    m_log.WarnFormat("[MAP IMAGE HANDLER]: IP address {0} may be rogue. Region not found at coordinates {1}-{2}",
+                    m_log.LogWarning("[MAP IMAGE HANDLER]: IP address {0} may be rogue. Region not found at coordinates {1}-{2}",
                         ipAddr, x, y);
                     httpResponse.RawBuffer = Util.ResultFailureMessage("Region not found at given coordinates");
                     //return;
@@ -176,7 +176,7 @@ class MapServerPostHandler : SimpleStreamHandler
         }
         catch (Exception e)
         {
-            m_log.ErrorFormat("[MAP SERVICE IMAGE HANDLER]: Exception {0} {1}", e.Message, e.StackTrace);
+            m_log.LogError("[MAP SERVICE IMAGE HANDLER]: Exception {0} {1}", e.Message, e.StackTrace);
         }
 
         httpResponse.RawBuffer = Util.ResultFailureMessage("Unexpected server error");

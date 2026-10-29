@@ -27,12 +27,13 @@
 
 using System.Data;
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 using Npgsql;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Data.PGSQL;
 
@@ -45,7 +46,7 @@ public class PGSQLSimulationData : ISimulationDataStore
     private const string LogHeader = "[REGION DB PGSQL]";
 
     // private static FileSystemDataStore Instance = new FileSystemDataStore();
-    private static readonly ILog _Log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger _Log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     /// <summary>
     /// The database manager
@@ -144,7 +145,7 @@ public class PGSQLSimulationData : ISimulationDataStore
                         // deleted).
                         if (!groupID.IsZero() && sceneObjectPart.UUID.NotEqual(groupID))
                         {
-                            _Log.WarnFormat(
+                            _Log.LogWarning(
                                 "[REGION DB]: Found root prim {0} {1} at {2} where group was actually {3}.  Forcing UUID to group UUID",
                                 sceneObjectPart.Name, sceneObjectPart.UUID, sceneObjectPart.GroupPosition, groupID);
 
@@ -204,7 +205,7 @@ public class PGSQLSimulationData : ISimulationDataStore
 
         LoadItems(primsWithInventory);
 
-        _Log.DebugFormat("[REGION DB]: Loaded {0} objects using {1} prims", objects.Count, prims.Count);
+        _Log.LogDebug("[REGION DB]: Loaded {0} objects using {1} prims", objects.Count, prims.Count);
 
         return new List<SceneObjectGroup>(objects.Values);
     }
@@ -251,7 +252,7 @@ public class PGSQLSimulationData : ISimulationDataStore
     /// <param name="regionUUID"></param>
     public void StoreObject(SceneObjectGroup obj, UUID regionUUID)
     {
-        //_Log.DebugFormat("[PGSQL]: Adding/Changing SceneObjectGroup: {0} to region: {1}, object has {2} prims.", obj.UUID, regionUUID, obj.Parts.Length);
+        //_Log.LogDebug("[PGSQL]: Adding/Changing SceneObjectGroup: {0} to region: {1}, object has {2} prims.", obj.UUID, regionUUID, obj.Parts.Length);
 
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
         {
@@ -272,7 +273,7 @@ public class PGSQLSimulationData : ISimulationDataStore
                         }
                         catch (NpgsqlException sqlEx)
                         {
-                            _Log.Error($"[REGION DB]: Store SceneObjectPrim SQL error: {sqlEx.Message}");
+                            _Log.LogError($"[REGION DB]: Store SceneObjectPrim SQL error: {sqlEx.Message}");
                             throw;
                         }
                     }
@@ -287,7 +288,7 @@ public class PGSQLSimulationData : ISimulationDataStore
                         }
                         catch (NpgsqlException sqlEx)
                         {
-                            _Log.Error($"[REGION DB]: Store SceneObjectPrimShapes SQL error: {sqlEx.Message}");
+                            _Log.LogError($"[REGION DB]: Store SceneObjectPrimShapes SQL error: {sqlEx.Message}");
                             throw;
                         }
                     }
@@ -297,7 +298,7 @@ public class PGSQLSimulationData : ISimulationDataStore
             }
             catch (Exception ex)
             {
-                _Log.ErrorFormat("[REGION DB]: Store SceneObjectGroup error: {0}, Rolling back...", ex.Message);
+                _Log.LogError("[REGION DB]: Store SceneObjectGroup error: {0}, Rolling back...", ex.Message);
                 try
                 {
                     transaction.Rollback();
@@ -305,7 +306,7 @@ public class PGSQLSimulationData : ISimulationDataStore
                 catch (Exception ex2)
                 {
                     //Show error
-                    _Log.InfoFormat("[REGION DB]: Rollback of SceneObjectGroup store transaction failed with error: {0}", ex2.Message);
+                    _Log.LogInformation("[REGION DB]: Rollback of SceneObjectGroup store transaction failed with error: {0}", ex2.Message);
 
                 }
             }
@@ -346,7 +347,8 @@ public class PGSQLSimulationData : ISimulationDataStore
             ""ClickAction"" = :ClickAction, ""Material"" = :Material, ""CollisionSound"" = :CollisionSound, ""CollisionSoundVolume"" = :CollisionSoundVolume, ""PassTouches"" = :PassTouches,
             ""LinkNumber"" = :LinkNumber, ""MediaURL"" = :MediaURL, ""DynAttrs"" = :DynAttrs, ""Vehicle"" = :Vehicle,
             ""PhysInertia"" = :PhysInertia, ""standtargetx"" =:standtargetx, ""standtargety"" =:standtargety, ""standtargetz"" =:standtargetz,
-            ""sitactrange"" =:sitactrange, ""pseudocrc"" = :pseudocrc, ""sopanims"" = :sopanims, ""linksetdata"" =:linksetdata, ""StartStr"" = :StartStr 
+            ""sitactrange"" =:sitactrange, ""pseudocrc"" = :pseudocrc, ""sopanims"" = :sopanims, ""linksetdata"" =:linksetdata, ""StartStr"" = :StartStr,
+            ""SitTargetActive"" = :SitTargetActive
             WHERE ""UUID"" = :UUID ;
 
         INSERT INTO
@@ -361,7 +363,7 @@ public class PGSQLSimulationData : ISimulationDataStore
             ""ForceMouselook"", ""ScriptAccessPin"", ""AllowedDrop"", ""DieAtEdge"", ""SalePrice"", ""SaleType"", ""ColorR"", ""ColorG"", ""ColorB"", ""ColorA"",
             ""ParticleSystem"", ""ClickAction"", ""Material"", ""CollisionSound"", ""CollisionSoundVolume"", ""PassTouches"", ""LinkNumber"", ""MediaURL"", ""DynAttrs"",
             ""PhysicsShapeType"", ""Density"", ""GravityModifier"", ""Friction"", ""Restitution"", ""PassCollisions"", ""RotationAxisLocks"", ""RezzerID"" , ""Vehicle"", ""PhysInertia"",
-            ""standtargetx"", ""standtargety"", ""standtargetz"", ""sitactrange"", ""pseudocrc"", ""sopanims"", ""linksetdata"", ""StartStr""
+            ""standtargetx"", ""standtargety"", ""standtargetz"", ""sitactrange"", ""pseudocrc"", ""sopanims"", ""linksetdata"", ""StartStr"", ""SitTargetActive""
             ) Select
             :UUID, :CreationDate, :Name, :Text, :Description, :SitName, :TouchName, :ObjectFlags, :OwnerMask, :NextOwnerMask, :GroupMask,
             :EveryoneMask, :BaseMask, :PositionX, :PositionY, :PositionZ, :GroupPositionX, :GroupPositionY, :GroupPositionZ, :VelocityX,
@@ -373,7 +375,7 @@ public class PGSQLSimulationData : ISimulationDataStore
             :ForceMouselook, :ScriptAccessPin, :AllowedDrop, :DieAtEdge, :SalePrice, :SaleType, :ColorR, :ColorG, :ColorB, :ColorA,
             :ParticleSystem, :ClickAction, :Material, :CollisionSound, :CollisionSoundVolume, :PassTouches, :LinkNumber, :MediaURL, :DynAttrs,
             :PhysicsShapeType, :Density, :GravityModifier, :Friction, :Restitution, :PassCollisions, :RotationAxisLocks, :RezzerID, :Vehicle, :PhysInertia,
-            :standtargetx, :standtargety, :standtargetz,:sitactrange, :pseudocrc, :sopanims, :LinksetData, :StartStr
+            :standtargetx, :standtargety, :standtargetz,:sitactrange, :pseudocrc, :sopanims, :LinksetData, :StartStr, :SitTargetActive
             where not EXISTS (SELECT ""UUID"" FROM prims WHERE ""UUID"" = :UUID);
         ";
 
@@ -439,7 +441,7 @@ public class PGSQLSimulationData : ISimulationDataStore
     /// <param name="regionUUID">regionUUID (is this used anyway</param>
     public void RemoveObject(UUID objectID, UUID regionUUID)
     {
-        //_Log.InfoFormat("[PGSQL]: Removing obj: {0} from region: {1}", objectID, regionUUID);
+        //_Log.LogInformation("[PGSQL]: Removing obj: {0} from region: {1}", objectID, regionUUID);
 
         //Remove from prims and primsitem table
         string sqlPrims = @"DELETE FROM PRIMS WHERE ""SceneGroupID"" = :objectID";
@@ -474,7 +476,7 @@ public class PGSQLSimulationData : ISimulationDataStore
     /// <param name="items"></param>
     public void StorePrimInventory(UUID primID, ICollection<TaskInventoryItem> items)
     {
-        //_Log.InfoFormat("[REGION DB: Persisting Prim Inventory with prim ID {0}", primID);
+        //_Log.LogInformation("[REGION DB: Persisting Prim Inventory with prim ID {0}", primID);
 
         //Statement from PGSQL section!
         // For now, we're just going to crudely remove all the previous inventory items
@@ -495,9 +497,9 @@ public class PGSQLSimulationData : ISimulationDataStore
         sql =
             @"INSERT INTO primitems (
             ""itemID"",""primID"",""assetID"",""parentFolderID"",""invType"",""assetType"",""name"",""description"",""creationDate"",""creatorID"",""ownerID"",""lastOwnerID"",""groupID"",
-            ""nextPermissions"",""currentPermissions"",""basePermissions"",""everyonePermissions"",""groupPermissions"",""flags"")
+            ""nextPermissions"",""currentPermissions"",""basePermissions"",""everyonePermissions"",""groupPermissions"",""flags"",""experienceID"")
             VALUES (:itemID,:primID,:assetID,:parentFolderID,:invType,:assetType,:name,:description,:creationDate,:creatorID,:ownerID,
-            :lastOwnerID,:groupID,:nextPermissions,:currentPermissions,:basePermissions,:everyonePermissions,:groupPermissions,:flags)";
+            :lastOwnerID,:groupID,:nextPermissions,:currentPermissions,:basePermissions,:everyonePermissions,:groupPermissions,:flags,:experienceID)";
 
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
@@ -557,10 +559,10 @@ public class PGSQLSimulationData : ISimulationDataStore
                     }
                     else
                     {
-                        _Log.Info("[REGION DB]: No terrain found for region");
+                        _Log.LogInformation("[REGION DB]: No terrain found for region");
                         return null;
                     }
-                    _Log.Info("[REGION DB]: Loaded terrain revision r" + rev);
+                    _Log.LogInformation("[REGION DB]: Loaded terrain revision r" + rev);
                 }
             }
         }
@@ -624,7 +626,7 @@ public class PGSQLSimulationData : ISimulationDataStore
                 conn.Open();
                 cmd.ExecuteNonQuery();
 
-                _Log.InfoFormat("{0} Deleted terrain revision id = {1}", LogHeader, regionID);
+                _Log.LogInformation("{0} Deleted terrain revision id = {1}", LogHeader, regionID);
             }
         }
 
@@ -644,7 +646,7 @@ public class PGSQLSimulationData : ISimulationDataStore
                 conn.Open();
                 cmd.ExecuteNonQuery();
 
-                _Log.InfoFormat("{0} Stored terrain id = {1}, terrainSize = <{2},{3}>",
+                _Log.LogInformation("{0} Stored terrain id = {1}, terrainSize = <{2},{3}>",
                                 LogHeader, regionID, terrData.SizeX, terrData.SizeY);
             }
         }
@@ -668,7 +670,7 @@ public class PGSQLSimulationData : ISimulationDataStore
                 conn.Open();
                 cmd.ExecuteNonQuery();
 
-                _Log.InfoFormat("{0} Deleted bakedterrain id = {1}", LogHeader, regionID);
+                _Log.LogInformation("{0} Deleted bakedterrain id = {1}", LogHeader, regionID);
             }
         }
 
@@ -688,7 +690,7 @@ public class PGSQLSimulationData : ISimulationDataStore
                 conn.Open();
                 cmd.ExecuteNonQuery();
 
-                _Log.InfoFormat("{0} Stored bakedterrain id = {1}, terrainSize = <{2},{3}>",
+                _Log.LogInformation("{0} Stored bakedterrain id = {1}, terrainSize = <{2},{3}>",
                                 LogHeader, regionID, terrData.SizeX, terrData.SizeY);
             }
         }
@@ -1137,7 +1139,7 @@ public class PGSQLSimulationData : ISimulationDataStore
         {
             newData.UserLocation = Vector3.Zero;
             newData.UserLookAt = Vector3.Zero;
-            _Log.ErrorFormat("[PARCEL]: unable to get parcel telehub settings for {1}", newData.Name);
+            _Log.LogError("[PARCEL]: unable to get parcel telehub settings for {1}", newData.Name);
         }
 
         newData.ParcelAccessList = new List<LandAccessEntry>();
@@ -1290,6 +1292,9 @@ public class PGSQLSimulationData : ISimulationDataStore
                             Convert.ToSingle(primRow["SitTargetOrientY"]),
                             Convert.ToSingle(primRow["SitTargetOrientZ"]),
                             Convert.ToSingle(primRow["SitTargetOrientW"]));
+        // NULL (every row saved before the column existed): the state follows the offset and rotation, as before.
+        if (primRow["SitTargetActive"] is not DBNull)
+            prim.SitTargetActive = Convert.ToInt32(primRow["SitTargetActive"]) != 0;
 
         prim.StandOffset = new Vector3(
                            Convert.ToSingle(primRow["standtargetx"]),
@@ -1504,6 +1509,7 @@ public class PGSQLSimulationData : ISimulationDataStore
         taskItem.EveryonePermissions = Convert.ToUInt32(inventoryRow["everyonePermissions"]);
         taskItem.GroupPermissions = Convert.ToUInt32(inventoryRow["groupPermissions"]);
         taskItem.Flags = Convert.ToUInt32(inventoryRow["flags"]);
+        taskItem.ExperienceID = DBGuid.FromDB(inventoryRow["experienceID"]);
 
         return taskItem;
     }
@@ -1541,6 +1547,7 @@ public class PGSQLSimulationData : ISimulationDataStore
         parameters.Add(_Database.CreateParameter("everyonePermissions", taskItem.EveryonePermissions));
         parameters.Add(_Database.CreateParameter("groupPermissions", taskItem.GroupPermissions));
         parameters.Add(_Database.CreateParameter("flags", taskItem.Flags));
+        parameters.Add(_Database.CreateParameter("experienceID", taskItem.ExperienceID));
 
         return parameters.ToArray();
     }
@@ -1779,6 +1786,12 @@ public class PGSQLSimulationData : ISimulationDataStore
         parameters.Add(_Database.CreateParameter("SitTargetOrientX", sitTargetOrient.X));
         parameters.Add(_Database.CreateParameter("SitTargetOrientY", sitTargetOrient.Y));
         parameters.Add(_Database.CreateParameter("SitTargetOrientZ", sitTargetOrient.Z));
+        // Only a state the offset and rotation do not give (an active target at a zero offset) is stored. Built here
+        // because CreateParameter turns null into an empty string.
+        parameters.Add(new NpgsqlParameter("SitTargetActive", NpgsqlTypes.NpgsqlDbType.Smallint)
+        {
+            Value = prim.SitTargetActiveIsExplicit ? (object)(short)(prim.SitTargetActive ? 1 : 0) : DBNull.Value
+        });
 
         Vector3 standTargetPos = prim.StandOffset;
         parameters.Add(_Database.CreateParameter("standtargetx", standTargetPos.X));

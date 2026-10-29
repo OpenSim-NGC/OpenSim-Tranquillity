@@ -25,7 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using System.Net;
+using OpenSim.Framework;
 using OpenSim.Framework.Serialization;
 using OpenSim.Region.Framework.Scenes;
 
@@ -101,24 +101,6 @@ public static class ArchiveHelpers
 
     public static Stream URIFetch(Uri uri)
     {
-        HttpWebRequest request  = (HttpWebRequest)WebRequest.Create(uri);
-
-        // request.Credentials = credentials;
-
-        request.ContentLength = 0;
-        request.KeepAlive     = false;
-
-        WebResponse response = request.GetResponse();
-        Stream file = response.GetResponseStream();
-
-        // justincc: gonna ignore the content type for now and just try anything
-        //if (response.ContentType != "application/x-oar")
-        //    throw new Exception(String.Format("{0} does not identify an OAR file", uri.ToString()));
-
-        if (response.ContentLength == 0)
-            throw new Exception(String.Format("{0} returned an empty file", uri.ToString()));
-
-        // return new BufferedStream(file, (int) response.ContentLength);
-        return new BufferedStream(file, 1000000);
+        return WebUtil.OpenHttpStream(uri);
     }
 }

@@ -26,7 +26,6 @@
  */
 
 using System.Reflection;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers;
@@ -37,11 +36,13 @@ using OpenSim.Server.Handlers.Base;
 using OpenSim.Services.Interfaces;
 
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.ServiceConnectorsIn.Neighbour;
 
 public class NeighbourServiceInConnectorModule : ISharedRegionModule, INeighbourService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
     private static bool m_Enabled = false;
     private static bool m_Registered = false;
 
@@ -60,7 +61,7 @@ public class NeighbourServiceInConnectorModule : ISharedRegionModule, INeighbour
             m_Enabled = moduleConfig.GetBoolean("NeighbourServiceInConnector", false);
             if (m_Enabled)
             {
-                m_log.Info("[NEIGHBOUR IN CONNECTOR]: NeighbourServiceInConnector enabled");
+                m_log.LogInformation("[NEIGHBOUR IN CONNECTOR]: NeighbourServiceInConnector enabled");
             }
 
         }
@@ -72,7 +73,7 @@ public class NeighbourServiceInConnectorModule : ISharedRegionModule, INeighbour
         if (!m_Enabled)
             return;
 
-//            m_log.Info("[NEIGHBOUR IN CONNECTOR]: Starting...");
+//            m_log.LogInformation("[NEIGHBOUR IN CONNECTOR]: Starting...");
     }
 
     public void Close()
@@ -125,7 +126,7 @@ public class NeighbourServiceInConnectorModule : ISharedRegionModule, INeighbour
         {
             if (s.RegionInfo.RegionHandle == regionHandle)
             {
-                //m_log.DebugFormat("[NEIGHBOUR IN CONNECTOR]: HelloNeighbour from {0} to {1}", thisRegion.RegionName, s.RegionInfo.RegionName);
+                //m_log.LogDebug("[NEIGHBOUR IN CONNECTOR]: HelloNeighbour from {0} to {1}", thisRegion.RegionName, s.RegionInfo.RegionName);
                 return s.IncomingHelloNeighbour(thisRegion);
             }
         }

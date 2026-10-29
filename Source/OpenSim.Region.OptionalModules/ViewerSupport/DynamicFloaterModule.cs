@@ -31,13 +31,13 @@ using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework;
 using Nini.Config;
-using log4net;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.ViewerSupport;
 
 public class DynamicFloaterModule : INonSharedRegionModule, IDynamicFloaterModule
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_scene;
 
@@ -166,7 +166,7 @@ public class DynamicFloaterModule : INonSharedRegionModule, IDynamicFloaterModul
         if (msg.Sender == null)
             return;
 
-        //m_log.DebugFormat("chan {0} msg {1}", msg.Channel, msg.Message);
+        //m_log.LogDebug("chan {0} msg {1}", msg.Channel, msg.Message);
 
         IClientAPI client = msg.Sender;
 

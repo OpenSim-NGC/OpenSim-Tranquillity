@@ -44,8 +44,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
     /// </remarks>
     public class SceneObjectDeRezTests : OpenSimTestCase
     {
-        [OneTimeSetUp]
-        public void FixtureInit()
+        public SceneObjectDeRezTests()
         {
             // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
             // This facility was added after the original async delete tests were written, so it may be possible now
@@ -53,8 +52,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Util.FireAndForgetMethod = FireAndForgetMethod.RegressionTest;
         }
 
-        [OneTimeTearDown]
-        public void TearDown()
+        public override void Dispose()
         {
             // We must set this back afterwards, otherwise later tests will fail since they're expecting multiple
             // threads.  Possibly, later tests should be rewritten so none of them require async stuff (which regression
@@ -92,13 +90,13 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Check that object isn't deleted until we crank the sogd handle.
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
-//            // TODO: Fix this assertion
-//            Assert.True(retrievedPart.ParentGroup.IsDeleted);
+//            Assert.NotNull(retrievedPart);
+//            Assert.False(retrievedPart.ParentGroup.IsDeleted);
 
             sogd.InventoryDeQueueAndDelete();
 
 //            SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-            // TODO: Fix this assertion
+            Assert.Null(retrievedPart);
         }
 
         /// <summary>
@@ -185,7 +183,7 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
             // Object should still be in the scene.
             SceneObjectPart retrievedPart = scene.GetSceneObjectPart(part.LocalId);
-            Assert.Equal(,);
+            Assert.Equal(part.UUID, retrievedPart.UUID);
         }
 
         /// <summary>
@@ -225,15 +223,15 @@ namespace OpenSim.Region.Framework.Scenes.Tests
 
 //            SceneObjectPart retrievedPart = scene.GetSceneObjectPart(so.LocalId);
 
-//            // TODO: Fix this assertion
-//            Assert.True(so.IsDeleted);
+//            Assert.NotNull(retrievedPart);
+//            Assert.False(so.IsDeleted);
 
             sogd.InventoryDeQueueAndDelete();
 
             Assert.True(so.IsDeleted);
 
             SceneObjectPart retrievedPart2 = scene.GetSceneObjectPart(so.LocalId);
-            // TODO: Fix this assertion
+            Assert.Null(retrievedPart2);
 
 //            SceneSetupHelpers.DeleteSceneObjectAsync(scene, part, DeRezAction.Take, userInfo.RootFolder.ID, client);
 
@@ -242,11 +240,11 @@ namespace OpenSim.Region.Framework.Scenes.Tests
                     scene.InventoryService, ua.PrincipalID, "folder1/" + myObjectName);
 
             // Check that we now have the taken part in our inventory
-            // TODO: Fix this assertion
+            Assert.NotNull(retrievedItem);
 
             // Check that the taken part has actually disappeared
 //            SceneObjectPart retrievedPart = scene.GetSceneObjectPart(part.LocalId);
-//            // TODO: Fix this assertion
+//            Assert.Null(retrievedPart);
         }
     }
 }

@@ -36,6 +36,8 @@ using Nwc.XmlRpc;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Server.MoneyServer.Models;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.MoneyServer.Controllers;
 
 [ApiController]

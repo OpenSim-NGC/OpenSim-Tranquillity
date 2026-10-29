@@ -26,7 +26,6 @@
  */
 
 using OpenMetaverse;
-using log4net;
 using Nini.Config;
 using System.Reflection;
 using OpenSim.Services.Base;
@@ -34,14 +33,23 @@ using OpenSim.Services.Interfaces;
 using OpenSim.Data;
 using OpenSim.Framework;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Services.InventoryService;
 
 public class XInventoryService : ServiceBase, IInventoryService
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected IXInventoryData m_Database;
     protected bool m_AllowDelete = true;
+
+    /// <summary>
+    /// False for a service that regions of other grids write to (the Hypergrid inventory services). Such a
+    /// caller cannot vouch for a script's Experience link, so an item it adds has none and an item it updates
+    /// keeps the link this grid stored.
+    /// </summary>
+    protected bool m_AcceptsExperienceLinks = true;
     protected string m_ConfigName = "InventoryService";
 
     public XInventoryService(IConfigSource config)
@@ -94,7 +102,48 @@ public class XInventoryService : ServiceBase, IInventoryService
             throw new Exception("Could not find a storage interface in the given module");
     }
 
+    /// <summary>
+    /// AIS-COF-1. Serialised per principal, because two overlapping calls for the same agent both read
+    /// "missing" and both create. <see cref="EnsureSystemFolder"/> is right that nothing inside it can close
+    /// that window; a lock outside it can.
+    ///
+    /// <para><b>This closes the race for a single Robust instance only.</b> A grid that runs one is covered.
+    /// A multi-instance or multi-simulator deployment that calls this concurrently from two processes is
+    /// still exposed, and for those the safety net is <see cref="WarnOnDuplicateSystemFolders"/>, which reports
+    /// the damage rather than preventing it. Only a unique constraint would prevent it, and the suitcase makes
+    /// <c>(agentID, type)</c> unavailable - see the remarks on that method.</para>
+    ///
+    /// <para>Striped rather than per-UUID: a fixed array of locks cannot leak and needs no cleanup, where a
+    /// dictionary of semaphores has to be reference-counted or it grows for the lifetime of the process. Two
+    /// principals sharing a stripe serialise against each other for the duration of one inventory creation,
+    /// which costs nothing that matters and can never be wrong.</para>
+    /// </summary>
     public virtual bool CreateUserInventory(UUID principalID)
+    {
+        lock (CreateLockFor(principalID))
+            return CreateUserInventoryLocked(principalID);
+    }
+
+    /// <summary>The number of lock stripes. A power of two, and far more than the concurrent logins this serves.</summary>
+    private const int CreateLockStripes = 64;
+
+    /// <summary>
+    /// Process-wide, and static deliberately: a region connector and the local service can both hold an
+    /// <see cref="XInventoryService"/>, and a per-instance lock would not serialise between them.
+    /// </summary>
+    private static readonly object[] s_createLocks = CreateStripes();
+
+    private static object[] CreateStripes()
+    {
+        var locks = new object[CreateLockStripes];
+        for (int i = 0; i < locks.Length; i++) locks[i] = new object();
+        return locks;
+    }
+
+    private static object CreateLockFor(UUID principalID)
+        => s_createLocks[(principalID.GetHashCode() & int.MaxValue) % CreateLockStripes];
+
+    private bool CreateUserInventoryLocked(UUID principalID)
     {
         // This is braindeaad. We can't ever communicate that we fixed
         // an existing inventory. Well, just return root folder status,
@@ -112,65 +161,143 @@ public class XInventoryService : ServiceBase, IInventoryService
 
         XInventoryFolder[] sysFolders = GetSystemFolders(principalID, rootFolder.ID);
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Animation))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Animation, "Animations");
+        WarnOnDuplicateSystemFolders(principalID, sysFolders);
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.BodyPart))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.BodyPart, "Body Parts");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Animation, "Animations");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.CallingCard))
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.BodyPart, "Body Parts");
+
+        XInventoryFolder callingCards = EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.CallingCard, "Calling Cards");
+        if (callingCards is not null)
         {
-            XInventoryFolder folder = CreateFolder(principalID, rootFolder.ID, (int)FolderType.CallingCard, "Calling Cards");
-            folder = CreateFolder(principalID, folder.folderID, (int)FolderType.CallingCard, "Friends");
+            XInventoryFolder folder = CreateFolder(principalID, callingCards.folderID, (int)FolderType.CallingCard, "Friends");
             CreateFolder(principalID, folder.folderID, (int)FolderType.CallingCard, "All");
         }
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Clothing))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Clothing, "Clothing");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Clothing, "Clothing");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.CurrentOutfit))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.CurrentOutfit, "Current Outfit");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.CurrentOutfit, "Current Outfit");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Favorites))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Favorites, "Favorites");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Favorites, "Favorites");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Gesture))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Gesture, "Gestures");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Gesture, "Gestures");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Landmark))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Landmark, "Landmarks");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Landmark, "Landmarks");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.LostAndFound))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.LostAndFound, "Lost And Found");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.LostAndFound, "Lost And Found");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Notecard))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Notecard, "Notecards");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Notecard, "Notecards");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Object))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Object, "Objects");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Object, "Objects");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Snapshot))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Snapshot, "Photo Album");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Snapshot, "Photo Album");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.LSLText))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.LSLText, "Scripts");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.LSLText, "Scripts");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Sound))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Sound, "Sounds");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Sound, "Sounds");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Texture))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Texture, "Textures");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Texture, "Textures");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Trash))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Trash, "Trash");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Trash, "Trash");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Settings))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Settings, "Settings");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Settings, "Settings");
 
-        if (!Array.Exists(sysFolders, f => f.type == (int)FolderType.Material))
-            CreateFolder(principalID, rootFolder.ID, (int)FolderType.Material, "Materials");
+        EnsureSystemFolder(principalID, rootFolder.ID, sysFolders, FolderType.Material, "Materials");
 
         return result;
+    }
+
+    /// <summary>
+    /// Create the agent's system folder of <paramref name="type"/> under <paramref name="rootID"/>, but only if
+    /// they do not already have one there. Returns the folder it created, or null when one already existed —
+    /// so a caller can tell whether it is responsible for populating it.
+    ///
+    /// <para><paramref name="sysFolders"/> is the snapshot read once at the top of
+    /// <see cref="CreateUserInventory"/>. By the time a later type is reached that snapshot is many database round
+    /// trips old, and this method is entered concurrently for the same principal: Direct Delivery calls
+    /// <c>CreateUserInventory</c> on every delivery, and a region can call it at any time through
+    /// <c>XInventoryInConnector</c>. Two overlapping calls that both read "missing" both create, and there is no
+    /// unique key on <c>(agentID, type)</c> to catch the loser, so the losing folder simply exists from then on,
+    /// never written to.</para>
+    ///
+    /// <para>Re-reading immediately before the insert narrows that window from the whole method to a single
+    /// query. <b>It does not close it.</b> Nothing here can: only a unique constraint on <c>(agentID, type)</c>
+    /// makes a duplicate impossible, and that is a migration plus a dedupe of the existing rows, in that order —
+    /// ledger A-R8. The extra read costs nothing in the normal case, because it is only reached when the snapshot
+    /// already says the folder is missing.</para>
+    /// </summary>
+    private XInventoryFolder EnsureSystemFolder(UUID principalID, UUID rootID, XInventoryFolder[] sysFolders, FolderType type, string name)
+    {
+        if (Array.Exists(sysFolders, f => f.type == (int)type))
+            return null;
+
+        XInventoryFolder[] fresh = m_Database.GetFolders(
+                [ "agentID", "parentFolderID", "type" ],
+                [ principalID.ToString(), rootID.ToString(), ((int)type).ToString() ]);
+
+        if (fresh.Length > 0)
+        {
+            m_log.LogDebug(
+                "[XINVENTORY]: not creating a second {Type} folder for {Principal}: {Count} appeared since this call started",
+                type, principalID, fresh.Length);
+            return null;
+        }
+
+        return CreateFolder(principalID, rootID, (int)type, name);
+    }
+
+    /// <summary>
+    /// AIS-COF-1. One WARN per duplicated type, for the agent whose inventory is being created or checked. It is
+    /// free: <paramref name="sysFolders"/> is the snapshot <see cref="CreateUserInventory"/> has already read, so
+    /// this adds no query.
+    ///
+    /// <para><b>Only folders directly under the agent's inventory root are counted, and that is the whole point
+    /// of the check.</b> Three things legitimately repeat a system type and none of them is a fault:</para>
+    /// <list type="bullet">
+    ///   <item><b>The HG suitcase.</b> <c>HGSuitcaseInventoryService.CreateSystemFolders</c> builds a complete
+    ///   second set of system folders under <c>My Suitcase</c> (type 100) - Current Outfit included. On one
+    ///   grid that accounted for seven accounts that looked like they had two Current Outfit folders each and did
+    ///   not. <c>sysFolders</c> is parented to the root, so the suitcase subtree is already excluded.</item>
+    ///   <item><b>The calling-card chain</b>, <c>Calling Cards</c> -> <c>Friends</c> -> <c>All</c>, three folders
+    ///   deep all typed <c>CallingCard</c>, created by <see cref="CreateUserInventory"/> itself. Only the first is
+    ///   under the root, so again already excluded.</item>
+    ///   <item><b>Saved outfits</b> (<c>FolderType.Outfit</c>, 47), of which a resident may have any number, and
+    ///   <b>user folders</b> (type -1). Both are excluded explicitly below - 47 by name, -1 because
+    ///   <see cref="GetSystemFolders"/> keeps only <c>type &gt;= 0</c>.</item>
+    /// </list>
+    ///
+    /// <para>A warning here is a data fault and wants an operator to merge the folders by hand, moving the
+    /// contents of the unused one into the one the viewer writes to. It is not self-healing: nothing in this
+    /// class removes a folder.</para>
+    /// </summary>
+    private void WarnOnDuplicateSystemFolders(UUID principalID, XInventoryFolder[] sysFolders)
+    {
+        if (sysFolders is null || sysFolders.Length < 2)
+            return;
+
+        var byType = new Dictionary<int, List<XInventoryFolder>>();
+        foreach (XInventoryFolder f in sysFolders)
+        {
+            if (f.type == (int)FolderType.Outfit)      // a resident may save any number of outfits
+                continue;
+            if (!byType.TryGetValue(f.type, out List<XInventoryFolder> group))
+                byType[f.type] = group = new List<XInventoryFolder>(1);
+            group.Add(f);
+        }
+
+        foreach (KeyValuePair<int, List<XInventoryFolder>> kv in byType)
+        {
+            if (kv.Value.Count < 2)
+                continue;
+
+            m_log.LogWarning(
+                "[XINVENTORY]: agent {Principal} has {Count} folders of type {Type} directly under the inventory "
+                + "root ({Folders}); exactly one is expected. This is a data fault, not a fault of this login, and "
+                + "wants the folders merged by hand. Folders of the same type inside My Suitcase are expected and "
+                + "are not counted here.",
+                principalID, kv.Value.Count, (FolderType)kv.Key,
+                string.Join(", ", kv.Value.ConvertAll(f => $"{f.folderID} v{f.version}")));
+        }
     }
 
     protected XInventoryFolder CreateFolder(UUID principalID, UUID parentID, int type, string name)
@@ -192,15 +319,23 @@ public class XInventoryService : ServiceBase, IInventoryService
 
     protected virtual XInventoryFolder[] GetSystemFolders(UUID principalID, UUID rootID)
     {
-        //m_log.DebugFormat("[XINVENTORY SERVICE]: Getting system folders for {0}", principalID);
+        //m_log.LogDebug("[XINVENTORY SERVICE]: Getting system folders for {0}", principalID);
 
         XInventoryFolder[] allFolders = m_Database.GetFolders(
                 [ "agentID", "parentFolderID" ],
                 [ principalID.ToString(), rootID.ToString() ]);
 
-        XInventoryFolder[] sysFolders = Array.FindAll(allFolders, f => f.type > 0);
+        // AIS-COF-1: >= 0, not > 0. FolderType.Texture IS zero, so the old filter dropped the "Textures" folder
+        // from every snapshot this returns - and EnsureSystemFolder reads that snapshot to decide whether the
+        // folder already exists. The answer was therefore always "missing" for Textures, on every call, and each
+        // call created another one. That is not a race; it is deterministic, and the data shows it exactly:
+        // type 0 was the ONLY type with root-level duplicates on one grid's data, and the account Direct Delivery
+        // calls CreateUserInventory on for every delivery had NINE "Textures" folders, all version 1 and empty,
+        // beside the one real one. Nothing else duplicated. Only the re-read added to EnsureSystemFolder
+        // stopped it growing further, by catching the miss one query later.
+        XInventoryFolder[] sysFolders = Array.FindAll(allFolders, f => f.type >= 0);
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[XINVENTORY SERVICE]: Found {0} system folders for {1}", sysFolders.Length, principalID);
 
         return sysFolders;
@@ -219,7 +354,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
         foreach (XInventoryFolder x in allFolders)
         {
-            //m_log.DebugFormat("[XINVENTORY SERVICE]: Adding folder {0} to skeleton", x.folderName);
+            //m_log.LogDebug("[XINVENTORY SERVICE]: Adding folder {0} to skeleton", x.folderName);
             folders.Add(ConvertToOpenSim(x));
         }
 
@@ -252,13 +387,13 @@ public class XInventoryService : ServiceBase, IInventoryService
 
     public virtual InventoryFolderBase GetFolderForType(UUID principalID, FolderType type)
     {
-//            m_log.DebugFormat("[XINVENTORY SERVICE]: Getting folder type {0} for user {1}", type, principalID);
+//            m_log.LogDebug("[XINVENTORY SERVICE]: Getting folder type {0} for user {1}", type, principalID);
 
         InventoryFolderBase rootFolder = GetRootFolder(principalID);
 
         if (rootFolder == null)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[XINVENTORY]: Found no root folder for {0} in GetFolderForType() when looking for {1}",
                 principalID, type);
 
@@ -270,7 +405,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
     private InventoryFolderBase GetSystemFolderForType(InventoryFolderBase rootFolder, FolderType type)
     {
-        //m_log.DebugFormat("[XINVENTORY SERVICE]: Getting folder type {0}", type);
+        //m_log.LogDebug("[XINVENTORY SERVICE]: Getting folder type {0}", type);
 
         if (type == FolderType.Root)
             return rootFolder;
@@ -281,11 +416,11 @@ public class XInventoryService : ServiceBase, IInventoryService
 
         if (folders.Length == 0)
         {
-            //m_log.WarnFormat("[XINVENTORY SERVICE]: Found no folder for type {0} ", type);
+            //m_log.LogWarning("[XINVENTORY SERVICE]: Found no folder for type {0} ", type);
             return null;
         }
 
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //    "[XINVENTORY SERVICE]: Found folder {0} {1} for type {2}",
         //    folders[0].folderName, folders[0].folderID, type);
 
@@ -298,7 +433,7 @@ public class XInventoryService : ServiceBase, IInventoryService
         // connector. So we disregard the principal and look
         // by ID.
         //
-        //m_log.DebugFormat("[XINVENTORY SERVICE]: Fetch contents for folder {0}", folderID.ToString());
+        //m_log.LogDebug("[XINVENTORY SERVICE]: Fetch contents for folder {0}", folderID.ToString());
         InventoryCollection inventory = new()
         {
             OwnerID = principalID,
@@ -312,7 +447,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
         foreach (XInventoryFolder x in folders)
         {
-            //m_log.DebugFormat("[XINVENTORY]: Adding folder {0} to response", x.folderName);
+            //m_log.LogDebug("[XINVENTORY]: Adding folder {0} to response", x.folderName);
             inventory.Folders.Add(ConvertToOpenSim(x));
         }
 
@@ -322,7 +457,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
         foreach (XInventoryItem i in items)
         {
-            //m_log.DebugFormat("[XINVENTORY]: Adding item {0} to response", i.inventoryName);
+            //m_log.LogDebug("[XINVENTORY]: Adding item {0} to response", i.inventoryName);
             inventory.Items.Add(ConvertToOpenSim(i));
         }
 
@@ -349,7 +484,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
     public virtual List<InventoryItemBase> GetFolderItems(UUID principalID, UUID folderID)
     {
-//            m_log.DebugFormat("[XINVENTORY]: Fetch items for folder {0}", folderID);
+//            m_log.LogDebug("[XINVENTORY]: Fetch items for folder {0}", folderID);
 
         // Since we probably don't get a valid principal here, either ...
         //
@@ -367,7 +502,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
     public virtual bool AddFolder(InventoryFolderBase folder)
     {
-//            m_log.DebugFormat("[XINVENTORY]: Add folder {0} type {1} in parent {2}", folder.Name, folder.Type, folder.ParentID);
+//            m_log.LogDebug("[XINVENTORY]: Add folder {0} type {1} in parent {2}", folder.Name, folder.Type, folder.ParentID);
 
         InventoryFolderBase check = GetFolder(folder.Owner, folder.ID);
         if (check != null)
@@ -379,7 +514,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
             if (rootFolder == null)
             {
-                m_log.WarnFormat(
+                m_log.LogWarning(
                     "[XINVENTORY]: Found no root folder for {0} in AddFolder() when looking for {1}",
                     folder.Owner, folder.Type);
 
@@ -393,7 +528,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
                 if (existingSystemFolder != null)
                 {
-                    m_log.WarnFormat(
+                    m_log.LogWarning(
                         "[XINVENTORY]: System folder of type {0} already exists when tried to add {1} to {2} for {3}",
                         folder.Type, folder.Name, folder.ParentID, folder.Owner);
 
@@ -408,7 +543,7 @@ public class XInventoryService : ServiceBase, IInventoryService
 
     public virtual bool UpdateFolder(InventoryFolderBase folder)
     {
-//            m_log.DebugFormat("[XINVENTORY]: Update folder {0} {1} ({2})", folder.Name, folder.Type, folder.ID);
+//            m_log.LogDebug("[XINVENTORY]: Update folder {0} {1} ({2})", folder.Name, folder.Type, folder.ID);
 
         XInventoryFolder xFolder = ConvertFromOpenSim(folder);
         InventoryFolderBase check = GetFolder(folder.Owner, folder.ID);
@@ -421,14 +556,14 @@ public class XInventoryService : ServiceBase, IInventoryService
         {
             if (xFolder.version < check.Version)
             {
-//                    m_log.DebugFormat("[XINVENTORY]: {0} < {1} can't do", xFolder.version, check.Version);
+//                    m_log.LogDebug("[XINVENTORY]: {0} < {1} can't do", xFolder.version, check.Version);
                 return false;
             }
 
             check.Version = (ushort)xFolder.version;
             xFolder = ConvertFromOpenSim(check);
 
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[XINVENTORY]: Storing version only update to system folder {0} {1} {2}",
 //                    xFolder.folderName, xFolder.version, xFolder.type);
 
@@ -467,7 +602,7 @@ public class XInventoryService : ServiceBase, IInventoryService
             //if (onlyIfTrash && !ParentIsTrash(id))
             if (onlyIfTrash && !ParentIsTrashOrLost(id))
                 continue;
-            //m_log.InfoFormat("[XINVENTORY SERVICE]: Delete folder {0}", id);
+            //m_log.LogInformation("[XINVENTORY SERVICE]: Delete folder {0}", id);
             InventoryFolderBase f = new() { ID = id };
             PurgeFolder(f, onlyIfTrash);
             m_Database.DeleteFolders("folderID", id.ToString());
@@ -505,8 +640,11 @@ public class XInventoryService : ServiceBase, IInventoryService
 
     public virtual bool AddItem(InventoryItemBase item)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[XINVENTORY SERVICE]: Adding item {0} {1} to folder {2} for {3}", item.Name, item.ID, item.Folder, item.Owner);
+
+        if (!m_AcceptsExperienceLinks)
+            item.ExperienceID = UUID.Zero;
 
         return m_Database.StoreItem(ConvertFromOpenSim(item));
     }
@@ -517,14 +655,14 @@ public class XInventoryService : ServiceBase, IInventoryService
             if (item.AssetType == (sbyte)AssetType.Link || item.AssetType == (sbyte)AssetType.LinkFolder)
                 return false;
 
-//            m_log.InfoFormat(
+//            m_log.LogInformation(
 //                "[XINVENTORY SERVICE]: Updating item {0} {1} in folder {2}", item.Name, item.ID, item.Folder);
 
         InventoryItemBase retrievedItem = GetItem(item.Owner, item.ID);
 
         if (retrievedItem == null)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[XINVENTORY SERVICE]: Tried to update item {0} {1}, owner {2} but no existing item found.",
                 item.Name, item.ID, item.Owner);
 
@@ -538,7 +676,7 @@ public class XInventoryService : ServiceBase, IInventoryService
             || retrievedItem.CreatorIdentification != item.CreatorIdentification
             || retrievedItem.Owner != item.Owner)
         {
-            m_log.WarnFormat(
+            m_log.LogWarning(
                 "[XINVENTORY SERVICE]: Caller to UpdateItem() for {0} {1} tried to alter property(s) that should be invariant, (InvType, AssetType, Folder, CreatorIdentification, Owner), existing ({2}, {3}, {4}, {5}, {6}), update ({7}, {8}, {9}, {10}, {11})",
                 retrievedItem.Name,
                 retrievedItem.ID,
@@ -559,6 +697,9 @@ public class XInventoryService : ServiceBase, IInventoryService
             item.CreatorIdentification = retrievedItem.CreatorIdentification;
             item.Owner = retrievedItem.Owner;
         }
+
+        if (!m_AcceptsExperienceLinks)
+            item.ExperienceID = retrievedItem.ExperienceID;
 
         return m_Database.StoreItem(ConvertFromOpenSim(item));
     }
@@ -716,7 +857,8 @@ public class XInventoryService : ServiceBase, IInventoryService
             SalePrice = item.salePrice,
             SaleType = (byte)item.saleType,
             Flags = (uint)item.flags,
-            CreationDate = item.creationDate
+            CreationDate = item.creationDate,
+            ExperienceID = item.experienceID
         };
     }
 
@@ -743,7 +885,8 @@ public class XInventoryService : ServiceBase, IInventoryService
             salePrice = item.SalePrice,
             saleType = (int)item.SaleType,
             flags = (int)item.Flags,
-            creationDate = item.CreationDate
+            creationDate = item.CreationDate,
+            experienceID = item.ExperienceID
         };
     }
 

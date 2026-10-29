@@ -32,6 +32,8 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.Avatars.Commands;
 
 /// <summary>
@@ -39,7 +41,7 @@ namespace OpenSim.Region.CoreModules.Avatars.Commands;
 /// </summary>
 public class UserCommandsModule : ISharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public const string TeleportUserCommandSyntax = "teleport user <first-name> <last-name> <destination>";
 
@@ -57,22 +59,22 @@ public class UserCommandsModule : ISharedRegionModule
 
     public void Initialise(IConfigSource source)
     {
-//            m_log.DebugFormat("[USER COMMANDS MODULE]: INITIALIZED MODULE");
+//            m_log.LogDebug("[USER COMMANDS MODULE]: INITIALIZED MODULE");
     }
 
     public void PostInitialise()
     {
-//            m_log.DebugFormat("[USER COMMANDS MODULE]: POST INITIALIZED MODULE");
+//            m_log.LogDebug("[USER COMMANDS MODULE]: POST INITIALIZED MODULE");
     }
 
     public void Close()
     {
-//            m_log.DebugFormat("[USER COMMANDS MODULE]: CLOSED MODULE");
+//            m_log.LogDebug("[USER COMMANDS MODULE]: CLOSED MODULE");
     }
 
     public void AddRegion(Scene scene)
     {
-//            m_log.DebugFormat("[USER COMMANDS MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[USER COMMANDS MODULE]: REGION {0} ADDED", scene.RegionInfo.RegionName);
 
         lock (m_scenes)
             m_scenes[scene.RegionInfo.RegionID] = scene;
@@ -90,7 +92,7 @@ public class UserCommandsModule : ISharedRegionModule
 
     public void RemoveRegion(Scene scene)
     {
-//            m_log.DebugFormat("[USER COMMANDS MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[USER COMMANDS MODULE]: REGION {0} REMOVED", scene.RegionInfo.RegionName);
 
         lock (m_scenes)
             m_scenes.Remove(scene.RegionInfo.RegionID);
@@ -98,7 +100,7 @@ public class UserCommandsModule : ISharedRegionModule
 
     public void RegionLoaded(Scene scene)
     {
-//            m_log.DebugFormat("[USER COMMANDS MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[USER COMMANDS MODULE]: REGION {0} LOADED", scene.RegionInfo.RegionName);
     }
 
     private ScenePresence GetUser(string firstName, string lastName)

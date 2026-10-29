@@ -109,7 +109,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             apiGrp1.llCreateLink(grp2.UUID.ToString(), ScriptBaseClass.TRUE);
 
-            Assert.Equal(,);
+            Assert.Equal(4, grp1.Parts.Length);
             Assert.True(grp2.IsDeleted);
         }
 
@@ -136,10 +136,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             apiGrp1.llBreakLink(2);
 
-            Assert.Equal(,);
+            Assert.Equal(1, grp1.Parts.Length);
 
             SceneObjectGroup grp2 = m_scene.GetSceneObjectGroup("grp1-Part1");
-            // TODO: Fix this assertion
+            Assert.NotNull(grp2);
         }
 
         [Fact]
@@ -167,22 +167,22 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             {
                 SceneObjectGroup nowGrp = m_scene.GetSceneObjectGroup("grp1-Part1");
-                // TODO: Fix this assertion
-                Assert.Equal(,);
+                Assert.NotNull(nowGrp);
+                Assert.Equal(1, nowGrp.Parts.Length);
             }
 
             {
                 SceneObjectGroup nowGrp = m_scene.GetSceneObjectGroup("grp1-Part2");
-                // TODO: Fix this assertion
-                Assert.Equal(,);
+                Assert.NotNull(nowGrp);
+                Assert.Equal(1, nowGrp.Parts.Length);
             }
 
             {
                 SceneObjectGroup nowGrp = m_scene.GetSceneObjectGroup("grp1-Part3");
-                // TODO: Fix this assertion
-                Assert.Equal(,);
+                Assert.NotNull(nowGrp);
+                Assert.Equal(1, nowGrp.Parts.Length);
             }
         }
-    }
         */
+    }
 }

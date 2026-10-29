@@ -26,14 +26,16 @@
  */
 
 using System.Reflection;
-using log4net;
 using OpenMetaverse;
+
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
 
 namespace OpenSim.Data.Null;
 
 public class NullUserAccountData : IUserAccountData
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Dictionary<UUID, UserAccountData> m_DataByUUID = new Dictionary<UUID, UserAccountData>();
     private Dictionary<string, UserAccountData> m_DataByName = new Dictionary<string, UserAccountData>();
@@ -55,7 +57,7 @@ public class NullUserAccountData : IUserAccountData
     {
         //if (m_log.IsDebugEnabled)
         //{
-        //    m_log.DebugFormat(
+        //    m_log.LogDebug(
         //      "[NULL USER ACCOUNT DATA]: Called Get with fields [{0}], values [{1}]",
         //      string.Join(", ", fields), string.Join(", ", values));
         //}
@@ -92,7 +94,7 @@ public class NullUserAccountData : IUserAccountData
         if (data == null)
             return false;
 
-        m_log.DebugFormat(
+        m_log.LogDebug(
             "[NULL USER ACCOUNT DATA]: Storing user account {0} {1} {2} {3}",
             data.FirstName, data.LastName, data.PrincipalID, this.GetHashCode());
 
@@ -101,14 +103,14 @@ public class NullUserAccountData : IUserAccountData
         if (data.Data.TryGetValue("Email", out string semail) && !string.IsNullOrEmpty(semail))
             m_DataByEmail[semail] = data;
 
-        // m_log.DebugFormat("m_DataByUUID count is {0}, m_DataByName count is {1}", m_DataByUUID.Count, m_DataByName.Count);
+        // m_log.LogDebug("m_DataByUUID count is {0}, m_DataByName count is {1}", m_DataByUUID.Count, m_DataByName.Count);
 
         return true;
     }
 
     public UserAccountData[] GetUsers(UUID scopeID, string query)
     {
-        //m_log.DebugFormat(
+        //m_log.LogDebug(
         //   "[NULL USER ACCOUNT DATA]: Called GetUsers with scope [{0}], query [{1}]", scopeID, query);
 
         string[] words = query.Split();

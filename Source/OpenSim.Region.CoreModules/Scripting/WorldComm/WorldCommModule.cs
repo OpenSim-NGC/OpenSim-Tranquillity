@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text.RegularExpressions;
 
@@ -36,9 +37,7 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
-// using log4net;
-// using System.Reflection;
-
+using Microsoft.Extensions.Logging;
 
 /*****************************************************
  *
@@ -89,7 +88,7 @@ namespace OpenSim.Region.CoreModules.Scripting.WorldComm;
 
 public class WorldCommModule : IWorldComm, INonSharedRegionModule
 {
-    // private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private const int DEBUG_CHANNEL = 0x7fffffff;
 
@@ -340,11 +339,44 @@ public class WorldCommModule : IWorldComm, INonSharedRegionModule
         }
     }
 
+    public event Action<OSChatMessage> OnMessageDelivered;
+
+    private void RaiseMessageDelivered(ChatTypeEnum type, int channel, string name, UUID id, string msg, Vector3 position, UUID target)
+    {
+        Action<OSChatMessage> handler = OnMessageDelivered;
+        if (handler is null)
+            return;
+
+        OSChatMessage chat = new OSChatMessage
+        {
+            Type = type,
+            Channel = channel,
+            From = name,
+            SenderUUID = id,
+            Message = msg,
+            Position = position,
+            Destination = target,
+            Scene = m_scene
+        };
+        foreach (Action<OSChatMessage> d in handler.GetInvocationList())
+        {
+            try
+            {
+                d(chat);
+            }
+            catch (Exception e)
+            {
+                m_log.LogError("[WorldComm]: OnMessageDelivered handler failed - continuing. {0} {1}", e.Message, e.StackTrace);
+            }
+        }
+    }
+
     public void DeliverMessage(ChatTypeEnum type, int channel, string name, UUID id, string msg)
     {
         if (type == ChatTypeEnum.Region)
         {
             TryEnqueueMessage(channel, name, id, msg);
+            RaiseMessageDelivered(type, channel, name, id, msg, Vector3.Zero, UUID.Zero);
             return;
         }
 
@@ -372,7 +404,7 @@ public class WorldCommModule : IWorldComm, INonSharedRegionModule
     public void DeliverMessage(ChatTypeEnum type, int channel,
             string name, UUID id, string msg, Vector3 position)
     {
-        // m_log.DebugFormat("[WorldComm] got[2] type {0}, channel {1}, name {2}, id {3}, msg {4}",
+        // m_log.LogDebug("[WorldComm] got[2] type {0}, channel {1}, name {2}, id {3}, msg {4}",
         //                   type, channel, name, id, msg);
 
         // validate type and set range
@@ -393,6 +425,7 @@ public class WorldCommModule : IWorldComm, INonSharedRegionModule
 
             case ChatTypeEnum.Region:
                 TryEnqueueMessage(channel, name, id, msg);
+                RaiseMessageDelivered(type, channel, name, id, msg, position, UUID.Zero);
                 return;
 
             default:
@@ -400,6 +433,7 @@ public class WorldCommModule : IWorldComm, INonSharedRegionModule
         }
 
         TryEnqueueMessage(channel, position, maxDistanceSQ, name, id, msg);
+        RaiseMessageDelivered(type, channel, name, id, msg, position, UUID.Zero);
     }
 
     /// <summary>
@@ -462,6 +496,7 @@ public class WorldCommModule : IWorldComm, INonSharedRegionModule
             }
 
             TryEnqueueMessage(channel, targets, name, id, msg);
+            RaiseMessageDelivered(ChatTypeEnum.Direct, channel, name, id, msg, pos, target);
             return;
         }
 
@@ -470,6 +505,7 @@ public class WorldCommModule : IWorldComm, INonSharedRegionModule
             return; // No error
 
         TryEnqueueMessage(channel, target, name, id, msg);
+        RaiseMessageDelivered(ChatTypeEnum.Direct, channel, name, id, msg, pos, target);
     }
 
     #endregion

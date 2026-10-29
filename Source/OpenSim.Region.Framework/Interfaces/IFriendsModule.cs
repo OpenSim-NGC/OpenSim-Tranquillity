@@ -100,4 +100,14 @@ public interface IFriendsModule
     void CacheFriendOnline(UUID userID, UUID friendOnline, bool online);
     List<UUID> GetCachedFriendsOnline(UUID userID);
     bool IsFriend(UUID userID, UUID friendID);
+
+    /// <summary>
+    /// Is friendID an accepted friend on userID's list, as the friends service holds it?
+    /// </summary>
+    /// <remarks>
+    /// Unlike IsFriend, userID need not be on this simulator. This is a service call: do not make it
+    /// on a thread the region cannot afford to block.
+    /// </remarks>
+    /// <returns>false if they are not friends, or if the friends service cannot be read.</returns>
+    bool IsFriendInService(UUID userID, UUID friendID) => false;
 }

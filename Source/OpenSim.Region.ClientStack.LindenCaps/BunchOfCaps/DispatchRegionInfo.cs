@@ -2,6 +2,7 @@
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Framework.Servers.HttpServer;
+using Microsoft.Extensions.Logging;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
 
 namespace OpenSim.Region.ClientStack.LindenCaps;
@@ -11,7 +12,7 @@ public partial class BunchOfCaps
 {
     public void DispatchRegionInfo(IOSHttpRequest request, IOSHttpResponse response, OSDMap map)
     {
-        //m_log.Debug("[CAPS]: DispatchRegionInfo Request in region: " + m_regionName + "\n");
+        //m_log.LogDebug("[CAPS]: DispatchRegionInfo Request in region: " + m_regionName + "\n");
 
         if (request.HttpMethod != "POST")
         {

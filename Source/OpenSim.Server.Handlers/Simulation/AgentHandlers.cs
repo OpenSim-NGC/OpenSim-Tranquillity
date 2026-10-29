@@ -32,19 +32,19 @@ using OpenSim.Services.Interfaces;
 using GridRegion = OpenSim.Services.Interfaces.GridRegion;
 using OpenSim.Framework;
 using OpenSim.Framework.Servers.HttpServer;
+using OpenSim.Server.Handlers.Base;
 
 using OpenMetaverse;
 using OpenMetaverse.StructuredData;
 
-using log4net;
-
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Server.Handlers.Simulation;
 
 //this is only for hg homeagent and gatekeeperagent
 public class AgentPostHandler : SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     protected bool m_Proxy = false;
 
@@ -54,7 +54,7 @@ public class AgentPostHandler : SimpleStreamHandler
 
     protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
-        // m_log.DebugFormat("[SIMULATION]: Stream handler called");
+        // m_log.LogDebug("[SIMULATION]: Stream handler called");
 
         httpResponse.ContentType = "text/html"; //??
         httpResponse.KeepAlive = false;
@@ -77,7 +77,7 @@ public class AgentPostHandler : SimpleStreamHandler
 
         if (!Utils.GetParams(httpRequest.UriPath, out agentID, out regionID, out action))
         {
-            m_log.InfoFormat("[AGENT HANDLER]: Invalid parameters for agent message {0}", httpRequest.RawUrl);
+            m_log.LogInformation("[AGENT HANDLER]: Invalid parameters for agent message {0}", httpRequest.RawUrl);
 
             httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
             httpResponse.RawBuffer = Utils.falseStrBytes;
@@ -120,7 +120,7 @@ public class AgentPostHandler : SimpleStreamHandler
         }
         catch (Exception ex)
         {
-            m_log.InfoFormat("[AGENT HANDLER]: exception on unpacking ChildCreate message {0}", ex.Message);
+            m_log.LogInformation("[AGENT HANDLER]: exception on unpacking ChildCreate message {0}", ex.Message);
             response.StatusCode = (int)HttpStatusCode.BadRequest;
             return;
         }
@@ -143,11 +143,16 @@ public class AgentPostHandler : SimpleStreamHandler
 
         bool result = CreateAgent(source, gatekeeper, destination, aCircuit, data.flags, data.fromLogin, ctx, out string reason);
 
-        OSDMap resp = new OSDMap(3);
+        OSDMap resp = new OSDMap(4);
         resp["reason"] = OSD.FromString(reason);
         resp["success"] = OSD.FromBoolean(result);
         // Let's also send out the IP address of the caller back to the caller (HG 1.5)
         resp["your_ip"] = remoteAddress;
+        // The home grid rotates ServiceSessionID on every authorised hop. Hand the rotated
+        // value back so the calling region can store it on the live circuit; without it that
+        // region presents a stale token on the NEXT hop and is refused.
+        if (result && !string.IsNullOrEmpty(aCircuit.ServiceSessionID))
+            resp["service_session_id"] = OSD.FromString(aCircuit.ServiceSessionID);
 
         response.StatusCode = (int)HttpStatusCode.OK;
         response.RawBuffer = OSDParser.SerializeJsonToBytes(resp);
@@ -165,12 +170,12 @@ public class AgentPostHandler : SimpleStreamHandler
         if (args.TryGetValue("destination_x", out tmpOSD) && tmpOSD != null)
             Int32.TryParse(tmpOSD.AsString(), out data.x);
         else
-            m_log.WarnFormat("  -- request didn't have destination_x");
+            m_log.LogWarning("  -- request didn't have destination_x");
 
         if (args.TryGetValue("destination_y", out tmpOSD) && tmpOSD != null)
             Int32.TryParse(tmpOSD.AsString(), out data.y);
         else
-            m_log.WarnFormat("  -- request didn't have destination_y");
+            m_log.LogWarning("  -- request didn't have destination_y");
 
         if (args.TryGetValue("destination_uuid", out tmpOSD) && tmpOSD != null)
             UUID.TryParse(tmpOSD.AsString(), out data.uuid);
@@ -198,14 +203,16 @@ public class AgentPostHandler : SimpleStreamHandler
 
 public class AgentSimpleHandler : SimpleStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private ISimulationService m_SimulationService;
+    private readonly ControlPlaneAccess m_ControlPlaneAccess;
     protected bool m_Proxy = false;
 
-    public AgentSimpleHandler(ISimulationService service) : base("/agent")
+    public AgentSimpleHandler(ISimulationService service, ControlPlaneAccess controlPlaneAccess) : base("/agent")
     {
         m_SimulationService = service;
+        m_ControlPlaneAccess = controlPlaneAccess;
     }
 
     protected override void ProcessRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
@@ -214,7 +221,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
         httpResponse.ContentType = "application/json";
         if (m_SimulationService == null)
         {
-            m_log.Debug("[AGENT HANDLER]: ProcessRequest called with null Simulation Service");
+            m_log.LogDebug("[AGENT HANDLER]: ProcessRequest called with null Simulation Service");
             httpResponse.StatusCode = (int)HttpStatusCode.InternalServerError;
             httpResponse.RawBuffer = Utils.falseStrBytes;
             return;
@@ -222,7 +229,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
 
         if (!Utils.GetParams(httpRequest.UriPath, out UUID agentID, out UUID regionID, out string action))
         {
-            m_log.InfoFormat("[AGENT HANDLER]: Invalid parameters for agent message {0}", httpRequest.UriPath);
+            m_log.LogInformation("[AGENT HANDLER]: Invalid parameters for agent message {0}", httpRequest.UriPath);
 
             httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
             httpResponse.RawBuffer = Utils.falseStrBytes;
@@ -264,6 +271,9 @@ public class AgentSimpleHandler : SimpleStreamHandler
             }
             case "POST":
             {
+                if (!m_ControlPlaneAccess.Authorize(httpRequest, httpResponse))
+                    return;
+
                 if (agentID.IsZero())
                 {
                     httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
@@ -432,7 +442,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
         }
 
         bool result = m_SimulationService.QueryAccess(destination, agentID, agentHomeURI, viaTeleport, position, features, ctx, out reason);
-        m_log.DebugFormat("[AGENT HANDLER]: QueryAccess returned {0} ({1}). Version={2}, {3}/{4}",
+        m_log.LogDebug("[AGENT HANDLER]: QueryAccess returned {0} ({1}). Version={2}, {3}/{4}",
             result, reason, version, inboundVersion, outboundVersion);
 
         resp["success"] = OSD.FromBoolean(result);
@@ -459,10 +469,10 @@ public class AgentSimpleHandler : SimpleStreamHandler
     protected void DoAgentDelete(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agentID, string action, UUID regionID, string auth_token)
     {
         if (string.IsNullOrEmpty(action))
-            m_log.DebugFormat("[AGENT HANDLER]: >>> DELETE <<< RegionID: {0}; from: {1}; auth_code: {2}",
+            m_log.LogDebug("[AGENT HANDLER]: >>> DELETE <<< RegionID: {0}; from: {1}; auth_code: {2}",
                 regionID, httpRequest.RemoteIPEndPoint.Address.ToString(), auth_token);
         else
-            m_log.DebugFormat("[AGENT HANDLER]: Release {0} to RegionID: {1}", agentID, regionID);
+            m_log.LogDebug("[AGENT HANDLER]: Release {0} to RegionID: {1}", agentID, regionID);
 
 
         if (action.Equals("release"))
@@ -478,7 +488,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
         httpResponse.StatusCode = (int)HttpStatusCode.OK;
         httpResponse.RawBuffer = Util.UTF8.GetBytes("OpenSim agent " + agentID.ToString());
 
-        //m_log.DebugFormat("[AGENT HANDLER]: Agent {0} Released/Deleted from region {1}", id, regionID);
+        //m_log.LogDebug("[AGENT HANDLER]: Agent {0} Released/Deleted from region {1}", id, regionID);
     }
 
     protected void DoAgentPost(OSDMap args, IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, UUID agentID)
@@ -506,7 +516,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
         }
         catch (Exception ex)
         {
-            m_log.InfoFormat("[AGENT HANDLER]: exception on unpacking ChildCreate message {0}", ex.Message);
+            m_log.LogInformation("[AGENT HANDLER]: exception on unpacking ChildCreate message {0}", ex.Message);
             httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
             httpResponse.RawBuffer = Util.UTF8.GetBytes("false");
             return;
@@ -555,12 +565,12 @@ public class AgentSimpleHandler : SimpleStreamHandler
         if (args.TryGetValue("destination_x", out tmpOSD) && tmpOSD != null)
             Int32.TryParse(tmpOSD.AsString(), out data.x);
         else
-            m_log.WarnFormat("  -- request didn't have destination_x");
+            m_log.LogWarning("  -- request didn't have destination_x");
 
         if (args.TryGetValue("destination_y", out tmpOSD) && tmpOSD != null)
             Int32.TryParse(tmpOSD.AsString(), out data.y);
         else
-            m_log.WarnFormat("  -- request didn't have destination_y");
+            m_log.LogWarning("  -- request didn't have destination_y");
 
         if (args.TryGetValue("destination_uuid", out tmpOSD) && tmpOSD != null)
             UUID.TryParse(tmpOSD.AsString(), out data.uuid);
@@ -583,7 +593,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
     {
         reason = string.Empty;
         bool ret = m_SimulationService.CreateAgent(source, destination, aCircuit, teleportFlags, ctx, out reason);
-        //                m_log.DebugFormat("[AGENT HANDLER]: SYNC CreateAgent {0} {1}", ret.ToString(), reason);
+        //                m_log.LogDebug("[AGENT HANDLER]: SYNC CreateAgent {0} {1}", ret.ToString(), reason);
         return ret;
     }
 
@@ -617,7 +627,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
             messageType = args["message_type"].AsString();
         else
         {
-            m_log.Warn("[AGENT HANDLER]: Agent Put Message Type not found. ");
+            m_log.LogWarning("[AGENT HANDLER]: Agent Put Message Type not found. ");
             messageType = "AgentData";
         }
 
@@ -631,7 +641,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
             }
             catch (Exception ex)
             {
-                m_log.InfoFormat("[AGENT HANDLER]: exception on unpacking ChildAgentUpdate message {0}", ex.Message);
+                m_log.LogInformation("[AGENT HANDLER]: exception on unpacking ChildAgentUpdate message {0}", ex.Message);
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                 httpResponse.RawBuffer = Util.UTF8.GetBytes("false");
                 return;
@@ -650,7 +660,7 @@ public class AgentSimpleHandler : SimpleStreamHandler
             }
             catch (Exception ex)
             {
-                m_log.InfoFormat("[AGENT HANDLER]: exception on unpacking ChildAgentUpdate message {0}", ex.Message);
+                m_log.LogInformation("[AGENT HANDLER]: exception on unpacking ChildAgentUpdate message {0}", ex.Message);
                 httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
                 httpResponse.RawBuffer = Util.UTF8.GetBytes("false");
                 return;

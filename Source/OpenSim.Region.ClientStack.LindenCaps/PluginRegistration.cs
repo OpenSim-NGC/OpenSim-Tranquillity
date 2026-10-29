@@ -34,6 +34,7 @@ public class PluginRegistration : IPluginRegistryProvider
     public void RegisterPlugins(PluginRegistry registry)
     {
         registry.Register("/OpenSim/RegionModules", new PluginDescriptor("AgentPreferencesModule", typeof(AgentPreferencesModule), "AgentPreferencesModule", "0.9"));
+        registry.Register("/OpenSim/RegionModules", new PluginDescriptor("AISv3Module", typeof(OpenSim.Region.ClientStack.LindenCaps.AIS.AISv3Module), "AISv3Module", "0.9"));
         registry.Register("/OpenSim/RegionModules", new PluginDescriptor("AvatarPickerSearchModule", typeof(AvatarPickerSearchModule), "AvatarPickerSearchModule", "0.9"));
         registry.Register("/OpenSim/RegionModules", new PluginDescriptor("BunchOfCapsModule", typeof(BunchOfCapsModule), "BunchOfCapsModule", "0.9"));
         registry.Register("/OpenSim/RegionModules", new PluginDescriptor("EventQueueGetModule", typeof(EventQueueGetModule), "EventQueueGetModule", "0.9"));

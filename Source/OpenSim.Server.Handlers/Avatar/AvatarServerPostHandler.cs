@@ -25,7 +25,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-using log4net;
 using System.Reflection;
 using System.Xml;
 using OpenSim.Server.Base;
@@ -35,11 +34,13 @@ using OpenSim.Framework.ServiceAuth;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenMetaverse;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Server.Handlers.Avatar;
 
 public class AvatarServerPostHandler : BaseStreamHandler
 {
-    private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private IAvatarService m_AvatarService;
 
@@ -57,7 +58,7 @@ public class AvatarServerPostHandler : BaseStreamHandler
             body = sr.ReadToEnd();
         body = body.Trim();
 
-        //m_log.DebugFormat("[XXX]: query String: {0}", body);
+        //m_log.LogDebug("[XXX]: query String: {0}", body);
 
         try
         {
@@ -82,11 +83,11 @@ public class AvatarServerPostHandler : BaseStreamHandler
                 case "removeitems":
                     return RemoveItems(request);
             }
-            m_log.DebugFormat("[AVATAR HANDLER]: unknown method request: {0}", method);
+            m_log.LogDebug("[AVATAR HANDLER]: unknown method request: {0}", method);
         }
         catch (Exception e)
         {
-            m_log.Debug("[AVATAR HANDLER]: Exception {0}" + e);
+            m_log.LogDebug("[AVATAR HANDLER]: Exception {0}" + e);
         }
 
         return FailureResult();

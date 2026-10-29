@@ -27,11 +27,12 @@
 
 using System.Reflection;
 using System.Text.RegularExpressions;
-using log4net;
 using Nini.Config;
 using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
+
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Region.OptionalModules.Avatar.Chat;
 
@@ -39,8 +40,7 @@ namespace OpenSim.Region.OptionalModules.Avatar.Chat;
 
 internal class RegionState
 {
-    private static readonly ILog m_log =
-        LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     // This computation is not the real region center if the region is larger than 256.
     //     This computation isn't fixed because there is not a handle back to the region.
@@ -120,7 +120,7 @@ internal class RegionState
         scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
         scene.EventManager.OnMakeChildAgent += OnMakeChildAgent;
 
-        m_log.InfoFormat("[IRC-Region {0}] Initialization complete", Region);
+        m_log.LogInformation("[IRC-Region {0}] Initialization complete", Region);
 
     }
 
@@ -162,7 +162,7 @@ internal class RegionState
             {
                 if (enabled && (cs.irc.Enabled) && (cs.irc.Connected) && (cs.ClientReporting))
                 {
-                    m_log.InfoFormat("[IRC-Region {0}]: {1} has left", Region, client.Name);
+                    m_log.LogInformation("[IRC-Region {0}]: {1} has left", Region, client.Name);
                     //Check if this person is excluded from IRC
                     if (!cs.ExcludeList.Contains(client.Name.ToLower()))
                     {
@@ -176,8 +176,8 @@ internal class RegionState
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[IRC-Region {0}]: ClientLoggedOut exception: {1}", Region, ex.Message);
-            m_log.Debug(ex);
+            m_log.LogError("[IRC-Region {0}]: ClientLoggedOut exception: {1}", Region, ex.Message);
+            m_log.LogDebug(ex, ex.Message);
         }
     }
 
@@ -196,7 +196,7 @@ internal class RegionState
                 if (enabled && (cs.irc.Enabled) && (cs.irc.Connected) && (cs.ClientReporting))
                 {
                     string clientName = String.Format("{0} {1}", presence.Firstname, presence.Lastname);
-                    m_log.DebugFormat("[IRC-Region {0}] {1} has left", Region, clientName);
+                    m_log.LogDebug("[IRC-Region {0}] {1} has left", Region, clientName);
                     cs.irc.PrivMsg(cs.NoticeMessageFormat, cs.irc.Nick, Region, String.Format("{0} has left", clientName));
                 }
                 client.OnLogout -= OnClientLoggedOut;
@@ -206,8 +206,8 @@ internal class RegionState
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[IRC-Region {0}]: MakeChildAgent exception: {1}", Region, ex.Message);
-            m_log.Debug(ex);
+            m_log.LogError("[IRC-Region {0}]: MakeChildAgent exception: {1}", Region, ex.Message);
+            m_log.LogDebug(ex, ex.Message);
         }
 
     }
@@ -229,7 +229,7 @@ internal class RegionState
                 if (enabled && (cs.irc.Enabled) && (cs.irc.Connected) && (cs.ClientReporting))
                 {
                     string clientName = String.Format("{0} {1}", presence.Firstname, presence.Lastname);
-                    m_log.DebugFormat("[IRC-Region {0}] {1} has arrived", Region, clientName);
+                    m_log.LogDebug("[IRC-Region {0}] {1} has arrived", Region, clientName);
                     //Check if this person is excluded from IRC
                     if (!cs.ExcludeList.Contains(clientName.ToLower()))
                     {
@@ -243,8 +243,8 @@ internal class RegionState
         }
         catch (Exception ex)
         {
-            m_log.ErrorFormat("[IRC-Region {0}]: MakeRootAgent exception: {1}", Region, ex.Message);
-            m_log.Debug(ex);
+            m_log.LogError("[IRC-Region {0}]: MakeRootAgent exception: {1}", Region, ex.Message);
+            m_log.LogDebug(ex, ex.Message);
         }
     }
 
@@ -266,7 +266,7 @@ internal class RegionState
         if (cs.CommandsEnabled && msg.Channel == cs.CommandChannel)
         {
 
-            m_log.DebugFormat("[IRC-Region {0}] command on channel {1}: {2}", Region, msg.Channel, msg.Message);
+            m_log.LogDebug("[IRC-Region {0}] command on channel {1}: {2}", Region, msg.Channel, msg.Message);
 
             string[] messages = msg.Message.Split(' ');
             string command = messages[0].ToLower();
@@ -339,7 +339,7 @@ internal class RegionState
                     // that evident.
 
                     default:
-                        m_log.DebugFormat("[IRC-Region {0}] Forwarding unrecognized command to IRC : {1}",
+                        m_log.LogDebug("[IRC-Region {0}] Forwarding unrecognized command to IRC : {1}",
                                         Region, msg.Message);
                         cs.irc.Send(msg.Message);
                         break;
@@ -347,9 +347,9 @@ internal class RegionState
             }
             catch (Exception ex)
             {
-                m_log.WarnFormat("[IRC-Region {0}] error processing in-world command channel input: {1}",
+                m_log.LogWarning("[IRC-Region {0}] error processing in-world command channel input: {1}",
                                 Region, ex.Message);
-                m_log.Debug(ex);
+                m_log.LogDebug(ex, ex.Message);
             }
 
             return;
@@ -367,7 +367,7 @@ internal class RegionState
 
         if (!cs.ValidInWorldChannels.Contains(msg.Channel))
         {
-            m_log.DebugFormat("[IRC-Region {0}] dropping message {1} on channel {2}", Region, msg, msg.Channel);
+            m_log.LogDebug("[IRC-Region {0}] dropping message {1} on channel {2}", Region, msg, msg.Channel);
             return;
         }
 
@@ -382,11 +382,11 @@ internal class RegionState
 
         if (!cs.irc.Connected)
         {
-            m_log.WarnFormat("[IRC-Region {0}] IRCConnector not connected: dropping message from {1}", Region, fromName);
+            m_log.LogWarning("[IRC-Region {0}] IRCConnector not connected: dropping message from {1}", Region, fromName);
             return;
         }
 
-        m_log.DebugFormat("[IRC-Region {0}] heard on channel {1} : {2}", Region, msg.Channel, msg.Message);
+        m_log.LogDebug("[IRC-Region {0}] heard on channel {1} : {2}", Region, msg.Channel, msg.Message);
 
         if (null != avatar && cs.RelayChat && (msg.Channel == 0 || msg.Channel == DEBUG_CHANNEL))
         {
@@ -404,7 +404,7 @@ internal class RegionState
             Match m = cs.AccessPasswordRegex.Match(msg.Message);
             if (null != m)
             {
-                m_log.DebugFormat("[IRC] relaying message from {0}: {1}", m.Groups["avatar"].ToString(),
+                m_log.LogDebug("[IRC] relaying message from {0}: {1}", m.Groups["avatar"].ToString(),
                                   m.Groups["message"].ToString());
                 cs.irc.PrivMsg(cs.PrivateMessageFormat, m.Groups["avatar"].ToString(),
                                scene.RegionInfo.RegionName, m.Groups["message"].ToString());
@@ -420,7 +420,7 @@ internal class RegionState
     {
         if (enabled)
         {
-            // m_log.DebugFormat("[IRC-OSCHAT] Region {0} being sent message", region.Region);
+            // m_log.LogDebug("[IRC-OSCHAT] Region {0} being sent message", region.Region);
             msg.Scene = scene;
             scene.EventManager.TriggerOnChatBroadcast(irc, msg);
         }

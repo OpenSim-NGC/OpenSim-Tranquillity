@@ -19,7 +19,6 @@ export CONSOLE="local"
 export BINDIR="$BASE_DIR"
 export CONFIGDIR="${CONFIGDIR:-$HOME/config}"
 export DATADIR="${DATADIR:-$HOME/data}"
-export LOGDIR="${LOGDIR:-$HOME/data/log}"
 
 if [ ! -d $BINDIR ]; then
     echo "Runtime directory $BINDIR does not exist!"
@@ -32,16 +31,15 @@ if [ ! -d $CONFIGDIR ]; then
 fi
 
 export CONFIGFILE="${CONFIGFILE:-$CONFIGDIR/${SERVICENAME}.ini}"
-export LOGCONFIG="${LOGCONFIG:-$CONFIGDIR/${SERVICENAME}.dll.config}"
 
 if [ ! -f $CONFIGFILE ]; then
     echo "Cannot find configuration $CONFIGFILE to run!"
     exit 2
 fi
 
-echo "Starting service OpenSim.Server.${SERVICENAME} in directory ${BINDIR} with config ${CONFIGFILE}, Logs at ${LOGDIR}."
+echo "Starting service OpenSim.Server.${SERVICENAME} in directory ${BINDIR} with config ${CONFIGFILE}"
 
-CMDARGS="--inifile ${CONFIGFILE} --console $CONSOLE --logconfig ${LOGCONFIG}"
+CMDARGS="--inifile ${CONFIGFILE} --console $CONSOLE"
 
 (cd ${BINDIR} && screen -S "${SERVICENAME}" -d -m dotnet OpenSim.Server.$SERVICENAME.dll ${CMDARGS})
 

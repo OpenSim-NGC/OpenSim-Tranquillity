@@ -31,6 +31,8 @@ using OpenSim.Framework;
 using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Region.Framework.Scenes;
 
+using Microsoft.Extensions.Logging;
+
 namespace OpenSim.Region.CoreModules.World.Land;
 
 public class ParcelCounts
@@ -44,7 +46,7 @@ public class ParcelCounts
 
 public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private Scene m_Scene;
     private Dictionary<UUID, PrimCounts> m_PrimCounts =
@@ -114,7 +116,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
             if (!m_Tainted)
                 AddObject(obj);
 //                else
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[PRIM COUNT MODULE]: Ignoring OnParcelPrimCountAdd() for {0} on {1} since count is tainted",
 //                        obj.Name, m_Scene.RegionInfo.RegionName);
         }
@@ -128,7 +130,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
             if (!m_Tainted)
                 RemoveObject(obj);
 //                else
-//                    m_log.DebugFormat(
+//                    m_log.LogDebug(
 //                        "[PRIM COUNT MODULE]: Ignoring OnObjectBeingRemovedFromScene() for {0} on {1} since count is tainted",
 //                        obj.Name, m_Scene.RegionInfo.RegionName);
         }
@@ -136,7 +138,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
 
     private void OnParcelPrimCountTainted()
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: OnParcelPrimCountTainted() called on {0}", m_Scene.RegionInfo.RegionName);
 
         lock (m_TaintLock)
@@ -175,7 +177,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
         // If for some reason there is no land object (perhaps the object is out of bounds) then we can't count it
         if (landObject == null)
         {
-//                m_log.WarnFormat(
+//                m_log.LogWarning(
 //                    "[PRIM COUNT MODULE]: Found no land object for {0} at position ({1}, {2}) on {3}",
 //                    obj.Name, pos.X, pos.Y, m_Scene.RegionInfo.RegionName);
 
@@ -184,11 +186,11 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
 
         LandData landData = landObject.LandData;
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: Adding object {0} with {1} parts to prim count for parcel {2} on {3}",
 //                obj.Name, obj.Parts.Length, landData.Name, m_Scene.RegionInfo.RegionName);
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: Object {0} is owned by {1} over land owned by {2}",
 //                obj.Name, obj.OwnerID, landData.OwnerID);
 
@@ -219,14 +221,14 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
     // NOTE: Call under Taint Lock
     private void RemoveObject(SceneObjectGroup obj)
     {
-//            m_log.DebugFormat("[PRIM COUNT MODULE]: Removing object {0} {1} from prim count", obj.Name, obj.UUID);
+//            m_log.LogDebug("[PRIM COUNT MODULE]: Removing object {0} {1} from prim count", obj.Name, obj.UUID);
 
         // Currently this is being done by tainting the count instead.
     }
 
     public IPrimCounts GetPrimCounts(UUID parcelID)
     {
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: GetPrimCounts for parcel {0} in {1}", parcelID, m_Scene.RegionInfo.RegionName);
 
         PrimCounts primCounts;
@@ -262,7 +264,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
                 count = counts.Owner;
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: GetOwnerCount for parcel {0} in {1} returning {2}",
 //                parcelID, m_Scene.RegionInfo.RegionName, count);
 
@@ -288,7 +290,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
                 count = counts.Group;
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: GetGroupCount for parcel {0} in {1} returning {2}",
 //                parcelID, m_Scene.RegionInfo.RegionName, count);
 
@@ -314,7 +316,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
                 count = counts.Others;
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: GetOthersCount for parcel {0} in {1} returning {2}",
 //                parcelID, m_Scene.RegionInfo.RegionName, count);
 
@@ -340,7 +342,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
                 count = counts.Selected;
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: GetSelectedCount for parcel {0} in {1} returning {2}",
 //                parcelID, m_Scene.RegionInfo.RegionName, count);
 
@@ -371,7 +373,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
             }
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: GetTotalCount for parcel {0} in {1} returning {2}",
 //                parcelID, m_Scene.RegionInfo.RegionName, count);
 
@@ -401,7 +403,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
             }
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: GetOthersCount for parcel {0} in {1} returning {2}",
 //                parcelID, m_Scene.RegionInfo.RegionName, count);
 
@@ -432,7 +434,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
             }
         }
 
-//            m_log.DebugFormat(
+//            m_log.LogDebug(
 //                "[PRIM COUNT MODULE]: GetUserCount for user {0} in parcel {1} in region {2} returning {3}",
 //                userID, parcelID, m_Scene.RegionInfo.RegionName, count);
 
@@ -442,7 +444,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
     // NOTE: This method MUST be called while holding the taint lock!
     private void Recount()
     {
-//            m_log.DebugFormat("[PRIM COUNT MODULE]: Recounting prims on {0}", m_Scene.RegionInfo.RegionName);
+//            m_log.LogDebug("[PRIM COUNT MODULE]: Recounting prims on {0}", m_Scene.RegionInfo.RegionName);
 
         m_OwnerMap.Clear();
         m_SimwideCounts.Clear();
@@ -456,7 +458,7 @@ public class PrimCountModule : IPrimCountModule, INonSharedRegionModule
 
             m_OwnerMap[landData.GlobalID] = landData.OwnerID;
             m_SimwideCounts[landData.OwnerID] = 0;
-//                m_log.DebugFormat(
+//                m_log.LogDebug(
 //                    "[PRIM COUNT MODULE]: Initializing parcel count for {0} on {1}",
 //                    landData.Name, m_Scene.RegionInfo.RegionName);
             m_ParcelCounts[landData.GlobalID] = new ParcelCounts();

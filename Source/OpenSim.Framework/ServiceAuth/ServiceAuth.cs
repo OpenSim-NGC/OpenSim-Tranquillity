@@ -27,11 +27,14 @@
 
 using Nini.Config;
 
+using Microsoft.Extensions.Logging;
+using OpenSim.Framework;
+
 namespace OpenSim.Framework.ServiceAuth;
 
 public class ServiceAuth
 {
-//        private static readonly ILog m_log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+//        private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     public static IServiceAuth Create(IConfigSource config, string section)
     {
@@ -50,10 +53,17 @@ public class ServiceAuth
             case "BasicHttpAuthentication":
                 compoundAuth.AddAuthenticator(new BasicHttpAuthentication(config, section));
                 break;
+
+            case "TrustedGridAuthentication":
+                // Design Brief §6 / ADR-005: rejects only Blocked-tier callers. In Slice 2 no grid
+                // can be Blocked, so this is inert. Verification is done separately by
+                // GridSignatureVerifier and never rejects.
+                compoundAuth.AddAuthenticator(new TrustedGridAuthentication());
+                break;
         }
 
 //            foreach (IServiceAuth auth in compoundAuth.GetAuthentors())
-//                m_log.DebugFormat("[SERVICE AUTH]: Configured authenticator {0}", auth.Name);
+//                m_log.LogDebug("[SERVICE AUTH]: Configured authenticator {0}", auth.Name);
 
         if (compoundAuth.Count > 0)
             return compoundAuth;
