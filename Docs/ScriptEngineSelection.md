@@ -34,10 +34,17 @@ Second Life's script editor has a compiler list: LSL Legacy (`lsl2`), LSL on Mon
 (`lsl-luau`) and Lua (`luau`). It sends the choice as the `target` field of the script upload capabilities
 (`UpdateScriptTask` for a script in an object, `UpdateScriptAgent` for one in the avatar's inventory).
 
-- `luau` and `lsl-luau` are kept with the script item, in the low byte of its flags (where Second Life keeps the
-  script subtype: 1 for Lua), so no database column is added and the choice survives a failed compile. The SLua
+- `luau` and `lsl-luau` are kept with the script item, in its flags, so no database column is added and the choice
+  survives a failed compile. `luau` is the script subtype Second Life's viewer defines for Lua (the value 1 in the
+  low byte of the flags). `lsl-luau` is not a subtype the viewer defines, so it is a flag bit of its own (0x01000000)
+  and the subtype byte stays that of an LSL script; the region never sends that bit to a viewer. The SLua
   engine compiles the script as the language the choice names (Lua, or LSL on the Luau virtual machine), whatever
   its first line says; a first line naming another engine is ignored for that script.
+- A script that carries a choice is started by one engine only, the one the region selected. An engine that
+  implements `IScriptEngineSelection` hears every script start and lets go of a script that is not its own. An
+  engine that cannot read the choice (YEngine reads only the first line) is not told of a script that carries one
+  unless it is the engine selected, so a script whose first line names it, saved with `luau`, runs on the selected
+  engine alone.
 - `mono` and `lsl2` make no explicit choice. They clear an earlier `luau` or `lsl-luau`, and the first line, a
   claim and the default decide as described above, so a viewer that only offers `mono` and `lsl2` behaves as before.
   A save that sends no `target` leaves the stored choice as it was.
@@ -48,6 +55,14 @@ Second Life's script editor has a compiler list: LSL Legacy (`lsl2`), LSL on Mon
   SLua engine answers for the scripts it runs; for a script without a stored choice it reports the language the
   script was compiled as.
 
-The `LuaScriptsEnabled` entry of the `SimulatorFeatures` capability, which a viewer needs before it enables the
-Lua entries of its compiler list, is not set by the region.
+## Lua in the viewer
 
+A viewer enables the Lua entries of its compiler list, and creates new scripts with the Lua subtype, when the
+`SimulatorFeatures` capability has `LuaScriptsEnabled` set to true. The SLua engine adds that entry when
+`[SLua] Enabled` is true and the engine is working (its runtime loaded, and the region's world communication
+present); with the engine off the capability is as it was.
+
+A new script created with the Lua subtype, in an object or in the avatar's inventory, gets a Lua default script
+instead of the LSL one (it says "Script running" on channel 0 when it starts, as the LSL default does), and the
+item keeps the Lua subtype. The Lua default is used only when a loaded engine takes Lua scripts; otherwise the
+LSL default is kept and the item has no Lua subtype.
