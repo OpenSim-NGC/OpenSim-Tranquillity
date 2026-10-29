@@ -303,7 +303,7 @@ public class ScriptCompileTargetSelectionTests : OpenSimTestCase
             CurrentPermissions = (uint)OpenMetaverse.PermissionMask.All,
             Folder = folder.ID,
             // an earlier target of the other kind must be replaced, a mono save must clear it
-            Flags = 0x40000000u | (target == "luau" ? (uint)ScriptCompileTarget.LslOnLuau : (uint)ScriptCompileTarget.Luau),
+            Flags = 0x40000000u | (target == "luau" ? ScriptCompileTargets.LslOnLuauFlag : (uint)ScriptCompileTarget.Luau),
         };
         rig.Scene.AddInventoryItem(item);
 
@@ -312,8 +312,11 @@ public class ScriptCompileTargetSelectionTests : OpenSimTestCase
         Assert.NotEqual(UUID.Zero, newAsset);
         InventoryItemBase stored = rig.Scene.InventoryService.GetItem(userId, item.ID);
         Assert.Equal(expected, ScriptCompileTargets.FromFlags((uint)stored.Flags));
-        Assert.Equal((uint)expected, (uint)stored.Flags & ScriptCompileTargets.SubtypeMask);   // the stored byte itself, not only how it reads back
-        Assert.Equal(0x40000000u, (uint)stored.Flags & ~ScriptCompileTargets.SubtypeMask);
+        // the stored bits themselves, not only how they read back: the subtype byte is 1 for Lua and 0 otherwise, the flag bit is set only for LSL on Lua
+        Assert.NotEqual(0u, ScriptCompileTargets.LslOnLuauFlag);
+        Assert.Equal(expected == ScriptCompileTarget.Luau ? 1u : 0u, (uint)stored.Flags & ScriptCompileTargets.SubtypeMask);
+        Assert.Equal(expected == ScriptCompileTarget.LslOnLuau ? ScriptCompileTargets.LslOnLuauFlag : 0u, (uint)stored.Flags & ScriptCompileTargets.LslOnLuauFlag);
+        Assert.Equal(0x40000000u, (uint)stored.Flags & ~(ScriptCompileTargets.SubtypeMask | ScriptCompileTargets.LslOnLuauFlag));
         Assert.Equal(newAsset, stored.AssetID);
     }
 }

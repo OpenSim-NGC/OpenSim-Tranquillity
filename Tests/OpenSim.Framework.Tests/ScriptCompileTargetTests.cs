@@ -5,6 +5,9 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+using System.Numerics;
+using OpenMetaverse;
+
 namespace OpenSim.Framework.Tests;
 
 /// <summary>
@@ -70,9 +73,9 @@ public class ScriptCompileTargetTests
         uint luau = ScriptCompileTargets.WithTarget(others | 0x7u, ScriptCompileTarget.Luau);
         Assert.Equal(others | 1u, luau);
 
-        uint lslOnLuau = ScriptCompileTargets.WithTarget(others, ScriptCompileTarget.LslOnLuau);
-        Assert.Equal(others, lslOnLuau & ~ScriptCompileTargets.SubtypeMask);
-        Assert.NotEqual(0u, lslOnLuau & ScriptCompileTargets.SubtypeMask);
+        // LSL on Lua leaves the subtype byte as it is for an LSL script and sets its own flag bit
+        uint lslOnLuau = ScriptCompileTargets.WithTarget(others | 0x7u, ScriptCompileTarget.LslOnLuau);
+        Assert.Equal(others | ScriptCompileTargets.LslOnLuauFlag, lslOnLuau);
         Assert.NotEqual(luau, lslOnLuau);
     }
 
@@ -89,8 +92,63 @@ public class ScriptCompileTargetTests
     [InlineData(0x40000000u)]
     [InlineData(0x7fu)]
     [InlineData(0xffu)]
+    [InlineData(2u)]
+    [InlineData(3u)]
     public void FlagsWithAnotherSubtypeHaveNoTarget(uint flags)
     {
         Assert.Equal(ScriptCompileTarget.Unspecified, ScriptCompileTargets.FromFlags(flags));
+    }
+
+    [Fact]
+    public void LslOnLuauHasAFlagBitOfItsOwnAndTheSubtypeByteStaysAsForLsl()
+    {
+        uint flags = ScriptCompileTargets.WithTarget(0u, ScriptCompileTarget.LslOnLuau);
+
+        Assert.NotEqual(0u, ScriptCompileTargets.LslOnLuauFlag);
+        Assert.Equal(ScriptCompileTargets.LslOnLuauFlag, flags);
+        Assert.Equal(0u, flags & ScriptCompileTargets.SubtypeMask);
+        Assert.Equal(ScriptCompileTarget.LslOnLuau, ScriptCompileTargets.FromFlags(flags));
+    }
+
+    [Fact]
+    public void TheLslOnLuauFlagIsOneBitThatNothingElseInAnItemsFlagsUses()
+    {
+        uint bit = ScriptCompileTargets.LslOnLuauFlag;
+
+        Assert.NotEqual(0u, bit);
+        Assert.Equal(1, BitOperations.PopCount(bit));
+        Assert.Equal(0u, bit & 0x80000000u);   // flags are stored as a signed 32-bit column in some databases
+
+        // every flag LibreMetaverse names for an inventory item, and the ones Second Life's viewer defines
+        // (llinventorydefines.h: slam perm, slam sale, the five overwrites, multiple items, shared single reference, the subtype byte)
+        foreach (InventoryItemFlags named in Enum.GetValues<InventoryItemFlags>())
+            Assert.Equal(0u, bit & (uint)named);
+        uint[] secondLife = { 0xff, 0x100, 0x1000, 0x10000, 0x20000, 0x40000, 0x80000, 0x100000, 0x200000, 0x40000000 };
+        foreach (uint used in secondLife)
+            Assert.Equal(0u, bit & used);
+
+        // the flags the region sends a viewer are masked to 0x2000ff, so the viewer never sees the bit
+        Assert.Equal(0u, bit & 0x2000ffu);
+    }
+
+    [Fact]
+    public void TheLuaSubtypeWinsIfTheLslOnLuauFlagIsSetAsWell()
+    {
+        Assert.Equal(ScriptCompileTarget.Luau, ScriptCompileTargets.FromFlags(1u | ScriptCompileTargets.LslOnLuauFlag));
+    }
+
+    [Fact]
+    public void AnotherTargetReplacesTheOneBeforeInTheSubtypeAndTheFlagBit()
+    {
+        uint lslOnLuau = ScriptCompileTargets.WithTarget(0x40000000u, ScriptCompileTarget.LslOnLuau);
+
+        uint luau = ScriptCompileTargets.WithTarget(lslOnLuau, ScriptCompileTarget.Luau);
+        Assert.Equal(0x40000001u, luau);
+
+        uint back = ScriptCompileTargets.WithTarget(luau, ScriptCompileTarget.LslOnLuau);
+        Assert.Equal(lslOnLuau, back);
+
+        uint none = ScriptCompileTargets.WithTarget(back, ScriptCompileTarget.Unspecified);
+        Assert.Equal(0x40000000u, none);
     }
 }
