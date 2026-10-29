@@ -10269,6 +10269,32 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return new LSLList(handles);
         }
 
+        // ── Second Life's forms of functions an older entry holds under another shape, and functions OpenSim's LSL lacks ──
+
+        public LSLList llGetAttachedListFiltered(string avatar, LSLList options) => new LSLList();
+
+        public LSLList llFindNotecardTextSync(string name, string pattern, int start, int count, LSLList options) => new LSLList();
+
+        public string llFindNotecardTextCount(string name, string pattern, LSLList options) => string.Empty;
+
+        public int llSetParcelForSale(int forSale, LSLList options) => 0;
+
+        public void llRemoteLoadScript(string target, string name, int running, int startParam) { }
+
+        public void llRemoteDataSetRegion() { }
+
+        public int llGetGameControlMode(string id) => 0;
+
+        public LSLList llGetGameControlModeAxes(string id) => new LSLList();
+
+        public int llGetGameControlModeButtons(string id) => 0;
+
+        public void llMapBeacon(string regionName, Vector3 pos, LSLList options) { }
+
+        public int llGiveAgentInventory(string agent, string folder, LSLList inventory, LSLList options) => 0;
+
+        public int llTransferOwnership(string agent, int flags, LSLList options) => 0;
+
         // The region's store when weather is switched on; otherwise null and the error to return.
         private IWindVolumeStore WindVolumesFor(out int error)
         {

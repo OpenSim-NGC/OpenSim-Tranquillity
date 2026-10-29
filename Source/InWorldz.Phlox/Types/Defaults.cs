@@ -6904,6 +6904,92 @@ namespace InWorldz.Phlox.Types
                 ParamNames = new string[] { },
                 TableIndex = 971
             }},
+            // Second Life's forms of functions an older entry holds under another shape (the __2 entries), and functions
+            // OpenSim's own LSL lacks. Appended above the existing indices; none of those moved.
+            {"llGetAttachedListFiltered__2", new FunctionSig {
+                FunctionName = "llGetAttachedListFiltered",
+                ReturnType = VarType.List,
+                ParamTypes = new VarType[] { VarType.Key, VarType.List },
+                ParamNames = new string[] { "avatar", "options" },
+                TableIndex = 972
+            }},
+            {"llFindNotecardTextSync__2", new FunctionSig {
+                FunctionName = "llFindNotecardTextSync",
+                ReturnType = VarType.List,
+                ParamTypes = new VarType[] { VarType.String, VarType.String, VarType.Integer, VarType.Integer, VarType.List },
+                ParamNames = new string[] { "name", "pattern", "start", "count", "options" },
+                TableIndex = 973
+            }},
+            {"llFindNotecardTextCount", new FunctionSig {
+                FunctionName = "llFindNotecardTextCount",
+                ReturnType = VarType.Key,
+                ParamTypes = new VarType[] { VarType.String, VarType.String, VarType.List },
+                ParamNames = new string[] { "name", "pattern", "options" },
+                TableIndex = 974
+            }},
+            {"llSetParcelForSale", new FunctionSig {
+                FunctionName = "llSetParcelForSale",
+                ReturnType = VarType.Integer,
+                ParamTypes = new VarType[] { VarType.Integer, VarType.List },
+                ParamNames = new string[] { "ForSale", "Options" },
+                TableIndex = 975
+            }},
+            {"llRemoteLoadScript", new FunctionSig {
+                FunctionName = "llRemoteLoadScript",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] { VarType.Key, VarType.String, VarType.Integer, VarType.Integer },
+                ParamNames = new string[] { "target", "name", "running", "start_param" },
+                TableIndex = 976
+            }},
+            {"llRemoteDataSetRegion", new FunctionSig {
+                FunctionName = "llRemoteDataSetRegion",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] {  },
+                ParamNames = new string[] {  },
+                TableIndex = 977
+            }},
+            {"llGetGameControlMode", new FunctionSig {
+                FunctionName = "llGetGameControlMode",
+                ReturnType = VarType.Integer,
+                ParamTypes = new VarType[] { VarType.Key },
+                ParamNames = new string[] { "id" },
+                TableIndex = 978
+            }},
+            {"llGetGameControlModeAxes", new FunctionSig {
+                FunctionName = "llGetGameControlModeAxes",
+                ReturnType = VarType.List,
+                ParamTypes = new VarType[] { VarType.Key },
+                ParamNames = new string[] { "id" },
+                TableIndex = 979
+            }},
+            {"llGetGameControlModeButtons", new FunctionSig {
+                FunctionName = "llGetGameControlModeButtons",
+                ReturnType = VarType.Integer,
+                ParamTypes = new VarType[] { VarType.Key },
+                ParamNames = new string[] { "id" },
+                TableIndex = 980
+            }},
+            {"llMapBeacon__2", new FunctionSig {
+                FunctionName = "llMapBeacon",
+                ReturnType = VarType.Void,
+                ParamTypes = new VarType[] { VarType.String, VarType.Vector, VarType.List },
+                ParamNames = new string[] { "region_name", "pos", "options" },
+                TableIndex = 981
+            }},
+            {"llGiveAgentInventory__2", new FunctionSig {
+                FunctionName = "llGiveAgentInventory",
+                ReturnType = VarType.Integer,
+                ParamTypes = new VarType[] { VarType.Key, VarType.String, VarType.List, VarType.List },
+                ParamNames = new string[] { "agent", "folder", "inventory", "options" },
+                TableIndex = 982
+            }},
+            {"llTransferOwnership__2", new FunctionSig {
+                FunctionName = "llTransferOwnership",
+                ReturnType = VarType.Integer,
+                ParamTypes = new VarType[] { VarType.Key, VarType.Integer, VarType.List },
+                ParamNames = new string[] { "agent", "flags", "options" },
+                TableIndex = 983
+            }},
          };
 
         /// <summary>
