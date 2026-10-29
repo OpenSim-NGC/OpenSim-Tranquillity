@@ -145,6 +145,17 @@ public class CrossEngineScriptControlTests
     }
 
     [Fact]
+    public void LlGetScriptStateAsksTheEngineThatRunsTheScriptNotTheItemsFlag()
+    {
+        // The engine runs the script; the item's flag says it does not. The engine's answer is the one SL gives.
+        using var r = new Rig();
+        r.R.H.Prim.Inventory.GetInventoryItem(r.VictimItem).ScriptRunning = false;
+
+        r.Drive("state");
+        Assert.Equal(1, r.R.Count("D state 1"));
+    }
+
+    [Fact]
     public void OsResetAllScriptsRestartsAScriptYEngineRunsInThePrim()
     {
         using var r = new Rig();
