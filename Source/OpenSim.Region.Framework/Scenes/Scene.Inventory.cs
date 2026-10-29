@@ -186,6 +186,11 @@ public partial class Scene
         return defaultModule;
     }
 
+    /// <summary>
+    /// The asset a new script item gets as its text, given the flags the viewer created the item with.
+    /// </summary>
+    public UUID GetDefaultScriptAssetID(uint flags) => Constants.DefaultScriptID;
+
     private static bool AnotherEngineHoldsSavedState(IScriptModule[] engines, IScriptModule except, TaskInventoryItem item)
     {
         foreach (IScriptModule engine in engines)
