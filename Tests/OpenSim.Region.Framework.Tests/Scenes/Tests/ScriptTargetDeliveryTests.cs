@@ -184,6 +184,19 @@ public class ScriptTargetDeliveryTests : OpenSimTestCase
     }
 
     [Fact]
+    public void WithNoTargetAnEngineThatIsNotTheOneChosenStillHearsTheRezAsBefore()
+    {
+        var rig = new Rig("//" + Other + ":\nx");
+
+        rig.Start();
+
+        // the first line names Beta, which starts it; Yeng hears it too, as every engine did before targets existed
+        Assert.Equal(new[] { rig.Item.ItemID }, rig.Beta.Started);
+        Assert.Equal(new[] { rig.Item.ItemID }, rig.Yeng.Heard);
+        Assert.Empty(rig.Yeng.Started);
+    }
+
+    [Fact]
     public void WithATargetNoEngineTakesTheEngineTheFirstLineNamesIsTheOneChosenAndHearsIt()
     {
         var rig = new Rig("//" + Plain + ":\nx", betaAcceptsTargets: false);
