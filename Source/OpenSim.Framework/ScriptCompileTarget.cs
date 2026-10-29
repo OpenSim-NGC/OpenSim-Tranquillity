@@ -49,6 +49,13 @@ public static class ScriptCompileTargets
     /// </summary>
     public const uint LslOnLuauFlag = 0x01000000u;
 
+    /// <summary>
+    /// The flags of an inventory item as a viewer is told them. <see cref="LslOnLuauFlag"/> is the region's own
+    /// record of a script's target; no viewer knows it, so it never leaves the region. Every other bit, the script
+    /// subtype in the low byte among them, is sent as it is.
+    /// </summary>
+    public static uint ForViewer(uint flags) => flags;
+
     /// <summary>The target a viewer named in the "target" field of a script upload; anything but "luau" and "lsl-luau" is <see cref="ScriptCompileTarget.Unspecified"/>.</summary>
     public static ScriptCompileTarget Parse(string viewerValue)
     {
