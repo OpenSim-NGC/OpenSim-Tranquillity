@@ -4,11 +4,14 @@
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- AssetsClient.cs is a console client with its own Main; do not generate the test host's entry point as well. -->
+    <GenerateProgramFile>false</GenerateProgramFile>
   </PropertyGroup>
   
   <ItemGroup>
     <ProjectReference Include="..\..\Source\OpenSim.Framework\OpenSim.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services\OpenSim.Services.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Services.Connectors\OpenSim.Services.Connectors.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
   </ItemGroup>
   <ItemGroup>

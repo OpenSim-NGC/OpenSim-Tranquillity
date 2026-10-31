@@ -30,6 +30,7 @@ using Microsoft.Extensions.Logging;
 using OpenMetaverse;
 
 using OpenSim.Framework;
+using OpenSim.Services.Connectors;
 
 namespace OpenSim.Tests.Clients.AssetsClient
 {
