@@ -443,6 +443,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         if (inventory is null || sp is null) return;
 
         List<CofWearableLink> links;
+        var unresolved = new List<CofUnresolvedLink>();
         try
         {
             var cof = inventory.GetFolderForType(sp.UUID, FolderType.CurrentOutfit);
@@ -451,19 +452,19 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             if (content?.Items is null) return;
 
             links = new List<CofWearableLink>(content.Items.Count);
-            var unresolved = 0;
             foreach (var link in content.Items)
             {
-                if (link is null || link.AssetType != (int)AssetType.Link || link.AssetID.IsZero()) continue;
+                if (link is null || link.AssetType != (int)AssetType.Link) continue;
+                if (link.AssetID.IsZero()) { unresolved.Add(new CofUnresolvedLink(link.Description, link.InvType)); continue; }   // a link to nothing
                 var target = inventory.GetItem(sp.UUID, link.AssetID);
-                if (target is null) { unresolved++; continue; }
+                if (target is null) { unresolved.Add(new CofUnresolvedLink(link.Description, link.InvType)); continue; }
                 if (target.InvType != (int)InventoryType.Wearable) continue;   // an attachment or a gesture link
                 var type = (int)(target.Flags & 0xff);
-                if (type < 0 || type >= AvatarWearable.MAX_WEARABLES) { unresolved++; continue; }
+                if (type < 0 || type >= AvatarWearable.MAX_WEARABLES) { unresolved.Add(new CofUnresolvedLink(link.Description, (int)InventoryType.Wearable)); continue; }
                 links.Add(new CofWearableLink(link.ID, link.Description, target.ID, type, target.AssetID));
             }
-            if (unresolved > 0)
-                m_log.LogWarning("[SSB]: {Count} COF link(s) for {Name} name an item this region cannot resolve as a wearable; their types keep what the agent already wears (S8)", unresolved, sp.Name);
+            if (unresolved.Count > 0)
+                m_log.LogWarning("[SSB]: {Count} COF link(s) for {Name} name an item this region cannot resolve as a wearable; a type they name keeps what the agent wears, and without a readable type this read drops no clothing (S8)", unresolved.Count, sp.Name);
         }
         catch (Exception ex)
         {
@@ -471,7 +472,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             return;
         }
 
-        var derived = CofWearables.Derive(sp.Appearance?.Wearables, links, out var changed);
+        var derived = CofWearables.Derive(sp.Appearance?.Wearables, links, unresolved, out var changed);
         if (!changed) return;
 
         sp.Appearance.Wearables = derived;
