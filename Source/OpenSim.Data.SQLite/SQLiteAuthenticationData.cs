@@ -199,9 +199,15 @@ public class SQLiteAuthenticationData : SQLiteFramework, IAuthenticationData
 
     public bool SetDataItem(UUID principalID, string item, string value)
     {
+        if (!IsColumn(item))
+            return false;
+
         using (SQLiteCommand cmd = new SQLiteCommand("update `" + m_Realm +
-                "` set `" + item + "` = " + value + " where UUID = '" + principalID.ToString() + "'"))
+                "` set `" + item + "` = :value where UUID = :PrincipalID"))
         {
+            cmd.Parameters.Add(new SQLiteParameter(":value", value));
+            cmd.Parameters.Add(new SQLiteParameter(":PrincipalID", principalID.ToString()));
+
             if (ExecuteNonQuery(cmd, m_Connection) > 0)
                 return true;
         }
@@ -209,14 +215,37 @@ public class SQLiteAuthenticationData : SQLiteFramework, IAuthenticationData
         return false;
     }
 
+    // The column name is part of the statement text, so it is checked against the table's own column list.
+    private bool IsColumn(string name)
+    {
+        if (string.IsNullOrEmpty(name))
+            return false;
+
+        using (SQLiteCommand cmd = new SQLiteCommand(
+                "select 1 from pragma_table_info(:realm) where name = :name collate nocase"))
+        {
+            cmd.Parameters.Add(new SQLiteParameter(":realm", m_Realm));
+            cmd.Parameters.Add(new SQLiteParameter(":name", name));
+
+            lock (m_Connection)
+            {
+                cmd.Connection = m_Connection;
+                return cmd.ExecuteScalar() != null;
+            }
+        }
+    }
+
     public bool SetToken(UUID principalID, string token, int lifetime)
     {
         if (System.Environment.TickCount - m_LastExpire > 30000)
             DoExpire();
 
-        using (SQLiteCommand cmd = new SQLiteCommand("insert into tokens (UUID, token, validity) values ('" + principalID.ToString() +
-            "', '" + token + "', datetime('now', 'localtime', '+" + lifetime.ToString() + " minutes'))"))
+        using (SQLiteCommand cmd = new SQLiteCommand("insert into tokens (UUID, token, validity) values (:PrincipalID, :token, datetime('now', 'localtime', :lifetime))"))
         {
+            cmd.Parameters.Add(new SQLiteParameter(":PrincipalID", principalID.ToString()));
+            cmd.Parameters.Add(new SQLiteParameter(":token", token));
+            cmd.Parameters.Add(new SQLiteParameter(":lifetime", "+" + lifetime.ToString() + " minutes"));
+
             if (ExecuteNonQuery(cmd, m_Connection) > 0)
                 return true;
         }
@@ -229,9 +258,12 @@ public class SQLiteAuthenticationData : SQLiteFramework, IAuthenticationData
         if (System.Environment.TickCount - m_LastExpire > 30000)
             DoExpire();
 
-        using (SQLiteCommand cmd = new SQLiteCommand("update tokens set validity = datetime('now', 'localtime', '+" + lifetime.ToString() +
-            " minutes') where UUID = '" + principalID.ToString() + "' and token = '" + token + "' and validity > datetime('now', 'localtime')"))
+        using (SQLiteCommand cmd = new SQLiteCommand("update tokens set validity = datetime('now', 'localtime', :lifetime) where UUID = :PrincipalID and token = :token and validity > datetime('now', 'localtime')"))
         {
+            cmd.Parameters.Add(new SQLiteParameter(":lifetime", "+" + lifetime.ToString() + " minutes"));
+            cmd.Parameters.Add(new SQLiteParameter(":PrincipalID", principalID.ToString()));
+            cmd.Parameters.Add(new SQLiteParameter(":token", token));
+
             if (ExecuteNonQuery(cmd, m_Connection) > 0)
                 return true;
         }
