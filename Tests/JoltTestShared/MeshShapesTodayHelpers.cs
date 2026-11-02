@@ -224,11 +224,21 @@ public partial class MeshShapesTodayTests
     internal static PrimitiveBaseShape MeshPbs(byte[] asset)
     {
         PrimitiveBaseShape pbs = PrimitiveBaseShape.CreateBox();
-        pbs.PathCurve = (byte)Extrusion.Curve1;   // as the viewer sends a mesh: circle profile, curved path (never the box fast path)
+        pbs.PathCurve = (byte)Extrusion.Curve1;   // a circle profile on a curved path: a shape no native fast path takes. A mesh the upload path builds carries its face count instead (UploadedMeshPbs)
         pbs.ProfileCurve = 0;
         pbs.SculptEntry = true;
         pbs.SculptType = (byte)SculptType.Mesh;
         pbs.SculptTexture = UUID.Random();   // the mesher caches by this
+        pbs.SculptData = asset;
+        return pbs;
+    }
+
+    /// <summary>A mesh part as the upload path builds it: <c>PrimitiveBaseShape.CreateMesh(faces, asset)</c>. Its profile and
+    /// path fields encode the mesh's face count, not its shape (3 faces: circle profile, straight path; 6 faces: square
+    /// profile, straight path), so a part of 3 or 6 faces shows no cuts.</summary>
+    internal static PrimitiveBaseShape UploadedMeshPbs(int faces, byte[] asset)
+    {
+        PrimitiveBaseShape pbs = PrimitiveBaseShape.CreateMesh(faces, UUID.Random());   // the mesher caches by the asset id
         pbs.SculptData = asset;
         return pbs;
     }
