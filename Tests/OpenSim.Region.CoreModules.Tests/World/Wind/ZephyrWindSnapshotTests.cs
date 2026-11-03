@@ -133,7 +133,8 @@ public class ZephyrWindSnapshotTests : OpenSimTestCase
     {
         Assembly assembly = typeof(ZephyrWindSnapshotTests).Assembly;
         string resource = assembly.GetManifestResourceNames().Single(n => n.EndsWith(name, StringComparison.Ordinal));
-        using Stream stream = assembly.GetManifestResourceStream(resource);
+        using Stream stream = assembly.GetManifestResourceStream(resource)
+            ?? throw new InvalidOperationException($"Manifest resource '{resource}' was not found.");
         using var reader = new BinaryReader(stream);
         var values = new float[stream.Length / sizeof(float)];
         for (int i = 0; i < values.Length; i++)

@@ -1,3 +1,5 @@
+ #nullable enable
+
 /*
  * Copyright (c) 2026 Legion Builds
  *

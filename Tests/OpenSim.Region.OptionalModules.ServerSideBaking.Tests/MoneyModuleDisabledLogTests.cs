@@ -74,7 +74,7 @@ public class MoneyModuleDisabledLogTests
             module.RemoveRegion(null);
         });
 
-        Assert.Empty(lines.Where(l => l.Level > LogLevel.Debug));
+        Assert.DoesNotContain(lines, l => l.Level > LogLevel.Debug);
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public class MoneyModuleDisabledLogTests
             module.Close();
         });
 
-        Assert.Empty(lines.Where(l => l.Level > LogLevel.Debug));
+        Assert.DoesNotContain(lines, l => l.Level > LogLevel.Debug);
     }
 
     [Theory]

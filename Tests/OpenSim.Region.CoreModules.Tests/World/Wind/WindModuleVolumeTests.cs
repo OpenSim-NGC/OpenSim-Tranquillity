@@ -52,17 +52,27 @@ public class WindModuleVolumeTests : OpenSimTestCase
     }
 
     private static IWindModelPlugin PluginOf(WindModule module)
-        => (IWindModelPlugin)typeof(WindModule).GetField("m_activeWindPlugin", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(module);
+    {
+        return (IWindModelPlugin)typeof(WindModule).GetField("m_activeWindPlugin", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(module)!;
+    }
 
-    private static void SetPlugin(WindModule module, IWindModelPlugin plugin)
-        => typeof(WindModule).GetField("m_activeWindPlugin", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(module, plugin);
+    private static void SetPlugin(WindModule module, IWindModelPlugin? plugin)
+    {
+        typeof(WindModule).GetField("m_activeWindPlugin", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(module, plugin);
+    }
 
     private static WindVolumeSpec Sphere(Vector3 center, float radius, Vector3 velocity, float falloff = 1f)
-        => new WindVolumeSpec
+    {
+        return new WindVolumeSpec
         {
-            Shape = WindVolumeShape.Sphere, Center = center, Radius = radius, FalloffStart = falloff,
-            LifetimeSeconds = 3000f, Velocity = velocity,
+            Shape = WindVolumeShape.Sphere,
+            Center = center,
+            Radius = radius,
+            FalloffStart = falloff,
+            LifetimeSeconds = 3000f,
+            Velocity = velocity,
         };
+    }
 
     /// <summary>A wind model whose wind is the same everywhere.</summary>
     private sealed class ConstantPlugin : IWindModelPlugin
@@ -78,12 +88,31 @@ public class WindModuleVolumeTests : OpenSimTestCase
         public void Initialise() { }
         public void Dispose() { }
         public void WindConfig(Scene scene, IConfig windConfig) { }
-        public bool WindUpdate(uint frame) => false;
-        public Vector3 WindSpeed(float x, float y, float z) => Wind;
-        public Vector2[] WindLLClientArray() => new Vector2[256];
-        public Dictionary<string, string> WindParams() => new();
+        public bool WindUpdate(uint frame)
+        {
+            return false;
+        }
+
+        public Vector3 WindSpeed(float x, float y, float z)
+        {
+            return Wind;
+        }
+
+        public Vector2[] WindLLClientArray()
+        {
+            return new Vector2[256];
+        }
+
+        public Dictionary<string, string> WindParams()
+        {
+            return new();
+        }
+
         public void WindParamSet(string param, float value) { }
-        public float WindParamGet(string param) => 0f;
+        public float WindParamGet(string param)
+        {
+            return 0f;
+        }
     }
 
     public static IEnumerable<object[]> PluginNames()
@@ -395,10 +424,18 @@ public class WindModuleVolumeTests : OpenSimTestCase
         public void AddRegion(Scene scene) { }
         public void RemoveRegion(Scene scene) { }
         public void RegionLoaded(Scene scene) { }
-        public Vector3 WindSpeed(int x, int y, int z) => new Vector3(x, y, z);
+        public Vector3 WindSpeed(int x, int y, int z)
+        {
+            return new Vector3(x, y, z);
+        }
+
         public void WindSet(int type, Vector3 loc, Vector3 speed) { }
         public void WindParamSet(string plugin, string param, float value) { }
-        public float WindParamGet(string plugin, string param) => 0f;
+        public float WindParamGet(string plugin, string param)
+        {
+            return 0f;
+        }
+
         public string WindActiveModelPluginName => "";
     }
 
@@ -433,12 +470,31 @@ public class WindModuleVolumeTests : OpenSimTestCase
         public void Initialise() { }
         public void Dispose() { }
         public void WindConfig(Scene scene, IConfig windConfig) { }
-        public bool WindUpdate(uint frame) => false;
-        public Vector3 WindSpeed(float x, float y, float z) => new Vector3(x, y, z);
-        public Vector2[] WindLLClientArray() => new Vector2[256];
-        public Dictionary<string, string> WindParams() => new();
+        public bool WindUpdate(uint frame)
+        {
+            return false;
+        }
+
+        public Vector3 WindSpeed(float x, float y, float z)
+        {
+            return new Vector3(x, y, z);
+        }
+
+        public Vector2[] WindLLClientArray()
+        {
+            return new Vector2[256];
+        }
+
+        public Dictionary<string, string> WindParams()
+        {
+            return new();
+        }
+
         public void WindParamSet(string param, float value) { }
-        public float WindParamGet(string param) => 0f;
+        public float WindParamGet(string param)
+        {
+            return 0f;
+        }
     }
 
     // ---- an object's volumes end with it ----
@@ -450,7 +506,9 @@ public class WindModuleVolumeTests : OpenSimTestCase
     }
 
     private static int MakeVolume(WindModule module, UUID creator)
-        => module.WindVolumes.Create(creator, Owner, Sphere(new Vector3(100, 100, 50), 10f, new Vector3(5f, 0f, 0f)));
+    {
+        return module.WindVolumes.Create(creator, Owner, Sphere(new Vector3(100, 100, 50), 10f, new Vector3(5f, 0f, 0f)));
+    }
 
     [Fact]
     public void DeletingAnObjectRemovesItsVolumesAndLeavesOthers()

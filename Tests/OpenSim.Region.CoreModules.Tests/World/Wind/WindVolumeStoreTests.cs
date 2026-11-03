@@ -31,7 +31,7 @@ public class WindVolumeStoreTests
     private static readonly UUID ObjB = UUID.Random();
     private static readonly UUID Owner = UUID.Random();
 
-    private static WindVolumeStore Store(Clock clock = null, WindVolumeLimits limits = null, bool enabled = true)
+    private static WindVolumeStore Store(Clock? clock = null, WindVolumeLimits? limits = null, bool enabled = true)
         => new WindVolumeStore(enabled, limits, clock == null ? null : clock.Now);
 
     private static WindVolumeSpec Sphere(float radius = 10f, float falloff = 0.5f, float lifetime = 60f, Vector3? velocity = null, Vector3? center = null)

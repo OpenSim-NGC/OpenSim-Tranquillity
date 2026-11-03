@@ -7,7 +7,7 @@
  */
 
 using OpenMetaverse;
-
+using Xunit;
 using OpenSim.Services.HypergridService;
 
 namespace OpenSim.Services.HypergridService.Tests;
@@ -27,7 +27,6 @@ namespace OpenSim.Services.HypergridService.Tests;
 /// travel row as acceptable fails <see cref="NoTravelSessionIsRefused"/>, and
 /// dropping the password-login exemption fails both login tests.
 /// </summary>
-[TestFixture]
 public class HomeLaunchAuthorizationTests
 {
     private static readonly UUID Traveller = new("00000000-0000-4000-8000-00000000000a");
@@ -58,16 +57,16 @@ public class HomeLaunchAuthorizationTests
                 targetGridName: targetGrid);
     }
 
-    [Test]
+    [Fact]
     public void NoTravelSessionIsRefused()
     {
-        Assert.That(Hop(travelSessionExists: false), Is.EqualTo(HomeLaunchDecision.RefuseNoSession));
+        Assert.Equal(HomeLaunchDecision.RefuseNoSession, Hop(travelSessionExists: false));
     }
 
-    [Test]
+    [Fact]
     public void ASessionBelongingToAnotherUserIsRefused()
     {
-        Assert.That(Hop(travelUser: SomeoneElse), Is.EqualTo(HomeLaunchDecision.RefuseUserMismatch));
+        Assert.Equal(HomeLaunchDecision.RefuseUserMismatch, Hop(travelUser: SomeoneElse));
     }
 
     /// <summary>
@@ -75,26 +74,20 @@ public class HomeLaunchAuthorizationTests
     /// token sends nothing at all, so this is what every unpatched hop looks like,
     /// and it must refuse for that stated reason rather than by accident.
     /// </summary>
-    [Test]
+    [Fact]
     public void AnEmptyTokenIsRefusedAndNamedAsEmpty()
     {
-        Assert.Multiple(() =>
-        {
-            Assert.That(Hop(presentedToken: ""), Is.EqualTo(HomeLaunchDecision.RefuseWrongToken));
-            Assert.That(Hop(presentedToken: null), Is.EqualTo(HomeLaunchDecision.RefuseWrongToken));
-            Assert.That(HomeLaunchAuthorization.TokenProblem(""), Does.Contain("EMPTY"));
-        });
+        Assert.Equal(HomeLaunchDecision.RefuseWrongToken, Hop(presentedToken: ""));
+        Assert.Equal(HomeLaunchDecision.RefuseWrongToken, Hop(presentedToken: null));
+        Assert.Contains("EMPTY", HomeLaunchAuthorization.TokenProblem(""));
     }
 
-    [Test]
+    [Fact]
     public void AStaleTokenIsRefusedAndNamedAsDifferent()
     {
-        Assert.Multiple(() =>
-        {
-            Assert.That(Hop(presentedToken: "http://playsim.net:8002;00000000-0000-4000-8000-0000000000ff"),
-                    Is.EqualTo(HomeLaunchDecision.RefuseWrongToken));
-            Assert.That(HomeLaunchAuthorization.TokenProblem("something"), Is.EqualTo("a different token"));
-        });
+        Assert.Equal(HomeLaunchDecision.RefuseWrongToken,
+                Hop(presentedToken: "http://playsim.net:8002;00000000-0000-4000-8000-0000000000ff"));
+        Assert.Equal("a different token", HomeLaunchAuthorization.TokenProblem("something"));
     }
 
     /// <summary>
@@ -103,26 +96,24 @@ public class HomeLaunchAuthorizationTests
     /// as a stale one, because the only question asked is whether it matches the
     /// token this session was issued.
     /// </summary>
-    [Test]
+    [Fact]
     public void AValidTokenBelongingToAnotherSessionIsRefused()
     {
         const string AnotherSessionsToken = "http://playsim.net:8002;9c4e1a77-0000-4000-8000-000000000002";
 
-        Assert.That(Hop(presentedToken: AnotherSessionsToken),
-                Is.EqualTo(HomeLaunchDecision.RefuseWrongToken));
+        Assert.Equal(HomeLaunchDecision.RefuseWrongToken, Hop(presentedToken: AnotherSessionsToken));
     }
 
-    [Test]
+    [Fact]
     public void TheExactIssuedTokenIsAllowed()
     {
-        Assert.That(Hop(), Is.EqualTo(HomeLaunchDecision.Allow));
+        Assert.Equal(HomeLaunchDecision.Allow, Hop());
     }
 
-    [Test]
+    [Fact]
     public void AnAgentWhoseRowSaysItIsAlreadyHereIsRefused()
     {
-        Assert.That(Hop(travelGrid: HomeGrid, targetGrid: HomeGrid),
-                Is.EqualTo(HomeLaunchDecision.RefuseAlreadyHome));
+        Assert.Equal(HomeLaunchDecision.RefuseAlreadyHome, Hop(travelGrid: HomeGrid, targetGrid: HomeGrid));
     }
 
     /// <summary>
@@ -130,101 +121,96 @@ public class HomeLaunchAuthorizationTests
     /// and has no prior trip by definition; if this ever refuses, first logins
     /// stop for everyone.
     /// </summary>
-    [Test]
+        [Fact]
     public void PasswordLoginWithNoTravelRowIsAllowed()
     {
-        Assert.That(
-                HomeLaunchAuthorization.Decide(
+        Assert.Equal(
+            HomeLaunchDecision.Allow,
+            HomeLaunchAuthorization.Decide(
                         fromLogin: true, travelSessionExists: false,
                         travelUserID: UUID.Zero, agentID: Traveller,
                         storedToken: null, presentedToken: null,
                         travelGridExternalName: null,
-                        homeGridName: HomeGrid, targetGridName: HomeGrid),
-                Is.EqualTo(HomeLaunchDecision.Allow));
+                homeGridName: HomeGrid, targetGridName: HomeGrid));
     }
 
-    [Test]
+        [Fact]
     public void PasswordLoginIsExemptFromEveryOtherCheck()
     {
-        Assert.That(
-                HomeLaunchAuthorization.Decide(
+        Assert.Equal(
+            HomeLaunchDecision.Allow,
+            HomeLaunchAuthorization.Decide(
                         fromLogin: true, travelSessionExists: true,
                         travelUserID: SomeoneElse, agentID: Traveller,
                         storedToken: IssuedToken, presentedToken: "",
                         travelGridExternalName: HomeGrid,
-                        homeGridName: HomeGrid, targetGridName: HomeGrid),
-                Is.EqualTo(HomeLaunchDecision.Allow));
+                homeGridName: HomeGrid, targetGridName: HomeGrid));
     }
 
     /// <summary>A token is a secret, so it is compared exactly.</summary>
-    [Test]
+        [Fact]
     public void TheTokenComparisonIsCaseSensitive()
     {
-        Assert.That(
-                HomeLaunchAuthorization.Decide(
+        Assert.Equal(
+            HomeLaunchDecision.RefuseWrongToken,
+            HomeLaunchAuthorization.Decide(
                         fromLogin: false, travelSessionExists: true,
                         travelUserID: Traveller, agentID: Traveller,
                         storedToken: "AbC", presentedToken: "abc",
                         travelGridExternalName: ForeignGrid,
-                        homeGridName: HomeGrid, targetGridName: ForeignGrid),
-                Is.EqualTo(HomeLaunchDecision.RefuseWrongToken));
+                homeGridName: HomeGrid, targetGridName: ForeignGrid));
     }
 
     /// <summary>A grid name is a host name, and the two sides of a hop disagree about case.</summary>
-    [Test]
+    [Fact]
     public void TheGridNameComparisonIsCaseInsensitive()
     {
-        Assert.That(Hop(travelGrid: "PlaySim.NET", targetGrid: HomeGrid),
-                Is.EqualTo(HomeLaunchDecision.RefuseAlreadyHome));
+        Assert.Equal(HomeLaunchDecision.RefuseAlreadyHome, Hop(travelGrid: "PlaySim.NET", targetGrid: HomeGrid));
     }
 
-    [Test]
+    [Fact]
     public void AHopOutToAnotherGridIsAllowedEvenWhenTheRowNamesThisGrid()
     {
-        Assert.That(Hop(travelGrid: HomeGrid, targetGrid: ForeignGrid),
-                Is.EqualTo(HomeLaunchDecision.Allow));
+        Assert.Equal(HomeLaunchDecision.Allow, Hop(travelGrid: HomeGrid, targetGrid: ForeignGrid));
     }
 
-    [TestCase("http://home.example", "http://HOME.example:80/", "http://home.example/")]
-    [TestCase("https://home.example/", "https://home.example:443", "https://HOME.example")]
-    [TestCase("http://home.example:8002/", "http://HOME.example:8002", "http://home.example:8002")]
+    [Theory]
+    [InlineData("http://home.example", "http://HOME.example:80/", "http://home.example/")]
+    [InlineData("https://home.example/", "https://home.example:443", "https://HOME.example")]
+    [InlineData("http://home.example:8002/", "http://HOME.example:8002", "http://home.example:8002")]
     public void EquivalentHomeGridUrisCannotBypassAlreadyHomeCheck(string homeGrid, string travelGrid, string targetGrid)
     {
-        Assert.That(HomeLaunchAuthorization.Decide(
+        Assert.Equal(HomeLaunchDecision.RefuseAlreadyHome, HomeLaunchAuthorization.Decide(
                 fromLogin: false, travelSessionExists: true,
                 travelUserID: Traveller, agentID: Traveller,
                 storedToken: IssuedToken, presentedToken: IssuedToken,
-                travelGridExternalName: travelGrid, homeGridName: homeGrid, targetGridName: targetGrid),
-                Is.EqualTo(HomeLaunchDecision.RefuseAlreadyHome));
+                travelGridExternalName: travelGrid, homeGridName: homeGrid, targetGridName: targetGrid));
     }
 
-    [Test]
+    [Fact]
     public void AnAuthorizedReturnFromAForeignGridIsAllowed()
     {
-        Assert.That(Hop(targetGrid: HomeGrid), Is.EqualTo(HomeLaunchDecision.Allow));
+        Assert.Equal(HomeLaunchDecision.Allow, Hop(targetGrid: HomeGrid));
     }
 
-    [Test]
+        [Fact]
     public void EachRefusalCarriesItsReasonAndAnAllowedLaunchCarriesNone()
     {
-        Assert.Multiple(() =>
-        {
-            Assert.That(HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.RefuseNoSession),
-                    Is.EqualTo("No authorized travel session"));
-            Assert.That(HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.RefuseAlreadyHome),
-                    Is.EqualTo("Agent is already on the home grid"));
-            Assert.That(HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.Allow), Is.Empty);
-        });
+        Assert.Equal("No authorized travel session",
+            HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.RefuseNoSession));
+        Assert.Equal("Agent is already on the home grid",
+            HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.RefuseAlreadyHome));
+        Assert.Empty(HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.Allow));
     }
 
     /// <summary>
     /// What a caller is told must not say which check failed: naming it tells a
     /// determined caller exactly what to change next.
     /// </summary>
-    [Test]
+    [Fact]
     public void TheReasonGivenToACallerDoesNotNameWhichCheckFailed()
     {
-        Assert.That(HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.RefuseUserMismatch),
-                Is.EqualTo(HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.RefuseWrongToken)));
+        Assert.Equal(HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.RefuseWrongToken),
+                HomeLaunchAuthorization.ReasonFor(HomeLaunchDecision.RefuseUserMismatch));
     }
 }

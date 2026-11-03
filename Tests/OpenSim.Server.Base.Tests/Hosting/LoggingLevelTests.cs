@@ -275,14 +275,14 @@ public sealed class LoggingLevelTests
             string text = File.ReadAllText(Directory.GetFiles(dir, "Example*.log").Single());
             string shown = string.Join("\n", console.Lines);
 
-            Assert.False(shown.Contains(Marker("Example.Quiet", LogLevel.Information)));
-            Assert.True(shown.Contains(Marker("Example.Quiet", LogLevel.Warning)));
-            Assert.False(text.Contains(Marker("Example.Quiet", LogLevel.Information)));
-            Assert.True(text.Contains(Marker("Example.Quiet", LogLevel.Warning)));
+            Assert.DoesNotContain(Marker("Example.Quiet", LogLevel.Information), shown);
+            Assert.Contains(Marker("Example.Quiet", LogLevel.Warning), shown);
+            Assert.DoesNotContain(Marker("Example.Quiet", LogLevel.Information), text);
+            Assert.Contains(Marker("Example.Quiet", LogLevel.Warning), text);
 
-            Assert.False(shown.Contains(Marker("Example.Other", LogLevel.Debug)));
-            Assert.True(shown.Contains(Marker("Example.Other", LogLevel.Information)));
-            Assert.True(text.Contains(Marker("Example.Other", LogLevel.Debug)));
+            Assert.DoesNotContain(Marker("Example.Other", LogLevel.Debug), shown);
+            Assert.Contains(Marker("Example.Other", LogLevel.Information), shown);
+            Assert.Contains(Marker("Example.Other", LogLevel.Debug), text);
         }
         finally
         {
@@ -297,10 +297,10 @@ public sealed class LoggingLevelTests
     {
         CategoryLogLevels levels = CategoryLogLevels.FromSettings(new KeyValuePair<string, string?>[]
         {
-            KeyValuePair.Create("default", "debug"),
-            KeyValuePair.Create("Microsoft.*", "Warning"),
-            KeyValuePair.Create("System", "none"),
-            KeyValuePair.Create("Broken", "loud"),
+            KeyValuePair.Create<string, string?>("default", "debug"),
+            KeyValuePair.Create<string, string?>("Microsoft.*", "Warning"),
+            KeyValuePair.Create<string, string?>("System", "none"),
+            KeyValuePair.Create<string, string?>("Broken", "loud"),
             KeyValuePair.Create<string, string?>("Empty", null),
             KeyValuePair.Create<string, string?>("*", "Error"),
         });

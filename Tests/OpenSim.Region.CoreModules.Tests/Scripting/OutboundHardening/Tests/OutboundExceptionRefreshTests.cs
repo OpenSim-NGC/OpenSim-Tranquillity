@@ -36,8 +36,15 @@ public class OutboundExceptionRefreshTests
     private sealed class FakeClock : TimeProvider
     {
         private DateTimeOffset m_now = new(2026, 10, 18, 12, 0, 0, TimeSpan.Zero);
-        public override DateTimeOffset GetUtcNow() => m_now;
-        public void Advance(TimeSpan by) => m_now += by;
+        public override DateTimeOffset GetUtcNow()
+        {
+            return m_now;
+        }
+
+        public void Advance(TimeSpan by)
+        {
+            m_now += by;
+        }
     }
 
     private sealed class Dns
@@ -46,7 +53,7 @@ public class OutboundExceptionRefreshTests
         private readonly Dictionary<string, int> m_calls = new();
 
         /// <summary>When set, the lookup of the exception host waits for this before it answers.</summary>
-        public TaskCompletionSource Gate;
+        public TaskCompletionSource? Gate;
         public TaskCompletionSource GateEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Dns Host(string host, params string[] addresses)
@@ -89,10 +96,12 @@ public class OutboundExceptionRefreshTests
     }
 
     private static Dns Fresh()
-        => new Dns()
-            .Host(AtOld.Host, OldAddress)
-            .Host(AtNew.Host, NewAddress)
-            .Host(ExceptionHost, OldAddress);
+    {
+        return new Dns()
+                .Host(AtOld.Host, OldAddress)
+                .Host(AtNew.Host, NewAddress)
+                .Host(ExceptionHost, OldAddress);
+    }
 
     private static OutboundUrlFilter Filter(Dns dns, FakeClock clock, string except, int? refreshMinutes = null)
     {
