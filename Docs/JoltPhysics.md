@@ -39,7 +39,7 @@ musl-based Linux (Alpine) has no native: there, keep another physics engine.
 All regions in a process share one job pool on this native (`JobPools`, below): its physics systems
 share one scratch allocator, so two physics updates at once would stop the process. More pools need a
 change in joltc itself. The recorded files and their hashes are in
-[native/joltc/README.md](../native/joltc/README.md).
+[JoltcNative.md](JoltcNative.md).
 
 A build with no runtime identifier carries every platform's file, so the same output runs on each.
 A `dotnet publish -r <rid>` puts that platform's file beside the assemblies instead, where the
@@ -69,7 +69,7 @@ through a JoltPhysicsSharp update) is refused at start until its files are recor
    and Jolt sources the new package is built from: the list in `JoltNativePackageTests`
    (`ShapeAndAllocatorRuleTests` checks the module's side of each rule).
 2. Record the new files: `JoltNative.PackageVersion` and the stock entries of `JoltNative.Known`,
-   the stock table of `assert-joltc-native.ps1` and the stock table of `native/joltc/README.md`.
+   the stock table of `assert-joltc-native.ps1` and the stock table of `Docs/JoltcNative.md`.
 3. Run the whole Jolt suite and the harness on the new files, and record the harness baselines of
    the new version on Windows x64 and Linux x64 ("Physics harness", below). Until they are
    recorded, the regression check reports the new files as having no baseline.

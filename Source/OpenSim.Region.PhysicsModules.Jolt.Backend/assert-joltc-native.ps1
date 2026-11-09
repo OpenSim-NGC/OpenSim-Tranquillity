@@ -21,7 +21,7 @@
 #     from an older deploy).
 # It runs in Windows PowerShell and in PowerShell 7 (pwsh) on Linux and macOS.
 #
-# The recorded hashes: native/joltc/README.md.
+# The recorded hashes: Docs/JoltcNative.md.
 #
 # Usage:
 #     powershell -File assert-joltc-native.ps1 -PublishDir "<output or publish directory>" [-AllowStray]

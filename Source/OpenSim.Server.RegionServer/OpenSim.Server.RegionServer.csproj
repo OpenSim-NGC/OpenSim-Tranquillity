@@ -101,7 +101,7 @@
   </ItemGroup>
 
   <!-- The Jolt physics module's native joltc comes from the JoltPhysics.Native package, under runtimes/<rid>/native/
-       (see native/joltc/README.md); this keeps the package's unused double-precision build out of the output. -->
+       (see Docs/JoltcNative.md); this keeps the package's unused double-precision build out of the output. -->
   <Import Project="../../Source/OpenSim.Region.PhysicsModules.Jolt.Backend/JoltNative.targets" />
 
   <ItemGroup>

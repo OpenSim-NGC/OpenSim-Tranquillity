@@ -28,7 +28,7 @@ public class JoltNativePackageTests
     // allocator between all physics systems and keeps its map of systems without a lock; the module is safe on it only
     // under these rules (ShapeAndAllocatorRuleTests checks the module's side of each).
     internal const string BeforeRecording =
-        "Before recording the new hashes in JoltNative.Known (and PackageVersion, assert-joltc-native.ps1 and native/joltc/README.md), " +
+        "Before recording the new hashes in JoltNative.Known (and PackageVersion, assert-joltc-native.ps1 and Docs/JoltcNative.md), " +
         "re-check against the joltc and Jolt sources the new package is built from:\n" +
         "  1. the pool gate rule: the joltc entry points that use the shared TempAllocator are still exactly the seven listed in " +
         "ShapeAndAllocatorRuleTests, and the module calls the ones that do only inside Step, under the job pool's gate;\n" +
