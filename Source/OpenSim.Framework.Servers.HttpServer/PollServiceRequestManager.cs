@@ -128,7 +128,7 @@ public class PollServiceRequestManager
         {
             if (!req.Request.Context.CanSend())
             {
-                req.PollServiceArgs.Drop(req.RequestID, req.PollServiceArgs.Id);
+                req.PollServiceArgs.Drop?.Invoke(req.RequestID, req.PollServiceArgs.Id);
                 return;
             }
 
