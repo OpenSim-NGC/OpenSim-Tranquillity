@@ -31,7 +31,8 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// </summary>
 // Process-wide state: SceneHelpers sets MainConsole.Instance and adds the scene to SceneManager (as in
 // BakeAfterPresenceClosedTests), and the fallback test swaps the logger factory through LogCapture, so this class
-// shares the log-capture collection with the other classes that swap it.
+// shares the log-capture collection with the other classes that swap it. Classes outside the collection may still log
+// while a capture is installed, so the assertions count only lines that name this test's own agent.
 [Collection("ssb-log-capture")]
 public class LoginBakeFromCofTests
 {
@@ -215,7 +216,7 @@ public class LoginBakeFromCofTests
         using (var log = new LogCapture())
         {
             outcome = await rig.Module.LoginBakeAsync(rig.Presence, CancellationToken.None);
-            warnings = log.Messages.Where(m => m.Contains("could not read the Current Outfit", StringComparison.Ordinal)).ToList();
+            warnings = log.Messages.Where(m => m.Contains("could not read the Current Outfit", StringComparison.Ordinal) && m.Contains(Agent.ToString(), StringComparison.Ordinal)).ToList();
         }
 
         Assert.True(outcome.Count(ChannelStatus.Baked) > 0, "the outfit baked nothing");
@@ -310,7 +311,7 @@ public class LoginBakeFromCofTests
 
                 // generous: the limit is 300 ms, so a bake held by the read is what keeps this from finishing
                 finished = await Task.WhenAny(bake, Task.Delay(TimeSpan.FromSeconds(30))) == bake;
-                warnings = log.Messages.Where(m => m.Contains("could not read the Current Outfit", StringComparison.Ordinal)).ToList();
+                warnings = log.Messages.Where(m => m.Contains("could not read the Current Outfit", StringComparison.Ordinal) && m.Contains(Agent.ToString(), StringComparison.Ordinal)).ToList();
             }
         }
         finally

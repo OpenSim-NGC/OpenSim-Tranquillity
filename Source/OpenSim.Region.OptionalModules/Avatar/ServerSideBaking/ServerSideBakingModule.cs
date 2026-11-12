@@ -652,8 +652,8 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
                 ApplyCofRead(sp, result);
             else
                 m_log.LogWarning(answered ? error : null,
-                    "[SSB]: could not read the Current Outfit for {Name} at login{Within}; the login bake uses the wearables of the stored avatar record",
-                    sp.Name, answered ? "" : $" within {timeout.TotalSeconds:0.###} s");
+                    "[SSB]: could not read the Current Outfit for {Name} ({Agent}) at login{Within}; the login bake uses the wearables of the stored avatar record",
+                    sp.Name, sp.UUID, answered ? "" : $" within {timeout.TotalSeconds:0.###} s");
         }
         return await BakeAsync(sp, BakeReason.Login, ct).ConfigureAwait(false);
     }
