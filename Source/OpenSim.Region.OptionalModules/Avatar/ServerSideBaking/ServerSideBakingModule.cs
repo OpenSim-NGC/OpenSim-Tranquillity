@@ -446,18 +446,32 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     /// </summary>
     private static bool ApplyCofToWearables(Scene scene, ScenePresence sp, out Exception error)
     {
+        var read = ReadCof(scene?.InventoryService, sp, out error);
+        if (read is null) return false;
+        ApplyCofRead(sp, read);
+        return true;
+    }
+
+    /// <summary>The wearable links of a Current Outfit folder, as <see cref="ReadCof"/> read them.</summary>
+    private sealed record CofRead(List<CofWearableLink> Links, List<CofUnresolvedLink> Unresolved);
+
+    /// <summary>
+    /// The read half of <see cref="ApplyCofToWearables"/>: the folder's wearable links, or null when there is no
+    /// inventory service, no folder or no content, or the read threw (<paramref name="error"/>). It changes nothing.
+    /// </summary>
+    private static CofRead ReadCof(IInventoryService inventory, ScenePresence sp, out Exception error)
+    {
         error = null;
-        var inventory = scene?.InventoryService;
-        if (inventory is null || sp is null) return false;
+        if (inventory is null || sp is null) return null;
 
         List<CofWearableLink> links;
         var unresolved = new List<CofUnresolvedLink>();
         try
         {
             var cof = inventory.GetFolderForType(sp.UUID, FolderType.CurrentOutfit);
-            if (cof is null) return false;
+            if (cof is null) return null;
             var content = inventory.GetFolderContent(sp.UUID, cof.ID);
-            if (content?.Items is null) return false;
+            if (content?.Items is null) return null;
 
             links = new List<CofWearableLink>(content.Items.Count);
             foreach (var link in content.Items)
@@ -477,15 +491,20 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         catch (Exception ex)
         {
             error = ex;
-            return false;
+            return null;
         }
 
-        var derived = CofWearables.Derive(sp.Appearance?.Wearables, links, unresolved, out var changed);
-        if (!changed) return true;
+        return new CofRead(links, unresolved);
+    }
+
+    /// <summary>The apply half of <see cref="ApplyCofToWearables"/>: <see cref="CofWearables.Derive"/> over a finished read.</summary>
+    private static void ApplyCofRead(ScenePresence sp, CofRead read)
+    {
+        var derived = CofWearables.Derive(sp.Appearance?.Wearables, read.Links, read.Unresolved, out var changed);
+        if (!changed) return;
 
         sp.Appearance.Wearables = derived;
         m_log.LogDebug("[SSB]: {Name}'s worn set from the COF: {Summary}", sp.Name, DescribeWearables(derived));
-        return true;
     }
 
     /// <summary>"Shirt x2, Pants" — the worn types and how many of each, for the log.</summary>
@@ -601,16 +620,42 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     /// </para>
     ///
     /// <para>
-    /// When the folder cannot be read, the bake uses the record's wearables, as before, and one warning says so.
+    /// When the folder cannot be read, or the read has not answered within <see cref="LoginCofReadTimeout"/>, the bake
+    /// uses the record's wearables, as before, and one warning says so. A read that answers after the limit is
+    /// dropped: the bake it would have changed has gone out, and the viewer's rebake request reads the folder again.
     /// NPCs have no Current Outfit folder and are baked from the appearance they were given.
     /// </para>
     /// </summary>
-    public Task<BakeOutcome> LoginBakeAsync(ScenePresence sp, CancellationToken ct)
+    /// <summary>
+    /// How long the login bake waits for the Current Outfit read before it bakes the stored record's wearables instead:
+    /// 5 s, the default <c>DelayBeforeAppearanceSave</c>, after which the viewer's own rebake request would bring the
+    /// folder's outfit anyway. The module has no other limit on an inventory read; the remote inventory connector's
+    /// limit is per request (<c>[InventoryService] RemoteRequestTimeout</c>, 100 s by default), and the read makes one
+    /// request per link in the folder.
+    /// </summary>
+    public TimeSpan LoginCofReadTimeout { get; set; } = TimeSpan.FromSeconds(5);
+
+    public async Task<BakeOutcome> LoginBakeAsync(ScenePresence sp, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(sp);
-        if (!sp.IsNPC && sp.Appearance is not null && !ApplyCofToWearables(sp.Scene, sp, out var error))
-            m_log.LogWarning(error, "[SSB]: could not read the Current Outfit for {Name} at login; the login bake uses the wearables of the stored avatar record", sp.Name);
-        return BakeAsync(sp, BakeReason.Login, ct);
+        if (!sp.IsNPC && sp.Appearance is not null)
+        {
+            // The read runs on its own task so that a slow inventory service holds it, not the bake. Its result is used
+            // only if it answers within the limit.
+            var inventory = sp.Scene?.InventoryService;
+            Exception error = null;
+            var read = Task.Run(() => { var r = ReadCof(inventory, sp, out var e); error = e; return r; });
+            var timeout = LoginCofReadTimeout;
+            var answered = await Task.WhenAny(read, Task.Delay(timeout, ct)).ConfigureAwait(false) == read;
+            var result = answered ? read.Result : null;
+            if (result is not null)
+                ApplyCofRead(sp, result);
+            else
+                m_log.LogWarning(answered ? error : null,
+                    "[SSB]: could not read the Current Outfit for {Name} at login{Within}; the login bake uses the wearables of the stored avatar record",
+                    sp.Name, answered ? "" : $" within {timeout.TotalSeconds:0.###} s");
+        }
+        return await BakeAsync(sp, BakeReason.Login, ct).ConfigureAwait(false);
     }
 
     // ------------------------------------------------------------------ console

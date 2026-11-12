@@ -222,4 +222,110 @@ public class LoginBakeFromCofTests
         Assert.Equal(1, rig.Presence.Appearance.Wearables[Alpha].Count);
         Assert.Single(warnings);
     }
+
+    /// <summary>
+    /// An inventory service whose first Current Outfit lookup - the login read's - can be held until the test lets it
+    /// go; every other call, the bake's own read of the folder version included, goes straight to the scene's service.
+    /// </summary>
+    private sealed class GatedInventory : IInventoryService
+    {
+        private readonly IInventoryService m_inner;
+        private int m_cofLookups;
+        public readonly ManualResetEventSlim Entered = new();
+        public readonly ManualResetEventSlim Open = new(true);
+        public readonly ManualResetEventSlim Left = new();
+
+        public GatedInventory(IInventoryService inner) { m_inner = inner; }
+
+        public InventoryFolderBase GetFolderForType(UUID userID, FolderType type)
+        {
+            var gated = type == FolderType.CurrentOutfit && Interlocked.Increment(ref m_cofLookups) == 1;
+            if (gated)
+            {
+                Entered.Set();
+                Open.Wait(TimeSpan.FromSeconds(60));
+            }
+            try { return m_inner.GetFolderForType(userID, type); }
+            finally { if (gated) Left.Set(); }
+        }
+
+        public bool CreateUserInventory(UUID user) => m_inner.CreateUserInventory(user);
+        public List<InventoryFolderBase> GetInventorySkeleton(UUID userId) => m_inner.GetInventorySkeleton(userId);
+        public InventoryFolderBase GetRootFolder(UUID userID) => m_inner.GetRootFolder(userID);
+        public InventoryCollection GetFolderContent(UUID userID, UUID folderID) => m_inner.GetFolderContent(userID, folderID);
+        public InventoryCollection[] GetMultipleFoldersContent(UUID principalID, UUID[] folderIDs) => m_inner.GetMultipleFoldersContent(principalID, folderIDs);
+        public List<InventoryItemBase> GetFolderItems(UUID userID, UUID folderID) => m_inner.GetFolderItems(userID, folderID);
+        public InventoryFolderBase GetFolder(UUID userID, UUID folderID) => m_inner.GetFolder(userID, folderID);
+        public bool AddFolder(InventoryFolderBase folder) => m_inner.AddFolder(folder);
+        public bool UpdateFolder(InventoryFolderBase folder) => m_inner.UpdateFolder(folder);
+        public bool MoveFolder(InventoryFolderBase folder) => m_inner.MoveFolder(folder);
+        public bool DeleteFolders(UUID userID, List<UUID> folderIDs) => m_inner.DeleteFolders(userID, folderIDs);
+        public bool DeleteFolders(UUID userID, List<UUID> folderIDs, bool onlyIfTrash) => m_inner.DeleteFolders(userID, folderIDs, onlyIfTrash);
+        public bool PurgeFolder(InventoryFolderBase folder) => m_inner.PurgeFolder(folder);
+        public bool AddItem(InventoryItemBase item) => m_inner.AddItem(item);
+        public bool UpdateItem(InventoryItemBase item) => m_inner.UpdateItem(item);
+        public bool MoveItems(UUID ownerID, List<InventoryItemBase> items) => m_inner.MoveItems(ownerID, items);
+        public bool DeleteItems(UUID userID, List<UUID> itemIDs) => m_inner.DeleteItems(userID, itemIDs);
+        public InventoryItemBase GetItem(UUID userID, UUID itemID) => m_inner.GetItem(userID, itemID);
+        public InventoryItemBase[] GetMultipleItems(UUID userID, UUID[] ids) => m_inner.GetMultipleItems(userID, ids);
+        public List<InventoryItemBase> GetActiveGestures(UUID userId) => m_inner.GetActiveGestures(userId);
+        public int GetAssetPermissions(UUID userID, UUID assetID) => m_inner.GetAssetPermissions(userID, assetID);
+        public bool HasInventoryForUser(UUID userID) => m_inner.HasInventoryForUser(userID);
+    }
+
+    /// <summary>
+    /// Put <paramref name="gated"/> in front of the scene's inventory service. Scene caches the service it resolved in a
+    /// protected field on first use, so registering a new module interface would not reach it.
+    /// </summary>
+    private static void UseInventory(Scene scene, IInventoryService gated)
+    {
+        var field = typeof(Scene).GetField("m_InventoryService",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        field.SetValue(scene, gated);
+    }
+
+    /// <summary>
+    /// A Current Outfit read that does not answer within the login read limit does not hold the login bake: the bake
+    /// goes ahead from the stored record, one warning says so, and the read that answers later changes nothing.
+    /// </summary>
+    [Fact]
+    public async Task AStalledCurrentOutfitReadDoesNotHoldTheLoginBake()
+    {
+        var rig = Setup(recordTypes: new[] { Shape, Skin, Alpha }, cofTypes: new[] { Shape, Skin });
+        var gated = new GatedInventory(rig.Scene.InventoryService);
+        UseInventory(rig.Scene, gated);
+        rig.Module.LoginCofReadTimeout = TimeSpan.FromMilliseconds(300);
+        gated.Open.Reset();
+
+        Task<BakeOutcome> bake = null;
+        List<string> warnings;
+        bool finished;
+        try
+        {
+            using (var log = new LogCapture())
+            {
+                bake = Task.Run(() => rig.Module.LoginBakeAsync(rig.Presence, CancellationToken.None));
+                Assert.True(gated.Entered.Wait(TimeSpan.FromSeconds(30)), "the login bake never read the Current Outfit");
+
+                // generous: the limit is 300 ms, so a bake held by the read is what keeps this from finishing
+                finished = await Task.WhenAny(bake, Task.Delay(TimeSpan.FromSeconds(30))) == bake;
+                warnings = log.Messages.Where(m => m.Contains("could not read the Current Outfit", StringComparison.Ordinal)).ToList();
+            }
+        }
+        finally
+        {
+            gated.Open.Set();
+        }
+
+        Assert.True(finished, "the login bake waited for the stalled Current Outfit read");
+        var outcome = await bake;
+        Assert.True(outcome.Count(ChannelStatus.Baked) > 0, "the outfit baked nothing");
+        Assert.Single(warnings);
+
+        // the late read must not rewrite the worn set behind the bake that was sent
+        Assert.True(gated.Left.Wait(TimeSpan.FromSeconds(30)), "the stalled read never finished");
+        await Task.Delay(TimeSpan.FromMilliseconds(500));   // a NOT-happened window: the late read's result has nowhere to go
+        Assert.Equal(1, rig.Presence.Appearance.Wearables[Alpha].Count);
+    }
 }
