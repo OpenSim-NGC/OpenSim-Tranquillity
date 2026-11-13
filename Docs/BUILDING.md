@@ -6,9 +6,8 @@ get or update source from git
   
 ### Building
  Prebuild is no longer used.  There is a top level Solution (sln) and csproj files for each
- of the projects in the solution.  The projects are designed to be publishable which 
- optimizes the build for a specific platform.  Future versions will support building into a '
- container and AOT compilation:
+ of the projects in the solution. The projects are designed to be publishable, which
+ optimizes the build for a specific platform:
  
  To run a build from a CLI run:
 
@@ -48,113 +47,85 @@ For rebuilding and debugging use the dotnet command options
   *  debug:   dotnet publish --configuration Debug
   *  release: dotnet publish --configuration Release
 
-# NuGet packages from the private GitHub Packages feed #
+# NuGet restore and Docker builds #
 
-Some OpenSim-Tranquillity dependencies are published to a **private GitHub Packages
-NuGet feed** owned by the `OpenSim-NGC` organization. Before you can `dotnet restore`
-(or build/publish, which restore automatically), you must authenticate to this feed.
-
-The repository already contains a `nuget.config` at the solution root that declares the
-feed and reads your credentials from two environment variables:
-
-```xml
-<packageSources>
-  <clear />
-  <add key="nuget.org" value="https://api.nuget.org/v3/index.json" />
-  <add key="github" value="https://nuget.pkg.github.com/OpenSim-NGC/index.json" />
-</packageSources>
-<packageSourceCredentials>
-  <github>
-    <add key="Username" value="%GITHUB_ACTOR%" />
-    <add key="ClearTextPassword" value="%GITHUB_TOKEN%" />
-  </github>
-</packageSourceCredentials>
-```
-
-You do **not** need to edit `nuget.config`. You only need to provide the two
-environment variables it references:
-
-* `GITHUB_ACTOR` — your GitHub username.
-* `GITHUB_TOKEN` — a GitHub Personal Access Token (PAT) with permission to read packages.
-
-## 1. Create a Personal Access Token (PAT)
-
-1. Sign in to GitHub and confirm you are a member of the `OpenSim-NGC` organization
-   (you need read access to its packages). If you are not a member, ask a maintainer
-   to add you.
-2. Go to **Settings → Developer settings → Personal access tokens**.
-3. Create a token:
-   * **Classic token:** enable the `read:packages` scope (add `write:packages`
-     only if you intend to publish packages).
-   * **Fine-grained token:** grant the `OpenSim-NGC` organization access and set
-     **Packages → Read-only** permission.
-4. Copy the token value now — GitHub only shows it once.
-
-> Keep the token secret. Never commit it to the repository or paste it into
-> `nuget.config`. If a token is ever exposed, revoke it immediately on GitHub.
-
-## 2. Export the environment variables
-
-### Linux / macOS (bash / zsh)
-
-Add these to your shell profile (`~/.bashrc`, `~/.zshrc`, or `~/.profile`) so they
-persist across sessions, then open a new terminal:
-
-```bash
-export GITHUB_ACTOR="your-github-username"
-export GITHUB_TOKEN="ghp_your_token_value"
-```
-
-To set them for the current session only:
-
-```bash
-GITHUB_ACTOR="your-github-username" GITHUB_TOKEN="ghp_your_token_value" dotnet restore
-```
-
-### Windows (PowerShell)
-
-For the current session:
-
-```powershell
-$env:GITHUB_ACTOR = "your-github-username"
-$env:GITHUB_TOKEN = "ghp_your_token_value"
-```
-
-To persist for your user account:
-
-```powershell
-[Environment]::SetEnvironmentVariable("GITHUB_ACTOR", "your-github-username", "User")
-[Environment]::SetEnvironmentVariable("GITHUB_TOKEN", "ghp_your_token_value", "User")
-```
-
-Open a new terminal after setting persistent variables so they take effect.
-
-## 3. Restore and build
-
-With the variables set, restore resolves packages from both nuget.org and the
-private GitHub feed:
+The repository's `nuget.config` uses nuget.org. Restore and build with the .NET
+SDK version specified by `global.json`:
 
 ```bash
 dotnet restore
 dotnet build --configuration Debug
 ```
 
-## Troubleshooting
+To build the GridServer, MoneyServer and RegionServer images, run from the
+repository root:
 
-* **401 Unauthorized** during restore: the token is missing, expired, or lacks the
-  `read:packages` scope. Verify `echo $GITHUB_ACTOR` / `echo $GITHUB_TOKEN`
-  (PowerShell: `$env:GITHUB_ACTOR`), and confirm the token has package read access.
-* **403 Forbidden**: your account is authenticated but not authorized for the
-  `OpenSim-NGC` packages — ask a maintainer to grant organization access.
-* **Package not found**: ensure the `github` source is listed by running
-  `dotnet nuget locals all --list` and `dotnet restore --verbosity normal`, and that
-  you are running the command from the solution root where `nuget.config` lives.
-* **Variables not picked up**: environment variable changes only apply to terminals
-  opened *after* they were set. Restart the terminal (or your IDE) and try again.
+```bash
+docker compose build
+```
 
-> CI note: the Docker Compose build tasks pass `GITHUB_ACTOR` / `GITHUB_TOKEN` as
-> BuildKit secrets, so the same two variables must be present in your shell before
-> running `docker compose build`.
+The Dockerfiles use the .NET 10 SDK and runtime images. Restore requires access
+to nuget.org; GitHub credentials are not required with the included NuGet configuration.
+
+### Container startup and optional mounts
+
+The container entrypoints run the packaged startup scripts in the foreground.
+Set `GRID_SERVICE_NAME` and `REGION_NAME` for Compose; MoneyServer needs no name:
+
+```bash
+export GRID_SERVICE_NAME=mygrid
+export REGION_NAME=myregion
+```
+
+GridServer reads `/app/config/GridServer.mygrid.ini`. RegionServer reads
+`/app/config/RegionServer.ini`, its packaged `RegionServerDefaults.ini`, and
+the `.ini` files in `/app/config/regions/myregion`. MoneyServer reads
+`/app/config/MoneyServer.ini`. GridServer and MoneyServer do not scan other
+files in `/app/config`; use includes as needed. The scripts accept one name
+argument for GridServer and RegionServer, and none for MoneyServer.
+
+The scripts default `CONFIGDIR` to `/app/config` and `DATADIR` to `/app/data`;
+these environment variables and `CONFIGFILE` can be overridden. RegionServer
+also accepts `DEFAULTCONFIG` and `REGIONDIR`. The directories and selected
+configuration must exist. Set `SERVER_NAME` if the hostname cannot be resolved
+to the fully qualified name required by your configuration. The scripts run the
+server directly, including outside containers; the existing screen-based command
+and stop scripts cannot control these processes. The servers use a local
+interactive console, so Compose allocates a TTY, keeps stdin open, and allows
+60 seconds for shutdown. When using `docker run`, use `-it` for the console and
+`--stop-timeout 60` to allow time for shutdown.
+
+To supply host directories, create separate config and log directories for each
+server, then set their absolute paths and use the optional Compose file:
+
+```bash
+export GRID_CONFIG_DIR=/path/to/grid/config
+export GRID_LOG_DIR=/path/to/grid/logs
+export MONEY_CONFIG_DIR=/path/to/money/config
+export MONEY_LOG_DIR=/path/to/money/logs
+export REGION_CONFIG_DIR=/path/to/region/config
+export REGION_LOG_DIR=/path/to/region/logs
+
+docker compose -f compose.yaml -f compose.mounts.yaml up
+```
+
+All six directory variables and directories are required when using this override,
+even when starting just one service. Config directories are mounted read-only at
+`/app/config`. Any referenced include files must also be accessible inside the
+container.
+
+Log directories are mounted at `/app/logdata`. The images run as the `app`
+user (UID 1654 in the current images), so each host log directory must be
+writable by that user. Config directories must be readable by it. The images
+default `LOGDIR` to `/app/logdata`; it can be overridden with an environment
+variable. Without the mount, logs there are lost when the container
+is removed.
+
+The log mount does not automatically redirect database files, caches, region
+configuration, or explicitly configured log paths. Configure and mount those paths
+separately where persistence is needed, and back up external databases
+independently. Do not mount over `/app/data`: the RegionServer image contains
+packaged resources there.
 
 # Configure #
 ## Standalone mode ##
