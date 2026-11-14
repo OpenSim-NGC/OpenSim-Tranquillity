@@ -8,10 +8,10 @@ has been retained in files directly derived from OpenSimulator.  Some new elemen
 licensed by their respective contributor.   Current License information is found in the LICENSE.txt file at
 the top of the project. 
 
-Tranquillity is a project that endeavours to develop a functioning virtual worlds server platform capable of 
+Tranquillity is a project that endeavours to develop a functioning virtual worlds server platform capable of
 supporting multiple clients and servers in a heterogeneous grid structure while leveraging the architectural
-patterns provided by the dotnet and C# platform. Tranquillity is written in C#, and requires a dotnet SDK to compile
-and runtime to execute compiled binaries.
+patterns provided by the .NET and C# platform. Tranquillity is written in C# and targets .NET 10. Building from
+source requires the .NET 10 SDK; running the published servers requires the .NET 10 runtime.
 
 # Compiling Tranquillity
 
@@ -27,29 +27,32 @@ see Docs/TESTING.txt.
 For plugin authoring and registration steps in the DotNetCorePlugins model,
 see Docs/PLUGIN_DEVELOPMENT.md.
 
-# Running Tranquillity on Windows
+# Running Tranquillity
 
-You will need dotnet 8.0 runtime (https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
+Install the [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0).
+For source builds, install the .NET 10 SDK version selected by `global.json`.
 
-To run Tranquillity from a command prompt
+Tranquillity now publishes separate server executables. From the directory containing
+the published server files, start a region server with:
 
- * cd to the directory where you unpacked Tranquillity.
- * Review and change configuration files (.ini) for your needs. see the "Configuring Tranquillity" section
- * run "dotnet Tranquillity.dll"
+```sh
+dotnet OpenSim.Server.RegionServer.dll
+```
 
+For a grid deployment, start the grid services with:
 
-# Running Tranquillity on Linux/Mac
+```sh
+dotnet OpenSim.Server.GridServer.dll
+```
 
-You will need
+If using the optional money server, start it with:
 
- * [dotnet 8.0 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
- 
-To run Tranquillity, from the unpacked distribution type:
+```sh
+dotnet OpenSim.Server.MoneyServer.dll
+```
 
- * cd to the directory where you unpackrf Tranquillity
- * review and change configuration files (.ini) for your needs. see the "Configuring Tranquillity" section
- * run "dotnet Tranquillity.dll"
- 
+Configure the server `.ini` files for your deployment before starting the servers;
+see the "Configuring Tranquillity" section and [Docs/BUILDING.md](Docs/BUILDING.md).
 
 # Configuring Tranquillity
 
