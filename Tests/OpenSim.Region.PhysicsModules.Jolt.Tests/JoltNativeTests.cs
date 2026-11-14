@@ -242,7 +242,16 @@ public class JoltNativeTests
     [Fact]
     public void The_readme_hash_tables_match_the_record()
     {
-        string readme = File.ReadAllText(Path.Combine(RepoRoot(), "native", "joltc", "README.md"));
+        // The record is Docs/JoltcNative.md; a tree that builds its own joltc keeps it as native/joltc/README.md beside the
+        // build. One of the two has to be there.
+        string[] candidates =
+        {
+            Path.Combine(RepoRoot(), "Docs", "JoltcNative.md"),
+            Path.Combine(RepoRoot(), "native", "joltc", "README.md"),
+        };
+        string record = candidates.FirstOrDefault(File.Exists);
+        Assert.True(record != null, "no hash record: neither " + string.Join(" nor ", candidates) + " exists");
+        string readme = File.ReadAllText(record);
         // The stock files of the package: `JoltPhysics.Native <version>` | `<folder>/<file>` | `<sha256>`.
         var stock = Regex.Matches(readme, @"^\| `JoltPhysics\.Native ([0-9.]+)` \| `([a-z0-9-]+)/([^`]+)` \| `([0-9a-f]{64})` \|", RegexOptions.Multiline)
             .Select(m => (Version: m.Groups[1].Value, Folder: m.Groups[2].Value, File: m.Groups[3].Value, Sha256: m.Groups[4].Value.ToUpperInvariant()))
