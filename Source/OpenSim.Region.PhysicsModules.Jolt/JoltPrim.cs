@@ -1970,6 +1970,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     for (int i = 0; i < _linkChildren.Count; i++)
                     {
                         JoltPrim c = _linkChildren[i];
+                        _module.LinksetRebuildChildHook?.Invoke(this);
                         // A part already welded keeps its place on the object (its offset); a newly linked one is placed
                         // where core put it, relative to the root now.
                         c.SyncFromLink();
@@ -1997,6 +1998,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             catch (Exception e)
             {
                 // Never let a linkset rebuild propagate into the heartbeat and wedge the region.
+                _module.NoteLinksetRebuildError();
                 JoltScene.m_log.LogError($"{JoltScene.LogHeader} linkset rebuild EXCEPTION for root {LocalID}: {e}");
             }
             finally { _rebuilding = false; }

@@ -2574,6 +2574,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         internal long BasicForcesUpdateTicks => Interlocked.Read(ref _basicForcesUpdateTicks);
         internal long BasicForcesUpdateCalls => Interlocked.Read(ref _basicForcesUpdateCalls);
 
+        // Linkset rebuilds that failed with an exception since the scene started (JoltPrim.RebuildCompoundNow logs each).
+        private int _linksetRebuildErrors;
+        internal int LinksetRebuildErrors => Volatile.Read(ref _linksetRebuildErrors);
+        internal void NoteLinksetRebuildError() => Interlocked.Increment(ref _linksetRebuildErrors);
+
+        // Tests only: called with the root for each part a linkset rebuild places, so a test can link or unlink a part at
+        // that point, as core's thread can while the step thread rebuilds. Null in a region.
+        internal Action<JoltPrim> LinksetRebuildChildHook;
+
         internal void MarkLinksetDirty(JoltPrim root)
         {
             lock (_dirtyLinksets) _dirtyLinksets.Add(root);
