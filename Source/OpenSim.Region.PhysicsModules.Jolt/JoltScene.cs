@@ -2891,8 +2891,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         internal const float SlowStepWarnMs = 40f;
         // At most one slow-step line per region in this many seconds; the ones held back are counted in the next.
         internal const double SlowStepLogSeconds = 10.0;
-        // A region's first steps after start that are never logged as slow (stub).
-        internal const long SlowStepWarmupSteps = 0;
+        // A region's first steps after start are never logged as slow: they build the broad phase and wake every body the
+        // region loaded (a start's first step took 66-74 ms with nothing wrong). About one second at the 11 Hz heartbeat.
+        internal const long SlowStepWarmupSteps = 10;
         private long _slowStepLoggedAt;
         private long _slowStepsHeldBack;
 
@@ -2901,7 +2902,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         internal static string SlowStepLine(string region, float physicsMs, float timeStep, long step, in StepResult r, int contactCount,
                                             in PhysicsCapacityStats s, long heldBack)
         {
-            if (!(physicsMs >= SlowStepWarnMs))
+            if (!(physicsMs >= SlowStepWarnMs) || step <= SlowStepWarmupSteps)
                 return null;
             var ci = System.Globalization.CultureInfo.InvariantCulture;
             string line = string.Format(ci,
@@ -2915,7 +2916,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // Logs a slow step at once (SlowStepLine), at most once per SlowStepLogSeconds per region.
         private void WarnIfSlowStep(IPhysicsBackend backend, in StepResult r, float timeStep, int contactCount, float physicsMs)
         {
-            if (!(physicsMs >= SlowStepWarnMs))
+            if (!(physicsMs >= SlowStepWarnMs) || _stepCount <= SlowStepWarmupSteps)
                 return;
             long now = System.Diagnostics.Stopwatch.GetTimestamp();
             long last = _slowStepLoggedAt;
