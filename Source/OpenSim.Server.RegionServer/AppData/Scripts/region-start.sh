@@ -25,7 +25,6 @@ export REGIONNAME=$1
 export CONSOLE="${CONSOLE:-local}"
 export BINDIR="$BASE_DIR"
 export CONFIGDIR="${CONFIGDIR:-/app/config}"
-export DATADIR="${DATADIR:-/app/data}"
 export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/RegionServer.ini}"
 export DEFAULTCONFIG="${DEFAULTCONFIG:-${BINDIR}/RegionServerDefaults.ini}"
 
@@ -36,11 +35,6 @@ fi
 
 if [ ! -d "$CONFIGDIR" ]; then
     echo "Cannot find configuration directory $CONFIGDIR"
-    exit 2
-fi
-
-if [ ! -d "$DATADIR" ]; then
-    echo "Cannot find data directory $DATADIR"
     exit 2
 fi
 

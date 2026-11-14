@@ -24,7 +24,6 @@ export SERVER_NAME
 export CONSOLE="${CONSOLE:-local}"
 export BINDIR="$BASE_DIR"
 export CONFIGDIR="${CONFIGDIR:-/app/config}"
-export DATADIR="${DATADIR:-/app/data}"
 
 # Handle a couple of different possible config file names.
 export CONFIGFILE="${CONFIGFILE:-${CONFIGDIR}/GridServer.${SERVICENAME}.ini}"

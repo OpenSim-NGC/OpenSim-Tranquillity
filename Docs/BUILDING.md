@@ -84,16 +84,15 @@ the `.ini` files in `/app/config/regions/myregion`. MoneyServer reads
 files in `/app/config`; use includes as needed. The scripts accept one name
 argument for GridServer and RegionServer, and none for MoneyServer.
 
-The scripts default `CONFIGDIR` to `/app/config` and `DATADIR` to `/app/data`;
-these environment variables and `CONFIGFILE` can be overridden. RegionServer
-also accepts `DEFAULTCONFIG` and `REGIONDIR`. The directories and selected
-configuration must exist. Set `SERVER_NAME` if the hostname cannot be resolved
-to the fully qualified name required by your configuration. The scripts run the
-server directly, including outside containers; the existing screen-based command
-and stop scripts cannot control these processes. The servers use a local
-interactive console, so Compose allocates a TTY, keeps stdin open, and allows
-60 seconds for shutdown. When using `docker run`, use `-it` for the console and
-`--stop-timeout 60` to allow time for shutdown.
+The scripts default `CONFIGDIR` to `/app/config` and these environment variables 
+and `CONFIGFILE` can be overridden. RegionServer also accepts `DEFAULTCONFIG` and 
+`REGIONDIR`. The directories and selected configuration must exist. Set `SERVER_NAME` 
+if the hostname cannot be resolved to the fully qualified name required by your 
+configuration. The scripts run the server directly, including outside containers; 
+the existing screen-based command and stop scripts cannot control these processes. 
+The servers use a local interactive console, so Compose allocates a TTY, keeps 
+stdin open, and allows 60 seconds for shutdown. When using `docker run`, use `-it` 
+for the console and `--stop-timeout 60` to allow time for shutdown.
 
 To supply host directories, create separate config and log directories for each
 server, then set their absolute paths and use the optional Compose file:

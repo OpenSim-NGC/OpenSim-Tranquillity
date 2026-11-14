@@ -23,7 +23,6 @@ export SERVER_NAME
 export CONSOLE="${CONSOLE:-local}"
 export BINDIR="$BASE_DIR"
 export CONFIGDIR="${CONFIGDIR:-/app/config}"
-export DATADIR="${DATADIR:-/app/data}"
 
 if [ ! -d "$BINDIR" ]; then
     echo "Runtime directory $BINDIR does not exist!"
