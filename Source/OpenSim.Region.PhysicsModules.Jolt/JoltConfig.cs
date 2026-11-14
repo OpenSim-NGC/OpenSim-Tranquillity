@@ -152,6 +152,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         public float RayCastSimulatorBudgetMs = PhysicsBackendSettings.DefaultRayCastSimulatorBudgetMs; // every other cast, the same
         public int RayCastMaxTestedHits = PhysicsBackendSettings.DefaultRayCastMaxTestedHits; // per cast
         public int RayCastMaxHits = MaxRayCastHits;                                          // hits one cast returns
+        // The viewer camera's collision ray: time (ms) its queued casts may take in one heartbeat, the rest waiting for the
+        // next. 30 is ubODE's limit for its queued rays (ODERayCastRequestManager.MaxTimePerCallMS). 0 = the camera ray is
+        // not answered (SupportsRayCast false) and the camera passes through walls, as before this setting.
+        public float CameraRayBudgetMs = 30f;
         public float AvatarPushMaxSpeed = PhysicsBackendSettings.DefaultAvatarPushMaxSpeed;   // m/s; 0 = pushes do not move avatars
         public float AvatarPushRecovery = PhysicsBackendSettings.DefaultAvatarPushRecovery;   // m/s per second
         public float AvatarObjectPushPerMomentum = PhysicsBackendSettings.DefaultAvatarObjectPushPerMomentum;   // N per kg m/s of an avatar walking into a loose object
@@ -280,6 +284,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             c.RayCastSimulatorBudgetMs = F(cfg, "RayCastSimulatorBudgetMs", c.RayCastSimulatorBudgetMs, 0.1f, 1000f, warnings);
             c.RayCastMaxTestedHits = I(cfg, "RayCastMaxTestedHits", c.RayCastMaxTestedHits, 1, 1_000_000, warnings);
             c.RayCastMaxHits = I(cfg, "RayCastMaxHits", c.RayCastMaxHits, 1, MaxRayCastHits, warnings);
+            c.CameraRayBudgetMs = F(cfg, "CameraRayBudgetMs", c.CameraRayBudgetMs, 0f, 1000f, warnings);
             c.AvatarPushMaxSpeed = F(cfg, "AvatarPushMaxSpeed", c.AvatarPushMaxSpeed, 0f, 1000f, warnings);
             c.AvatarPushRecovery = F(cfg, "AvatarPushRecovery", c.AvatarPushRecovery, 0f, 1000f, warnings);
             c.AvatarObjectPushPerMomentum = F(cfg, "AvatarObjectPushPerMomentum", c.AvatarObjectPushPerMomentum, 0f, 100000f, warnings);

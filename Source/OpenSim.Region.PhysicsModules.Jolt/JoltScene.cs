@@ -2269,8 +2269,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         //    ray after login or teleport (ScenePresence.MakeRootAgent), and by OpenSim's LSL_Api.llCastRay (YEngine)
         //    through Scene.RayCastFiltered. Its flags and hit count do not tell a script's cast from the simulator's (a
         //    script can ask for exactly the same ones), so it is charged to RayCastBudget.Simulator; see BudgetFor.
-        // The viewer camera's collision ray and the sit ray do not come here: this module does not override
-        // SupportsRayCast() or the sit query, so the base class answers them.
+        // The viewer camera's collision ray does not come here: it has its own overload, queued and cast on the heartbeat
+        // (see CameraRay below). The sit ray does not come here either: this module does not override the sit query, so
+        // the base class answers it.
         public override List<ContactResult> RaycastWorld(Vector3 position, Vector3 direction, float length, int Count)
         {
             List<ContactResult> results = CastAll(position, direction, length, Count, QueryFilter.Default,
@@ -2574,6 +2575,92 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         internal long BasicForcesUpdateTicks => Interlocked.Read(ref _basicForcesUpdateTicks);
         internal long BasicForcesUpdateCalls => Interlocked.Read(ref _basicForcesUpdateCalls);
 
+        // ---------------------------------------------------------------------
+        // The viewer camera's collision ray, as ubODE answers it (ODEScene.SupportsRayCast / RaycastWorld with a
+        // RaycastCallback, ODERayCastRequestManager). Core casts from the avatar's head toward the camera when either moves
+        // (ScenePresence.checkCameraCollision) and turns the closest hit into the camera constraint plane it sends the
+        // viewer; it casts again only after the callback, so every request is answered, a miss included. The request is
+        // queued from the agent's thread and cast here on the heartbeat, against prims of every kind (physical, static,
+        // phantom, volume detect; core drops a volume-detect part) and not the terrain or avatars (RayFilterFlags.AllPrims),
+        // closest hit first. The casts take at most [Jolt] CameraRayBudgetMs of each heartbeat, as ubODE's queue stops after
+        // 30 ms; the rest wait for the next heartbeat. They are charged to neither the script's nor the simulator's ray budget.
+        // ---------------------------------------------------------------------
+        private readonly struct CameraRay
+        {
+            public readonly Vector3 Origin, Direction;
+            public readonly float Length;
+            public readonly RaycastCallback Callback;
+            public CameraRay(Vector3 origin, Vector3 direction, float length, RaycastCallback callback)
+            { Origin = origin; Direction = direction; Length = length; Callback = callback; }
+        }
+
+        private readonly System.Collections.Concurrent.ConcurrentQueue<CameraRay> _cameraRays = new();
+        private static readonly QueryFilter CameraRayFilter = ToQueryFilter(RayFilterFlags.AllPrims);
+
+        public override bool SupportsRayCast() => _joltConfig.CameraRayBudgetMs > 0f;
+
+        public override void RaycastWorld(Vector3 position, Vector3 direction, float length, RaycastCallback retMethod)
+        {
+            if (retMethod == null)
+                return;
+            if (!SupportsRayCast())
+            {
+                base.RaycastWorld(position, direction, length, retMethod);
+                return;
+            }
+            _cameraRays.Enqueue(new CameraRay(position, direction, length, retMethod));
+        }
+
+        private void DrainCameraRays()
+        {
+            if (_cameraRays.IsEmpty)
+                return;
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
+            long limit = (long)(_joltConfig.CameraRayBudgetMs * System.Diagnostics.Stopwatch.Frequency / 1000.0);
+            while (_cameraRays.TryDequeue(out CameraRay ray))
+            {
+                AnswerCameraRay(in ray);
+                if (System.Diagnostics.Stopwatch.GetTimestamp() - start > limit)
+                    break;
+            }
+        }
+
+        private void AnswerCameraRay(in CameraRay ray)
+        {
+            bool hit = false;
+            ContactResult best = default;
+            try
+            {
+                List<ContactResult> hits = CastAll(ray.Origin, ray.Direction, ray.Length, _joltConfig.RayCastMaxHits, CameraRayFilter,
+                                                   RayCastBudget.None, out _);
+                foreach (ContactResult c in hits)
+                    if (!hit || c.Depth < best.Depth) { best = c; hit = true; }
+            }
+            catch (Exception e)
+            {
+                m_log.LogError($"{LogHeader} camera ray EXCEPTION: {e}");
+                hit = false;
+            }
+            Callback(in ray, hit, best);
+        }
+
+        private static void Callback(in CameraRay ray, bool hit, in ContactResult c)
+        {
+            try
+            {
+                if (hit) ray.Callback(true, c.Pos, c.ConsumerID, c.Depth, c.Normal);
+                else ray.Callback(false, Vector3.Zero, 0, 0f, Vector3.Zero);
+            }
+            catch (Exception e) { m_log.LogError($"{LogHeader} camera ray callback EXCEPTION: {e}"); }
+        }
+
+        // A region going down answers what is still queued with a miss, so no avatar waits on a ray that is never cast.
+        private void AnswerQueuedCameraRaysWithMisses()
+        {
+            while (_cameraRays.TryDequeue(out CameraRay ray))
+                Callback(in ray, false, default);
+        }
+
         internal void MarkLinksetDirty(JoltPrim root)
         {
             lock (_dirtyLinksets) _dirtyLinksets.Add(root);
@@ -2634,6 +2721,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // coalesces a whole linkset's worth of child-links into a single rebuild - rebuilding on every
             // child's link() churns the root and can hang the region load of a persisted physical linkset.
             DrainDirtyLinksets();
+            DrainCameraRays();
 
             // Mirrors BulletSim's taint-deferred creation: activate physical bodies that were
             // created INERT (asleep) now, AFTER the linkset weld and any load-time property/vehicle setup have
@@ -2894,6 +2982,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private float SimulateSubsteps(float timeStep)
         {
             DrainDirtyLinksets();
+            DrainCameraRays();
             DrainPendingActivation();
 
             int n = _substeps.Advance(timeStep);
@@ -3506,6 +3595,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         public override void Dispose()
         {
+            AnswerQueuedCameraRaysWithMisses();
             // The backend's teardown frees every shape it still holds, the shared ones with the rest.
             lock (_sharedShapeLock)
             {
