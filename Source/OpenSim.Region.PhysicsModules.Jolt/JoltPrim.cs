@@ -163,7 +163,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // child (SceneObjectGroup). We weld the children into the ROOT's body as a StaticCompoundShape:
         // one rigid body whose sub-shapes are the root + each child at its root-relative offset. The root
         // owns _linkChildren + _compoundShape; a welded child holds _linkRoot and has no body of its own.
+        // The root's welded children. Core links and unlinks parts on its own thread while the step thread rebuilds the
+        // compound and other threads read the set, so a published list is never changed: LinkChild, UnlinkChild and the
+        // teardown put a new list in its place under _linkChildrenLock, and a reader takes the field once and walks that.
         private System.Collections.Generic.List<JoltPrim> _linkChildren;   // root: welded children
+        private readonly object _linkChildrenLock = new object();
         private JoltPrim _linkRoot;                                        // child: our compound root, if welded
         private ShapeId _compoundShape = ShapeId.Invalid;                  // root: the built compound (Invalid = single shape)
 
@@ -904,8 +908,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // If we are a compound root, orphan our welded children (group teardown removes them anyway).
             if (_linkChildren != null)
             {
-                foreach (JoltPrim c in _linkChildren) if (ReferenceEquals(c._linkRoot, this)) c._linkRoot = null;
-                _linkChildren.Clear();
+                System.Collections.Generic.List<JoltPrim> orphans;
+                lock (_linkChildrenLock) { orphans = _linkChildren; _linkChildren = new System.Collections.Generic.List<JoltPrim>(); }
+                foreach (JoltPrim c in orphans) if (ReferenceEquals(c._linkRoot, this)) c._linkRoot = null;
             }
             if (_body.IsValid)
                 _backend.RemoveBody(_body);
@@ -1907,9 +1912,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // N child-links into ONE rebuild at a controlled point - off the load path, O(N) not O(N^2).
         internal void LinkChild(JoltPrim child)
         {
-            _linkChildren ??= new System.Collections.Generic.List<JoltPrim>();
-            if (!_linkChildren.Contains(child))
-                _linkChildren.Add(child);
+            lock (_linkChildrenLock)
+            {
+                if (_linkChildren == null || !_linkChildren.Contains(child))
+                {
+                    var next = _linkChildren == null ? new System.Collections.Generic.List<JoltPrim>() : new System.Collections.Generic.List<JoltPrim>(_linkChildren);
+                    next.Add(child);
+                    _linkChildren = next;
+                }
+            }
             child._linkRoot = this;
             _module.MarkLinksetDirty(this);
             CheckComplexity();
@@ -1917,7 +1928,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         internal void UnlinkChild(JoltPrim child)
         {
-            if (_linkChildren != null) _linkChildren.Remove(child);
+            lock (_linkChildrenLock)
+            {
+                if (_linkChildren != null && _linkChildren.Contains(child))
+                {
+                    var next = new System.Collections.Generic.List<JoltPrim>(_linkChildren);
+                    next.Remove(child);
+                    _linkChildren = next;
+                }
+            }
             _module.MarkLinksetDirty(this);
         }
 
@@ -1940,25 +1959,28 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             try
             {
                 ShapeId oldCompound = _compoundShape;
+                // The children as they are now; a part linked or unlinked during the rebuild marks the root dirty again,
+                // so the next frame's rebuild takes it in.
+                System.Collections.Generic.List<JoltPrim> children = _linkChildren;
 
-                if (_linkChildren == null || _linkChildren.Count == 0)
+                if (children == null || children.Count == 0)
                 {
                     _compoundShape = ShapeId.Invalid;   // single member -> plain body, not a degenerate compound
                 }
                 else
                 {
                     // Weld: drop each child's independent body (it lives as a sub-shape of the compound now).
-                    foreach (JoltPrim c in _linkChildren)
+                    foreach (JoltPrim c in children)
                         if (c._body.IsValid) { _backend.RemoveBody(c._body); c._body = BodyId.Invalid; }
 
                     // A shape shared with other prims must not be given this part's density (SetShapeDensity below).
                     lock (_shapeLock) MakeShapePrivate();
-                    foreach (JoltPrim c in _linkChildren)
+                    foreach (JoltPrim c in children)
                         lock (c._shapeLock) c.MakeShapePrivate();
 
                     SQuaternion rootBody = BodyOrientationOf(_orientation);
                     SQuaternion invRoot = SQuaternion.Conjugate(rootBody);
-                    var kids = new CompoundChild[1 + _linkChildren.Count];
+                    var kids = new CompoundChild[1 + children.Count];
                     kids[0] = new CompoundChild { Shape = _shape, Position = SVector3.Zero, Orientation = SQuaternion.Identity, UserData = LocalID };
                     // Each part's own density in the compound's mass properties, so its centre of mass and inertia follow
                     // where the mass is (the SL wiki's Physics Material Settings test page allows different physics settings
@@ -1967,9 +1989,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     // mass is set to the parts' sum just after (CreateBodyInternal), and a linkset of one density is built
                     // exactly as before.
                     _backend.SetShapeDensity(_shape, JoltShapeDensity * ShapeMassFactor());
-                    for (int i = 0; i < _linkChildren.Count; i++)
+                    for (int i = 0; i < children.Count; i++)
                     {
-                        JoltPrim c = _linkChildren[i];
+                        JoltPrim c = children[i];
                         _module.LinksetRebuildChildHook?.Invoke(this);
                         // A part already welded keeps its place on the object (its offset); a newly linked one is placed
                         // where core put it, relative to the root now.
