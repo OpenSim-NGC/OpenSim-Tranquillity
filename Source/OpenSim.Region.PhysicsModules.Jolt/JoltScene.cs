@@ -2891,6 +2891,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         internal const float SlowStepWarnMs = 40f;
         // At most one slow-step line per region in this many seconds; the ones held back are counted in the next.
         internal const double SlowStepLogSeconds = 10.0;
+        // A region's first steps after start that are never logged as slow (stub).
+        internal const long SlowStepWarmupSteps = 0;
         private long _slowStepLoggedAt;
         private long _slowStepsHeldBack;
 

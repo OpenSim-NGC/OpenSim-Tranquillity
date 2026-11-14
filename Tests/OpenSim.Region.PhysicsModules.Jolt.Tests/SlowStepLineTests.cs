@@ -56,4 +56,30 @@ public class SlowStepLineTests
         Assert.Contains("poolWaitMax=61.84 ms", line);
         Assert.Contains("3 more held back", line);
     }
+
+    // A region's first steps build the broad phase and wake every loaded body: on a live start the first step of two regions
+    // took 74.19 ms and 66.24 ms with nothing wrong. Those steps get no line; the limit is unchanged after them.
+    [Theory]
+    [InlineData(1, 74.19f)]
+    [InlineData(1, 66.24f)]
+    [InlineData(JoltScene.SlowStepWarmupSteps, 500f)]
+    public void A_slow_step_among_the_first_after_start_has_no_line(long step, float ms)
+    {
+        PhysicsCapacityStats s = Stats();
+        StepResult r = Step(2, ms);
+        Assert.Null(JoltScene.SlowStepLine("Region A", ms, 1f / 11f, step, in r, 7, in s, 0));
+    }
+
+    [Fact]
+    public void The_first_slow_step_after_the_start_steps_has_its_line_at_the_same_limit()
+    {
+        PhysicsCapacityStats s = Stats();
+        long first = JoltScene.SlowStepWarmupSteps + 1;
+        StepResult r = Step(2, JoltScene.SlowStepWarnMs);
+        string line = JoltScene.SlowStepLine("Region A", JoltScene.SlowStepWarnMs, 1f / 11f, first, in r, 7, in s, 0);
+        Assert.NotNull(line);
+        Assert.Contains($"step {first}", line);
+        StepResult under = Step(2, JoltScene.SlowStepWarnMs - 0.01f);
+        Assert.Null(JoltScene.SlowStepLine("Region A", JoltScene.SlowStepWarnMs - 0.01f, 1f / 11f, first, in under, 7, in s, 0));
+    }
 }
