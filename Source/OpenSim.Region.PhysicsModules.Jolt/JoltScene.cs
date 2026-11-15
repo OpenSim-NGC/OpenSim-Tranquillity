@@ -2269,9 +2269,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         //    ray after login or teleport (ScenePresence.MakeRootAgent), and by OpenSim's LSL_Api.llCastRay (YEngine)
         //    through Scene.RayCastFiltered. Its flags and hit count do not tell a script's cast from the simulator's (a
         //    script can ask for exactly the same ones), so it is charged to RayCastBudget.Simulator; see BudgetFor.
-        // The viewer camera's collision ray does not come here: it has its own overload, queued and cast on the heartbeat
-        // (see CameraRay below). The sit ray does not come here either: this module does not override the sit query, so
-        // the base class answers it.
+        // The viewer camera's collision ray and the sit ray do not come here: this module does not override
+        // SupportsRayCast() or the sit query, so the base class answers them.
         public override List<ContactResult> RaycastWorld(Vector3 position, Vector3 direction, float length, int Count)
         {
             List<ContactResult> results = CastAll(position, direction, length, Count, QueryFilter.Default,
@@ -2576,8 +2575,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         internal long BasicForcesUpdateCalls => Interlocked.Read(ref _basicForcesUpdateCalls);
 
         // ---------------------------------------------------------------------
-        // The viewer camera's collision ray, as ubODE answers it (ODEScene.SupportsRayCast / RaycastWorld with a
-        // RaycastCallback, ODERayCastRequestManager). Core casts from the avatar's head toward the camera when either moves
+        // The viewer camera's collision ray does not go through the RaycastWorld overloads above: it has this overload,
+        // which queues the request and casts it on the heartbeat. It is answered as ubODE answers it
+        // (ODEScene.SupportsRayCast / RaycastWorld with a RaycastCallback, ODERayCastRequestManager). Core casts from the avatar's head toward the camera when either moves
         // (ScenePresence.checkCameraCollision) and turns the closest hit into the camera constraint plane it sends the
         // viewer; it casts again only after the callback, so every request is answered, a miss included. The request is
         // queued from the agent's thread and cast here on the heartbeat, against prims of every kind (physical, static,
