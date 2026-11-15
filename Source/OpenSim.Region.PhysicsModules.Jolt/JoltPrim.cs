@@ -727,8 +727,11 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         //     motors off.
         //   - Below -100 m or above 100 000 m it is stopped there and OutOfBounds is raised once; core makes the object
         //     non-physical (SceneObjectPart.PhysicsOutOfBounds).
-        // While it waits, and after it went out of bounds until core makes it non-physical, it has no body: nothing steps
-        // it, nothing touches it and it sends no updates (ubODE disables its body and its collisions).
+        // While it waits it keeps its body, parked: moved to a layer that collides with nothing and that no query finds,
+        // made kinematic and still, and it sends no updates (ubODE disables its body and its collisions, and enables the
+        // same body again on CrossingFailure). A body made and removed for every crossing would churn the engine for an
+        // object that rolls off a void edge and is put back every few seconds. After it went out of bounds, until core
+        // makes it non-physical, it has no body.
         // ---------------------------------------------------------------------
         internal const float MinBodyZ = -100f;      // ODEPrim.UpdatePositionAndVelocity
         internal const float MaxBodyZ = 100000f;
@@ -793,7 +796,40 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             _orientation = rot;
             _velocity = velocity;
             _rotationalVelocity = angularVelocity;
-            LeaveEngine(Away.Crossing);
+            Park();
+        }
+
+        // Out of the engine's way while the object waits past the edge, keeping the body (see above).
+        private void Park()
+        {
+            _away = Away.Crossing;
+            if (!_body.IsValid)
+                return;
+            _backend.SetBodyLayer(_body, PhysicsLayer.Parked);
+            _backend.SetBodyMotionType(_body, BodyMotionType.Kinematic, activate: false);
+            _backend.SetBodyLinearVelocity(_body, default);
+            _backend.SetBodyAngularVelocity(_body, default);
+            _backend.DeactivateBody(_body);
+        }
+
+        // Back from the edge: the parked body is set where core put the object, solid and dynamic again, and woken at the
+        // top of the next step as a new body is (deferred activation). A body removed meanwhile (a reshape or physics
+        // toggle while it waited) is made anew.
+        private void Unpark()
+        {
+            _away = Away.None;
+            if (!_body.IsValid)
+            {
+                CreateBodyInternal();
+                return;
+            }
+            _backend.SetBodyTransform(_body, ToS(_position), BodyOrientationOf(_orientation), activate: false);
+            _backend.SetBodyMotionType(_body, BodyMotionType.Dynamic, activate: false);
+            _backend.SetBodyLayer(_body, BodyLayer);
+            _backend.SetBodyLinearVelocity(_body, default);
+            _backend.SetBodyAngularVelocity(_body, default);
+            _activationPending = true;
+            _module.RegisterPendingActivation(this);
         }
 
         private void LeaveOutOfBounds(Vector3 pos, Quaternion rot)
@@ -831,7 +867,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     _velocity = new Vector3(s.LinearVelocity.X, s.LinearVelocity.Y, s.LinearVelocity.Z);
                     _rotationalVelocity = new Vector3(s.AngularVelocity.X, s.AngularVelocity.Y, s.AngularVelocity.Z);
                 }
-                LeaveEngine(Away.Crossing);
+                Park();
             }
         }
 
@@ -849,8 +885,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 _position.Z = Math.Clamp(_position.Z + 0.2f, Constants.MinSimulationHeight, Constants.MaxSimulationHeight);
                 _velocity = Vector3.Zero;
                 _vehicle?.StopMotors();
-                _away = Away.None;
-                CreateBodyInternal();
+                Unpark();
             }
             RequestPhysicsterseUpdate();
         }

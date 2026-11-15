@@ -145,6 +145,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         /// tree of fixed prims; the prim goes back to <see cref="Static"/> when the motion ends.
         /// </summary>
         MovingStatic = 8,
+
+        /// <summary>
+        /// A physical prim's body while its object waits past the region's edge for core to cross it or put it back
+        /// (PhysicsActor.CrossingStart, CrossingFailure). It collides with nothing and no query finds it, and it stays the
+        /// same body when the object comes back, as ubODE disables its body and enables it again.
+        /// </summary>
+        Parked = 9,
     }
 
     /// <summary>
