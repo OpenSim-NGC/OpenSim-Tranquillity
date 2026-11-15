@@ -94,7 +94,7 @@ public class PhysicsSitSceneTests
 
     // Switch off, avatar 10 m and a little from the clicked point (JoltTestingRegion1's seat table stood the avatar
     // at <170, 60, 26.05> for a box at <180, 60, 25.5>): core's fallback refuses beyond 10 m and sends nothing.
-    // The fallback is synchronous, so no wait is needed.
+    // The 1 s window is a "did not happen" wait: an engine that answered anyway would do so on another thread.
     [Fact]
     public void With_PhysicsSit_off_a_sit_from_beyond_10_m_is_refused_by_core()
     {
@@ -103,6 +103,7 @@ public class PhysicsSitSceneTests
         ScenePresence sp = r.Avatar(BoxAt + TopCentre + new Vector3(-10f, 0f, 0.3f));
 
         sp.HandleAgentRequestSit(sp.ControllingClient, sp.UUID, box.UUID, TopCentre);
+        Thread.Sleep(1000);
         Say(sp, "off 10 m");
 
         Assert.Equal(0u, sp.ParentID);
