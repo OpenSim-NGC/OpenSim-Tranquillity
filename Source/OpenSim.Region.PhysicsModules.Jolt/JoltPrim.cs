@@ -523,10 +523,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         private void CreateBodyInternal()
         {
-            // Away from the region (crossing, or out of bounds) the prim has no body; a reshape or relink meanwhile keeps
-            // its shapes for when it comes back.
+            // Away from the region (crossing, or out of bounds) the prim has no body; a reshape, relink or physics toggle
+            // meanwhile keeps its shapes for when it comes back, and the body parked with the old ones is dropped.
             if (_away != Away.None)
+            {
+                DropParkedBody();
                 return;
+            }
 
             // Load-time position sanity: never bring a PHYSICAL body up penetrating the terrain. If
             // the saved/current centre is below where it rests on the surface, lift it there and zero its
@@ -728,10 +731,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         //   - Below -100 m or above 100 000 m it is stopped there and OutOfBounds is raised once; core makes the object
         //     non-physical (SceneObjectPart.PhysicsOutOfBounds).
         // While it waits it keeps its body, parked: moved to a layer that collides with nothing and that no query finds,
-        // made kinematic and still, and it sends no updates (ubODE disables its body and its collisions, and enables the
-        // same body again on CrossingFailure). A body made and removed for every crossing would churn the engine for an
-        // object that rolls off a void edge and is put back every few seconds. After it went out of bounds, until core
-        // makes it non-physical, it has no body.
+        // made kinematic, still and asleep, and held aside from _body. Every path that acts on the body (the vehicle drive,
+        // script forces, move to target, the rotation target, hover, buoyancy, velocity and impulse setters, the collision
+        // dispatch, the step drain) finds no body, as it found none when the body was removed, so the parked body takes
+        // part in nothing. ubODE keeps its body too: it disables it and its collisions (disableBodySoft), unsubscribes its
+        // collision events, skips it in Move and UpdatePositionAndVelocity, and on CrossingFailure enables the same body
+        // again (changeDisable(false)). A body made and removed for every crossing would churn the engine for an object
+        // that rolls off a void edge and is put back every few seconds. A reshape, relink or physics toggle while it waits
+        // drops the parked body, and the prim gets a new one when it comes back, as before. After it went out of bounds,
+        // until core makes it non-physical, it has no body.
         // ---------------------------------------------------------------------
         internal const float MinBodyZ = -100f;      // ODEPrim.UpdatePositionAndVelocity
         internal const float MaxBodyZ = 100000f;
@@ -739,6 +747,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private enum Away : byte { None, Crossing, OutOfBounds }
         private volatile Away _away;
         private readonly object _awayLock = new object();
+        private BodyId _parkedBody = BodyId.Invalid;      // the body kept while the prim waits past the edge (Park, Unpark)
+        private ShapeId _parkedShape = ShapeId.Invalid;   // the shape that body was parked with
+        internal bool IsParked => _parkedBody.IsValid;
         internal bool HasLeftRegion => _away != Away.None;
 
         private bool InRegion(Vector3 p)   // Scene.PositionIsInCurrentRegion
@@ -799,35 +810,83 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             Park();
         }
 
-        // Out of the engine's way while the object waits past the edge, keeping the body (see above).
+        // Out of the engine's way while the object waits past the edge, keeping the body (see above): parked, then held
+        // aside so that nothing finds it as the prim's body.
         private void Park()
         {
             _away = Away.Crossing;
             if (!_body.IsValid)
                 return;
-            _backend.SetBodyLayer(_body, PhysicsLayer.Parked);
-            _backend.SetBodyMotionType(_body, BodyMotionType.Kinematic, activate: false);
-            _backend.SetBodyLinearVelocity(_body, default);
-            _backend.SetBodyAngularVelocity(_body, default);
-            _backend.DeactivateBody(_body);
+            BodyId body = _body;
+            _body = BodyId.Invalid;
+            _vehicleStepProvider?.Disarm();
+            _scriptForceProvider?.Disarm();
+            _backend.SetBodyLayer(body, PhysicsLayer.Parked);
+            _backend.SetBodyMotionType(body, BodyMotionType.Kinematic, activate: false);
+            _backend.SetBodyLinearVelocity(body, default);
+            _backend.SetBodyAngularVelocity(body, default);
+            _backend.DeactivateBody(body);
+            _parkedShape = _compoundShape.IsValid ? _compoundShape : _shape;
+            _parkedBody = body;
         }
 
-        // Back from the edge: the parked body is set where core put the object, solid and dynamic again, and woken at the
-        // top of the next step as a new body is (deferred activation). A body removed meanwhile (a reshape or physics
-        // toggle while it waited) is made anew.
+        // The parked body is of no more use: the prim was reshaped, relinked, made non-physical or removed while it waited.
+        private void DropParkedBody()
+        {
+            if (!_parkedBody.IsValid)
+                return;
+            _backend.RemoveBody(_parkedBody);
+            _parkedBody = BodyId.Invalid;
+            _parkedShape = ShapeId.Invalid;
+        }
+
+        // Back from the edge: the parked body is the prim's body again, set where core put the object, at rest, solid and
+        // dynamic, with what the prim was given while it waited (its flags, material, buoyancy, mass, vehicle setup and
+        // rotation locks), and woken at the top of the next step as a new body is (deferred activation). If the body was
+        // dropped while it waited, or the prim's shape is no longer the one it was parked with, a new body is made.
         private void Unpark()
         {
             _away = Away.None;
-            if (!_body.IsValid)
+            BodyId body = _parkedBody;
+            ShapeId shape = _parkedShape;
+            _parkedBody = BodyId.Invalid;
+            _parkedShape = ShapeId.Invalid;
+            if (body.IsValid && (!_isPhysical || !shape.Equals(_compoundShape.IsValid ? _compoundShape : _shape)))
             {
-                CreateBodyInternal();
+                _backend.RemoveBody(body);
+                body = BodyId.Invalid;
+            }
+            if (!body.IsValid)
+            {
+                if (!_body.IsValid)
+                    CreateBodyInternal();
                 return;
             }
-            _backend.SetBodyTransform(_body, ToS(_position), BodyOrientationOf(_orientation), activate: false);
-            _backend.SetBodyMotionType(_body, BodyMotionType.Dynamic, activate: false);
+            _backend.SetBodyTransform(body, ToS(_position), BodyOrientationOf(_orientation), activate: false);
+            _backend.SetBodyMotionType(body, BodyMotionType.Dynamic, activate: false);
+            _backend.SetBodyLinearVelocity(body, default);
+            _backend.SetBodyAngularVelocity(body, default);
+            _body = body;
             _backend.SetBodyLayer(_body, BodyLayer);
-            _backend.SetBodyLinearVelocity(_body, default);
-            _backend.SetBodyAngularVelocity(_body, default);
+            _backend.SetBodySensor(_body, _isVolumeDetect);
+            _backend.SetBodyWantsContactEvents(_body, _subscribedMs > 0);
+            _backend.SetBodyFriction(_body, _friction);
+            _backend.SetBodyRestitution(_body, _restitution);
+            if (_compoundShape.IsValid && _linkChildren != null)
+            {
+                foreach (JoltPrim c in _linkChildren)
+                    _backend.SetBodyPartMaterial(_body, c.LocalID, c._friction, c._restitution);
+                _backend.SetBodyMass(_body, LinksetMass());
+            }
+            else
+                SetLoneBodyMass();
+            _backend.SetBodyDamping(_body, PrimLinearDamping, PrimAngularDamping);
+            _backend.SetBodyGravityFactor(_body, ScriptGravityFactor);
+            ApplyVehicleBodyParams();   // an active vehicle's own damping, gravity, contact material and no-sleep
+            if (_rotationLocks != 0)
+                ApplyRotationLocks();
+            if (_selected && _linkRoot == null)
+                HoldSelected();
             _activationPending = true;
             _module.RegisterPendingActivation(this);
         }
@@ -945,6 +1004,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             if (_body.IsValid)
                 _backend.RemoveBody(_body);
             _body = BodyId.Invalid;
+            DropParkedBody();
             if (_compoundShape.IsValid) { _backend.ReleaseShape(_compoundShape); _compoundShape = ShapeId.Invalid; }
             if (_shape.IsValid)
                 _module.ReleaseShape(_backend, _shape);
