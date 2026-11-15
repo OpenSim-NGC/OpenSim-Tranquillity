@@ -238,7 +238,8 @@ public class ParkedPastTheEdgeSceneTests
         Vector3 waiting = o.Actor.Position;
         var other = new Watched(r.Physical("in the way", new Vector3(255.9f, waiting.Y, Ground + 0.6f), new Vector3(1.2f, 1.2f, 1.2f)), collisionEvents: true);
         Vector3 placed = other.Actor.Position;
-        for (int i = 0; i < 110 && r.Active > 0; i++)   // the new box settles and sleeps, at most 10 s
+        r.Step();                                       // a new body wakes at the top of the next step
+        for (int i = 0; i < 110 && r.Active > 0; i++)   // then it settles and sleeps, at most 10 s more
             r.Step();
         int live = r.Live;
         List<Beat> beats = Wait(r, o, 2.0);
