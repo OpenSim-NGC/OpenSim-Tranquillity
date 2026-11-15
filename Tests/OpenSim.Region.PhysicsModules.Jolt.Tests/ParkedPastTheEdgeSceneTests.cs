@@ -420,6 +420,32 @@ public class ParkedPastTheEdgeSceneTests
         Assert.True(o.Actor.Position.Z > backZ - 0.03f, $"fell from {backZ:0.000} to {o.Actor.Position.Z:0.000} with buoyancy 1");
     }
 
+    // ---- 11. reshaped while it waits ---------------------------------------------------------------------------------
+
+    // Resized while it waits: the body parked with the old shape is dropped at once, and the prim is put back with a new
+    // body of its new size, as it was before bodies were parked.
+    [Fact]
+    public void Resized_while_it_waits_it_drops_the_parked_body_and_comes_back_with_a_new_one_of_its_new_size()
+    {
+        using var r = new Region();
+        Watched o = Pushed(r, new Vector3(6f, 0f, 0f));
+        BodyId body = o.Prim.BodyHandle;
+        int live = r.Live;
+        UntilWaitingPastTheEdge(r, o);
+        Assert.Equal(live, r.Live);
+        o.Part.Scale = new Vector3(1f, 1f, 1f);
+        r.Step();
+        int liveWaiting = r.Live;
+        PutBack(r, o);
+        r.Steps(3.0);
+        Vector3 p = o.Actor.Position;
+        Say($"RESIZED live before {live}, while waiting {liveWaiting}, after {r.Live}; body {o.Prim.BodyHandle.Value} (was {body.Value}); at {p}");
+        Assert.Equal(live - 1, liveWaiting);
+        Assert.Equal(live, r.Live);
+        Assert.True(o.Prim.BodyHandle.IsValid && o.Prim.BodyHandle.Value != body.Value, "it came back with the body parked with its old shape");
+        Assert.InRange(p.Z, Ground + 0.5f - 0.05f, Ground + 0.5f + 0.05f);   // resting on the ground at its new half height
+    }
+
     // ---- 10. put back, it carries on -------------------------------------------------------------------------------
 
     // The same body, simulated again: it falls the 0.2 m core's put-back raised it, lands on the ground, its collision
