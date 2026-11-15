@@ -22,8 +22,10 @@ public static class AisMutation
     /// <summary>
     /// Fields of an item PATCH this tree can store. The viewer sends the item's **whole** <c>asLLSD()</c> map with
     /// <c>asset_id</c>/<c>shadow_id</c> swapped for <c>hash_id</c> (<c>llviewerinventory.cpp:435-454</c> and
-    /// <c>:1399-1422</c>), so most keys in a body are just the item as the viewer already had it. Anything not
-    /// listed here is ignored rather than refused — refusing would fail every ordinary rename.
+    /// <c>:1399-1422</c>), so most keys in a body are just the item as the viewer already had it.
+    /// <c>parent_id</c>, <c>item_id</c>, <c>thumbnail</c> and <c>favorite</c> are refused when they ask for a
+    /// change (<see cref="RefusedItemChanges"/>); the other keys not listed here (<c>type</c>, <c>inv_type</c>,
+    /// <c>created_at</c>) are ignored.
     ///
     /// <para>
     /// <c>hash_id</c> is listed but is not applied here: it is a transaction id, and only the region's
@@ -44,7 +46,8 @@ public static class AisMutation
     /// Fields of a category PATCH this tree can store. The viewer sends the category's whole <c>asLLSD()</c> for a
     /// rename or a type change, or a single-key <c>{thumbnail}</c> / <c>{favorite}</c> map for a protected folder
     /// (<c>llviewerinventory.cpp:651-665</c>, <c>:866-884</c>, <c>:1436-1457</c>). <c>thumbnail</c> and
-    /// <c>favorite</c> have no column in this tree's inventory, so they are accepted and dropped.
+    /// <c>favorite</c> have no column in this tree's inventory: a body asking to set one is refused
+    /// (<see cref="RefusedFolderChanges"/>).
     /// </summary>
     public static readonly string[] CategoryFields = { "name" };
 
@@ -93,9 +96,76 @@ public static class AisMutation
     }
 
     /// <summary>
+    /// The keys of an item PATCH body that ask for a change this route does not make. The handler answers such a
+    /// body 400 and writes nothing, rather than applying the rest and answering 200 as if the whole body had
+    /// been carried out.
+    ///
+    /// <para>
+    /// <c>parent_id</c>: SL's published Inventory API v3 gives Item-PATCH a <c>modifyItem</c> schema of
+    /// <c>asset_id</c>, <c>name</c>, <c>sale_info</c>, <c>flags</c>, <c>desc</c>, <c>hash_id</c> and
+    /// <c>permissions</c>, and puts moving under a separate MOVE verb
+    /// (wiki.secondlife.com/wiki/Linden_Lab_Official:Inventory_API_v3, "Item-PATCH", "Item-MOVE"). The official
+    /// viewer moves with the MoveInventoryItem UDP message (<c>llviewerinventory.cpp:558</c>) and its PATCH body
+    /// repeats the item's current parent (<c>LLInventoryItem::asLLSD</c>, <c>llinventory.cpp:936-939</c>), so the
+    /// same parent is no change and a different one is a move this route does not do.
+    /// </para>
+    /// <para>
+    /// <c>item_id</c> other than the item addressed by the URL; and a <c>thumbnail</c> or <c>favorite</c> that
+    /// asks for a value. The viewer sets both through this PATCH (<c>favorite_send</c>,
+    /// <c>llinventoryfunctions.cpp:2516-2539</c>), and this inventory has no column for either, so the stored
+    /// state is always "none": clearing one is no change, setting one cannot be stored.
+    /// </para>
+    /// </summary>
+    public static IReadOnlyList<string> RefusedItemChanges(OSDMap body, InventoryItemBase item)
+    {
+        var refused = new List<string>();
+        if (body.ContainsKey("parent_id") && body["parent_id"].AsUUID() != item.Folder) refused.Add("parent_id");
+        if (body.ContainsKey("item_id") && body["item_id"].AsUUID() != item.ID) refused.Add("item_id");
+        AddUnstorable(body, refused);
+        return refused;
+    }
+
+    /// <summary>
+    /// The keys of a category PATCH body that ask for a change this route does not make. SL's Category-PATCH
+    /// <c>modifyCategory</c> schema is <c>name</c> alone and moving is Category-MOVE (same page). The viewer's
+    /// body is <c>LLInventoryCategory::asLLSD</c> (<c>llinventory.cpp:1236-1256</c>): the folder's id under
+    /// <c>item_id</c>, <c>parent_id</c>, its type under <c>type</c>, <c>name</c>, and a thumbnail or favorite when
+    /// set. A different parent is a move; a different <c>type</c> is <c>changeType</c>
+    /// (<c>llviewerinventory.cpp:866-881</c>), which this route does not apply (a type change can turn a folder
+    /// into, or out of, a system folder); <c>type_default</c> is the same field as AIS writes it on a create.
+    /// </summary>
+    public static IReadOnlyList<string> RefusedFolderChanges(OSDMap body, InventoryFolderBase folder)
+    {
+        var refused = new List<string>();
+        if (body.ContainsKey("parent_id") && body["parent_id"].AsUUID() != folder.ParentID) refused.Add("parent_id");
+        foreach (var idKey in new[] { "item_id", "category_id" })
+            if (body.ContainsKey(idKey) && body[idKey].AsUUID() != folder.ID) refused.Add(idKey);
+        foreach (var typeKey in new[] { "type", "type_default" })
+            if (body.ContainsKey(typeKey) && body[typeKey].AsInteger() != folder.Type) refused.Add(typeKey);
+        AddUnstorable(body, refused);
+        return refused;
+    }
+
+    /// <summary>
+    /// <c>thumbnail</c> ({<c>asset_id</c>}, or the flat <c>thumbnail_id</c>) and <c>favorite</c> ({<c>toggled</c>})
+    /// with a value set. The viewer clears a favorite by sending an undefined value
+    /// (<c>llinventoryfunctions.cpp:2525</c>) and a thumbnail with a null id, and neither is ever stored here, so
+    /// only a request to set one is a change.
+    /// </summary>
+    private static void AddUnstorable(OSDMap body, List<string> refused)
+    {
+        if (body.TryGetValue("thumbnail", out var thumb) && thumb is OSDMap t && t["asset_id"].AsUUID().IsNotZero())
+            refused.Add("thumbnail");
+        if (body.TryGetValue("thumbnail_id", out var thumbId) && thumbId.AsUUID().IsNotZero())
+            refused.Add("thumbnail_id");
+        if (body.TryGetValue("favorite", out var fav) && fav is OSDMap f && f["toggled"].AsBoolean())
+            refused.Add("favorite");
+    }
+
+    /// <summary>
     /// Applies the storable fields of <paramref name="body"/> to <paramref name="item"/> and reports what it did.
-    /// <c>parent_id</c> is deliberately **not** applied: a move changes two folders' versions and is not handled
-    /// here, so a body whose parent differs is treated as an unchanged parent.
+    /// Call <see cref="RefusedItemChanges"/> first: a body it refuses must not reach this. <c>parent_id</c> and
+    /// <c>item_id</c> are not applied here; by then they name the item's own parent and id.
     /// </summary>
     public static Applied ApplyToItem(OSDMap body, InventoryItemBase item)
     {
@@ -153,7 +223,10 @@ public static class AisMutation
         return new Applied(changed, ignored, transaction);
     }
 
-    /// <summary>Applies the storable fields of a category PATCH. <c>type_default</c> is ignored: see the decisions.</summary>
+    /// <summary>
+    /// Applies the storable fields of a category PATCH. Call <see cref="RefusedFolderChanges"/> first: by the time a
+    /// body reaches this its <c>parent_id</c>, ids and type repeat the folder's own.
+    /// </summary>
     public static Applied ApplyToFolder(OSDMap body, InventoryFolderBase folder)
     {
         var changed = new List<string>();
