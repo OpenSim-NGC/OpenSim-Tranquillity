@@ -544,10 +544,12 @@ public class MissingLlFunctionTests
     private sealed class FakeInventoryAccess : IInventoryAccessModule
     {
         public readonly ConcurrentQueue<(DeRezAction Action, List<SceneObjectGroup> Groups, UUID Agent)> Copies = new();
+        // As the region's module does: one item per object, null for an object whose copy failed.
+        public bool Fails;
         public List<InventoryItemBase> CopyToInventory(DeRezAction action, UUID folderID, List<SceneObjectGroup> objectGroups, IClientAPI remoteClient, bool asAttachment)
         {
             Copies.Enqueue((action, objectGroups, remoteClient.AgentId));
-            return new List<InventoryItemBase>();
+            return objectGroups.Select(g => Fails ? null : new InventoryItemBase(UUID.Random(), remoteClient.AgentId)).ToList();
         }
         public UUID CapsUpdateInventoryItemAsset(IClientAPI remoteClient, UUID itemID, byte[] data) => UUID.Zero;
         public bool UpdateInventoryItemAsset(UUID ownerID, InventoryItemBase item, AssetBase asset) => false;
@@ -585,6 +587,31 @@ public class MissingLlFunctionTests
         Assert.Equal(sp.UUID, copy.Agent);
         Assert.Same(r.H.Prim.ParentGroup, copy.Groups.Single());
         Assert.Equal(owner, r.H.Prim.OwnerID);
+        Assert.NotNull(r.H.Scene.GetSceneObjectGroup(r.H.Prim.ParentGroup.UUID));
+    }
+
+    [Fact]
+    public void WhenTheTakeCannotReachTheInventoryTheObjectStays()
+    {
+        using var r = new InventoryGivesRig();
+        var sp = Present(r);
+        var access = new FakeInventoryAccess { Fails = true };
+        r.H.Scene.RegisterModuleInterface<IInventoryAccessModule>(access);
+        var id = r.H.Prim.ParentGroup.UUID;
+        Assert.Equal(TRANSFER_NO_PERMS, r.Api.llTransferOwnership(sp.UUID.ToString(), TRANSFER_FLAG_TAKE, L()));
+        Assert.True(access.Copies.TryDequeue(out _));
+        Assert.NotNull(r.H.Scene.GetSceneObjectGroup(id));
+    }
+
+    [Fact]
+    public void WhenTheCopyCannotReachTheInventoryTheAnswerIsNotOk()
+    {
+        using var r = new InventoryGivesRig();
+        var sp = Present(r);
+        var access = new FakeInventoryAccess { Fails = true };
+        r.H.Scene.RegisterModuleInterface<IInventoryAccessModule>(access);
+        Assert.Equal(TRANSFER_NO_PERMS, r.Api.llTransferOwnership(sp.UUID.ToString(), TRANSFER_FLAG_COPY, L()));
+        Assert.True(access.Copies.TryDequeue(out _));
         Assert.NotNull(r.H.Scene.GetSceneObjectGroup(r.H.Prim.ParentGroup.UUID));
     }
 
