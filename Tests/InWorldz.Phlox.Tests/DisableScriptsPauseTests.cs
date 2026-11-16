@@ -87,6 +87,59 @@ public class DisableScriptsPauseTests
         StopsKeepsAndGoesOn(h, item, () => h.PumpUntil(() => Counts(h).Length >= 3, TimeSpan.FromSeconds(30)));
     }
 
+    private const string Other =
+        "integer m; default { state_entry() { llSetTimerEvent(0.1); } timer() { m++; llSay(0, \"m=\" + (string)m); } }";
+
+    private static int[] OtherCounts(SchedulerHarness h)
+        => h.Said.Where(s => s.StartsWith("m=")).Select(s => int.Parse(s[2..])).ToArray();
+
+    /// <summary>
+    /// A script its engine had suspended before scripts were disabled (as a crossing does) is still suspended after
+    /// scripts are allowed again, while the other script, which only the switch paused, counts again.
+    /// </summary>
+    private static void HeldStaysSuspended(SchedulerHarness h, OpenSim.Region.Framework.Interfaces.IScriptModule engine, UUID held, UUID other)
+    {
+        Assert.True(h.PumpUntil(() => Counts(h).Length >= 3 && OtherCounts(h).Length >= 3, TimeSpan.FromSeconds(30)),
+            "the scripts never counted to 3");
+        Assert.True(engine.SuspendScript(held));
+        h.PumpFor(TimeSpan.FromMilliseconds(200));
+        int heldLast = Counts(h).Last();
+
+        Disable(h);
+        h.PumpFor(TimeSpan.FromMilliseconds(200));
+        int otherLast = OtherCounts(h).Last();
+        Enable(h);
+
+        Assert.True(h.PumpUntil(() => OtherCounts(h).Last() > otherLast, TimeSpan.FromSeconds(30)), "the other script never counted again");
+        // a window in which the held script must not count
+        h.PumpFor(TimeSpan.FromSeconds(1));
+        Assert.Equal(heldLast, Counts(h).Last());
+        Assert.True(HasScript(h, held));
+
+        // its own resume still lets it go on from its count
+        Assert.True(engine.ResumeScript(held));
+        Assert.True(h.PumpUntil(() => Counts(h).Last() > heldLast, TimeSpan.FromSeconds(30)), "the held script never counted again");
+        Assert.Equal(heldLast + 1, Counts(h).First(c => c > heldLast));
+    }
+
+    [Fact]
+    public void PhloxLeavesAScriptSuspendedForAnotherReasonSuspendedWhenScriptsAreAllowedAgain()
+    {
+        using var h = new SchedulerHarness();
+        UUID held = h.RezScript(Counter);
+        UUID other = h.RezScript(Other);
+        HeldStaysSuspended(h, h.Engine, held, other);
+    }
+
+    [Fact]
+    public void YEngineLeavesAScriptSuspendedForAnotherReasonSuspendedWhenScriptsAreAllowedAgain()
+    {
+        using var h = new SchedulerHarness(withYEngine: true);
+        UUID held = SchedulerHarnessYEngine.Rez(h, h.Prim, Counter);
+        UUID other = SchedulerHarnessYEngine.Rez(h, h.Prim, Other);
+        HeldStaysSuspended(h, h.YEngine, held, other);
+    }
+
     [Fact]
     public void TheViewersDebugRequestAndTheConsoleSwitchDoTheSame()
     {

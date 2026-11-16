@@ -95,6 +95,25 @@ public class DisableScriptsPauseTests : OpenSimTestCase
     }
 
     [Fact]
+    public void AScriptSuspendedForAnotherReasonIsNotResumedByAllowingScripts()
+    {
+        TestHelpers.InMethod();
+        Setup();
+        SceneObjectGroup a = SceneHelpers.AddSceneObject(m_scene, 2, TestHelpers.ParseTail(1), "a", 0x10);
+        TaskInventoryItem held = AddScript(a, 0);
+        TaskInventoryItem other = AddScript(a, 1);
+        // e.g. held by a border crossing: the engine already has it suspended when scripts are disabled
+        m_engine.SuspendScript(held.ItemID);
+        m_engine.Suspended.Clear();
+
+        m_scene.ScriptsEnabled = false;
+        m_scene.ScriptsEnabled = true;
+
+        Assert.Equal(new[] { held.ItemID }, m_engine.StillSuspended);
+        Assert.Equal(new[] { other.ItemID }, m_engine.Resumed.Distinct());
+    }
+
+    [Fact]
     public void AScriptNoEngineHoldsIsStartedWhenScriptsAreAllowedAgain()
     {
         TestHelpers.InMethod();
@@ -142,7 +161,7 @@ public class DisableScriptsPauseTests : OpenSimTestCase
             .Invoke(estate, new object[] { null, invoice, agent, disableScripts, false, false });
 
     /// <summary>An engine that keeps every script it is given, suspended or not, and records what it is asked.</summary>
-    private sealed class PausingEngine : IScriptModule
+    private sealed class PausingEngine : IScriptModule, IScriptSuspension
     {
         private readonly HashSet<UUID> m_running = new();
         private readonly HashSet<UUID> m_suspended = new();
@@ -163,6 +182,7 @@ public class DisableScriptsPauseTests : OpenSimTestCase
         public void AddRegion(Scene scene)
         {
             scene.StackModuleInterface<IScriptModule>(this);
+            scene.StackModuleInterface<IScriptSuspension>(this);
             scene.EventManager.OnRezScript += OnRezScript;
             scene.EventManager.OnRemoveScript += (localID, itemID) => { Removed.Add(itemID); m_running.Remove(itemID); };
         }
@@ -186,6 +206,8 @@ public class DisableScriptsPauseTests : OpenSimTestCase
             Suspended.Add(itemID);
             return true;
         }
+
+        public bool IsSuspended(UUID itemID) => m_suspended.Contains(itemID);
 
         public bool ResumeScript(UUID itemID)
         {

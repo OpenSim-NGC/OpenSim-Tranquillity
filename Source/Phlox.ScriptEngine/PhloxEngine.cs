@@ -367,6 +367,7 @@ namespace Phlox.ScriptEngine
             m_Scene = scene;
             m_Scene.RegisterModuleInterface<IScriptModule>(this);
             m_Scene.StackModuleInterface<IScriptModule>(this);
+            m_Scene.StackModuleInterface<IScriptSuspension>(new SuspensionQuery(this));
             m_log.LogInformation("[PhloxEngine]: Added to region {0}", scene.RegionInfo.RegionName);
         }
 
@@ -2093,6 +2094,17 @@ namespace Phlox.ScriptEngine
         // doesn't run, so a multi-engine caller can try the next engine.
         public bool SuspendScript(UUID itemID)
             => m_ExeScheduler != null && m_ExeScheduler.RequestSuspend(itemID);
+
+        /// <summary>True when this engine runs the script and has it suspended, or a suspend of it is pending.</summary>
+        public bool IsSuspended(UUID itemID) => false;
+
+        /// <summary>Answers <see cref="IScriptSuspension"/> for this engine, so the region can ask it.</summary>
+        private sealed class SuspensionQuery : IScriptSuspension
+        {
+            private readonly PhloxEngine m_engine;
+            public SuspensionQuery(PhloxEngine engine) => m_engine = engine;
+            public bool IsSuspended(UUID itemID) => m_engine.IsSuspended(itemID);
+        }
 
         // Returning TRUE for a Phlox script that is not yet running is deliberate (fe31bac769): Phlox
         // scripts are never rez-suspended, so "not suspended" IS success — returning false made
