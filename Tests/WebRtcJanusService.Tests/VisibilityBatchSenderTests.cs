@@ -94,9 +94,8 @@ namespace osWebRtcVoice.Tests
             public readonly Dictionary<UUID, IReadOnlyCollection<UUID>> Columns = new();
             public readonly Dictionary<UUID, IReadOnlyCollection<UUID>> MuteColumns = new();
 
-#pragma warning disable CS0067 // required by the interface; the sender does not subscribe
-            public event Action<VisibilityBatch> BatchProduced;
-#pragma warning restore CS0067
+            // Required by the interface; the sender does not subscribe.
+            public event Action<VisibilityBatch> BatchProduced { add { } remove { } }
 
             public VisibilityBatch SnapshotFor(UUID listener)
             {
