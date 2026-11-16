@@ -119,9 +119,10 @@ public partial class Scene : SceneBase
     /// <summary>
     /// If false then scripts are not enabled on the simulator. Turning scripts off pauses them, as the region's
     /// "disable scripts" setting does in Second Life: every engine is asked to suspend each script, nothing is
-    /// removed, and a script keeps its state, its timers and the events that reach it. Turning scripts on again
-    /// resumes the scripts that were suspended here, and starts a script that no engine holds (one that arrived
-    /// while scripts were off).
+    /// removed, and a script keeps its state, its timers and the events that reach it. A script an engine reports
+    /// as already suspended (<see cref="IScriptSuspension"/>, for example during a crossing) is left alone. Turning
+    /// scripts on again resumes only the scripts that were suspended here, and starts a script that no engine holds
+    /// (one that arrived while scripts were off).
     /// </summary>
     public bool ScriptsEnabled
     {
@@ -133,6 +134,7 @@ public partial class Scene : SceneBase
                 // the new value is set first, so a script started from the loops below sees it
                 m_scripts_enabled = value;
                 IScriptModule[] engines = RequestModuleInterfaces<IScriptModule>();
+                IScriptSuspension[] suspensions = RequestModuleInterfaces<IScriptSuspension>();
 
                 if (!value)
                 {
@@ -143,7 +145,7 @@ public partial class Scene : SceneBase
                     {
                         if (ent is SceneObjectGroup group)
                         {
-                            List<UUID> suspended = group.SuspendScripts(engines);
+                            List<UUID> suspended = group.SuspendScripts(engines, suspensions);
                             lock (m_scriptsSuspendedByDisable)
                                 m_scriptsSuspendedByDisable.UnionWith(suspended);
                         }
@@ -159,7 +161,6 @@ public partial class Scene : SceneBase
                         if (ent is SceneObjectGroup sog)
                         {
                             sog.ResumeScriptsAfterDisable(engines, m_scriptsSuspendedByDisable, DefaultScriptEngine);
-                            sog.ResumeScripts();
                         }
                     }
                     lock (m_scriptsSuspendedByDisable)

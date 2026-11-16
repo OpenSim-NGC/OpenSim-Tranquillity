@@ -2121,7 +2121,13 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
      * @brief Allow script to dequeue events.
      */
     /// <summary>True when this engine runs the script and has it suspended (IScriptSuspension).</summary>
-    public bool IsSuspended(UUID itemID) => false;
+    public bool IsSuspended(UUID itemID)
+    {
+        if (!TryGetInstance(itemID, out XMRInstance instance))
+            return false;
+        lock (instance.m_QueueLock)
+            return instance.m_Suspended;
+    }
 
     public bool ResumeScript(UUID itemID)
     {

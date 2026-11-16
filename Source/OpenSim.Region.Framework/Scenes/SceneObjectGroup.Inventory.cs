@@ -614,9 +614,11 @@ public partial class SceneObjectGroup : EntityBase
     /// <summary>
     /// Stops the engines from running any script of this object (no event is started), so that the state read
     /// afterwards is the last one. Returns the items that were suspended, to give to <see cref="ResumeScripts(IScriptModule[], List{UUID})"/>
-    /// when the object stays; an object that moves on has its scripts removed instead.
+    /// when the object stays; an object that moves on has its scripts removed instead. A script that one of
+    /// <paramref name="leaveSuspended"/> reports as already suspended is not asked again and not listed, so that
+    /// whoever suspended it stays the one to resume it.
     /// </summary>
-    public List<UUID> SuspendScripts(IScriptModule[] engines)
+    public List<UUID> SuspendScripts(IScriptModule[] engines, IScriptSuspension[] leaveSuspended = null)
     {
         List<UUID> suspended = new();
         if (engines is null || engines.Length == 0)
@@ -627,6 +629,9 @@ public partial class SceneObjectGroup : EntityBase
         {
             foreach (TaskInventoryItem item in parts[i].Inventory.GetInventoryItems(InventoryType.LSL))
             {
+                if (IsAlreadySuspended(leaveSuspended, item.ItemID))
+                    continue;
+
                 foreach (IScriptModule engine in engines)
                 {
                     // an engine that fails leaves that one script running: it does not stop the others being
@@ -693,8 +698,34 @@ public partial class SceneObjectGroup : EntityBase
 
         ResumeScripts(engines, resume);
 
+        // a started script is let run as the rez path lets it (some engines create a script suspended), and only it:
+        // the object's other scripts are not resumed here
+        List<UUID> started = new();
         foreach ((SceneObjectPart part, TaskInventoryItem item) in start)
-            part.Inventory.CreateScriptInstance(item, 0, false, defaultEngine, 0);
+        {
+            if (part.Inventory.CreateScriptInstance(item, 0, false, defaultEngine, 0))
+                started.Add(item.ItemID);
+        }
+        ResumeScripts(engines, started);
+    }
+
+    private static bool IsAlreadySuspended(IScriptSuspension[] suspensions, UUID itemID)
+    {
+        if (suspensions is null)
+            return false;
+        foreach (IScriptSuspension suspension in suspensions)
+        {
+            try
+            {
+                if (suspension is not null && suspension.IsSuspended(itemID))
+                    return true;
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning($"[SCENE OBJECT GROUP]: Asking whether script {itemID} is suspended failed: {e.Message}");
+            }
+        }
+        return false;
     }
 
     /// <summary>Lets the scripts that <see cref="SuspendScripts"/> stopped run again.</summary>

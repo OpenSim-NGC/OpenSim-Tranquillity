@@ -2096,7 +2096,7 @@ namespace Phlox.ScriptEngine
             => m_ExeScheduler != null && m_ExeScheduler.RequestSuspend(itemID);
 
         /// <summary>True when this engine runs the script and has it suspended, or a suspend of it is pending.</summary>
-        public bool IsSuspended(UUID itemID) => false;
+        public bool IsSuspended(UUID itemID) => m_ExeScheduler != null && m_ExeScheduler.IsSuspended(itemID);
 
         /// <summary>Answers <see cref="IScriptSuspension"/> for this engine, so the region can ask it.</summary>
         private sealed class SuspensionQuery : IScriptSuspension
