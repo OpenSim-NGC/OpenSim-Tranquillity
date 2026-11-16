@@ -15,7 +15,11 @@ the engine in this order and stops at the first step that gives an answer:
 3. **A claim.** A script with source is offered to each engine that can claim scripts (an engine that implements
    `IScriptEngineSelection`), in the order the engines are loaded; the first to say yes gets it. Phlox and YEngine
    do not claim scripts.
-4. **The default.** `[Startup] DefaultScriptEngine`.
+4. **The default.** `[Startup] DefaultScriptEngine`. Two files give it a value, and they differ: the shipped
+   `Source/OpenSim.Server.RegionServer/AppData/RegionServerDefaults.ini` sets `DefaultScriptEngine = "InWorldz.Phlox"`,
+   while the code default, used when no configuration sets the key (`Source/OpenSim.Region.Framework/Scenes/Scene.cs`),
+   is `YEngine`. A region started from the shipped defaults file therefore defaults to Phlox; a host that supplies
+   its own configuration without the key defaults to YEngine.
 
 An engine that is not a script-selection participant is unaffected: it is chosen by name, by saved state or as
 the default.
