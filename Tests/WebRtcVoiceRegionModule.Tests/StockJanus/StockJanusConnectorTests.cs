@@ -36,7 +36,7 @@ using osWebRtcVoice.Tests.StockJanus;
 
 namespace osWebRtcVoice.Tests
 {
-#pragma warning disable CS0618
+#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
     [TestFixture, NUnit.Framework.Timeout(240000)]
 #pragma warning restore CS0618
     [NeedsPlugin(JanusPluginKind.Mixer)]

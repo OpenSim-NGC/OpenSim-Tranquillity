@@ -144,7 +144,7 @@ namespace osWebRtcVoice.Tests
 
         // The test restarts the mixer's container and waits up to 90 s for its Admin API, so the
         // assembly-wide 10 s limit is too short for it.
-#pragma warning disable CS0618
+#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
         [Test, Timeout(240000)]
 #pragma warning restore CS0618
         public async Task RealSimPath_ArmsHeartbeatsAndDetectsAMixerRestart()

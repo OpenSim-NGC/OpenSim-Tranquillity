@@ -352,7 +352,7 @@ namespace osWebRtcVoice.Tests
 
     /// <summary>The scenarios against a call session service in another process, over HTTP. Opt-in; see the file header.</summary>
     // The assembly-wide 10 s backstop is too short for a seat lease that has to run out in real time.
-#pragma warning disable CS0618
+#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
     [TestFixture, NUnit.Framework.Timeout(240000)]
 #pragma warning restore CS0618
     public class GridStoreProcessTests : StoreScenarios
@@ -410,7 +410,7 @@ namespace osWebRtcVoice.Tests
     }
 
     /// <summary>What a region does while the service is stopped, and after it is started again. Opt-in; see the file header.</summary>
-#pragma warning disable CS0618
+#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
     [TestFixture, NUnit.Framework.Timeout(120000)]
 #pragma warning restore CS0618
     public class GridStoreRestartProof
