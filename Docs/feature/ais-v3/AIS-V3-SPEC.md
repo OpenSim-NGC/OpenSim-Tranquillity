@@ -401,11 +401,13 @@ to send anything except a single-key `{thumbnail}` or `{favorite}` map (`update_
 | `name`, `desc` | `:979-980` | **applied** |
 | `flags` | `:976` | **applied** |
 | `sale_info` | `:977` (`llsaleinfo.cpp:97-107`: `sale_type`, `sale_price`) | **applied** |
-| `parent_id` | `:938` | **ignored**: a move changes two folders' versions and is not this route's job |
+| `parent_id` | `:938` | the item's own parent: no change. **Any other value is refused 400**, nothing written: SL's Item-PATCH `modifyItem` schema has no `parent_id` and moving is the separate MOVE verb (wiki.secondlife.com/wiki/Linden_Lab_Official:Inventory_API_v3); the viewer moves by `MoveInventoryItem` (`llviewerinventory.cpp:558`) |
 | `type`, `inv_type` | `:966-975` | **ignored**: invariants; `XInventoryService.UpdateItem` refuses to change them anyway |
 | `created_at` | `:981` | **ignored** |
-| `item_id` | `:937` | **ignored**: it is the URL |
-| `thumbnail`, `favorite` | `:942-951` | **ignored**: no column in this tree |
+| `item_id` | `:937` | the URL's id: no change; any other id is refused 400 |
+| `thumbnail`, `favorite` | `:942-951` | no column in this tree: absent or cleared is no change; **a value to set is refused 400** rather than answered 200 and dropped |
+
+`UpdateCategory` follows the same rule: SL's Category-PATCH `modifyCategory` schema is `name` alone. A body whose `parent_id`, `item_id`/`category_id` or `type`/`type_default` differs from the folder's own, or that sets a `thumbnail` or `favorite`, is refused 400 naming those keys, and nothing is written. A refusal carries no `_updated_category_versions`.
 
 If the asset-transaction module refuses the save, the PATCH answers 403 and lists no
 `_updated_category_versions`. The viewer's folder version then does not advance, and its next fetch sees the

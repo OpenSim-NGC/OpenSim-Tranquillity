@@ -149,12 +149,13 @@ public class AisMutationHttpTests
 
     /// <summary>
     /// The viewer sends the item's whole <c>asLLSD</c> map (<c>llviewerinventory.cpp:435-454</c>), so a
-    /// body is mostly keys carrying values that have not changed. The ones this tree has no column for —
-    /// <c>thumbnail</c>, <c>favorite</c>, <c>created_at</c> — and the invariants <c>type</c> / <c>inv_type</c> /
-    /// <c>parent_id</c> are ignored rather than refused, because refusing would fail every ordinary rename.
+    /// body is mostly keys carrying values that have not changed. <c>created_at</c> and the invariants
+    /// <c>type</c> / <c>inv_type</c> are ignored rather than refused, because refusing would fail every ordinary
+    /// rename; <c>item_id</c> and <c>parent_id</c> repeating what the item already has are no change at all.
     /// A16 moved <c>asset_id</c>, <c>hash_id</c> and <c>permissions</c> out of this set; the two here are still
     /// no-ops for their own reasons — an unknown transaction has no asset yet, and <c>owner_mask</c> is not a
-    /// client-settable field.
+    /// client-settable field. A <c>thumbnail</c> or <c>favorite</c> that asks for a value is a change this
+    /// tree cannot store, and is refused (see the PATCH field-refusal tests below); absent, as here, it is fine.
     /// </summary>
     [Test]
     public void a_patch_carrying_fields_this_tree_cannot_store_is_ignored_not_refused()
@@ -166,8 +167,6 @@ public class AisMutationHttpTests
             ["item_id"] = Shirt,
             ["parent_id"] = Clothing,
             ["hash_id"] = UUID.Random(),
-            ["thumbnail"] = new OSDMap { ["asset_id"] = UUID.Random() },
-            ["favorite"] = new OSDMap { ["toggled"] = true },
             ["type"] = 5,
             ["inv_type"] = 18,
             ["created_at"] = 1756900000,
@@ -680,6 +679,243 @@ public class AisMutationHttpTests
             Assert.That(response.StatusCode, Is.EqualTo(expected), $"{verb} {path}");
         }
     }
+    // ------------------------------------------------------------------ PATCH fields that are refused, not ignored
+
+    // SL's published Inventory API v3 lists the fields a PATCH may set: Item-PATCH's modifyItem schema (asset_id,
+    // name, sale_info, flags, desc, hash_id, permissions) and Category-PATCH's modifyCategory schema (name). Neither
+    // has parent_id; moving is a separate MOVE verb (wiki.secondlife.com/wiki/Linden_Lab_Official:Inventory_API_v3,
+    // "Item-MOVE", "Category-MOVE"), and the official viewer moves by the UDP MoveInventoryItem / MoveInventoryFolder
+    // messages (llviewerinventory.cpp:558, :639). A PATCH that asks for a change this tree does not carry out is
+    // answered 400 (the page's "Invalid request") and writes nothing, rather than 200 with the change dropped.
+
+    /// <summary>A refusal: 400, the field named, no delta envelope (so no folder version moves on the client).</summary>
+    private static void AssertRefusedNaming(int status, OSDMap body, string field)
+    {
+        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest), $"a PATCH asking to change {field} must not be answered 200");
+        AssertErrorBody(body, 400);
+        Assert.That(body["message"].AsString(), Does.Contain(field), "the error names the field it refused");
+        Assert.That(body.ContainsKey("_updated_category_versions"), Is.False, "a refusal reports no folder version");
+    }
+
+    [Test]
+    public void patching_an_item_with_a_new_parent_id_is_400_and_the_item_stays_where_it_was()
+    {
+        var b = Inventory();
+        var clothingVersion = b.Folders[Clothing].Version;
+        var partyVersion = b.Folders[Party].Version;
+
+        var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["parent_id"] = Party });
+
+        AssertRefusedNaming(status, body, "parent_id");
+        Assert.That(b.Items[Shirt].Folder, Is.EqualTo(Clothing), "the item did not move");
+        Assert.That(b.Folders[Clothing].Version, Is.EqualTo(clothingVersion));
+        Assert.That(b.Folders[Party].Version, Is.EqualTo(partyVersion));
+        Assert.That(b.Writes, Is.Empty, "nothing was written");
+    }
+
+    [Test]
+    public void a_new_parent_id_alongside_a_rename_refuses_the_whole_patch()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Moved Shirt", ["parent_id"] = Party });
+
+        AssertRefusedNaming(status, body, "parent_id");
+        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Blue Shirt"), "the rename in the same body is not applied either");
+        Assert.That(b.Items[Shirt].Folder, Is.EqualTo(Clothing));
+        Assert.That(b.Writes, Is.Empty);
+    }
+
+    [Test]
+    public void patching_an_item_with_a_null_parent_id_is_400()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["parent_id"] = UUID.Zero });
+
+        AssertRefusedNaming(status, body, "parent_id");
+        Assert.That(b.Items[Shirt].Folder, Is.EqualTo(Clothing));
+    }
+
+    [Test]
+    public void patching_an_item_with_its_own_parent_id_is_an_ordinary_update()
+    {
+        // The viewer's body is the item's whole asLLSD (llinventory.cpp:936-939), so parent_id is in every rename.
+        var b = Inventory();
+        var before = b.Folders[Clothing].Version;
+
+        var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Red Shirt", ["parent_id"] = Clothing, ["item_id"] = Shirt });
+
+        Assert.That(status, Is.EqualTo(200));
+        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Red Shirt"));
+        Assert.That(b.Items[Shirt].Folder, Is.EqualTo(Clothing));
+        Assert.That(body["parent_id"].AsUUID(), Is.EqualTo(Clothing));
+        Assert.That(Versions(body)[Clothing.ToString()].AsInteger(), Is.EqualTo(before + 1));
+    }
+
+    [Test]
+    public void patching_an_item_whose_body_names_another_item_id_is_400()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "x", ["item_id"] = PartyHat });
+
+        AssertRefusedNaming(status, body, "item_id");
+        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Blue Shirt"));
+        Assert.That(b.Items[PartyHat].Name, Is.EqualTo("Party Hat"));
+    }
+
+    [Test]
+    public void patching_an_item_thumbnail_is_400_because_this_tree_cannot_store_it()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["thumbnail"] = new OSDMap { ["asset_id"] = UUID.Random() } });
+
+        AssertRefusedNaming(status, body, "thumbnail");
+        Assert.That(b.Writes, Is.Empty);
+    }
+
+    [Test]
+    public void marking_an_item_favorite_is_400_because_this_tree_cannot_store_it()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["favorite"] = new OSDMap { ["toggled"] = true } });
+
+        AssertRefusedNaming(status, body, "favorite");
+        Assert.That(b.Writes, Is.Empty);
+    }
+
+    [Test]
+    public void clearing_favorite_or_thumbnail_on_an_item_that_has_neither_is_not_a_change()
+    {
+        // favorite_send sends an undefined value to clear (llinventoryfunctions.cpp:2516-2527); this tree stores
+        // no favorite or thumbnail, so clearing one asks for the state it already has.
+        var b = Inventory();
+
+        var (status, _) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap
+        {
+            ["name"] = "Red Shirt",
+            ["favorite"] = new OSD(),
+            ["thumbnail"] = new OSDMap { ["asset_id"] = UUID.Zero },
+        });
+
+        Assert.That(status, Is.EqualTo(200));
+        Assert.That(b.Items[Shirt].Name, Is.EqualTo("Red Shirt"));
+    }
+
+    [Test]
+    public void patching_a_category_with_a_new_parent_id_is_400_and_the_folder_stays_where_it_was()
+    {
+        var b = Inventory();
+        var rootVersion = b.Folders[Root].Version;
+        var clothingVersion = b.Folders[Clothing].Version;
+
+        var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["parent_id"] = Root });
+
+        AssertRefusedNaming(status, body, "parent_id");
+        Assert.That(b.Folders[Party].ParentID, Is.EqualTo(Outfits), "the folder did not move");
+        Assert.That(b.Folders[Root].Version, Is.EqualTo(rootVersion));
+        Assert.That(b.Folders[Clothing].Version, Is.EqualTo(clothingVersion));
+        Assert.That(b.Writes, Is.Empty);
+    }
+
+    [Test]
+    public void a_new_category_parent_id_alongside_a_rename_refuses_the_whole_patch()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["name"] = "Moved", ["parent_id"] = Root });
+
+        AssertRefusedNaming(status, body, "parent_id");
+        Assert.That(b.Folders[Party].Name, Is.EqualTo("Party"));
+        Assert.That(b.Folders[Party].ParentID, Is.EqualTo(Outfits));
+    }
+
+    [Test]
+    public void patching_a_category_with_its_own_parent_id_and_type_is_an_ordinary_rename()
+    {
+        // LLInventoryCategory::asLLSD (llinventory.cpp:1236-1256) sends item_id, parent_id, type and name.
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap
+        {
+            ["name"] = "Party Clothes",
+            ["item_id"] = Party,
+            ["parent_id"] = Outfits,
+            ["type"] = (int)b.Folders[Party].Type,
+        });
+
+        Assert.That(status, Is.EqualTo(200));
+        Assert.That(b.Folders[Party].Name, Is.EqualTo("Party Clothes"));
+        Assert.That(b.Folders[Party].ParentID, Is.EqualTo(Outfits));
+        Assert.That(Versions(body).Keys, Is.EquivalentTo(new[] { Party.ToString(), Outfits.ToString() }));
+    }
+
+    [Test]
+    public void moving_a_system_folder_by_patch_is_400_and_it_stays_put()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/category/{Clothing}", new OSDMap { ["parent_id"] = Party });
+
+        AssertRefusedNaming(status, body, "parent_id");
+        Assert.That(b.Folders[Clothing].ParentID, Is.EqualTo(Root));
+        Assert.That(b.Writes, Is.Empty);
+    }
+
+    [Test]
+    public void changing_a_category_type_by_patch_is_400_and_the_type_stays()
+    {
+        // LLViewerInventoryCategory::changeType sends the whole asLLSD with a new "type" (llviewerinventory.cpp:866-881).
+        var b = Inventory();
+        var type = b.Folders[Party].Type;
+
+        var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["type"] = (int)FolderType.Outfit });
+
+        AssertRefusedNaming(status, body, "type");
+        Assert.That(b.Folders[Party].Type, Is.EqualTo(type));
+        Assert.That(b.Writes, Is.Empty);
+    }
+
+    [Test]
+    public void changing_a_category_type_default_by_patch_is_400()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["type_default"] = (int)FolderType.Outfit });
+
+        AssertRefusedNaming(status, body, "type_default");
+        Assert.That(b.Writes, Is.Empty);
+    }
+
+    [Test]
+    public void patching_a_category_whose_body_names_another_id_is_400()
+    {
+        var b = Inventory();
+
+        var (status, body) = Send(b, "PATCH", $"/category/{Party}", new OSDMap { ["name"] = "x", ["category_id"] = Outfits });
+
+        AssertRefusedNaming(status, body, "category_id");
+        Assert.That(b.Folders[Party].Name, Is.EqualTo("Party"));
+        Assert.That(b.Folders[Outfits].Name, Is.EqualTo("Outfits"));
+    }
+
+    [Test]
+    public void a_category_thumbnail_or_favorite_is_400_because_this_tree_cannot_store_it()
+    {
+        // The one PATCH the viewer sends for a protected folder (update_inventory_category, llviewerinventory.cpp:1436-1457).
+        var b = Inventory();
+
+        var (tStatus, tBody) = Send(b, "PATCH", $"/category/{Clothing}", new OSDMap { ["thumbnail"] = new OSDMap { ["asset_id"] = UUID.Random() } });
+        var (fStatus, fBody) = Send(b, "PATCH", $"/category/{Clothing}", new OSDMap { ["favorite"] = new OSDMap { ["toggled"] = true } });
+
+        AssertRefusedNaming(tStatus, tBody, "thumbnail");
+        AssertRefusedNaming(fStatus, fBody, "favorite");
+        Assert.That(b.Writes, Is.Empty);
+    }
+
     private static void AssertErrorBody(OSDMap body, int code)
     {
         Assert.That(body["error_code"].AsInteger(), Is.EqualTo(code));
