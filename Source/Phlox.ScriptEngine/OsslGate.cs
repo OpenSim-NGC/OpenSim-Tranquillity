@@ -55,7 +55,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Phlox.ScriptEngine
 {
-    internal sealed class OsslGate
+    public sealed class OsslGate : IScriptOsslChecks
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(OsslGate));
 
@@ -80,9 +80,17 @@ namespace Phlox.ScriptEngine
         private readonly ThreatLevel m_maxThreatLevel;
         private readonly ConcurrentDictionary<string, FunctionPerms> m_perms = new();
 
-        public OsslGate(IConfigSource config)
+        public OsslGate(IConfigSource config) : this(config, "InWorldz.Phlox")
         {
-            m_osslconfig = config?.Configs["OSSL"] ?? config?.Configs["InWorldz.Phlox"];
+        }
+
+        /// <summary>
+        /// The gate for another script engine: the same [OSSL] section, and when it is absent that engine's own section
+        /// (<paramref name="engineSection"/>) in the place of [InWorldz.Phlox].
+        /// </summary>
+        public OsslGate(IConfigSource config, string engineSection)
+        {
+            m_osslconfig = config?.Configs["OSSL"] ?? config?.Configs[engineSection];
             m_enabled = m_osslconfig?.GetBoolean("AllowOSFunctions", true) ?? true;
             m_errorToOwner = m_osslconfig?.GetBoolean("PermissionErrorToOwner", false) ?? false;
             string risk = m_osslconfig?.GetString("OSFunctionThreatLevel", "VeryLow") ?? "VeryLow";

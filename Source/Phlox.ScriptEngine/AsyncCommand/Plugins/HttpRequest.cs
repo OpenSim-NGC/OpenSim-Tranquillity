@@ -181,7 +181,7 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
         /// </summary>
         internal UUID Start(UUID itemID, UUID objectID, Func<UUID> start, out bool capped)
         {
-            bool enforceCaps = (m_CmdManager.m_ScriptEngine as global::Phlox.ScriptEngine.PhloxEngine)?.HttpInFlightThrottle ?? true;
+            bool enforceCaps = m_CmdManager.HostServices?.HttpInFlightThrottle ?? true;
             lock (m_TrackLock)
             {
                 capped = enforceCaps

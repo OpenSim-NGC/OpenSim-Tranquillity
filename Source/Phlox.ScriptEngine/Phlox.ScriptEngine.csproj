@@ -45,6 +45,10 @@
   <ItemGroup>
     <Compile Include="LSLSystemAPI.cs" />
     <Compile Include="ILSLSystemAPI.cs" />
+    <Compile Include="IScriptHostServices.cs" />
+    <Compile Include="IScriptHostServiceParts.cs" />
+    <Compile Include="IScriptRuntimeAccess.cs" />
+    <Compile Include="InterpreterAccess.cs" />
     <Compile Include="PhloxExperienceAdapter.cs" />
     <Compile Include="LinksetDataPhloxExtensions.cs" />
     <Compile Include="PhloxEngine.cs" />

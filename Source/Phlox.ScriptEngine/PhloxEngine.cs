@@ -62,7 +62,7 @@ namespace Phlox.ScriptEngine
     /// <summary>Where syscalls that can reach a service run.</summary>
     public enum ServiceCallDeferralMode { Auto, Always, Never }
 
-    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine, IScriptStateProvider, IScriptEngineSelection
+    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine, IScriptStateProvider, IScriptEngineSelection, IScriptHostServices
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -90,6 +90,42 @@ namespace Phlox.ScriptEngine
         internal PhloxListenManager ListenManager { get; private set; }
         internal AsyncCommandManager AsyncCommands { get; private set; }
 		internal StateManager StateManager { get; private set; }
+
+        #region IScriptHostServices (seam A: what LSLSystemAPI needs of its engine, so that another engine can host it)
+
+        // The members that are public here already satisfy the interface. The ones below are internal or have an
+        // internal type, so the interface gets them through these.
+        IScriptEngine IScriptHostServices.ScriptEngine => this;
+        PhloxNotecardCache IScriptHostServices.NotecardCache => NotecardCache;
+        int IScriptHostServices.PhysicsFrameTimeAvg => PhysicsFrameTimeAvg;
+        IScriptOsslChecks IScriptHostServices.Ossl => Ossl;
+        IScriptListenService IScriptHostServices.ListenManager => ListenManager;
+        AsyncCommandManager IScriptHostServices.AsyncCommands => AsyncCommands;
+        IScriptStateTracker IScriptHostServices.StateManager => StateManager == null ? null : (m_StateTracker ??= new StateTracker(this));
+        void IScriptHostServices.SysReturnSequenced(UUID itemId, object retValue, int delay, int seq) => SysReturnSequenced(itemId, retValue, delay, seq);
+        int IScriptHostServices.PostDataserverToPrim(SceneObjectPart part, UUID skip, UUID asker, string queryId, string data) => PostDataserverToPrim(part, skip, asker, queryId, data);
+        void IScriptHostServices.SetItemRunningFlag(uint localId, UUID itemId, bool running) => SetItemRunningFlag(localId, itemId, running);
+        void IScriptHostServices.RequestParcelCheck(UUID itemId) => RequestParcelCheck(itemId);
+        void IScriptHostServices.SendToWorldComm(Action<IWorldComm> send) => SendToWorldComm(send);
+        float IScriptHostServices.GetEventQueueFreeSpacePercentage(UUID itemID) => GetEventQueueFreeSpacePercentage(itemID);
+        void IScriptHostServices.ExperienceGrantRestored() => ExperienceGrantRestored();
+        void IScriptHostServices.ExperienceCannotRun(UUID experience, int code) => ExperienceCannotRun(experience, code);
+
+        private IScriptStateTracker m_StateTracker;
+
+        /// <summary>The state manager as the API sees it: it is handed the script's access object, and the manager wants the interpreter inside it.</summary>
+        private sealed class StateTracker : IScriptStateTracker
+        {
+            private readonly PhloxEngine m_engine;
+            public StateTracker(PhloxEngine engine) { m_engine = engine; }
+
+            public void ScriptChanged(IScriptRuntimeAccess script)
+            {
+                if (script is InterpreterAccess access) m_engine.StateManager?.ScriptChanged(access.Interpreter);
+            }
+        }
+
+        #endregion
 
         #region INonSharedRegionModule
 

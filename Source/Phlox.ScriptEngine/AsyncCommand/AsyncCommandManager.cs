@@ -69,6 +69,18 @@ namespace Phlox.ScriptEngine.AsyncCommand
 
         public IScriptEngine m_ScriptEngine;
 
+        /// <summary>
+        /// The engine's settings, which the plugins read. Phlox's engine is its own host services, so the manager takes them from
+        /// it unless they are set; an engine that keeps them in another object sets them.
+        /// </summary>
+        public IScriptHostServices HostServices
+        {
+            get => m_HostServices ?? m_ScriptEngine as IScriptHostServices;
+            set => m_HostServices = value;
+        }
+
+        private IScriptHostServices m_HostServices;
+
         private static readonly Dictionary<IScriptEngine, SensorRepeat> m_SensorRepeat =
             new Dictionary<IScriptEngine, SensorRepeat>();
         private static readonly Dictionary<IScriptEngine, HttpRequest> m_HttpRequest =
