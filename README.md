@@ -29,7 +29,7 @@ see Docs/PLUGIN_DEVELOPMENT.md.
 
 # Running Tranquillity
 
-Install the [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0).
+Install the [.NET 10 Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0) for RegionServer. GridServer and MoneyServer also require the **ASP.NET Core 10 Runtime**, available on the same download page.
 For source builds, install the .NET 10 SDK version selected by `global.json`.
 
 Tranquillity now publishes separate server executables. From the directory containing
