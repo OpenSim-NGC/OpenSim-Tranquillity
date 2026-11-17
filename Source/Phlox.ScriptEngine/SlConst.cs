@@ -78,6 +78,11 @@ namespace Phlox.ScriptEngine
 
         // ── ENV_* ─────────────────────────────────────────────────────────
         public const int ENV_OK = 1;
+        public const int ENV_NOT_EXPERIENCE = -1;
+        public const int ENV_NO_EXPERIENCE_PERMISSION = -2;
+        public const int ENV_NO_ENVIRONMENT = -3;
+        public const int ENV_INVALID_AGENT = -4;
+        public const int ENV_INVALID_RULE = -5;
 
         // ── ERR_* ─────────────────────────────────────────────────────────
         public const int ERR_GENERIC = -1;
@@ -352,6 +357,12 @@ namespace Phlox.ScriptEngine
         public const int REZ_POS = 2;
         public const int REZ_ROT = 3;
         public const int REZ_VEL = 4;
+        public const int REZ_ACCEL = 5;
+        public const int REZ_OMEGA = 7;
+        public const int REZ_SOUND = 9;
+        public const int REZ_SOUND_COLLIDE = 10;
+        public const int REZ_LOCK_AXES = 11;
+        public const int REZ_DAMAGE_TYPE = 12;
 
         // ── SIT_* ─────────────────────────────────────────────────────────
         public const int SIT_FLAG_ALLOW_UNSIT = 2;
