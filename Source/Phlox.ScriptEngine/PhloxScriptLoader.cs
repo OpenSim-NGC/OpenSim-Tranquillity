@@ -714,8 +714,9 @@ namespace Phlox.ScriptEngine
         }
 
         /// <summary>
-        /// Compile the script as LSL or SLua. A first line naming Phlox ("//InWorldz.Phlox:&lt;language&gt;", the header that
-        /// gives a script to Phlox on any region, <see cref="PhloxEngineHeader"/>) decides by its language part, read as
+        /// Compile the script as LSL or SLua. A first line naming Phlox ("//InWorldz.Phlox:&lt;language&gt;" or the short
+        /// "//Phlox:&lt;language&gt;", the headers that give a script to Phlox on any region, <see cref="PhloxEngineHeader"/>)
+        /// decides by its language part, read as
         /// YEngine reads its own: "" or "lsl" is LSL; "slua" is SLua, compiled with the header line blanked (its newline
         /// kept) so error line numbers match the source; anything else is a compile error on line 1. The language part
         /// is lowercased first, as YEngine does, so "SLua" and "SLUA" are SLua too. Without that header, the source decides
@@ -723,7 +724,7 @@ namespace Phlox.ScriptEngine
         /// </summary>
         internal static CompiledScript CompileByLanguage(CompilerFrontend frontend, string scriptText)
         {
-            if (PhloxEngineHeader.NamedEngine(scriptText) == PhloxEngineHeader.PhloxName)
+            if (PhloxEngineHeader.IsPhloxName(PhloxEngineHeader.NamedEngine(scriptText)))
             {
                 string language = PhloxEngineHeader.Language(scriptText);
                 if (language == "slua")

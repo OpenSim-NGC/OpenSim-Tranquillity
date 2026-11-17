@@ -97,7 +97,9 @@ public partial class Scene
 
     /// <summary>
     /// The script engine that will run a script: the engine named on the script's first line
-    /// ("//engine:language") if loaded, otherwise an engine with matching saved state (default first),
+    /// ("//engine:language", the engine's name or one of its header aliases) if loaded, otherwise an engine with
+    /// matching saved state (default first), otherwise the first engine that claims the script (a script with
+    /// source is offered to each engine that implements <see cref="IScriptEngineSelection"/>),
     /// otherwise the default engine; null if no suitable engine is loaded.
     /// </summary>
     /// <param name="defaultEngine">the engine name the caller passes to CreateScriptInstance (DefaultScriptEngine)</param>
@@ -119,7 +121,8 @@ public partial class Scene
                     string named = firstline[..colon].TrimEnd();
                     foreach (IScriptModule engine in engines)
                     {
-                        if (engine.ScriptEngineName == named)
+                        if (engine.ScriptEngineName == named
+                            || (engine is IScriptEngineSelection selection && HasHeaderAlias(selection, named)))
                             return engine;
                     }
                 }
@@ -149,7 +152,31 @@ public partial class Scene
                     return engine;
             }
         }
+
+        // No header and no saved state placed the script. An engine may still ask for it; a script with no source
+        // (a crossing that carries its state) has nothing to claim.
+        if (!string.IsNullOrEmpty(scriptSource))
+        {
+            foreach (IScriptModule engine in engines)
+            {
+                if (engine is IScriptEngineSelection selection && selection.ClaimsScript(scriptSource))
+                    return engine;
+            }
+        }
         return defaultModule;
+    }
+
+    private static bool HasHeaderAlias(IScriptEngineSelection engine, string named)
+    {
+        IReadOnlyList<string> aliases = engine.HeaderAliases;
+        if (aliases is null)
+            return false;
+        for (int i = 0; i < aliases.Count; i++)
+        {
+            if (aliases[i] == named)
+                return true;
+        }
+        return false;
     }
 
     /// <summary>
