@@ -552,4 +552,6 @@ public interface ILSL_Api
   LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer face);
    LSL_Vector llWorldPosToHUD(LSL_Vector WorldPosition);
            void llSetRenderMaterial(LSL_String material, LSL_Integer face);
+           void llSetLinkRenderMaterial(LSL_Integer link, LSL_String material, LSL_Integer face);
+           void llSetLinkGLTFOverrides(LSL_Integer link, LSL_Integer face, LSL_List options);
 }
