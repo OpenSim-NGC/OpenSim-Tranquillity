@@ -1,0 +1,42 @@
+services:
+  gridserver:
+    volumes:
+      - type: bind
+        source: ${GRID_CONFIG_DIR:?Set GRID_CONFIG_DIR}
+        target: /app/config
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${GRID_LOG_DIR:?Set GRID_LOG_DIR}
+        target: /app/logdata
+        bind:
+          create_host_path: false
+
+  moneyserver:
+    volumes:
+      - type: bind
+        source: ${MONEY_CONFIG_DIR:?Set MONEY_CONFIG_DIR}
+        target: /app/config
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${MONEY_LOG_DIR:?Set MONEY_LOG_DIR}
+        target: /app/logdata
+        bind:
+          create_host_path: false
+
+  regionserver:
+    volumes:
+      - type: bind
+        source: ${REGION_CONFIG_DIR:?Set REGION_CONFIG_DIR}
+        target: /app/config
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${REGION_LOG_DIR:?Set REGION_LOG_DIR}
+        target: /app/logdata
+        bind:
+          create_host_path: false
