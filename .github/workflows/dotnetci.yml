@@ -41,11 +41,26 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
       run: dotnet build ./Tranquillity.sln --configuration Release --no-restore
 
-#    - name: Tests
-#      env:
-#        GITHUB_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
-#      run: dotnet test ./Tranquillity.sln --verbosity normal
-#
+    # Every test project in the solution runs. The job fails on a test that fails and is not in
+    # Tests/known-failures.txt, or on a test project that produced no results (a crashed test host);
+    # known failures that pass are listed so the file can be trimmed. See Tests/README-CI.md.
+    - name: Test
+      continue-on-error: true
+      run: >
+        dotnet test ./Tranquillity.sln --configuration Release --no-build
+        --logger "trx;LogFilePrefix=results" --results-directory TestResults
+        --blame-hang --blame-hang-timeout 15m
+
+    - name: Compare with known failures
+      run: python3 tools/check-test-results.py TestResults Tests/known-failures.txt Tranquillity.sln
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: TestResults
+        retention-days: 14
 
 #   Conditional Execution: Triggers deployment pipelines strictly for production code signatures
 #    - name: Publish Production Release

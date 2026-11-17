@@ -1,0 +1,2 @@
+# Tests known to fail on develop, as the CI job sees them (ubuntu-latest).
+# One per line: <assembly> :: <test name as the .trx file names it>. See Tests/README-CI.md.
