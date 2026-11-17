@@ -174,6 +174,16 @@ namespace Phlox.ScriptEngine
         public const int OBJECT_TOTAL_SCRIPT_COUNT = 10;
         public const int OBJECT_VELOCITY = 5;
 
+        // ── OVERRIDE_GLTF_* (llSetLinkGLTFOverrides) ─────────────────────
+        public const int OVERRIDE_GLTF_BASE_COLOR_FACTOR = 1;
+        public const int OVERRIDE_GLTF_BASE_ALPHA = 2;
+        public const int OVERRIDE_GLTF_BASE_ALPHA_MODE = 3;
+        public const int OVERRIDE_GLTF_BASE_ALPHA_MASK = 4;
+        public const int OVERRIDE_GLTF_BASE_DOUBLE_SIDED = 5;
+        public const int OVERRIDE_GLTF_METALLIC_FACTOR = 6;
+        public const int OVERRIDE_GLTF_ROUGHNESS_FACTOR = 7;
+        public const int OVERRIDE_GLTF_EMISSIVE_FACTOR = 8;
+
         // ── PARCEL_* ──────────────────────────────────────────────────────
         public const int PARCEL_DETAILS_DESC = 1;
         public const int PARCEL_DETAILS_GROUP = 3;

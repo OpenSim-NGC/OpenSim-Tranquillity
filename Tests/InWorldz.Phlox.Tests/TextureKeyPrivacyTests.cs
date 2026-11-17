@@ -89,12 +89,13 @@ public class TextureKeyPrivacyTests
         part.Shape.ProjectionTextureUUID = ProjTex;
         part.Shape.ProjectionFOV = 1.5f;
 
+        // the viewer's compact override form: one texture per glTF slot (base color, normal, metallic-roughness, emissive)
         var gltf = new OSDMap
         {
-            ["tex"] = OSD.FromString(GltfBase.ToString()),
-            ["ntex"] = OSD.FromString(GltfNormal.ToString()),
-            ["mrtex"] = OSD.FromString(GltfMr.ToString()),
-            ["etex"] = OSD.FromString(GltfEmissive.ToString()),
+            ["tex"] = new OSDArray
+            {
+                OSD.FromUUID(GltfBase), OSD.FromUUID(GltfNormal), OSD.FromUUID(GltfMr), OSD.FromUUID(GltfEmissive),
+            },
         };
         part.Shape.RenderMaterials = new Primitive.RenderMaterials
         {

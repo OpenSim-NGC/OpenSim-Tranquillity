@@ -8281,142 +8281,19 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 }
 
                 // ── PBR / glTF Material params ──────────────────────────────
+                // Stored through GltfMaterialOverride, in the compact form viewers read, as YEngine's LSL_Api does.
 
                 case PRIM_RENDER_MATERIAL:
-                {
                     // [ PRIM_RENDER_MATERIAL, integer face, string render_material ]
-                    if (idx + 1 >= data.Length) { idx = data.Length; break; }
-                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx++; break; }
-                    string matStr = data[idx++].ToString();
-                    UUID matUUID = UUID.Zero;
-                    UUID.TryParse(matStr, out matUUID);
-
-                    var shape_rm = part.Shape;
-                    shape_rm.RenderMaterials ??= new OpenMetaverse.Primitive.RenderMaterials();
-                    int numFaces_rm = part.GetNumberOfSides();
-
-                    if (face == ALL_SIDES)
-                    {
-                        var entries = new OpenMetaverse.Primitive.RenderMaterials.RenderMaterialEntry[numFaces_rm];
-                        for (int i = 0; i < numFaces_rm; i++)
-                        {
-                            entries[i].te_index = (byte)i;
-                            entries[i].id = matUUID;
-                        }
-                        shape_rm.RenderMaterials.entries = entries;
-                        // Clear non-transform overrides per SL spec
-                    }
-                    else if (face >= 0 && face < numFaces_rm)
-                    {
-                        SetRenderMaterialEntry(ref shape_rm.RenderMaterials.entries, matUUID, face);
-                    }
-
-                    if (part.ParentGroup != null)
-                        part.ParentGroup.HasGroupChanged = true;
-                    part.ScheduleFullUpdate();
+                    PrimSetRenderMaterial(part, data[idx], data[idx + 1]);
                     break;
-                }
 
                 case PRIM_GLTF_BASE_COLOR:
-                {
-                    // [ PRIM_GLTF_BASE_COLOR, face, texture, repeats, offsets, rotation,
-                    //   color, alpha, alpha_mode, alpha_cutoff, double_sided ]
-                    if (idx + 9 >= data.Length) { idx = data.Length; break; }
-                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 9; break; }
-                    string texture = data[idx++].ToString();
-                    Vector3 repeats = (Vector3)data[idx++];
-                    Vector3 offsets = (Vector3)data[idx++];
-                    float rotation = (float)Convert.ToDouble(data[idx++]);
-                    Vector3 color = (Vector3)data[idx++];
-                    float alpha = (float)Convert.ToDouble(data[idx++]);
-                    int alphaMode = Convert.ToInt32(data[idx++]);
-                    float alphaCutoff = (float)Convert.ToDouble(data[idx++]);
-                    int doubleSided = Convert.ToInt32(data[idx++]);
-
-                    var osd = new OpenMetaverse.StructuredData.OSDMap();
-                    if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
-                        osd["tex"] = texture;
-                    osd["rep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
-                    osd["off"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
-                    osd["rot"] = (double)rotation;
-                    osd["bc"] = new OpenMetaverse.StructuredData.OSDArray { (double)color.X, (double)color.Y, (double)color.Z, (double)alpha };
-                    osd["am"] = alphaMode;
-                    osd["ac"] = (double)alphaCutoff;
-                    osd["ds"] = (doubleSided != 0);
-
-                    ApplyGLTFOverrideToPart(part, face, osd);
-                    break;
-                }
-
                 case PRIM_GLTF_NORMAL:
-                {
-                    // [ PRIM_GLTF_NORMAL, face, texture, repeats, offsets, rotation ]
-                    if (idx + 4 >= data.Length) { idx = data.Length; break; }
-                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 4; break; }
-                    string texture = data[idx++].ToString();
-                    Vector3 repeats = (Vector3)data[idx++];
-                    Vector3 offsets = (Vector3)data[idx++];
-                    float rotation = (float)Convert.ToDouble(data[idx++]);
-
-                    var osd = new OpenMetaverse.StructuredData.OSDMap();
-                    if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
-                        osd["ntex"] = texture;
-                    osd["nrep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
-                    osd["noff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
-                    osd["nrot"] = (double)rotation;
-
-                    ApplyGLTFOverrideToPart(part, face, osd);
-                    break;
-                }
-
                 case PRIM_GLTF_METALLIC_ROUGHNESS:
-                {
-                    // [ PRIM_GLTF_METALLIC_ROUGHNESS, face, texture, repeats, offsets, rotation,
-                    //   metallic_factor, roughness_factor ]
-                    if (idx + 6 >= data.Length) { idx = data.Length; break; }
-                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 6; break; }
-                    string texture = data[idx++].ToString();
-                    Vector3 repeats = (Vector3)data[idx++];
-                    Vector3 offsets = (Vector3)data[idx++];
-                    float rotation = (float)Convert.ToDouble(data[idx++]);
-                    float metallic = (float)Convert.ToDouble(data[idx++]);
-                    float roughness = (float)Convert.ToDouble(data[idx++]);
-
-                    var osd = new OpenMetaverse.StructuredData.OSDMap();
-                    if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
-                        osd["mrtex"] = texture;
-                    osd["mrrep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
-                    osd["mroff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
-                    osd["mrrot"] = (double)rotation;
-                    osd["mf"] = (double)Math.Clamp(metallic, 0f, 1f);
-                    osd["rf"] = (double)Math.Clamp(roughness, 0f, 1f);
-
-                    ApplyGLTFOverrideToPart(part, face, osd);
-                    break;
-                }
-
                 case PRIM_GLTF_EMISSIVE:
-                {
-                    // [ PRIM_GLTF_EMISSIVE, face, texture, repeats, offsets, rotation, emissive_tint ]
-                    if (idx + 5 >= data.Length) { idx = data.Length; break; }
-                    int face; try { face = Convert.ToInt32(data[idx++]); } catch { idx += 5; break; }
-                    string texture = data[idx++].ToString();
-                    Vector3 repeats = (Vector3)data[idx++];
-                    Vector3 offsets = (Vector3)data[idx++];
-                    float rotation = (float)Convert.ToDouble(data[idx++]);
-                    Vector3 emissive = (Vector3)data[idx++];
-
-                    var osd = new OpenMetaverse.StructuredData.OSDMap();
-                    if (!string.IsNullOrEmpty(texture) && texture != UUID.Zero.ToString())
-                        osd["etex"] = texture;
-                    osd["erep"] = new OpenMetaverse.StructuredData.OSDArray { (double)repeats.X, (double)repeats.Y };
-                    osd["eoff"] = new OpenMetaverse.StructuredData.OSDArray { (double)offsets.X, (double)offsets.Y };
-                    osd["erot"] = (double)rotation;
-                    osd["ec"] = new OpenMetaverse.StructuredData.OSDArray { (double)emissive.X, (double)emissive.Y, (double)emissive.Z };
-
-                    ApplyGLTFOverrideToPart(part, face, osd);
+                    PrimSetGltf(part, code, data, idx);
                     break;
-                }
 
                 default:
                     return false;
@@ -9288,58 +9165,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                     // ── PBR / glTF Material get params ──────────────────────────
 
                     case PRIM_RENDER_MATERIAL:
-                    {
-                        // Returns: [ string render_material ]
-                        if (idx >= data.Length) break;
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        var shape_rm = part.Shape;
-                        string matId = string.Empty;
-                        if (shape_rm?.RenderMaterials?.entries != null && face >= 0)
-                        {
-                            foreach (var entry in shape_rm.RenderMaterials.entries)
-                            {
-                                if (entry.te_index == (byte)face)
-                                { matId = ConditionalMaterialNameOrUUID(part, entry.id.ToString()); break; }
-                            }
-                        }
-                        result.Add(matId);
-                        break;
-                    }
-
                     case PRIM_GLTF_BASE_COLOR:
-                    {
-                        // Returns: [ texture, repeats, offsets, rotation, color, alpha,
-                        //            alpha_mode, alpha_cutoff, double_sided ]
-                        if (idx >= data.Length) break;
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        GetGLTFBaseColorParams(part, face, result);
-                        break;
-                    }
-
                     case PRIM_GLTF_NORMAL:
-                    {
-                        // Returns: [ texture, repeats, offsets, rotation ]
-                        if (idx >= data.Length) break;
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        GetGLTFTransformParams(part, face, "ntex", "nrep", "noff", "nrot", result);
-                        break;
-                    }
-
                     case PRIM_GLTF_METALLIC_ROUGHNESS:
-                    {
-                        // Returns: [ texture, repeats, offsets, rotation, metallic_factor, roughness_factor ]
-                        if (idx >= data.Length) break;
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        GetGLTFMetallicRoughnessParams(part, face, result);
-                        break;
-                    }
-
                     case PRIM_GLTF_EMISSIVE:
                     {
-                        // Returns: [ texture, repeats, offsets, rotation, emissive_tint ]
                         if (idx >= data.Length) break;
-                        int face; try { face = Convert.ToInt32(data[idx++]); } catch { break; }
-                        GetGLTFEmissiveParams(part, face, result);
+                        if (data[idx++] is not int face) break;
+                        PrimGetGltf(part, code, face, result);
                         break;
                     }
 
@@ -19339,457 +19172,362 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         // ── Tier 2: PBR / GLTF Material Functions (598–602) ──
 
+        // The faces' glTF render materials and overrides are stored through GltfMaterialOverride (OpenSim.Region.Framework),
+        // in the compact form viewers read and MaterialsModule writes, so YEngine and Phlox scripts and viewer edits see
+        // the same data. SL: https://wiki.secondlife.com/wiki/GLTF_Overrides
+
         public string llGetRenderMaterial(int face)
         {
-            var shape = m_host.Shape;
-            if (shape?.RenderMaterials?.entries == null)
-                return string.Empty;
-            if (face < 0)
-                return string.Empty;
-            foreach (var entry in shape.RenderMaterials.entries)
-            {
-                if (entry.te_index == (byte)face)
-                    return ConditionalMaterialNameOrUUID(m_host, entry.id.ToString());
-            }
-            return string.Empty;
+            // SL (https://wiki.secondlife.com/wiki/LlGetRenderMaterial): ALL_SIDES reads face zero; a face that does not
+            // exist reads NULL_KEY.
+            if (face == ALL_SIDES) face = 0;
+            if (face < 0 || face >= m_host.GetNumberOfSides()) return UUID.Zero.ToString();
+            return RenderMaterialAsSeen(m_host, face);
         }
 
         public void llSetRenderMaterial(string materialId, int face)
         {
-            if (!UUID.TryParse(materialId, out UUID matUUID))
-                return;
-            if (!World.Permissions.CanEditObject(m_host.ParentGroup.UUID, m_host.OwnerID))
-                return;
-
-            var shape = m_host.Shape;
-            shape.RenderMaterials ??= new OpenMetaverse.Primitive.RenderMaterials();
-
-            int numFaces = m_host.GetNumberOfSides();
-
-            if (face == ALL_SIDES)
-            {
-                var entries = new OpenMetaverse.Primitive.RenderMaterials.RenderMaterialEntry[numFaces];
-                for (int i = 0; i < numFaces; i++)
-                {
-                    entries[i].te_index = (byte)i;
-                    entries[i].id = matUUID;
-                }
-                shape.RenderMaterials.entries = entries;
-            }
-            else if (face >= 0 && face < numFaces)
-            {
-                if (shape.RenderMaterials.entries == null)
-                {
-                    shape.RenderMaterials.entries = new OpenMetaverse.Primitive.RenderMaterials.RenderMaterialEntry[1];
-                    shape.RenderMaterials.entries[0].te_index = (byte)face;
-                    shape.RenderMaterials.entries[0].id = matUUID;
-                }
-                else
-                {
-                    int idx = -1;
-                    for (int i = 0; i < shape.RenderMaterials.entries.Length; i++)
-                    {
-                        if (shape.RenderMaterials.entries[i].te_index == (byte)face)
-                        { idx = i; break; }
-                    }
-                    if (idx >= 0)
-                    {
-                        shape.RenderMaterials.entries[idx].id = matUUID;
-                    }
-                    else
-                    {
-                        int len = shape.RenderMaterials.entries.Length;
-                        Array.Resize(ref shape.RenderMaterials.entries, len + 1);
-                        shape.RenderMaterials.entries[len].te_index = (byte)face;
-                        shape.RenderMaterials.entries[len].id = matUUID;
-                    }
-                }
-            }
-            else
-            {
-                return;
-            }
-
-            m_host.ParentGroup.HasGroupChanged = true;
-            m_host.ScheduleUpdate(PrimUpdateFlags.FullUpdate);
+            // SL (https://wiki.secondlife.com/wiki/LlSetRenderMaterial): a material in the prim's inventory or a
+            // material key, NULL_KEY removing it; clears the face's overrides but its texture transforms; 0.2s delay.
+            if (RenderMaterialKeyOrName(materialId, "llSetRenderMaterial", out UUID material))
+                SetPartRenderMaterial(m_host, material, face);
+            ScriptSleep(200);
         }
 
         public int llIsLinkGLTFMaterial(int link, int face)
         {
-            foreach (SceneObjectPart part in GetLinkParts(link))
-            {
-                var shape = part.Shape;
-                if (shape?.RenderMaterials?.overrides == null)
-                    return 0;
-                if (face == ALL_SIDES)
-                {
-                    return shape.RenderMaterials.overrides.Length > 0 ? 1 : 0;
-                }
-                foreach (var ovr in shape.RenderMaterials.overrides)
-                {
-                    if (ovr.te_index == (byte)face && !string.IsNullOrEmpty(ovr.data))
-                        return 1;
-                }
-                return 0; // only check first matching link part
-            }
-            return 0;
-        }
-
-public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
-        {
-            // overrides is a strided list of [key, value, key, value, ...]
-            // Builds LLSD Notation data matching the format used by MaterialsModule
-            if (overrides.Length < 2 || overrides.Length % 2 != 0)
-                return 0;
-
-            // Build an OSDMap in the compact format the viewer expects
-            var outosd = new OpenMetaverse.StructuredData.OSDMap();
-
-            for (int i = 0; i < overrides.Length; i += 2)
-            {
-                string key = overrides.Data[i].ToString();
-                string val = overrides.Data[i + 1].ToString();
-                var ci = System.Globalization.CultureInfo.InvariantCulture;
-
-                switch (key)
-                {
-                    case "base_color":
-                    {
-                        if (TryParseColor4(val, out float r, out float g, out float b, out float a))
-                        {
-                            outosd["bc"] = new OpenMetaverse.StructuredData.OSDArray()
-                            {
-                                Math.Round((double)r, 4),
-                                Math.Round((double)g, 4),
-                                Math.Round((double)b, 4),
-                                Math.Round((double)a, 4)
-                            };
-                        }
-                        break;
-                    }
-                    case "metallic_factor":
-                    {
-                        if (float.TryParse(val, System.Globalization.NumberStyles.Float, ci, out float mf))
-                            outosd["mf"] = Math.Round((double)Math.Clamp(mf, 0f, 1f), 3);
-                        break;
-                    }
-                    case "roughness_factor":
-                    {
-                        if (float.TryParse(val, System.Globalization.NumberStyles.Float, ci, out float rf))
-                            outosd["rf"] = Math.Round((double)Math.Clamp(rf, 0f, 1f), 3);
-                        break;
-                    }
-                    case "emissive_factor":
-                    {
-                        if (TryParseVector3(val, out float er, out float eg, out float eb))
-                        {
-                            outosd["ec"] = new OpenMetaverse.StructuredData.OSDArray()
-                            {
-                                Math.Round((double)er, 4),
-                                Math.Round((double)eg, 4),
-                                Math.Round((double)eb, 4)
-                            };
-                        }
-                        break;
-                    }
-                    case "alpha_mode":
-                    {
-                        outosd["am"] = val.ToUpper() switch
-                        {
-                            "BLEND" => 1,
-                            "MASK" => 2,
-                            _ => 0
-                        };
-                        break;
-                    }
-                    case "alpha_cutoff":
-                    {
-                        if (float.TryParse(val, System.Globalization.NumberStyles.Float, ci, out float ac))
-                            outosd["ac"] = Math.Round((double)Math.Clamp(ac, 0f, 1f), 3);
-                        break;
-                    }
-                    case "double_sided":
-                    {
-                        outosd["ds"] = (val == "1" || val.ToLower() == "true");
-                        break;
-                    }
-                }
-            }
-
-            if (outosd.Count == 0)
-                return 0;
-
-            string llsdData = OpenMetaverse.StructuredData.OSDParser.SerializeLLSDNotation(outosd);
-            int changed = 0;
-
-            foreach (SceneObjectPart part in GetLinkParts(link))
-            {
-                if (!World.Permissions.CanEditObject(part.ParentGroup.UUID, m_host.OwnerID))
-                    continue;
-
-                var shape = part.Shape;
-                shape.RenderMaterials ??= new OpenMetaverse.Primitive.RenderMaterials();
-
-                int numFaces = part.GetNumberOfSides();
-               if (face == ALL_SIDES)
-                {
-                    for (int f = 0; f < numFaces; f++)
-                        ApplyGLTFOverride(ref shape.RenderMaterials.overrides, llsdData, f);
-                }
-                else if (face >= 0 && face < numFaces)
-                {
-                    ApplyGLTFOverride(ref shape.RenderMaterials.overrides, llsdData, face);
-                }
-                else
-                {
-                    continue;
-                }
-
-                part.ParentGroup.HasGroupChanged = true;
-                part.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
-                changed++;
-            }
-            return changed > 0 ? 1 : 0;
-        }
-
-        private static void ApplyGLTFOverride(
-            ref OpenMetaverse.Primitive.RenderMaterials.RenderMaterialOverrideEntry[] overrides,
-            string data, int face)
-        {
-            if (overrides == null)
-            {
-                overrides = new OpenMetaverse.Primitive.RenderMaterials.RenderMaterialOverrideEntry[1];
-                overrides[0].te_index = (byte)face;
-                overrides[0].data = data;
-                return;
-            }
-
-            for (int i = 0; i < overrides.Length; i++)
-            {
-                if (overrides[i].te_index == (byte)face)
-                {
-                    overrides[i].data = data;
-                    return;
-                }
-            }
-
-            int len = overrides.Length;
-            Array.Resize(ref overrides, len + 1);
-            overrides[len].te_index = (byte)face;
-            overrides[len].data = data;
-        }
-
-        // ── PBR helpers for PRIM_RENDER_MATERIAL / PRIM_GLTF_* in SetPrimParams/GetPrimParams ──
-
-        private static void SetRenderMaterialEntry(
-            ref OpenMetaverse.Primitive.RenderMaterials.RenderMaterialEntry[] entries,
-            UUID matId, int face)
-        {
-            if (entries == null)
-            {
-                entries = new OpenMetaverse.Primitive.RenderMaterials.RenderMaterialEntry[1];
-                entries[0].te_index = (byte)face;
-                entries[0].id = matId;
-                return;
-            }
-
-            for (int i = 0; i < entries.Length; i++)
-            {
-                if (entries[i].te_index == (byte)face)
-                {
-                    entries[i].id = matId;
-                    return;
-                }
-            }
-
-            int len = entries.Length;
-            Array.Resize(ref entries, len + 1);
-            entries[len].te_index = (byte)face;
-            entries[len].id = matId;
-        }
-
-        private void ApplyGLTFOverrideToPart(SceneObjectPart part, int face,
-            OpenMetaverse.StructuredData.OSDMap osd)
-        {
-            if (osd.Count == 0) return;
-
-            var shape = part.Shape;
-            shape.RenderMaterials ??= new OpenMetaverse.Primitive.RenderMaterials();
-
-            string llsdData = OpenMetaverse.StructuredData.OSDParser.SerializeLLSDNotation(osd);
-            int numFaces = part.GetNumberOfSides();
-
+            // SL (https://wiki.secondlife.com/wiki/LlIsLinkGLTFMaterial): TRUE when the face has a glTF material;
+            // ALL_SIDES only when every face has one. FALSE for a face or link that does not exist, and for a link
+            // that names several prims (LINK_SET, ...).
+            if (link == LINK_SET || link == LINK_ALL_OTHERS || link == LINK_ALL_CHILDREN) return 0;
+            SceneObjectPart part = GetLinkParts(link).FirstOrDefault();
+            if (part == null) return 0;
+            int sides = part.GetNumberOfSides();
             if (face == ALL_SIDES)
             {
-                for (int f = 0; f < numFaces; f++)
-                    ApplyGLTFOverride(ref shape.RenderMaterials.overrides, llsdData, f);
+                if (sides == 0) return 0;
+                for (int f = 0; f < sides; f++)
+                {
+                    if (GltfMaterialOverride.GetRenderMaterial(part.Shape, f).IsZero()) return 0;
+                }
+                return 1;
             }
-            else if (face >= 0 && face < numFaces)
+            if (face < 0 || face >= sides) return 0;
+            return GltfMaterialOverride.GetRenderMaterial(part.Shape, face).IsZero() ? 0 : 1;
+        }
+
+        /// <summary>
+        /// SL llSetLinkGLTFOverrides (https://wiki.secondlife.com/wiki/LlSetLinkGLTFOverrides): a list of
+        /// OVERRIDE_GLTF_* constants each followed by its value, "" clearing that override. A face that does not exist
+        /// changes nothing. SL's function returns nothing; Phlox's signature returns TRUE when a face changed.
+        /// </summary>
+        public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
+        {
+            object[] data = overrides?.Data ?? Array.Empty<object>();
+            var edits = new List<Action<GltfMaterialOverride>>();
+            for (int i = 0; i + 1 < data.Length; i += 2)
             {
-                ApplyGLTFOverride(ref shape.RenderMaterials.overrides, llsdData, face);
+                object v = data[i + 1];
+                if (data[i] is not int param)
+                {
+                    ShoutError($"llSetLinkGLTFOverrides: parameter {i} must be an OVERRIDE_GLTF_* constant.");
+                    return 0;
+                }
+                switch (param)
+                {
+                    case OVERRIDE_GLTF_BASE_COLOR_FACTOR when GltfColor(v, out Vector3? c):
+                        edits.Add(o => o.BaseColor = c);
+                        break;
+                    case OVERRIDE_GLTF_BASE_ALPHA when GltfUnit(v, out float? a):
+                        edits.Add(o => o.BaseAlpha = a);
+                        break;
+                    case OVERRIDE_GLTF_BASE_ALPHA_MODE when GltfAlphaMode(v, out int? m):
+                        edits.Add(o => o.AlphaMode = m);
+                        break;
+                    case OVERRIDE_GLTF_BASE_ALPHA_MASK when GltfUnit(v, out float? ac):
+                        edits.Add(o => o.AlphaCutoff = ac);
+                        break;
+                    case OVERRIDE_GLTF_BASE_DOUBLE_SIDED when GltfInt(v, out int? ds):
+                        edits.Add(o => o.DoubleSided = ds.HasValue ? ds.Value != 0 : null);
+                        break;
+                    case OVERRIDE_GLTF_METALLIC_FACTOR when GltfUnit(v, out float? mf):
+                        edits.Add(o => o.MetallicFactor = mf);
+                        break;
+                    case OVERRIDE_GLTF_ROUGHNESS_FACTOR when GltfUnit(v, out float? rf):
+                        edits.Add(o => o.RoughnessFactor = rf);
+                        break;
+                    case OVERRIDE_GLTF_EMISSIVE_FACTOR when GltfColor(v, out Vector3? ec):
+                        edits.Add(o => o.EmissiveColor = ec);
+                        break;
+                    default:
+                        ShoutError($"llSetLinkGLTFOverrides: invalid value for parameter {param}.");
+                        return 0;
+                }
             }
-            else
+            if (edits.Count == 0 || (face < 0 && face != ALL_SIDES)) return 0;
+
+            bool changed = false;
+            foreach (SceneObjectPart part in GetLinkParts(link))
+                changed |= GltfMaterialOverride.Edit(part, face, o => { foreach (var edit in edits) edit(o); });
+            return changed ? 1 : 0;
+        }
+
+        // ── PBR helpers for llSetRenderMaterial, PRIM_RENDER_MATERIAL and PRIM_GLTF_* ──
+
+        /// <summary>
+        /// A render material as llSetRenderMaterial and PRIM_RENDER_MATERIAL name it: a material item in the script's
+        /// prim, else a key (NULL_KEY: none). SL shouts an error on DEBUG_CHANNEL for anything else.
+        /// </summary>
+        private bool RenderMaterialKeyOrName(string name, string func, out UUID material)
+        {
+            material = UUID.Zero;
+            if (!string.IsNullOrEmpty(name))
             {
+                material = OpenSim.Region.Framework.Scenes.Scripting.ScriptUtils.GetAssetIdFromItemName(m_host, name, (int)AssetType.Material);
+                if (material != UUID.Zero || UUID.TryParse(name, out material))
+                    return true;
+            }
+            ShoutError($"{func}: material \"{name}\" not found");
+            return false;
+        }
+
+        /// <summary>
+        /// Set a part's render material on a face, or every face for ALL_SIDES; a face that does not exist changes
+        /// nothing. A change raises CHANGED_RENDER_MATERIAL, as OpenSim's LSL_Api does.
+        /// </summary>
+        private void SetPartRenderMaterial(SceneObjectPart part, UUID material, int face)
+        {
+            if (face < 0 && face != ALL_SIDES) return;
+            if (GltfMaterialOverride.SetRenderMaterial(part, face, material))
+                part.TriggerScriptChangedEvent(Changed.MATERIAL);
+        }
+
+        /// <summary>A face's render material as a script reads it: its name, its key, or NULL_KEY.</summary>
+        private string RenderMaterialAsSeen(SceneObjectPart part, int face)
+        {
+            UUID material = GltfMaterialOverride.GetRenderMaterial(part.Shape, face);
+            return material.IsZero() ? UUID.Zero.ToString() : ConditionalMaterialNameOrUUID(part, material.ToString());
+        }
+
+        private void PrimSetRenderMaterial(SceneObjectPart part, object faceArg, object materialArg)
+        {
+            if (faceArg is not int face) return;
+            if (RenderMaterialKeyOrName(materialArg?.ToString(), "llSetPrimitiveParams: PRIM_RENDER_MATERIAL", out UUID material))
+                SetPartRenderMaterial(part, material, face);
+        }
+
+        /// <summary>
+        /// PRIM_GLTF_BASE_COLOR, _NORMAL, _METALLIC_ROUGHNESS and _EMISSIVE (SL wiki pages of those names):
+        /// [ face, texture, repeats, offsets, rotation_in_radians, ...the rule's own values ]. Any value given as ""
+        /// clears that override. A value of the wrong type skips the rule, as PRIM_NORMAL does; a texture that is
+        /// neither an item in the prim nor a key shouts an error and skips it, as SL does.
+        /// </summary>
+        private void PrimSetGltf(SceneObjectPart part, int code, object[] data, int idx)
+        {
+            if (data[idx] is not int face || (face < 0 && face != ALL_SIDES)) return;
+            int slot = GltfSlot(code);
+
+            if (!GltfTexture(data[idx + 1], out UUID? texture, out bool found)) return;
+            if (!found)
+            {
+                ShoutError($"llSetPrimitiveParams: {GltfRuleName(code)}: texture \"{data[idx + 1]}\" not found");
+                return;
+            }
+            if (!GltfVector(data[idx + 2], out Vector3? repeats) || !GltfVector(data[idx + 3], out Vector3? offsets)
+                || !GltfFloat(data[idx + 4], out float? rotation))
+                return;
+
+            Action<GltfMaterialOverride> extra = null;
+            switch (code)
+            {
+                case PRIM_GLTF_BASE_COLOR:
+                    // [ ..., vector color, float alpha, integer alpha_mode, float alpha_mask_cutoff, integer double_sided ]
+                    if (!GltfColor(data[idx + 5], out Vector3? color) || !GltfUnit(data[idx + 6], out float? alpha)
+                        || !GltfAlphaMode(data[idx + 7], out int? mode) || !GltfUnit(data[idx + 8], out float? cutoff)
+                        || !GltfInt(data[idx + 9], out int? doubleSided))
+                        return;
+                    extra = o =>
+                    {
+                        o.BaseColor = color;
+                        o.BaseAlpha = alpha;
+                        o.AlphaMode = mode;
+                        o.AlphaCutoff = cutoff;
+                        o.DoubleSided = doubleSided.HasValue ? doubleSided.Value != 0 : null;
+                    };
+                    break;
+                case PRIM_GLTF_METALLIC_ROUGHNESS:
+                    // [ ..., float metallic_factor, float roughness_factor ]
+                    if (!GltfUnit(data[idx + 5], out float? metallic) || !GltfUnit(data[idx + 6], out float? roughness))
+                        return;
+                    extra = o => { o.MetallicFactor = metallic; o.RoughnessFactor = roughness; };
+                    break;
+                case PRIM_GLTF_EMISSIVE:
+                    // [ ..., vector emissive_tint ]
+                    if (!GltfColor(data[idx + 5], out Vector3? emissive)) return;
+                    extra = o => o.EmissiveColor = emissive;
+                    break;
+            }
+
+            GltfMaterialOverride.Edit(part, face, o =>
+            {
+                o.SetTexture(slot, texture);
+                o.SetScale(slot, repeats.HasValue
+                    ? new Vector2(Math.Clamp(repeats.Value.X, -10000f, 10000f), Math.Clamp(repeats.Value.Y, -10000f, 10000f))
+                    : null);
+                o.SetOffset(slot, offsets.HasValue
+                    ? new Vector2(Math.Clamp(offsets.Value.X, -1f, 1f), Math.Clamp(offsets.Value.Y, -1f, 1f))
+                    : null);
+                o.SetRotation(slot, rotation);
+                extra?.Invoke(o);
+            });
+        }
+
+        /// <summary>
+        /// The PRIM_RENDER_MATERIAL and PRIM_GLTF_* reads of one face, or of every face for ALL_SIDES; nothing for a
+        /// face that does not exist. A value that is not overridden reads as "", as SL documents.
+        /// </summary>
+        private void PrimGetGltf(SceneObjectPart part, int code, int face, List<object> result)
+        {
+            int sides = part.GetNumberOfSides();
+            if (face == ALL_SIDES)
+            {
+                for (int f = 0; f < sides; f++)
+                    PrimGetGltfFace(part, code, f, result);
+            }
+            else if (face >= 0 && face < sides)
+                PrimGetGltfFace(part, code, face, result);
+        }
+
+        private void PrimGetGltfFace(SceneObjectPart part, int code, int face, List<object> result)
+        {
+            if (code == PRIM_RENDER_MATERIAL)
+            {
+                result.Add(RenderMaterialAsSeen(part, face));
                 return;
             }
 
-            if (part.ParentGroup != null)
-                part.ParentGroup.HasGroupChanged = true;
-            part.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
-        }
+            GltfMaterialOverride o = GltfMaterialOverride.Get(part.Shape, face);
+            int slot = GltfSlot(code);
 
-        private string GetGLTFOverrideField(SceneObjectPart part, int face, string fieldName)
-        {
-            var shape = part.Shape;
-            if (shape?.RenderMaterials?.overrides == null) return null;
+            UUID? texture = o.GetTexture(slot);
+            if (!texture.HasValue)
+                result.Add(string.Empty);
+            else if (texture.Value == GltfMaterialOverride.NullTextureOverride)
+                result.Add(UUID.Zero.ToString());
+            else
+                result.Add(ConditionalMaterialNameOrUUID(part, texture.Value.ToString()));
+            Vector2? scale = o.GetScale(slot);
+            result.Add(scale.HasValue ? new Vector3(scale.Value.X, scale.Value.Y, 0f) : string.Empty);
+            Vector2? offset = o.GetOffset(slot);
+            result.Add(offset.HasValue ? new Vector3(offset.Value.X, offset.Value.Y, 0f) : string.Empty);
+            result.Add(GltfOut(o.GetRotation(slot)));
 
-            foreach (var ovr in shape.RenderMaterials.overrides)
+            switch (code)
             {
-                if (ovr.te_index == (byte)face && !string.IsNullOrEmpty(ovr.data))
-                {
-                    try
-                    {
-                        var parsed = OpenMetaverse.StructuredData.OSDParser.DeserializeLLSDNotation(ovr.data)
-                            as OpenMetaverse.StructuredData.OSDMap;
-                        if (parsed != null && parsed.ContainsKey(fieldName))
-                            return parsed[fieldName].ToString();
-                    }
-                    catch { }
-                }
+                case PRIM_GLTF_BASE_COLOR:
+                    result.Add(o.BaseColor.HasValue ? o.BaseColor.Value : string.Empty);
+                    result.Add(GltfOut(o.BaseAlpha));
+                    result.Add(o.AlphaMode.HasValue ? o.AlphaMode.Value : string.Empty);
+                    result.Add(GltfOut(o.AlphaCutoff));
+                    result.Add(o.DoubleSided.HasValue ? (o.DoubleSided.Value ? 1 : 0) : string.Empty);
+                    break;
+                case PRIM_GLTF_METALLIC_ROUGHNESS:
+                    result.Add(GltfOut(o.MetallicFactor));
+                    result.Add(GltfOut(o.RoughnessFactor));
+                    break;
+                case PRIM_GLTF_EMISSIVE:
+                    result.Add(o.EmissiveColor.HasValue ? o.EmissiveColor.Value : string.Empty);
+                    break;
             }
-            return null;
         }
 
-        private OpenMetaverse.StructuredData.OSDMap GetGLTFOverrideMap(SceneObjectPart part, int face)
-        {
-            var shape = part.Shape;
-            if (shape?.RenderMaterials?.overrides == null) return null;
+        private static object GltfOut(float? v) => v.HasValue ? v.Value : string.Empty;
 
-            foreach (var ovr in shape.RenderMaterials.overrides)
+        private static int GltfSlot(int code) => code switch
+        {
+            PRIM_GLTF_NORMAL => GltfMaterialOverride.SLOT_NORMAL,
+            PRIM_GLTF_METALLIC_ROUGHNESS => GltfMaterialOverride.SLOT_METALLIC_ROUGHNESS,
+            PRIM_GLTF_EMISSIVE => GltfMaterialOverride.SLOT_EMISSIVE,
+            _ => GltfMaterialOverride.SLOT_BASE_COLOR,
+        };
+
+        private static string GltfRuleName(int code) => code switch
+        {
+            PRIM_GLTF_NORMAL => "PRIM_GLTF_NORMAL",
+            PRIM_GLTF_METALLIC_ROUGHNESS => "PRIM_GLTF_METALLIC_ROUGHNESS",
+            PRIM_GLTF_EMISSIVE => "PRIM_GLTF_EMISSIVE",
+            _ => "PRIM_GLTF_BASE_COLOR",
+        };
+
+        // The value readers for PRIM_GLTF_* and llSetLinkGLTFOverrides: "" is null (clear the override); false for a
+        // value of the wrong type.
+
+        private static bool GltfUnset(object v) => v is string s && s.Length == 0;
+
+        private bool GltfTexture(object v, out UUID? texture, out bool found)
+        {
+            texture = null;
+            found = true;
+            if (GltfUnset(v)) return true;
+            if (v is not string name) return false;
+            UUID id = OpenSim.Region.Framework.Scenes.Scripting.ScriptUtils.GetAssetIdFromItemName(m_host, name, (int)AssetType.Texture);
+            if (id == UUID.Zero && !UUID.TryParse(name, out id))
             {
-                if (ovr.te_index == (byte)face && !string.IsNullOrEmpty(ovr.data))
-                {
-                    try
-                    {
-                        return OpenMetaverse.StructuredData.OSDParser.DeserializeLLSDNotation(ovr.data)
-                            as OpenMetaverse.StructuredData.OSDMap;
-                    }
-                    catch { }
-                }
+                found = false;
+                return true;
             }
-            return null;
-        }
-
-        private void GetGLTFBaseColorParams(SceneObjectPart part, int face, List<object> result)
-        {
-            var osd = GetGLTFOverrideMap(part, face);
-
-            // texture
-            result.Add(ConditionalMaterialNameOrUUID(part, osd != null && osd.ContainsKey("tex") ? osd["tex"].AsString() : string.Empty));
-            // repeats
-            if (osd != null && osd.ContainsKey("rep") && osd["rep"] is OpenMetaverse.StructuredData.OSDArray repArr && repArr.Count >= 2)
-                result.Add(new Vector3((float)repArr[0].AsReal(), (float)repArr[1].AsReal(), 0f));
-            else
-                result.Add(new Vector3(1f, 1f, 0f));
-            // offsets
-            if (osd != null && osd.ContainsKey("off") && osd["off"] is OpenMetaverse.StructuredData.OSDArray offArr && offArr.Count >= 2)
-                result.Add(new Vector3((float)offArr[0].AsReal(), (float)offArr[1].AsReal(), 0f));
-            else
-                result.Add(Vector3.Zero);
-            // rotation
-            result.Add(osd != null && osd.ContainsKey("rot") ? (float)osd["rot"].AsReal() : 0f);
-            // color (RGB from bc array)
-            if (osd != null && osd.ContainsKey("bc") && osd["bc"] is OpenMetaverse.StructuredData.OSDArray bcArr && bcArr.Count >= 3)
-                result.Add(new Vector3((float)bcArr[0].AsReal(), (float)bcArr[1].AsReal(), (float)bcArr[2].AsReal()));
-            else
-                result.Add(Vector3.One);
-            // alpha (4th element of bc)
-            if (osd != null && osd.ContainsKey("bc") && osd["bc"] is OpenMetaverse.StructuredData.OSDArray bcArr2 && bcArr2.Count >= 4)
-                result.Add((float)bcArr2[3].AsReal());
-            else
-                result.Add(1f);
-            // alpha_mode
-            result.Add(osd != null && osd.ContainsKey("am") ? osd["am"].AsInteger() : 0);
-            // alpha_cutoff
-            result.Add(osd != null && osd.ContainsKey("ac") ? (float)osd["ac"].AsReal() : 0.5f);
-            // double_sided
-            result.Add(osd != null && osd.ContainsKey("ds") && osd["ds"].AsBoolean() ? 1 : 0);
-        }
-
-        private void GetGLTFTransformParams(SceneObjectPart part, int face,
-            string texKey, string repKey, string offKey, string rotKey, List<object> result)
-        {
-            var osd = GetGLTFOverrideMap(part, face);
-
-            // texture
-            result.Add(ConditionalMaterialNameOrUUID(part, osd != null && osd.ContainsKey(texKey) ? osd[texKey].AsString() : string.Empty));
-            // repeats
-            if (osd != null && osd.ContainsKey(repKey) && osd[repKey] is OpenMetaverse.StructuredData.OSDArray repArr && repArr.Count >= 2)
-                result.Add(new Vector3((float)repArr[0].AsReal(), (float)repArr[1].AsReal(), 0f));
-            else
-                result.Add(new Vector3(1f, 1f, 0f));
-            // offsets
-            if (osd != null && osd.ContainsKey(offKey) && osd[offKey] is OpenMetaverse.StructuredData.OSDArray offArr && offArr.Count >= 2)
-                result.Add(new Vector3((float)offArr[0].AsReal(), (float)offArr[1].AsReal(), 0f));
-            else
-                result.Add(Vector3.Zero);
-            // rotation
-            result.Add(osd != null && osd.ContainsKey(rotKey) ? (float)osd[rotKey].AsReal() : 0f);
-        }
-
-        private void GetGLTFMetallicRoughnessParams(SceneObjectPart part, int face, List<object> result)
-        {
-            var osd = GetGLTFOverrideMap(part, face);
-
-            // texture, repeats, offsets, rotation
-            GetGLTFTransformParams(part, face, "mrtex", "mrrep", "mroff", "mrrot", result);
-            // metallic_factor
-            result.Add(osd != null && osd.ContainsKey("mf") ? (float)osd["mf"].AsReal() : 0f);
-            // roughness_factor
-            result.Add(osd != null && osd.ContainsKey("rf") ? (float)osd["rf"].AsReal() : 0.5f);
-        }
-
-        private void GetGLTFEmissiveParams(SceneObjectPart part, int face, List<object> result)
-        {
-            var osd = GetGLTFOverrideMap(part, face);
-
-            // texture, repeats, offsets, rotation
-            GetGLTFTransformParams(part, face, "etex", "erep", "eoff", "erot", result);
-            // emissive_tint
-            if (osd != null && osd.ContainsKey("ec") && osd["ec"] is OpenMetaverse.StructuredData.OSDArray ecArr && ecArr.Count >= 3)
-                result.Add(new Vector3((float)ecArr[0].AsReal(), (float)ecArr[1].AsReal(), (float)ecArr[2].AsReal()));
-            else
-                result.Add(Vector3.Zero);
-        }
-
-        private static bool TryParseColor4(string s, out float r, out float g, out float b, out float a)
-        {
-            r = g = b = 0f; a = 1f;
-            s = s.Trim().Trim('<', '>');
-            var parts = s.Split(',');
-            if (parts.Length < 3) return false;
-            var ci = System.Globalization.CultureInfo.InvariantCulture;
-            if (!float.TryParse(parts[0].Trim(), System.Globalization.NumberStyles.Float, ci, out r)) return false;
-            if (!float.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Float, ci, out g)) return false;
-            if (!float.TryParse(parts[2].Trim(), System.Globalization.NumberStyles.Float, ci, out b)) return false;
-            if (parts.Length >= 4)
-                float.TryParse(parts[3].Trim(), System.Globalization.NumberStyles.Float, ci, out a);
+            // NULL_KEY overrides the slot to no texture, the viewer's GLTF_OVERRIDE_NULL_UUID
+            texture = id == UUID.Zero ? GltfMaterialOverride.NullTextureOverride : id;
             return true;
         }
 
-        private static bool TryParseVector3(string s, out float x, out float y, out float z)
+        private static bool GltfVector(object v, out Vector3? vec)
         {
-            x = y = z = 0f;
-            s = s.Trim().Trim('<', '>');
-            var parts = s.Split(',');
-            if (parts.Length < 3) return false;
-            var ci = System.Globalization.CultureInfo.InvariantCulture;
-            if (!float.TryParse(parts[0].Trim(), System.Globalization.NumberStyles.Float, ci, out x)) return false;
-            if (!float.TryParse(parts[1].Trim(), System.Globalization.NumberStyles.Float, ci, out y)) return false;
-            if (!float.TryParse(parts[2].Trim(), System.Globalization.NumberStyles.Float, ci, out z)) return false;
+            vec = null;
+            if (GltfUnset(v)) return true;
+            if (v is not Vector3 x) return false;
+            vec = x;
             return true;
         }
 
+        private static bool GltfColor(object v, out Vector3? color)
+        {
+            if (!GltfVector(v, out color)) return false;
+            if (color.HasValue)
+                color = new Vector3(Math.Clamp(color.Value.X, 0f, 1f), Math.Clamp(color.Value.Y, 0f, 1f), Math.Clamp(color.Value.Z, 0f, 1f));
+            return true;
+        }
+
+        private static bool GltfFloat(object v, out float? f)
+        {
+            f = null;
+            if (GltfUnset(v)) return true;
+            if (!PrimFloat(v, out float x)) return false;
+            f = x;
+            return true;
+        }
+
+        private static bool GltfUnit(object v, out float? f)
+        {
+            if (!GltfFloat(v, out f)) return false;
+            if (f.HasValue) f = Math.Clamp(f.Value, 0f, 1f);
+            return true;
+        }
+
+        private static bool GltfInt(object v, out int? i)
+        {
+            i = null;
+            if (GltfUnset(v)) return true;
+            if (v is not int x) return false;
+            i = x;
+            return true;
+        }
+
+        private static bool GltfAlphaMode(object v, out int? mode)
+        {
+            if (!GltfInt(v, out mode)) return false;
+            return !mode.HasValue || (mode.Value >= GltfMaterialOverride.ALPHA_MODE_OPAQUE && mode.Value <= GltfMaterialOverride.ALPHA_MODE_MASK);
+        }
 
         public void llRenderMaterial(string materialId)
         {
@@ -21406,46 +21144,14 @@ public int llSetLinkGLTFOverrides(int link, int face, LSLList overrides)
         // ── 657: llSetLinkRenderMaterial ──
         public void llSetLinkRenderMaterial(int link, string materialId, int face)
         {
-            // Set PBR render material on a specific link's face
-            // Extends llSetRenderMaterial to target specific links
-            var parts = GetLinkParts(link);
-            foreach (var part in parts)
+            // SL (https://wiki.secondlife.com/wiki/LlSetLinkRenderMaterial): llSetRenderMaterial on the link's prims,
+            // with the same 0.2s delay.
+            if (RenderMaterialKeyOrName(materialId, "llSetLinkRenderMaterial", out UUID material))
             {
-                try
-                {
-                    UUID matId = UUID.Zero;
-                    UUID.TryParse(materialId, out matId);
-
-                    if (face == ALL_SIDES)
-                    {
-                        for (int f = 0; f < part.GetNumberOfSides(); f++)
-                            SetPartRenderMaterial(part, matId, f);
-                    }
-                    else
-                    {
-                        SetPartRenderMaterial(part, matId, face);
-                    }
-                    part.ScheduleFullUpdate();
-                }
-                catch (Exception e)
-                {
-                    m_log.LogWarning("[PhloxAPI]: llSetLinkRenderMaterial error: {0}", e.Message);
-                }
+                foreach (SceneObjectPart part in GetLinkParts(link))
+                    SetPartRenderMaterial(part, material, face);
             }
-        }
-
-        private void SetPartRenderMaterial(SceneObjectPart part, UUID matId, int face)
-        {
-            // Helper: set render material UUID on a specific face of a part
-            var te = part.Shape.Textures;
-            if (te == null) return;
-            if (face < 0 || face >= part.GetNumberOfSides()) return;
-            var faceEntry = te.GetFace((uint)face);
-            if (faceEntry != null)
-            {
-                faceEntry.MaterialID = matId;
-                part.UpdateTextureEntry(te);
-            }
+            ScriptSleep(200);
         }
 
         // ── 658: llXorBase64 ──
