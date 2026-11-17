@@ -111,6 +111,6 @@ public class RemoteAdminRestartTests
         Hashtable result = Restart(plugin, new Hashtable { ["milliseconds"] = "30000" });
 
         Xunit.Assert.Equal(true, result["success"]);
-        Xunit.Assert.All(modules.Values, m => Assert.Equal(30, m.ScheduledSeconds));
+        Xunit.Assert.All(modules.Values, m => Xunit.Assert.Equal(30, m.ScheduledSeconds));
     }
 }

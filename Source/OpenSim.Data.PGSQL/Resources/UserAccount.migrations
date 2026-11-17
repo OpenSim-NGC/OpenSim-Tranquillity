@@ -55,3 +55,15 @@ BEGIN TRANSACTION;
 ALTER TABLE UserAccounts ADD "active" integer NOT NULL DEFAULT 1;
 
 COMMIT;
+
+:VERSION 6
+
+-- UserAccountService stores and reads DisplayName and NameChanged, as the MySQL
+-- store does since its version 7. Quoted: PostgreSQL folds unquoted names to lower case.
+
+BEGIN TRANSACTION;
+
+ALTER TABLE UserAccounts ADD "DisplayName" varchar(31) NULL;
+ALTER TABLE UserAccounts ADD "NameChanged" integer NULL DEFAULT 0;
+
+COMMIT;
