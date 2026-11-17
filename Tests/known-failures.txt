@@ -6,9 +6,6 @@
 OpenSim.Tests.Clients.AssetClient :: (no tests) # the project contains no tests
 Warp3D.Tests :: (no tests) # its three test files are excluded with <Compile Remove> in the project file
 
-# InWorldz.Phlox.Tests (flaky on develop)
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.GrantRestoreTests.AClaimNotedForCarryIsNotSavedAsAGrantByARegionStop # flaky: stops the region before the script has run its event; failed about 1 run in 3 on develop
-
 # OpenSim.Region.PhysicsModules.Jolt.Tests (flaky)
 OpenSim.Region.PhysicsModules.Jolt.Tests :: OpenSim.Region.PhysicsModules.Jolt.Tests.FirstRayCastTests.The_first_cast_after_the_scene_loads_costs_about_what_a_later_one_does # flaky: compares two timings; passed in the baseline run and failed in a later one
 

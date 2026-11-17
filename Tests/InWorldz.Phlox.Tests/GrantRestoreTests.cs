@@ -49,6 +49,7 @@ public class GrantRestoreTests
                 if (cmd == ""take"") { llTakeControls(CONTROL_FWD, TRUE, FALSE); llSay(0, ""took""); }
                 else if (cmd == ""ask"") llRequestPermissions(llList2Key(w, 1), (integer)llList2String(w, 2));
                 else if (cmd == ""reset"") llResetScript();
+                else if (cmd == ""ping"") llSay(0, ""pong"");
             }
             run_time_permissions(integer p) { llSay(0, ""rtp="" + (string)p); }
             control(key id, integer l, integer e) { llSay(0, ""ctl""); }
@@ -620,7 +621,7 @@ public class GrantRestoreTests
             item = RezAndGrantByDialog(h, owner, asset, TriggerAnimation | Debit);
             h.PumpUntilIdle(TimeSpan.FromSeconds(2));
             SavedStateRig.States(h).SaveNow(new[] { (Interpreter)h.InterpreterFor(item) });
-            Command(h, "nothing");   // the script runs, so the final save captures it again
+            Command(h, "ping", "pong");   // the script runs (waited for), so the final save captures it again
             h.StopRegionAsTheSimulatorDoes();
         }
         using var h2 = Restart(owner, asset, item);
@@ -678,7 +679,7 @@ public class GrantRestoreTests
             Assert.True(Api(h, item).HasGrantClaim);
             asset = copy.RootPart.Inventory.GetInventoryItem(item).AssetID;
             Assert.NotEqual(string.Empty, h.Engine.GetXMLState(item));   // the capture for carry notes the claim
-            Command(h, "nothing");   // the script runs, so the final save captures it
+            Command(h, "ping", "pong");   // the script runs (waited for), so the final save captures it
             h.StopRegionAsTheSimulatorDoes();
         }
         SerializedRuntimeState row = StateManager.Decode(SavedStateRig.Row(item)!.Value.Blob);
