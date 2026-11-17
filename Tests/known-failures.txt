@@ -6,16 +6,6 @@
 OpenSim.Tests.Clients.AssetClient :: (no tests) # the project contains no tests
 Warp3D.Tests :: (no tests) # its three test files are excluded with <Compile Remove> in the project file
 
-# InWorldz.Phlox.Tests
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.CrossingEndAtStopTests.QueuedEventsOfAHeldScriptRunOnceAndInOrderAfterARestoreWhenTheEndIsTakenInTheFinalPass(unpumped: 0)
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.CrossingEndAtStopTests.QueuedEventsOfAHeldScriptRunOnceAndInOrderAfterARestoreWhenTheEndIsTakenInTheFinalPass(unpumped: 1)
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.EventQueueRoutingTests.NullChangeControlEventsAreCoalescedWhileOneIsQueued
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.ExperienceGrantRestoreTests.ANewLlRequestPermissionsEndsTheExperienceNote
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.ExperienceStateReadTests.AScriptThatMakesNoCallAfterItsGrantStillLosesItAndItsControls
-
-# OpenSim.Framework.PluginMigration.Tests
-OpenSim.Framework.PluginMigration.Tests :: OpenSim.Framework.PluginMigration.Tests.PluginRegistryTests.TestProviderRegistrationsDoNotContainUnexpectedTriples
-
 # InWorldz.Phlox.Tests (flaky on develop)
 InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.GrantRestoreTests.AClaimNotedForCarryIsNotSavedAsAGrantByARegionStop # flaky: stops the region before the script has run its event; failed about 1 run in 3 on develop
 
