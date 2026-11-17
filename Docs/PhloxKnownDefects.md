@@ -934,10 +934,10 @@ such list.
   it is no longer an attachment. When the avatar crosses or teleports to another region the force goes with it in the
   agent data (optional fields `constant_force` and `constant_force_local`); arriving from a simulator that does not
   send them, the avatar has no force.
-  **No physics engine in this repository applies the force yet** (ubODE, BulletSim, POS and BasicPhysics keep the
-  default `SetConstantForce`, which does nothing), so the avatar does not move. ubODE's avatar has no constant force
-  at all: its `Force` property reports the avatar's walking target velocity and setting it does nothing. An engine
-  outside this repository, such as a Jolt module, shows no effect either until it implements `SetConstantForce`.
+  **Only the Jolt module applies the force** (`JoltCharacter.SetConstantForce` passes it to the Jolt character as a
+  constant force, and updates a local force as the avatar turns). ubODE, BulletSim, POS and BasicPhysics keep the default
+  `SetConstantForce`, which does nothing, so on those engines the avatar does not move. ubODE's avatar has no
+  constant force at all: its `Force` property reports the avatar's walking target velocity and setting it does nothing.
 - `llSetForce` in an unattached physical object: a local force (`local` TRUE) is turned once by the object's rotation
   when it is set, not kept in the object's frame as it turns.
 - `botFollowAvatar` goes straight for the avatar. Halcyon also steered around objects along the avatar's recent
