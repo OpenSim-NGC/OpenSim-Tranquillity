@@ -3330,7 +3330,9 @@ public class GloebitMoneyModule : IMoneyModule, ISharedRegionModule, GloebitTran
         // Verify that land transferred successfully - sad that we have to check this.
         ILandObject parcel = s.LandChannel.GetLandObject(e.parcelLocalID);
         UUID newOwnerID = parcel.LandData.OwnerID;
-        if (newOwnerID != UUID.Parse(txn.PayerID)) 
+        // Land bought for a group belongs to the group (LandObject.UpdateLandSold).
+        UUID expectedOwnerID = e.groupOwned ? e.groupId : UUID.Parse(txn.PayerID);
+        if (newOwnerID != expectedOwnerID) 
         {
             // This should only happen if due to race condition.  Unclear if possible or result.
             returnMsg = "Land transfer failed.  Owner is not buyer.";

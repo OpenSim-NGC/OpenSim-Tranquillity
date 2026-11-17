@@ -1148,6 +1148,9 @@ public class DTLNSLMoneyModule : IMoneyModule, ISharedRegionModule
     {
         if (m_debug) m_log.LogInformation("[MONEY]: ValidateLandBuy:");
 
+        // processLandBuy charges nothing while selling is disabled, so a sale for a price is not validated then.
+        if (!m_sellEnabled && landBuyEvent.parcelPrice > 0) return;
+
         IClientAPI senderClient = GetLocateClient(landBuyEvent.agentId);
         if (senderClient != null)
         {
