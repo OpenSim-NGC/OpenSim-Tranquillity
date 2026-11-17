@@ -12,46 +12,9 @@ InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.CrossingEndAtStopTests.QueuedEvents
 InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.EventQueueRoutingTests.NullChangeControlEventsAreCoalescedWhileOneIsQueued
 InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.ExperienceGrantRestoreTests.ANewLlRequestPermissionsEndsTheExperienceNote
 InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.ExperienceStateReadTests.AScriptThatMakesNoCallAfterItsGrantStillLosesItAndItsControls
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.OsslDrawPixelTests.TheRendererAloneDrawsRedHelloOnWhiteWhereTheScriptAskedFor
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.OsslDrawPixelTests.TheTextureOnTheFaceDecodesToRedHelloOnWhite
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.OsslDrawTests.SetDynamicTextureDataRendersTheDrawListOntoTheFaces
-InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.OsslDrawTests.TheGateHoldsAtItsUpstreamLevel
 
 # OpenSim.Framework.PluginMigration.Tests
 OpenSim.Framework.PluginMigration.Tests :: OpenSim.Framework.PluginMigration.Tests.PluginRegistryTests.TestProviderRegistrationsDoNotContainUnexpectedTriples
-
-# OpenSimNGC.Appearance.Baking.Tests
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.a_bake_encodes_five_components_and_round_trips_the_morph_mask
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.a_channel_that_drew_a_fully_transparent_texture_is_not_nothing_drawn
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.a_worn_wearable_with_no_texture_asset_still_contributes_its_morph_mask
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.bake_hash_is_stable_across_ordering_and_changes_with_every_input
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.encoded_bakes_are_a_single_tile_codestream_and_round_trip
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.requesting_a_subset_of_channels_bakes_only_those_and_changes_no_bytes
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.skirt_and_extra_channels_appear_only_when_worn_or_painted
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.the_backend_bakes_the_five_classic_channels_from_bytes_and_reports_fidelity
-OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.the_default_encoder_would_tile_a_512_bake_so_the_config_pins_one_tile
-
-# OpenSim.Region.OptionalModules.ServerSideBaking.Tests
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeAfterPresenceClosedTests.ABakeForAPresenceThatStaysIsRecordedForIt
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeAfterPresenceClosedTests.ABakeQueuedForAPresenceThatHasClosedEndsQuietly
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeAfterPresenceClosedTests.APresenceThatClosesWhileItsBakeRunsHasNothingWrittenBack
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeLogLevelTests.ABakeWithAFailedChannelIsLoggedAtInformation
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeLogLevelTests.ANormalBakeIsLoggedAtDebug
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeLogLevelTests.ARegionsStartUpLinesAreDebugAndTheGlobalLineStaysInformation
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BomAuxChannelTests.AllFiveAuxChannelsCompositeAndEncodeTogether
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BomAuxChannelTests.TheLibraryProducesAnAuxChannelOnlyForASlotThatIsPainted
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BomAuxChannelTests.TheOrchestratorStoresEachAuxChannelAndWritesFaces40To44
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BomAuxChannelTests.TheRobustRouteServesEveryAuxChannel
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.LoginBakeFromCofTests.ARecordThatMatchesTheCurrentOutfitIsLeftAsItIs
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.LoginBakeFromCofTests.AStalledCurrentOutfitReadDoesNotHoldTheLoginBake
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.LoginBakeFromCofTests.TheFirstAppearanceAtLoginIsBakedFromTheCurrentOutfitNotTheStaleRecord
-OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.LoginBakeFromCofTests.WithNoCurrentOutfitToReadTheLoginBakeUsesTheRecordAndLogsOnce
-
-# OpenSim.Region.ScriptEngine.Tests
-OpenSim.Region.ScriptEngine.Tests :: OpenSim.Region.ScriptEngine.Shared.Tests.LSL_ApiHttpTests.TestLlRequestUrl
-OpenSim.Region.ScriptEngine.Tests :: OpenSim.Region.ScriptEngine.Shared.Tests.LSL_ApiUserTests.TestLlRequestAgentDataOnline
-OpenSim.Region.ScriptEngine.Tests :: OpenSim.Region.ScriptEngine.Shared.Tests.LSL_TypesTestLSLFloat.TestExplicitCastLSLStringToLSLFloat
-OpenSim.Region.ScriptEngine.Tests :: OpenSim.Region.ScriptEngine.Shared.Tests.LSL_TypesTestLSLFloat.TestExplicitCastStringToLSLFloat
 
 # InWorldz.Phlox.Tests (flaky on develop)
 InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.GrantRestoreTests.AClaimNotedForCarryIsNotSavedAsAGrantByARegionStop # flaky: stops the region before the script has run its event; failed about 1 run in 3 on develop
