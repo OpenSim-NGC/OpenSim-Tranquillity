@@ -1,2 +1,116 @@
 # Tests known to fail on develop, as the CI job sees them (ubuntu-latest).
 # One per line: <assembly> :: <test name as the .trx file names it>. See Tests/README-CI.md.
+# Baseline: develop 578db56998, CI run 44180804833 (16,565 tests, 95 failed). The list should only shrink.
+
+# Projects expected to report no tests
+OpenSim.Tests.Clients.AssetClient :: (no tests) # the project contains no tests
+Warp3D.Tests :: (no tests) # its three test files are excluded with <Compile Remove> in the project file
+
+# InWorldz.Phlox.Tests
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.CrossingEndAtStopTests.QueuedEventsOfAHeldScriptRunOnceAndInOrderAfterARestoreWhenTheEndIsTakenInTheFinalPass(unpumped: 0)
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.CrossingEndAtStopTests.QueuedEventsOfAHeldScriptRunOnceAndInOrderAfterARestoreWhenTheEndIsTakenInTheFinalPass(unpumped: 1)
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.EventQueueRoutingTests.NullChangeControlEventsAreCoalescedWhileOneIsQueued
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.ExperienceGrantRestoreTests.ANewLlRequestPermissionsEndsTheExperienceNote
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.ExperienceStateReadTests.AScriptThatMakesNoCallAfterItsGrantStillLosesItAndItsControls
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.OsslDrawPixelTests.TheRendererAloneDrawsRedHelloOnWhiteWhereTheScriptAskedFor
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.OsslDrawPixelTests.TheTextureOnTheFaceDecodesToRedHelloOnWhite
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.OsslDrawTests.SetDynamicTextureDataRendersTheDrawListOntoTheFaces
+InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.OsslDrawTests.TheGateHoldsAtItsUpstreamLevel
+
+# OpenSim.Framework.PluginMigration.Tests
+OpenSim.Framework.PluginMigration.Tests :: OpenSim.Framework.PluginMigration.Tests.PluginRegistryTests.TestProviderRegistrationsDoNotContainUnexpectedTriples
+
+# OpenSim.Framework.Servers.Tests
+OpenSim.Framework.Servers.Tests :: OpenSim.Framework.Servers.Tests.VersionInfoTests.TestVersionLength
+
+# OpenSimNGC.Appearance.Baking.Tests
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.a_bake_encodes_five_components_and_round_trips_the_morph_mask
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.a_channel_that_drew_a_fully_transparent_texture_is_not_nothing_drawn
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.a_worn_wearable_with_no_texture_asset_still_contributes_its_morph_mask
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.bake_hash_is_stable_across_ordering_and_changes_with_every_input
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.encoded_bakes_are_a_single_tile_codestream_and_round_trip
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.requesting_a_subset_of_channels_bakes_only_those_and_changes_no_bytes
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.skirt_and_extra_channels_appear_only_when_worn_or_painted
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.the_backend_bakes_the_five_classic_channels_from_bytes_and_reports_fidelity
+OpenSimNGC.Appearance.Baking.Tests :: OpenSimNGC.Appearance.Baking.Tests.BackendTests.the_default_encoder_would_tile_a_512_bake_so_the_config_pins_one_tile
+
+# OpenSim.Region.CoreModules.Tests
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.OutboundWiringTests.VectorRenderConnectsARedirectHopTheProxyBypassesStraightToItsAllowedAddress
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.OutboundWiringTests.VectorRenderConnectsToTheAddressItsFilterAllows
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.OutboundWiringTests.VectorRenderRefusesAHostThatTurnsBlockedAtTheConnect
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.OutboundWiringTests.VectorRenderRefusesARedirectHopThatTurnsBlockedAtTheConnect
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.OutboundWiringTests.VectorRenderRefusesARedirectHopTheProxyBypassesThatTurnsBlockedAtTheConnect
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "http://10.0.0.1/img.png")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "http://100.64.0.1/img.png")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "http://127.0.0.1:PORT/img.png")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "http://169.254.169.254/latest/meta-data/")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "http://172.16.0.1/img.png")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "http://172.31.255.254:8003/img.png")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "http://192.168.1.1:9000/img.png")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "http://localhost:PORT/img.png")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ALoopbackOrPrivateImageUrlIsNotFetched(url: "https://10.0.0.1/img.png")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.AnExceptEntryAllowsItsEndpoint
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.AnImagelessDrawingIsUnchanged
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.APublicImageUrlIsFetched
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ARedirectToAnAllowedAddressIsStillFollowed
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Scripting.OutboundHardening.Tests.VectorRenderImageFilterTests.ARedirectToAPrivateAddressIsNotFollowed
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.GuessedTableCachedUnderTheOldNameIsNotUsed
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ModuleTableIsTheLayerStartsOfALayerFirstCodestream
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ModuleWarnsAndGuessesForACodestreamThatIsNotLayerFirst
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ReaderGivesOffsetsInTheFileForAJp2File
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ReaderHasNoTableForACodestreamThatIsNotLayerFirst(progression: "comp-pos")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ReaderHasNoTableForACodestreamThatIsNotLayerFirst(progression: "pos-comp")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ReaderHasNoTableForACodestreamThatIsNotLayerFirst(progression: "res")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ReaderHasNoTableForACodestreamThatIsNotLayerFirst(progression: "res-pos")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ReaderHasNoTableForMoreThanOneTile
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ReaderReturnsTheLayerStartsTheSopMarkersShow
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Agent.TextureSender.J2KLayerBoundaryTests.ReaderThrowsNothingForTruncatedOrGarbageBytes
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.A_flagged_closed_sculpt_is_a_solid_shape_that_is_inside_out_only_with_invert(type: Sphere)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.A_flagged_closed_sculpt_is_a_solid_shape_that_is_inside_out_only_with_invert(type: Torus)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.A_flagged_sculpt_is_not_flat(type: Cylinder)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.A_flagged_sculpt_is_not_flat(type: Sphere)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.A_flagged_sculpt_is_not_flat(type: Torus)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Both_flags_give_the_mirrored_shape_with_its_faces_reversed(type: Cylinder)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Both_flags_give_the_mirrored_shape_with_its_faces_reversed(type: Plane)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Both_flags_give_the_mirrored_shape_with_its_faces_reversed(type: Sphere)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Both_flags_give_the_mirrored_shape_with_its_faces_reversed(type: Torus)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Sculpts_without_flags_give_the_shapes_the_mesher_gave_before(type: Cylinder, expected: "1054 2044 -35.2 -0.56 1.00 -0.91 0.91 -2.00 1.97")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Sculpts_without_flags_give_the_shapes_the_mesher_gave_before(type: Plane, expected: "1067 2010 -20.8 -0.75 1.00 -1.50 1.50 0.35 1.59")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Sculpts_without_flags_give_the_shapes_the_mesher_gave_before(type: Sphere, expected: "989 1976 25.1 -0.46 0.94 -0.90 0.90 -1.62 1.61")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Sculpts_without_flags_give_the_shapes_the_mesher_gave_before(type: Torus, expected: "1053 2106 17.4 -0.62 1.00 -1.30 1.30 -0.62 0.62")
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.The_invert_flag_gives_the_unflagged_shape_with_its_faces_reversed(type: Cylinder)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.The_invert_flag_gives_the_unflagged_shape_with_its_faces_reversed(type: Plane)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.The_invert_flag_gives_the_unflagged_shape_with_its_faces_reversed(type: Sphere)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.The_invert_flag_gives_the_unflagged_shape_with_its_faces_reversed(type: Torus)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.The_mirror_flag_gives_the_unflagged_shape_mirrored_in_x_with_its_faces_still_outward(type: Cylinder)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.The_mirror_flag_gives_the_unflagged_shape_mirrored_in_x_with_its_faces_still_outward(type: Plane)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.The_mirror_flag_gives_the_unflagged_shape_mirrored_in_x_with_its_faces_still_outward(type: Sphere)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.The_mirror_flag_gives_the_unflagged_shape_mirrored_in_x_with_its_faces_still_outward(type: Torus)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Physics.SculptFlagsTests.Two_prims_with_the_same_map_and_size_but_different_flags_each_get_their_own_cached_mesh
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Scripting.ModernSkiaRenderingTests.BitmapCompositionPreservesForegroundOpacity(alpha: 0)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Scripting.ModernSkiaRenderingTests.BitmapCompositionPreservesForegroundOpacity(alpha: 128)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Scripting.ModernSkiaRenderingTests.BitmapCompositionPreservesForegroundOpacity(alpha: 255)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Scripting.ModernSkiaRenderingTests.PolygonPathsRemainClosedAndKeepTheirFillOrStroke(command: "FillPolygon", stroked: False)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Scripting.ModernSkiaRenderingTests.PolygonPathsRemainClosedAndKeepTheirFillOrStroke(command: "Polygon", stroked: True)
+
+# OpenSim.Region.OptionalModules.ServerSideBaking.Tests
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeAfterPresenceClosedTests.ABakeForAPresenceThatStaysIsRecordedForIt
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeAfterPresenceClosedTests.ABakeQueuedForAPresenceThatHasClosedEndsQuietly
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeAfterPresenceClosedTests.APresenceThatClosesWhileItsBakeRunsHasNothingWrittenBack
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeLogLevelTests.ABakeWithAFailedChannelIsLoggedAtInformation
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeLogLevelTests.ANormalBakeIsLoggedAtDebug
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BakeLogLevelTests.ARegionsStartUpLinesAreDebugAndTheGlobalLineStaysInformation
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BomAuxChannelTests.AllFiveAuxChannelsCompositeAndEncodeTogether
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BomAuxChannelTests.TheLibraryProducesAnAuxChannelOnlyForASlotThatIsPainted
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BomAuxChannelTests.TheOrchestratorStoresEachAuxChannelAndWritesFaces40To44
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.BomAuxChannelTests.TheRobustRouteServesEveryAuxChannel
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.LoginBakeFromCofTests.ARecordThatMatchesTheCurrentOutfitIsLeftAsItIs
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.LoginBakeFromCofTests.AStalledCurrentOutfitReadDoesNotHoldTheLoginBake
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.LoginBakeFromCofTests.TheFirstAppearanceAtLoginIsBakedFromTheCurrentOutfitNotTheStaleRecord
+OpenSim.Region.OptionalModules.ServerSideBaking.Tests :: OpenSim.Region.OptionalModules.ServerSideBaking.Tests.LoginBakeFromCofTests.WithNoCurrentOutfitToReadTheLoginBakeUsesTheRecordAndLogsOnce
+
+# OpenSim.Region.ScriptEngine.Tests
+OpenSim.Region.ScriptEngine.Tests :: OpenSim.Region.ScriptEngine.Shared.Tests.LSL_ApiHttpTests.TestLlRequestUrl
+OpenSim.Region.ScriptEngine.Tests :: OpenSim.Region.ScriptEngine.Shared.Tests.LSL_ApiUserTests.TestLlRequestAgentDataOnline
+OpenSim.Region.ScriptEngine.Tests :: OpenSim.Region.ScriptEngine.Shared.Tests.LSL_TypesTestLSLFloat.TestExplicitCastLSLStringToLSLFloat
+OpenSim.Region.ScriptEngine.Tests :: OpenSim.Region.ScriptEngine.Shared.Tests.LSL_TypesTestLSLFloat.TestExplicitCastStringToLSLFloat

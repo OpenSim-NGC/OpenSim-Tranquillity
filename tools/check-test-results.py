@@ -13,6 +13,7 @@ A known failure that passes is reported, so the file can be trimmed, but does no
 some entries are flaky and pass on some runs.
 
 Known-failures file: one test per line, "<assembly> :: <test name as the .trx names it>".
+"<assembly> :: (no tests)" marks a test project that is expected to report no tests.
 Blank lines and lines starting with # are ignored; text after " # " on a line is a note.
 """
 
@@ -27,10 +28,10 @@ COMPLETED = {"Completed", "Passed", "Failed", "Warning"}
 
 
 def test_assemblies(solution: Path) -> set[str]:
-    """Assembly names of the test projects under Tests/ in the solution."""
+    """Assembly names of the test projects in the solution (any project that uses Microsoft.NET.Test.Sdk)."""
     root = solution.parent
     names = set()
-    for rel in re.findall(r'"(Tests[\\/][^"]+\.csproj)"', solution.read_text(encoding="utf-8-sig")):
+    for rel in re.findall(r'"([^"]+\.csproj)"', solution.read_text(encoding="utf-8-sig")):
         proj = root / rel.replace("\\", "/")
         text = proj.read_text(encoding="utf-8-sig")
         if "Microsoft.NET.Test.Sdk" not in text:
@@ -91,13 +92,15 @@ def main() -> int:
         print(f"{assembly}: {c['Passed']} passed, {c['Failed']} failed, {sum(c.values()) - c['Passed'] - c['Failed']} other")
 
     missing = sorted(expected - seen_assemblies)
+    # "<assembly> :: (no tests)" in the known-failures file: a project that is expected to find no tests.
+    missing = [a for a in missing if f"{a} :: (no tests)" not in known]
     for assembly in missing:
         problems.append(f"{assembly}: no test results (the test host crashed, or the project has no tests)")
 
     failed = {k for k, v in outcomes.items() if v == "Failed"}
     new_failures = sorted(failed - known)
     now_passing = sorted(k for k in known if outcomes.get(k) == "Passed")
-    not_run = sorted(k for k in known if k not in outcomes)
+    not_run = sorted(k for k in known if k not in outcomes and not k.endswith(" :: (no tests)"))
 
     print(f"\n{len(outcomes)} tests, {len(failed)} failed, {len(failed & known)} of them known.")
     if now_passing:

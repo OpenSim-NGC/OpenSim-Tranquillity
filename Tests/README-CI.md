@@ -44,6 +44,10 @@ them. Each needs its own repair before it is added:
 | `OpenSim.Region.PhysicsModules.BulletS.Tests` | 2 |
 | `OpenSim.Performance.Tests` (`OpenSim.Tests.Performance`) | 1 |
 
+Two projects in the solution report no tests, and are listed in `known-failures.txt` as `(no tests)`:
+`OpenSim.Tests.Clients.AssetClient` contains none, and `Warp3D.Tests` excludes its three test files with
+`<Compile Remove>`.
+
 ## Running the same check locally
 
 ```sh
