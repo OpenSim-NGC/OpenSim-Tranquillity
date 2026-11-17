@@ -1731,14 +1731,19 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
     public void llSetClickAction(int action)
     {
-        byte old = m_host.ClickAction;
-        m_host.ClickAction = (byte)action;
-        if(m_host.ClickAction != old)
+        SetPartClickAction(m_host, action);
+    }
+
+    /// <summary>llSetClickAction and PRIM_CLICK_ACTION on one prim.</summary>
+    private static void SetPartClickAction(SceneObjectPart part, int action)
+    {
+        byte old = part.ClickAction;
+        part.ClickAction = (byte)action;
+        if(part.ClickAction != old)
         {
-            m_host.ParentGroup.HasGroupChanged = true;
-            m_host.ScheduleFullUpdate();
+            part.ParentGroup.HasGroupChanged = true;
+            part.ScheduleFullUpdate();
         }
-        return;
     }
 
     public void llSetColor(LSL_Vector color, int face)
@@ -5675,28 +5680,36 @@ public void llDetachFromAvatar()
 
     public void llCollisionSound(LSL_String impact_sound, LSL_Float impact_volume)
     {
+        SetPartCollisionSound(m_host, impact_sound.m_string, (float)impact_volume);
+    }
 
-        if(String.IsNullOrEmpty(impact_sound.m_string))
+    /// <summary>
+    /// llCollisionSound and PRIM_COLLISION_SOUND on one prim: "" suppresses the collision sound; otherwise a sound's
+    /// key or the name of a sound in the prim.
+    /// </summary>
+    private static void SetPartCollisionSound(SceneObjectPart part, string impact_sound, float impact_volume)
+    {
+        if(String.IsNullOrEmpty(impact_sound))
         {
-            m_host.CollisionSoundVolume = (float)impact_volume;
-            m_host.CollisionSound = m_host.invalidCollisionSoundUUID;
-            m_host.CollisionSoundType = -1; // disable all sounds
-            m_host.aggregateScriptEvents();
+            part.CollisionSoundVolume = impact_volume;
+            part.CollisionSound = part.invalidCollisionSoundUUID;
+            part.CollisionSoundType = -1; // disable all sounds
+            part.aggregateScriptEvents();
             return;
         }
 
         // TODO: Parameter check logic required.
-        UUID soundId = ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, impact_sound, AssetType.Sound);
+        UUID soundId = ScriptUtils.GetAssetIdFromKeyOrItemName(part, impact_sound, AssetType.Sound);
         if(soundId.IsZero())
-            m_host.CollisionSoundType = -1;
+            part.CollisionSoundType = -1;
         else
         {
-            m_host.CollisionSound = soundId;
-            m_host.CollisionSoundVolume = (float)impact_volume;
-            m_host.CollisionSoundType = 1;
+            part.CollisionSound = soundId;
+            part.CollisionSoundVolume = impact_volume;
+            part.CollisionSoundType = 1;
         }
 
-        m_host.aggregateScriptEvents();
+        part.aggregateScriptEvents();
     }
 
     public LSL_String llGetAnimation(LSL_Key id)
@@ -10952,6 +10965,92 @@ public void llDetachFromAvatar()
 
                         part.ScriptedSitOnly = script_only;
                         break;
+
+                    case ScriptBaseClass.PRIM_SIT_FLAGS:
+                        // [ PRIM_SIT_FLAGS, integer flags ], as llSetLinkSitFlags
+                        if (remain < 1)
+                            return new LSL_List();
+                        int sitFlags;
+                        try
+                        {
+                            sitFlags = rules.GetIntegerItem(idx++);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule #{0} -> PRIM_SIT_FLAGS: arg #{1} - parameter 1 must be integer", rulesParsed, idx - idxStart - 1));
+                            return new LSL_List();
+                        }
+                        SetPartSitFlags(part, sitFlags);
+                        break;
+
+                    case ScriptBaseClass.PRIM_DAMAGE:
+                        // [ PRIM_DAMAGE, float damage, integer damage_type ]: the object's damage; the scene keeps no type
+                        if (remain < 2)
+                            return new LSL_List();
+                        float primDamage;
+                        try
+                        {
+                            primDamage = rules.GetStrictFloatItem(idx++);
+                            rules.GetIntegerItem(idx++);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule #{0} -> PRIM_DAMAGE: arg #{1} - parameters must be float and integer", rulesParsed, idx - idxStart - 1));
+                            return new LSL_List();
+                        }
+                        SetPartDamage(part, primDamage);
+                        break;
+
+                    case ScriptBaseClass.PRIM_HEALTH:
+                        // [ PRIM_HEALTH, float health ]: the scene keeps no prim health; accepted and dropped
+                        if (remain < 1)
+                            return new LSL_List();
+                        try
+                        {
+                            rules.GetStrictFloatItem(idx++);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule #{0} -> PRIM_HEALTH: arg #{1} - parameter 1 must be float", rulesParsed, idx - idxStart - 1));
+                            return new LSL_List();
+                        }
+                        break;
+
+                    case ScriptBaseClass.PRIM_CLICK_ACTION:
+                        // [ PRIM_CLICK_ACTION, integer action ], as llSetClickAction on this prim
+                        if (remain < 1)
+                            return new LSL_List();
+                        int clickAction;
+                        try
+                        {
+                            clickAction = rules.GetIntegerItem(idx++);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule #{0} -> PRIM_CLICK_ACTION: arg #{1} - parameter 1 must be integer", rulesParsed, idx - idxStart - 1));
+                            return new LSL_List();
+                        }
+                        SetPartClickAction(part, clickAction);
+                        break;
+
+                    case ScriptBaseClass.PRIM_COLLISION_SOUND:
+                        // [ PRIM_COLLISION_SOUND, string sound, float volume ], as llCollisionSound on this prim
+                        if (remain < 2)
+                            return new LSL_List();
+                        string collisionSound;
+                        float collisionVolume;
+                        try
+                        {
+                            collisionSound = rules.GetStrictStringItem(idx++);
+                            collisionVolume = rules.GetStrictFloatItem(idx++);
+                        }
+                        catch (InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule #{0} -> PRIM_COLLISION_SOUND: arg #{1} - parameters must be string and float", rulesParsed, idx - idxStart - 1));
+                            return new LSL_List();
+                        }
+                        SetPartCollisionSound(part, collisionSound, collisionVolume);
+                        break;
                     case ScriptBaseClass.PRIM_ALPHA_MODE:
                         if (remain < 3)
                             return new LSL_List();
@@ -12454,6 +12553,39 @@ public void llDetachFromAvatar()
                         res.Add(LSL_Vector.Zero);
                         res.Add(LSL_Rotation.Identity);
                     }
+                    break;
+
+                case ScriptBaseClass.PRIM_ALLOW_UNSIT:
+                    res.Add(new LSL_Integer(part.AllowUnsit ? 1 : 0));
+                    break;
+
+                case ScriptBaseClass.PRIM_SCRIPTED_SIT_ONLY:
+                    res.Add(new LSL_Integer(part.ScriptedSitOnly ? 1 : 0));
+                    break;
+
+                case ScriptBaseClass.PRIM_SIT_FLAGS:
+                    res.Add(new LSL_Integer(PartSitFlags(part)));
+                    break;
+
+                case ScriptBaseClass.PRIM_DAMAGE:
+                    // [ float damage, integer damage_type ]: SL's 0.0 while none is set (the scene's -1); no type is kept
+                    res.Add(new LSL_Float(Math.Max(0f, part.ParentGroup?.Damage ?? 0f)));
+                    res.Add(new LSL_Integer(ScriptBaseClass.DAMAGE_TYPE_GENERIC));
+                    break;
+
+                case ScriptBaseClass.PRIM_HEALTH:
+                    // SL: objects start with 0 health; the scene keeps none
+                    res.Add(new LSL_Float(0.0));
+                    break;
+
+                case ScriptBaseClass.PRIM_CLICK_ACTION:
+                    res.Add(new LSL_Integer(part.ClickAction));
+                    break;
+
+                case ScriptBaseClass.PRIM_COLLISION_SOUND:
+                    // [ key sound, float volume ]; a suppressed sound reads NULL_KEY
+                    res.Add(new LSL_Key(part.CollisionSound.Equals(part.invalidCollisionSoundUUID) ? ScriptBaseClass.NULL_KEY : part.CollisionSound.ToString()));
+                    res.Add(new LSL_Float(part.CollisionSoundVolume));
                     break;
 
                 case ScriptBaseClass.PRIM_NORMAL:
@@ -15589,6 +15721,10 @@ public void llDetachFromAvatar()
                     case ScriptBaseClass.OBJECT_TEXT_ALPHA:
                         ret.Add(new LSL_Float(1.0f));
                         break;
+                    case ScriptBaseClass.OBJECT_LOCKED:
+                    case ScriptBaseClass.OBJECT_VOLUME_DETECT:
+                        ret.Add(new LSL_Integer(0));
+                        break;
                     default:
                         // Invalid or unhandled constant.
                         ret.Add(new LSL_Integer(ScriptBaseClass.OBJECT_UNKNOWN_DETAIL));
@@ -15833,6 +15969,14 @@ public void llDetachFromAvatar()
                         break;
                     case ScriptBaseClass.OBJECT_TEXT_ALPHA:
                         ret.Add(new LSL_Float(obj.GetTextAlpha()));
+                        break;
+                    case ScriptBaseClass.OBJECT_LOCKED:
+                        // as core OpenSim: locked when the owner may not move it
+                        ret.Add(new LSL_Integer(obj.ParentGroup is null || obj.ParentGroup.IsDeleted ||
+                            (obj.ParentGroup.EffectiveOwnerPerms & (uint)PermissionMask.Move) != 0 ? 0 : 1));
+                        break;
+                    case ScriptBaseClass.OBJECT_VOLUME_DETECT:
+                        ret.Add(new LSL_Integer(obj.ParentGroup is not null && !obj.ParentGroup.IsDeleted && obj.ParentGroup.IsVolumeDetect ? 1 : 0));
                         break;
                     default:
                         // Invalid or unhandled constant.
@@ -18044,9 +18188,22 @@ public void llDetachFromAvatar()
                     case ScriptBaseClass.PRIM_TEMP_ON_REZ:
                     case ScriptBaseClass.PRIM_NAME:
                     case ScriptBaseClass.PRIM_DESC:
+                    // nothing to set on an avatar, but the values are skipped so the rules after them apply
+                    case ScriptBaseClass.PRIM_ALLOW_UNSIT:
+                    case ScriptBaseClass.PRIM_SCRIPTED_SIT_ONLY:
+                    case ScriptBaseClass.PRIM_SIT_FLAGS:
+                    case ScriptBaseClass.PRIM_HEALTH:
+                    case ScriptBaseClass.PRIM_CLICK_ACTION:
                         if (remain < 1)
                             return new LSL_List();
                         idx++;
+                        break;
+
+                    case ScriptBaseClass.PRIM_DAMAGE:
+                    case ScriptBaseClass.PRIM_COLLISION_SOUND:
+                        if (remain < 2)
+                            return new LSL_List();
+                        idx += 2;
                         break;
 
                     case ScriptBaseClass.PRIM_GLOW:
@@ -21392,25 +21549,53 @@ public void llDetachFromAvatar()
     public LSL_Integer llGetLinkSitFlags(LSL_Integer linknum)
     {
         SceneObjectPart part = linknum == ScriptBaseClass.LINK_THIS ? m_host : m_host.ParentGroup.GetLinkNumPart(linknum);
-        if (part is not null)
-        {
-            int flags = ScriptBaseClass.SIT_FLAG_OPENSIMFORCED;
-            if(part.IsSitTargetSet)
-                flags |= 0x01;
-            return new LSL_Integer(flags);
-        }
-        return new LSL_Integer(0);
+        return part is null ? new LSL_Integer(0) : new LSL_Integer(PartSitFlags(part));
+    }
+
+    /// <summary>
+    /// One prim's SIT_FLAG_* word, for llGetLinkSitFlags and PRIM_SIT_FLAGS: SIT_TARGET, ALLOW_UNSIT and
+    /// SCRIPTED_ONLY from the part (ALLOW_UNSIT and SCRIPTED_ONLY are the part properties PRIM_ALLOW_UNSIT and
+    /// PRIM_SCRIPTED_SIT_ONLY set and the region's sit path checks); NO_COLLIDE and NO_DAMAGE are always set, as a
+    /// seated avatar here neither collides nor takes damage.
+    /// </summary>
+    private static int PartSitFlags(SceneObjectPart part)
+    {
+        int flags = ScriptBaseClass.SIT_FLAG_NO_COLLIDE | ScriptBaseClass.SIT_FLAG_NO_DAMAGE;
+        if (part.IsSitTargetSet)
+            flags |= ScriptBaseClass.SIT_FLAG_SIT_TARGET;
+        if (part.AllowUnsit)
+            flags |= ScriptBaseClass.SIT_FLAG_ALLOW_UNSIT;
+        if (part.ScriptedSitOnly)
+            flags |= ScriptBaseClass.SIT_FLAG_SCRIPTED_ONLY;
+        return flags;
+    }
+
+    /// <summary>
+    /// Sets one prim's sit flags, for llSetLinkSitFlags and PRIM_SIT_FLAGS. ALLOW_UNSIT and SCRIPTED_ONLY take the
+    /// word's value; SIT_TARGET is read-only (SL). NO_COLLIDE and NO_DAMAGE are kept in SitFlagsStored, where Phlox
+    /// reads them, but change nothing here.
+    /// </summary>
+    private static void SetPartSitFlags(SceneObjectPart part, int flags)
+    {
+        part.AllowUnsit = (flags & ScriptBaseClass.SIT_FLAG_ALLOW_UNSIT) != 0;
+        part.ScriptedSitOnly = (flags & ScriptBaseClass.SIT_FLAG_SCRIPTED_ONLY) != 0;
+        part.SitFlagsStored = flags & (ScriptBaseClass.SIT_FLAG_NO_COLLIDE | ScriptBaseClass.SIT_FLAG_NO_DAMAGE);
+    }
+
+    /// <summary>
+    /// llSetDamage-like PRIM_DAMAGE amount: the object's damage, which the scene's collision damage reads. SL limits
+    /// prim damage to 100; below 0 is held at 0 (the scene deals only damage above 0).
+    /// </summary>
+    private static void SetPartDamage(SceneObjectPart part, float damage)
+    {
+        if (part.ParentGroup is not null)
+            part.ParentGroup.Damage = Math.Clamp(damage, 0f, 100f);
     }
 
     public void llSetLinkSitFlags(LSL_Integer linknum, LSL_Integer flags)
     {
-        // does nothing since we do not have any of the flags
-        /*
-        SceneObjectPart part = linknum == ScriptBaseClass.LINK_THIS ? m_host : m_host.ParentGroup.GetLinkNumPart(linknum);
-        if (part is not null)
-        {
-        }
-        */
+        foreach (SceneObjectPart part in GetLinkParts(linknum.value))
+            SetPartSitFlags(part, flags.value);
     }
 
     public LSL_String llComputeHash(LSL_String message, LSL_String algo)
