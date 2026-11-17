@@ -40,6 +40,11 @@ public class GroupChatGateTests : OpenSimTestCase
                     return id == GroupId ? new ExtendedGroupRecord { GroupID = GroupId, GroupName = "Test Group" } : null;
                 case nameof(IGroupsServicesConnector.GetGroupMembers):
                     return new List<GroupMembersData>();
+                case nameof(IGroupsServicesConnector.GetAgentGroupMembership):
+                    // the sender is a member who may join the group's chat
+                    return (UUID)args![2]! == GroupId
+                        ? new ExtendedGroupMembershipData { GroupID = GroupId, GroupPowers = (ulong)GroupPowers.JoinChat }
+                        : null;
                 default:
                     Type rt = method.ReturnType;
                     return rt == typeof(void) || !rt.IsValueType ? null : Activator.CreateInstance(rt);

@@ -253,6 +253,13 @@ public class GroupsMessagingModule : ISharedRegionModule, IGroupsMessagingModule
     /// <summary>
     /// Not really needed, but does confirm that the group exists.
     /// </summary>
+    /// <summary>Whether <paramref name="agentID"/> is a member of the group whose roles give "Join group chat".</summary>
+    private bool MayChat(UUID agentID, UUID groupID)
+    {
+        GroupMembershipData membership = m_groupData.GetAgentGroupMembership(UUID.Zero.ToString(), agentID.ToString(), groupID);
+        return membership != null && (membership.GroupPowers & (ulong)GroupPowers.JoinChat) != 0;
+    }
+
     public bool StartGroupChatSession(UUID agentID, UUID groupID)
     {
         if (m_debugEnabled)
@@ -357,6 +364,11 @@ public class GroupsMessagingModule : ISharedRegionModule, IGroupsMessagingModule
 
                     continue;
                 }
+            }
+            else if ((member.AgentPowers & (ulong)GroupPowers.JoinChat) == 0)
+            {
+                // group chat reaches only the members whose roles give "Join group chat"
+                continue;
             }
             else if (hasAgentDroppedGroupChatSession(member.AgentID.ToString(), groupID))
             {
@@ -649,7 +661,7 @@ public class GroupsMessagingModule : ISharedRegionModule, IGroupsMessagingModule
 
             GroupRecord groupInfo = m_groupData.GetGroupRecord(UUID.Zero.ToString(), GroupID, null);
 
-            if (groupInfo != null)
+            if (groupInfo != null && MayChat(AgentID, GroupID))
             {
                 AgentInvitedToGroupChatSession(AgentID.ToString(), GroupID);
 
@@ -690,6 +702,14 @@ public class GroupsMessagingModule : ISharedRegionModule, IGroupsMessagingModule
             {
                 if (m_debugEnabled)
                     m_log.LogDebug("[Groups.Messaging]: Session {0} is not a group session, ignoring the message", GroupID);
+                return;
+            }
+
+            // Only a member whose roles give "Join group chat" (JoinChat) talks in it.
+            if (!MayChat(AgentID, GroupID))
+            {
+                if (m_debugEnabled)
+                    m_log.LogDebug("[Groups.Messaging]: {0} may not join group chat {1}; dropped", AgentID, GroupID);
                 return;
             }
 
