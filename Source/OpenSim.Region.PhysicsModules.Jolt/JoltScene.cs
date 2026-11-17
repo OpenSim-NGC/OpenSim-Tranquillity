@@ -2269,8 +2269,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         //    ray after login or teleport (ScenePresence.MakeRootAgent), and by OpenSim's LSL_Api.llCastRay (YEngine)
         //    through Scene.RayCastFiltered. Its flags and hit count do not tell a script's cast from the simulator's (a
         //    script can ask for exactly the same ones), so it is charged to RayCastBudget.Simulator; see BudgetFor.
-        // The viewer camera's collision ray and the sit ray do not come here: this module does not override
-        // SupportsRayCast() or the sit query, so the base class answers them.
+        // The viewer camera's collision ray does not come here: this module does not override SupportsRayCast(), so the
+        // base class answers it. The sit query (SitAvatar) casts at one part only, through RaycastActor below.
         public override List<ContactResult> RaycastWorld(Vector3 position, Vector3 direction, float length, int Count)
         {
             List<ContactResult> results = CastAll(position, direction, length, Count, QueryFilter.Default,
@@ -2282,6 +2282,76 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         public override object RaycastWorld(Vector3 position, Vector3 direction, float length, int Count, RayFilterFlags filter)
             => CastAll(position, direction, length, Count, ToQueryFilter(filter), _warmingUpRays ? RayCastBudget.None : BudgetFor(filter), out _);
+
+        /// <summary>
+        /// A ray against one part only, as ubODE's RaycastActor: whatever lies in front of the part is passed through. A
+        /// part welded into its linkset root's body is hit on its own shape, not the rest of the linkset. The part's kind
+        /// must be in <paramref name="flags"/> (physical or nonphysical, phantom, volume detect), as ubODE checks it. Only
+        /// prims are answered; an avatar gets no hits. Charged to the simulator's ray budget; a refused or cut-short cast
+        /// gives no hits.
+        /// </summary>
+        public override List<ContactResult> RaycastActor(PhysicsActor actor, Vector3 position, Vector3 direction, float length, int Count, RayFilterFlags flags)
+        {
+            var results = new List<ContactResult>();
+            IPhysicsBackend backend = _backend;   // read once: a teardown on another thread nulls it
+            if (backend == null || actor is not JoltPrim prim || prim.IsRemoved)
+                return results;
+            BodyId body = prim.PartBody;
+            if (!body.IsValid || !(length > 0f) || !float.IsFinite(length) || !position.IsFinite() || !direction.IsFinite())
+                return results;
+
+            RayFilterFlags kind = prim.IsPhysical ? RayFilterFlags.physical : RayFilterFlags.nonphysical;
+            if (prim.Phantom)
+                kind |= RayFilterFlags.phantom;
+            if (prim.IsVolumeDtc)
+                kind |= RayFilterFlags.volumedtc;
+            if ((kind & flags) == 0)
+                return results;
+
+            Vector3 dn = direction;
+            dn.Normalize();
+            if (!dn.IsFinite() || dn == Vector3.Zero)
+                return results;
+            if (!ClipRay(position, dn, length, out float from, out float to))
+                return results;
+            Vector3 start = position + dn * from;
+
+            int want = (flags & RayFilterFlags.ClosestHit) != 0 ? 1 : Math.Clamp(Count, 1, _joltConfig.RayCastMaxHits);
+            var hits = new RayHit[want];
+            // As ubODE's actor ray: back faces count unless the caller asks to cull them, so a ray that starts inside the part
+            // (the sit's edge search) hits the face it leaves by.
+            bool backFaces = (flags & RayFilterFlags.BackFaceCull) == 0;
+            int n = backend.RayCastBody(body, prim.LocalID, new SVector3(start.X, start.Y, start.Z), new SVector3(dn.X, dn.Y, dn.Z),
+                                        to - from, backFaces, _warmingUpRays ? RayCastBudget.None : RayCastBudget.Simulator, hits, out _);
+            for (int i = 0; i < n; i++)
+            {
+                results.Add(new ContactResult
+                {
+                    ConsumerID = prim.LocalID,
+                    Pos = new Vector3(hits[i].Point.X, hits[i].Point.Y, hits[i].Point.Z),
+                    Normal = new Vector3(hits[i].Normal.X, hits[i].Normal.Y, hits[i].Normal.Z),
+                    Depth = from + hits[i].Distance,         // from the caller's start, not the clipped one
+                });
+            }
+            return results;
+        }
+
+        /// <summary>
+        /// Sitting on a part with no sit target (ScenePresence.PhysicsSit): where the avatar sits is worked out off the
+        /// caller's thread, as ubODE does, and handed to <paramref name="PhysicsSitResponse"/> (JoltSitAvatar). Returns 1
+        /// when the answer will come through the callback; 0 with [Jolt] PhysicsSit = false, and core then seats the
+        /// avatar at the clicked point itself.
+        /// </summary>
+        public override int SitAvatar(PhysicsActor actor, Vector3 AbsolutePosition, Vector3 CameraPosition, Vector3 offset, Vector3 AvatarSize, SitAvatarCallback PhysicsSitResponse)
+        {
+            if (!_joltConfig.PhysicsSit)
+                return 0;
+            Util.FireAndForget(delegate
+            {
+                new JoltSitAvatar(this).Sit(actor, AbsolutePosition, CameraPosition, offset, AvatarSize, PhysicsSitResponse);
+            });
+            return 1;
+        }
 
         // The budget a cast on the 5-argument entry is charged to. Nothing in RayFilterFlags marks a script's cast today,
         // so every such cast goes to the simulator's budget. When the caller can mark a script cast (a flag set by
@@ -2573,6 +2643,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private long _basicForcesUpdateTicks, _basicForcesUpdateCalls;
         internal long BasicForcesUpdateTicks => Interlocked.Read(ref _basicForcesUpdateTicks);
         internal long BasicForcesUpdateCalls => Interlocked.Read(ref _basicForcesUpdateCalls);
+
+        // Linkset rebuilds that failed with an exception since the scene started (JoltPrim.RebuildCompoundNow logs each).
+        private int _linksetRebuildErrors;
+        internal int LinksetRebuildErrors => Volatile.Read(ref _linksetRebuildErrors);
+        internal void NoteLinksetRebuildError() => Interlocked.Increment(ref _linksetRebuildErrors);
+
+        // Tests only: called with the root for each part a linkset rebuild places, so a test can link or unlink a part at
+        // that point, as core's thread can while the step thread rebuilds. Null in a region.
+        internal Action<JoltPrim> LinksetRebuildChildHook;
 
         // ---------------------------------------------------------------------
         // The viewer camera's collision ray does not go through the RaycastWorld overloads above: it has this overload,
@@ -2905,10 +2984,56 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // Everything after the backend step: metrics, capacity, the body / character drains and the collision
         // dispatch. `r` is the step whose body and character states are reported; the contact count, overflow,
         // physics time and timing cover every backend step of this heartbeat (one, unless substepping).
+        // A physics step this slow (ms) is logged at once with what the region held, not only in the metrics interval line.
+        internal const float SlowStepWarnMs = 40f;
+        // At most one slow-step line per region in this many seconds; the ones held back are counted in the next.
+        internal const double SlowStepLogSeconds = 10.0;
+        // A region's first steps after start are never logged as slow: they build the broad phase and wake every body the
+        // region loaded (a start's first step took 66-74 ms with nothing wrong). About one second at the 11 Hz heartbeat.
+        internal const long SlowStepWarmupSteps = 10;
+        private long _slowStepLoggedAt;
+        private long _slowStepsHeldBack;
+
+        /// <summary>The warning for one slow physics step, or null when the step was not slow (under
+        /// <see cref="SlowStepWarnMs"/>).</summary>
+        internal static string SlowStepLine(string region, float physicsMs, float timeStep, long step, in StepResult r, int contactCount,
+                                            in PhysicsCapacityStats s, long heldBack)
+        {
+            if (!(physicsMs >= SlowStepWarnMs) || step <= SlowStepWarmupSteps)
+                return null;
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            string line = string.Format(ci,
+                "{0} {1}: physics step {2} took {3:0.00} ms (step length {4:0.0} ms): active={5}, bodies={6}, shapes={7}, avatars={8}, " +
+                "bodyUpdates={9}, contacts={10}, updateError={11}, poolWaitMax={12:0.00} ms",
+                LogHeader, region, step, physicsMs, timeStep * 1000f, r.ActiveBodyCount, s.LiveBodyCount, s.LiveShapeCount, s.CharacterCount,
+                r.BodyUpdateCount, contactCount, s.LastUpdateError, s.UpdateGateWaitMsMax);
+            return heldBack > 0 ? line + string.Format(ci, " ({0} more held back since the last line)", heldBack) : line;
+        }
+
+        // Logs a slow step at once (SlowStepLine), at most once per SlowStepLogSeconds per region.
+        private void WarnIfSlowStep(IPhysicsBackend backend, in StepResult r, float timeStep, int contactCount, float physicsMs)
+        {
+            if (!(physicsMs >= SlowStepWarnMs) || _stepCount <= SlowStepWarmupSteps)
+                return;
+            long now = System.Diagnostics.Stopwatch.GetTimestamp();
+            long last = _slowStepLoggedAt;
+            if (last != 0 && now - last < (long)(SlowStepLogSeconds * System.Diagnostics.Stopwatch.Frequency))
+            {
+                _slowStepsHeldBack++;
+                return;
+            }
+            PhysicsCapacityStats s = backend.GetCapacityStats();
+            string line = SlowStepLine(RegionName, physicsMs, timeStep, _stepCount, in r, contactCount, in s, _slowStepsHeldBack);
+            _slowStepLoggedAt = now;
+            _slowStepsHeldBack = 0;
+            m_log.LogWarning(line);
+        }
+
         private void ReportStep(IPhysicsBackend backend, in StepResult r, float timeStep, int contactCount, bool contactsOverflowed, float physicsMs, bool mergeSubsteps,
                                 in HeartbeatTiming timing)
         {
             _lastActiveBodyCount = r.ActiveBodyCount;
+            WarnIfSlowStep(backend, in r, timeStep, contactCount, physicsMs);
             double gapMs = _pendingGapTicks * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
             _pendingGapTicks = 0;
             JoltMetrics.RecordStep(RegionName, physicsMs, r.ActiveBodyCount, in timing, gapMs, timeStep * 1000.0,   // step-time instrumentation (`jolt metrics`)
@@ -2928,7 +3053,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 JoltPrim p;
                 lock (_prims)
                     _prims.TryGetValue(bs.UserData, out p);
-                p?.ApplyStepState(in bs);
+                p?.ApplyStepState(in bs, timeStep);
                 _diagnostics?.BodyUpdated(in bs);   // the test commands' drop tracker
             }
 

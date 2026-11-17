@@ -7,6 +7,9 @@
  */
 
 /*
+ * Copyright (c) 2015, InWorldz Halcyon Developers
+ * All rights reserved.
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  * 
@@ -74,7 +77,7 @@ using ScenePrimType = OpenSim.Region.Framework.Scenes.PrimType;
 
 namespace Phlox.ScriptEngine
 {
-    public class LSLSystemAPI : ISystemAPI, InWorldz.Phlox.Glue.ISyscallDeferralAdvisor
+    public class LSLSystemAPI : ISystemAPI, ILSLSystemAPI, InWorldz.Phlox.Glue.ISyscallDeferralAdvisor
     {
         // ── Inline or deferred ──────────────────────────────────────────────
         //
@@ -2720,7 +2723,74 @@ namespace Phlox.ScriptEngine
                 ScriptShoutError("llResetOtherScript: script '" + name + "' not found");
                 return;
             }
-            m_ScriptEngine.ApiResetScript(item.ItemID);
+            ResetScriptOfAnyEngine(item.ItemID, api: true);
+        }
+
+        /// <summary>
+        /// Resets a script of the prim whatever engine runs it (SL has one script runtime, so llResetOtherScript, llSetScriptState,
+        /// llGetScriptState and osResetAllScripts name a script and do not depend on how it was compiled). The engine that runs the
+        /// item is asked: this one, else the other script engine of the region that holds it. When none holds it (it may still be
+        /// compiling) every engine is asked, this one first; an engine ignores an item it does not know. Another engine's script
+        /// is reset from outside (ResetScript), as YEngine's own llResetOtherScript does: ApiResetScript is for a script that
+        /// resets itself and aborts the caller's own thread in YEngine.
+        /// </summary>
+        private void ResetScriptOfAnyEngine(UUID itemId, bool api)
+        {
+            if (m_ScriptEngine.HasScript(itemId, out _))
+            {
+                if (api) m_ScriptEngine.ApiResetScript(itemId); else m_ScriptEngine.ResetScript(itemId);
+                return;
+            }
+            if (EngineOtherThanThisRunning(itemId, out OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine other, out _))
+            {
+                other.ResetScript(itemId);
+                return;
+            }
+            if (api) m_ScriptEngine.ApiResetScript(itemId); else m_ScriptEngine.ResetScript(itemId);
+            foreach (OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine e in OtherScriptEngines())
+            {
+                try
+                {
+                    e.ResetScript(itemId);
+                }
+                catch (Exception ex)
+                {
+                    m_log.LogWarning("[PhloxAPI]: another script engine failed to reset a script: {0}", ex.Message);
+                }
+            }
+        }
+
+        /// <summary>Each script engine of the region other than the one running this script, once.</summary>
+        private List<OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine> OtherScriptEngines()
+        {
+            var others = new List<OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine>();
+            foreach (IScriptModule m in World?.RequestModuleInterfaces<IScriptModule>() ?? Array.Empty<IScriptModule>())
+                if (!ReferenceEquals(m, m_ScriptEngine.ScriptModule) && m is OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine e && !others.Contains(e))
+                    others.Add(e);
+            return others;
+        }
+
+        /// <summary>The other script engine of the region that runs the script item, and whether the script is running.</summary>
+        private bool EngineOtherThanThisRunning(UUID itemId, out OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine engine, out bool running)
+        {
+            foreach (OpenSim.Region.ScriptEngine.Interfaces.IScriptEngine e in OtherScriptEngines())
+            {
+                try
+                {
+                    if (e.ScriptModule != null && e.ScriptModule.HasScript(itemId, out running))
+                    {
+                        engine = e;
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    m_log.LogWarning("[PhloxAPI]: another script engine failed to say whether it runs a script: {0}", ex.Message);
+                }
+            }
+            engine = null;
+            running = false;
+            return false;
         }
 
         public int llGetScriptState(string name)
@@ -2732,10 +2802,13 @@ namespace Phlox.ScriptEngine
                 ScriptShoutError("llGetScriptState: script '" + name + "' not found");
                 return 0;
             }
-            // Halcyon asks the engine (EngineInterface.GetScriptState). A script this engine does not run, or one still
-            // compiling, answers from the item's Running flag, which llSetScriptState keeps.
+            // Halcyon asks the engine (EngineInterface.GetScriptState). A script another engine of the region runs is asked
+            // of that engine; one no engine runs, or one still compiling, answers from the item's Running flag, which
+            // llSetScriptState keeps.
             if (m_ScriptEngine != null && m_ScriptEngine.HasScript(item.ItemID, out bool running))
                 return running ? 1 : 0;
+            if (EngineOtherThanThisRunning(item.ItemID, out _, out bool otherRunning))
+                return otherRunning ? 1 : 0;
             return item.ScriptRunning ? 1 : 0;
         }
 
@@ -12665,7 +12738,7 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             }
             else scripts.AddRange(m_host.Inventory.GetInventoryItems(InventoryType.LSL));
             foreach (TaskInventoryItem script in scripts)
-                if (script.ItemID != m_itemID) m_ScriptEngine.ResetScript(script.ItemID);
+                if (script.ItemID != m_itemID) ResetScriptOfAnyEngine(script.ItemID, api: false);
             World?.RequestModuleInterface<IUrlModule>()?.ScriptRemoved(m_itemID);
             m_ScriptEngine.ApiResetScript(m_itemID);
         }

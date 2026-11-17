@@ -11,6 +11,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Framework;
 
@@ -28,6 +29,31 @@ namespace OpenSim.Framework;
 public sealed class DnsAddressQuery
 {
     public static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(2);
+
+    /// <summary>The port DNS servers are asked on.</summary>
+    public const int DefaultPort = 53;
+
+    /// <summary>
+    /// Reads a DnsServers setting: IP addresses separated by commas or semicolons, in the order they are to be
+    /// asked. An entry that is not an IP address (or is 0.0.0.0, :: or 255.255.255.255) is left out with a
+    /// warning that starts with <paramref name="logTag"/>. Null or blank gives an empty list.
+    /// </summary>
+    public static List<IPAddress> ParseServerList(string value, ILogger log, string logTag)
+    {
+        List<IPAddress> servers = new();
+        if (string.IsNullOrWhiteSpace(value))
+            return servers;
+
+        foreach (string item in value.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (IPAddress.TryParse(item, out IPAddress server) && !server.Equals(IPAddress.Any) && !server.Equals(IPAddress.IPv6Any)
+                && !server.Equals(IPAddress.None))
+                servers.Add(server);
+            else
+                log?.LogWarning("{0}: DnsServers entry \"{1}\" ignored: it is not an IP address", logTag, item);
+        }
+        return servers;
+    }
 
     private const int HeaderLength = 12;
     private const ushort TypeA = 1;

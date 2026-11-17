@@ -74,9 +74,8 @@ namespace osWebRtcVoice.Tests
             private readonly IFeederWorld _world;
             public Feed(IFeederWorld world) { _world = world; Current = VisibilityMatrix.Build(world); }
             public VisibilityMatrix Current { get; private set; }
-#pragma warning disable CS0067
-            public event Action<VisibilityBatch> BatchProduced;
-#pragma warning restore CS0067
+            // Required by the interface; this fake never raises it.
+            public event Action<VisibilityBatch> BatchProduced { add { } remove { } }
             public VisibilityBatch SnapshotFor(UUID listener) => DeltaComputer.SnapshotFor(Current, listener, -999);
             public VisibilityBatch Tick() { Current = VisibilityMatrix.Build(_world); return VisibilityBatch.EmptyDelta(-999); }
         }

@@ -74,6 +74,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             public float EarlyOut;
             public Vector3 Origin;
             public Vector3 RayDir;
+            // RayCastBody: only hits on this native body count, and with ByPart only on the compound child whose index the
+            // hit's SubShapeID carries in its low PartMask bits.
+            public bool OnlyOneBody;
+            public uint OnlyBody;
+            public bool ByPart;
+            public uint PartMask;
+            public uint PartIndex;
 
             public void Reset(int want, int maxTested, TimeProvider clock, long deadline, Vector3 origin, Vector3 rayDir)
             {
@@ -89,6 +96,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 EarlyOut = InitialEarlyOut;
                 Origin = origin;
                 RayDir = rayDir;
+                OnlyOneBody = false;
+                ByPart = false;
             }
 
             // Returns the new early-out fraction: never above the last one (Jolt requires it to only shrink). The deadline
@@ -101,6 +110,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                     CutShort = true;
                     return EarlyOut = -float.MaxValue;   // Jolt tests nothing more: no fraction is below this
                 }
+                if (OnlyOneBody && (r.BodyId != OnlyBody || (ByPart && (r.SubShapeId2 & PartMask) != PartIndex)))
+                    return EarlyOut;   // another body, or another part of this one: passed through
 
                 // The same body at the same point (the heightfield's two triangles meeting under the ray): one hit,
                 // the nearer.
@@ -208,8 +219,22 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         private RayBudgetState BudgetState(RayCastBudget budget)
             => _rayBudgets[budget == RayCastBudget.Script ? 0 : 1];
 
-        public unsafe int RayCastLimited(Vector3 origin, Vector3 direction, float maxDistance, QueryFilter filter, RayCastBudget budget,
-                                         Span<RayHit> hits, out RayCastStatus status)
+        public int RayCastLimited(Vector3 origin, Vector3 direction, float maxDistance, QueryFilter filter, RayCastBudget budget,
+                                  Span<RayHit> hits, out RayCastStatus status)
+            => RayCastBounded(origin, direction, maxDistance, filter, BodyId.Invalid, 0u, false, budget, hits, out status);
+
+        public int RayCastBody(BodyId body, uint partUserData, Vector3 origin, Vector3 direction, float maxDistance, bool backFaces,
+                               RayCastBudget budget, Span<RayHit> hits, out RayCastStatus status)
+        {
+            status = RayCastStatus.Ok;
+            if (!body.IsValid)
+                return 0;
+            return RayCastBounded(origin, direction, maxDistance, QueryFilter.None, body, partUserData, backFaces, budget, hits, out status);
+        }
+
+        // RayCastLimited, or with onlyBody valid RayCastBody (every layer, that body's hits only; filter unused).
+        private unsafe int RayCastBounded(Vector3 origin, Vector3 direction, float maxDistance, QueryFilter filter, BodyId onlyBody,
+                                          uint partUserData, bool backFaces, RayCastBudget budget, Span<RayHit> hits, out RayCastStatus status)
         {
             status = RayCastStatus.Ok;
             if (_system == null || hits.Length == 0)
@@ -224,6 +249,25 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             lock (_simLock)
             {
                 if (_disposed) return 0;   // backend torn down (shutdown race) - no native call
+                uint onlyNative = 0, partMask = 0, partIndex = 0;
+                bool byPart = false;
+                if (onlyBody.IsValid)
+                {
+                    if (!TryResolve(onlyBody, out JoltBodyRecord onlyRec, out BodyID onlyJid))
+                        return 0;   // the body is gone: nothing to hit
+                    onlyNative = onlyJid.ID;
+                    if (partUserData != 0u && _shapes.TryGet(onlyRec.Shape.Value, out JoltShapeRecord shapeRec)
+                        && shapeRec.CompoundChildUserData != null)
+                    {
+                        int at = Array.IndexOf(shapeRec.CompoundChildUserData, partUserData);
+                        if (at < 0)
+                            return 0;   // no such part in this linkset
+                        int bits = shapeRec.CompoundIndexBits;
+                        partMask = bits >= 32 ? uint.MaxValue : (1u << bits) - 1u;
+                        partIndex = (uint)at;
+                        byPart = true;
+                    }
+                }
                 // RayCastBudget.None (the module's warm-up) is charged and counted nowhere.
                 RayBudgetState? b = budget == RayCastBudget.None ? null : BudgetState(budget);
                 long allowed = RayBudgetTicks(b == null ? RayCastBudget.Simulator : budget);
@@ -244,13 +288,26 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
                 long start = clock.GetTimestamp();
                 ClosestHits c = t_closest ??= new ClosestHits();
                 c.Reset(hits.Length, RayMaxTested, clock, start + (allowed - used), origin, rayDir);
+                if (onlyBody.IsValid)
+                {
+                    c.OnlyOneBody = true;
+                    c.OnlyBody = onlyNative;
+                    c.ByPart = byPart;
+                    c.PartMask = partMask;
+                    c.PartIndex = partIndex;
+                }
 
                 // The same faces are tested as RayCastAll tests, except that a convex shape (a box, the avatar's capsule) is not
                 // solid to a ray that starts inside it: a cast does not report a prim its line starts inside
                 // (wiki.secondlife.com/wiki/LlCastRay), so the cast goes on to what lies beyond instead of hitting it at distance 0.
                 var settings = new RayCastSettings { TreatConvexAsSolid = false };
+                if (backFaces)
+                {
+                    settings.BackFaceModeTriangles = BackFaceMode.CollideWithBackFaces;
+                    settings.BackFaceModeConvex = BackFaceMode.CollideWithBackFaces;
+                }
                 Vector3 o = origin, d = rayDir;
-                IntPtr objectFilter = FilterFor(filter).Handle;
+                IntPtr objectFilter = onlyBody.IsValid ? IntPtr.Zero : FilterFor(filter).Handle;   // Zero: every layer
                 JPH_NarrowPhaseQuery_CastRay2(_system.NarrowPhaseQuery.Handle, &o, &d, &settings,
                     &OnRayHit, IntPtr.Zero, IntPtr.Zero, objectFilter, IntPtr.Zero, IntPtr.Zero);
 

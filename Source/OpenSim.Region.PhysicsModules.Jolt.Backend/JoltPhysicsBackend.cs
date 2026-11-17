@@ -780,6 +780,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             PhysicsLayer.AvatarQuery => BroadPhase.Moving, // in the broadphase so queries find it; collides with nothing
             PhysicsLayer.Phantom => BroadPhase.Moving,
             PhysicsLayer.MovingStatic => BroadPhase.Moving, // a prim keyframed motion moves: kept out of the tree of fixed prims
+            PhysicsLayer.Parked => BroadPhase.Moving,       // waiting past the region's edge; collides with nothing
             _ => BroadPhase.Moving,
         };
 
@@ -795,6 +796,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             // collision pair is exactly what makes the marker inert - no push, no contacts (verified) -
             // so it can be findable by queries without ever entering the solve.
             if (a == PhysicsLayer.AvatarQuery || b == PhysicsLayer.AvatarQuery)
+                return false;
+            // A body waiting past the region's edge touches nothing until it comes back.
+            if (a == PhysicsLayer.Parked || b == PhysicsLayer.Parked)
                 return false;
 
             // A phantom prim touches the terrain only: objects and avatars pass through it, and a physical one
@@ -4904,6 +4908,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             // Debris has no QueryFilter bit - detection queries (llCastRay/llSensor) never return particle
             // debris, so it is excluded from every filter, INCLUDING All.
             PhysicsLayer.Debris => false,
+            // A body waiting past the region's edge is in no query: the object is not in the region for that time.
+            PhysicsLayer.Parked => false,
             _ => false,
         };
 

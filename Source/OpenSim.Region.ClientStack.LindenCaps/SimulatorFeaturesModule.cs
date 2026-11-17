@@ -104,6 +104,28 @@ public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeature
     public void RegionLoaded(Scene s)
     {
         GetGridExtraFeatures(s);
+        AddScriptEngines(s);
+    }
+
+    /// <summary>
+    /// List the script engines this region runs, by each IScriptModule's ScriptEngineName, under
+    /// OpenSimExtras["ScriptEngines"], so a viewer's script editor can offer only the languages the region can run.
+    /// </summary>
+    /// <remarks>
+    /// Every script engine has stacked its IScriptModule in AddRegion by the time RegionLoaded runs. A region with
+    /// no script engine sends an empty list. It is added after the grid's extra features, so the region's own list
+    /// is the one sent.
+    /// </remarks>
+    private void AddScriptEngines(Scene scene)
+    {
+        OSDArray engines = new();
+        foreach (IScriptModule engine in scene.RequestModuleInterfaces<IScriptModule>())
+        {
+            if (engine is not null && !string.IsNullOrEmpty(engine.ScriptEngineName))
+                engines.Add(engine.ScriptEngineName);
+        }
+
+        AddOpenSimExtraFeature("ScriptEngines", engines);
     }
 
     public void Close() { }

@@ -62,7 +62,7 @@ namespace Phlox.ScriptEngine
     /// <summary>Where syscalls that can reach a service run.</summary>
     public enum ServiceCallDeferralMode { Auto, Always, Never }
 
-    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine, IScriptStateProvider
+    public class PhloxEngine : INonSharedRegionModule, IScriptEngine, IScriptModule, IParcelScriptPolicyEngine, IScriptStateProvider, IScriptEngineSelection
     {
         private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -94,6 +94,13 @@ namespace Phlox.ScriptEngine
         #region INonSharedRegionModule
 
         public string Name => PhloxEngineHeader.PhloxName;
+
+        private static readonly string[] s_headerAliases = { PhloxEngineHeader.PhloxAlias };
+
+        /// <summary>"//Phlox:" gives a script to this engine as "//InWorldz.Phlox:" does.</summary>
+        public IReadOnlyList<string> HeaderAliases => s_headerAliases;
+
+        public bool ClaimsScript(string scriptSource) => false;
         public Type ReplaceableInterface => null;
 
         /// <summary>
@@ -367,6 +374,7 @@ namespace Phlox.ScriptEngine
             m_Scene = scene;
             m_Scene.RegisterModuleInterface<IScriptModule>(this);
             m_Scene.StackModuleInterface<IScriptModule>(this);
+            m_Scene.StackModuleInterface<IScriptSuspension>(new SuspensionQuery(this));
             m_log.LogInformation("[PhloxEngine]: Added to region {0}", scene.RegionInfo.RegionName);
         }
 
@@ -585,15 +593,20 @@ namespace Phlox.ScriptEngine
             MainConsole.Instance.Output("  and no prim in this region holds an inventory item with that id.");
         }
 
-        /// <summary>The engine named in the script's own header if loaded, or this region's default.</summary>
-        private string ScriptEngineNameFor(TaskInventoryItem item)
+        /// <summary>The engine the region chose for this script: its header, saved state, a claim, or the default.</summary>
+        private string ScriptEngineNameFor(TaskInventoryItem item) => ChosenEngineName(m_Scene, item);
+
+        /// <summary>
+        /// The name of the engine <see cref="Scene.ResolveScriptEngine"/> gives the script, as the region decides it at a
+        /// rez, or "(unknown)" when the script, its asset or an engine for it cannot be found.
+        /// </summary>
+        internal static string ChosenEngineName(Scene scene, TaskInventoryItem item)
         {
             try
             {
-                string engine = m_Scene?.DefaultScriptEngine;
-                AssetBase asset = m_Scene?.AssetService?.Get(item.AssetID.ToString());
-                if (asset?.Data != null)
-                    engine = PhloxEngineHeader.Owner(OpenMetaverse.Utils.BytesToString(asset.Data), engine, LoadedEngineNames());
+                AssetBase asset = scene?.AssetService?.Get(item.AssetID.ToString());
+                string source = asset?.Data != null ? OpenMetaverse.Utils.BytesToString(asset.Data) : null;
+                string engine = scene?.ResolveScriptEngine(scene.DefaultScriptEngine, source, item)?.ScriptEngineName;
                 return string.IsNullOrEmpty(engine) ? "(unknown)" : engine;
             }
             catch { return "(unknown)"; }
@@ -2093,6 +2106,17 @@ namespace Phlox.ScriptEngine
         // doesn't run, so a multi-engine caller can try the next engine.
         public bool SuspendScript(UUID itemID)
             => m_ExeScheduler != null && m_ExeScheduler.RequestSuspend(itemID);
+
+        /// <summary>True when this engine runs the script and has it suspended, or a suspend of it is pending.</summary>
+        public bool IsSuspended(UUID itemID) => m_ExeScheduler != null && m_ExeScheduler.IsSuspended(itemID);
+
+        /// <summary>Answers <see cref="IScriptSuspension"/> for this engine, so the region can ask it.</summary>
+        private sealed class SuspensionQuery : IScriptSuspension
+        {
+            private readonly PhloxEngine m_engine;
+            public SuspensionQuery(PhloxEngine engine) => m_engine = engine;
+            public bool IsSuspended(UUID itemID) => m_engine.IsSuspended(itemID);
+        }
 
         // Returning TRUE for a Phlox script that is not yet running is deliberate (fe31bac769): Phlox
         // scripts are never rez-suspended, so "not suspended" IS success — returning false made
