@@ -13,6 +13,7 @@
     </Dependencies>
 
     <Extension path = "/OpenSim/RegionModules">
+        <RegionModule id="AISv3Module" class="OpenSim.Region.ClientStack.LindenCaps.AIS.AISv3Module" />
         <RegionModule id="AgentPreferencesModule" class="OpenSim.Region.ClientStack.LindenCaps.AgentPreferencesModule" />
         <RegionModule id="AvatarPickerSearchModule" class="OpenSim.Region.ClientStack.LindenCaps.AvatarPickerSearchModule" />
         <RegionModule id="BunchOfCapsModule" class="OpenSim.Region.ClientStack.LindenCaps.BunchOfCapsModule" />

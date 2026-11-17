@@ -405,7 +405,10 @@ public class PluginRegistryTests
                     string classShortName = className.Split('.').Last();
                     bool hasId = providerSource.Contains($"\"{id}\"", StringComparison.Ordinal);
                     bool hasClassLiteral = providerSource.Contains($"\"{className}\"", StringComparison.Ordinal);
-                    bool hasTypeOf = providerSource.Contains($"typeof({classShortName})", StringComparison.Ordinal);
+                    // typeof(Name), or typeof(Full.Name) for a class outside the provider's namespace (ParseProviderTriples
+                    // resolves a short name against that namespace only).
+                    bool hasTypeOf = providerSource.Contains($"typeof({classShortName})", StringComparison.Ordinal)
+                                     || providerSource.Contains($"typeof({className})", StringComparison.Ordinal);
 
                     if (!hasId || (!hasClassLiteral && !hasTypeOf))
                     {
