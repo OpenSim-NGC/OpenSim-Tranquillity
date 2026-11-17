@@ -378,7 +378,7 @@ public class RemoteAdminPlugin : IApplicationPlugin
             else
                 restartList = new List<Scene>() { rebootedScene };
 
-            foreach (Scene s in m_application.SceneManager.Scenes)
+            foreach (Scene s in restartList)
             {
                 restartModule = s.RequestModuleInterface<IRestartModule>();
                 if (restartModule != null)
