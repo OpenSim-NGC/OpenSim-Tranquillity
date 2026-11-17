@@ -562,7 +562,14 @@ public class ExperienceGrantRestoreTests
     {
         UUID owner = UUID.Random(), visitor = UUID.Random(), experience = UUID.Random(), asset = UUID.Random(), item = UUID.Random();
         // The visitor is asked for TRIGGER_ANIMATION, already held; a dialog goes to them and is not answered.
-        GrantAndSave(owner, visitor, experience, asset, item, h1 => Command(h1, "ask " + visitor + " 16"));
+        GrantAndSave(owner, visitor, experience, asset, item, h1 =>
+        {
+            Command(h1, "ask " + visitor + " 16");
+            // The ask comes over chat and says nothing back (the dialog is not answered): wait for the script to
+            // have run it, which ends the Experience grant, before the state is saved.
+            Assert.True(h1.PumpUntil(() => ((Interpreter)h1.InterpreterFor(item)).ScriptState.ExperienceGrant == null),
+                "the ask never ran: " + SavedStateRig.SaidText(h1));
+        });
         SerializedRuntimeState row = RowState(item);
         Assert.Equal(visitor.ToString(), row.PermsGranter);
         Assert.Null(row.PermsExperience);
