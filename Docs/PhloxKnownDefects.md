@@ -946,6 +946,10 @@ such list.
 - `PRIM_HEALTH` and the damage type in `PRIM_DAMAGE` are accepted and dropped. Reading them
   back gives 0.0 and `DAMAGE_TYPE_GENERIC`.
 - `PRIM_PHYSICS_MATERIAL` can be set, but reading it returns nothing.
+- `PRIM_GLTF_*` and `llSetLinkGLTFOverrides`: SL lets a script change only the texture
+  transforms of a face whose glTF material is no-modify
+  ([GLTF Overrides](https://wiki.secondlife.com/wiki/GLTF_Overrides)). The material asset's
+  permissions are not checked here, on Phlox or YEngine, so every override can be changed.
 - `PRIM_SIT_FLAGS`: `SIT_FLAG_NO_COLLIDE` and `SIT_FLAG_NO_DAMAGE` are stored for read-back
   only.
 - `PRIM_SIT_TARGET` with a nonzero active value sets a target at `ZERO_VECTOR` with

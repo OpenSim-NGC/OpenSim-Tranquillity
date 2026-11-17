@@ -11187,6 +11187,34 @@ public void llDetachFromAvatar()
 
                         return rules.GetSublist(idx, -1);
 
+                    case ScriptBaseClass.PRIM_RENDER_MATERIAL:
+                        // [ PRIM_RENDER_MATERIAL, integer face, string render_material ]
+                        if (remain < 2)
+                            return new LSL_List();
+                        try
+                        {
+                            face = rules.GetIntegerItem(idx++);
+                        }
+                        catch(InvalidCastException)
+                        {
+                            Error(originFunc, string.Format("Error running rule #{0} -> PRIM_RENDER_MATERIAL: arg #{1} - must be integer", rulesParsed, idx - idxStart - 1));
+                            return new LSL_List();
+                        }
+                        if (!RenderMaterialKeyOrName(rules.GetStringItem(idx++), originFunc, out UUID renderMaterial))
+                            return new LSL_List();
+                        SetPartRenderMaterial(part, renderMaterial, face);
+                        break;
+
+                    case ScriptBaseClass.PRIM_GLTF_BASE_COLOR:
+                    case ScriptBaseClass.PRIM_GLTF_NORMAL:
+                    case ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS:
+                    case ScriptBaseClass.PRIM_GLTF_EMISSIVE:
+                        if (remain < GltfValueCount(code))
+                            return new LSL_List();
+                        if (!SetPrimGltf(part, code, rules, ref idx, originFunc, rulesParsed))
+                            return new LSL_List();
+                        break;
+
                     case ScriptBaseClass.PRIM_PROJECTOR:
                         if (remain < 4)
                             return new LSL_List();
@@ -12461,6 +12489,17 @@ public void llDetachFromAvatar()
                         return new LSL_List();
 
                     return rules.GetSublist(idx, -1);
+
+                case ScriptBaseClass.PRIM_RENDER_MATERIAL:
+                case ScriptBaseClass.PRIM_GLTF_BASE_COLOR:
+                case ScriptBaseClass.PRIM_GLTF_NORMAL:
+                case ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS:
+                case ScriptBaseClass.PRIM_GLTF_EMISSIVE:
+                    if (remain < 1)
+                        return new LSL_List();
+                    face = rules.GetIntegerItem(idx++);
+                    GetPrimGltf(part, code, face, ref res);
+                    break;
 
                 case ScriptBaseClass.PRIM_PROJECTOR:
                     if (part.Shape.ProjectionEntry)
@@ -18080,6 +18119,22 @@ public void llDetachFromAvatar()
                         idx += 7;
                         break;
 
+                    // glTF materials: nothing to set on an avatar, but the values are skipped so the rules after apply
+                    case ScriptBaseClass.PRIM_RENDER_MATERIAL:
+                        if (remain < 2)
+                            return new LSL_List();
+                        idx += 2;
+                        break;
+
+                    case ScriptBaseClass.PRIM_GLTF_BASE_COLOR:
+                    case ScriptBaseClass.PRIM_GLTF_NORMAL:
+                    case ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS:
+                    case ScriptBaseClass.PRIM_GLTF_EMISSIVE:
+                        if (remain < GltfValueCount(code))
+                            return new LSL_List();
+                        idx += GltfValueCount(code);
+                        break;
+
                     case ScriptBaseClass.PRIM_LINK_TARGET:
                         if (remain < 3) // setting to 3 on the basis that parsing any usage of PRIM_LINK_TARGET that has nothing following it is pointless.
                             return new LSL_List();
@@ -18297,6 +18352,17 @@ public void llDetachFromAvatar()
                     res.Add(new LSL_Float(0f)); // intensity
                     res.Add(new LSL_Float(0f));    // radius
                     res.Add(new LSL_Float(0f));   // falloff
+                    break;
+
+                case ScriptBaseClass.PRIM_RENDER_MATERIAL:
+                case ScriptBaseClass.PRIM_GLTF_BASE_COLOR:
+                case ScriptBaseClass.PRIM_GLTF_NORMAL:
+                case ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS:
+                case ScriptBaseClass.PRIM_GLTF_EMISSIVE:
+                    // an avatar has no glTF materials; skip the face
+                    if (remain < 1)
+                        return new LSL_List();
+                    idx++;
                     break;
 
                 case ScriptBaseClass.PRIM_REFLECTION_PROBE:
@@ -21406,6 +21472,12 @@ public void llDetachFromAvatar()
         return new LSL_String();
     }
 
+    #region glTF render materials and overrides
+
+    // The faces' glTF render materials and overrides are kept through GltfMaterialOverride (OpenSim.Region.Framework),
+    // in the compact form viewers read and MaterialsModule writes, so YEngine and Phlox scripts and viewer edits see the
+    // same data. SL: https://wiki.secondlife.com/wiki/GLTF_Overrides
+
     public LSL_String llGetRenderMaterial(LSL_Integer lface )
     {
         return GetMaterial(m_host, lface.value);
@@ -21413,44 +21485,38 @@ public void llDetachFromAvatar()
 
     protected static LSL_String GetMaterial(SceneObjectPart part, int face)
     {
-        if (part.Shape.RenderMaterials is null ||
-                part.Shape.RenderMaterials.entries is null ||
-                part.Shape.RenderMaterials.entries.Length == 0)
-            return ScriptBaseClass.NULL_KEY;
-
         if (face == ScriptBaseClass.ALL_SIDES)
             face = 0;
-        else if (face < 0)
-            return ScriptBaseClass.NULL_KEY;
-        else if (face >= GetNumberOfSides(part))
+        else if (face < 0 || face >= GetNumberOfSides(part))
             return ScriptBaseClass.NULL_KEY;
 
-        UUID asset = UUID.Zero;
-        try
-        {
-            var re = part.Shape.RenderMaterials.entries
-                .First(entry => entry.te_index == face);  
-            asset = re.id;              
-        }
-        catch (ArgumentNullException)
-        {
+        return GltfAssetAsSeen(part, GltfMaterialOverride.GetRenderMaterial(part.Shape, face), AssetType.Material);
+    }
+
+    /// <summary>
+    /// A render material or glTF texture key as a script reads it (SL llGetRenderMaterial): the item's name when it is
+    /// in the prim's inventory, else the key when the owner has full permissions on the object, else NULL_KEY.
+    /// </summary>
+    protected static LSL_String GltfAssetAsSeen(SceneObjectPart part, UUID asset, AssetType type)
+    {
+        if (asset.IsZero())
             return ScriptBaseClass.NULL_KEY;
-        }
 
         lock (part.TaskInventory)
         {
             part.TaskInventory.LockItemsForRead(true);
             try
-            { 
-                foreach (KeyValuePair<UUID, TaskInventoryItem> inv in part.TaskInventory.Where(inv => inv.Value.Type == (int)AssetType.Material && inv.Value.AssetID.Equals(asset)))
+            {
+                foreach (KeyValuePair<UUID, TaskInventoryItem> inv in part.TaskInventory)
                 {
-                    return inv.Value.Name.ToString();
+                    if (inv.Value.Type == (int)type && inv.Value.AssetID.Equals(asset))
+                        return inv.Value.Name;
                 }
             }
             finally { part.TaskInventory.LockItemsForRead(false); }
         }
 
-        if((part.ParentGroup.EffectiveOwnerPerms & (uint)PermissionMask.All) != (uint)PermissionMask.All)
+        if ((part.ParentGroup.EffectiveOwnerPerms & (uint)PermissionMask.All) != (uint)PermissionMask.All)
             return ScriptBaseClass.NULL_KEY;
 
         return asset.ToString();
@@ -21458,6 +21524,8 @@ public void llDetachFromAvatar()
 
     public LSL_Integer llIsLinkGLTFMaterial(LSL_Integer linknum, LSL_Integer lface)
     {
+        // SL: FALSE for a link that does not exist or names several prims (LINK_SET, ...), and for a face that does
+        // not exist; ALL_SIDES is TRUE only when every face has a glTF material.
         SceneObjectPart part;
         if (linknum == ScriptBaseClass.LINK_ROOT)
             part = m_host.ParentGroup.RootPart;
@@ -21468,157 +21536,414 @@ public void llDetachFromAvatar()
         if(part is null)
             return 0;
 
-        if (part.Shape.RenderMaterials is null ||
-                part.Shape.RenderMaterials.entries is null ||
-                part.Shape.RenderMaterials.entries.Length == 0)
-            return 0;
-
+        int nsides = GetNumberOfSides(part);
         int face = lface.value;
         if (face == ScriptBaseClass.ALL_SIDES)
         {
-            int nsides = GetNumberOfSides(part);
-            bool[] pbr = new bool[nsides];
-            foreach(Primitive.RenderMaterials.RenderMaterialEntry re in part.Shape.RenderMaterials.entries)
+            if (nsides == 0)
+                return 0;
+            for (int f = 0; f < nsides; f++)
             {
-                if(re.te_index > 0 && re.te_index < pbr.Length && re.id.IsNotZero())
-                    pbr[re.te_index] = true;
-            }
-            foreach(bool b in pbr)
-            {
-                if (!b)
+                if (GltfMaterialOverride.GetRenderMaterial(part.Shape, f).IsZero())
                     return 0;
             }
             return 1;
         }
 
-        if (face < 0)
+        if (face < 0 || face >= nsides)
             return 0;
-        else if (face >= GetNumberOfSides(part))
-            return 0;
-        foreach(Primitive.RenderMaterials.RenderMaterialEntry re in part.Shape.RenderMaterials.entries)
-        {
-            if(re.te_index == face)
-                return re.id.IsZero() ? 0 : 1;
-        }
-        return 0;
+        return GltfMaterialOverride.GetRenderMaterial(part.Shape, face).IsZero() ? 0 : 1;
     }
 
     public void llSetRenderMaterial(LSL_String materialstr, LSL_Integer lsl_face)
     {
-        if(m_materialsModule is null)
-            return;
+        if (RenderMaterialKeyOrName(materialstr.m_string, "llSetRenderMaterial", out UUID matID))
+            SetPartRenderMaterial(m_host, matID, lsl_face.value);
+    }
 
-        if(string.IsNullOrEmpty(materialstr.m_string))
-        { 
-            Error("llSetRenderMaterial", "material \"\" not found");
+    public void llSetLinkRenderMaterial(LSL_Integer link, LSL_String materialstr, LSL_Integer lsl_face)
+    {
+        if (!RenderMaterialKeyOrName(materialstr.m_string, "llSetLinkRenderMaterial", out UUID matID))
             return;
+        foreach (SceneObjectPart part in GetLinkParts(link.value))
+            SetPartRenderMaterial(part, matID, lsl_face.value);
+    }
+
+    /// <summary>
+    /// SL llSetLinkGLTFOverrides: a list of OVERRIDE_GLTF_* constants each followed by its value, "" clearing that
+    /// override. A face that does not exist changes nothing.
+    /// </summary>
+    public void llSetLinkGLTFOverrides(LSL_Integer link, LSL_Integer lsl_face, LSL_List options)
+    {
+        const string func = "llSetLinkGLTFOverrides";
+        List<Action<GltfMaterialOverride>> edits = new();
+        object[] data = options.Data;
+        for (int i = 0; i + 1 < data.Length; i += 2)
+        {
+            object v = data[i + 1];
+            if (!GltfInt(data[i], out int? param) || !param.HasValue)
+            {
+                Error(func, $"parameter {i} must be an OVERRIDE_GLTF_* constant");
+                return;
+            }
+            switch (param.Value)
+            {
+                case ScriptBaseClass.OVERRIDE_GLTF_BASE_COLOR_FACTOR when GltfColor(v, out Vector3? c):
+                    edits.Add(o => o.BaseColor = c);
+                    break;
+                case ScriptBaseClass.OVERRIDE_GLTF_BASE_ALPHA when GltfUnit(v, out float? a):
+                    edits.Add(o => o.BaseAlpha = a);
+                    break;
+                case ScriptBaseClass.OVERRIDE_GLTF_BASE_ALPHA_MODE when GltfAlphaMode(v, out int? m):
+                    edits.Add(o => o.AlphaMode = m);
+                    break;
+                case ScriptBaseClass.OVERRIDE_GLTF_BASE_ALPHA_MASK when GltfUnit(v, out float? ac):
+                    edits.Add(o => o.AlphaCutoff = ac);
+                    break;
+                case ScriptBaseClass.OVERRIDE_GLTF_BASE_DOUBLE_SIDED when GltfInt(v, out int? ds):
+                    edits.Add(o => o.DoubleSided = ds.HasValue ? ds.Value != 0 : null);
+                    break;
+                case ScriptBaseClass.OVERRIDE_GLTF_METALLIC_FACTOR when GltfUnit(v, out float? mf):
+                    edits.Add(o => o.MetallicFactor = mf);
+                    break;
+                case ScriptBaseClass.OVERRIDE_GLTF_ROUGHNESS_FACTOR when GltfUnit(v, out float? rf):
+                    edits.Add(o => o.RoughnessFactor = rf);
+                    break;
+                case ScriptBaseClass.OVERRIDE_GLTF_EMISSIVE_FACTOR when GltfColor(v, out Vector3? ec):
+                    edits.Add(o => o.EmissiveColor = ec);
+                    break;
+                default:
+                    Error(func, $"invalid value for parameter {param.Value}");
+                    return;
+            }
         }
 
         int face = lsl_face.value;
-        bool changed;
-
-        if(UUID.ZeroString.Equals(materialstr.m_string, StringComparison.OrdinalIgnoreCase))
-        {
-            if(m_host.Shape.RenderMaterials is null || m_host.Shape.RenderMaterials.entries is null || m_host.Shape.RenderMaterials.entries.Length == 0)
-                return;
-
-            changed = m_materialsModule.CleanMaterialOverrides(ref m_host.Shape.RenderMaterials.overrides, face);
-            if(face == ScriptBaseClass.ALL_SIDES)
-            {
-                m_host.Shape.RenderMaterials.entries = null;
-                changed = true;
-            }
-            else
-                changed |= m_materialsModule.RemoveMaterialEntry(ref m_host.Shape.RenderMaterials.entries, face);
-
-            if(changed)
-            { 
-                m_host.ParentGroup.HasGroupChanged = true;
-                m_host.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
-                m_host.TriggerScriptChangedEvent(Changed.MATERIAL);
-            }
+        if (edits.Count == 0 || (face < 0 && face != ScriptBaseClass.ALL_SIDES))
             return;
-        }
+        foreach (SceneObjectPart part in GetLinkParts(link.value))
+            GltfMaterialOverride.Edit(part, face, o => { foreach (var edit in edits) edit(o); });
+    }
 
-        UUID matID = ScriptUtils.GetAssetIdFromItemName(m_host, materialstr.m_string, (int)AssetType.Material);
-        if (matID.IsZero())
+    /// <summary>
+    /// A render material as llSetRenderMaterial and PRIM_RENDER_MATERIAL name it: a material item in the script's
+    /// prim, else a key (NULL_KEY: none). Anything else is an error.
+    /// </summary>
+    private bool RenderMaterialKeyOrName(string name, string func, out UUID material)
+    {
+        material = UUID.Zero;
+        if (!string.IsNullOrEmpty(name))
         {
-            if (!UUID.TryParse(materialstr.m_string, out matID) || matID.IsZero())
-            { 
-                Error("llSetRenderMaterial", $"material \"{materialstr.m_string}\" not found");
-                return;
-            }
+            material = ScriptUtils.GetAssetIdFromItemName(m_host, name, (int)AssetType.Material);
+            if (material.IsNotZero() || UUID.TryParse(name, out material))
+                return true;
         }
+        Error(func, $"material \"{name}\" not found");
+        return false;
+    }
 
-        int nsides = GetNumberOfSides(m_host);
-        if(face >= nsides)
+    /// <summary>
+    /// Set a part's render material on a face, or every face for ALL_SIDES, clearing the face's overrides but its
+    /// texture transforms (SL). A face that does not exist changes nothing. A change raises CHANGED_RENDER_MATERIAL.
+    /// </summary>
+    private static void SetPartRenderMaterial(SceneObjectPart part, UUID material, int face)
+    {
+        if (face < 0 && face != ScriptBaseClass.ALL_SIDES)
             return;
+        if (GltfMaterialOverride.SetRenderMaterial(part, face, material))
+            part.TriggerScriptChangedEvent(Changed.MATERIAL);
+    }
 
-        m_host.Shape.RenderMaterials ??= new();
-        m_host.Shape.RenderMaterials.entries ??= new Primitive.RenderMaterials.RenderMaterialEntry[1];
+    private static int GltfValueCount(int code) => code switch
+    {
+        ScriptBaseClass.PRIM_GLTF_NORMAL => 5,
+        ScriptBaseClass.PRIM_GLTF_EMISSIVE => 6,
+        ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS => 7,
+        _ => 10,
+    };
 
-        changed = m_materialsModule.CleanMaterialOverrides(ref m_host.Shape.RenderMaterials.overrides, face);
-        if(face == ScriptBaseClass.ALL_SIDES)
+    private static int GltfSlot(int code) => code switch
+    {
+        ScriptBaseClass.PRIM_GLTF_NORMAL => GltfMaterialOverride.SLOT_NORMAL,
+        ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS => GltfMaterialOverride.SLOT_METALLIC_ROUGHNESS,
+        ScriptBaseClass.PRIM_GLTF_EMISSIVE => GltfMaterialOverride.SLOT_EMISSIVE,
+        _ => GltfMaterialOverride.SLOT_BASE_COLOR,
+    };
+
+    private static string GltfRuleName(int code) => code switch
+    {
+        ScriptBaseClass.PRIM_GLTF_NORMAL => "PRIM_GLTF_NORMAL",
+        ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS => "PRIM_GLTF_METALLIC_ROUGHNESS",
+        ScriptBaseClass.PRIM_GLTF_EMISSIVE => "PRIM_GLTF_EMISSIVE",
+        _ => "PRIM_GLTF_BASE_COLOR",
+    };
+
+    /// <summary>
+    /// The PRIM_GLTF_BASE_COLOR, _NORMAL, _METALLIC_ROUGHNESS and _EMISSIVE setter rules (SL wiki pages of those
+    /// names): [ face, texture, repeats, offsets, rotation_in_radians, ...the rule's own values ], any value given as
+    /// "" clearing that override. <paramref name="idx"/> is at the face and is moved past the rule. False, after an
+    /// error, for a value of the wrong type or a texture that is neither in the prim nor a key.
+    /// </summary>
+    private bool SetPrimGltf(SceneObjectPart part, int code, LSL_List rules, ref int idx, string originFunc, uint rulesParsed)
+    {
+        int start = idx;
+        object[] data = rules.Data;
+        idx += GltfValueCount(code);
+        string rule = GltfRuleName(code);
+
+        bool Fail(int arg, string what)
         {
-            if(m_host.Shape.RenderMaterials.entries is null || m_host.Shape.RenderMaterials.entries.Length != nsides)
-            {
-                m_host.Shape.RenderMaterials.entries = new Primitive.RenderMaterials.RenderMaterialEntry[nsides];
-                for (int i = 0; i < m_host.Shape.RenderMaterials.entries.Length; i++)
-                {
-                    m_host.Shape.RenderMaterials.entries[i] = new()
-                    {
-                        te_index = (byte)i,
-                        id = matID
-                    };
-                }
-                changed = true;
-            }
-            else
-            {
-                for (int i = 0; i < m_host.Shape.RenderMaterials.entries.Length; i++)
-                {
-                    if(matID.NotEqual(m_host.Shape.RenderMaterials.entries[i].id))
-                    { 
-                        changed = true;
-                        m_host.Shape.RenderMaterials.entries[i].id = matID;
-                    }
-                }
-            }
+            Error(originFunc, $"Error running rule #{rulesParsed} -> {rule}: arg #{arg} - {what}");
+            return false;
         }
-        else
-        {
-            int indx = 0;
-            for( ; indx < m_host.Shape.RenderMaterials.entries.Length; indx++)
-            {
-                if (m_host.Shape.RenderMaterials.entries[indx].te_index == face)
-                {
-                    if(matID.NotEqual(m_host.Shape.RenderMaterials.entries[indx].id))
-                    { 
-                        changed = true;
-                        m_host.Shape.RenderMaterials.entries[indx].id = matID;
-                    }
-                    break;
-                }
-            }
-            if(indx == m_host.Shape.RenderMaterials.entries.Length)
-            {
-                Array.Resize(ref m_host.Shape.RenderMaterials.entries, m_host.Shape.RenderMaterials.entries.Length + 1);
 
-                m_host.Shape.RenderMaterials.entries[indx] = new()
+        if (!GltfInt(data[start], out int? lface) || !lface.HasValue)
+            return Fail(0, "parameter 1 must be integer");
+        int face = lface.Value;
+
+        if (!GltfTexture(data[start + 1], out UUID? texture, out bool found))
+            return Fail(1, "parameter 2 must be a string or key");
+        if (!found)
+            return Fail(1, $"texture \"{data[start + 1]}\" must be a UUID or a texture name on object inventory");
+        if (!GltfVector(data[start + 2], out Vector3? repeats))
+            return Fail(2, "parameter 3 (repeats) must be vector or \"\"");
+        if (!GltfVector(data[start + 3], out Vector3? offsets))
+            return Fail(3, "parameter 4 (offsets) must be vector or \"\"");
+        if (!GltfFloat(data[start + 4], out float? rotation))
+            return Fail(4, "parameter 5 (rotation) must be float or \"\"");
+
+        Action<GltfMaterialOverride> extra = null;
+        switch (code)
+        {
+            case ScriptBaseClass.PRIM_GLTF_BASE_COLOR:
+                if (!GltfColor(data[start + 5], out Vector3? color))
+                    return Fail(5, "parameter 6 (color) must be vector or \"\"");
+                if (!GltfUnit(data[start + 6], out float? alpha))
+                    return Fail(6, "parameter 7 (alpha) must be float or \"\"");
+                if (!GltfAlphaMode(data[start + 7], out int? mode))
+                    return Fail(7, "parameter 8 (alpha_mode) must be a PRIM_GLTF_ALPHA_MODE_* constant or \"\"");
+                if (!GltfUnit(data[start + 8], out float? cutoff))
+                    return Fail(8, "parameter 9 (alpha_mask_cutoff) must be float or \"\"");
+                if (!GltfInt(data[start + 9], out int? doubleSided))
+                    return Fail(9, "parameter 10 (double_sided) must be integer or \"\"");
+                extra = o =>
                 {
-                    te_index = (byte)face,
-                    id = matID
+                    o.BaseColor = color;
+                    o.BaseAlpha = alpha;
+                    o.AlphaMode = mode;
+                    o.AlphaCutoff = cutoff;
+                    o.DoubleSided = doubleSided.HasValue ? doubleSided.Value != 0 : null;
                 };
-                changed = true;
-            }
+                break;
+            case ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS:
+                if (!GltfUnit(data[start + 5], out float? metallic))
+                    return Fail(5, "parameter 6 (metallic_factor) must be float or \"\"");
+                if (!GltfUnit(data[start + 6], out float? roughness))
+                    return Fail(6, "parameter 7 (roughness_factor) must be float or \"\"");
+                extra = o => { o.MetallicFactor = metallic; o.RoughnessFactor = roughness; };
+                break;
+            case ScriptBaseClass.PRIM_GLTF_EMISSIVE:
+                if (!GltfColor(data[start + 5], out Vector3? emissive))
+                    return Fail(5, "parameter 6 (emissive_tint) must be vector or \"\"");
+                extra = o => o.EmissiveColor = emissive;
+                break;
         }
-        if(changed)
-        { 
-            m_host.ParentGroup.HasGroupChanged = true;
-            m_host.ScheduleUpdate(PrimUpdateFlags.MaterialOvr | PrimUpdateFlags.FullUpdate);
-            m_host.TriggerScriptChangedEvent(Changed.MATERIAL);
+
+        if (face < 0 && face != ScriptBaseClass.ALL_SIDES)
+            return true;
+
+        int slot = GltfSlot(code);
+        GltfMaterialOverride.Edit(part, face, o =>
+        {
+            o.SetTexture(slot, texture);
+            o.SetScale(slot, repeats.HasValue
+                ? new Vector2(Math.Clamp(repeats.Value.X, -10000f, 10000f), Math.Clamp(repeats.Value.Y, -10000f, 10000f))
+                : null);
+            o.SetOffset(slot, offsets.HasValue
+                ? new Vector2(Math.Clamp(offsets.Value.X, -1f, 1f), Math.Clamp(offsets.Value.Y, -1f, 1f))
+                : null);
+            o.SetRotation(slot, rotation);
+            extra?.Invoke(o);
+        });
+        return true;
+    }
+
+    /// <summary>
+    /// The PRIM_RENDER_MATERIAL and PRIM_GLTF_* reads of one face, or of every face for ALL_SIDES; nothing for a
+    /// face that does not exist. A value that is not overridden reads as "", as SL documents.
+    /// </summary>
+    private static void GetPrimGltf(SceneObjectPart part, int code, int face, ref LSL_List res)
+    {
+        int nsides = GetNumberOfSides(part);
+        if (face == ScriptBaseClass.ALL_SIDES)
+        {
+            for (int f = 0; f < nsides; f++)
+                GetPrimGltfFace(part, code, f, ref res);
+        }
+        else if (face >= 0 && face < nsides)
+            GetPrimGltfFace(part, code, face, ref res);
+    }
+
+    private static void GetPrimGltfFace(SceneObjectPart part, int code, int face, ref LSL_List res)
+    {
+        if (code == ScriptBaseClass.PRIM_RENDER_MATERIAL)
+        {
+            res.Add(GltfAssetAsSeen(part, GltfMaterialOverride.GetRenderMaterial(part.Shape, face), AssetType.Material));
+            return;
+        }
+
+        GltfMaterialOverride o = GltfMaterialOverride.Get(part.Shape, face);
+        int slot = GltfSlot(code);
+        LSL_String empty = new(string.Empty);
+
+        UUID? texture = o.GetTexture(slot);
+        if (!texture.HasValue)
+            res.Add(empty);
+        else if (texture.Value.Equals(GltfMaterialOverride.NullTextureOverride))
+            res.Add(new LSL_String(ScriptBaseClass.NULL_KEY));
+        else
+            res.Add(GltfAssetAsSeen(part, texture.Value, AssetType.Texture));
+
+        Vector2? scale = o.GetScale(slot);
+        res.Add(scale.HasValue ? (object)new LSL_Vector(scale.Value.X, scale.Value.Y, 0) : empty);
+        Vector2? offset = o.GetOffset(slot);
+        res.Add(offset.HasValue ? (object)new LSL_Vector(offset.Value.X, offset.Value.Y, 0) : empty);
+        res.Add(GltfOut(o.GetRotation(slot)));
+
+        switch (code)
+        {
+            case ScriptBaseClass.PRIM_GLTF_BASE_COLOR:
+                res.Add(o.BaseColor.HasValue ? (object)new LSL_Vector(o.BaseColor.Value) : empty);
+                res.Add(GltfOut(o.BaseAlpha));
+                res.Add(o.AlphaMode.HasValue ? (object)new LSL_Integer(o.AlphaMode.Value) : empty);
+                res.Add(GltfOut(o.AlphaCutoff));
+                res.Add(o.DoubleSided.HasValue ? (object)new LSL_Integer(o.DoubleSided.Value ? 1 : 0) : empty);
+                break;
+            case ScriptBaseClass.PRIM_GLTF_METALLIC_ROUGHNESS:
+                res.Add(GltfOut(o.MetallicFactor));
+                res.Add(GltfOut(o.RoughnessFactor));
+                break;
+            case ScriptBaseClass.PRIM_GLTF_EMISSIVE:
+                res.Add(o.EmissiveColor.HasValue ? (object)new LSL_Vector(o.EmissiveColor.Value) : empty);
+                break;
         }
     }
+
+    // object on both arms: LSL_String converts implicitly to the other LSL types, which would turn "" into 0
+    private static object GltfOut(float? v) => v.HasValue ? (object)new LSL_Float(v.Value) : new LSL_String(string.Empty);
+
+    // The value readers for PRIM_GLTF_* and llSetLinkGLTFOverrides: "" is null (clear the override); false for a
+    // value of the wrong type.
+
+    private static bool GltfUnset(object v) => v switch
+    {
+        LSL_Types.LSLString s => string.IsNullOrEmpty(s.m_string),
+        LSL_Types.key k => string.IsNullOrEmpty(k.value),
+        string s => s.Length == 0,
+        _ => false,
+    };
+
+    private static string GltfString(object v) => v switch
+    {
+        LSL_Types.LSLString s => s.m_string,
+        LSL_Types.key k => k.value,
+        string s => s,
+        _ => null,
+    };
+
+    private bool GltfTexture(object v, out UUID? texture, out bool found)
+    {
+        texture = null;
+        found = true;
+        if (GltfUnset(v))
+            return true;
+        string name = GltfString(v);
+        if (name is null)
+            return false;
+        UUID id = ScriptUtils.GetAssetIdFromItemName(m_host, name, (int)AssetType.Texture);
+        if (id.IsZero() && !UUID.TryParse(name, out id))
+        {
+            found = false;
+            return true;
+        }
+        // NULL_KEY overrides the slot to no texture, the viewer's GLTF_OVERRIDE_NULL_UUID
+        texture = id.IsZero() ? GltfMaterialOverride.NullTextureOverride : id;
+        return true;
+    }
+
+    private static bool GltfVector(object v, out Vector3? vec)
+    {
+        vec = null;
+        if (GltfUnset(v))
+            return true;
+        switch (v)
+        {
+            case LSL_Vector lv:
+                vec = new Vector3((float)lv.x, (float)lv.y, (float)lv.z);
+                return true;
+            case Vector3 ov:
+                vec = ov;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private static bool GltfColor(object v, out Vector3? color)
+    {
+        if (!GltfVector(v, out color))
+            return false;
+        if (color.HasValue)
+            color = new Vector3(Math.Clamp(color.Value.X, 0f, 1f), Math.Clamp(color.Value.Y, 0f, 1f), Math.Clamp(color.Value.Z, 0f, 1f));
+        return true;
+    }
+
+    private static bool GltfFloat(object v, out float? f)
+    {
+        f = null;
+        if (GltfUnset(v))
+            return true;
+        switch (v)
+        {
+            case LSL_Float lf: f = (float)lf.value; return true;
+            case LSL_Integer li: f = li.value; return true;
+            case float fv: f = fv; return true;
+            case double dv: f = (float)dv; return true;
+            case int iv: f = iv; return true;
+            default: return false;
+        }
+    }
+
+    private static bool GltfUnit(object v, out float? f)
+    {
+        if (!GltfFloat(v, out f))
+            return false;
+        if (f.HasValue)
+            f = Math.Clamp(f.Value, 0f, 1f);
+        return true;
+    }
+
+    private static bool GltfInt(object v, out int? i)
+    {
+        i = null;
+        if (GltfUnset(v))
+            return true;
+        switch (v)
+        {
+            case LSL_Integer li: i = li.value; return true;
+            case int iv: i = iv; return true;
+            default: return false;
+        }
+    }
+
+    private static bool GltfAlphaMode(object v, out int? mode)
+    {
+        if (!GltfInt(v, out mode))
+            return false;
+        return !mode.HasValue || (mode.Value >= ScriptBaseClass.PRIM_GLTF_ALPHA_MODE_OPAQUE && mode.Value <= ScriptBaseClass.PRIM_GLTF_ALPHA_MODE_MASK);
+    }
+
+    #endregion
 
     public LSL_Vector llWorldPosToHUD(LSL_Vector wp)
     {

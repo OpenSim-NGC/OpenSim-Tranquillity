@@ -475,6 +475,21 @@ public partial class ScriptBaseClass
     public const int PRIM_DAMAGE = 51;
     public const int PRIM_HEALTH = 52;
 
+    // PRIM_GLTF_BASE_COLOR alpha_mode
+    public const int PRIM_GLTF_ALPHA_MODE_OPAQUE = 0;
+    public const int PRIM_GLTF_ALPHA_MODE_BLEND = 1;
+    public const int PRIM_GLTF_ALPHA_MODE_MASK = 2;
+
+    // llSetLinkGLTFOverrides
+    public const int OVERRIDE_GLTF_BASE_COLOR_FACTOR = 1;
+    public const int OVERRIDE_GLTF_BASE_ALPHA = 2;
+    public const int OVERRIDE_GLTF_BASE_ALPHA_MODE = 3;
+    public const int OVERRIDE_GLTF_BASE_ALPHA_MASK = 4;
+    public const int OVERRIDE_GLTF_BASE_DOUBLE_SIDED = 5;
+    public const int OVERRIDE_GLTF_METALLIC_FACTOR = 6;
+    public const int OVERRIDE_GLTF_ROUGHNESS_FACTOR = 7;
+    public const int OVERRIDE_GLTF_EMISSIVE_FACTOR = 8;
+
     // parameters
 
     public const int PRIM_ALPHA_MODE_NONE = 0;
