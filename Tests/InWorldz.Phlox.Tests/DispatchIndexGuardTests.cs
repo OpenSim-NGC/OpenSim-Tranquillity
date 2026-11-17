@@ -94,7 +94,9 @@ public class DispatchIndexGuardTests
         // seven are type-discriminated overloads of names already here, and the baseline is keyed by name.
         // osMakeNotecard adds one name for its two forms.
         // The wind-volume functions add three names (iwWindVolumeCreate, iwWindVolumeRemove, iwWindVolumes).
-        Assert.Equal(936, baseline.Count);
+        // Second Life's forms of twelve ll functions add seven names (llFindNotecardTextCount, llSetParcelForSale, llRemoteLoadScript,
+        // llRemoteDataSetRegion and the three llGetGameControlMode functions); the other five are overloads of names already here.
+        Assert.Equal(943, baseline.Count);
     }
 
     /// <summary>

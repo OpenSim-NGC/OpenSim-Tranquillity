@@ -1037,5 +1037,18 @@ namespace Phlox.ScriptEngine
         int botIsPersistent(string botID);
         string botGetPersistentData(string botID, string key);
         int botSetPersistentData(string botID, string key, string value);
+        // Second Life's forms of functions an older member holds under another shape, and functions OpenSim's LSL lacks.
+        LSLList llGetAttachedListFiltered(string avatar, LSLList options);
+        LSLList llFindNotecardTextSync(string name, string pattern, int start, int count, LSLList options);
+        string llFindNotecardTextCount(string name, string pattern, LSLList options);
+        int llSetParcelForSale(int forSale, LSLList options);
+        void llRemoteLoadScript(string target, string name, int running, int startParam);
+        void llRemoteDataSetRegion();
+        int llGetGameControlMode(string id);
+        LSLList llGetGameControlModeAxes(string id);
+        int llGetGameControlModeButtons(string id);
+        void llMapBeacon(string regionName, Vector3 pos, LSLList options);
+        int llGiveAgentInventory(string agent, string folder, LSLList inventory, LSLList options);
+        int llTransferOwnership(string agent, int flags, LSLList options);
     }
 }

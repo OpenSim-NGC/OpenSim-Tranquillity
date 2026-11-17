@@ -939,3 +939,10 @@ osMakeNotecard 967
 iwWindVolumeCreate 969
 iwWindVolumeRemove 970
 iwWindVolumes 971
+llFindNotecardTextCount 974
+llSetParcelForSale 975
+llRemoteLoadScript 976
+llRemoteDataSetRegion 977
+llGetGameControlMode 978
+llGetGameControlModeAxes 979
+llGetGameControlModeButtons 980

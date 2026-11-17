@@ -10198,6 +10198,334 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             return new LSLList(handles);
         }
 
+        // ── Second Life's forms of functions an older entry holds under another shape, and functions OpenSim's LSL lacks ──
+        // The reference for each is its page on the SL wiki and its entry in LL's lsl-definitions (lsl_definitions.yaml).
+
+        private const int PERMISSION_PRIVILEGED_LAND_ACCESS = 524288;
+        private const int TRANSFER_OK = 0, TRANSFER_BAD_OPTS = -1, TRANSFER_NO_TARGET = -2, TRANSFER_NO_ITEMS = -4,
+            TRANSFER_BAD_ROOT = -5, TRANSFER_NO_PERMS = -6, TRANSFER_NO_ATTACHMENT = -7;
+        private const int TRANSFER_DEST = 0, TRANSFER_FLAGS = 1, TRANSFER_FLAG_TAKE = 2, TRANSFER_FLAG_COPY = 4;
+        private const string NotecardNak = "\n\u0015\n";
+
+        /// <summary>
+        /// SL wiki LlGetAttachedListFiltered: the keys of the avatar's public attachments in the order they were attached;
+        /// [FILTER_INCLUDE, point] limits the list to a point and may repeat; "NOT ON REGION" for a child agent and
+        /// "NOT FOUND" for a key that is no agent. HUDs come only with FILTER_FLAG_HUDS and an experience the script, the
+        /// avatar and the HUD share; the engine's attachment list never holds a HUD, so none is added and
+        /// ATTACH_ANY_HUD finds nothing.
+        /// </summary>
+        public LSLList llGetAttachedListFiltered(string avatar, LSLList options)
+        {
+            if (!UUID.TryParse(avatar, out UUID agentID)) return new LSLList(new object[] { "NOT FOUND" });
+            ScenePresence sp = World?.GetScenePresence(agentID);
+            if (sp == null) return new LSLList(new object[] { "NOT FOUND" });
+            if (sp.IsChildAgent) return new LSLList(new object[] { "NOT ON REGION" });
+
+            const int FilterInclude = 1;
+            var points = new HashSet<int>();
+            for (int i = 0; options != null && i + 1 < options.Length; i += 2)
+                if (options.Data[i] is int key && key == FilterInclude && options.Data[i + 1] is int point)
+                    points.Add(point);
+
+            var ret = new List<object>();
+            var attachments = sp.GetAttachments();
+            if (attachments != null)
+                foreach (var grp in attachments)
+                    if (!grp.HasPrivateAttachmentPoint && (points.Count == 0 || points.Contains((int)grp.AttachmentPoint)))
+                        ret.Add(grp.UUID.ToString());
+            return new LSLList(ret);
+        }
+
+        /// <summary>
+        /// The matches of <paramref name="rx"/> in a notecard, line by line, as the strided list [line, column, length, ...]
+        /// that llFindNotecardTextSync answers (lsl-definitions func-id 508): <paramref name="skip"/> matches are passed
+        /// over, and at most <paramref name="max"/> are returned.
+        /// </summary>
+        private static List<object> NotecardMatches(System.Text.RegularExpressions.Regex rx, PhloxNotecardCache.Card card, int skip, int max)
+        {
+            var found = new List<object>();
+            int seen = 0, taken = 0;
+            for (int line = 0; line < card.LineCount && taken < max; line++)
+                foreach (System.Text.RegularExpressions.Match m in rx.Matches(card.Line(line)))
+                {
+                    if (seen++ < skip) continue;
+                    found.Add(line); found.Add(m.Index); found.Add(m.Length);
+                    if (++taken >= max) break;
+                }
+            return found;
+        }
+
+        private System.Text.RegularExpressions.Regex NotecardPattern(string function, string pattern)
+        {
+            try { return ScriptRegex.Create(pattern); }
+            catch (ArgumentException e)
+            {
+                ShoutError(function + ": invalid regular expression: " + e.Message);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// SL wiki LlFindNotecardTextSync, lsl-definitions func-id 508: the pattern is a regular expression, start is the
+        /// number of matches to skip, count the most to return (0: 64, and never more than 64); the answer is
+        /// [line, column, length, ...], empty when nothing matches or the card holds embedded items. A missing notecard is
+        /// shouted on DEBUG_CHANNEL and answers NAK, an invalid pattern is shouted and answers an empty list. The notecard
+        /// is read from the asset service (the wiki's "not cached" NAK has no counterpart here: every card can be read).
+        /// </summary>
+        public LSLList llFindNotecardTextSync(string name, string pattern, int start, int count, LSLList options)
+        {
+            if (m_host == null || World == null) return new LSLList();
+            UUID notecard = NotecardAssetIn(m_host, name);
+            if (notecard == UUID.Zero)
+            {
+                ShoutError("Notecard '" + name + "' could not be found.");
+                return new LSLList(new object[] { NotecardNak });
+            }
+            var rx = NotecardPattern("llFindNotecardTextSync", pattern);
+            if (rx == null) return new LSLList();
+            try
+            {
+                AssetBase asset = World.AssetService.Get(notecard.ToString());
+                if (asset == null || asset.Data == null || asset.Type != (sbyte)AssetType.Notecard)
+                {
+                    ShoutError("Notecard '" + name + "' could not be found.");
+                    return new LSLList(new object[] { NotecardNak });
+                }
+                var card = new PhloxNotecardCache.Card(HasEmbeddedItems(asset.Data) ? string.Empty : StripNotecardHeader(asset.Data));
+                int max = count <= 0 ? 64 : Math.Min(count, 64);
+                return new LSLList(NotecardMatches(rx, card, Math.Max(0, start), max));
+            }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+            {
+                ShoutError("llFindNotecardTextSync: " + ScriptRegex.TimedOutMessage);
+                return new LSLList();
+            }
+        }
+
+        /// <summary>
+        /// lsl-definitions func-id 507: asynchronously requests the number of matches of the pattern in the notecard; the
+        /// call answers the query key and the count arrives as a dataserver event. No delay. A missing notecard or an
+        /// invalid pattern is shouted on DEBUG_CHANNEL and no query is made (the key is NULL_KEY).
+        /// </summary>
+        public string llFindNotecardTextCount(string name, string pattern, LSLList options)
+        {
+            if (m_host == null || World == null) return UUID.Zero.ToString();
+            var rx = NotecardPattern("llFindNotecardTextCount", pattern);
+            if (rx == null) return UUID.Zero.ToString();
+            UUID notecard = NotecardAssetIn(m_host, name);
+            if (notecard == UUID.Zero)
+            {
+                ShoutError("Notecard '" + name + "' could not be found.");
+                return UUID.Zero.ToString();
+            }
+            UUID queryID = NewDataserverQuery();
+            AnswerNotecardRead(notecard, queryID, card =>
+            {
+                try { return (NotecardMatches(rx, card, 0, int.MaxValue).Count / 3).ToString(); }
+                catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+                {
+                    ShoutError("llFindNotecardTextCount: " + ScriptRegex.TimedOutMessage);
+                    return "0";
+                }
+            }, name, "llFindNotecardTextCount");
+            return queryID.ToString();
+        }
+
+        /// <summary>
+        /// SL wiki LlSetParcelForSale: the script's owner owns the parcel and has granted PERMISSION_PRIVILEGED_LAND_ACCESS;
+        /// PARCEL_SALE_PRICE (an integer), PARCEL_SALE_AGENT (the one agent who may buy) and PARCEL_SALE_OBJECTS (the
+        /// parcel's objects go with it); the price must be above zero unless an agent is named; FALSE takes the parcel off
+        /// sale and clears the options. Answers a PARCEL_SALE_* code. PARCEL_SALE_ERROR_IN_ESCROW has no counterpart: the
+        /// region has no escrow.
+        /// </summary>
+        public int llSetParcelForSale(int forSale, LSLList options)
+        {
+            const int Ok = 0, NoParcel = 1, NoPermissions = 2, InvalidPrice = 4, BadParams = 5;
+            if (m_host == null || World == null) return NoParcel;
+            ILandObject land = World.LandChannel?.GetLandObject(m_host.AbsolutePosition.X, m_host.AbsolutePosition.Y);
+            if (land == null) return NoParcel;
+            TaskInventoryItem self = GetInventorySelf();
+            if (self == null || (self.PermsMask & PERMISSION_PRIVILEGED_LAND_ACCESS) == 0 || self.PermsGranter != m_host.OwnerID
+                || land.LandData.IsGroupOwned || land.LandData.OwnerID != m_host.OwnerID)
+                return NoPermissions;
+
+            int price = 0;
+            UUID buyer = UUID.Zero;
+            bool withObjects = false;
+            if (options != null)
+            {
+                if (options.Length % 2 != 0) return BadParams;
+                for (int i = 0; i < options.Length; i += 2)
+                {
+                    if (!(options.Data[i] is int key)) return BadParams;
+                    object value = options.Data[i + 1];
+                    switch (key)
+                    {
+                        case 1: if (!(value is int p)) return BadParams; price = p; break;
+                        case 2: if (!UUID.TryParse(value as string, out buyer)) return BadParams; break;
+                        case 3: if (!(value is int o)) return BadParams; withObjects = o != 0; break;
+                        default: return BadParams;
+                    }
+                }
+            }
+
+            LandData data = land.LandData;
+            if (forSale != 0)
+            {
+                if (price < 0 || (price == 0 && buyer == UUID.Zero)) return InvalidPrice;
+                data.Flags |= (uint)ParcelFlags.ForSale;
+                if (withObjects) data.Flags |= (uint)ParcelFlags.ForSaleObjects; else data.Flags &= ~(uint)ParcelFlags.ForSaleObjects;
+                data.SalePrice = price;
+                data.AuthBuyerID = buyer;
+            }
+            else
+            {
+                data.Flags &= ~(uint)(ParcelFlags.ForSale | ParcelFlags.ForSaleObjects);
+                data.SalePrice = 0;
+                data.AuthBuyerID = UUID.Zero;
+            }
+            World.EventManager.TriggerLandObjectUpdated((uint)data.LocalID, land);
+            return Ok;
+        }
+
+        /// <summary>
+        /// lsl-definitions: llRemoteLoadScript is deprecated and sleeps 3.0 seconds. OpenSim's own LSL says
+        /// "Command deprecated" and sleeps; so does this.
+        /// </summary>
+        public void llRemoteLoadScript(string target, string name, int running, int startParam)
+        {
+            ShoutError("llRemoteLoadScript: Command deprecated - Use llRemoteLoadScriptPin instead");
+            ScriptSleep(3000);
+        }
+
+        /// <summary>lsl-definitions: llRemoteDataSetRegion is deprecated (it re-registered XML-RPC channels); OpenSim's own LSL says so, and so does this.</summary>
+        public void llRemoteDataSetRegion()
+        {
+            ShoutError("llRemoteDataSetRegion: Command deprecated - Use llOpenRemoteDataChannel instead");
+        }
+
+        // The game-control functions read what a viewer sends about its game controller. No viewer sends it to this
+        // region, so every call is the case the SL wiki (LlGetGameControlMode) documents as -1: the script has no
+        // game-control data for the avatar. The wiki and lsl-definitions say nothing for the other two in that case; the
+        // same "no data" read is an empty list of axes and no buttons.
+
+        public int llGetGameControlMode(string id) => -1;
+
+        public LSLList llGetGameControlModeAxes(string id) => new LSLList();
+
+        public int llGetGameControlModeButtons(string id) => 0;
+
+        /// <summary>
+        /// lsl-definitions func-id 516: displays a beacon on the viewer of the avatar touching or wearing the object, only
+        /// for attached scripts or during touch events; sleep 1.0. No message that draws a beacon is sent to a viewer
+        /// here, so the call does what the definition says it does where it has no effect: nothing, after its sleep.
+        /// </summary>
+        public void llMapBeacon(string regionName, Vector3 pos, LSLList options)
+        {
+            ScriptSleep(1000);
+        }
+
+        /// <summary>
+        /// SL wiki LlGiveAgentInventory: the listed items go to the agent in a new folder named <paramref name="folder"/>;
+        /// TRANSFER_DEST names a root path of up to four "|"-separated folders, TRANSFER_FLAGS has no flags defined;
+        /// no-copy items are left out, and no-transfer items unless the agent owns the script; the script sleeps 3.0
+        /// seconds. Answers TRANSFER_OK or a TRANSFER_* error. The root path is checked but the folder is made where the
+        /// region puts every give; TRANSFER_THROTTLE is not produced.
+        /// </summary>
+        public int llGiveAgentInventory(string agent, string folder, LSLList inventory, LSLList options)
+        {
+            try
+            {
+                if (m_host == null || World == null) return TRANSFER_NO_PERMS;
+                for (int i = 0; options != null && i < options.Length; i += 2)
+                {
+                    if (i + 1 >= options.Length || !(options.Data[i] is int key)) return TRANSFER_BAD_OPTS;
+                    object value = options.Data[i + 1];
+                    if (key == TRANSFER_DEST)
+                    {
+                        if (!(value is string path)) return TRANSFER_BAD_OPTS;
+                        string[] folders = path.Split('|', StringSplitOptions.RemoveEmptyEntries);
+                        if (folders.Length == 0 || folders.Length > 4 || folders.Any(f => f.Equals("Trash", StringComparison.OrdinalIgnoreCase)))
+                            return TRANSFER_BAD_ROOT;
+                    }
+                    else if (key == TRANSFER_FLAGS) { if (!(value is int)) return TRANSFER_BAD_OPTS; }
+                    else return TRANSFER_BAD_OPTS;
+                }
+                if (m_host.ParentGroup.IsAttachment) return TRANSFER_NO_ATTACHMENT;
+                if (!UUID.TryParse(agent, out UUID agentId) || agentId == UUID.Zero) return TRANSFER_NO_TARGET;
+                ScenePresence sp = World.GetScenePresence(agentId);
+                if (sp == null || sp.IsChildAgent) return TRANSFER_NO_TARGET;
+                // The object's own right to be given away; an item inside it that cannot be transferred is dealt with below, item by item.
+                if ((m_host.ParentGroup.RootPart.OwnerMask & (uint)OpenSim.Framework.PermissionMask.Transfer) == 0) return TRANSFER_NO_PERMS;
+                if (GiveRefusedByMute(agentId, "inventory")) return TRANSFER_NO_PERMS;
+
+                var given = new List<UUID>();
+                foreach (UUID id in ListedItems(m_host, inventory, shoutMissing: false))
+                {
+                    TaskInventoryItem item = m_host.Inventory.GetInventoryItem(id);
+                    if (item == null || (item.CurrentPermissions & (uint)OpenSim.Framework.PermissionMask.Copy) == 0) continue;
+                    if (agentId != m_host.OwnerID && (item.CurrentPermissions & (uint)OpenSim.Framework.PermissionMask.Transfer) == 0) continue;
+                    given.Add(id);
+                }
+                if (given.Count == 0) return TRANSFER_NO_ITEMS;
+
+                int rc = GiveTaskItems(m_host, agentId, folder, given, out string failure);
+                if (rc == IW_DELIVER_OK) return TRANSFER_OK;
+                m_log.LogDebug("[PhloxAPI]: llGiveAgentInventory to {0} failed: {1}", agentId, failure);
+                return rc == IW_DELIVER_PERM ? TRANSFER_NO_PERMS : rc == IW_DELIVER_USER ? TRANSFER_NO_TARGET : TRANSFER_NO_ITEMS;
+            }
+            finally
+            {
+                ScriptSleep(3000);
+            }
+        }
+
+        /// <summary>
+        /// SL wiki LlTransferOwnership: the object goes to an agent in the region. With no flag it changes owner where it
+        /// stands (as the wiki says, the sale of an original); TRANSFER_FLAG_TAKE puts it in the agent's inventory and
+        /// removes it from the region; TRANSFER_FLAG_COPY gives the agent a copy and the object stays. No options are
+        /// defined; the reserved flag, an unknown flag and TAKE with COPY are TRANSFER_BAD_OPTS (the wiki is silent on
+        /// the last). The object must be transferable (and copyable for COPY), and not an attachment.
+        /// </summary>
+        public int llTransferOwnership(string agent, int flags, LSLList options)
+        {
+            if (m_host == null || World == null) return TRANSFER_NO_PERMS;
+            SceneObjectGroup grp = m_host.ParentGroup;
+            if (grp == null) return TRANSFER_NO_PERMS;
+            if (grp.IsAttachment) return TRANSFER_NO_ATTACHMENT;
+            if (options != null && options.Length > 0) return TRANSFER_BAD_OPTS;
+            if ((flags & ~(TRANSFER_FLAG_TAKE | TRANSFER_FLAG_COPY)) != 0 || (flags & TRANSFER_FLAG_TAKE) != 0 && (flags & TRANSFER_FLAG_COPY) != 0)
+                return TRANSFER_BAD_OPTS;
+            if (!UUID.TryParse(agent, out UUID agentId) || agentId == UUID.Zero) return TRANSFER_NO_TARGET;
+            ScenePresence sp = World.GetScenePresence(agentId);
+            if (sp == null || sp.IsChildAgent) return TRANSFER_NO_TARGET;
+
+            uint perms = grp.EffectiveOwnerPerms;
+            if (grp.OwnerID != m_host.OwnerID || (perms & (uint)OpenSim.Framework.PermissionMask.Transfer) == 0) return TRANSFER_NO_PERMS;
+            if ((flags & TRANSFER_FLAG_COPY) != 0 && (perms & (uint)OpenSim.Framework.PermissionMask.Copy) == 0) return TRANSFER_NO_PERMS;
+
+            if ((flags & (TRANSFER_FLAG_TAKE | TRANSFER_FLAG_COPY)) == 0)
+                return GiveToTempWearer(grp, sp, GetInventorySelf()) ? TRANSFER_OK : TRANSFER_NO_PERMS;
+
+            IInventoryAccessModule access = World.RequestModuleInterface<IInventoryAccessModule>();
+            if (access == null)
+            {
+                ShoutError("llTransferOwnership: this region cannot deliver an object to an inventory");
+                return TRANSFER_NO_PERMS;
+            }
+            bool take = (flags & TRANSFER_FLAG_TAKE) != 0;
+            List<InventoryItemBase> items = access.CopyToInventory(take ? DeRezAction.Take : DeRezAction.TakeCopy, UUID.Zero, new List<SceneObjectGroup> { grp }, sp.ControllingClient, false);
+            // The module answers one item per object, null where the copy failed. The object leaves the region only once
+            // the agent has it, so a failed copy keeps it and is not TRANSFER_OK.
+            if (items == null || items.Count == 0 || items.Contains(null))
+            {
+                ShoutError("llTransferOwnership: the object could not be put in the agent's inventory");
+                return TRANSFER_NO_PERMS;
+            }
+            if (take) World.DeleteSceneObject(grp, false);
+            return TRANSFER_OK;
+        }
+
         // The region's store when weather is switched on; otherwise null and the error to return.
         private IWindVolumeStore WindVolumesFor(out int error)
         {

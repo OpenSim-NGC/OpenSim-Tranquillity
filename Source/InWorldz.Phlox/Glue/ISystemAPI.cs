@@ -799,6 +799,20 @@ namespace InWorldz.Phlox.Glue
         int iwWindVolumeRemove(int handle);
         /// <summary>The handles of the volumes this object made, as integers.</summary>
         LSLList iwWindVolumes();
+        // Functions with Second Life's signatures (the five whose names an older entry already holds are overloads),
+        // and functions OpenSim's own LSL does not have.
+        LSLList llGetAttachedListFiltered(string avatar, LSLList options);
+        LSLList llFindNotecardTextSync(string name, string pattern, int start, int count, LSLList options);
+        string llFindNotecardTextCount(string name, string pattern, LSLList options);
+        int llSetParcelForSale(int forSale, LSLList options);
+        void llRemoteLoadScript(string target, string name, int running, int startParam);
+        void llRemoteDataSetRegion();
+        int llGetGameControlMode(string id);
+        LSLList llGetGameControlModeAxes(string id);
+        int llGetGameControlModeButtons(string id);
+        void llMapBeacon(string regionName, Vector3 pos, LSLList options);
+        int llGiveAgentInventory(string agent, string folder, LSLList inventory, LSLList options);
+        int llTransferOwnership(string agent, int flags, LSLList options);
         int iwHasParcelPowers(int groupPower);
         Vector3 iwGroundSurfaceNormal(Vector3 offset);
         string iwRequestAnimationData(string name);
