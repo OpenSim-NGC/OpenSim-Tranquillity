@@ -55,10 +55,17 @@ public class GroupsMessagingSessionSendTests : OpenSimTestCase
     /// <summary>A groups service that knows one group and has no members online.</summary>
     public class FakeGroupsConnector : DispatchProxy
     {
+        /// <summary>The sender's powers in the group, or null when they are not a member.</summary>
+        public ulong? SenderPowers = (ulong)GroupPowers.JoinChat;
+
         protected override object? Invoke(MethodInfo? method, object?[]? args)
         {
             switch (method!.Name)
             {
+                case nameof(IGroupsServicesConnector.GetAgentGroupMembership):
+                    return (UUID)args![2]! == GroupId && SenderPowers.HasValue
+                        ? new ExtendedGroupMembershipData { GroupID = GroupId, GroupPowers = SenderPowers.Value }
+                        : null;
                 case nameof(IGroupsServicesConnector.GetGroupRecord):
                     UUID id = (UUID)args![1]!;
                     return id == GroupId ? new ExtendedGroupRecord { GroupID = GroupId, GroupName = "Test Group" } : null;
@@ -84,12 +91,13 @@ public class GroupsMessagingSessionSendTests : OpenSimTestCase
     private readonly List<GridInstantMessage> m_received = new();
     private TestClient m_sender = null!;
 
-    private void SetUpScene()
+    private void SetUpScene(ulong? senderPowers = (ulong)GroupPowers.JoinChat)
     {
         Scene scene = new SceneHelpers().SetupScene();
 
-        scene.RegisterModuleInterface<IGroupsServicesConnector>(
-            DispatchProxy.Create<IGroupsServicesConnector, FakeGroupsConnector>());
+        IGroupsServicesConnector groups = DispatchProxy.Create<IGroupsServicesConnector, FakeGroupsConnector>();
+        ((FakeGroupsConnector)(object)groups).SenderPowers = senderPowers;
+        scene.RegisterModuleInterface<IGroupsServicesConnector>(groups);
         scene.RegisterModuleInterface<IMessageTransferModule>(DispatchProxy.Create<IMessageTransferModule, InertService>());
         scene.RegisterModuleInterface<IUserManagement>(DispatchProxy.Create<IUserManagement, InertService>());
 
@@ -146,5 +154,30 @@ public class GroupsMessagingSessionSendTests : OpenSimTestCase
             Assert.Equal("hello", im.message);
             Assert.Equal(GroupId.Guid, im.imSessionID);
         }
+    }
+
+    // Group chat is for the group's members whose roles give "Join group chat" (JoinChat).
+    [Fact]
+    public void ASessionSendFromANonMemberIsDropped()
+    {
+        TestHelpers.InMethod();
+        SetUpScene(senderPowers: null);
+
+        SendSessionSend(GroupId);
+
+        lock (m_received)
+            Assert.Empty(m_received);
+    }
+
+    [Fact]
+    public void ASessionSendFromAMemberWithoutJoinChatIsDropped()
+    {
+        TestHelpers.InMethod();
+        SetUpScene(senderPowers: (ulong)GroupPowers.ReceiveNotices);
+
+        SendSessionSend(GroupId);
+
+        lock (m_received)
+            Assert.Empty(m_received);
     }
 }

@@ -426,6 +426,9 @@ public class RemoteConnectorCacheWrapper
 
                     m_Cache.AddOrUpdate("role-" + roleID.ToString(), r, GROUPS_CACHE_TIMEOUT);
                 }
+            // Every member who holds the role has new powers: their cached memberships are out of date.
+            lock (m_Cache)
+                m_Cache.Clear();
             return true;
         }
         else
@@ -449,7 +452,22 @@ public class RemoteConnectorCacheWrapper
             m_Cache.Remove("roles-" + groupID.ToString());
             m_Cache.Remove("roles-" + groupID.ToString() + "-" + RequestingAgentID.ToString());
             m_Cache.Remove("rolemembers-" + RequestingAgentID.ToString() + "-" + groupID.ToString());
+            // the members who held it have lost its powers
+            m_Cache.Clear();
         }
+    }
+
+    /// <summary>
+    /// Forget what is cached about one member: their roles change their powers, which their memberships and the
+    /// group's member lists carry.
+    /// </summary>
+    private void ForgetMember(string RequestingAgentID, string AgentID, UUID GroupID)
+    {
+        m_Cache.Remove("membership-" + AgentID + "-" + GroupID.ToString());
+        m_Cache.Remove("memberships-" + AgentID);
+        m_Cache.Remove("active-" + AgentID);
+        m_Cache.Remove("members-" + RequestingAgentID + "-" + GroupID.ToString());
+        m_Cache.Remove("members-" + AgentID + "-" + GroupID.ToString());
     }
 
     public List<GroupRolesData> GetGroupRoles(string RequestingAgentID, UUID GroupID, GroupRolesListDelegate d)
@@ -592,6 +610,7 @@ public class RemoteConnectorCacheWrapper
                 if (m_Cache.Contains(cacheKey))
                     m_Cache.Remove(cacheKey);
 
+                ForgetMember(RequestingAgentID, AgentID, GroupID);
             }
         }
     }
@@ -616,6 +635,8 @@ public class RemoteConnectorCacheWrapper
 
                 cacheKey = "rolemembers-" + RequestingAgentID.ToString() + "-" + GroupID.ToString();
                 m_Cache.Remove(cacheKey);
+
+                ForgetMember(RequestingAgentID, AgentID, GroupID);
             }
         }
     }
