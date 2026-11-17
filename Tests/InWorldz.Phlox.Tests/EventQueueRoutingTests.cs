@@ -102,6 +102,10 @@ default
             Post(h, id, SupportedEventList.Events.CONTROL, agent, 1, 0);   // held, nothing changed
 
         Assert.True(h.PumpUntil(() => Count(h, "free") == 1, TimeSpan.FromSeconds(10)), Said(h));
+        // The key-down runs once the script is back to its queue: wait for it (PumpUntilIdle can find the
+        // scheduler quiet while the handler's last llSay is still being completed). Then the window that
+        // proves the held repeats were dropped.
+        Assert.True(h.PumpUntil(() => Count(h, "control 1 1") == 1, TimeSpan.FromSeconds(10)), Said(h));
         Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
         Assert.Equal(1, Count(h, "control 1 1"));
         Assert.Equal(0, Count(h, "control 1 0"));
