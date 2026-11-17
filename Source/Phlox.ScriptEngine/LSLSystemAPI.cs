@@ -10585,7 +10585,14 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
                 return TRANSFER_NO_PERMS;
             }
             bool take = (flags & TRANSFER_FLAG_TAKE) != 0;
-            access.CopyToInventory(take ? DeRezAction.Take : DeRezAction.TakeCopy, UUID.Zero, new List<SceneObjectGroup> { grp }, sp.ControllingClient, false);
+            List<InventoryItemBase> items = access.CopyToInventory(take ? DeRezAction.Take : DeRezAction.TakeCopy, UUID.Zero, new List<SceneObjectGroup> { grp }, sp.ControllingClient, false);
+            // The module answers one item per object, null where the copy failed. The object leaves the region only once
+            // the agent has it, so a failed copy keeps it and is not TRANSFER_OK.
+            if (items == null || items.Count == 0 || items.Contains(null))
+            {
+                ShoutError("llTransferOwnership: the object could not be put in the agent's inventory");
+                return TRANSFER_NO_PERMS;
+            }
             if (take) World.DeleteSceneObject(grp, false);
             return TRANSFER_OK;
         }
