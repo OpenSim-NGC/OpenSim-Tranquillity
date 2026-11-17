@@ -2904,4 +2904,14 @@ public partial class ScriptBaseClass
     {
         m_LSL_Functions.llSetRenderMaterial(material, face);
     }
+
+    public void llSetLinkRenderMaterial(LSL_Integer link, LSL_String material, LSL_Integer face)
+    {
+        m_LSL_Functions.llSetLinkRenderMaterial(link, material, face);
+    }
+
+    public void llSetLinkGLTFOverrides(LSL_Integer link, LSL_Integer face, LSL_List options)
+    {
+        m_LSL_Functions.llSetLinkGLTFOverrides(link, face, options);
+    }
 }

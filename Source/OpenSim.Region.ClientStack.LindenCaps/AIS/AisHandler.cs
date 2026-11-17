@@ -513,6 +513,11 @@ public sealed class AisHandler : SimpleStreamHandler
         WithFolderLock(item.Folder, route, response, () =>
         {
 
+            // A body that asks for a change this route does not make (a move, above all) is refused whole, before
+            // anything is applied: answering 200 would tell the client the move happened.
+            var refused = AisMutation.RefusedItemChanges(body, item);
+            if (refused.Count > 0) { WriteRefused(response, "item", route, refused); return; }
+
             // Captured before ApplyToItem, which mutates the item in place.
             var assetBefore = item.AssetID;
 
@@ -561,8 +566,9 @@ public sealed class AisHandler : SimpleStreamHandler
 
     /// <summary>
     /// PATCH /category/{id}. <c>parseCategory</c> creates zero-delta entries for the category **and** its parent
-    /// (§1d-bis, <c>llaisapi.cpp:1419-1428</c>), so both are listed. <c>thumbnail</c> and <c>favorite</c> have no
-    /// storage in this tree and are dropped.
+    /// (<c>llaisapi.cpp:1419-1428</c>), so both are listed. A body asking to move the folder, change its
+    /// type, or set a <c>thumbnail</c> or <c>favorite</c> (no storage in this tree) is refused 400
+    /// (<see cref="AisMutation.RefusedFolderChanges"/>).
     /// </summary>
     private void UpdateCategory(AisRoute route, OSDMap body, IOSHttpResponse response)
     {
@@ -571,6 +577,9 @@ public sealed class AisHandler : SimpleStreamHandler
         {
             var folder = m_backend.GetFolder(m_agentId, route.Id);
             if (folder is null) { WriteError(response, HttpStatusCode.NotFound, $"no category {route.Id}", route); return; }
+
+            var refused = AisMutation.RefusedFolderChanges(body, folder);
+            if (refused.Count > 0) { WriteRefused(response, "category", route, refused); return; }
 
             var applied = AisMutation.ApplyToFolder(body, folder);
             if (applied.Any && !m_backend.UpdateFolder(folder))
@@ -1190,6 +1199,22 @@ public sealed class AisHandler : SimpleStreamHandler
         if (AisOperations.IsMutation(route.Operation) && m_log.IsEnabled(LogLevel.Debug))
             m_log.LogDebug("[AIS]: {Operation} -> {Status} {Message} {Deltas}",
                 route.Operation, (int)status, message, AisMutation.SummariseDeltas(body));
+    }
+
+    /// <summary>
+    /// 400 for a PATCH that asks for changes this route does not make, naming them; nothing has been written.
+    /// SL's Inventory API v3 answers Item-PATCH and Category-PATCH "400 Invalid request" for a request it will
+    /// not carry out, and moving belongs to the MOVE verb, not PATCH
+    /// (wiki.secondlife.com/wiki/Linden_Lab_Official:Inventory_API_v3). The message names only the request's own
+    /// object and keys, never a folder the body pointed at, so another resident's folder and a missing one read
+    /// the same.
+    /// </summary>
+    private static void WriteRefused(IOSHttpResponse response, string what, AisRoute route, IReadOnlyList<string> refused)
+    {
+        WriteError(response, HttpStatusCode.BadRequest,
+            $"PATCH cannot change {string.Join(", ", refused)} of {what} {route.Id}; nothing was changed. "
+            + "A PATCH does not move inventory (the viewer moves with MoveInventoryItem / MoveInventoryFolder), and "
+            + "this server does not change a folder's type or store a thumbnail or favorite through it.", route);
     }
 
     private static void WriteError(IOSHttpResponse response, HttpStatusCode status, string message, AisRoute route)

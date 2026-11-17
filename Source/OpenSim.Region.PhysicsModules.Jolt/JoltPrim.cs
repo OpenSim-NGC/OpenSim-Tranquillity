@@ -55,6 +55,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private byte _shapeType;
         private Vector3 _velocity;              // last drained linear velocity (the SOP reads this for terse updates)
         private Vector3 _rotationalVelocity;    // last drained angular velocity
+        private Vector3 _acceleration;          // last drained change of velocity per second (Acceleration)
 
         // SceneObjectPart.Density (simulator units, default 1000) x DensityScaleFactor = PHYSICAL density
         // (kg/m^3). The same 0.01 conversion BulletSim's BSParam.DensityScaleFactor applies; forwarding it
@@ -163,11 +164,17 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // child (SceneObjectGroup). We weld the children into the ROOT's body as a StaticCompoundShape:
         // one rigid body whose sub-shapes are the root + each child at its root-relative offset. The root
         // owns _linkChildren + _compoundShape; a welded child holds _linkRoot and has no body of its own.
+        // The root's welded children. Core links and unlinks parts on its own thread while the step thread rebuilds the
+        // compound and other threads read the set, so a published list is never changed: LinkChild, UnlinkChild and the
+        // teardown put a new list in its place under _linkChildrenLock, and a reader takes the field once and walks that.
         private System.Collections.Generic.List<JoltPrim> _linkChildren;   // root: welded children
+        private readonly object _linkChildrenLock = new object();
         private JoltPrim _linkRoot;                                        // child: our compound root, if welded
         private ShapeId _compoundShape = ShapeId.Invalid;                  // root: the built compound (Invalid = single shape)
 
         internal BodyId BodyHandle => _body;
+        // The body a ray at this part tests: its own, or its linkset root's when it is welded into the root's body.
+        internal BodyId PartBody => IsWeldedChild ? _linkRoot._body : _body;
         internal string ShapeKind => _shapeKind;
         internal ShapeId ShapeHandle => _shape;
         // Read by the `jolt reloadcheck` / `jolt vehiclestatus` console commands.
@@ -523,10 +530,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         private void CreateBodyInternal()
         {
-            // Away from the region (crossing, or out of bounds) the prim has no body; a reshape or relink meanwhile keeps
-            // its shapes for when it comes back.
+            // Away from the region (crossing, or out of bounds) the prim has no body; a reshape, relink or physics toggle
+            // meanwhile keeps its shapes for when it comes back, and the body parked with the old ones is dropped.
             if (_away != Away.None)
+            {
+                DropParkedBody();
                 return;
+            }
 
             // Load-time position sanity: never bring a PHYSICAL body up penetrating the terrain. If
             // the saved/current centre is below where it rests on the surface, lift it there and zero its
@@ -665,7 +675,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // box/sphere/mesh - only cylinders carry a correction). Called once per active body per step, plus
         // one final time when the body sleeps (JustDeactivated) - which is the settle update that stops the
         // viewer interpolating a rested object.
-        internal void ApplyStepState(in BodyState s)
+        internal void ApplyStepState(in BodyState s, float stepSeconds)
         {
             // A kinematic prim's pose is the one its object was given (the body only follows it), and a drain that wrote the
             // body's place back could overwrite a pose set since the step.
@@ -706,6 +716,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 {
                     _position = newPos;
                     _orientation = newRot;
+                    _acceleration = StepAcceleration(_velocity, newVel, stepSeconds, (s.Flags & BodyStateFlags.JustDeactivated) != 0);
                     _velocity = newVel;
                     _rotationalVelocity = newAngVel;
                 }
@@ -727,8 +738,16 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         //     motors off.
         //   - Below -100 m or above 100 000 m it is stopped there and OutOfBounds is raised once; core makes the object
         //     non-physical (SceneObjectPart.PhysicsOutOfBounds).
-        // While it waits, and after it went out of bounds until core makes it non-physical, it has no body: nothing steps
-        // it, nothing touches it and it sends no updates (ubODE disables its body and its collisions).
+        // While it waits it keeps its body, parked: moved to a layer that collides with nothing and that no query finds,
+        // made kinematic, still and asleep, and held aside from _body. Every path that acts on the body (the vehicle drive,
+        // script forces, move to target, the rotation target, hover, buoyancy, velocity and impulse setters, the collision
+        // dispatch, the step drain) finds no body, as it found none when the body was removed, so the parked body takes
+        // part in nothing. ubODE keeps its body too: it disables it and its collisions (disableBodySoft), unsubscribes its
+        // collision events, skips it in Move and UpdatePositionAndVelocity, and on CrossingFailure enables the same body
+        // again (changeDisable(false)). A body made and removed for every crossing would churn the engine for an object
+        // that rolls off a void edge and is put back every few seconds. A reshape, relink or physics toggle while it waits
+        // drops the parked body, and the prim gets a new one when it comes back, as before. After it went out of bounds,
+        // until core makes it non-physical, it has no body.
         // ---------------------------------------------------------------------
         internal const float MinBodyZ = -100f;      // ODEPrim.UpdatePositionAndVelocity
         internal const float MaxBodyZ = 100000f;
@@ -736,6 +755,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private enum Away : byte { None, Crossing, OutOfBounds }
         private volatile Away _away;
         private readonly object _awayLock = new object();
+        private BodyId _parkedBody = BodyId.Invalid;      // the body kept while the prim waits past the edge (Park, Unpark)
+        private ShapeId _parkedShape = ShapeId.Invalid;   // the shape that body was parked with
+        internal bool IsParked => _parkedBody.IsValid;
         internal bool HasLeftRegion => _away != Away.None;
 
         private bool InRegion(Vector3 p)   // Scene.PositionIsInCurrentRegion
@@ -793,7 +815,88 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             _orientation = rot;
             _velocity = velocity;
             _rotationalVelocity = angularVelocity;
-            LeaveEngine(Away.Crossing);
+            Park();
+        }
+
+        // Out of the engine's way while the object waits past the edge, keeping the body (see above): parked, then held
+        // aside so that nothing finds it as the prim's body.
+        private void Park()
+        {
+            _away = Away.Crossing;
+            if (!_body.IsValid)
+                return;
+            BodyId body = _body;
+            _body = BodyId.Invalid;
+            _vehicleStepProvider?.Disarm();
+            _scriptForceProvider?.Disarm();
+            _backend.SetBodyLayer(body, PhysicsLayer.Parked);
+            _backend.SetBodyMotionType(body, BodyMotionType.Kinematic, activate: false);
+            _backend.SetBodyLinearVelocity(body, default);
+            _backend.SetBodyAngularVelocity(body, default);
+            _backend.DeactivateBody(body);
+            _parkedShape = _compoundShape.IsValid ? _compoundShape : _shape;
+            _parkedBody = body;
+        }
+
+        // The parked body is of no more use: the prim was reshaped, relinked, made non-physical or removed while it waited.
+        private void DropParkedBody()
+        {
+            if (!_parkedBody.IsValid)
+                return;
+            _backend.RemoveBody(_parkedBody);
+            _parkedBody = BodyId.Invalid;
+            _parkedShape = ShapeId.Invalid;
+        }
+
+        // Back from the edge: the parked body is the prim's body again, set where core put the object, at rest, solid and
+        // dynamic, with what the prim was given while it waited (its flags, material, buoyancy, mass, vehicle setup and
+        // rotation locks), and woken at the top of the next step as a new body is (deferred activation). If the body was
+        // dropped while it waited, or the prim's shape is no longer the one it was parked with, a new body is made.
+        private void Unpark()
+        {
+            _away = Away.None;
+            BodyId body = _parkedBody;
+            ShapeId shape = _parkedShape;
+            _parkedBody = BodyId.Invalid;
+            _parkedShape = ShapeId.Invalid;
+            if (body.IsValid && (!_isPhysical || !shape.Equals(_compoundShape.IsValid ? _compoundShape : _shape)))
+            {
+                _backend.RemoveBody(body);
+                body = BodyId.Invalid;
+            }
+            if (!body.IsValid)
+            {
+                if (!_body.IsValid)
+                    CreateBodyInternal();
+                return;
+            }
+            _backend.SetBodyTransform(body, ToS(_position), BodyOrientationOf(_orientation), activate: false);
+            _backend.SetBodyMotionType(body, BodyMotionType.Dynamic, activate: false);
+            _backend.SetBodyLinearVelocity(body, default);
+            _backend.SetBodyAngularVelocity(body, default);
+            _body = body;
+            _backend.SetBodyLayer(_body, BodyLayer);
+            _backend.SetBodySensor(_body, _isVolumeDetect);
+            _backend.SetBodyWantsContactEvents(_body, _subscribedMs > 0);
+            _backend.SetBodyFriction(_body, _friction);
+            _backend.SetBodyRestitution(_body, _restitution);
+            if (_compoundShape.IsValid && _linkChildren != null)
+            {
+                foreach (JoltPrim c in _linkChildren)
+                    _backend.SetBodyPartMaterial(_body, c.LocalID, c._friction, c._restitution);
+                _backend.SetBodyMass(_body, LinksetMass());
+            }
+            else
+                SetLoneBodyMass();
+            _backend.SetBodyDamping(_body, PrimLinearDamping, PrimAngularDamping);
+            _backend.SetBodyGravityFactor(_body, ScriptGravityFactor);
+            ApplyVehicleBodyParams();   // an active vehicle's own damping, gravity, contact material and no-sleep
+            if (_rotationLocks != 0)
+                ApplyRotationLocks();
+            if (_selected && _linkRoot == null)
+                HoldSelected();
+            _activationPending = true;
+            _module.RegisterPendingActivation(this);
         }
 
         private void LeaveOutOfBounds(Vector3 pos, Quaternion rot)
@@ -831,7 +934,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     _velocity = new Vector3(s.LinearVelocity.X, s.LinearVelocity.Y, s.LinearVelocity.Z);
                     _rotationalVelocity = new Vector3(s.AngularVelocity.X, s.AngularVelocity.Y, s.AngularVelocity.Z);
                 }
-                LeaveEngine(Away.Crossing);
+                Park();
             }
         }
 
@@ -849,8 +952,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 _position.Z = Math.Clamp(_position.Z + 0.2f, Constants.MinSimulationHeight, Constants.MaxSimulationHeight);
                 _velocity = Vector3.Zero;
                 _vehicle?.StopMotors();
-                _away = Away.None;
-                CreateBodyInternal();
+                Unpark();
             }
             RequestPhysicsterseUpdate();
         }
@@ -904,12 +1006,14 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             // If we are a compound root, orphan our welded children (group teardown removes them anyway).
             if (_linkChildren != null)
             {
-                foreach (JoltPrim c in _linkChildren) if (ReferenceEquals(c._linkRoot, this)) c._linkRoot = null;
-                _linkChildren.Clear();
+                System.Collections.Generic.List<JoltPrim> orphans;
+                lock (_linkChildrenLock) { orphans = _linkChildren; _linkChildren = new System.Collections.Generic.List<JoltPrim>(); }
+                foreach (JoltPrim c in orphans) if (ReferenceEquals(c._linkRoot, this)) c._linkRoot = null;
             }
             if (_body.IsValid)
                 _backend.RemoveBody(_body);
             _body = BodyId.Invalid;
+            DropParkedBody();
             if (_compoundShape.IsValid) { _backend.ReleaseShape(_compoundShape); _compoundShape = ShapeId.Invalid; }
             if (_shape.IsValid)
                 _module.ReleaseShape(_backend, _shape);
@@ -922,6 +1026,20 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // ---------------------------------------------------------------------
         // PhysicsActor contract. Real state: Position / Orientation / Size (pushed to the body).
         // Members not wired to the body below are inert.
+        // ubODE's rule (ODEPrim.cs, the velocity update after each step): the acceleration is the change of velocity over the
+        // step, a new velocity under 0.005 m/s on every axis counting as zero, and an acceleration under 0.01 on every axis is
+        // zero. Only the acceleration uses the rounded velocity; the velocity reported is the body's own. A body that went to
+        // sleep this step is at rest: no acceleration (ubODE zeroes it for a disabled body).
+        internal static Vector3 StepAcceleration(Vector3 oldVel, Vector3 newVel, float stepSeconds, bool wentToSleep)
+        {
+            if (newVel.ApproxZero(0.005f))
+                newVel = Vector3.Zero;
+            if (wentToSleep || !(stepSeconds > 0f))
+                return Vector3.Zero;
+            Vector3 a = (newVel - oldVel) * (1f / stepSeconds);
+            return a.ApproxZero(0.01f) ? Vector3.Zero : a;
+        }
+
         // ---------------------------------------------------------------------
 
         // A welded child is wherever its root's body has carried it: its root's pose with its offset in the linkset.
@@ -1652,7 +1770,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             return len > max && len > 0f ? torque * (max / len) : torque;
         }
 
-        public override Vector3 Acceleration { get => Vector3.Zero; set { } }
+        // What llGetAccel reads: the change of velocity over the last step (ApplyStepState), as ubODE works it out. Zero for a
+        // prim that is not physical. Set by nothing: the setter is ignored, as on ubODE.
+        public override Vector3 Acceleration { get => _isPhysical ? _acceleration : Vector3.Zero; set { } }
         public override float CollisionScore { get; set; }
         public override bool Kinematic { get => false; set { } }
 
@@ -1907,9 +2027,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // N child-links into ONE rebuild at a controlled point - off the load path, O(N) not O(N^2).
         internal void LinkChild(JoltPrim child)
         {
-            _linkChildren ??= new System.Collections.Generic.List<JoltPrim>();
-            if (!_linkChildren.Contains(child))
-                _linkChildren.Add(child);
+            lock (_linkChildrenLock)
+            {
+                if (_linkChildren == null || !_linkChildren.Contains(child))
+                {
+                    var next = _linkChildren == null ? new System.Collections.Generic.List<JoltPrim>() : new System.Collections.Generic.List<JoltPrim>(_linkChildren);
+                    next.Add(child);
+                    _linkChildren = next;
+                }
+            }
             child._linkRoot = this;
             _module.MarkLinksetDirty(this);
             CheckComplexity();
@@ -1917,7 +2043,15 @@ namespace OpenSim.Region.PhysicsModules.Jolt
 
         internal void UnlinkChild(JoltPrim child)
         {
-            if (_linkChildren != null) _linkChildren.Remove(child);
+            lock (_linkChildrenLock)
+            {
+                if (_linkChildren != null && _linkChildren.Contains(child))
+                {
+                    var next = new System.Collections.Generic.List<JoltPrim>(_linkChildren);
+                    next.Remove(child);
+                    _linkChildren = next;
+                }
+            }
             _module.MarkLinksetDirty(this);
         }
 
@@ -1940,25 +2074,28 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             try
             {
                 ShapeId oldCompound = _compoundShape;
+                // The children as they are now; a part linked or unlinked during the rebuild marks the root dirty again,
+                // so the next frame's rebuild takes it in.
+                System.Collections.Generic.List<JoltPrim> children = _linkChildren;
 
-                if (_linkChildren == null || _linkChildren.Count == 0)
+                if (children == null || children.Count == 0)
                 {
                     _compoundShape = ShapeId.Invalid;   // single member -> plain body, not a degenerate compound
                 }
                 else
                 {
                     // Weld: drop each child's independent body (it lives as a sub-shape of the compound now).
-                    foreach (JoltPrim c in _linkChildren)
+                    foreach (JoltPrim c in children)
                         if (c._body.IsValid) { _backend.RemoveBody(c._body); c._body = BodyId.Invalid; }
 
                     // A shape shared with other prims must not be given this part's density (SetShapeDensity below).
                     lock (_shapeLock) MakeShapePrivate();
-                    foreach (JoltPrim c in _linkChildren)
+                    foreach (JoltPrim c in children)
                         lock (c._shapeLock) c.MakeShapePrivate();
 
                     SQuaternion rootBody = BodyOrientationOf(_orientation);
                     SQuaternion invRoot = SQuaternion.Conjugate(rootBody);
-                    var kids = new CompoundChild[1 + _linkChildren.Count];
+                    var kids = new CompoundChild[1 + children.Count];
                     kids[0] = new CompoundChild { Shape = _shape, Position = SVector3.Zero, Orientation = SQuaternion.Identity, UserData = LocalID };
                     // Each part's own density in the compound's mass properties, so its centre of mass and inertia follow
                     // where the mass is (the SL wiki's Physics Material Settings test page allows different physics settings
@@ -1967,9 +2104,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                     // mass is set to the parts' sum just after (CreateBodyInternal), and a linkset of one density is built
                     // exactly as before.
                     _backend.SetShapeDensity(_shape, JoltShapeDensity * ShapeMassFactor());
-                    for (int i = 0; i < _linkChildren.Count; i++)
+                    for (int i = 0; i < children.Count; i++)
                     {
-                        JoltPrim c = _linkChildren[i];
+                        JoltPrim c = children[i];
+                        _module.LinksetRebuildChildHook?.Invoke(this);
                         // A part already welded keeps its place on the object (its offset); a newly linked one is placed
                         // where core put it, relative to the root now.
                         c.SyncFromLink();
@@ -1997,6 +2135,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             catch (Exception e)
             {
                 // Never let a linkset rebuild propagate into the heartbeat and wedge the region.
+                _module.NoteLinksetRebuildError();
                 JoltScene.m_log.LogError($"{JoltScene.LogHeader} linkset rebuild EXCEPTION for root {LocalID}: {e}");
             }
             finally { _rebuilding = false; }

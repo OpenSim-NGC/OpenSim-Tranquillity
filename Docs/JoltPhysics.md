@@ -235,6 +235,7 @@ the region starts.
 | `RayCastSimulatorBudgetMs` | 5 | Time (ms) every other ray cast may take in one heartbeat: the simulator's own (rez placement, landing after login or teleport) and YEngine's `llCastRay`. |
 | `RayCastMaxTestedHits` | 1024 | Hits the engine may report to one cast before it is cut short (a mesh reports each triangle the ray crosses). |
 | `RayCastMaxHits` | 256 | Hits one cast returns, Second Life's documented maximum for `RC_MAX_HITS` (https://wiki.secondlife.com/wiki/LlCastRay). |
+| `CameraRayBudgetMs` | 30 | Time (ms) the viewer camera's collision rays may take in one heartbeat; the rest wait for the next. Each ray is cast from the avatar's head toward its camera against prims (not terrain or avatars), and the closest hit becomes the camera constraint the viewer gets, so the camera stops at a wall. 30 is ubODE's limit for its queued rays. 0 turns the camera ray off: the camera passes through walls. |
 | `AvatarPushMaxSpeed` | 100 | The ceiling (m/s) on the speed pushes can give an avatar. A strong push reaches it; a weaker one stays below. 0: pushes do not move avatars. |
 | `AvatarPushRecovery` | 5 | How fast (m/s per second) an avatar's push allowance refills. |
 | `AvatarObjectPushPerMomentum` | 100 | Force (N) an avatar pushes a physical object with, per unit of its own momentum into the object (its mass times its speed). Halcyon's figure. |

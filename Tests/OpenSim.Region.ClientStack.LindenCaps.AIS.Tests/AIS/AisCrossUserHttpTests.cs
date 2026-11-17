@@ -206,6 +206,76 @@ public class AisCrossUserHttpTests
         Assert.That(svc.Folders[Bob.Outfit].Name, Is.EqualTo("Beach Outfit"));
     }
 
+    // ------------------------------------------------------------------ PATCH naming a parent outside the agent's inventory
+
+    // A PATCH never moves anything (SL's Item-PATCH and Category-PATCH schemas carry no parent_id; moving is the
+    // separate MOVE verb), so a parent_id that differs from the object's own is refused with 400 before any folder
+    // is looked up. The answer must therefore be the same whether the named folder is another resident's, the
+    // library's, or does not exist: anything else would be the membership oracle the 404 rule above closes.
+
+    /// <summary>A folder in the shared library, owned by a principal that is neither Alice nor Bob.</summary>
+    private static readonly UUID LibraryOwner = new("11111111-0000-4000-8000-0000000000ff");
+    private static readonly UUID LibraryFolder = new("11111111-0000-4000-8000-000000000001");
+
+    private static (int Status, OSDMap Body) PatchAlicesWearableInto(PrincipalIgnoringInventoryService svc, UUID target)
+        => AsAlice(svc, "PATCH", $"/item/{Alice.Wearable}", new OSDMap { ["name"] = "a shirt", ["parent_id"] = target });
+
+    [Test]
+    public void PATCH_own_item_into_another_residents_folder_is_400_like_a_missing_folder_and_moves_nothing()
+    {
+        var svc = World();
+        var bobsChildren = ChildItems(svc, Bob.Clothing);
+
+        var (status, body) = PatchAlicesWearableInto(svc, Bob.Clothing);
+        var (missingStatus, missingBody) = PatchAlicesWearableInto(svc, UUID.Random());
+
+        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest));
+        Assert.That(body["message"].AsString(), Does.Contain("parent_id"));
+        Assert.That(missingStatus, Is.EqualTo(status), "a foreign folder and a missing one get the same answer");
+        Assert.That(body["message"].AsString(), Is.EqualTo(missingBody["message"].AsString()), "and the same words");
+        Assert.That(svc.Items[Alice.Wearable].Folder, Is.EqualTo(Alice.Clothing), "Alice's item did not move");
+        Assert.That(ChildItems(svc, Bob.Clothing), Is.EqualTo(bobsChildren), "nothing arrived in Bob's folder");
+    }
+
+    [Test]
+    public void PATCH_own_item_into_a_library_folder_is_400_and_moves_nothing()
+    {
+        var svc = World();
+        svc.Seed(LibraryFolder, LibraryOwner, UUID.Zero, "Library", (short)FolderType.Root);
+
+        var (status, body) = PatchAlicesWearableInto(svc, LibraryFolder);
+
+        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest));
+        Assert.That(body["message"].AsString(), Does.Contain("parent_id"));
+        Assert.That(svc.Items[Alice.Wearable].Folder, Is.EqualTo(Alice.Clothing));
+        Assert.That(ChildItems(svc, LibraryFolder), Is.Empty);
+    }
+
+    [Test]
+    public void PATCH_own_category_into_another_residents_folder_is_400_and_moves_nothing()
+    {
+        var svc = World();
+
+        var (status, body) = AsAlice(svc, "PATCH", $"/category/{Alice.Outfit}", new OSDMap { ["parent_id"] = Bob.Clothing });
+
+        Assert.That(status, Is.EqualTo((int)HttpStatusCode.BadRequest));
+        Assert.That(body["message"].AsString(), Does.Contain("parent_id"));
+        Assert.That(svc.Folders[Alice.Outfit].ParentID, Is.EqualTo(Alice.Clothing));
+        Assert.That(ChildFolders(svc, Bob.Clothing), Is.EqualTo(new[] { Bob.Outfit }));
+    }
+
+    [Test]
+    public void PATCH_another_residents_item_with_a_parent_id_is_still_404()
+    {
+        // The owner check comes first: a body that would be refused must not turn "not yours" into a 400 oracle.
+        var svc = World();
+
+        var (status, _) = AsAlice(svc, "PATCH", $"/item/{Bob.Wearable}", new OSDMap { ["parent_id"] = Alice.Clothing });
+
+        Assert.That(status, Is.EqualTo((int)HttpStatusCode.NotFound));
+        Assert.That(svc.Items[Bob.Wearable].Folder, Is.EqualTo(Bob.Clothing));
+    }
+
     // ------------------------------------------------------------------ deletes
 
     [Test]

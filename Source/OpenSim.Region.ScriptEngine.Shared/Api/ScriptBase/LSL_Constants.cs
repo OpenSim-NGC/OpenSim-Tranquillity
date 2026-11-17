@@ -475,6 +475,21 @@ public partial class ScriptBaseClass
     public const int PRIM_DAMAGE = 51;
     public const int PRIM_HEALTH = 52;
 
+    // PRIM_GLTF_BASE_COLOR alpha_mode
+    public const int PRIM_GLTF_ALPHA_MODE_OPAQUE = 0;
+    public const int PRIM_GLTF_ALPHA_MODE_BLEND = 1;
+    public const int PRIM_GLTF_ALPHA_MODE_MASK = 2;
+
+    // llSetLinkGLTFOverrides
+    public const int OVERRIDE_GLTF_BASE_COLOR_FACTOR = 1;
+    public const int OVERRIDE_GLTF_BASE_ALPHA = 2;
+    public const int OVERRIDE_GLTF_BASE_ALPHA_MODE = 3;
+    public const int OVERRIDE_GLTF_BASE_ALPHA_MASK = 4;
+    public const int OVERRIDE_GLTF_BASE_DOUBLE_SIDED = 5;
+    public const int OVERRIDE_GLTF_METALLIC_FACTOR = 6;
+    public const int OVERRIDE_GLTF_ROUGHNESS_FACTOR = 7;
+    public const int OVERRIDE_GLTF_EMISSIVE_FACTOR = 8;
+
     // parameters
 
     public const int PRIM_ALPHA_MODE_NONE = 0;
@@ -1174,10 +1189,10 @@ public partial class ScriptBaseClass
     public const int REZ_PARAM_STRING = 13;
 
     public const int SIT_FLAG_SIT_TARGET    = 0x01;
-    public const int SIT_FLAG_ALLOW_UNSIT   = 0x02; // unsupported always true
-    public const int SIT_FLAG_SCRIPTED_ONLY = 0x04; // unsupported always false
-    public const int SIT_FLAG_NO_COLLIDE    = 0x10; // unsupported always true
-    public const int SIT_FLAG_NO_DAMAGE     = 0x20; // unsupported always true
+    public const int SIT_FLAG_ALLOW_UNSIT   = 0x02; // the part's AllowUnsit (PRIM_ALLOW_UNSIT)
+    public const int SIT_FLAG_SCRIPTED_ONLY = 0x04; // the part's ScriptedSitOnly (PRIM_SCRIPTED_SIT_ONLY)
+    public const int SIT_FLAG_NO_COLLIDE    = 0x10; // always true: a seated avatar does not collide here
+    public const int SIT_FLAG_NO_DAMAGE     = 0x20; // always true: a seated avatar takes no damage here
     public const int SIT_FLAG_OPENSIMFORCED = SIT_FLAG_ALLOW_UNSIT | SIT_FLAG_NO_COLLIDE | SIT_FLAG_NO_DAMAGE;
 
     public const int ERR_GENERIC              = -1;
@@ -1231,4 +1246,90 @@ public partial class ScriptBaseClass
     public const int TRANSFER_BAD_ROOT = -5;
     public const int TRANSFER_NO_PERMS = -6;
     public const int TRANSFER_NO_ATTACHMENT = -7;
+
+    // SL constants (secondlife/lsl-definitions) for functions and rules this engine has, so SL scripts using them
+    // compile. Pathfinding, game controls, combat 2.0, environment and the functions not implemented here are left out.
+
+    // llDerezObject
+    public const int DEREZ_DIE = 0;
+    public const int DEREZ_MAKE_TEMP = 1;
+    public const int DEREZ_TO_INVENTORY = 2;
+
+    // llPassTouches, llPassCollisions
+    public const int PASS_IF_NOT_HANDLED = 0;
+    public const int PASS_ALWAYS = 1;
+    public const int PASS_NEVER = 2;
+
+    // SL's names for the status codes OpenSim calls LSL_STATUS_* (llSetPrimMediaParams, llClearPrimMedia, ...)
+    public const int STATUS_OK = 0;
+    public const int STATUS_MALFORMED_PARAMS = 1000;
+    public const int STATUS_TYPE_MISMATCH = 1001;
+    public const int STATUS_BOUNDS_ERROR = 1002;
+    public const int STATUS_NOT_FOUND = 1003;
+    public const int STATUS_NOT_SUPPORTED = 1004;
+    public const int STATUS_INTERNAL_ERROR = 1999;
+    public const int STATUS_WHITELIST_FAILED = 2001;
+
+    // prim-params rules
+    public const int PRIM_CLICK_ACTION = 43;
+    public const int PRIM_COLLISION_SOUND = 53;
+
+    // PRIM_DAMAGE, REZ_DAMAGE_TYPE. The scene keeps no damage type: PRIM_DAMAGE reads DAMAGE_TYPE_GENERIC.
+    public const int DAMAGE_TYPE_IMPACT = -1;
+    public const int DAMAGE_TYPE_GENERIC = 0;
+    public const int DAMAGE_TYPE_ACID = 1;
+    public const int DAMAGE_TYPE_BLUDGEONING = 2;
+    public const int DAMAGE_TYPE_COLD = 3;
+    public const int DAMAGE_TYPE_ELECTRIC = 4;
+    public const int DAMAGE_TYPE_FIRE = 5;
+    public const int DAMAGE_TYPE_FORCE = 6;
+    public const int DAMAGE_TYPE_NECROTIC = 7;
+    public const int DAMAGE_TYPE_PIERCING = 8;
+    public const int DAMAGE_TYPE_POISON = 9;
+    public const int DAMAGE_TYPE_PSYCHIC = 10;
+    public const int DAMAGE_TYPE_RADIANT = 11;
+    public const int DAMAGE_TYPE_SLASHING = 12;
+    public const int DAMAGE_TYPE_SONIC = 13;
+    public const int DAMAGE_TYPE_EMOTIONAL = 14;
+
+    // llSetPrimMediaParams limits
+    public const int PRIM_MEDIA_PARAM_MAX = 14;
+    public const int PRIM_MEDIA_MAX_URL_LENGTH = 1024;
+    public const int PRIM_MEDIA_MAX_WHITELIST_SIZE = 1024;
+    public const int PRIM_MEDIA_MAX_WHITELIST_COUNT = 64;
+    public const int PRIM_MEDIA_MAX_WIDTH_PIXELS = 2048;
+    public const int PRIM_MEDIA_MAX_HEIGHT_PIXELS = 2048;
+
+    // llGetObjectDetails
+    public const int OBJECT_LOCKED = 55;
+    public const int OBJECT_VOLUME_DETECT = 56;
+
+    // llGetParcelDetails PARCEL_DETAILS_TP_ROUTING
+    public const int TP_ROUTING_BLOCKED = 0;
+    public const int TP_ROUTING_LANDINGP = 1;
+    public const int TP_ROUTING_FREE = 2;
+
+    // llModifyLand: SL's current brush names (TerrainModule.ModifyTerrain reads 0, 1, 2 as small, medium, large)
+    public const int LAND_BRUSH_SMALL = 0;
+    public const int LAND_BRUSH_MEDIUM = 1;
+    public const int LAND_BRUSH_LARGE = 2;
+
+    // llSitOnLink
+    public const int SIT_OK = 1;
+
+    // llRequestAgentData DATA_PAYINFO
+    public const int PAYMENT_INFO_ON_FILE = 1;
+    public const int PAYMENT_INFO_USED = 2;
+
+    // llGetAgentInfo; this simulator sets neither
+    public const int AGENT_AUTOMATED = 0x4000;
+    public const int AGENT_FLOATING_VIA_SCRIPTED_ATTACHMENT = 0x8000;
+
+    // http_response metadata
+    public const int HTTP_BODY_TRUNCATED = 0;
+
+    // flags this simulator accepts but does not act on yet
+    public const int REGION_FLAG_BLOCK_FLYOVER = 0x8000000;      // llGetRegionFlags
+    public const int STATUS_DIE_ON_NO_REZZER = 0x1000;            // llSetStatus
+    public const int REZ_FLAG_DIE_ON_NO_REZZER = 0x0100;          // llRezObjectWithParams REZ_FLAGS
 }

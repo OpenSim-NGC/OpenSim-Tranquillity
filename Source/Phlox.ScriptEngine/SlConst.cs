@@ -78,6 +78,11 @@ namespace Phlox.ScriptEngine
 
         // ── ENV_* ─────────────────────────────────────────────────────────
         public const int ENV_OK = 1;
+        public const int ENV_NOT_EXPERIENCE = -1;
+        public const int ENV_NO_EXPERIENCE_PERMISSION = -2;
+        public const int ENV_NO_ENVIRONMENT = -3;
+        public const int ENV_INVALID_AGENT = -4;
+        public const int ENV_INVALID_RULE = -5;
 
         // ── ERR_* ─────────────────────────────────────────────────────────
         public const int ERR_GENERIC = -1;
@@ -173,6 +178,16 @@ namespace Phlox.ScriptEngine
         public const int OBJECT_TEMP_ON_REZ = 23;
         public const int OBJECT_TOTAL_SCRIPT_COUNT = 10;
         public const int OBJECT_VELOCITY = 5;
+
+        // ── OVERRIDE_GLTF_* (llSetLinkGLTFOverrides) ─────────────────────
+        public const int OVERRIDE_GLTF_BASE_COLOR_FACTOR = 1;
+        public const int OVERRIDE_GLTF_BASE_ALPHA = 2;
+        public const int OVERRIDE_GLTF_BASE_ALPHA_MODE = 3;
+        public const int OVERRIDE_GLTF_BASE_ALPHA_MASK = 4;
+        public const int OVERRIDE_GLTF_BASE_DOUBLE_SIDED = 5;
+        public const int OVERRIDE_GLTF_METALLIC_FACTOR = 6;
+        public const int OVERRIDE_GLTF_ROUGHNESS_FACTOR = 7;
+        public const int OVERRIDE_GLTF_EMISSIVE_FACTOR = 8;
 
         // ── PARCEL_* ──────────────────────────────────────────────────────
         public const int PARCEL_DETAILS_DESC = 1;
@@ -352,6 +367,12 @@ namespace Phlox.ScriptEngine
         public const int REZ_POS = 2;
         public const int REZ_ROT = 3;
         public const int REZ_VEL = 4;
+        public const int REZ_ACCEL = 5;
+        public const int REZ_OMEGA = 7;
+        public const int REZ_SOUND = 9;
+        public const int REZ_SOUND_COLLIDE = 10;
+        public const int REZ_LOCK_AXES = 11;
+        public const int REZ_DAMAGE_TYPE = 12;
 
         // ── SIT_* ─────────────────────────────────────────────────────────
         public const int SIT_FLAG_ALLOW_UNSIT = 2;

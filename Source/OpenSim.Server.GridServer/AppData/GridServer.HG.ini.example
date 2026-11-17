@@ -913,9 +913,9 @@
     ;; behind the same NAT). The address is obtained by resolving the GatekeeperURI
     ;; hostname.
     ;;
-    ;; The name is always resolved through the operating system resolver, so the
-    ;; hosts file and the system's resolver settings (resolv.conf on Linux) decide
-    ;; the answer; this lookup sends no DNS queries of its own. If this host resolves
+    ;; Unless DnsServers is set (below), the name is resolved through the operating
+    ;; system resolver, so the hosts file and the system's resolver settings
+    ;; (resolv.conf on Linux) decide the answer. If this host resolves
     ;; its OWN public hostname to a LAN address - a hosts-file entry, split-horizon
     ;; DNS, a container's DNS, a router that lacks NAT loopback - the fallback
     ;; compares a public IP against a private one and fails for every foreign
@@ -929,16 +929,39 @@
     ;; name that this machine resolves to the public address (a second name for the
     ;; same grid that is not in the hosts file, for example). It is used in place
     ;; of the GatekeeperURI hostname. Leave it commented to resolve the
-    ;; GatekeeperURI hostname, as before.
+    ;; GatekeeperURI hostname, as before. An IP address is used as it is, with no
+    ;; lookup.
     ; PublicAddress = "203.0.113.20"
     ;; or
     ; PublicAddress = "public.grid.example.org"
     ;;
+    ;; DNS servers to ask for the name above (PublicAddress, or the GatekeeperURI
+    ;; hostname when PublicAddress is not set): a comma separated list of DNS server
+    ;; IP addresses, the same form as [ViewerAddress] DnsServers. Empty (the default)
+    ;; leaves the name to the operating system resolver, as described above. Use it
+    ;; when this machine must resolve the grid's own name to a LAN address - a
+    ;; hosts-file entry that keeps traffic between your own servers inside your
+    ;; network, or a router without NAT loopback - and the name is on dynamic DNS,
+    ;; so a fixed PublicAddress would go stale. When set, the name is asked of these
+    ;; servers for its A record, in the order given until one answers, at start and
+    ;; every ExternalIPRefreshMinutes; the hosts file is not consulted for it. A
+    ;; server that does not answer within 2 seconds is skipped. If none answers, the
+    ;; last good address is kept; if there has never been one, the operating system
+    ;; answer is used, and a warning is logged each time. Servers are queried on UDP
+    ;; port 53. The start-up line names the servers when the answer came from them:
+    ;;   [EXTERNAL IP RESOLVER]: <name> resolved to <address> via DNS servers <list>
+    ;; Robust also logs a warning at start when the address it settles on is
+    ;; private, loopback or link-local.
+    ;; Example: DnsServers = "192.0.2.53, 198.51.100.53"
+    ; DnsServers = ""
+    ;;
     ;; How often, in minutes, to re-resolve the name so a dynamic-DNS address
     ;; change takes effect without restarting Robust. 0 disables the refresh.
-    ;; Default 30. Each answer is also cached for 5 minutes after its last use,
-    ;; so a value under 5 does not find a change any sooner. A failed lookup is
-    ;; logged as a warning and the previous address is kept.
+    ;; Default 30. Without DnsServers, each answer is also cached for 5 minutes
+    ;; after its last use, so a value under 5 does not find a change any sooner.
+    ;; A failed lookup is logged as a warning and the previous address is kept.
+    ;; The older ExternalIPResolver key is no longer read; Robust logs a warning at
+    ;; start when it is still set. Use PublicAddress and DnsServers instead.
     ; ExternalIPRefreshMinutes = 30
 
 

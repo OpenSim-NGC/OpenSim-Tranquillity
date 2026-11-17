@@ -22,7 +22,7 @@ using osWebRtcVoice.Tests.StockJanus;
 namespace osWebRtcVoice.Tests
 {
     // The assembly-wide 10 s backstop is too short for a session with a real gateway and a real peer.
-#pragma warning disable CS0618
+#pragma warning disable CS0618 // Timeout is [Obsolete], but CancelAfter only cancels a token the test must check; Timeout also fails a test that hangs.
     [TestFixture, NUnit.Framework.Timeout(240000)]
 #pragma warning restore CS0618
     public class StockJanusNonSpatialTests

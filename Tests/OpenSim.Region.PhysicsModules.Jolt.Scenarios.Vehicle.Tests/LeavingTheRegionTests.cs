@@ -31,7 +31,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 /// <para>What the module does, ubODE's (ODEPrim.UpdatePositionAndVelocity, CrossingStart, CrossingFailure): past the edge
 /// the object waits just outside (0.1 to 2 m), stopped, with the velocity it left at reported to core and handed to the
 /// neighbour; a failed crossing brings it back 0.2 m higher, at rest, its vehicle motors off. Below -100 m or above
-/// 100 000 m it is stopped there and OutOfBounds is raised. While it waits, and after, its body is not simulated.</para>
+/// 100 000 m it is stopped there and OutOfBounds is raised. While it waits past an edge it keeps its one body, parked: not
+/// simulated, touching nothing and reported by nothing, as ubODE keeps its body disabled (disableBodySoft), so the region's
+/// body count does not change; a failed crossing carries on with the same body, and a crossing into a neighbour removes it.
+/// Out of bounds, until core makes it non-physical, it is not simulated either.</para>
 ///
 /// Serial with the other native tests: every run steps a real backend on the shared job pool.
 /// </summary>
@@ -240,8 +243,9 @@ public class LeavingTheRegionTests
         => trace.Where(p => p.T > o.LeftAt + Heartbeat * 1.5 && p.InTransit).ToList();
 
     // While it waits just outside the edge: where ubODE leaves it, at the height and with the velocity it left with, not
-    // stepped, not updated, touching nothing; the region has one body fewer.
-    private static void AssertWaitsOutside(List<Point> trace, CoreObject o, int liveBefore, int bodiesPerObject = 1)
+    // stepped, not updated, touching nothing, raising no collision event; its body is kept, parked and asleep, so the region
+    // has as many bodies as before it left and none of them awake.
+    private static void AssertWaitsOutside(List<Point> trace, CoreObject o, int liveBefore)
     {
         Assert.False(double.IsNaN(o.LeftAt), "core was never told the object left the region");
         List<Point> waiting = Waiting(trace, o);
@@ -258,7 +262,7 @@ public class LeavingTheRegionTests
             Assert.Equal(first.Terse, p.Terse);
             Assert.Equal(first.Collisions, p.Collisions);
             Assert.Equal(0, p.Active);
-            Assert.Equal(liveBefore - bodiesPerObject, p.Live);
+            Assert.Equal(liveBefore, p.Live);
         }
     }
 
@@ -503,7 +507,8 @@ public class LeavingTheRegionTests
             Assert.True(MathF.Abs(p.Position.Z - o.LeftPosition.Z) < 0.01f, $"t={p.T:0.000}: moved while waiting: {p.Position}");
             Assert.Equal(waiting[0].Terse, p.Terse);
             Assert.Equal(waiting[0].Collisions, p.Collisions);
-            Assert.True(p.Live <= live - 1, $"t={p.T:0.000}: its body is still in the region ({p.Live} of {live})");
+            Assert.Equal(live, p.Live);   // its body is kept, parked
+            Assert.True(p.Active <= 1, $"t={p.T:0.000}: {p.Active} bodies awake; only the other box may be");
         }
         Assert.False(double.IsNaN(o.BackAt), "the crossing never failed");
         Point back = trace.First(p => p.T > o.BackAt + 1e-9);

@@ -116,16 +116,7 @@ public sealed class ViewerAddressConfig
 
     private static List<IPAddress> ParseDnsServers(string value, ILogger log)
     {
-        List<IPAddress> servers = new();
-        foreach (string item in value.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (IPAddress.TryParse(item, out IPAddress server) && !server.Equals(IPAddress.Any) && !server.Equals(IPAddress.IPv6Any)
-                && !server.Equals(IPAddress.None))
-                servers.Add(server);
-            else
-                log?.LogWarning("[VIEWER ADDRESS]: DnsServers entry \"{0}\" ignored: it is not an IP address", item);
-        }
-        return servers;
+        return DnsAddressQuery.ParseServerList(value, log, "[VIEWER ADDRESS]");
     }
 
     /// <summary>True for a dotted IPv4 literal other than 0.0.0.0 (the form a region registers and a viewer can be given).</summary>

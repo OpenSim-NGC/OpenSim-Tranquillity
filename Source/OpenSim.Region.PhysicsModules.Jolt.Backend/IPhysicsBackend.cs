@@ -145,6 +145,13 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         /// tree of fixed prims; the prim goes back to <see cref="Static"/> when the motion ends.
         /// </summary>
         MovingStatic = 8,
+
+        /// <summary>
+        /// A physical prim's body while its object waits past the region's edge for core to cross it or put it back
+        /// (PhysicsActor.CrossingStart, CrossingFailure). It collides with nothing and no query finds it, and it stays the
+        /// same body when the object comes back, as ubODE disables its body and enables it again.
+        /// </summary>
+        Parked = 9,
     }
 
     /// <summary>
@@ -936,6 +943,17 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
         int RayCastLimited(
             Vector3 origin, Vector3 direction, float maxDistance,
             QueryFilter filter, RayCastBudget budget, Span<RayHit> hits, out RayCastStatus status);
+
+        /// <summary>
+        /// <see cref="RayCastLimited"/> against one body only, on every layer (phantom and volume detect bodies too):
+        /// what lies in front of the body is passed through. With <paramref name="partUserData"/> not 0 and the body a
+        /// linkset, only the part with that UserData counts (the root part or one welded child). Charged to
+        /// <paramref name="budget"/> as any other cast. With <paramref name="backFaces"/> a face the ray leaves the
+        /// shape through is a hit too: a ray that starts inside the part hits the face it leaves by.
+        /// </summary>
+        int RayCastBody(
+            BodyId body, uint partUserData, Vector3 origin, Vector3 direction, float maxDistance, bool backFaces,
+            RayCastBudget budget, Span<RayHit> hits, out RayCastStatus status);
 
         /// <summary>A new heartbeat: this region's ray cast time, in both budgets, starts again from zero.</summary>
         void BeginRayCastBudget();
