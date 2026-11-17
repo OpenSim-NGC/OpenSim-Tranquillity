@@ -25,6 +25,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using System.Net;
 using Nini.Config;
 
 namespace OpenSim.Framework;
@@ -39,6 +40,12 @@ public class NetworkServersInfo
     public string HttpSSLCertPath = "";
     public string HttpSSLCNCertPass = "";
     public uint httpSSLPort = 9001;
+
+    /// <summary>
+    /// The address every HTTP and HTTPS listener of the process binds to: <c>[Network] bind_ip_address</c>.
+    /// Default: every interface (<see cref="IPAddress.Any"/>).
+    /// </summary>
+    public IPAddress HttpListenerAddress = IPAddress.Any;
 
     // "Out of band" managemnt https
     public bool ssl_listener = false;
@@ -59,6 +66,7 @@ public class NetworkServersInfo
     {
         HttpListenerPort =
             (uint) config.Configs["Network"].GetInt("http_listener_port", (int) ConfigSettings.DefaultRegionHttpPort);
+        HttpListenerAddress = ParseBindAddress(config.Configs["Network"].GetString("bind_ip_address", string.Empty));
         httpSSLPort =
             (uint)config.Configs["Network"].GetInt("http_listener_sslport", ((int)ConfigSettings.DefaultRegionHttpPort+1));
         HttpUsesSSL = config.Configs["Network"].GetBoolean("http_listener_ssl", false);
@@ -75,5 +83,21 @@ public class NetworkServersInfo
             cert_pass = config.Configs["Network"].GetString("cert_pass",String.Empty);
             https_port = (uint)config.Configs["Network"].GetInt("https_port", 0);
         }
+    }
+
+    /// <summary>
+    /// Reads <c>[Network] bind_ip_address</c>: an IPv4 or IPv6 address, such as <c>127.0.0.1</c> to accept
+    /// connections from this machine only. Empty means every interface. Anything else is refused, so that a
+    /// mistyped address never leaves the server listening more widely than intended.
+    /// </summary>
+    /// <exception cref="ArgumentException">The value is not empty and not an IP address.</exception>
+    public static IPAddress ParseBindAddress(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return IPAddress.Any;
+        if (IPAddress.TryParse(value.Trim(), out IPAddress address))
+            return address;
+        throw new ArgumentException(
+            $"[Network] bind_ip_address \"{value}\" is not an IP address. Give an IPv4 or IPv6 address, or leave it empty for every interface.");
     }
 }

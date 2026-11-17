@@ -157,6 +157,11 @@
 [Network]
     port = ${Const|PrivatePort}
 
+    ; The address every HTTP and HTTPS listener binds to, including ConsolePort and
+    ; connectors on their own ports. Empty (the default): every interface. 127.0.0.1
+    ; accepts connections from this machine only.
+    ; bind_ip_address = ""
+
     ; HTTPS for "Out of band" management applications such as the remote admin
     ; module. May specify https_main = True to make the main http server
     ; use https or "False" to make the main server HTTP

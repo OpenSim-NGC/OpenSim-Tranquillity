@@ -7,6 +7,7 @@
  * with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
  */
 
+using System.Net;
 using System.Reflection;
 using Nini.Config;
 using Microsoft.Extensions.Logging;
@@ -53,6 +54,11 @@ public sealed class GridHttpServerFactory : IGridHttpServerFactory
 
         uint consolePort = (uint)networkConfig.GetInt("ConsolePort", 0);
 
+        // [Network] bind_ip_address: every listener below, and the servers services open later through
+        // MainServer.GetHttpServer (ConsolePort, a connector's own port), bind to it.
+        IPAddress listenAddress = NetworkServersInfo.ParseBindAddress(networkConfig.GetString("bind_ip_address", string.Empty));
+        MainServer.Instance.DefaultListenIPAddress = listenAddress;
+
         BaseHttpServer httpServer;
 
         //
@@ -75,6 +81,7 @@ public sealed class GridHttpServerFactory : IGridHttpServerFactory
 
             httpServer = new BaseHttpServer(port, ssl_main, cert_path, cert_pass);
         }
+        httpServer.ListenIPAddress = listenAddress;
 
         MainServer.Instance.AddHttpServer(httpServer);
 
@@ -94,12 +101,12 @@ public sealed class GridHttpServerFactory : IGridHttpServerFactory
                 if (cert_pass.Length == 0)
                     _logger.LogError("[SSL]: Password for X509 certificate is missing, server can't start.");
 
-                MainServer.Instance.AddHttpServer(new BaseHttpServer(https_port, ssl_listener, cert_path, cert_pass));
+                MainServer.Instance.AddHttpServer(new BaseHttpServer(https_port, ssl_listener, cert_path, cert_pass) { ListenIPAddress = listenAddress });
             }
             else
             {
                 _logger.LogWarning("[SSL]: SSL port is active but no SSL is used because external SSL was requested.");
-                MainServer.Instance.AddHttpServer(new BaseHttpServer(https_port));
+                MainServer.Instance.AddHttpServer(new BaseHttpServer(https_port) { ListenIPAddress = listenAddress });
             }
         }
 

@@ -650,6 +650,12 @@
     ;; the region ports use UDP.
     ; http_listener_port = 9000
 
+    ;# {bind_ip_address} {} {IP address the HTTP and HTTPS listeners bind to? (empty for every interface)} {}
+    ;; 127.0.0.1 accepts connections from this machine only. Covers every HTTP and HTTPS
+    ;; port of the simulator, including ones modules open. The UDP port follows
+    ;; InternalAddress in Regions.ini.
+    ; bind_ip_address = ""
+
     ;; Region control-plane endpoints such as /agent, /object, /region and /friends
     ;; accept POST requests only from loopback and the hosts listed here.
     ;; Add the IP addresses or hostnames of your ROBUST/GridServer login host(s)
