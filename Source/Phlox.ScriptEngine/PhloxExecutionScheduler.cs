@@ -141,6 +141,9 @@ namespace Phlox.ScriptEngine
         // enable/disable: listens, timers and touch subscriptions stay registered and the
         // user-visible Running flag is untouched; the script just stops receiving timeslices.
         private readonly Queue<SuspendResumeReq> m_SuspendResumeQueue = new();
+        // The scripts suspended, or asked to be, as callers on other threads see it (guarded by m_SuspendResumeQueue):
+        // m_Suspended is the scheduler thread's own view and changes only when the queue is processed.
+        private readonly HashSet<UUID> m_SuspendRequested = new();
         private struct SuspendResumeReq { public UUID ItemId; public bool Suspend; }
         private readonly HashSet<UUID> m_Suspended = new();
 
@@ -785,7 +788,10 @@ namespace Phlox.ScriptEngine
             lock (m_AllScriptsLock)
                 if (!m_AllScripts.ContainsKey(itemId)) return false;
             lock (m_SuspendResumeQueue)
+            {
                 m_SuspendResumeQueue.Enqueue(new SuspendResumeReq { ItemId = itemId, Suspend = true });
+                m_SuspendRequested.Add(itemId);
+            }
             m_WorkArrived();
             return true;
         }
@@ -800,8 +806,23 @@ namespace Phlox.ScriptEngine
             lock (m_AllScriptsLock)
                 if (!m_AllScripts.ContainsKey(itemId)) return;
             lock (m_SuspendResumeQueue)
+            {
                 m_SuspendResumeQueue.Enqueue(new SuspendResumeReq { ItemId = itemId, Suspend = false });
+                m_SuspendRequested.Remove(itemId);
+            }
             m_WorkArrived();
+        }
+
+        /// <summary>
+        /// Whether a script this scheduler runs is suspended, or a suspend of it is queued and not yet undone by a
+        /// resume. Safe from any thread.
+        /// </summary>
+        public bool IsSuspended(UUID itemId)
+        {
+            lock (m_AllScriptsLock)
+                if (!m_AllScripts.ContainsKey(itemId)) return false;
+            lock (m_SuspendResumeQueue)
+                return m_SuspendRequested.Contains(itemId);
         }
 
         public bool ResetNow(UUID itemId)
@@ -1201,6 +1222,8 @@ namespace Phlox.ScriptEngine
             bool itemLeftPrim = ItemLeftItsPrim(itemId);
             RemoveFromRunQueue(itemId);
             m_Suspended.Remove(itemId);
+            lock (m_SuspendResumeQueue)
+                m_SuspendRequested.Remove(itemId);
             UnregisterFromNotifications(script);
             // Whatever the API's unload hook throws, the script still leaves the scheduler - a throw here used to
             // abort the unload and keep the script (and everything it held) loaded for the life of the region.
