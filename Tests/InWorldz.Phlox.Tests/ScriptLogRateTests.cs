@@ -358,11 +358,13 @@ public class ScriptLogRateTests
         {
             switch (function)
             {
+                // Phlox cannot apply llSetAgentEnvironment's settings list yet: SL's ENV_INVALID_RULE (-5) after the
+                // experience checks pass; "sunset" names no settings item, so ENV_NO_ENVIRONMENT (-3).
                 case "llSetAgentEnvironment":
-                    Assert.Equal(0, api.llSetAgentEnvironment(agent.ToString(), 1f, new LSLList(new List<object>())));
+                    Assert.Equal(-5, api.llSetAgentEnvironment(agent.ToString(), 1f, new LSLList(new List<object>())));
                     break;
                 case "llReplaceAgentEnvironment":
-                    Assert.Equal(0, api.llReplaceAgentEnvironment(agent.ToString(), 1f, "sunset"));
+                    Assert.Equal(-3, api.llReplaceAgentEnvironment(agent.ToString(), 1f, "sunset"));
                     break;
                 default:
                     api.llMapBeacon(agent.ToString(), "here", Vector3.One);
@@ -370,7 +372,13 @@ public class ScriptLogRateTests
             }
         }
 
-        var lines = xr.R.Log.With(function == "llMapBeacon" ? "llMapBeacon: beacon" : function + " called");
+        if (function != "llMapBeacon")
+        {
+            // The environment calls answer the script (return code, DEBUG_CHANNEL) and write no log line at all.
+            Assert.Empty(xr.R.Log.With(function));
+            return;
+        }
+        var lines = xr.R.Log.With("llMapBeacon: beacon");
         Assert.Equal(25, lines.Count);
         Assert.All(lines, l => Assert.Equal(LogLevel.Debug, l.Level));
     }

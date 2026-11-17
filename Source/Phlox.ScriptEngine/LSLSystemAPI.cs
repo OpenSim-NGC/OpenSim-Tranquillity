@@ -20544,46 +20544,57 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
         public int llSetAgentEnvironment(string agentID, float transition, LSLList paramList)
         {
-            // Experience-gated: set per-agent environment (EEP)
-            if (m_host == null || World == null) return -1;
-
-            UUID targetAgent;
-            if (!UUID.TryParse(agentID, out targetAgent)) return -1;
-
-            // Check experience permission
-            if (!HasExperiencePermission(targetAgent))
-                return -3; // XP_ERROR_NOT_EXPERIENCE
-
-            ScenePresence sp = World.GetScenePresence(targetAgent);
-            if (sp == null || sp.IsChildAgent) return -1;
-
-            // Per-agent EEP requires viewer/region support for GenericMessage or
-            // EnvironmentUpdate per-agent caps. Most OpenSim builds don't support this yet.
-            // Log the attempt and return success so scripts don't break.
-            m_log.LogDebug("[PhloxAPI]: llSetAgentEnvironment called for agent {0} with {1} params (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
-                targetAgent, paramList.Length, transition);
-            return 0; // Report success so scripts proceed
+            // SL (https://wiki.secondlife.com/wiki/LlSetAgentEnvironment): an agent's own environment settings, as part
+            // of an experience. Phlox cannot apply the settings list yet (YEngine's parser, LSL_Api.ParamsToEnvUpdate,
+            // is bound to its own script instance), so after SL's checks it refuses the call with an error instead of
+            // reporting a success that changed nothing.
+            int check = CheckAgentEnvironmentCall(agentID, out _);
+            if (check != ENV_OK) return check;
+            ShoutError("llSetAgentEnvironment is not supported by Phlox yet; a //YEngine: script can use it.");
+            return ENV_INVALID_RULE;
         }
 
         public int llReplaceAgentEnvironment(string agentID, float transition, string environment)
         {
-            // Experience-gated: replace per-agent environment with named EEP preset
-            if (m_host == null || World == null) return -1;
+            // SL (https://wiki.secondlife.com/wiki/LlReplaceAgentEnvironment): the environment one agent sees, as part
+            // of an experience; NULL_KEY or "" restores the region's and parcel's. Sent as YEngine's LSL_Api does.
+            int check = CheckAgentEnvironmentCall(agentID, out UUID agent);
+            if (check != ENV_OK) return check;
 
-            UUID targetAgent;
-            if (!UUID.TryParse(agentID, out targetAgent)) return -1;
+            IEventQueue eq = World.RequestModuleInterface<IEventQueue>();
+            if (eq == null) return ENV_NO_ENVIRONMENT;
 
-            // Check experience permission
-            if (!HasExperiencePermission(targetAgent))
-                return -3; // XP_ERROR_NOT_EXPERIENCE
+            if (string.IsNullOrEmpty(environment) || environment == UUID.Zero.ToString())
+            {
+                eq.SendEnvironmentUpdate(GetScriptExperienceId(), agent, new ClearEnvironmentUpdate { TransitionTime = transition });
+                return ENV_OK;
+            }
 
-            ScenePresence sp = World.GetScenePresence(targetAgent);
-            if (sp == null || sp.IsChildAgent) return -1;
+            UUID envID = OpenSim.Region.Framework.Scenes.Scripting.ScriptUtils.GetAssetIdFromKeyOrItemName(m_host, environment);
+            if (envID == UUID.Zero) return ENV_NO_ENVIRONMENT;
+            AssetBase asset = World.AssetService.Get(envID.ToString());
+            if (asset == null || asset.Type != (sbyte)AssetType.Settings) return ENV_NO_ENVIRONMENT;
 
-            // Per-agent EEP replace requires viewer protocol support.
-            m_log.LogDebug("[PhloxAPI]: llReplaceAgentEnvironment called for agent {0} environment='{1}' (transition={2}s). Per-agent EEP not yet implemented in viewer protocol.",
-                targetAgent, environment, transition);
-            return 0; // Report success so scripts proceed
+            eq.SendEnvironmentUpdate(GetScriptExperienceId(), agent,
+                new FullEnvironmentUpdate { AssetID = asset.FullID, TransitionTime = transition });
+            return ENV_OK;
+        }
+
+        /// <summary>
+        /// The checks llSetAgentEnvironment and llReplaceAgentEnvironment share, with SL's codes: ENV_NOT_EXPERIENCE
+        /// for a script outside an experience, ENV_INVALID_AGENT for a key that is not an agent in the region, and
+        /// ENV_NO_EXPERIENCE_PERMISSION when the agent has not granted the experience. ENV_OK otherwise.
+        /// </summary>
+        private int CheckAgentEnvironmentCall(string agentID, out UUID agent)
+        {
+            agent = UUID.Zero;
+            if (m_host == null || World == null) return ENV_INVALID_AGENT;
+            if (GetScriptExperienceId() == UUID.Zero) return ENV_NOT_EXPERIENCE;
+            if (!UUID.TryParse(agentID, out agent) || agent == UUID.Zero) return ENV_INVALID_AGENT;
+            ScenePresence sp = World.GetScenePresence(agent);
+            if (sp == null || sp.IsChildAgent) return ENV_INVALID_AGENT;
+            if (!HasExperiencePermission(agent)) return ENV_NO_EXPERIENCE_PERMISSION;
+            return ENV_OK;
         }
 
         // ── Tier 8: Remaining SL Function Gaps (636–643) ──
@@ -20764,74 +20775,67 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             bool atRoot = false;
             bool posRelative = false;
 
-            for (int i = 0; i < paramList.Length; i++)
+            // SL's rules, each a REZ_* code and its values (https://wiki.secondlife.com/wiki/LlRezObjectWithParams).
+            // Every rule is read by its value count, so a rule Phlox does not act on never shifts the rules after it.
+            // An unknown rule, a rule short of values or a value of the wrong type is an error and rezzes nothing,
+            // as YEngine does.
+            object[] data = paramList.Data;
+            int i = 0;
+            while (i < data.Length)
             {
-                int rule;
-                try { rule = Convert.ToInt32(paramList.Data[i]); }
-                catch { continue; }
+                if (data[i] is not int rule)
+                {
+                    ShoutError($"llRezObjectWithParams: parameter {i} must be a REZ_* constant");
+                    return String.Empty;
+                }
+                int count = RezRuleValueCount(rule);
+                if (count < 0)
+                {
+                    ShoutError($"llRezObjectWithParams: Unknown parameter {rule} at {i}");
+                    return String.Empty;
+                }
+                if (i + count >= data.Length)
+                {
+                    ShoutError($"llRezObjectWithParams: parameter {rule} at {i} needs {count} value(s)");
+                    return String.Empty;
+                }
+                int v = i + 1;
+                i += 1 + count;
 
                 switch (rule)
                 {
                     case REZ_POS:
-                        if (i + 3 < paramList.Length)
-                        {
-                            try
-                            {
-                                pos = (Vector3)paramList.Data[i + 1];
-                                atRoot = Convert.ToInt32(paramList.Data[i + 2]) != 0;
-                                posRelative = Convert.ToInt32(paramList.Data[i + 3]) != 0;
-                                i += 3;
-                            }
-                            catch { }
-                        }
+                        // [ REZ_POS, vector position, integer relative, integer at_root ]
+                        if (data[v] is not Vector3 p || data[v + 1] is not int rel || data[v + 2] is not int root)
+                            return RezRuleTypeError(rule, v);
+                        pos = p;
+                        posRelative = rel != 0;
+                        atRoot = root != 0;
                         break;
                     case REZ_ROT:
-                        if (i + 2 < paramList.Length)
-                        {
-                            try
-                            {
-                                rot = (Quaternion)paramList.Data[i + 1];
-                                bool rotRelative = Convert.ToInt32(paramList.Data[i + 2]) != 0;
-                                if (rotRelative) rot = m_host.GetWorldRotation() * rot;
-                                i += 2;
-                            }
-                            catch { }
-                        }
+                        // [ REZ_ROT, rotation rot, integer relative ]
+                        if (data[v] is not Quaternion r || data[v + 1] is not int rotRelative)
+                            return RezRuleTypeError(rule, v);
+                        rot = rotRelative != 0 ? m_host.GetWorldRotation() * r : r;
                         break;
                     case REZ_VEL:
-                        if (i + 3 < paramList.Length)
-                        {
-                            try
-                            {
-                                vel = (Vector3)paramList.Data[i + 1];
-                                bool velRelative = Convert.ToInt32(paramList.Data[i + 2]) != 0;
-                                if (velRelative) vel = vel * m_host.GetWorldRotation();
-                                i += 3;
-                            }
-                            catch { }
-                        }
+                        // [ REZ_VEL, vector velocity, integer local, integer inherit ]; inherit is not acted on
+                        if (data[v] is not Vector3 velocity || data[v + 1] is not int local || data[v + 2] is not int)
+                            return RezRuleTypeError(rule, v);
+                        vel = local != 0 ? velocity * m_host.GetWorldRotation() : velocity;
                         break;
                     case REZ_PARAM_STRING:
                         // upstream LSL_Api.cs:3796-3803
-                        if (i + 1 < paramList.Length)
-                        {
-                            startString = paramList.Data[i + 1]?.ToString() ?? string.Empty;
-                            i += 1;
-                        }
+                        startString = data[v]?.ToString() ?? string.Empty;
                         break;
                     case REZ_PARAM:
-                        if (i + 1 < paramList.Length)
-                        {
-                            try { param = Convert.ToInt32(paramList.Data[i + 1]); i += 1; }
-                            catch { }
-                        }
-                        break;
-                    case REZ_FLAGS:
-                    case REZ_DAMAGE:
-                        // Skip — advanced Combat2 flags, consume the value
-                        if (i + 1 < paramList.Length) i += 1;
+                        if (data[v] is not int startParam)
+                            return RezRuleTypeError(rule, v);
+                        param = startParam;
                         break;
                     default:
+                        // REZ_FLAGS, REZ_ACCEL, REZ_OMEGA, REZ_DAMAGE, REZ_SOUND, REZ_SOUND_COLLIDE, REZ_LOCK_AXES and
+                        // REZ_DAMAGE_TYPE: read and not acted on (Docs/PhloxKnownDefects.md)
                         break;
                 }
             }
@@ -20843,6 +20847,25 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             // Delegate to existing rez infrastructure; its NULL_KEY failure is SL's "" here.
             string key = RezObjectInternal(inventory, pos, vel, rot, param, atRoot, startString);
             return key == UUID.Zero.ToString() ? String.Empty : key;
+        }
+
+        /// <summary>
+        /// The values each llRezObjectWithParams rule takes after its code (SL wiki LlRezObjectWithParams), or -1 for
+        /// a rule SL does not document (REZ_TORQUE has no published argument list).
+        /// </summary>
+        private static int RezRuleValueCount(int rule) => rule switch
+        {
+            REZ_PARAM or REZ_FLAGS or REZ_DAMAGE or REZ_LOCK_AXES or REZ_DAMAGE_TYPE or REZ_PARAM_STRING => 1,
+            REZ_ROT or REZ_ACCEL or REZ_SOUND_COLLIDE => 2,
+            REZ_POS or REZ_VEL or REZ_SOUND => 3,
+            REZ_OMEGA => 4,
+            _ => -1,
+        };
+
+        private string RezRuleTypeError(int rule, int at)
+        {
+            ShoutError($"llRezObjectWithParams: a value of parameter {rule} at {at} has the wrong type");
+            return String.Empty;
         }
 
         public string llGetMaterialOverride(int face, LSLList paramList)
@@ -21810,13 +21833,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
         // ── 665: llGetVehicleFlags ──
         public int llGetVehicleFlags()
         {
+            // The VEHICLE_FLAG_* word llSetVehicleType, llSetVehicleFlags and llRemoveVehicleFlags keep on the root
+            // part (SceneObjectPart.VehicleParams), physical or not; 0 when the object is no vehicle.
             if (m_host?.ParentGroup == null || m_host.ParentGroup.IsDeleted) return 0;
-            PhysicsActor pa = m_host.ParentGroup.RootPart.PhysActor;
-            if (pa == null) return 0;
-
-            // PhysicsActor doesn't expose a flags getter — return VehicleType for now.
-            // Full flags support requires adding a getter to the physics engine.
-            return pa.VehicleType;
+            SOPVehicle vehicle = m_host.ParentGroup.RootPart.VehicleParams;
+            return vehicle == null ? 0 : (int)vehicle.vd.m_flags;
         }
 
         // ── 666: llGetLinkGLTFOverrides ──

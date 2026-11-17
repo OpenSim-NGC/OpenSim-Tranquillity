@@ -887,9 +887,11 @@ such list.
     SL's LSL does ([LlRezObjectWithParams](https://wiki.secondlife.com/wiki/LlRezObjectWithParams)).
     SLua's `ll.RezObjectWithParams` also returns `""` on failure, where SL's Lua returns
     `NULL_KEY`. YEngine returns `NULL_KEY` on failure.
-  - `REZ_FLAGS` and `REZ_DAMAGE` are ignored.
-  - A `REZ_*` rule it does not handle is skipped without consuming its value, so the rules
-    after it are misread.
+  - `REZ_FLAGS`, `REZ_ACCEL`, `REZ_OMEGA`, `REZ_DAMAGE`, `REZ_SOUND`, `REZ_SOUND_COLLIDE`,
+    `REZ_LOCK_AXES` and `REZ_DAMAGE_TYPE` are read and ignored; `REZ_VEL`'s `inherit` is ignored.
+  - `REZ_TORQUE`, which SL does not document, is an unknown rule: like any unknown rule, a rule
+    short of values or a value of the wrong type, it shouts an error and rezzes nothing, as
+    YEngine does.
 - `llDerezObject` refuses `DEREZ_TO_INVENTORY` (returns 0). `DEREZ_DIE` and
   `DEREZ_MAKE_TEMP` work.
 - `llTargetedEmail`, in its four-argument form, sends only to external addresses (target type
@@ -898,10 +900,9 @@ such list.
   raise "not yet supported for setting".
 - `llReplaceEnvironment` applies the day length and offset but never loads the named
   environment asset.
-- `llSetAgentEnvironment` and `llReplaceAgentEnvironment` change nothing, but return 0
-  (success).
+- `llSetAgentEnvironment` cannot apply its settings list yet: after SL's checks it shouts an
+  error and returns `ENV_INVALID_RULE`. `llReplaceAgentEnvironment` works.
 - `llGetEnvironment` returns fixed defaults for most sky parameters.
-- `llGetVehicleFlags` returns the vehicle type, not its flags.
 - `llGetAgentInfo` never sets `AGENT_AUTOPILOT`.
 - `llGetParcelDetails` / `osGetParcelDetails`:
   - name, description, owner, group, area and id are real;
