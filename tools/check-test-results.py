@@ -7,7 +7,7 @@ Usage: check-test-results.py <results-dir> <known-failures-file> <solution>
 
 - a test fails that is not in the known-failures file (a new failure);
 - a test project in the solution produced no results (its test host crashed or never ran);
-- a results file reports a run that did not complete.
+- a results file reports a run that did not complete, or a test host that crashed or hung partway.
 
 A known failure that passes is reported, so the file can be trimmed, but does not fail the run:
 some entries are flaky and pass on some runs.
@@ -25,6 +25,7 @@ from pathlib import Path
 
 NS = {"t": "http://microsoft.com/schemas/VisualStudio/TeamTest/2010"}
 COMPLETED = {"Completed", "Passed", "Failed", "Warning"}
+STOPPED = ("The active test run was aborted", "Test host process crashed", "exited with error")
 
 
 def test_assemblies(solution: Path) -> set[str]:
@@ -78,6 +79,13 @@ def main() -> int:
         seen_assemblies |= assemblies_here
         if run_outcome not in COMPLETED:
             problems.append(f"{trx.name} ({', '.join(sorted(assemblies_here)) or 'no tests'}): run outcome {run_outcome}")
+        # A test host that crashed or hung (and was stopped by --blame-hang) leaves the run "Failed", as a run
+        # with failing tests is, plus a RunInfo with outcome Error; the tests after the crash never ran.
+        # (xUnit also reports each failing test as an Error RunInfo; only these messages mean the run stopped.)
+        for info in root.iterfind("t:ResultSummary/t:RunInfos/t:RunInfo", NS):
+            text = (info.findtext("t:Text", default="", namespaces=NS) or "").strip()
+            if info.get("outcome") == "Error" and any(m in text for m in STOPPED):
+                problems.append(f"{', '.join(sorted(assemblies_here)) or trx.name}: {text.splitlines()[0]}")
         for result in root.iterfind("t:Results/t:UnitTestResult", NS):
             assembly = storage.get(result.get("testId"), "?")
             key = f"{assembly} :: {result.get('testName')}"
