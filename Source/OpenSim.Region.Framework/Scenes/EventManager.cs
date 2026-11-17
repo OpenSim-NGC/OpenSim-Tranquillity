@@ -1152,6 +1152,13 @@ public class EventManager
     public event LandBuy OnLandBuy;
 
     /// <summary>
+    /// Triggered by <see cref="TriggerLandBuy"/> once every <see cref="OnLandBuy"/> handler has run, so a money module
+    /// that charges in OnLandBuy has recorded the payment (<see cref="LandBuyArgs.amountDebited"/>) before the land
+    /// module hands the parcel over here, whatever order the handlers were added in.
+    /// </summary>
+    public event LandBuy OnLandBuyTransfer;
+
+    /// <summary>
     /// Triggered to allow or prevent a real estate transaction
     /// </summary>
     /// <remarks>
@@ -2285,10 +2292,11 @@ public class EventManager
 
     public void TriggerLandBuy(Object sender, LandBuyArgs args)
     {
-        LandBuy handlerLandBuy = OnLandBuy;
-        if (handlerLandBuy != null)
+        foreach (LandBuy handlers in new[] { OnLandBuy, OnLandBuyTransfer })
         {
-            foreach (LandBuy d in handlerLandBuy.GetInvocationList())
+            if (handlers == null)
+                continue;
+            foreach (LandBuy d in handlers.GetInvocationList())
             {
                 try
                 {
