@@ -121,19 +121,19 @@ public class MockScriptEngine : INonSharedRegionModule, IScriptModule, IScriptEn
 
     public bool PostScriptEvent(UUID itemID, EventParams evParams)
     {
-        List<EventParams> eventsForItem;
-
-        if (!PostedEvents.ContainsKey(itemID))
+        // Events can arrive from worker threads (the dataserver posts from its work pool), so writes
+        // and ClearPostedEvents take a lock on PostedEvents; a test reading it while one may arrive
+        // takes the same lock.
+        lock (PostedEvents)
         {
-            eventsForItem = new List<EventParams>();
-            PostedEvents.Add(itemID, eventsForItem);
-        }
-        else
-        {
-            eventsForItem = PostedEvents[itemID];
-        }
+            if (!PostedEvents.TryGetValue(itemID, out List<EventParams> eventsForItem))
+            {
+                eventsForItem = new List<EventParams>();
+                PostedEvents.Add(itemID, eventsForItem);
+            }
 
-        eventsForItem.Add(evParams);
+            eventsForItem.Add(evParams);
+        }
 
         if (PostEventHook != null)
             PostEventHook(itemID, evParams);
@@ -284,7 +284,8 @@ public class MockScriptEngine : INonSharedRegionModule, IScriptModule, IScriptEn
 
     public void ClearPostedEvents()
     {
-        PostedEvents.Clear();
+        lock (PostedEvents)
+            PostedEvents.Clear();
     }
 
     public void SleepScript(UUID itemID, int delay)
