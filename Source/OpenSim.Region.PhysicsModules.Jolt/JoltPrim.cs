@@ -55,6 +55,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private byte _shapeType;
         private Vector3 _velocity;              // last drained linear velocity (the SOP reads this for terse updates)
         private Vector3 _rotationalVelocity;    // last drained angular velocity
+        private Vector3 _acceleration;          // last drained change of velocity per second (Acceleration)
 
         // SceneObjectPart.Density (simulator units, default 1000) x DensityScaleFactor = PHYSICAL density
         // (kg/m^3). The same 0.01 conversion BulletSim's BSParam.DensityScaleFactor applies; forwarding it
@@ -172,6 +173,8 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         private ShapeId _compoundShape = ShapeId.Invalid;                  // root: the built compound (Invalid = single shape)
 
         internal BodyId BodyHandle => _body;
+        // The body a ray at this part tests: its own, or its linkset root's when it is welded into the root's body.
+        internal BodyId PartBody => IsWeldedChild ? _linkRoot._body : _body;
         internal string ShapeKind => _shapeKind;
         internal ShapeId ShapeHandle => _shape;
         // Read by the `jolt reloadcheck` / `jolt vehiclestatus` console commands.
@@ -669,7 +672,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // box/sphere/mesh - only cylinders carry a correction). Called once per active body per step, plus
         // one final time when the body sleeps (JustDeactivated) - which is the settle update that stops the
         // viewer interpolating a rested object.
-        internal void ApplyStepState(in BodyState s)
+        internal void ApplyStepState(in BodyState s, float stepSeconds)
         {
             // A kinematic prim's pose is the one its object was given (the body only follows it), and a drain that wrote the
             // body's place back could overwrite a pose set since the step.
@@ -710,6 +713,7 @@ namespace OpenSim.Region.PhysicsModules.Jolt
                 {
                     _position = newPos;
                     _orientation = newRot;
+                    _acceleration = StepAcceleration(_velocity, newVel, stepSeconds, (s.Flags & BodyStateFlags.JustDeactivated) != 0);
                     _velocity = newVel;
                     _rotationalVelocity = newAngVel;
                 }
@@ -927,6 +931,20 @@ namespace OpenSim.Region.PhysicsModules.Jolt
         // ---------------------------------------------------------------------
         // PhysicsActor contract. Real state: Position / Orientation / Size (pushed to the body).
         // Members not wired to the body below are inert.
+        // ubODE's rule (ODEPrim.cs, the velocity update after each step): the acceleration is the change of velocity over the
+        // step, a new velocity under 0.005 m/s on every axis counting as zero, and an acceleration under 0.01 on every axis is
+        // zero. Only the acceleration uses the rounded velocity; the velocity reported is the body's own. A body that went to
+        // sleep this step is at rest: no acceleration (ubODE zeroes it for a disabled body).
+        internal static Vector3 StepAcceleration(Vector3 oldVel, Vector3 newVel, float stepSeconds, bool wentToSleep)
+        {
+            if (newVel.ApproxZero(0.005f))
+                newVel = Vector3.Zero;
+            if (wentToSleep || !(stepSeconds > 0f))
+                return Vector3.Zero;
+            Vector3 a = (newVel - oldVel) * (1f / stepSeconds);
+            return a.ApproxZero(0.01f) ? Vector3.Zero : a;
+        }
+
         // ---------------------------------------------------------------------
 
         // A welded child is wherever its root's body has carried it: its root's pose with its offset in the linkset.
@@ -1657,7 +1675,9 @@ namespace OpenSim.Region.PhysicsModules.Jolt
             return len > max && len > 0f ? torque * (max / len) : torque;
         }
 
-        public override Vector3 Acceleration { get => Vector3.Zero; set { } }
+        // What llGetAccel reads: the change of velocity over the last step (ApplyStepState), as ubODE works it out. Zero for a
+        // prim that is not physical. Set by nothing: the setter is ignored, as on ubODE.
+        public override Vector3 Acceleration { get => _isPhysical ? _acceleration : Vector3.Zero; set { } }
         public override float CollisionScore { get; set; }
         public override bool Kinematic { get => false; set { } }
 

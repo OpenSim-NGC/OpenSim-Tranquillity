@@ -937,6 +937,17 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Backend
             Vector3 origin, Vector3 direction, float maxDistance,
             QueryFilter filter, RayCastBudget budget, Span<RayHit> hits, out RayCastStatus status);
 
+        /// <summary>
+        /// <see cref="RayCastLimited"/> against one body only, on every layer (phantom and volume detect bodies too):
+        /// what lies in front of the body is passed through. With <paramref name="partUserData"/> not 0 and the body a
+        /// linkset, only the part with that UserData counts (the root part or one welded child). Charged to
+        /// <paramref name="budget"/> as any other cast. With <paramref name="backFaces"/> a face the ray leaves the
+        /// shape through is a hit too: a ray that starts inside the part hits the face it leaves by.
+        /// </summary>
+        int RayCastBody(
+            BodyId body, uint partUserData, Vector3 origin, Vector3 direction, float maxDistance, bool backFaces,
+            RayCastBudget budget, Span<RayHit> hits, out RayCastStatus status);
+
         /// <summary>A new heartbeat: this region's ray cast time, in both budgets, starts again from zero.</summary>
         void BeginRayCastBudget();
 
