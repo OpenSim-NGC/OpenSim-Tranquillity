@@ -523,7 +523,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
             selectedEngine ??= scene.ResolveScriptEngine(engine, String.Empty, item);
             engine = selectedEngine?.ScriptEngineName ?? engine;
             m_part.ParentGroup.Scene.EventManager.TriggerRezScript(
-                m_part.LocalId, itemID, String.Empty, startParam, postOnRez, engine, stateSource);
+                m_part.LocalId, itemID, String.Empty, startParam, postOnRez, engine, stateSource, item);
             StoreScriptErrors(itemID, null);
             m_part.ParentGroup.AddActiveScriptCount(1);
             m_part.ScheduleFullUpdate();
@@ -555,7 +555,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
         selectedEngine ??= scene.ResolveScriptEngine(engine, script, item);
         engine = selectedEngine?.ScriptEngineName ?? engine;
         m_part.ParentGroup.Scene.EventManager.TriggerRezScript(
-            m_part.LocalId, itemID, script, startParam, postOnRez, engine, stateSource);
+            m_part.LocalId, itemID, script, startParam, postOnRez, engine, stateSource, item);
         StoreScriptErrors(itemID, null);
         //if (item.ScriptRunning)
             m_part.ParentGroup.AddActiveScriptCount(1);
@@ -1642,7 +1642,7 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                     invString.AddNameValueLine("asset_id", UUID.ZeroString);
                 invString.AddNameValueLine("type", Utils.AssetTypeToString((AssetType)item.Type));
                 invString.AddNameValueLine("inv_type", Utils.InventoryTypeToString((InventoryType)item.InvType));
-                invString.AddNameValueLine("flags", Utils.UIntToHexString(item.Flags));
+                invString.AddNameValueLine("flags", Utils.UIntToHexString(ScriptCompileTargets.ForViewer(item.Flags)));
 
                 invString.AddSaleStart();
                 invString.AddNameValueLine("sale_type", "not");

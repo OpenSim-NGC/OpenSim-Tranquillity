@@ -2620,7 +2620,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             data.GroupID = items[i].GroupID;
             data.GroupOwned = items[i].GroupOwned;
             data.GroupMask = items[i].GroupPermissions;
-            data.Flags = items[i].Flags;
+            data.Flags = ScriptCompileTargets.ForViewer(items[i].Flags);
             data.SalePrice = items[i].SalePrice;
             data.SaleType = items[i].SaleType;
 
@@ -3637,7 +3637,14 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         }
     }
 
+    /// <summary>
+    /// The reply also tells the editor which compile target the script was saved with, which the region keeps with the
+    /// script item.
+    /// </summary>
     public void SendScriptRunningReply(UUID objectID, UUID itemID, bool running)
+        => SendScriptRunningReply(objectID, itemID, running, m_scene.GetScriptCompileTarget(objectID, itemID));
+
+    public void SendScriptRunningReply(UUID objectID, UUID itemID, bool running, ScriptCompileTarget target)
     {
         IEventQueue eq = Scene.RequestModuleInterface<IEventQueue>();
         if (eq is null)
@@ -3650,7 +3657,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         }
         else
         {
-            eq.ScriptRunningEvent(objectID, itemID, running, m_agentId);
+            eq.ScriptRunningEvent(objectID, itemID, running, m_agentId, target);
         }
     }
 
@@ -13596,7 +13603,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 LLSDxmlEncode2.AddElem("AssetID", item.AssetID, sb);
                 LLSDxmlEncode2.AddElem("Type", item.AssetType, sb);
                 LLSDxmlEncode2.AddElem("InvType", item.InvType, sb);
-                LLSDxmlEncode2.AddElem("Flags", item.Flags, sb);
+                LLSDxmlEncode2.AddElem("Flags", ScriptCompileTargets.ForViewer(item.Flags), sb);
                 LLSDxmlEncode2.AddElem("SaleType", item.SaleType, sb);
                 LLSDxmlEncode2.AddElem("SalePrice", item.SalePrice, sb);
                 LLSDxmlEncode2.AddElem("Name", item.Name, sb);

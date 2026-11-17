@@ -89,7 +89,7 @@ public static class AisEnvelope
             ["desc"] = item.Description ?? "",
             ["type"] = item.AssetType,
             ["inv_type"] = item.InvType,
-            ["flags"] = (int)item.Flags,
+            ["flags"] = (int)ScriptCompileTargets.ForViewer(item.Flags),
             ["created_at"] = item.CreationDate,
             ["permissions"] = Permissions(item),
             ["sale_info"] = SaleInfo(item),
@@ -114,7 +114,7 @@ public static class AisEnvelope
         ["desc"] = link.Description ?? "",
         ["type"] = link.AssetType,
         ["inv_type"] = link.InvType,
-        ["flags"] = (int)link.Flags,
+        ["flags"] = (int)ScriptCompileTargets.ForViewer(link.Flags),
         ["created_at"] = link.CreationDate,
     };
 

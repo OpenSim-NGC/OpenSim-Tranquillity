@@ -6,6 +6,7 @@
  */
 
 using System.Collections.Generic;
+using OpenSim.Framework;
 
 namespace OpenSim.Region.Framework.Interfaces;
 
@@ -29,4 +30,13 @@ public interface IScriptEngineSelection
     /// and the first engine that says yes gets the script; when none does, the default engine runs it.
     /// </summary>
     bool ClaimsScript(string scriptSource);
+
+    /// <summary>
+    /// Whether this engine runs scripts a viewer saved with the given compile target (the viewer's compiler list:
+    /// "luau" or "lsl-luau"). A script item that carries such a target goes to the first engine that says yes, ahead
+    /// of the script's first line, unless another engine holds saved state for the item and asset. Never asked for
+    /// <see cref="ScriptCompileTarget.Unspecified"/>. The default is no, so an engine written before this member
+    /// existed is selected as before.
+    /// </summary>
+    bool AcceptsCompileTarget(ScriptCompileTarget target) => false;
 }
