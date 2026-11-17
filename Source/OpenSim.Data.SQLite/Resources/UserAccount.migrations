@@ -33,3 +33,15 @@ BEGIN;
 ALTER TABLE `UserAccounts` ADD `active` BOOLEAN NOT NULL DEFAULT TRUE;
 
 COMMIT;
+
+:VERSION 4		# -------------------------
+
+-- UserAccountService stores and reads DisplayName and NameChanged, as the MySQL
+-- store does since its version 7.
+
+BEGIN;
+
+ALTER TABLE `UserAccounts` ADD `DisplayName` VARCHAR(31) NULL;
+ALTER TABLE `UserAccounts` ADD `NameChanged` INTEGER NULL DEFAULT 0;
+
+COMMIT;

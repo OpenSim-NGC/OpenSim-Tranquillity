@@ -15,9 +15,11 @@ namespace OpenSim.Server.Handlers.Tests;
 /// SQLite stores run text they are given as data. Each test uses a database file; the stores keep one static
 /// connection per store type for the whole process, so one file per store type is created on first use.
 /// SQLITE_QUERY_TEST_DIR names the folder for the files (default: the test output folder).
-/// All tests are in one class, so they run one after another; the class touches process-wide state (the stores'
-/// static connections) and so shares no state with other classes.
+/// All tests are in one class, so they run one after another. The class touches process-wide state (the stores'
+/// static connections), which UserAccountDisplayNameColumnTests also uses, so the two share the "SQLite stores"
+/// collection and never run at once.
 /// </summary>
+[Xunit.Collection("SQLite stores")]
 public class SqliteQueryParameterTests
 {
     private const string QuoteText = "x' or '1'='1";
