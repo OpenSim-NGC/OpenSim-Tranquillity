@@ -94,6 +94,13 @@ public sealed class MainServer : IMainServer
         get { return new Dictionary<uint, IHttpServer>(_httpServers); }
     }
 
+    /// <summary>
+    /// The address a server created by <see cref="GetHttpServer(uint, IPAddress)"/> listens on when the caller
+    /// names none: <c>[Network] bind_ip_address</c>, set by the server factories at startup. Default: every
+    /// interface (<see cref="IPAddress.Any"/>), as before the setting existed.
+    /// </summary>
+    public IPAddress DefaultListenIPAddress { get; set; } = IPAddress.Any;
+
     public void RegisterHttpConsoleCommands(ICommandConsole console)
     {
         console.Commands.AddCommand(
@@ -364,7 +371,7 @@ public sealed class MainServer : IMainServer
     /// </remarks>
     /// <returns></returns>
     /// <param name='port'>If 0 then the default HTTP server is returned.</param>
-    /// <param name='ipaddr'>A specific IP address to bind to.  If null then the default IP address is used.</param>
+    /// <param name='ipaddr'>A specific IP address to bind to.  If null then <see cref="DefaultListenIPAddress"/> is used.</param>
     public IHttpServer GetHttpServer(uint port, IPAddress ipaddr)
     {
         if (port == 0)
@@ -384,8 +391,7 @@ public sealed class MainServer : IMainServer
 
             _httpServers[port] = new BaseHttpServer(port);
 
-            if (ipaddr != null)
-                _httpServers[port].ListenIPAddress = ipaddr;
+            _httpServers[port].ListenIPAddress = ipaddr ?? DefaultListenIPAddress;
 
             _httpServers[port].Start();
 

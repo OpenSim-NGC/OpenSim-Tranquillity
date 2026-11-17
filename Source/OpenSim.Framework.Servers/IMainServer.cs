@@ -40,6 +40,12 @@ public interface IMainServer
 
     Dictionary<uint, IHttpServer> Servers { get; }
 
+    /// <summary>
+    /// The address a server created by <see cref="GetHttpServer(uint, IPAddress)"/> listens on when the caller
+    /// names none (<c>[Network] bind_ip_address</c>). Default: every interface.
+    /// </summary>
+    IPAddress DefaultListenIPAddress { get; set; }
+
     void AddHttpServer(IHttpServer server);
     
     bool ContainsHttpServer(uint port);   

@@ -36,6 +36,11 @@ public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
             m_log.LogError("[REGION SERVER]: HTTP Server config failed.   HTTP Server and HTTPS server must be on different ports");
         }
 
+        // [Network] bind_ip_address: every listener below, and the servers modules open later through
+        // MainServer.GetHttpServer, bind to it.
+        System.Net.IPAddress listenAddress = serversInfo.HttpListenerAddress ?? System.Net.IPAddress.Any;
+        MainServer.Instance.DefaultListenIPAddress = listenAddress;
+
         BaseHttpServer mainHttpServer = null;
 
         if (serversInfo.HttpUsesSSL)
@@ -44,12 +49,14 @@ public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
                     mainSSLport, serversInfo.HttpUsesSSL,
                     serversInfo.HttpSSLCN,
                     serversInfo.HttpSSLCertPath, serversInfo.HttpSSLCNCertPass);
+            mainHttpServer.ListenIPAddress = listenAddress;
             mainHttpServer.Start();
             MainServer.Instance.AddHttpServer(mainHttpServer);
         }
 
         // unsecure main server
         BaseHttpServer server = new BaseHttpServer(mainport);
+        server.ListenIPAddress = listenAddress;
         if (!serversInfo.HttpUsesSSL)
         {
             mainHttpServer = server;
@@ -71,6 +78,7 @@ public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
                     serversInfo.https_port, serversInfo.ssl_listener,
                     serversInfo.cert_path,
                     serversInfo.cert_pass);
+                server.ListenIPAddress = listenAddress;
 
                 m_log.LogInformation("[REGION SERVER]: Starting OOB HTTPS server on port {0}", server.SSLPort);
                 server.Start();
@@ -79,6 +87,7 @@ public sealed class RegionHttpServerFactory : IRegionHttpServerFactory
             else
             {
                 server = new BaseHttpServer(serversInfo.https_port);
+                server.ListenIPAddress = listenAddress;
 
                 m_log.LogInformation("[REGION SERVER]: Starting HTTP server on port {0} for external HTTPS", server.Port);
                 server.Start();

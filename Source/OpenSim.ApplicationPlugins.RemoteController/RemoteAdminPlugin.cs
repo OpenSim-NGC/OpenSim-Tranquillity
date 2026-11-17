@@ -115,8 +115,9 @@ public class RemoteAdminPlugin : IApplicationPlugin
                 }
 
                 m_application = openSim;
-                string bind_ip_address = m_config.GetString("bind_ip_address", "0.0.0.0");
-                IPAddress ipaddr = IPAddress.Parse(bind_ip_address);
+                // Unset: the server binds to [Network] bind_ip_address (MainServer.DefaultListenIPAddress).
+                string bind_ip_address = m_config.GetString("bind_ip_address", string.Empty).Trim();
+                IPAddress ipaddr = bind_ip_address.Length == 0 ? null : IPAddress.Parse(bind_ip_address);
                 m_httpServer = MainServer.Instance.GetHttpServer((uint)port,ipaddr);
 
                 Dictionary<string, XmlRpcMethod> availableMethods = new Dictionary<string, XmlRpcMethod>();
