@@ -73,7 +73,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
 
     /// <summary>
     /// Resolves (and periodically re-resolves) the public address of the gatekeeper host.
-    /// See [UserAgentService] PublicAddress / ExternalIPRefreshMinutes.
+    /// See [UserAgentService] PublicAddress / DnsServers / ExternalIPRefreshMinutes.
     /// </summary>
     protected static ExternalIPResolver m_ExternalIPResolver;
 
@@ -168,9 +168,11 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
                 // Resolve the gatekeeper's public address through the operating system resolver, as
                 // before. [UserAgentService] PublicAddress names the host (or IP address) to resolve
                 // instead of the gatekeeper host, so a grid whose own hosts file maps the gatekeeper
-                // name to a private address can name a public one. The lookup is repeated every
-                // ExternalIPRefreshMinutes so a dynamic-DNS change heals without a restart. A failed
-                // lookup logs a warning and never throws here.
+                // name to a private address can name a public one. [UserAgentService] DnsServers,
+                // when set, has that name asked of those DNS servers first, so the hosts file does not
+                // decide the answer. The lookup is repeated every ExternalIPRefreshMinutes so a
+                // dynamic-DNS change heals without a restart. A failed lookup logs a warning and never
+                // throws here.
                 m_ExternalIPResolver = ExternalIPResolver.FromConfig(config, host, m_log);
                 if (string.IsNullOrEmpty(m_ExternalIPResolver.CurrentIP))
                     m_log.LogWarning("[USER AGENT SERVICE]: could not resolve {0}; the NAT fallback in client verification is unavailable until a refresh succeeds",
