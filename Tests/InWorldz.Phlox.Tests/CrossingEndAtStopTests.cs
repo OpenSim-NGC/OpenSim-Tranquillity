@@ -82,6 +82,9 @@ public class CrossingEndAtStopTests
         Assert.DoesNotContain("entry", h2.Said);                                              // restored, not started fresh
 
         var exe2 = SavedStateRig.Exe(h2);
+        // Each llSay pauses the script 15 ms ([InWorldz.Phlox] ChatThrottle, on by default), and PumpUntilIdle does
+        // not wait for a sleeping script: wait for it to be back to waiting.
+        Assert.True(h2.PumpUntil(() => h2.RunStateOf(item) == "Waiting", TimeSpan.FromSeconds(5)), h2.RunStateOf(item));
         Assert.Equal("Waiting", h2.RunStateOf(item));
         Assert.DoesNotContain("CrossingWait", exe2.GetStatus(item).LocalDisable ?? "");
         Assert.Equal(0, exe2.GetStatus(item).QueuedEvents);
