@@ -54,6 +54,7 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         private Scene m_scene;
         private MockScriptEngine m_engine;
         private UrlModule m_urlModule;
+        private BaseHttpServer m_server;
 
         private TaskInventoryItem m_scriptItem;
         private LSL_Api m_lslApi;
@@ -72,6 +73,13 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
         public override void Dispose()
         {
+            // Stop the server this test started: removing it from MainServer alone leaves it listening.
+            if (m_server != null)
+            {
+                MainServer.Instance.RemoveHttpServer(m_server.Port);
+                m_server.Stop();
+                m_server = null;
+            }
             TearDown();
             TestFixureTearDown();
             base.Dispose();
@@ -104,10 +112,10 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             config.Configs["Network"].Set("http_listener_port", port);
             m_scene = new SceneHelpers().SetupScene();
 
-            BaseHttpServer server = new BaseHttpServer(port);
-            MainServer.Instance.AddHttpServer(server);
+            m_server = new BaseHttpServer(port);
+            MainServer.Instance.AddHttpServer(m_server);
 
-            server.Start();
+            m_server.Start();
 
             SceneHelpers.SetupSceneModules(m_scene, config, m_engine, m_urlModule);
 

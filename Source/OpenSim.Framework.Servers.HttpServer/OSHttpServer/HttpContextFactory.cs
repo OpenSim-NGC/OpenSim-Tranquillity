@@ -129,8 +129,12 @@ public class HttpContextFactory : IHttpContextFactory
     /// </summary>
     public void Shutdown()
     {
-        ContextTimeoutManager.Stop();
+        // Give back this factory's share of the shared send thread once, however often Shutdown is called.
+        if (Interlocked.Exchange(ref m_shutDown, 1) == 0)
+            ContextTimeoutManager.Stop();
     }
+
+    private int m_shutDown;
 }
 
 /// <summary>

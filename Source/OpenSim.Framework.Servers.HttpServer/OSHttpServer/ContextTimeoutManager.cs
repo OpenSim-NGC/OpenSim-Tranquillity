@@ -60,13 +60,27 @@ public static class ContextTimeoutManager
         TimeStampClockPeriodMS = 1e3 / (double)Stopwatch.Frequency;
     }
 
+    // One send and timeout thread serves every HTTP listener in the process. Each HttpContextFactory (one
+    // per listener) takes a share with Start and gives it back with Stop, and the thread shuts down only
+    // when the last share is given back. A Start after a full shutdown starts a new thread. Before, the
+    // first listener to stop ended the thread for all of them and it never came back: responses queued
+    // for sending on every other listener (poll-service replies such as scripted URLs and the event queue)
+    // were never sent.
+    private static int m_users;
+
     public static void Start()
     {
         lock (m_threadLock)
         {
-            if (m_internalThread != null)
+            m_users++;
+            if (m_internalThread != null && !m_shuttingDown)
                 return;
 
+            // A thread from an earlier full shutdown may still be finishing; it does not take this lock.
+            m_internalThread?.Join(5000);
+
+            m_processWaitEven ??= new AutoResetEvent(false);
+            m_shuttingDown = false;
             m_lastTimeOutCheckTime = GetTimeStamp();
             using(ExecutionContext.SuppressFlow())
                 m_internalThread = new Thread(ThreadRunProcess);
@@ -81,10 +95,15 @@ public static class ContextTimeoutManager
 
     public static void Stop()
     {
-        if (m_processWaitEven != null)
+        lock (m_threadLock)
         {
-            m_processWaitEven.Set();
+            if (m_users > 0)
+                m_users--;
+            if (m_users > 0 || m_shuttingDown)
+                return;
+
             m_shuttingDown = true;
+            m_processWaitEven?.Set();
         }
     }
 
