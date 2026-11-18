@@ -58,6 +58,16 @@ public class MySQLSimulationData : ISimulationDataStore
     /// </summary>
     private object m_dbLock = new object();
 
+    /// <summary>
+    /// Reads a region's prims with their shapes. The rows come back in link order (root first, then the children
+    /// by LinkNumber), so each linkset's parts are added to their group in link order. Without an ORDER BY the
+    /// rows come back in whatever order the server finds them (often primary key, the prim UUID), and each
+    /// linkset's children were added to their group in that order.
+    /// </summary>
+    public const string LoadObjectsQuery =
+        "SELECT * FROM prims LEFT JOIN primshapes ON prims.UUID = primshapes.UUID WHERE RegionUUID = ?RegionUUID " +
+        "ORDER BY prims.LinkNumber";
+
     protected virtual Assembly Assembly
     {
         get { return GetType().Assembly; }
@@ -329,8 +339,7 @@ public class MySQLSimulationData : ISimulationDataStore
 
                 using (MySqlCommand cmd = dbcon.CreateCommand())
                 {
-                    cmd.CommandText =
-                        "SELECT * FROM prims LEFT JOIN primshapes ON prims.UUID = primshapes.UUID WHERE RegionUUID = ?RegionUUID";
+                    cmd.CommandText = LoadObjectsQuery;
                     cmd.Parameters.AddWithValue("RegionUUID", regionID.ToString());
                     cmd.CommandTimeout = 3600;
 
@@ -377,7 +386,7 @@ public class MySQLSimulationData : ISimulationDataStore
 
         #endregion Prim Loading
 
-        // Add all of the children objects to the SOGs
+        // Add all of the children objects to the SOGs, in the order the query returned them (link order)
         foreach (SceneObjectPart prim in prims.Values)
         {
             if (prim.UUID.NotEqual(prim.ParentUUID))
