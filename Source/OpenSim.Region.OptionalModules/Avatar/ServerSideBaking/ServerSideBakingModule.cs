@@ -257,7 +257,8 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         // save would do is destroy this bake's index, because AvatarService.SetAvatar deletes every row for the
         // agent before rewriting those keys (AvatarService.cs:93). The bake index written above IS the
         // persistence of the baked faces.
-        if (live && !closed)
+        // A run that only reset unused slots (every other channel failed) still changed faces and is sent too.
+        if ((live || outcome.Count(ChannelStatus.Cleared) > 0) && !closed)
         {
             sp.SendAppearanceToAllOtherAgents();
             sp.SendAppearanceToAgent(sp);
