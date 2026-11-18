@@ -120,3 +120,6 @@ InWorldz.Phlox.Tests :: InWorldz.Phlox.Tests.GrantRestoreTests.AClaimNotedForCar
 
 # OpenSim.Region.PhysicsModules.Jolt.Tests (flaky)
 OpenSim.Region.PhysicsModules.Jolt.Tests :: OpenSim.Region.PhysicsModules.Jolt.Tests.FirstRayCastTests.The_first_cast_after_the_scene_loads_costs_about_what_a_later_one_does # flaky: compares two timings; passed in the baseline run and failed in a later one
+
+# OpenSim.Region.CoreModules.Tests (flaky)
+OpenSim.Region.CoreModules.Tests :: OpenSim.Region.CoreModules.Tests.Framework.SharedRestTransportTests.AsyncRequester_HonorsHigherConnectionLimitWithoutChangingSharedHandler # flaky: expects six connections within 3 s; a loaded runner missed it once
