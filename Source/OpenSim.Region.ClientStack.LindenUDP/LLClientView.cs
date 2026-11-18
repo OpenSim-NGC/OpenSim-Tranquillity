@@ -9253,8 +9253,13 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         //m_log.LogInformation("[LAND]: LAND:" + modify.ToString());
         for (int i = 0; i < modify.ParcelData.Length; i++)
         {
+            // the real size in ModifyBlockExtended; a viewer without it sends the old brush index
+            // only (LLToolBrushLand: 0, 1, 2 for 1, 2 and 4 m)
+            float brushSize = i < modify.ModifyBlockExtended.Length
+                ? modify.ModifyBlockExtended[i].BrushSize
+                : 1 << Math.Min((int)modify.ModifyBlock.BrushSize, 2);
             c.OnModifyTerrain?.Invoke(c.m_agentId, modify.ModifyBlock.Height, modify.ModifyBlock.Seconds,
-                                modify.ModifyBlockExtended[i].BrushSize, modify.ModifyBlock.Action,
+                                brushSize, modify.ModifyBlock.Action,
                                 modify.ParcelData[i].North, modify.ParcelData[i].West,
                                 modify.ParcelData[i].South, modify.ParcelData[i].East,
                                 modify.ParcelData[i].LocalID);
