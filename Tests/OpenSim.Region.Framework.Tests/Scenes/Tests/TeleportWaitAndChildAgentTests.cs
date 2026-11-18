@@ -172,6 +172,19 @@ public class TeleportWaitAndChildAgentTests : OpenSimTestCase
     private static void Later(int ms, Action action)
         => ThreadPool.UnsafeQueueUserWorkItem(_ => { Thread.Sleep(ms); action(); }, null);
 
+    /// <summary>Whether <paramref name="condition"/> holds within <see cref="Quick"/>.</summary>
+    private static bool SoonTrue(Func<bool> condition)
+    {
+        Stopwatch watch = Stopwatch.StartNew();
+        while (!condition())
+        {
+            if (watch.Elapsed > Quick)
+                return false;
+            Thread.Sleep(20);
+        }
+        return true;
+    }
+
     // ---- a region that holds only a child agent does not teleport it ----------------------------------------------
 
     [Fact]
@@ -262,8 +275,12 @@ public class TeleportWaitAndChildAgentTests : OpenSimTestCase
         TimeSpan took = TimedTeleport(rig, rig.Client, rig.A, rig.C, new Vector3(10, 11, 12));
 
         Assert.True(took < Quick, $"the teleport took {took}");
-        Assert.Null(rig.C.GetScenePresence(rig.User));
-        Assert.Null(rig.C.AuthenticateHandler.GetAgentCircuitData(rig.User));
+
+        // the teleport ends when C starts closing the agent; the close itself finishes on C's own thread
+        Assert.True(
+            SoonTrue(() => rig.C.GetScenePresence(rig.User) is null
+                && rig.C.AuthenticateHandler.GetAgentCircuitData(rig.User) is null),
+            "C still holds the agent");
     }
 
     [Fact]
