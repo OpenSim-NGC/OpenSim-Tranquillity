@@ -366,7 +366,9 @@ public class TerrainData
             float* endp = p + m_mapPatchsStride;
             min = max = *p;
             float* y = p;
-            int j = Constants.TerrainPatchSize - 1;
+            // every cell of every line, the first line's last one too: a cell outside the range is
+            // encoded wrong, and viewers see a height the region does not have
+            int j = Constants.TerrainPatchSize;
 
             do
             {
