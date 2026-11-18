@@ -91,6 +91,13 @@
     ;; where it was. A wait ends at once if the avatar is closed here or its viewer logs out. (default is 25)
     ; RootAgentWaitSeconds = 25
 
+    ;# {LoginConnectWaitSeconds} {} {Seconds a region keeps a login for a viewer that has not connected} {} 120
+    ;; A login marks the user online once the region has taken it. If the viewer does not connect within this
+    ;; time (a cancelled login, a crash, UDP blocked), the region closes the login and marks the user offline
+    ;; again; a viewer that connects but leaves before it finishes arriving is marked offline when it goes.
+    ;; 0 keeps such a login until the region restarts, and the user online until their next login. (default is 120)
+    ; LoginConnectWaitSeconds = 120
+
     ;# {ConsolePrompt} {} {ConsolePrompt} {} "Region (\R) "
     ;; Console prompt
     ;; Certain special characters can be used to customize the prompt

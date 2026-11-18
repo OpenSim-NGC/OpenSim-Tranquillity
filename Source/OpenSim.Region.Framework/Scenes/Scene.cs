@@ -997,6 +997,8 @@ public partial class Scene : SceneBase
 
             SeeIntoRegion = startupConfig.GetBoolean("see_into_region", SeeIntoRegion);
 
+            LoginConnectWait = TimeSpan.FromSeconds(Math.Max(0, startupConfig.GetInt("LoginConnectWaitSeconds", 120)));
+
             MaxUndoCount = startupConfig.GetInt("MaxPrimUndos", 20);
 
             PhysicalPrims = startupConfig.GetBoolean("physical_prim", true);
@@ -1852,6 +1854,10 @@ public partial class Scene : SceneBase
                     tempOnRezMS = (float)(nowMS - lastMS); // bad.. counts the FireAndForget, not CleanTempObjects
                     lastMS = nowMS;
                 }
+
+                // logins whose viewer has not connected
+                if (Frame % m_update_temp_cleaning == 0)
+                    CheckLoginArrivals();
 
                 if (Frame % m_update_events == 0)
                 {
@@ -4398,6 +4404,11 @@ public partial class Scene : SceneBase
                     "[SCENE {0}]: authorized {1} agent {2} {3} {4} (circuit code {5})",
                     Name, (acd.child ? "child" : "root"), acd.firstname, acd.lastname,
                     acd.AgentID, acd.circuitcode);
+
+                // the login service marks the user online now; follow the login until the avatar is root here (its
+                // circuit is a child one until then; the neighbours' child agents are not sent with ViaLogin)
+                if ((teleportFlags & (uint)TPFlags.ViaLogin) != 0)
+                    AwaitLoginArrival(acd);
 
 
                 if (m_capsModule is not null)
