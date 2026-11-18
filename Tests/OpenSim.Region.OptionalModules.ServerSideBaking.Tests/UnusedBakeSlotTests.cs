@@ -362,6 +362,38 @@ public class UnusedBakeSlotTests
         Assert.Empty(off.Superseded);
     }
 
+    /// <summary>
+    /// Re-baking a channel does not delete the bake it replaces either, for the same reason: a saved appearance
+    /// notecard (and an NPC made from it) still names the old id. Stock OpenSim never deletes bakes. The index still
+    /// moves to the new bake, so the appearance service serves only the current one.
+    /// </summary>
+    [Fact]
+    public void ARebakeLeavesThePreviousBakeAssetInPlace()
+    {
+        var rig = new Rig();
+        var blue = rig.Store(WearableKind.Skirt, "Blue skirt", new Dictionary<TextureSlot, UUID> { [TextureSlot.Skirt] = rig.Texture(30, 60, 220) });
+        var red = rig.Store(WearableKind.Skirt, "Red skirt", new Dictionary<TextureSlot, UUID> { [TextureSlot.Skirt] = rig.Texture(220, 40, 30) });
+
+        var oldBake = rig.Bake(rig.Outfit((WearableType.Skirt, blue)), 1).Channels.Single(c => c.Channel == BakeChannel.Skirt).AssetId;
+        var saved = rig.Appearance.PackForNotecard();
+        Assert.Contains(saved["textures"] as OpenMetaverse.StructuredData.OSDArray, t => t.AsUUID() == oldBake);
+
+        var second = rig.Bake(rig.Outfit((WearableType.Skirt, red)), 2);
+        var skirt = second.Channels.Single(c => c.Channel == BakeChannel.Skirt);
+        Assert.Equal(ChannelStatus.Baked, skirt.Status);
+        Assert.NotEqual(oldBake, skirt.AssetId);
+        Assert.Equal(skirt.AssetId, rig.Face(19));
+
+        // the old bake is still in the asset service and was never deleted
+        Assert.NotNull(rig.Assets.GetUnchecked(oldBake.ToString()));
+        Assert.DoesNotContain("delete " + oldBake, rig.Assets.Ops);
+        Assert.Empty(second.Superseded);
+
+        // the index moved on: the service serves the new bake and refuses the old one
+        Assert.NotNull(rig.Service.GetBake(Agent, "skirt", skirt.AssetId));
+        Assert.Null(rig.Service.GetBake(Agent, "skirt", oldBake));
+    }
+
     /// <summary>A first bake with nothing on the extra channels has nothing to clear: those channels stay Skipped.</summary>
     [Fact]
     public void AChannelThatNeverHadABakeIsSkippedNotCleared()

@@ -294,15 +294,15 @@ public class BakeReuseTests
             // the hash itself changed, not only the BakeSize key: size is inside BakeHash
             Assert.NotEqual(first.Channels.Single(c => c.Channel == ch).InputHash, rig.Keys[$"BakeHash:{ch}"]);
         }
-        // every one of the five old assets was superseded
-        Assert.Equal(5, second.Superseded.Count);
-        Assert.All(firstIds.Values, id => Assert.Contains(id, second.Superseded));
+        // none of the five old assets was deleted: a saved appearance notecard may still name them
+        Assert.Empty(second.Superseded);
+        Assert.All(firstIds.Values, id => Assert.NotNull(rig.Assets.GetUnchecked(id.ToString())));
     }
 
-    // ------------------------------------------------------------------ 6. supersede ordering
+    // ------------------------------------------------------------------ 6. a re-bake keeps the previous asset
 
     [Fact]
-    public void Supersede_DeletesThePreviousAssetAndOnlyAfterTheNewOneIsStored()
+    public void Rebake_KeepsThePreviousAssetAndStoresTheNewOne()
     {
         if (!FixturesPresent) { Console.WriteLine(SkipNote); return; }
         var rig = Load();
@@ -315,16 +315,13 @@ public class BakeReuseTests
 
         var newUpper = second.Channels.Single(c => c.Channel == BakeChannel.Upper).AssetId;
         Assert.NotEqual(oldUpper, newUpper);
-        Assert.Equal(new[] { oldUpper }, second.Superseded);
-        Assert.Null(rig.Assets.GetUnchecked(oldUpper.ToString()));
+        Assert.Empty(second.Superseded);
+        // the previous bake stays in the asset service (a saved appearance notecard may still name it) and nothing
+        // was deleted; the new bake is stored
+        Assert.NotNull(rig.Assets.GetUnchecked(oldUpper.ToString()));
         Assert.NotNull(rig.Assets.GetUnchecked(newUpper.ToString()));
-
-        // the order on the asset service: the new bake is stored, then the old one is deleted. Never the reverse,
-        // or a failing store would leave the avatar with a face pointing at nothing.
-        var store = rig.Assets.Ops.IndexOf("store " + newUpper);
-        var delete = rig.Assets.Ops.IndexOf("delete " + oldUpper);
-        Assert.True(store >= 0 && delete >= 0, string.Join(" | ", rig.Assets.Ops));
-        Assert.True(store < delete, $"store must precede delete: {string.Join(" | ", rig.Assets.Ops)}");
+        Assert.Contains("store " + newUpper, rig.Assets.Ops);
+        Assert.DoesNotContain(rig.Assets.Ops, o => o.StartsWith("delete "));
 
         // and nothing a face still points at was touched: the four reused channels keep their assets
         foreach (var ch in Live.Where(c => c != BakeChannel.Upper))
