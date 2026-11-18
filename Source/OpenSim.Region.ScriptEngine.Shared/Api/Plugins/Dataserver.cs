@@ -116,12 +116,13 @@ public class Dataserver
     // temporary don't use
     public UUID RegisterRequest(uint localID, UUID itemID, string identifier, Action<string> action)
     {
+        DataserverRequest ds;
         lock (DataserverRequests)
         {
             if (DataserverRequests.ContainsKey(identifier))
                 return UUID.Zero;
 
-            DataserverRequest ds = new DataserverRequest()
+            ds = new DataserverRequest()
             {
                 localID = localID,
                 itemID = itemID,
@@ -134,37 +135,40 @@ public class Dataserver
             };
 
             DataserverRequests[identifier] = ds;
-            if (action != null)
-                m_WorkPool.Enqueue(identifier);
-
-            return ds.ID;
         }
+        // Outside the lock: see the other overload.
+        if (action != null)
+            m_WorkPool.Enqueue(identifier);
+
+        return ds.ID;
     }
 
     public UUID RegisterRequest(uint localID, UUID itemID, Action<string> action)
     {
-        lock (DataserverRequests)
+        string identifier = UUID.Random().ToString();
+        DataserverRequest ds = new DataserverRequest()
         {
-            string identifier = UUID.Random().ToString();
+            localID = localID,
+            itemID = itemID,
 
-            DataserverRequest ds = new DataserverRequest()
-            {
-                localID = localID,
-                itemID = itemID,
+            ID = UUID.Random(),
+            handle = identifier,
 
-                ID = UUID.Random(),
-                handle = identifier,
+            startTime = DateTime.MaxValue,
+            action = action
+        };
 
-                startTime = DateTime.MaxValue,
-                action = action
-            };
-
+        lock (DataserverRequests)
             DataserverRequests[identifier] = ds;
-            if (action != null)
-                m_WorkPool.Enqueue(identifier);
 
-            return ds.ID;
-        }
+        // Hand the action to the work pool after the lock is released. With FireAndForgetMethod None or
+        // RegressionTest the pool runs it on this thread, and the action reaches AsyncCommandManager, whose
+        // getters take its static lock; the command handler thread takes that static lock and then this
+        // one (ExpireRequests). Enqueuing inside this lock deadlocked the two.
+        if (action != null)
+            m_WorkPool.Enqueue(identifier);
+
+        return ds.ID;
     }
 
     public void ProcessActions(object st)
