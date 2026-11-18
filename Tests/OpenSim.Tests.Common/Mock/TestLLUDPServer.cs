@@ -43,6 +43,9 @@ public class TestLLUDPServer : LLUDPServer
 {
     public List<Packet> PacketsSent { get; private set; }
 
+    /// <summary>The throttle category each packet in <see cref="PacketsSent"/> was sent with (acks: Unknown).</summary>
+    public List<ThrottleOutPacketType> CategoriesSent { get; } = new();
+
     public TestLLUDPServer(IPAddress listenIP, uint port, int proxyPortOffsetParm, IConfigSource configSource, AgentCircuitManager circuitManager)
         : base(listenIP, port, proxyPortOffsetParm, configSource, circuitManager)
     {
@@ -52,12 +55,14 @@ public class TestLLUDPServer : LLUDPServer
     public override void SendAckImmediate(IPEndPoint remoteEndpoint, PacketAckPacket ack)
     {
         PacketsSent.Add(ack);
+        CategoriesSent.Add(ThrottleOutPacketType.Unknown);
     }
 
     public override void SendPacket(
         LLUDPClient udpClient, Packet packet, ThrottleOutPacketType category, bool allowSplitting, UnackedPacketMethod method)
     {
         PacketsSent.Add(packet);
+        CategoriesSent.Add(category);
     }
 
     public void ClientOutgoingPacketHandler(IClientAPI client, bool resendUnacked, bool sendAcks, bool sendPing)
