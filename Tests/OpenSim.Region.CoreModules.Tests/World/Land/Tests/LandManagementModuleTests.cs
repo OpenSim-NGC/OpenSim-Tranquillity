@@ -396,6 +396,26 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.Equal(new List<int> { 7 }, answered);
     }
 
+    // The list of who owns objects on a parcel started a recount of every object of the region before it checked
+    // that the asker may see the list: any visitor asking again and again kept the region busy.
+    [Fact]
+    public void TestOnlyThoseWhoMaySeeTheObjectOwnersStartARecount()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        bool allowed = false;
+        f.Scene.Permissions.OnEditParcelProperties += (user, parcel, p, manager) => allowed;
+        int recounts = 0;
+        f.Scene.EventManager.OnParcelPrimCountUpdate += () => recounts++;
+
+        f.Module.ClientOnParcelObjectOwnerRequest(f.Parcel.LandData.LocalID, f.Client);
+        Assert.Equal(0, recounts);
+
+        allowed = true;
+        f.Module.ClientOnParcelObjectOwnerRequest(f.Parcel.LandData.LocalID, f.Client);
+        Assert.Equal(1, recounts);
+    }
+
     // Join stored its parcels, and so fired their events, holding the land list's lock. A handler takes the prim
     // count's lock (PrimCountModule), which Recount holds while it asks for every parcel (the land list's lock): the
     // two threads waited on each other for good. Loading the parcels from storage (startup, an OAR) did the same.
