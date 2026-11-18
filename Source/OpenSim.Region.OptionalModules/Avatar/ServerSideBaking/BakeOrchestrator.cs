@@ -302,7 +302,7 @@ public static class BakeOrchestrator
     /// official viewer reads as "no bake" (llvoavatar.cpp:11741-11742). Leaving the previous bake there would keep
     /// a removed skirt drawn (llvoavatar.cpp:8113-8125) and keep painting a removed layer on Bakes-on-Mesh faces
     /// (llviewerobject.cpp:5185-5194). A channel that held something is reported <see cref="ChannelStatus.Cleared"/>;
-    /// <see cref="Run"/> then drops its index entry and retires the old bake. With <paramref name="needed"/> null
+    /// <see cref="Run"/> then drops its index entry; the old bake asset is left in place. With <paramref name="needed"/> null
     /// such channels are left alone, as before.
     /// </para>
     ///
@@ -486,13 +486,13 @@ public static class BakeOrchestrator
             w.Failures.Count == 0 ? needed : null);
 
         // Channels the outfit stopped using: drop their index entries so the appearance service stops serving the
-        // old bake, then retire the old asset. The asset goes only once the entry is gone; if the removal fails the
-        // entry stays, and the next bake finds it and tries again.
+        // old bake. If the removal fails the entry stays, and the next bake finds it and tries again. The old bake
+        // asset is not deleted: its id can still be named outside this avatar's TextureEntry, for example by a
+        // notecard a script saved the appearance to (AvatarAppearance.PackForNotecard writes every baked face) and
+        // any NPC created from it.
         var cleared = outcomes.Where(o => o.Status == ChannelStatus.Cleared && index.Bakes.ContainsKey(o.Channel))
             .Select(o => o.Channel).ToList();
-        if (cleared.Count > 0 && BakeIndex.Remove(avatars, agentId, cleared))
-            foreach (var ch in cleared)
-                Supersede(assets, appearance, index.Bakes, ch, BakeConstants.DefaultAvatarTexture, superseded, timings);
+        if (cleared.Count > 0) BakeIndex.Remove(avatars, agentId, cleared);
 
         // the index: one row pair per channel that now has a live bake, plus the three scalars
         var live = outcomes

@@ -20,7 +20,7 @@ namespace OpenSim.Region.OptionalModules.ServerSideBaking.Tests;
 /// <summary>
 /// A bake channel the outfit stops using must go back to "no bake": its baked face holds IMG_DEFAULT_AVATAR
 /// (c228d1cf-4b5d-4ba8-84f4-899a0796aa97), its bake-index entry is dropped so the appearance service no longer
-/// serves the old bake, and the old bake asset is retired.
+/// serves the old bake. The old bake asset itself is left in place.
 ///
 /// <para>
 /// Why it matters to every viewer: the official viewer treats a baked slot as defined only while it holds
@@ -144,9 +144,9 @@ public class UnusedBakeSlotTests
         Assert.False(rig.Avatars.Records[Agent].ContainsKey(BakeIndex.HashKey(ch)), $"{ch}: {BakeIndex.HashKey(ch)} still stored");
         Assert.Null(rig.Service.GetBake(Agent, token, oldBake));
 
-        // the old bake is retired
-        Assert.Null(rig.Assets.GetUnchecked(oldBake.ToString()));
-        Assert.Contains(oldBake, outcome.Superseded);
+        // the old bake asset itself stays: other copies may still name it (see TheOldBakeAssetIsLeftInPlace)
+        Assert.NotNull(rig.Assets.GetUnchecked(oldBake.ToString()));
+        Assert.DoesNotContain(oldBake, outcome.Superseded);
     }
 
     // ------------------------------------------------------------------ skirt, slot 19
@@ -312,8 +312,8 @@ public class UnusedBakeSlotTests
     }
 
     /// <summary>
-    /// If the avatar service cannot remove the index entry, the old bake is not deleted (the entry would point at
-    /// nothing), and the next bake finds the entry and finishes the job.
+    /// If the avatar service cannot remove the index entry, the channel is still reported Cleared and the entry
+    /// stays; the next bake finds the entry and removes it.
     /// </summary>
     [Fact]
     public void WhenTheIndexEntryCannotBeRemovedTheOldBakeIsKeptAndTheNextBakeRetries()
@@ -333,6 +333,33 @@ public class UnusedBakeSlotTests
         rig.Avatars.FailRemoveItems = false;
         var retry = rig.Bake(rig.Outfit(), 3);
         AssertSlotReset(rig, retry, BakeChannel.Skirt, 19, "skirt", skirtBake);
+    }
+
+    /// <summary>
+    /// The asset of a cleared bake is not deleted. Its id can live on outside this avatar's TextureEntry: a script
+    /// that saves the avatar's appearance to a notecard writes every baked face, the skirt and aux slots included
+    /// (AvatarAppearance.PackForNotecard, called by the OSSL save-appearance functions), and an NPC created from that
+    /// notecard uses those ids. Deleting the asset would break them; clearing the slot and the index entry is enough
+    /// to stop the avatar showing it and the appearance service serving it.
+    /// </summary>
+    [Fact]
+    public void TheOldBakeAssetIsLeftInPlace()
+    {
+        var rig = new Rig();
+        var skirt = rig.Store(WearableKind.Skirt, "Skirt", new Dictionary<TextureSlot, UUID> { [TextureSlot.Skirt] = rig.Texture(30, 60, 220) });
+        var skirtBake = rig.Bake(rig.Outfit((WearableType.Skirt, skirt)), 1).Channels.Single(c => c.Channel == BakeChannel.Skirt).AssetId;
+
+        // a saved appearance taken while the skirt is worn names the skirt bake
+        var saved = rig.Appearance.PackForNotecard();
+        Assert.Contains(saved["textures"] as OpenMetaverse.StructuredData.OSDArray, t => t.AsUUID() == skirtBake);
+
+        var off = rig.Bake(rig.Outfit(), 2);
+
+        Assert.Equal(ImgDefaultAvatar, rig.Face(19));
+        Assert.Null(rig.Service.GetBake(Agent, "skirt", skirtBake));
+        Assert.NotNull(rig.Assets.GetUnchecked(skirtBake.ToString()));
+        Assert.DoesNotContain("delete " + skirtBake, rig.Assets.Ops);
+        Assert.Empty(off.Superseded);
     }
 
     /// <summary>A first bake with nothing on the extra channels has nothing to clear: those channels stay Skipped.</summary>
