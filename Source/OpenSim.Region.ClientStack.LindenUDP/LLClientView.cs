@@ -643,15 +643,33 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         m_killRecord.Clear();
         GroupsInView.Clear();
 
-        if(m_scene.GetNumberOfClients() == 0)
-        {
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-            GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
-        }
+        // Give the memory back when the simulator has gone idle. This used to run when this region had no client
+        // left, on the thread closing the connection: on a simulator with several regions that was every time one of
+        // them emptied (a teleport out of a quiet region), and the full compacting collection stopped the whole
+        // process while the other regions had avatars in them.
+        if (NoClientsInAnyRegion())
+            Util.FireAndForget(_ => CollectWhenIdle(), null, "LLClientView.CollectWhenIdle");
     }
+
+    private bool NoClientsInAnyRegion()
+    {
+        if (m_scene.GetNumberOfClients() != 0)
+            return false;
+        foreach (Scene s in SceneManager.Instance.Scenes)
+            if (s.GetNumberOfClients() != 0)
+                return false;
+        return true;
+    }
+
+    /// <summary>The collection run when the last client of the simulator closes (replaceable in tests).</summary>
+    public static Action CollectWhenIdle = () =>
+    {
+        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.CompactOnce;
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+        GCSettings.LargeObjectHeapCompactionMode = GCLargeObjectHeapCompactionMode.Default;
+    };
 
     public void Kick(string message)
     {
