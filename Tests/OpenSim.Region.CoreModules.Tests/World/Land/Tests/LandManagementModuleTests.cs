@@ -212,6 +212,50 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.Equal(0, f.Stores);
     }
 
+    // The region's Allow Land Join/Divide was only sent to the viewer, which greys its buttons out; a client that sent
+    // ParcelDivide or ParcelJoin anyway, or a script (osParcelSubdivide), changed the parcels.
+    [Fact]
+    public void TestJoinAndDivideFollowTheRegionsSetting()
+    {
+        TestHelpers.InMethod();
+        UUID estateOwner = TestHelpers.ParseTail(0x10);
+        UUID resident = TestHelpers.ParseTail(0x11);
+
+        foreach (UUID owner in new[] { resident, estateOwner })
+        {
+            LandManagementModule lmm = new LandManagementModule();
+            Scene scene = new SceneHelpers().SetupScene();
+            SceneHelpers.SetupSceneModules(scene, new Nini.Config.IniConfigSource(), lmm,
+                new OpenSim.Region.CoreModules.World.Permissions.DefaultPermissionsModule());
+            scene.RegionInfo.EstateSettings.EstateOwner = estateOwner;
+            scene.RegionInfo.RegionSettings.AllowLandJoinDivide = false;
+
+            ILandObject lo = new LandObject(owner, false, scene);
+            lo.SetLandBitmap(lo.GetSquareLandBitmap(0, 0, (int)Constants.RegionSize, (int)Constants.RegionSize));
+            lmm.AddLandObject(lo);
+
+            lmm.Subdivide(0, 0, 16, 16, owner);
+            int expected = owner == estateOwner ? 2 : 1;
+            Assert.Equal(expected, lmm.AllParcels().Count);
+
+            if (owner == estateOwner)
+            {
+                lmm.Join(0, 0, 32, 16, owner);
+                Assert.Single(lmm.AllParcels());
+            }
+            else
+            {
+                // the resident divides once the region allows it, and joins only then
+                scene.RegionInfo.RegionSettings.AllowLandJoinDivide = true;
+                lmm.Subdivide(0, 0, 16, 16, owner);
+                Assert.Equal(2, lmm.AllParcels().Count);
+                scene.RegionInfo.RegionSettings.AllowLandJoinDivide = false;
+                lmm.Join(0, 0, 32, 16, owner);
+                Assert.Equal(2, lmm.AllParcels().Count);
+            }
+        }
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>
