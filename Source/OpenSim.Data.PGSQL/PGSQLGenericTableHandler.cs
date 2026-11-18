@@ -125,7 +125,8 @@ public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
         if (m_ColumnNames != null)
             return;
 
-        m_ColumnNames = new List<string>();
+        // filled, then published whole: a query on another thread uses the list as soon as it is set
+        List<string> columnNames = new List<string>();
 
         DataTable schemaTable = reader.GetSchemaTable();
 
@@ -133,9 +134,11 @@ public class PGSQLGenericTableHandler<T> : PGSqlFramework where T : class, new()
         {
             if (row["ColumnName"] != null &&
                     (!m_Fields.ContainsKey(row["ColumnName"].ToString())))
-                m_ColumnNames.Add(row["ColumnName"].ToString());
+                columnNames.Add(row["ColumnName"].ToString());
 
         }
+
+        m_ColumnNames = columnNames;
     }
 
     // TODO GET CONSTRAINTS FROM POSTGRESQL
