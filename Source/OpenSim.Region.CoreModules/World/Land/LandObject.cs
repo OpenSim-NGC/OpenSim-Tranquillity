@@ -611,9 +611,16 @@ public class LandObject : ILandObject
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId,this, GroupPowers.SetLandingPoint, false))
         {
-            newData.LandingType = args.LandingType;
-            newData.UserLocation = args.UserLocation;
-            newData.UserLookAt = args.UserLookAt;
+            // a landing point is a place on the parcel, as on Second Life: one elsewhere (another parcel, a banned
+            // one, outside the region) or not a number would send arriving visitors there
+            Vector3 at = args.UserLocation;
+            bool unset = at == Vector3.Zero;
+            if (unset || (at.IsFinite() && ContainsPoint((int)at.X, (int)at.Y)))
+            {
+                newData.LandingType = args.LandingType;
+                newData.UserLocation = at;
+                newData.UserLookAt = args.UserLookAt.IsFinite() ? args.UserLookAt : Vector3.Zero;
+            }
         }
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId,this, GroupPowers.ChangeMedia, false))
