@@ -472,6 +472,35 @@ public sealed class ExperienceConsoleCommandsTests : IDisposable
         Assert.Equal((int)ExperienceFlags.Suspended, Only().properties);
     }
 
+    // ---- a console nobody can answer ----
+
+    // A console with no input (a server started with --background, as a service, or with its input redirected)
+    // is never asked to read an answer: a question with no default is an error naming it, and a question with a
+    // default takes it and says so on the console.
+    [Fact]
+    public void AConsoleWithNoInputRefusesToPromptForAnExperienceCommand()
+    {
+        m_console.HasInput = false;
+        m_console.Answers.Enqueue("Garden Tour");
+
+        InvalidOperationException refused =
+            Assert.Throws<InvalidOperationException>(() => m_console.RunCommand("create named experience"));
+
+        Assert.Contains("\"Experience name\"", refused.Message);
+        Assert.Contains("configuration", refused.Message);
+        Assert.Empty(m_console.Prompts);
+        Assert.Single(m_console.Answers);
+        Assert.Empty(Store.All());
+
+        m_console.Answers.Clear();
+        m_console.RunCommand("create experience Test User");
+
+        Assert.Empty(m_console.Prompts);
+        Assert.Contains(m_console.Lines, l => l.StartsWith("No console input: \"Experience Key\" takes its default"));
+        Assert.Contains("Experience created!", m_console.Lines);
+        Assert.Equal(OwnerId, Only().owner_id);
+    }
+
     // ---- help ----
 
     [Theory]
@@ -496,14 +525,21 @@ public sealed class ExperienceConsoleCommandsTests : IDisposable
 
     // ---- test doubles ----
 
-    /// <summary>A real command console whose input comes from a queue and whose output is kept.</summary>
+    /// <summary>
+    /// A real command console whose input comes from a queue and whose output is kept. It has input unless a test
+    /// says otherwise, whatever the test process's own standard input is: under a test runner or CI that is
+    /// redirected, and <see cref="ConsoleBase.CanPrompt"/> would then refuse every question.
+    /// </summary>
     private sealed class ScriptedConsole : CommandConsole
     {
         public readonly Queue<string> Answers = new Queue<string>();
         public readonly List<string> Prompts = new List<string>();
         public readonly List<string> Lines = new List<string>();
+        public bool HasInput = true;
 
         public ScriptedConsole() : base("test") { }
+
+        public override bool CanPrompt => HasInput;
 
         public override string ReadLine(string p, bool isCommand, bool e)
         {
