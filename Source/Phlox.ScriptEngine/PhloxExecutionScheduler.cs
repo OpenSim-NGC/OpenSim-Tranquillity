@@ -846,11 +846,7 @@ namespace Phlox.ScriptEngine
             bool wasStopped = !wasCrashed && !script.ScriptState.GeneralEnable;
             lock (m_AllScriptsLock) m_HeldFresh.Remove(itemId);   // A reset of a held script owes it nothing more
             script.Reset();
-            if (wasStopped)
-            {
-                script.ScriptState.GeneralEnable = false;
-                m_StoppedTimerLeft.Remove(itemId);   // The reset ended its timer; nothing is left to resume
-            }
+            if (wasStopped) script.ScriptState.GeneralEnable = false;
             if (wasCrashed)
             {
                 // A reset is how a crashed script comes back - fresh, and running again
@@ -869,12 +865,18 @@ namespace Phlox.ScriptEngine
             lock (m_PendingEvents)
             {
                 DropPendingEventsLocked(itemId);
-                PostEvent(itemId, new PostedEvent
+                var stateEntry = new PostedEvent
                 {
                     EventType = SupportedEventList.Events.STATE_ENTRY,
                     Args = Array.Empty<object>()
-                });
+                };
+                if (wasStopped) script.ScriptState.QueueEvent(stateEntry);   // On its own queue now, so the save below holds it
+                else PostEvent(itemId, stateEntry);
             }
+
+            // The reset deleted the saved state, and a stopped script never runs again to get itself saved: save the
+            // reset state now, stopped and with its state_entry waiting, or a region restart would load it fresh and running.
+            if (wasStopped) m_Engine.StateManager?.ScriptChanged(script);
 
             if (!m_RunIndex.ContainsKey(itemId) && script.ScriptState.Enabled)
             {

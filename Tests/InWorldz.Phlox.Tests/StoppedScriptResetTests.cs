@@ -79,14 +79,14 @@ public class StoppedScriptResetTests
     }
 
     /// <summary>Tick Running: the state_entry the reset queued runs, once, from the fresh globals.</summary>
-    private void AssertStartRunsStateEntryOnce(SchedulerHarness h, UUID itemId)
+    private void AssertStartRunsStateEntryOnce(SchedulerHarness h, UUID itemId, int upsBefore = 1)
     {
         h.Scene.EventManager.TriggerStartScript(h.Prim.LocalId, itemId);
-        Assert.True(h.PumpUntil(() => Ups(h) >= 2), "state_entry never ran after Running was ticked: " + Log(h));
+        Assert.True(h.PumpUntil(() => Ups(h) >= upsBefore + 1), "state_entry never ran after Running was ticked: " + Log(h));
         h.PumpFor(TimeSpan.FromSeconds(1));   // a window in which a second state_entry must NOT run
         _out.WriteLine("after start: said=[" + Log(h) + "]");
 
-        Assert.Equal(2, Ups(h));
+        Assert.Equal(upsBefore + 1, Ups(h));
         Assert.Equal("up 1", h.Said.Last(s => s.StartsWith("up ")));   // the globals were reset: n counted from 0
         Assert.True(h.Engine.GetScriptState(itemId));
     }
@@ -129,6 +129,43 @@ public class StoppedScriptResetTests
         Assert.Equal(2, Ups(h));
         Assert.Equal("up 1", h.Said.Last(s => s.StartsWith("up ")));
         Assert.True(h.Engine.GetScriptState(itemId));
+    }
+
+    /// <summary>
+    /// A reset deletes the script's saved state, and a stopped script never runs again to get itself saved. The reset
+    /// state, still stopped and with its state_entry waiting, has to be saved by the reset itself, or a region restart
+    /// loads the script fresh and running. The region stop is the simulator's own path (only scripts marked changed are
+    /// saved), as in TerminatedScriptStaysStoppedTests.
+    /// </summary>
+    [Fact]
+    public void AStoppedScriptThatWasResetStaysStoppedAcrossARegionRestart()
+    {
+        var assetId = UUID.Random();
+        var itemId = UUID.Random();
+        using (var h1 = new SchedulerHarness())
+        {
+            h1.RezScript(Target, assetId, itemId);
+            Assert.True(h1.PumpUntil(() => h1.Said.Contains("up 1")));
+            h1.PostTouch(itemId);
+            Assert.True(h1.PumpUntil(() => h1.Said.Contains("n 11")));
+            h1.Scene.EventManager.TriggerStopScript(h1.Prim.LocalId, itemId);
+            Assert.True(h1.PumpUntil(() => !h1.Engine.GetScriptState(itemId)));
+            h1.Scene.EventManager.TriggerScriptReset(h1.Prim.LocalId, itemId);
+            AssertResetAndStillStopped(h1, itemId);
+            h1.StopRegionAsTheSimulatorDoes();
+        }
+
+        using var h2 = new SchedulerHarness();
+        h2.RezScript(Target, assetId, itemId);   // the item as the region DB presents it: Running flag at its default, true
+        Assert.True(h2.PumpUntil(() => h2.InterpreterFor(itemId) != null));
+        h2.PumpFor(TimeSpan.FromSeconds(1));      // a window in which state_entry must NOT run
+        _out.WriteLine("after restart: said=[" + Log(h2) + "]");
+
+        Assert.Equal(0, Ups(h2));
+        Assert.False(h2.Engine.GetScriptState(itemId));
+        Assert.False(h2.IsOnRunQueue(itemId));
+
+        AssertStartRunsStateEntryOnce(h2, itemId, upsBefore: 0);
     }
 
     [Fact]
