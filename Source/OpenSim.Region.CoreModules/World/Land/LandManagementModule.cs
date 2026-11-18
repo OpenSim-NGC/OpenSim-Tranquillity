@@ -1288,11 +1288,8 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
             //m_landList[startLandObjectIndex].ForceUpdateLandInfo();
         }
 
-        UpdateLandObject(startLandObject.LandData.LocalID, startLandObject.LandData);
-
-        //add the new land object
-        ILandObject result = AddLandObject(newLand);
-
+        // a landing point now on the new parcel is the parent's no more; reset before the parent is stored, or
+        // the reset was lost on restart and visitors to the parent landed on the new parcel
         if (startLandObject.LandData.LandingType == (byte)LandingType.LandingPoint)
         {
             int x = (int)startLandObject.LandData.UserLocation.X;
@@ -1303,7 +1300,12 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
                 startLandObject.LandData.UserLocation = Vector3.Zero;
                 startLandObject.LandData.UserLookAt = Vector3.Zero;
             }
-         }
+        }
+
+        UpdateLandObject(startLandObject.LandData.LocalID, startLandObject.LandData);
+
+        //add the new land object
+        ILandObject result = AddLandObject(newLand);
 
         m_scene.EventManager.TriggerParcelPrimCountTainted();
 
