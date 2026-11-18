@@ -738,6 +738,13 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
     /// </param>
     public ILandObject AddLandObject(ILandObject new_land)
     {
+        return AddLandObject(new_land, true);
+    }
+
+    /// <param name="fireAdded">False when the caller holds the land list's lock: it fires LandObjectAdded once it has
+    /// let go (see <see cref="EventManagerOnIncomingLandDataFromStorage"/>).</param>
+    private ILandObject AddLandObject(ILandObject new_land, bool fireAdded)
+    {
         // Only now can we add the prim counts to the land object - we rely on the global ID which is generated
         // as a random UUID inside LandData initialization
         if (m_primCountModule is not null)
@@ -814,7 +821,8 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
             m_landFakeIDs[new_land.LandData.FakeID] = new_land.LandData.LocalID;
         }
 
-        m_scene.EventManager.TriggerLandObjectAdded(new_land);
+        if (fireAdded)
+            m_scene.EventManager.TriggerLandObjectAdded(new_land);
 
         return new_land;
     }
@@ -1391,9 +1399,14 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
             {
                 m_landList[masterLandObject.LandData.LocalID].SetLandBitmap(
                     slaveLandObject.MergeLandBitmaps(masterLandObject.GetLandBitmap(), slaveLandObject.GetLandBitmap()));
-                performFinalLandJoin(masterLandObject, slaveLandObject);
             }
         }
+
+        // the stores, and the events they fire, outside the land list's lock: a handler takes the prim count's lock,
+        // which PrimCountModule.Recount holds while it asks for every parcel (this lock), and the two threads waited
+        // on each other for good
+        foreach (ILandObject slaveLandObject in selectedLandObjects)
+            performFinalLandJoin(masterLandObject, slaveLandObject);
 
         m_scene.EventManager.TriggerParcelPrimCountTainted();
         masterLandObject.SendLandUpdateToAvatarsOverMe();
@@ -1886,10 +1899,14 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
 
     private void EventManagerOnIncomingLandDataFromStorage(List<LandData> data)
     {
+        // the parcels are added under the land list's lock, and their events fired, their prim counts finalised and
+        // the avatars over them told once it is let go: those take the prim count's lock, which
+        // PrimCountModule.Recount holds while it asks for every parcel (this lock)
+        List<ILandObject> added = new();
         lock (m_landList)
         {
             for (int i = 0; i < data.Count; i++)
-                IncomingLandObjectFromStorage(data[i]);
+                added.Add(IncomingLandObjectFromStorage(data[i]));
 
             // Layer data is in LandUnit (4m) chunks
             for (int y = 0; y < m_regionSizeY / Constants.TerrainPatchSize * (Constants.TerrainPatchSize / Constants.LandUnit); y++)
@@ -1933,7 +1950,9 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
                             newLand.SetLandBitmap(CreateBitmapForID(0));
                             newLand.LandData.OwnerID = m_scene.RegionInfo.EstateSettings.EstateOwner;
                             newLand.LandData.ClaimDate = Util.UnixTimeSinceEpoch();
-                            newLand = AddLandObject(newLand);
+                            newLand = AddLandObject(newLand, false);
+                            if (newLand is not null)
+                                added.Add(newLand);
                         }
                         else
                         {
@@ -1945,22 +1964,26 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
                 }
             }
 
-            FinalizeLandPrimCountUpdate(); // update simarea information
-
-            lock (m_landList)
-            {
-                foreach(LandObject lo in m_landList.Values)
-                    lo.SendLandUpdateToAvatarsOverMe();
-            }
         }
+
+        foreach (ILandObject lo in added)
+        {
+            if (lo is not null)
+                m_scene.EventManager.TriggerLandObjectAdded(lo);
+        }
+
+        FinalizeLandPrimCountUpdate(); // update simarea information
+
+        foreach (ILandObject lo in AllParcels())
+            lo.SendLandUpdateToAvatarsOverMe();
     }
 
-    private void IncomingLandObjectFromStorage(LandData data)
+    private ILandObject IncomingLandObjectFromStorage(LandData data)
     {
         ILandObject new_land = new LandObject(data.OwnerID, data.IsGroupOwned, m_scene, data);
 
         new_land.SetLandBitmapFromByteArray();
-        AddLandObject(new_land);
+        return AddLandObject(new_land, false);
     }
 
     public void ReturnObjectsInParcel(int localID, uint returnType, UUID[] agentIDs, UUID[] taskIDs, IClientAPI remoteClient)
