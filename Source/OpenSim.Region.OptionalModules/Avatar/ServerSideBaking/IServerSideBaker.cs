@@ -33,8 +33,9 @@ public enum ChannelStatus
     /// <summary>An input for the channel was unusable (missing/unparseable wearable, missing/undecodable texture); the face was left as it was.</summary>
     Failed,
     /// <summary>
-    /// The outfit no longer uses the channel (a skirt or a universal layer was taken off) and it held a bake: its
-    /// face was reset to IMG_DEFAULT_AVATAR, its bake-index entry was removed and the old bake was retired.
+    /// The outfit no longer uses the channel (a skirt or a universal layer was taken off) and it held a bake or an
+    /// index entry: its face was reset to IMG_DEFAULT_AVATAR. When the bake index had an entry for it, the entry is
+    /// removed and then the old bake is retired; if the removal fails both stay and the next bake tries again.
     /// </summary>
     Cleared,
 }

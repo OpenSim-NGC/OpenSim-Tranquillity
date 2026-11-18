@@ -479,7 +479,11 @@ public static class BakeOrchestrator
         }
 
         var superseded = new List<UUID>();
-        var outcomes = StoreAndApply(results, inputs, agentId, assets, appearance, reuse.Reused, index.Bakes, superseded, timings, needed);
+        // A wearable that could not be fetched or parsed may have been the one painting a channel, and which
+        // channels it paints is unknown without it (an extra channel is switched on by any wearable that carries
+        // its texture slot). So a run with such a failure clears nothing; the next clean bake does.
+        var outcomes = StoreAndApply(results, inputs, agentId, assets, appearance, reuse.Reused, index.Bakes, superseded, timings,
+            w.Failures.Count == 0 ? needed : null);
 
         // Channels the outfit stopped using: drop their index entries so the appearance service stops serving the
         // old bake, then retire the old asset. The asset goes only once the entry is gone; if the removal fails the
