@@ -28,6 +28,7 @@
 using System.Net;
 using Nini.Config;
 using OpenMetaverse;
+using OpenMetaverse.Packets;
 using OpenSim.Framework;
 using OpenSim.Framework.Monitoring;
 using OpenSim.Region.Framework.Scenes;
@@ -132,7 +133,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
         /// <summary>
         /// Test adding a client to the stack
         /// </summary>
-/*        
+
         [Fact]
         public void TestAddClient()
         {
@@ -156,11 +157,17 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             uccp.CircuitCode = uccpCcBlock;
 
             byte[] uccpBytes = uccp.ToBytes();
-            UDPPacketBuffer upb = new UDPPacketBuffer(testEp); // full size: the server may take it into its buffer pool
-            upb.DataLength = uccpBytes.Length;  // God knows why this isn't set by the constructor.
-            Buffer.BlockCopy(uccpBytes, 0, upb.Data, 0, uccpBytes.Length);
 
-            udpServer.PacketReceived(upb);
+            // a fresh full size buffer for each packet: the server takes a buffer it is given into its pool when done
+            UDPPacketBuffer Received()
+            {
+                UDPPacketBuffer upb = new UDPPacketBuffer(testEp);
+                upb.DataLength = uccpBytes.Length;
+                Buffer.BlockCopy(uccpBytes, 0, upb.Data, 0, uccpBytes.Length);
+                return upb;
+            }
+
+            udpServer.PacketReceived(Received());
 
             // Presence shouldn't exist since the circuit manager doesn't know about this circuit for authentication yet
             Assert.Null(m_scene.GetScenePresence(myAgentUuid));
@@ -171,20 +178,20 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
 
             m_scene.AuthenticateHandler.AddNewCircuit(myCircuitCode, acd);
 
-            udpServer.PacketReceived(upb);
+            udpServer.PacketReceived(Received());
 
             // Should succeed now
             ScenePresence sp = m_scene.GetScenePresence(myAgentUuid);
             Assert.Equal(myAgentUuid, sp.UUID);
 
-            Assert.Equal(1, udpServer.PacketsSent.Count);
-
-            Packet packet = udpServer.PacketsSent[0];
-            Assert.IsAssignableFrom<PacketAckPacket>(packet);
-
-            PacketAckPacket ackPacket = packet as PacketAckPacket;
-            Assert.Equal(1, ackPacket.Packets.Length);
-            Assert.Equal(0, ackPacket.Packets[0].ID);
+            // each UseCircuitCode is acknowledged, the one refused for its unknown circuit too
+            Assert.Equal(2, udpServer.PacketsSent.Count);
+            Assert.All(udpServer.PacketsSent, packet =>
+            {
+                PacketAckPacket ackPacket = Assert.IsAssignableFrom<PacketAckPacket>(packet);
+                Assert.Single(ackPacket.Packets);
+                Assert.Equal(0u, ackPacket.Packets[0].ID);
+            });
         }
 
         [Fact]
@@ -207,7 +214,7 @@ namespace OpenSim.Region.ClientStack.LindenUDP.Tests
             ScenePresence spAfterAckTimeout = m_scene.GetScenePresence(sp.UUID);
             Assert.Null(spAfterAckTimeout);
         }
-*/
+
 //        /// <summary>
 //        /// Test removing a client from the stack
 //        /// </summary>
