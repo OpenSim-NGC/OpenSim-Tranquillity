@@ -41,7 +41,7 @@ public class ViewerAddressDnsServerTests
     {
         private readonly UdpClient _udp = new(new IPEndPoint(IPAddress.Loopback, 0));
         private readonly CancellationTokenSource _stop = new();
-        private readonly Task _loop;
+        private readonly Thread _loop;
         private readonly List<string> _names = new();
         private int _queries;
 
@@ -55,7 +55,11 @@ public class ViewerAddressDnsServerTests
 
         public FakeDns()
         {
-            _loop = Task.Run(Serve);
+            // Its own thread, not the thread pool: with every test project running at once the pool can be too busy
+            // to read the query before the lookup under test gives up, and the test would then pass on a timeout
+            // without the server's reply ever being sent.
+            _loop = new Thread(Serve) { IsBackground = true, Name = "FakeDns" };
+            _loop.Start();
         }
 
         public FakeDns Answering(string address)
@@ -65,22 +69,37 @@ public class ViewerAddressDnsServerTests
             return this;
         }
 
-        private async Task Serve()
+        private void Serve()
         {
             try
             {
                 while (!_stop.IsCancellationRequested)
                 {
-                    UdpReceiveResult received = await _udp.ReceiveAsync(_stop.Token);
+                    IPEndPoint remote = new(IPAddress.Any, 0);
+                    byte[] query = _udp.Receive(ref remote);
+                    string name;
+                    byte[][] replies;
+                    try
+                    {
+                        name = DnsMessages.QuestionName(query);
+                        replies = Handler(query);
+                    }
+                    catch (Exception)
+                    {
+                        // Not a DNS query: a stray datagram on this loopback port from another test process running
+                        // at the same time. Skip it and keep serving; it is not one of the lookup's queries.
+                        continue;
+                    }
                     Interlocked.Increment(ref _queries);
                     lock (_names)
-                        _names.Add(DnsMessages.QuestionName(received.Buffer));
-                    foreach (byte[] reply in Handler(received.Buffer))
-                        await _udp.SendAsync(reply, reply.Length, received.RemoteEndPoint);
+                        _names.Add(name);
+                    foreach (byte[] reply in replies)
+                        _udp.Send(reply, reply.Length, remote);
                 }
             }
-            catch (OperationCanceledException)
+            catch (SocketException)
             {
+                // Dispose closed the socket.
             }
             catch (ObjectDisposedException)
             {
@@ -91,13 +110,7 @@ public class ViewerAddressDnsServerTests
         {
             _stop.Cancel();
             _udp.Dispose();
-            try
-            {
-                _loop.Wait(TimeSpan.FromSeconds(5));
-            }
-            catch (AggregateException)
-            {
-            }
+            _loop.Join(TimeSpan.FromSeconds(5));
             _stop.Dispose();
         }
     }
@@ -348,8 +361,9 @@ public class ViewerAddressDnsServerTests
             "short-address-data" => new[] { DnsMessages.Response(q, answers: DnsMessages.Record(DnsMessages.PointerToQuestion, 1, new byte[] { 198, 51, 100 })) },
             _ => throw new ArgumentException(kind),
         };
+        // 1.5 s: the reply arrives well before the lookup gives up, so falling back below proves it was ignored.
         using ViewerAddressSelector s = Sel(Cfg($"0.0.0.0/0={Host}", "127.0.0.1", log), dns, log, null,
-            TimeSpan.FromMilliseconds(300));
+            TimeSpan.FromMilliseconds(1500));
 
         // The reply is ignored, so the lookup ends without a DNS answer and the operating system's answer is used.
         Assert.Equal(s_os, Given(s));

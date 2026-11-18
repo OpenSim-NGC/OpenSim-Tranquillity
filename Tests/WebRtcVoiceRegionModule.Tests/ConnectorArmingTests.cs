@@ -302,10 +302,14 @@ namespace osWebRtcVoice.Tests
             // The new service starts with no room records; each agent is placed again by a provision into its room.
             rig.Svc.OnListenerProvisioned(npc, rig.EstateRoom);
             rig.Svc.OnListenerProvisioned(Avatar, rig.EstateRoom);
-            OSDMap fresh = WaitFor(rig.Transport, 0, m => IsReplace(m) && Names(m, npc) && Names(m, Avatar),
-                "the new epoch's snapshot naming the NPC and the avatar");
-            AssertArmingReplace(fresh, rig, npc);
-            Assert.That(fresh["room_epoch"].AsString(), Is.Not.EqualTo(first["room_epoch"].AsString()), "a new epoch");
+            // Both are armed again, in one replace or two: two provisions that land before the new service's first
+            // flush go out together, and one that lands after it goes out on its own.
+            OSDMap freshNpc = WaitFor(rig.Transport, 0, m => IsReplace(m) && Names(m, npc), "the new epoch arming the NPC");
+            OSDMap freshAvatar = WaitFor(rig.Transport, 0, m => IsReplace(m) && Names(m, Avatar), "the new epoch arming the avatar");
+            AssertArmingReplace(freshNpc, rig, npc);
+            Assert.That(freshNpc["room_epoch"].AsString(), Is.Not.EqualTo(first["room_epoch"].AsString()), "a new epoch");
+            Assert.That(freshAvatar["room_epoch"].AsString(), Is.EqualTo(freshNpc["room_epoch"].AsString()),
+                "the avatar armed in the same new epoch");
         }
 
         // ---- heartbeat ----
