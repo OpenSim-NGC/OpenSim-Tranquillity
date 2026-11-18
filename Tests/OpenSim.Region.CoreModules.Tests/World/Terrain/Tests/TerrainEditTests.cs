@@ -134,6 +134,29 @@ public class TerrainEditTests : OpenSimTestCase
         Assert.True(r.Height(5, 15) < Ground + 1.5f, "the next parcel changed again");
     }
 
+    // A flood whose selection had no part in the region was clamped into it, and changed the edge's row or column.
+    [Fact]
+    public void ASelectionOutsideTheRegionChangesNothing()
+    {
+        TestHelpers.InMethod();
+        Region r = new Region(s_resident, permissions: false);
+        TestClient c = r.Client(s_resident);
+
+        Modify(c, 300, 0, 400, 16, parcel: -1);
+        Modify(c, 0, -40, 16, -20, parcel: -1);
+        Modify(c, float.NaN, 0, 16, 16, parcel: -1);
+
+        for (int i = 0; i < 16; i++)
+        {
+            Assert.Equal(Ground, r.Height(255, i));
+            Assert.Equal(Ground, r.Height(i, 0));
+        }
+
+        // one that reaches into the region changes its part
+        Modify(c, 250, 0, 300, 4, parcel: -1);
+        Assert.True(r.Height(255, 2) > Ground, "the part in the region did not change");
+    }
+
     // The region's Block Terraform was only sent to the viewer, which greys its tools out; a client that sent
     // ModifyLand anyway changed any parcel that let it.
     [Fact]

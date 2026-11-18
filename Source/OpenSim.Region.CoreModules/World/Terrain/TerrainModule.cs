@@ -1434,6 +1434,11 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                 {
                     if (m_floodeffects.ContainsKey((StandardTerrainEffects)action))
                     {
+                        // a selection with no part in the region changes nothing; clamped into it, it
+                        // changed the edge's row or column
+                        if (!(east >= 0 && north >= 0 && west < m_channel.Width && south < m_channel.Height))
+                            return;
+
                         bool[,] fillArea = new bool[m_channel.Width, m_channel.Height];
                         fillArea.Initialize();
 
