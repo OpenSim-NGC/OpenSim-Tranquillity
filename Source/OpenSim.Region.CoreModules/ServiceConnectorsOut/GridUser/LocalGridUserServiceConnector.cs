@@ -155,6 +155,11 @@ public class LocalGridUserServicesConnector : ISharedRegionModule, IGridUserServ
         return m_GridUserService.LoggedOut(userID, sessionID, regionID, lastPosition, lastLookAt);
     }
 
+    public bool LoggedOutRegion(UUID regionID)
+    {
+        return m_GridUserService.LoggedOutRegion(regionID);
+    }
+
     public bool SetHome(string userID, UUID homeID, Vector3 homePosition, Vector3 homeLookAt)
     {
         return m_GridUserService.SetHome(userID, homeID, homePosition, homeLookAt);

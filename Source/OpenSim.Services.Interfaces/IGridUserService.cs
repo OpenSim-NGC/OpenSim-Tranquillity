@@ -114,6 +114,14 @@ public interface IGridUserService
     /// <returns>True if the logout request was successfully processed, otherwise false</returns>
     bool LoggedOut(string userID, UUID sessionID, UUID regionID, Vector3 lastPosition, Vector3 lastLookAt);
 
+    /// <summary>
+    /// Marks offline the users still marked online whose last region is <paramref name="regionID"/>. A region that
+    /// starts holds nobody, so they were left online by its simulator stopping without logging them out (a crash, a
+    /// kill); a user who went on to another region has that region as their last one.
+    /// </summary>
+    /// <returns>True if the request was processed, otherwise false</returns>
+    bool LoggedOutRegion(UUID regionID);
+
     bool SetHome(string userID, UUID homeID, Vector3 homePosition, Vector3 homeLookAt);
 
     /// <summary>

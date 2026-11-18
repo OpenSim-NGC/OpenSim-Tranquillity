@@ -53,6 +53,9 @@ public class ActivityDetector
         // But we could trigger the position update more often
         scene.EventManager.OnMakeRootAgent += OnMakeRootAgent;
         scene.EventManager.OnNewClient += OnNewClient;
+
+        // users its simulator stopped without logging out (as the presence detector does for their sessions)
+        m_GridUserService.LoggedOutRegion(scene.RegionInfo.RegionID);
     }
 
     public void RemoveRegion(Scene scene)
