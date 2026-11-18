@@ -838,8 +838,19 @@ namespace Phlox.ScriptEngine
             UnregisterFromNotifications(script);
             m_Engine.StateManager?.DeleteState(itemId);
             bool wasCrashed = script.ScriptState.TerminatedReason != null;
+            // The owner's Running flag is off (the viewer's checkbox, llSetScriptState FALSE). RuntimeState.Reset turns
+            // GeneralEnable back on, but a reset does not start a stopped script: it is reset and stays stopped, and
+            // the state_entry posted below waits in its queue until the script is set running (StartAfterStop). The
+            // stock engine does the same: YEngine's reset (XMRInstRun.ResetLocked) posts state_entry and leaves the
+            // running flag alone.
+            bool wasStopped = !wasCrashed && !script.ScriptState.GeneralEnable;
             lock (m_AllScriptsLock) m_HeldFresh.Remove(itemId);   // A reset of a held script owes it nothing more
             script.Reset();
+            if (wasStopped)
+            {
+                script.ScriptState.GeneralEnable = false;
+                m_StoppedTimerLeft.Remove(itemId);   // The reset ended its timer; nothing is left to resume
+            }
             if (wasCrashed)
             {
                 // A reset is how a crashed script comes back - fresh, and running again
