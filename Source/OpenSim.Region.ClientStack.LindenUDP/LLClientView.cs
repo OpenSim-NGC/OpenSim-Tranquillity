@@ -5787,7 +5787,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 PrimUpdateFlags flags = PrimUpdateFlags.CancelKill;
                 if(viewerCache && grp.IsViewerCachable)
                     flags |= PrimUpdateFlags.UpdateProbe;
-                foreach (SceneObjectPart p in grp.Parts)
+                foreach (SceneObjectPart p in grp.PartsInLinkOrder)
                     SendEntityUpdate(p, flags);
             }
         }
@@ -5939,7 +5939,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                     PrimUpdateFlags flags = PrimUpdateFlags.CancelKill;
                     if (grp.IsViewerCachable)
                         flags |= PrimUpdateFlags.UpdateProbe;
-                    foreach (SceneObjectPart p in grp.Parts)
+                    foreach (SceneObjectPart p in grp.PartsInLinkOrder)
                         SendEntityUpdate(p, flags);
                 }
             }
@@ -5949,7 +5949,7 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 PrimUpdateFlags flags = PrimUpdateFlags.CancelKill;
                 foreach (SceneObjectGroup grp in GroupsNeedFullUpdate)
                 {
-                    foreach (SceneObjectPart p in grp.Parts)
+                    foreach (SceneObjectPart p in grp.PartsInLinkOrder)
                         SendEntityUpdate(p, flags);
                 }
             }

@@ -698,6 +698,65 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         get { return m_parts.GetArray(); }
     }
 
+    /// <summary>
+    /// The parts in link order: the root first, then the children by link number.
+    /// </summary>
+    /// <remarks>
+    /// The object update messages carry no link number, so a viewer numbers a linkset's parts in the order they
+    /// arrive. Second Life sends the root first and the children in link order; every path that sends a group's
+    /// parts to a viewer uses this order to match. <see cref="Parts"/> stays in storage order, which after a load
+    /// from a region store is the order the store returned the rows. The array returned must not be changed.
+    /// </remarks>
+    public SceneObjectPart[] PartsInLinkOrder
+    {
+        get
+        {
+            SceneObjectPart[] parts = m_parts.GetArray();
+            if (parts.Length < 2)
+                return parts;
+
+            SceneObjectPart root = m_rootPart;
+            if (IsInLinkOrder(parts, root))
+                return parts;
+
+            LinkOrderCache cache = m_linkOrderCache;
+            if (cache is not null && ReferenceEquals(cache.Source, parts) && IsInLinkOrder(cache.Ordered, root))
+                return cache.Ordered;
+
+            // OrderBy is a stable sort: parts with equal link numbers keep their storage order
+            SceneObjectPart[] ordered = parts.OrderBy(p => p == root ? int.MinValue : p.LinkNum).ToArray();
+            m_linkOrderCache = new LinkOrderCache(parts, ordered);
+            return ordered;
+        }
+    }
+
+    private sealed class LinkOrderCache
+    {
+        public readonly SceneObjectPart[] Source;
+        public readonly SceneObjectPart[] Ordered;
+
+        public LinkOrderCache(SceneObjectPart[] source, SceneObjectPart[] ordered)
+        {
+            Source = source;
+            Ordered = ordered;
+        }
+    }
+
+    // the last ordered copy and the storage array it was made from; replaced as a whole, so readers never see a mix
+    private volatile LinkOrderCache m_linkOrderCache;
+
+    private static bool IsInLinkOrder(SceneObjectPart[] parts, SceneObjectPart root)
+    {
+        if (parts[0] != root)
+            return false;
+        for (int i = 2; i < parts.Length; i++)
+        {
+            if (parts[i - 1].LinkNum > parts[i].LinkNum)
+                return false;
+        }
+        return true;
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool ContainsPart(UUID partID)
     {
@@ -1552,7 +1611,7 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         if (IsDeleted || Scene is null)
             return;
 
-        SceneObjectPart[] parts = m_parts.GetArray();
+        SceneObjectPart[] parts = PartsInLinkOrder;
         Scene.ForEachScenePresence(delegate (ScenePresence viewer)
         {
             if (viewer.IsNPC)
@@ -3229,7 +3288,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
         else
         RootPart.SendUpdate(remoteClient, update);
 
-        SceneObjectPart[] parts = m_parts.GetArray();
+        SceneObjectPart[] parts = PartsInLinkOrder;
         for (int i = 0; i < parts.Length; i++)
         {
             SceneObjectPart part = parts[i];
@@ -3252,7 +3311,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         RootPart.SendUpdate(remoteClient, update);
 
-        SceneObjectPart[] parts = m_parts.GetArray();
+        SceneObjectPart[] parts = PartsInLinkOrder;
         for (int i = 0; i < parts.Length; i++)
         {
             SceneObjectPart part = parts[i];
@@ -3895,7 +3954,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
 
         double now = Util.GetTimeStampMS();
         RootPart.SendScheduledUpdates(now);
-        SceneObjectPart[] parts = m_parts.GetArray();
+        SceneObjectPart[] parts = PartsInLinkOrder;
         for (int i = 0; i < parts.Length; i++)
         {
             SceneObjectPart part = parts[i];
@@ -4036,7 +4095,7 @@ public void GetAxisAlignedBoundingBoxRaw(out float minX, out float maxX, out flo
             }
         }
 
-        SceneObjectPart[] parts = m_parts.GetArray();
+        SceneObjectPart[] parts = PartsInLinkOrder;
         for (int i = 0; i < parts.Length; i++)
             parts[i].SendTerseUpdateToAllClientsInternal();
     }
