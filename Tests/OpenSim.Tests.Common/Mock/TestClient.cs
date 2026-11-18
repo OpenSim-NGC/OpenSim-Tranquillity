@@ -881,6 +881,15 @@ public class TestClient : IClientAPI, IClientCore
     }
 
     /// <summary>
+    /// Test seam: raise <see cref="OnModifyTerrain"/> as if a ModifyLand packet had arrived.
+    /// </summary>
+    public void TriggerModifyTerrain(float height, float seconds, float brushSize, byte action,
+                                     float north, float west, float south, float east, int parcelLocalID)
+    {
+        OnModifyTerrain?.Invoke(AgentId, height, seconds, brushSize, action, north, west, south, east, parcelLocalID);
+    }
+
+    /// <summary>
     /// Test seam: raise <see cref="OnUpdateEstateAccessDeltaRequest"/> as if an EstateOwnerMessage
     /// "estateaccessdelta" had arrived.
     /// </summary>
