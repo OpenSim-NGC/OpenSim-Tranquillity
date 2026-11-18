@@ -337,6 +337,29 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.Equal(Vector3.Zero, big.LandData.UserLocation);
     }
 
+    // A subdivide that takes the parent's landing point resets it, but the parent was stored before the reset: after
+    // a restart visitors to the parent landed on the new parcel, which may since have been sold.
+    [Fact]
+    public void TestASubdivideStoresTheParentWithItsLandingPointReset()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        f.Current.LandingType = (byte)LandingType.LandingPoint;
+        f.Current.UserLocation = new Vector3(8, 8, 25);
+        int parent = f.Parcel.LandData.LocalID;
+        List<byte> stored = new();
+        f.Scene.EventManager.OnLandObjectAdded += lo =>
+        {
+            if (lo.LandData.LocalID == parent)
+                stored.Add(lo.LandData.LandingType);
+        };
+
+        f.Module.Subdivide(0, 0, 16, 16, f.OwnerId);
+
+        Assert.NotEmpty(stored);
+        Assert.All(stored, t => Assert.Equal((byte)LandingType.Direct, t));
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>
