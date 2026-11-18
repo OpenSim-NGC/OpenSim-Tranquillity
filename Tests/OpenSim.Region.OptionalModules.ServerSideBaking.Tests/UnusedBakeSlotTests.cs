@@ -286,6 +286,55 @@ public class UnusedBakeSlotTests
         Assert.NotNull(rig.Service.GetBake(Agent, "skirt", skirtBake));
     }
 
+    /// <summary>
+    /// A worn Tattoo painting the aux channels whose wearable asset cannot be fetched this time is not "taken off".
+    /// Its channels are not failed by kind (the aux slots belong to the Universal type), so the guard is that a run
+    /// with any unusable wearable clears nothing.
+    /// </summary>
+    [Fact]
+    public void AWornTattooOnTheAuxChannelsWhoseAssetIsMissingKeepsItsBakes()
+    {
+        var rig = new Rig();
+        var tattoo = rig.Store(WearableKind.Tattoo, "Tattoo", Paint(rig, Aux.Select(a => a.Slot)));
+        var worn = rig.Bake(rig.Outfit((WearableType.Tattoo, tattoo)), 1);
+
+        Assert.True(rig.Assets.Remove(tattoo.Asset.ToString()));
+        var again = rig.Bake(rig.Outfit((WearableType.Tattoo, tattoo)), 2);
+
+        foreach (var (ch, _, face, token) in Aux)
+        {
+            var bake = worn.Channels.Single(c => c.Channel == ch).AssetId;
+            Assert.NotEqual(ChannelStatus.Cleared, again.Channels.Single(c => c.Channel == ch).Status);
+            Assert.Equal(bake, rig.Face(face));
+            Assert.NotNull(rig.Service.GetBake(Agent, token, bake));
+            Assert.NotNull(rig.Assets.GetUnchecked(bake.ToString()));
+        }
+    }
+
+    /// <summary>
+    /// If the avatar service cannot remove the index entry, the old bake is not deleted (the entry would point at
+    /// nothing), and the next bake finds the entry and finishes the job.
+    /// </summary>
+    [Fact]
+    public void WhenTheIndexEntryCannotBeRemovedTheOldBakeIsKeptAndTheNextBakeRetries()
+    {
+        var rig = new Rig();
+        var skirt = rig.Store(WearableKind.Skirt, "Skirt", new Dictionary<TextureSlot, UUID> { [TextureSlot.Skirt] = rig.Texture(30, 60, 220) });
+        var skirtBake = rig.Bake(rig.Outfit((WearableType.Skirt, skirt)), 1).Channels.Single(c => c.Channel == BakeChannel.Skirt).AssetId;
+
+        rig.Avatars.FailRemoveItems = true;
+        var off = rig.Bake(rig.Outfit(), 2);
+        Assert.Equal(ImgDefaultAvatar, rig.Face(19));
+        Assert.Equal(ChannelStatus.Cleared, off.Channels.Single(c => c.Channel == BakeChannel.Skirt).Status);
+        Assert.True(BakeIndex.Read(rig.Avatars, Agent).TryGet(BakeChannel.Skirt, out _));
+        Assert.NotNull(rig.Assets.GetUnchecked(skirtBake.ToString()));
+        Assert.DoesNotContain(skirtBake, off.Superseded);
+
+        rig.Avatars.FailRemoveItems = false;
+        var retry = rig.Bake(rig.Outfit(), 3);
+        AssertSlotReset(rig, retry, BakeChannel.Skirt, 19, "skirt", skirtBake);
+    }
+
     /// <summary>A first bake with nothing on the extra channels has nothing to clear: those channels stay Skipped.</summary>
     [Fact]
     public void AChannelThatNeverHadABakeIsSkippedNotCleared()
