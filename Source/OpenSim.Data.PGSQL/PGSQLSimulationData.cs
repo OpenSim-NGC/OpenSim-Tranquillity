@@ -45,6 +45,17 @@ public class PGSQLSimulationData : ISimulationDataStore
     private const string _migrationStore = "RegionStore";
     private const string LogHeader = "[REGION DB PGSQL]";
 
+    /// <summary>
+    /// Reads a region's prims with their shapes, grouped by linkset with the root first and then the children by
+    /// LinkNumber, so each linkset's parts are added to their group in link order.
+    /// </summary>
+    public const string LoadObjectsQuery = @"SELECT *,
+                           CASE WHEN prims.""UUID"" = prims.""SceneGroupID"" THEN 0 ELSE 1 END as sort
+                            FROM prims
+                            LEFT JOIN primshapes ON prims.""UUID"" = primshapes.""UUID""
+                            WHERE ""RegionUUID"" = :RegionUUID
+                            ORDER BY ""SceneGroupID"" asc, sort asc, ""LinkNumber"" asc";
+
     // private static FileSystemDataStore Instance = new FileSystemDataStore();
     private static readonly ILogger _Log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -105,12 +116,7 @@ public class PGSQLSimulationData : ISimulationDataStore
         Dictionary<UUID, SceneObjectGroup> objects = new Dictionary<UUID, SceneObjectGroup>();
         SceneObjectGroup grp = null;
 
-        string sql = @"SELECT *,
-                           CASE WHEN prims.""UUID"" = prims.""SceneGroupID"" THEN 0 ELSE 1 END as sort
-                            FROM prims
-                            LEFT JOIN primshapes ON prims.""UUID"" = primshapes.""UUID""
-                            WHERE ""RegionUUID"" = :RegionUUID
-                            ORDER BY ""SceneGroupID"" asc, sort asc, ""LinkNumber"" asc";
+        string sql = LoadObjectsQuery;
 
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
         using (NpgsqlCommand command = new NpgsqlCommand(sql, conn))
