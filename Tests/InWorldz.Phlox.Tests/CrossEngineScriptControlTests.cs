@@ -101,6 +101,23 @@ public class CrossEngineScriptControlTests
         _out.WriteLine(string.Join(" | ", r.R.H.Said));
     }
 
+    /// <summary>
+    /// The SL wiki, llResetOtherScript, Caveats: "If the script is not running, this call has no effect, even after the
+    /// script is set running again." That holds for a stopped script another engine runs too.
+    /// </summary>
+    [Fact]
+    public void LlResetOtherScriptOfAStoppedScriptYEngineRunsHasNoEffect()
+    {
+        using var r = new Rig();
+        r.Drive("stop");
+        r.Drive("reset");
+        r.Drive("start");
+        Assert.True(r.YHears("after"), "the YEngine script does not hear after it was started: " + string.Join(" | ", r.R.H.Said));
+        r.R.Quiet(500, "Y entry");
+        _out.WriteLine(string.Join(" | ", r.R.H.Said));
+        Assert.Equal(1, r.R.Count("Y entry"));
+    }
+
     [Fact]
     public void LlSetScriptStateStopsAndStartsAScriptYEngineRuns()
     {

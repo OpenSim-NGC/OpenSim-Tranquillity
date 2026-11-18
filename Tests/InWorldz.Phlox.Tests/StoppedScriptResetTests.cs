@@ -20,6 +20,8 @@ namespace InWorldz.Phlox.Tests;
 /// the reset posts state_entry and leaves the running flag alone. The viewer only sends ScriptReset and
 /// SetScriptRunning (Second Life viewer, llpreviewscript.cpp LLLiveLSLEditor::onReset and onRunningCheckboxClicked);
 /// what the region does with them is the server's rule. A running script that is reset restarts as before.
+/// llResetOtherScript is the exception: on a script that is not running it does nothing, and the script is not reset
+/// when it is set running again (https://wiki.secondlife.com/wiki/LlResetOtherScript, Caveats).
 /// </summary>
 // Touches no process-wide state: each test has its own harness, so the class runs in parallel.
 public class StoppedScriptResetTests
@@ -168,8 +170,13 @@ public class StoppedScriptResetTests
         AssertStartRunsStateEntryOnce(h2, itemId, upsBefore: 0);
     }
 
+    /// <summary>
+    /// The SL wiki, llResetOtherScript, Caveats: "If the script is not running, this call has no effect, even after the
+    /// script is set running again." The stopped script keeps its globals, gets no state_entry, and when it is started it
+    /// carries on from where it stopped.
+    /// </summary>
     [Fact]
-    public void LlResetOtherScriptOfAStoppedScriptLeavesItStoppedUntilItIsStarted()
+    public void LlResetOtherScriptOfAStoppedScriptHasNoEffectEvenAfterItIsStarted()
     {
         using var h = new SchedulerHarness();
         var itemId = RezTouchedAndStopped(h);
@@ -177,7 +184,43 @@ public class StoppedScriptResetTests
 
         h.PostTouch(resetterId);
         Assert.True(h.PumpUntil(() => h.Said.Contains("reset sent")));
-        AssertResetAndStillStopped(h, itemId);
-        AssertStartRunsStateEntryOnce(h, itemId);
+        h.PumpFor(TimeSpan.FromSeconds(1));   // a window in which a reset must NOT be applied
+        _out.WriteLine("after llResetOtherScript: said=[" + Log(h) + "]");
+
+        Assert.False(GlobalsCleared(h, itemId), "llResetOtherScript reset a script that was not running");
+        Assert.False(h.Engine.GetScriptState(itemId));
+        Assert.False(h.IsOnRunQueue(itemId));
+        Assert.Equal(1, Ups(h));
+
+        h.Scene.EventManager.TriggerStartScript(h.Prim.LocalId, itemId);
+        Assert.True(h.PumpUntil(() => h.Engine.GetScriptState(itemId)));
+        h.PumpFor(TimeSpan.FromSeconds(1));   // a window in which a held-back state_entry must NOT run
+        h.PostTouch(itemId);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("n 21")), "the started script did not carry on from its own globals: " + Log(h));
+        _out.WriteLine("after start: said=[" + Log(h) + "]");
+
+        Assert.Equal(1, Ups(h));
+        Assert.DoesNotContain("n 10", h.Said);
+    }
+
+    /// <summary>llResetOtherScript on a running script resets it: state_entry runs again from fresh globals.</summary>
+    [Fact]
+    public void LlResetOtherScriptOfARunningScriptRestartsIt()
+    {
+        using var h = new SchedulerHarness();
+        var itemId = h.RezScript(Target);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("up 1")));
+        h.PostTouch(itemId);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("n 11")));
+        var resetterId = h.RezScript(Resetter);
+
+        h.PostTouch(resetterId);
+        Assert.True(h.PumpUntil(() => Ups(h) >= 2), "a running script was not reset: " + Log(h));
+        h.PumpFor(TimeSpan.FromSeconds(1));   // a window in which a second restart must NOT happen
+        _out.WriteLine("said=[" + Log(h) + "]");
+
+        Assert.Equal(2, Ups(h));
+        Assert.Equal("up 1", h.Said.Last(s => s.StartsWith("up ")));
+        Assert.True(h.Engine.GetScriptState(itemId));
     }
 }

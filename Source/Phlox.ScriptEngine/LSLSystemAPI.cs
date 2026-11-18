@@ -2746,6 +2746,9 @@ namespace Phlox.ScriptEngine
                 ScriptShoutError("llResetOtherScript: script '" + name + "' not found");
                 return;
             }
+            // SL wiki, llResetOtherScript, Caveats: "If the script is not running, this call has no effect, even after the
+            // script is set running again." Running is what llGetScriptState answers for the same script.
+            if (llGetScriptState(name) == 0) return;
             ResetScriptOfAnyEngine(item.ItemID, api: true);
         }
 
