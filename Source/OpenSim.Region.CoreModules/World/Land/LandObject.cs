@@ -551,9 +551,12 @@ public class LandObject : ILandObject
                     ParcelFlags.AllowAPrimitiveEntry |
                     ParcelFlags.AllowGroupObjectEntry |
                     ParcelFlags.AllowFly);
-            newData.SeeAVs = args.SeeAVs;
-            newData.AnyAVSounds = args.AnyAVSounds;
-            newData.GroupAVSounds = args.GroupAVSounds;
+            if (!args.WithoutMediaDetailsAndAvatarSettings)
+            {
+                newData.SeeAVs = args.SeeAVs;
+                newData.AnyAVSounds = args.AnyAVSounds;
+                newData.GroupAVSounds = args.GroupAVSounds;
+            }
         }
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId, this, GroupPowers.LandSetSale, true))
@@ -619,11 +622,14 @@ public class LandObject : ILandObject
             newData.MediaID = args.MediaID;
             newData.MediaURL = args.MediaURL;
             newData.MusicURL = args.MusicURL;
-            newData.MediaType = args.MediaType;
-            newData.MediaDescription = args.MediaDescription;
-            newData.MediaWidth = args.MediaWidth;
-            newData.MediaHeight = args.MediaHeight;
-            newData.MediaLoop = args.MediaLoop;
+            if (!args.WithoutMediaDetailsAndAvatarSettings)
+            {
+                newData.MediaType = args.MediaType;
+                newData.MediaDescription = args.MediaDescription;
+                newData.MediaWidth = args.MediaWidth;
+                newData.MediaHeight = args.MediaHeight;
+                newData.MediaLoop = args.MediaLoop;
+            }
             //newData.ObscureMusic = args.ObscureMusic;
             newData.ObscureMusic = false; // obsolete
             //newData.ObscureMedia = args.ObscureMedia;
