@@ -1437,16 +1437,25 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
             for (int x = 0; x < sx;)
             {
                 curID = GetLandObjectIDinLandUnits(x,y);
-                if(curID < 0)
-                    continue;
-
-                ILandObject currentParcel = GetLandObject(curID);
-                if (currentParcel is null)
-                    continue;
-
-                LandData currentParcelLandData = currentParcel.LandData;
+                ILandObject currentParcel = curID < 0 ? null : GetLandObject(curID);
+                LandData currentParcelLandData = currentParcel?.LandData;
                 if (currentParcelLandData is null)
+                {
+                    // a cell no parcel holds (between the land being cleared and loaded again, as an OAR
+                    // load does): public land with no lines, and on to the next cell. Skipping it without
+                    // moving on kept this thread spinning for good.
+                    byteArray[byteArrayCount] = 0;
+                    byteArrayCount++;
+                    if (byteArrayCount >= LAND_BLOCKS_PER_PACKET)
+                    {
+                        remote_client.SendLandParcelOverlay(byteArray, sequenceID);
+                        byteArrayCount = 0;
+                        sequenceID++;
+                        byteArray = new byte[LAND_BLOCKS_PER_PACKET];
+                    }
+                    ++x;
                     continue;
+                }
 
                 // types
                 if (currentParcelLandData.OwnerID.Equals(remote_client.AgentId))
