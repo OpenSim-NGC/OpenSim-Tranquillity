@@ -1862,18 +1862,19 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
 
         if (terr != null)
         {
-//                m_log.LogWarning("[CLIENT]: Got Request to Send Terrain in region " + Scene.RegionInfo.RegionName);
-            if (File.Exists(Util.dataDir() + "/terrain.raw"))
-            {
-                File.Delete(Util.dataDir() + "/terrain.raw");
-            }
-            terr.SaveToFile(Util.dataDir() + "/terrain.raw");
-
+            // in memory: one file shared by every region of the process gave a manager another region's
+            // terrain when two downloads met, or an exception when the save wrote nothing
             byte[] bdata;
-            using(FileStream input = new FileStream(Util.dataDir() + "/terrain.raw",FileMode.Open))
+            try
             {
-                bdata = new byte[input.Length];
-                input.ReadExactly(bdata);
+                using MemoryStream output = new();
+                terr.SaveToStream("terrain.raw", output);
+                bdata = output.ToArray();
+            }
+            catch (Exception e)
+            {
+                m_log.LogError("[TERRAIN]: Could not save the terrain of {0} for {1}: {2}", Scene.Name, remote_client.Name, e.Message);
+                bdata = null;
             }
             if(bdata == null || bdata.Length == 0)
             {
