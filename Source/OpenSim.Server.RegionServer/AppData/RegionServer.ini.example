@@ -274,14 +274,17 @@
     ; meshing = ZeroMesher
     ;; With ubODE physics engine you must select ubODEMeshmerizer
     ; meshing = ubODEMeshmerizer
+    ;; With Jolt you must select Meshmerizer: the region server stops at startup otherwise
 
     ;; Choose one of the physics engines below
-    ;# {physics} {} {Select physics engine} {OpenDynamicsEngine BulletSim basicphysics POS} ubODE
+    ;# {physics} {} {Select physics engine} {OpenDynamicsEngine BulletSim basicphysics POS Jolt} ubODE
     ;; Default is ubODE
     ; physics = BulletSim
     ; physics = basicphysics
     ; physics = POS
     ; physics = ubODE
+    ;; Jolt needs meshing = Meshmerizer (see above); its settings are in the [Jolt] section of RegionServerDefaults.ini
+    ; physics = Jolt
 
     ; ubODE does allocate a lot of memory on stack. On linux you may need to increase its limit
     ; script opensim-ode-sh starts opensim setting that limit. You may need to increase it even more on large regions
