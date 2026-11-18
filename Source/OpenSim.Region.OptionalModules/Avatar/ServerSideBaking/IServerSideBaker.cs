@@ -35,7 +35,7 @@ public enum ChannelStatus
     /// <summary>
     /// The outfit no longer uses the channel (a skirt or a universal layer was taken off) and it held a bake or an
     /// index entry: its face was reset to IMG_DEFAULT_AVATAR. When the bake index had an entry for it, the entry is
-    /// removed and then the old bake is retired; if the removal fails both stay and the next bake tries again.
+    /// removed (if the removal fails it stays and the next bake tries again). The old bake asset is not deleted.
     /// </summary>
     Cleared,
 }
