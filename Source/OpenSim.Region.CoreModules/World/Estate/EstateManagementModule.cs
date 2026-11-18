@@ -1724,11 +1724,7 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         {
             if ((TerrainUploader != null) && (XferID == TerrainUploader.XferID))
             {
-                remoteClient.OnXferReceive -= TerrainUploader.XferReceive;
-                remoteClient.OnAbortXfer -= AbortTerrainXferHandler;
-                TerrainUploader.TerrainUploadDone -= HandleTerrainApplication;
-
-                TerrainUploader = null;
+                DropTerrainUploader();
                 remoteClient.SendAlertMessage("Terrain Upload aborted by the client");
             }
         }
@@ -1738,11 +1734,8 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
     {
         lock (this)
         {
-            remoteClient.OnXferReceive -= TerrainUploader.XferReceive;
-            remoteClient.OnAbortXfer -= AbortTerrainXferHandler;
-            TerrainUploader.TerrainUploadDone -= HandleTerrainApplication;
-
-            TerrainUploader = null;
+            if (TerrainUploader is not null && TerrainUploader.Client == remoteClient)
+                DropTerrainUploader();
         }
 
         m_log.LogDebug("[CLIENT]: Terrain upload from {0} to {1} complete.", remoteClient.Name, Scene.Name);
@@ -1793,20 +1786,66 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
         }
     }
 
+    /// <summary>
+    /// An upload that has received nothing for this long is given up: its viewer left or stopped sending, and it
+    /// would keep every other upload out until the region restarts.
+    /// </summary>
+    public static readonly TimeSpan TerrainUploadIdle = TimeSpan.FromMinutes(2);
+
+    /// <summary>
+    /// The largest terrain file taken: a .raw (13 bytes a point) of this region, or 16 MB for the image formats of a
+    /// small one.
+    /// </summary>
+    private long MaxTerrainFileSize()
+    {
+        long points = (long)Scene.RegionInfo.RegionSizeX * Scene.RegionInfo.RegionSizeY;
+        return Math.Max(13 * points, 16L << 20) + 65536;
+    }
+
+    private void DropTerrainUploader()
+    {
+        IClientAPI client = TerrainUploader.Client;
+        client.OnXferReceive -= TerrainUploader.XferReceive;
+        client.OnAbortXfer -= AbortTerrainXferHandler;
+        TerrainUploader.TerrainUploadDone -= HandleTerrainApplication;
+        TerrainUploader.TerrainUploadFailed -= HandleTerrainUploadFailure;
+        TerrainUploader = null;
+    }
+
+    private void HandleTerrainUploadFailure(string reason, IClientAPI remoteClient)
+    {
+        lock (this)
+        {
+            if (TerrainUploader is not null && TerrainUploader.Client == remoteClient)
+                DropTerrainUploader();
+        }
+        m_log.LogWarning("[TERRAIN]: Terrain upload from {0} to {1} refused: {2}", remoteClient.Name, Scene.Name, reason);
+        remoteClient.SendAlertMessage(reason);
+    }
+
     private void HandleUploadTerrain(IClientAPI remote_client, string clientFileName)
     {
         lock (this)
         {
+            // an upload whose viewer left, or that stopped, no longer holds the place
+            if (TerrainUploader is not null &&
+                (!TerrainUploader.Client.IsActive || DateTime.UtcNow - TerrainUploader.LastActivity > TerrainUploadIdle))
+            {
+                m_log.LogWarning("[TERRAIN]: Gave up the terrain upload from {0} to {1}", TerrainUploader.Client.Name, Scene.Name);
+                DropTerrainUploader();
+            }
+
             if (TerrainUploader == null)
             {
                 m_log.LogDebug(
                     "[TERRAIN]: Started receiving terrain upload for region {0} from {1}",
                     Scene.Name, remote_client.Name);
 
-                TerrainUploader = new EstateTerrainXferHandler(remote_client, clientFileName);
+                TerrainUploader = new EstateTerrainXferHandler(remote_client, clientFileName, MaxTerrainFileSize());
                 remote_client.OnXferReceive += TerrainUploader.XferReceive;
                 remote_client.OnAbortXfer += AbortTerrainXferHandler;
                 TerrainUploader.TerrainUploadDone += HandleTerrainApplication;
+                TerrainUploader.TerrainUploadFailed += HandleTerrainUploadFailure;
                 TerrainUploader.RequestStartXfer(remote_client);
             }
             else

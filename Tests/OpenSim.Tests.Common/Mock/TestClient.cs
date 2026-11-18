@@ -401,11 +401,7 @@ public class TestClient : IClientAPI, IClientCore
 
     public int PingTimeMS { get { return 0; } }
 
-    public bool IsActive
-    {
-        get { return true; }
-        set { }
-    }
+    public bool IsActive { get; set; } = true;
 
     public bool IsLoggingOut { get; set; }
 
@@ -849,7 +845,7 @@ public class TestClient : IClientAPI, IClientCore
 
     public virtual void SendAbortXferPacket(ulong xferID)
     {
-
+        OnSentAbortXfer?.Invoke(xferID);
     }
 
     public virtual void SendEconomyData(float EnergyEfficiency, int ObjectCapacity, int ObjectCount, int PriceEnergyUnit,
@@ -944,12 +940,27 @@ public class TestClient : IClientAPI, IClientCore
     {
     }
 
+    /// <summary>Test seam: the xfer messages the region sends this client.</summary>
+    public event Action<ulong, uint> OnSentConfirmXfer;
+    public event Action<ulong> OnSentAbortXfer;
+    public event Action<ulong, string> OnSentXferRequest;
+
     public void SendConfirmXfer(ulong xferID, uint PacketID)
     {
+        OnSentConfirmXfer?.Invoke(xferID, PacketID);
     }
 
     public void SendXferRequest(ulong XferID, short AssetType, UUID vFileID, byte FilePath, byte[] FileName)
     {
+        OnSentXferRequest?.Invoke(XferID, Utils.BytesToString(FileName));
+    }
+
+    /// <summary>
+    /// Test seam: raise <see cref="OnUploadTerrain"/> as if the estate tools had asked to upload a terrain file.
+    /// </summary>
+    public void TriggerUploadTerrain(string clientFileName)
+    {
+        OnUploadTerrain?.Invoke(this, clientFileName);
     }
 
     public void SendInitiateDownload(string simFileName, string clientFileName)

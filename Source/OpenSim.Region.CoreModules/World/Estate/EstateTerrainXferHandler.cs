@@ -33,32 +33,42 @@ using Microsoft.Extensions.Logging;
 namespace OpenSim.Region.CoreModules.World.Estate;
 
 
+/// <summary>
+/// A terrain file the estate tools upload (the viewer's LLXfer_File): numbered packets, each sent once the one before
+/// was confirmed, the first starting with the file's size, the last flagged.
+/// </summary>
 public class EstateTerrainXferHandler
 {
-    //private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
-
-    private AssetBase m_asset;
+    private const uint LastPacket = 0x80000000;
 
     public delegate void TerrainUploadComplete(string name, byte[] filedata, IClientAPI remoteClient);
     public event TerrainUploadComplete TerrainUploadDone;
 
-    //private string m_description = String.Empty;
-    //private string m_name = String.Empty;
-    //private UUID TransactionID = UUID.Zero;
-    private sbyte type = 0;
+    public delegate void TerrainUploadFailure(string reason, IClientAPI remoteClient);
+    public event TerrainUploadFailure TerrainUploadFailed;
+
+    private readonly string m_name;
+    private readonly long m_maxSize;
+    private readonly MemoryStream m_data = new();
+    private uint m_nextPacket;
+    private bool m_done;
 
     public ulong mXferID;
 
-    public EstateTerrainXferHandler(IClientAPI pRemoteClient, string pClientFilename)
+    /// <param name="maxSize">The largest file taken, in bytes.</param>
+    public EstateTerrainXferHandler(IClientAPI pRemoteClient, string pClientFilename, long maxSize)
     {
-        m_asset = new AssetBase(UUID.Zero, pClientFilename, type, pRemoteClient.AgentId.ToString())
-        {
-            Data = Array.Empty<byte>(),
-            Description = "empty",
-            Local = true,
-            Temporary = true
-        };
+        Client = pRemoteClient;
+        m_name = pClientFilename;
+        m_maxSize = maxSize;
+        LastActivity = DateTime.UtcNow;
     }
+
+    /// <summary>The estate manager uploading.</summary>
+    public IClientAPI Client { get; }
+
+    /// <summary>When the upload started or last received a packet.</summary>
+    public DateTime LastActivity { get; private set; }
 
     public ulong XferID
     {
@@ -68,47 +78,80 @@ public class EstateTerrainXferHandler
     public void RequestStartXfer(IClientAPI pRemoteClient)
     {
         mXferID = Util.GetNextXferID();
-        pRemoteClient.SendXferRequest(mXferID, m_asset.Type, m_asset.FullID, 0, Utils.StringToBytes(m_asset.Name));
+        pRemoteClient.SendXferRequest(mXferID, 0, UUID.Zero, 0, Utils.StringToBytes(m_name));
     }
 
     /// <summary>
     /// Process transfer data received from the client.
     /// </summary>
-    /// <param name="xferID"></param>
-    /// <param name="packetID"></param>
-    /// <param name="data"></param>
     public void XferReceive(IClientAPI remoteClient, ulong xferID, uint packetID, byte[] data)
     {
         if (mXferID != xferID)
             return;
 
+        string failure = null;
+        bool complete = false;
         lock (this)
         {
-            if (m_asset.Data.Length > 1)
+            LastActivity = DateTime.UtcNow;
+            uint number = packetID & ~LastPacket;
+
+            // a packet taken already: its confirm was lost and the viewer sent it again. Confirm it again, but adding
+            // it a second time would corrupt the file
+            if (m_done || number < m_nextPacket)
             {
-                byte[] destinationArray = new byte[m_asset.Data.Length + data.Length];
-                Array.Copy(m_asset.Data, 0, destinationArray, 0, m_asset.Data.Length);
-                Array.Copy(data, 0, destinationArray, m_asset.Data.Length, data.Length);
-                m_asset.Data = destinationArray;
+                remoteClient.SendConfirmXfer(xferID, packetID);
+                return;
+            }
+
+            // ahead of the one expected: the viewer waits for the confirm of the one before, so it sends that again
+            if (number > m_nextPacket)
+                return;
+
+            int offset = 0;
+            if (number == 0)
+            {
+                // the first packet starts with the file's size
+                if (data.Length < 4)
+                    failure = "The terrain file was not sent correctly.";
+                else if (Utils.BytesToInt(data, 0) is int declared && (declared < 0 || declared > m_maxSize))
+                    failure = $"The terrain file is too large for this region ({declared} bytes, {m_maxSize} at most).";
+                offset = 4;
+            }
+
+            if (failure is null && m_data.Length + data.Length - offset > m_maxSize)
+                failure = $"The terrain file is too large for this region ({m_maxSize} bytes at most).";
+
+            if (failure is null)
+            {
+                m_data.Write(data, offset, data.Length - offset);
+                m_nextPacket++;
+                remoteClient.SendConfirmXfer(xferID, packetID);
+                if ((packetID & LastPacket) != 0)
+                {
+                    m_done = true;
+                    complete = true;
+                }
             }
             else
             {
-                byte[] buffer2 = new byte[data.Length - 4];
-                Array.Copy(data, 4, buffer2, 0, data.Length - 4);
-                m_asset.Data = buffer2;
+                m_done = true;
             }
+        }
 
-            remoteClient.SendConfirmXfer(xferID, packetID);
-
-            if ((packetID & 0x80000000) != 0)
-            {
-                SendCompleteMessage(remoteClient);
-            }
+        if (failure is not null)
+        {
+            remoteClient.SendAbortXferPacket(xferID);
+            TerrainUploadFailed?.Invoke(failure, remoteClient);
+        }
+        else if (complete)
+        {
+            SendCompleteMessage(remoteClient);
         }
     }
 
     public void SendCompleteMessage(IClientAPI remoteClient)
     {
-        TerrainUploadDone?.Invoke(m_asset.Name, m_asset.Data, remoteClient);
+        TerrainUploadDone?.Invoke(m_name, m_data.ToArray(), remoteClient);
     }
 }
