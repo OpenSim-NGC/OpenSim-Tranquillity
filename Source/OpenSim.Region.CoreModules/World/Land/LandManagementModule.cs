@@ -1717,9 +1717,14 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
                 return;
         }
 
-            m_scene.EventManager.TriggerParcelPrimCountUpdate();
-            land.SendLandObjectOwners(remote_client);
-        }
+        // the recount scans every object of the region: only for someone who may see the answer, or any visitor
+        // asking again and again kept the region busy
+        if (!m_scene.Permissions.CanEditParcelProperties(remote_client.AgentId, land, GroupPowers.LandOptions, true))
+            return;
+
+        m_scene.EventManager.TriggerParcelPrimCountUpdate();
+        land.SendLandObjectOwners(remote_client);
+    }
 
     public void ClientOnParcelGodForceOwner(int local_id, UUID ownerID, IClientAPI remote_client)
     {
