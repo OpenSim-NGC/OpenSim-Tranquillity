@@ -360,6 +360,20 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.All(stored, t => Assert.Equal((byte)LandingType.Direct, t));
     }
 
+    // The overlay loop skipped a cell no parcel holds without moving on, and spun for good: between the land being
+    // cleared and loaded again (an OAR load) any avatar asking for the overlay hung that thread.
+    [Fact]
+    public void TestTheOverlayOfCellsNoParcelHoldsIsSent()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        IClientAPI client = SceneHelpers.AddScenePresence(f.Scene, TestHelpers.ParseTail(0x3)).ControllingClient;
+        f.Module.Clear(false);
+
+        Task send = Task.Run(() => f.Module.SendParcelOverlay(client));
+        Assert.True(send.Wait(TimeSpan.FromSeconds(10)), "the overlay was never sent");
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>
