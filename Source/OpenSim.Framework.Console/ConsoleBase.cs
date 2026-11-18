@@ -109,13 +109,40 @@ public class ConsoleBase : IConsole
         System.Console.WriteLine(text);
     }
 
+    /// <summary>
+    /// Whether a question can be put to someone at this console. False when standard input is not a terminal: a
+    /// server started with --background, as a service, or with its input redirected. Nobody would answer, and the
+    /// local console cannot read keys from redirected input at all.
+    /// </summary>
+    public virtual bool CanPrompt => !System.Console.IsInputRedirected;
+
+    /// <summary>
+    /// The answer to a question nobody can be asked: its default, said on the console so the choice is on record,
+    /// or, with no default, an error naming the question, so the setting can be put in the configuration instead.
+    /// </summary>
+    protected string Unanswered(string p, string def)
+    {
+        if (def != null)
+        {
+            Output("No console input: \"{0}\" takes its default, \"{1}\".", p, def);
+            return def;
+        }
+        throw new InvalidOperationException(
+            $"\"{p}\" needs an answer, but this console has no input (started with --background, as a service, or with " +
+            "input redirected). Give the value in the configuration instead.");
+    }
+
     public string Prompt(string p)
     {
+        if (!CanPrompt)
+            return Unanswered(p, null);
         return ReadLine(String.Format("{0}: ", p), false, true);
     }
 
     public string Prompt(string p, string def)
     {
+        if (!CanPrompt)
+            return Unanswered(p, def);
         string ret = ReadLine(String.Format("{0} [{1}]: ", p, def), false, true);
         if (ret.Length == 0)
             ret = def;
@@ -147,6 +174,8 @@ public class ConsoleBase : IConsole
 
     public virtual string Prompt(string p, string def, List<char> excludedCharacters, bool echo = true)
     {
+        if (!CanPrompt)
+            return Unanswered(p, def);
         bool itisdone = false;
         string ret = String.Empty;
         while (!itisdone)

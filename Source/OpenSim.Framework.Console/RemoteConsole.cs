@@ -138,6 +138,9 @@ public class RemoteConsole : CommandConsole
     protected string m_AllowedOrigin = String.Empty;
 
 
+    /// <summary>Questions are answered over the console's HTTP connection, whatever the process's own input is.</summary>
+    public override bool CanPrompt => true;
+
     public RemoteConsole(string defaultPrompt) : base(defaultPrompt)
     {
         // There is something wrong with this architecture.
