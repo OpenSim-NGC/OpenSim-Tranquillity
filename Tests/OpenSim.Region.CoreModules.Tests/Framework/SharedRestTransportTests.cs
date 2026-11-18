@@ -265,14 +265,16 @@ public sealed class SharedRestTransportTests : IDisposable
         m_server.Responder = _ => new RecordingHttpServer.Reply
         {
             Body = Encoding.UTF8.GetBytes("<string>reply</string>"),
-            BodyDelayMilliseconds = 5000
+            BodyDelayMilliseconds = 10000
         };
         int callbacks = 0;
         Task[] requests = Enumerable.Range(0, 6).Select(_ =>
             AsynchronousRestObjectRequester.MakeRequestAsync<string, string>(
                 "POST", m_server.BaseUri.ToString(), "payload",
                 value => { if (value == "reply") Interlocked.Increment(ref callbacks); }, 6)).ToArray();
-        bool allConnectedBeforeBodiesArrived = m_server.WaitForRequests(6, 3000);
+        // Six connections at once, before any body arrives: with a limit of four, two would wait for a body.
+        // The bodies take 10 s and the connections get 8 s, room for a busy machine; 5 s and 3 s missed on CI.
+        bool allConnectedBeforeBodiesArrived = m_server.WaitForRequests(6, 8000);
         await Task.WhenAll(requests);
         Assert.True(allConnectedBeforeBodiesArrived);
         Assert.Equal(6, callbacks);

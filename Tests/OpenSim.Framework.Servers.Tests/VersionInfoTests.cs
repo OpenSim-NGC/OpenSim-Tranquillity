@@ -35,10 +35,35 @@ namespace OpenSim.Framework.Servers.Tests
 {
     public class VersionInfoTests : OpenSimTestCase
     {
+        // GetVersionString pads to VERSIONINFO_VERSION_LENGTH as a minimum width (PadRight), so short
+        // versions line up; it never cuts. A build version carries the commit (Nerdbank.GitVersioning,
+        // e.g. "0.9.3.9441+1a2b3c4d5e"), so the real version string is longer than 48 and stays whole.
         [Fact]
         public void TestVersionLength()
         {
-            Xunit.Assert.Equal(VersionInfo.VERSIONINFO_VERSION_LENGTH, VersionInfo.Version.Length);
+            Xunit.Assert.True(VersionInfo.Version.Length >= VersionInfo.VERSIONINFO_VERSION_LENGTH,
+                $"\"{VersionInfo.Version}\" is shorter than {VersionInfo.VERSIONINFO_VERSION_LENGTH}");
+            Xunit.Assert.StartsWith("OpenSim-NGC Tranquillity ", VersionInfo.Version);
+            Xunit.Assert.Contains(VersionInfo.VersionNumber, VersionInfo.Version);
+        }
+
+        [Fact]
+        public void AShortVersionIsPaddedToTheMinimumWidth()
+        {
+            string version = VersionInfo.GetVersionString("1.0", "Release");
+
+            Xunit.Assert.Equal(VersionInfo.VERSIONINFO_VERSION_LENGTH, version.Length);
+            Xunit.Assert.Equal("OpenSim-NGC Tranquillity Release 1.0", version.TrimEnd());
+        }
+
+        [Fact]
+        public void ALongVersionIsKeptWhole()
+        {
+            string number = "0.9.3.9441+" + new string('a', 40);
+
+            string version = VersionInfo.GetVersionString(number, "Release");
+
+            Xunit.Assert.Equal("OpenSim-NGC Tranquillity Release " + number, version);
         }
     }
 }

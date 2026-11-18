@@ -245,6 +245,8 @@ public class ExperienceStateReadTests
         r.XProperties = Suspended;
         r.Read();
         Assert.True(r.H.PumpUntil(() => !r.Sp.HasScriptControls(r.Item("s1"))), "the controls are still taken");
+        // The controls go before the script runs its denial event: wait for the event too.
+        Assert.True(r.H.PumpUntil(() => r.Denials("s1") >= 1), "no denial event");
         Assert.Equal(0, r.MaskOf("s1"));
         Assert.Equal(1, r.Denials("s1"));
         Assert.Contains(r.Denied("s1", 9), r.H.Said);

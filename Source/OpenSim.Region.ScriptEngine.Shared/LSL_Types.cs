@@ -2967,8 +2967,50 @@ public partial class LSL_Types
 
         public LSLFloat(ReadOnlySpan<char> s)
         {
-            if (!double.TryParse(s, NumberStyles.Float, Culture.NumberFormatInfo, out value))
+            if (double.TryParse(s, NumberStyles.Float, Culture.NumberFormatInfo, out value))
+                return;
+            // LSL casts a string to float from its leading number and ignores the rest, as C's strtod
+            // does: (float)"1ef" is 1.0, (float)"-1.E+5.0" is -100000.0, (float)"e10" is 0.0. Phlox does
+            // the same (InWorldz.Phlox.Util.Encoding.CastToFloat). A string the whole of which parses
+            // (such as "NaN") is read as before.
+            ReadOnlySpan<char> number = LeadingNumber(s);
+            if (number.Length == 0 || !double.TryParse(number, NumberStyles.Float, Culture.NumberFormatInfo, out value))
                 value = 0;
+        }
+
+        /// <summary>
+        /// The longest leading decimal number: spaces, an optional sign, digits with an optional
+        /// decimal point (at least one digit), and an exponent only when digits follow it.
+        /// </summary>
+        private static ReadOnlySpan<char> LeadingNumber(ReadOnlySpan<char> s)
+        {
+            int i = 0;
+            while (i < s.Length && char.IsWhiteSpace(s[i]))
+                i++;
+            int start = i;
+            if (i < s.Length && (s[i] == '+' || s[i] == '-'))
+                i++;
+            int digits = 0;
+            while (i < s.Length && char.IsAsciiDigit(s[i])) { i++; digits++; }
+            if (i < s.Length && s[i] == '.')
+            {
+                i++;
+                while (i < s.Length && char.IsAsciiDigit(s[i])) { i++; digits++; }
+            }
+            if (digits == 0)
+                return ReadOnlySpan<char>.Empty;
+            int end = i;
+            if (i < s.Length && (s[i] == 'e' || s[i] == 'E'))
+            {
+                int j = i + 1;
+                if (j < s.Length && (s[j] == '+' || s[j] == '-'))
+                    j++;
+                int expDigits = 0;
+                while (j < s.Length && char.IsAsciiDigit(s[j])) { j++; expDigits++; }
+                if (expDigits > 0)
+                    end = j;
+            }
+            return s.Slice(start, end - start);
         }
 
         #endregion

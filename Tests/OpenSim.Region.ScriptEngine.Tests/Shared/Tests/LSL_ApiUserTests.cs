@@ -28,9 +28,11 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
+using Nini.Config;
 using Xunit;
 using OpenMetaverse;
 using OpenSim.Framework;
+using OpenSim.Region.CoreModules.Framework.UserManagement;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.ScriptEngine.Shared.Api;
 using OpenSim.Region.ScriptEngine.Shared.ScriptBase;
@@ -51,16 +53,24 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
             m_engine = new MockScriptEngine();
 
             m_scene = new SceneHelpers().SetupScene();
-            SceneHelpers.SetupSceneModules(m_scene, m_engine);
+            // llRequestAgentData looks users up through IUserManagement, and answers nothing without it.
+            IniConfigSource config = new IniConfigSource();
+            config.AddConfig("Modules");
+            SceneHelpers.SetupSceneModules(m_scene, config, m_engine, new UserManagementModule());
         }
 
+        // llRequestAgentData(DATA_ONLINE) answers at once for an avatar in the region (the fast local path,
+        // RequestWithImediatePost). For anyone else it asks the presence service on the dataserver's work
+        // pool and posts the dataserver event when the answer comes, caching it for
+        // LlRequestAgentDataCacheTimeoutMs; so an offline answer arrives after the call returns.
         [Fact]
         public void TestLlRequestAgentDataOnline()
         {
             TestHelpers.InMethod();
-//            TestHelpers.EnableLogging();
 
-            UUID userId = TestHelpers.ParseTail(0x1);
+            // Not ParseTail(0x1): other tests in the assembly log that user in, and the presence service the test
+            // scenes share would still report them online.
+            UUID userId = UUID.Random();
 
             UserAccount ua1 = UserAccountHelpers.CreateUserWithInventory(m_scene, userId);
 
@@ -69,85 +79,46 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
 
             LSL_Api apiGrp1 = new LSL_Api();
             apiGrp1.Initialize(m_engine, part, scriptItem);
-
-            // Initially long timeout to test cache
-            apiGrp1.LlRequestAgentDataCacheTimeoutMs = 20000;
-
-            // Offline test
-            {
-                apiGrp1.llRequestAgentData(userId.ToString(), ScriptBaseClass.DATA_ONLINE);
-
-                Assert.True(m_engine.PostedEvents.ContainsKey(scriptItem.ItemID));
-
-                List<EventParams> events = m_engine.PostedEvents[scriptItem.ItemID];
-                Assert.Equal(1, events.Count);
-                EventParams eventParams = events[0];
-                Assert.Equal("dataserver", eventParams.EventName);
-
-                string data = eventParams.Params[1].ToString();
-                Assert.Equal(0, int.Parse(data));
-
-                m_engine.PostedEvents.Clear();
-            }
-
-            // Online test.  Should get the 'wrong' result because of caching.
-            ScenePresence sp = SceneHelpers.AddScenePresence(m_scene, ua1);
-
-            {
-                apiGrp1.llRequestAgentData(userId.ToString(), ScriptBaseClass.DATA_ONLINE);
-
-                Assert.True(m_engine.PostedEvents.ContainsKey(scriptItem.ItemID));
-
-                List<EventParams> events = m_engine.PostedEvents[scriptItem.ItemID];
-                Assert.Equal(1, events.Count);
-                EventParams eventParams = events[0];
-                Assert.Equal("dataserver", eventParams.EventName);
-
-                string data = eventParams.Params[1].ToString();
-                Assert.Equal(0, int.Parse(data));
-
-                m_engine.PostedEvents.Clear();
-            }
-
             apiGrp1.LlRequestAgentDataCacheTimeoutMs = 20;
 
-            // Make absolutely sure that we should trigger cache timeout.
-            Thread.Sleep(apiGrp1.LlRequestAgentDataCacheTimeoutMs + 50);
+            // Not in the region and not online: the presence service's answer, posted from the work pool.
+            apiGrp1.llRequestAgentData(userId.ToString(), ScriptBaseClass.DATA_ONLINE);
+            Assert.Equal(0, WaitForOnlineReply(scriptItem.ItemID));
 
-            {
-                apiGrp1.llRequestAgentData(userId.ToString(), ScriptBaseClass.DATA_ONLINE);
+            // In the region: answered at once.
+            ScenePresence sp = SceneHelpers.AddScenePresence(m_scene, ua1);
+            apiGrp1.llRequestAgentData(userId.ToString(), ScriptBaseClass.DATA_ONLINE);
+            Assert.Equal(1, WaitForOnlineReply(scriptItem.ItemID));
 
-                Assert.True(m_engine.PostedEvents.ContainsKey(scriptItem.ItemID));
-
-                List<EventParams> events = m_engine.PostedEvents[scriptItem.ItemID];
-                Assert.Equal(1, events.Count);
-                EventParams eventParams = events[0];
-                Assert.Equal("dataserver", eventParams.EventName);
-
-                string data = eventParams.Params[1].ToString();
-                Assert.Equal(1, int.Parse(data));
-
-                m_engine.PostedEvents.Clear();
-            }
-
+            // Gone again, once the cached answer has expired: offline.
             m_scene.CloseAgent(userId, false);
-
             Thread.Sleep(apiGrp1.LlRequestAgentDataCacheTimeoutMs + 50);
+            apiGrp1.llRequestAgentData(userId.ToString(), ScriptBaseClass.DATA_ONLINE);
+            Assert.Equal(0, WaitForOnlineReply(scriptItem.ItemID));
+        }
 
+        /// <summary>
+        /// Waits up to 10 s for the one dataserver event a DATA_ONLINE request posts, returns its answer
+        /// (0 or 1), and clears the posted events.
+        /// </summary>
+        private int WaitForOnlineReply(UUID itemId)
+        {
+            DateTime deadline = DateTime.UtcNow.AddSeconds(10);
+            while (true)
             {
-                apiGrp1.llRequestAgentData(userId.ToString(), ScriptBaseClass.DATA_ONLINE);
-
-                Assert.True(m_engine.PostedEvents.ContainsKey(scriptItem.ItemID));
-
-                List<EventParams> events = m_engine.PostedEvents[scriptItem.ItemID];
-                Assert.Equal(1, events.Count);
-                EventParams eventParams = events[0];
-                Assert.Equal("dataserver", eventParams.EventName);
-
-                string data = eventParams.Params[1].ToString();
-                Assert.Equal(0, int.Parse(data));
-
-                m_engine.PostedEvents.Clear();
+                lock (m_engine.PostedEvents)
+                {
+                    if (m_engine.PostedEvents.TryGetValue(itemId, out List<EventParams> events) && events.Count > 0)
+                    {
+                        Assert.Single(events);
+                        Assert.Equal("dataserver", events[0].EventName);
+                        int answer = int.Parse(events[0].Params[1].ToString());
+                        m_engine.PostedEvents.Clear();
+                        return answer;
+                    }
+                }
+                Assert.True(DateTime.UtcNow < deadline, "no dataserver event within 10 s");
+                Thread.Sleep(10);
             }
         }
     }

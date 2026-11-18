@@ -50,6 +50,7 @@
         <RegionModule id="SampleMoneyModule" class="OpenSim.Region.OptionalModules.World.MoneyModule.SampleMoneyModule" />
         <RegionModule id="NPCModule" class="OpenSim.Region.OptionalModules.World.NPC.NPCModule" />
         <RegionModule id="SceneCommandsModule" class="OpenSim.Region.OptionalModules.Avatar.Attachments.SceneCommandsModule" />
+        <RegionModule id="ServerSideBakingModule" class="OpenSim.Region.OptionalModules.Avatar.ServerSideBaking.ServerSideBakingModule" />
         <RegionModule id="TreePopulatorModule" class="OpenSim.Region.OptionalModules.World.TreePopulator.TreePopulatorModule" />        
         <RegionModule id="WorldViewModule" class="OpenSim.Region.OptionalModules.World.WorldView.WorldViewModule" />        
     </Extension>

@@ -382,6 +382,25 @@ namespace OpenSim.Region.ScriptEngine.Shared.Tests
         }
 
         /// <summary>
+        /// A string cast to float reads its leading number and ignores the rest, as LSL does; a string that
+        /// parses whole ("NaN" among them) reads as it did before.
+        /// </summary>
+        [Fact]
+        public void TestCastStringToLSLFloatReadsTheLeadingNumber()
+        {
+            Assert.Equal(12.5, ((LSL_Types.LSLFloat)"12.5m").value, _lowPrecisionTolerance);
+            Assert.Equal(3.5, ((LSL_Types.LSLFloat)"  3.5 metres").value, _lowPrecisionTolerance);
+            Assert.Equal(2.0, ((LSL_Types.LSLFloat)"+2x").value, _lowPrecisionTolerance);
+            Assert.Equal(-0.25, ((LSL_Types.LSLFloat)"-.25,7").value, _lowPrecisionTolerance);
+            Assert.Equal(7.0, ((LSL_Types.LSLFloat)"7e").value, _lowPrecisionTolerance);
+            Assert.Equal(700.0, ((LSL_Types.LSLFloat)"7e2;").value, _lowPrecisionTolerance);
+            Assert.Equal(0.0, ((LSL_Types.LSLFloat)"abc").value, _lowPrecisionTolerance);
+            Assert.Equal(0.0, ((LSL_Types.LSLFloat)"-").value, _lowPrecisionTolerance);
+            Assert.Equal(0.0, ((LSL_Types.LSLFloat)".").value, _lowPrecisionTolerance);
+            Assert.True(double.IsNaN(((LSL_Types.LSLFloat)"NaN").value));
+        }
+
+        /// <summary>
         /// Tests LSLString is correctly cast implicitly to LSLFloat.
         /// </summary>
         [Fact]
