@@ -115,6 +115,16 @@ public class GridUserServicesConnector : BaseServiceConnector, IGridUserService
         return Set(sendData, userID, region, position, lookat);
     }
 
+    public bool LoggedOutRegion(UUID regionID)
+    {
+        Dictionary<string, object> sendData = new Dictionary<string, object>();
+        sendData["VERSIONMIN"] = ProtocolVersions.ClientProtocolVersionMin.ToString();
+        sendData["VERSIONMAX"] = ProtocolVersions.ClientProtocolVersionMax.ToString();
+        sendData["METHOD"] = "loggedoutregion";
+
+        return Set(sendData, string.Empty, regionID, Vector3.Zero, Vector3.Zero);
+    }
+
     public bool SetHome(string userID, UUID regionID, Vector3 position, Vector3 lookAt)
     {
         Dictionary<string, object> sendData = new Dictionary<string, object>();

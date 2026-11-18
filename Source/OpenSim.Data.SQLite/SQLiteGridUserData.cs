@@ -30,6 +30,8 @@ using OpenSim.Framework;
 
 using System.Data.SQLite;
 
+using OpenMetaverse;
+
 namespace OpenSim.Data.SQLite;
 
 /// <summary>
@@ -62,4 +64,8 @@ public class SQLiteGridUserData : SQLiteGenericTableHandler<GridUserData>, IGrid
         }
     }
 
+    public GridUserData[] GetOnlineInRegion(UUID regionID)
+    {
+        return base.Get(new[] { "LastRegionID", "Online" }, new[] { regionID.ToString(), true.ToString() });
+    }
 }

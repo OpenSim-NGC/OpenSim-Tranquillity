@@ -28,6 +28,8 @@ using OpenSim.Framework;
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using OpenMetaverse;
+
 namespace OpenSim.Data.MySQL;
 
 /// <summary>
@@ -52,5 +54,10 @@ public class MySQLGridUserData : MySQLGenericTableHandler<GridUserData>, IGridUs
     public GridUserData[] GetAll(string userID)
     {
         return base.Get(String.Format("UserID LIKE '{0}%'", userID));
+    }
+
+    public GridUserData[] GetOnlineInRegion(UUID regionID)
+    {
+        return base.Get(new[] { "LastRegionID", "Online" }, new[] { regionID.ToString(), true.ToString() });
     }
 }

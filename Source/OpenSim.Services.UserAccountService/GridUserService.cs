@@ -279,6 +279,33 @@ public class GridUserService : GridUserServiceBase, IGridUserService
         return false;
     }
 
+    public bool LoggedOutRegion(UUID regionID)
+    {
+        GridUserData[] left = m_Database.GetOnlineInRegion(regionID);
+        if (left.Length == 0)
+            return true;
+
+        m_log.LogInformation(
+            "[GRID USER SERVICE]: Region {0} started with {1} users still marked online in it: marking them offline",
+            regionID, left.Length);
+
+        string now = Util.UnixTimeSinceEpoch().ToString();
+        bool ok = true;
+        foreach (GridUserData d in left)
+        {
+            d.Data["Online"] = false.ToString();
+            d.Data["Logout"] = now;
+            if (m_Database.Store(d))
+            {
+                if (d.UserID.Length >= 36)
+                    cache.Add(d.UserID.Substring(0, 36), d, 300000);
+            }
+            else
+                ok = false;
+        }
+        return ok;
+    }
+
     public bool SetHome(string userID, UUID homeID, Vector3 homePosition, Vector3 homeLookAt)
     {
         GridUserData d = GetGridUserData(userID);

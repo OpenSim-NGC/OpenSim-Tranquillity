@@ -28,6 +28,8 @@ using OpenSim.Framework;
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using OpenMetaverse;
+
 namespace OpenSim.Data.PGSQL;
 
 /// <summary>
@@ -58,4 +60,8 @@ public class PGSQLGridUserData : PGSQLGenericTableHandler<GridUserData>,
         return base.Get(String.Format("\"UserID\" LIKE '{0}%'", userID));
     }
 
+    public GridUserData[] GetOnlineInRegion(UUID regionID)
+    {
+        return base.Get(new[] { "LastRegionID", "Online" }, new[] { regionID.ToString(), true.ToString() });
+    }
 }

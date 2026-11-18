@@ -25,6 +25,8 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+using OpenMetaverse;
+
 namespace OpenSim.Data;
 
 // This MUST be a ref type!
@@ -46,5 +48,10 @@ public interface IGridUserData
 {
     GridUserData Get(string userID);
     GridUserData[] GetAll(string query);
+
+    /// <summary>
+    /// The users marked online whose last region is <paramref name="regionID"/>.
+    /// </summary>
+    GridUserData[] GetOnlineInRegion(UUID regionID);
     bool Store(GridUserData data);
 }
