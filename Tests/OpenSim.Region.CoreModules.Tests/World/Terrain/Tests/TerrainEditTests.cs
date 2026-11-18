@@ -133,4 +133,26 @@ public class TerrainEditTests : OpenSimTestCase
         Assert.True(r.Height(5, 255) > Ground, "the selection to the edge did not change the parcel");
         Assert.True(r.Height(5, 15) < Ground + 1.5f, "the next parcel changed again");
     }
+
+    // The region's Block Terraform was only sent to the viewer, which greys its tools out; a client that sent
+    // ModifyLand anyway changed any parcel that let it.
+    [Fact]
+    public void BlockTerraformLeavesTheEstateManagersAlone()
+    {
+        TestHelpers.InMethod();
+        Region r = new Region(s_resident, permissions: true);
+        r.Scene.RegionInfo.RegionSettings.BlockTerraform = true;
+        TestClient resident = r.Client(s_resident);
+        TestClient owner = r.Client(s_estateOwner);
+
+        Modify(resident, 40, 40, 40, 40, parcel: -1);
+        Assert.Equal(Ground, r.Height(40, 40));
+
+        Modify(owner, 60, 60, 60, 60, parcel: -1);
+        Assert.True(r.Height(60, 60) > Ground, "the estate owner could not terraform");
+
+        r.Scene.RegionInfo.RegionSettings.BlockTerraform = false;
+        Modify(resident, 40, 40, 40, 40, parcel: -1);
+        Assert.True(r.Height(40, 40) > Ground, "the parcel's owner could not terraform once the region allowed it");
+    }
 }
