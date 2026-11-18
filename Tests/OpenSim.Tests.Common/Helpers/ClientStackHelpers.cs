@@ -60,7 +60,7 @@ public static class ClientStackHelpers
         uccp.CircuitCode = uccpCcBlock;
 
         byte[] uccpBytes = uccp.ToBytes();
-        UDPPacketBuffer upb = new UDPPacketBuffer(testEp, uccpBytes.Length);
+        UDPPacketBuffer upb = new UDPPacketBuffer(testEp); // full size: the server may take it into its buffer pool
         upb.DataLength = uccpBytes.Length;  // God knows why this isn't set by the constructor.
         Buffer.BlockCopy(uccpBytes, 0, upb.Data, 0, uccpBytes.Length);
 
