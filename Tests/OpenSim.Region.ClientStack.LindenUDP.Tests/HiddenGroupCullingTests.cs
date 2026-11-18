@@ -73,5 +73,7 @@ public class HiddenGroupCullingTests : OpenSimTestCase
         client.CheckGroupsInView();
 
         Assert.True(InView(client, hidden), "the group is not in view once it is shown again");
+
+        scene.CloseAgent(sp.UUID, true);
     }
 }
