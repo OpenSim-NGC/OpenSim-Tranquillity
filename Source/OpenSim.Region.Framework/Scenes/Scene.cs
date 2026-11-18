@@ -4309,17 +4309,34 @@ public partial class Scene : SceneBase
                 // We have a root agent. Is it in transit?
                 if (!EntityTransferModule.IsInTransit(sp.UUID))
                 {
-                    // We have a zombie from a crashed session.
-                    // Or the same user is trying to be root twice here, won't work.
-                    // Kill it.
-                    m_log.LogWarning(
-                        "[SCENE]: Existing root scene presence detected for {0} {1} in {2} when connecting.  Removing existing presence.",
-                        sp.Name, sp.UUID, RegionInfo.RegionName);
+                    if (!vialogin && sp.ControllingClient is not null && sp.ControllingClient.SessionId.Equals(acd.SessionID))
+                    {
+                        // The same session coming here by teleport or crossing: the avatar is in the region it comes
+                        // from, and this root is a copy left behind (two regions came to disagree about where the
+                        // avatar is). Closing it as a root logged the user off the grid, closed the avatar's child
+                        // agents in the other regions, and then refused this arrival for the user being offline.
+                        // Make it a child agent, as a region the avatar leaves does, and let the arrival use it.
+                        m_log.LogWarning(
+                            "[SCENE]: {0} {1} is arriving in {2} by teleport or crossing but was still root here: making the stale root a child agent",
+                            sp.Name, sp.UUID, RegionInfo.RegionName);
 
-                    if (sp.ControllingClient is not null)
-                        CloseAgent(sp.UUID, true);
+                        sp.HasMovedAway(false);
+                        sp.MakeChildAgent(source?.RegionHandle ?? 0);
+                    }
+                    else
+                    {
+                        // We have a zombie from a crashed session.
+                        // Or the same user is trying to be root twice here, won't work.
+                        // Kill it.
+                        m_log.LogWarning(
+                            "[SCENE]: Existing root scene presence detected for {0} {1} in {2} when connecting.  Removing existing presence.",
+                            sp.Name, sp.UUID, RegionInfo.RegionName);
 
-                    sp = null;
+                        if (sp.ControllingClient is not null)
+                            CloseAgent(sp.UUID, true);
+
+                        sp = null;
+                    }
                 }
                 //else
                 //    m_log.LogWarning("[SCENE]: Existing root scene presence for {0} {1} in {2}, but agent is in trasit", sp.Name, sp.UUID, RegionInfo.RegionName);
