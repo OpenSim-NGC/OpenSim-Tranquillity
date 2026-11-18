@@ -144,6 +144,16 @@ public class GetAssetsHandler
 
         if (asset.Type != (sbyte)type)
         {
+            // A region's four terrain slots (RegionHandshake TerrainDetail0-3) hold either textures or GLTF materials,
+            // so viewers fetch each one both ways and keep whichever loads (Firestorm/SL LLTerrainMaterials::
+            // setDetailAssetID). A texture asked for as a material is that probe on every login: answer not found,
+            // quietly, instead of sending the whole texture again for the viewer to fail to parse. Other mismatches
+            // stay tolerated, since asset types in grid databases are often wrong.
+            if (type == AssetType.Material && asset.Type == (sbyte)AssetType.Texture)
+            {
+                response.StatusCode = (int)HttpStatusCode.NotFound;
+                return;
+            }
             m_log.LogWarning("[GETASSET]: asset with wrong type: " + assetStr + " " + asset.Type.ToString() + " != " + ((sbyte)type).ToString());
             //response.StatusCode = (int)HttpStatusCode.NotFound;
             //return;
