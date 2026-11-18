@@ -287,7 +287,7 @@ public static class BakeOrchestrator
         return exists;
     }
 
-    // ------------------------------------------------------------------ step 6: store + faces + supersede
+    // ------------------------------------------------------------------ step 6: store + faces
 
     /// <summary>
     /// Store each bake as a texture asset (ADR-004 marker: name <c>bake:&lt;agent&gt;:&lt;channel&gt;</c>, description = input
@@ -307,9 +307,12 @@ public static class BakeOrchestrator
     /// </para>
     ///
     /// <para>
-    /// Supersede (ADR-004): once a channel's new asset is confirmed stored <i>and</i> its face has been moved to
-    /// it, the asset the channel held before is deleted. Never before the store — a store that fails must leave
-    /// the old bake serving — and never an asset any baked face still points at.
+    /// The bake a channel held before is never deleted, whether the channel is re-baked or cleared. Its id can still
+    /// be named outside this avatar's TextureEntry: the OSSL save-appearance functions write every baked face into a
+    /// notecard (<c>AvatarAppearance.PackForNotecard</c>) and an NPC created from it uses those ids. Stock OpenSim
+    /// never deletes bakes either. The bake index moves to the new bake, so the appearance service serves only the
+    /// current one; removing old bake assets is left to a separate tool. <paramref name="superseded"/> is kept for
+    /// callers and stays empty.
     /// </para>
     /// </summary>
     public static IReadOnlyList<ChannelOutcome> StoreAndApply(IReadOnlyList<BakeResult> results, ResolvedInputs inputs, UUID agentId,
@@ -384,41 +387,14 @@ public static class BakeOrchestrator
             timings?.AddAssetStore(tStore);
             if (string.IsNullOrEmpty(storedId) || !UUID.TryParse(storedId, out var id) || id.IsZero())
             {
-                // the store failed: the channel's previous bake, if any, is still the one its face points at and
-                // is emphatically not superseded.
+                // the store failed: the channel's previous bake, if any, is still the one its face points at.
                 outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Failed, UUID.Zero, result.InputHash, "asset service refused the bake", result.Fidelity));
                 continue;
             }
             appearance.Texture.CreateFace((uint)FaceOf(ch)).TextureID = id;
             outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Baked, id, result.InputHash, "", result.Fidelity));
-            Supersede(assets, appearance, previous, ch, id, superseded, timings);
         }
         return outcomes;
-    }
-
-    /// <summary>
-    /// Delete the asset the channel held before this run, now that the new one is stored and the face has moved.
-    /// Refuses to delete an asset that any baked face still points at — including the one just written, and
-    /// including a face of some other channel that was left alone this run.
-    /// </summary>
-    private static void Supersede(IAssetService assets, AvatarAppearance appearance, IReadOnlyDictionary<BakeChannel, StoredBake> previous,
-        BakeChannel ch, UUID newId, List<UUID> superseded, BakeTimings timings = null)
-    {
-        if (previous is null || !previous.TryGetValue(ch, out var old)) return;
-        if (old.AssetId.IsZero() || old.AssetId == newId) return;
-        foreach (var other in AllChannels)
-        {
-            var face = appearance.Texture.FaceTextures[FaceOf(other)];
-            if (face is not null && face.TextureID == old.AssetId) return;
-        }
-        try
-        {
-            var t0 = BakeTimings.Now;
-            var gone = assets.Delete(old.AssetId.ToString());
-            timings?.AddAssetStore(t0, deleted: true);
-            if (gone) superseded?.Add(old.AssetId);
-        }
-        catch (Exception) { }
     }
 
     // ------------------------------------------------------------------ the whole scene-free run
@@ -429,7 +405,7 @@ public static class BakeOrchestrator
         => Run(agentId, reason, wearables, visualParams, appearance, assets, null, backend, compositor, bakeSize, 0, ct);
 
     /// <summary>
-    /// Resolve, decide what can be reused, bake the rest, store, write faces, supersede, and record the bake index
+    /// Resolve, decide what can be reused, bake the rest, store, write faces, and record the bake index
     /// in the avatar service. Sending is the caller's.
     /// </summary>
     /// <param name="avatars">The avatar service holding the ADR-004 index, or null for a run that neither reads nor writes it.</param>

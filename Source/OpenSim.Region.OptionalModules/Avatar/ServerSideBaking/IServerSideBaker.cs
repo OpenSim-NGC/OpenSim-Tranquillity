@@ -60,7 +60,7 @@ public sealed record BakeOutcome(UUID AgentId, BakeReason Reason, IReadOnlyList<
         return n;
     }
 
-    /// <summary>Assets deleted because a new bake for the same channel superseded them (ADR-004).</summary>
+    /// <summary>Assets deleted because a new bake replaced them. Always empty: previous bakes are no longer deleted (see <see cref="BakeOrchestrator.StoreAndApply"/>).</summary>
     public IReadOnlyList<UUID> Superseded { get; init; } = Array.Empty<UUID>();
 
     /// <summary>Whether the ADR-004 bake index was written to the avatar service on this run.</summary>
