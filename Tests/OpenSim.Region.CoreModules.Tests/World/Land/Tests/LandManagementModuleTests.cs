@@ -297,6 +297,46 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.False(f.Current.SeeAVs);
     }
 
+    // A landing point is a place on the parcel: one elsewhere (another parcel, outside the region) or not a number
+    // sent arriving visitors there.
+    [Fact]
+    public void TestALandingPointIsAPlaceOnTheParcel()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        f.Module.Subdivide(0, 0, 16, 16, f.OwnerId);
+        ILandObject big = f.Module.GetLandObject(100, 100);
+
+        LandUpdateArgs SetPoint(Vector3 at)
+        {
+            LandUpdateArgs a = PropertiesSave(big.LandData, big.LandData.Flags);
+            a.LandingType = (byte)LandingType.LandingPoint;
+            a.UserLocation = at;
+            a.UserLookAt = new Vector3(1, 0, 0);
+            return a;
+        }
+
+        big.UpdateLandProperties(SetPoint(new Vector3(100, 100, 25)), f.Client, out _, out _);
+        Assert.Equal(new Vector3(100, 100, 25), big.LandData.UserLocation);
+
+        foreach (Vector3 elsewhere in new[] {
+            new Vector3(8, 8, 25),                      // the other parcel
+            new Vector3(300, 100, 25),                  // outside the region
+            new Vector3(float.NaN, 100, 25),
+            new Vector3(100, float.PositiveInfinity, 25) })
+        {
+            big.UpdateLandProperties(SetPoint(elsewhere), f.Client, out _, out _);
+            Assert.Equal(new Vector3(100, 100, 25), big.LandData.UserLocation);
+        }
+
+        // no landing point at all is fine
+        LandUpdateArgs direct = SetPoint(Vector3.Zero);
+        direct.LandingType = (byte)LandingType.Direct;
+        big.UpdateLandProperties(direct, f.Client, out _, out _);
+        Assert.Equal((byte)LandingType.Direct, big.LandData.LandingType);
+        Assert.Equal(Vector3.Zero, big.LandData.UserLocation);
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>
