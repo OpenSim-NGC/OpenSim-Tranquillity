@@ -396,6 +396,29 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.Equal(new List<int> { 7 }, answered);
     }
 
+    // UpdateLandProperties stored the parcel only when the user could change one of its flags. A group role whose
+    // powers change fields but no flag (the name and description, the landing point) had its save dropped without
+    // a word.
+    [Fact]
+    public void TestAnEditByARoleThatChangesNoFlagIsStored()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        f.Scene.Permissions.OnEditParcelProperties += (user, parcel, p, manager) => p == GroupPowers.LandChangeIdentity;
+
+        LandUpdateArgs a = PropertiesSave(f.Current, f.Current.Flags);
+        a.Name = "renamed";
+        a.Desc = "by a role that may change the identity only";
+        a.ParcelFlags = f.Current.Flags ^ (uint)ParcelFlags.AllowFly;
+        f.Parcel.UpdateLandProperties(a, f.Client, out _, out _);
+
+        Assert.Equal("renamed", f.Current.Name);
+        Assert.Equal("by a role that may change the identity only", f.Current.Description);
+        // the flag it may not change is as it was
+        Assert.Equal(0u, (a.ParcelFlags ^ f.Current.Flags) & ~(uint)ParcelFlags.AllowFly);
+        Assert.NotEqual(a.ParcelFlags & (uint)ParcelFlags.AllowFly, f.Current.Flags & (uint)ParcelFlags.AllowFly);
+    }
+
     // The list of who owns objects on a parcel started a recount of every object of the region before it checked
     // that the asker may see the list: any visitor asking again and again kept the region busy.
     [Fact]

@@ -533,6 +533,9 @@ public class LandObject : ILandObject
         LandData newData = LandData.Copy();
 
         uint allowedDelta = 0;
+        // a power that changes fields but no flag (the name, the landing point, the media…) is still a change to
+        // store: only the flags were looked at, and a group role with only such powers saved nothing
+        bool edited = false;
 
         // These two are always blocked as no client can set them anyway
         // ParcelFlags.ForSaleObjects
@@ -540,6 +543,7 @@ public class LandObject : ILandObject
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId, this, GroupPowers.LandOptions, false))
         {
+            edited = true;
             allowedDelta |= (uint)(ParcelFlags.AllowLandmark |
                     ParcelFlags.AllowTerraform |
                     ParcelFlags.AllowDamage |
@@ -561,6 +565,7 @@ public class LandObject : ILandObject
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId, this, GroupPowers.LandSetSale, true))
         {
+            edited = true;
             // Without the estate's "allow land resell" only the estate owner, its managers and administrators put land
             // up for sale; the viewer only hides its sell button.
             if (CanResell(remote_client.AgentId))
@@ -595,6 +600,7 @@ public class LandObject : ILandObject
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId,this, GroupPowers.FindPlaces, false))
         {
+            edited = true;
             newData.Category = args.Category;
 
             allowedDelta |= (uint)(ParcelFlags.ShowDirectory |
@@ -604,6 +610,7 @@ public class LandObject : ILandObject
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId,this, GroupPowers.LandChangeIdentity, false))
         {
+            edited = true;
             newData.Description = args.Desc;
             newData.Name = args.Name;
             newData.SnapshotID = args.SnapshotID;
@@ -611,6 +618,7 @@ public class LandObject : ILandObject
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId,this, GroupPowers.SetLandingPoint, false))
         {
+            edited = true;
             // a landing point is a place on the parcel, as on Second Life: one elsewhere (another parcel, a banned
             // one, outside the region) or not a number would send arriving visitors there
             Vector3 at = args.UserLocation;
@@ -625,6 +633,7 @@ public class LandObject : ILandObject
 
         if (m_scenePermissions.CanEditParcelProperties(remote_client.AgentId,this, GroupPowers.ChangeMedia, false))
         {
+            edited = true;
             newData.MediaAutoScale = args.MediaAutoScale;
             newData.MediaID = args.MediaID;
             newData.MediaURL = args.MediaURL;
@@ -654,6 +663,7 @@ public class LandObject : ILandObject
             // don't allow passes on group owned until we can give money to groups
             if (!newData.IsGroupOwned && m_scenePermissions.CanEditParcelProperties(remote_client.AgentId,this, GroupPowers.LandManagePasses, false))
             {
+                edited = true;
                 newData.PassHours = args.PassHours;
                 newData.PassPrice = args.PassPrice;
 
@@ -687,7 +697,7 @@ public class LandObject : ILandObject
             allowedDelta |= (uint)ParcelFlags.DenyAnonymous;
         }
 
-        if (allowedDelta != (uint)ParcelFlags.None)
+        if (edited || allowedDelta != (uint)ParcelFlags.None)
         {
             uint preserve = LandData.Flags & ~allowedDelta;
             newData.Flags = preserve | (args.ParcelFlags & allowedDelta);
