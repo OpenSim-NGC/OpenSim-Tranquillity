@@ -396,6 +396,43 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.Equal(new List<int> { 7 }, answered);
     }
 
+    // Join stored its parcels, and so fired their events, holding the land list's lock. A handler takes the prim
+    // count's lock (PrimCountModule), which Recount holds while it asks for every parcel (the land list's lock): the
+    // two threads waited on each other for good. Loading the parcels from storage (startup, an OAR) did the same.
+    [Fact]
+    public void TestLandEventsFireWithTheLandListUnlocked()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        object landList = typeof(LandManagementModule)
+            .GetField("m_landList", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            .GetValue(f.Module);
+        List<string> locked = new();
+        int events = 0;
+        void Check(string what)
+        {
+            events++;
+            if (Monitor.IsEntered(landList))
+                locked.Add(what);
+        }
+        f.Scene.EventManager.OnLandObjectAdded += _ => Check("added");
+        f.Scene.EventManager.OnLandObjectRemoved += _ => Check("removed");
+        f.Scene.EventManager.OnParcelPrimCountTainted += () => Check("tainted");
+
+        f.Module.Subdivide(0, 0, 16, 16, f.OwnerId);
+        f.Module.Subdivide(16, 0, 32, 16, f.OwnerId);
+        f.Module.Join(0, 0, 32, 16, f.OwnerId);
+        Assert.Equal(2, f.Module.AllParcels().Count);
+
+        List<LandData> stored = f.Module.AllParcels().ConvertAll(lo => lo.LandData.Copy());
+        f.Module.Clear(false);
+        f.Scene.EventManager.TriggerIncomingLandDataFromStorage(stored);
+        Assert.Equal(2, f.Module.AllParcels().Count);
+
+        Assert.True(events > 0);
+        Assert.Empty(locked);
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>
