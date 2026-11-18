@@ -499,7 +499,16 @@ public class LLLoginService : ILoginService
 
             if(!m_allowDuplicatePresences)
             {
-                if(guinfo is not null && guinfo.Online && !guinfo.LastRegionID.IsZero())
+                if(guinfo is not null && guinfo.Online && !guinfo.LastRegionID.IsZero()
+                    && OnlineFlagIsStale(m_PresenceService, PrincipalIDstr))
+                {
+                    // nothing to refuse the login for: clear the record and go on
+                    m_log.LogInformation(
+                        "[LLOGIN SERVICE]: {0} {1} was marked online in {2} without a session (a simulator stopped without logging them out); logging in",
+                        firstName, lastName, guinfo.LastRegionID);
+                    m_GridUserService.LoggedOut(PrincipalIDstr, scopeID, guinfo.LastRegionID, guinfo.LastPosition, guinfo.LastLookAt);
+                }
+                else if(guinfo is not null && guinfo.Online && !guinfo.LastRegionID.IsZero())
                 {
                     if(SendAgentGodKillToRegion(scopeID, account.PrincipalID, guinfo))
                     {
@@ -1214,6 +1223,20 @@ public class LLLoginService : ILoginService
                 }
                 break;
         }
+    }
+
+    /// <summary>
+    /// True when the grid user record says the user is online but the presence service has no session for them.
+    /// Every live session has a presence entry, and a simulator that starts clears its regions' entries
+    /// (PresenceDetector.AddRegion), but the grid user record of an avatar whose simulator stopped without logging it
+    /// out stays online: the next login was refused ("already logged in") and had to be tried again.
+    /// </summary>
+    public static bool OnlineFlagIsStale(IPresenceService presence, string userID)
+    {
+        if (presence is null)
+            return false;
+        PresenceInfo[] sessions = presence.GetAgents(new[] { userID });
+        return sessions is not null && sessions.Length == 0;
     }
 
     private bool SendAgentGodKillToRegion(UUID scopeID, UUID agentID , GridUserInfo guinfo)
