@@ -1467,15 +1467,9 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         // if far jump we do need to close anyways
         if (NeedsClosing(reg, OutSideViewRange))
         {
-            int count = 60;
-            do
-            {
-                Thread.Sleep(250);
-                if(sp.IsDeleted)
-                    return;
-                if(!sp.IsInTransit)
-                    break;
-            } while (--count > 0);
+            WaitForRelease(sp, ReleaseWait);
+            if (sp.IsDeleted)
+                return;
 
             if (!sp.IsDeleted)
             {
@@ -2866,6 +2860,42 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         //Scene.CloseAgent(sp.UUID, false);
         sp.IsInTransit = false;
         //m_entityTransferStateMachine.SetAgentArrivedAtDestination(id);
+
+        if (m_awaitingRelease.TryGetValue(id, out ManualResetEventSlim released))
+            released.Set();
+    }
+
+    /// <summary>How long the departing region waits for the destination's release call after a far teleport.</summary>
+    public TimeSpan ReleaseWait { get; set; } = TimeSpan.FromSeconds(15);
+
+    // far teleports waiting for the destination's release call, by agent
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<UUID, ManualResetEventSlim> m_awaitingRelease = new();
+
+    /// <summary>
+    /// Wait until the destination has released <paramref name="sp"/> (AgentArrivedAtDestination clears its transit
+    /// flag) or it is closed here, for at most <paramref name="wait"/>. The release wakes the wait at once; it used to
+    /// be looked for every 250 ms.
+    /// </summary>
+    private void WaitForRelease(ScenePresence sp, TimeSpan wait)
+    {
+        // registered before the flag is looked at, so a release in between is not missed
+        ManualResetEventSlim released = new(false);
+        m_awaitingRelease[sp.UUID] = released;
+        try
+        {
+            long deadline = Environment.TickCount64 + (long)wait.TotalMilliseconds;
+            while (sp.IsInTransit && !sp.IsDeleted)
+            {
+                long left = deadline - Environment.TickCount64;
+                if (left <= 0)
+                    break;
+                released.Wait((int)Math.Min(left, 250));
+            }
+        }
+        finally
+        {
+            m_awaitingRelease.TryRemove(new KeyValuePair<UUID, ManualResetEventSlim>(sp.UUID, released));
+        }
     }
 
     #endregion
