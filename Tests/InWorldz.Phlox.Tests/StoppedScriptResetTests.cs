@@ -21,7 +21,10 @@ namespace InWorldz.Phlox.Tests;
 /// SetScriptRunning (Second Life viewer, llpreviewscript.cpp LLLiveLSLEditor::onReset and onRunningCheckboxClicked);
 /// what the region does with them is the server's rule. A running script that is reset restarts as before.
 /// llResetOtherScript is the exception: on a script that is not running it does nothing, and the script is not reset
-/// when it is set running again (https://wiki.secondlife.com/wiki/LlResetOtherScript, Caveats).
+/// when it is set running again (https://wiki.secondlife.com/wiki/LlResetOtherScript, Caveats). A script stopped by a
+/// runtime error is not covered by that rule: llResetOtherScript is how SL restarts one (the crash monitor example on
+/// https://wiki.secondlife.com/wiki/LlGetScriptState), since llSetScriptState "Cannot be used to restart a script that
+/// has encountered a run-time error" (https://wiki.secondlife.com/wiki/LlSetScriptState, Caveats).
 /// </summary>
 // Touches no process-wide state: each test has its own harness, so the class runs in parallel.
 public class StoppedScriptResetTests
@@ -222,5 +225,31 @@ public class StoppedScriptResetTests
         Assert.Equal(2, Ups(h));
         Assert.Equal("up 1", h.Said.Last(s => s.StartsWith("up ")));
         Assert.True(h.Engine.GetScriptState(itemId));
+    }
+
+    /// <summary>
+    /// A script stopped by a runtime error is restarted by llResetOtherScript: its state_entry runs again. The SL wiki's
+    /// crash monitor (llGetScriptState) restarts crashed scripts this way.
+    /// </summary>
+    [Fact]
+    public void LlResetOtherScriptOfACrashedScriptRestartsIt()
+    {
+        // osSetRot is VeryHigh; at VeryLow the call is denied and the denial ends the script with a runtime error
+        const string crasher = @"default {
+            state_entry() { llSay(0, ""crasher up""); osSetRot(llGetKey(), <0,0,0,1>); llSay(0, ""after""); }
+        }";
+        using var h = new SchedulerHarness(cfg => cfg.AddConfig("OSSL").Set("OSFunctionThreatLevel", "VeryLow"));
+        var itemId = h.RezScript(crasher);   // "script1", the item the resetter names
+        Assert.True(h.PumpUntil(() => h.RunStateOf(itemId) == "Killed"), "the script did not crash: " + Log(h));
+        Assert.False(h.Engine.GetScriptState(itemId));
+        var resetterId = h.RezScript(Resetter);
+
+        h.PostTouch(resetterId);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("reset sent")));
+        Assert.True(h.PumpUntil(() => h.Said.Count(s => s == "crasher up") >= 2), "llResetOtherScript did not restart a crashed script: " + Log(h));
+        _out.WriteLine("said=[" + Log(h) + "]");
+
+        Assert.Equal(2, h.Said.Count(s => s == "crasher up"));
+        Assert.DoesNotContain("after", h.Said);
     }
 }

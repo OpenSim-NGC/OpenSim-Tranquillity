@@ -64,6 +64,8 @@ namespace Phlox.ScriptEngine
         bool PostObjectLinksetDataEvent(uint localID, int action, ReadOnlySpan<char> name, ReadOnlySpan<char> value);
         int PostDataserverToPrim(SceneObjectPart part, UUID skip, UUID asker, string queryId, string data);
         bool HasScript(UUID itemID, out bool running);
+        /// <summary>True when this engine runs the script and a runtime error stopped it.</summary>
+        bool IsScriptTerminated(UUID itemID) => false;
         void SetTimerEvent(uint localID, UUID itemID, float sec);
         void SetMinEventDelay(UUID itemID, float seconds);
         void SetItemRunningFlag(uint localId, UUID itemId, bool running);

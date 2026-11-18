@@ -921,6 +921,13 @@ namespace Phlox.ScriptEngine
             return st.GeneralEnable && (st.LocalDisable & ~RuntimeState.LocalDisableFlag.Parcel) == RuntimeState.LocalDisableFlag.None;
         }
 
+        /// <summary>Was this script stopped by a runtime error? Safe from any thread.</summary>
+        internal bool IsTerminated(UUID itemId)
+        {
+            lock (m_AllScriptsLock)
+                return m_AllScripts.TryGetValue(itemId, out Interpreter s) && s.ScriptState.TerminatedReason != null;
+        }
+
         /// <summary>Is this script paused by the parcel rule?</summary>
         internal bool IsParcelPaused(UUID itemId)
         {
