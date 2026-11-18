@@ -8775,6 +8775,11 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         if(c.SceneAgent is null || c.SceneAgent.IsChildAgent ||
                 c.SceneAgent.IsInTransit || seq <= c.m_thisAgentUpdateArgs.lastpacketSequence )
         {
+            // a viewer sends agent updates to the region it believes it is in: one still sending them to a region
+            // that holds it only as a child agent has not taken in a crossing out of here
+            if (c.SceneAgent is ScenePresence child && child.IsChildAgent && !child.IsInTransit)
+                child.AgentUpdateWhileChild();
+
             // throttle reset is done at MoveAgentIntoRegion()
             // called by scenepresence on completemovement
             //PacketPool.Instance.ReturnPacket(packet);

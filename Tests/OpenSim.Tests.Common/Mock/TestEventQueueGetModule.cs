@@ -45,8 +45,8 @@ public class TestEventQueueGetModule : IEventQueue, INonSharedRegionModule
 
         public Event(string name, object[] args)
         {
-            name = Name;
-            args = Args;
+            Name = name;
+            Args = args;
         }
     }
 
