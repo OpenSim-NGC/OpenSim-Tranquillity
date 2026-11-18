@@ -61,6 +61,11 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
     private bool m_ignoreEstatePaymentAccessControl;
 
     private EstateTerrainXferHandler TerrainUploader;
+
+    /// <summary>The highest water and the furthest the ground may be raised or lowered from its baked height, in
+    /// metres (the viewer's region terrain panel).</summary>
+    public const float MaxWaterHeight = 100f;
+    public const float MaxTerrainLimit = 100f;
     public TelehubManager m_Telehub;
 
     public event ChangeDelegate OnRegionInfoChange;
@@ -717,6 +722,15 @@ public class EstateManagementModule : IEstateModule, INonSharedRegionModule
             bool UseEstateSun, bool UseFixedSun, float SunHour,
             bool UseGlobal, bool EstateFixedSun, float EstateSunHour)
     {
+        // a value that is not a number turned the limits off (every comparison with it is false); the rest are
+        // kept to the viewer's ranges (LLPanelRegionTerrainInfo): water 0 to 100 m, the ground up to 100 m above
+        // and below its baked height
+        if (!float.IsFinite(WaterHeight) || !float.IsFinite(TerrainRaiseLimit) || !float.IsFinite(TerrainLowerLimit))
+            return;
+        WaterHeight = Math.Clamp(WaterHeight, 0f, MaxWaterHeight);
+        TerrainRaiseLimit = Math.Clamp(TerrainRaiseLimit, 0f, MaxTerrainLimit);
+        TerrainLowerLimit = Math.Clamp(TerrainLowerLimit, -MaxTerrainLimit, 0f);
+
         double lastwaterlevel = Scene.RegionInfo.RegionSettings.WaterHeight;
         // Water Height
         Scene.RegionInfo.RegionSettings.WaterHeight = WaterHeight;
