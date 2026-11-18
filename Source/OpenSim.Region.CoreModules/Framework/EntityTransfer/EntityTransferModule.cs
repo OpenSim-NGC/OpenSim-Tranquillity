@@ -149,6 +149,86 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     private readonly System.Collections.Concurrent.ConcurrentDictionary<UUID, (GridRegion Destination, string AuthToken)>
         m_awaitingArrival = new();
 
+    /// <summary>
+    /// A crossing out of this region whose viewer may not have taken it in: what the CrossedRegion event said, so it
+    /// can be sent again while the viewer keeps sending agent updates here (it believes it is still in this region,
+    /// where the avatar is now a child agent, and the neighbour waits for it: stuck at the border).
+    /// </summary>
+    private sealed class CrossedAway
+    {
+        public GridRegion Destination;
+        public Vector3 Position, Velocity;
+        public IPEndPoint EndPoint;
+        public string CapsPath;
+        public UUID SessionID;
+        public long SentMs, ExpiresMs;
+        public int Resends;
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<UUID, CrossedAway> m_crossedAway = new();
+
+    /// <summary>How long after a crossing a viewer still sending here counts as having missed it.</summary>
+    public int CrossedRegionResendAfterMs { get; set; } = 3000;
+
+    /// <summary>How many times CrossedRegion is sent again to a viewer that keeps sending here.</summary>
+    public int CrossedRegionMaxResends { get; set; } = 3;
+
+    /// <summary>How long after a crossing the old region watches for a viewer that missed it.</summary>
+    public int CrossedRegionWatchMs { get; set; } = 60000;
+
+    private void WatchCrossedAway(ScenePresence agent, GridRegion destination, Vector3 pos, Vector3 vel,
+        IPEndPoint endpoint, string capsPath)
+    {
+        if (m_eqModule is null)
+            return;
+        long now = Environment.TickCount64;
+        m_crossedAway[agent.UUID] = new CrossedAway
+        {
+            Destination = destination, Position = pos, Velocity = vel, EndPoint = endpoint, CapsPath = capsPath,
+            SessionID = agent.ControllingClient.SessionId, SentMs = now, ExpiresMs = now + CrossedRegionWatchMs
+        };
+        agent.OnAgentUpdateWhileChild -= ResendCrossingToALostViewer;
+        agent.OnAgentUpdateWhileChild += ResendCrossingToALostViewer;
+    }
+
+    private void ResendCrossingToALostViewer(ScenePresence agent)
+    {
+        if (!m_crossedAway.TryGetValue(agent.UUID, out CrossedAway c))
+        {
+            agent.OnAgentUpdateWhileChild -= ResendCrossingToALostViewer;
+            return;
+        }
+
+        long now = Environment.TickCount64;
+        if (now > c.ExpiresMs || agent.IsDeleted)
+        {
+            m_crossedAway.TryRemove(agent.UUID, out _);
+            agent.OnAgentUpdateWhileChild -= ResendCrossingToALostViewer;
+            return;
+        }
+        if (now - c.SentMs < CrossedRegionResendAfterMs)
+            return;
+
+        if (c.Resends >= CrossedRegionMaxResends)
+        {
+            m_log.LogWarning(
+                "[ENTITY TRANSFER MODULE]: The viewer of {0} still acts as if in {1} after a crossing into {2} and {3} resends; giving up",
+                agent.Name, m_sceneName, c.Destination.RegionName, c.Resends);
+            m_crossedAway.TryRemove(agent.UUID, out _);
+            agent.OnAgentUpdateWhileChild -= ResendCrossingToALostViewer;
+            return;
+        }
+
+        c.Resends++;
+        c.SentMs = now;
+        m_log.LogInformation(
+            "[ENTITY TRANSFER MODULE]: The viewer of {0} still acts as if in {1} after crossing into {2}: sending the crossing again ({3})",
+            agent.Name, m_sceneName, c.Destination.RegionName, c.Resends);
+        m_eqModule.CrossRegion(
+            c.Destination.RegionHandle, c.Position, c.Velocity, c.EndPoint, c.CapsPath, agent.UUID, c.SessionID,
+            c.Destination.RegionSizeX, c.Destination.RegionSizeY);
+    }
+
     // For performance, we keed a cached of banned regions so we don't keep going
     //    to the grid service.
     private class BannedRegionCache
@@ -2032,6 +2112,7 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 neighbourRegion.RegionHandle, pos, vel2 /* agent.Velocity */,
                 endpoint, capsPath, agentUUID, agent.ControllingClient.SessionId,
                 neighbourRegion.RegionSizeX, neighbourRegion.RegionSizeY);
+            WatchCrossedAway(agent, neighbourRegion, pos, vel2, endpoint, capsPath);
         }
         else
         {
