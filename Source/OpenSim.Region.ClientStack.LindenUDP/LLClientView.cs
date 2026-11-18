@@ -612,13 +612,37 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
             OutPacket(disable, ThrottleOutPacketType.Unknown);
         }
 
-        // Fire the callback for this connection closing
-        OnConnectionClosed?.Invoke(this);
+        // Fire the callback for this connection closing, each handler on its own: one that throws must not keep the
+        // others (the logouts from presence and grid user among them) from running, nor this client from being taken
+        // out of the scene below. The client is already inactive, which the timeout does not look at again, so an
+        // avatar left in the scene stayed until the region restarted.
+        Action<IClientAPI> closed = OnConnectionClosed;
+        if (closed is not null)
+        {
+            foreach (Action<IClientAPI> handler in closed.GetInvocationList())
+            {
+                try
+                {
+                    handler(this);
+                }
+                catch (Exception e)
+                {
+                    m_log.LogError(e, "{0} A connection closed handler for {1} in {2} failed", LogHeader, Name, m_scene.Name);
+                }
+            }
+        }
 
-        m_asyncPacketProcess.Stop();
+        try
+        {
+            m_asyncPacketProcess.Stop();
 
-        // Flush all of the packets out of the UDP server for this client
-        m_udpServer?.Flush(m_udpClient);
+            // Flush all of the packets out of the UDP server for this client
+            m_udpServer?.Flush(m_udpClient);
+        }
+        catch (Exception e)
+        {
+            m_log.LogError(e, "{0} Stopping the packet processing of {1} in {2} failed", LogHeader, Name, m_scene.Name);
+        }
 
         // Remove ourselves from the scene
         m_scene.RemoveClient(m_agentId, true);
@@ -3403,7 +3427,9 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
                 ItemID = UUID.Zero
             };
 
-            OutPacket(logReply, ThrottleOutPacketType.Task);
+            // sent at once, not queued behind the region's object updates: the close that follows a logout drops the
+            // client's queues (Flush does nothing), and a viewer that gets no reply waits out its own logout timeout
+            OutPacket(logReply, ThrottleOutPacketType.Unknown);
         }
     }
 
