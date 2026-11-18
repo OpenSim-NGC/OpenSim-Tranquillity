@@ -3281,6 +3281,16 @@ public partial class Scene : SceneBase
         // XXX: A race condition exists here where two simultaneous calls to AddNewAgent can interfere with
         // each other.  In practice, this does not currently occur in the code.
         AgentCircuitData aCircuit = m_authenticateHandler.GetAgentCircuitData(client.CircuitCode);
+        if (aCircuit is null)
+        {
+            // closed while it connected (a close, or a second connection from another endpoint, removed the
+            // circuit): there is nothing to add the agent with
+            m_log.LogWarning(
+                "[SCENE]: Not adding {0} {1} to {2}: its circuit {3} was removed while it connected",
+                client.Name, client.AgentId, RegionInfo.RegionName, client.CircuitCode);
+            StatsReporter.UpdateUsersLoggingIn(false);
+            return null;
+        }
 
         // We lock here on AgentCircuitData to prevent a race condition between the thread adding a new connection
         // and a simultaneous one that removes it (as can happen if the client is closed at a particular point
@@ -4850,6 +4860,42 @@ Label_GroupsDone:
             "gives out for itself (the address recorded for the viewer is {4}). Viewers outside this region's network " +
             "cannot reach that address: list the address they should use for their network in [ViewerAddress] Addresses.",
             agentID, RegionInfo.RegionName, RegionInfo.ExternalHostName, RegionInfo.InternalEndPoint.Port, circuit.IPAddress);
+    }
+
+    /// <summary>
+    /// Close the connection of a child agent that the viewer has opened again from another endpoint, keeping what
+    /// the new connection needs: the circuit it was authorised with and the agent's capabilities at the same seed.
+    /// A plain close removes both, so the new connection was refused (and the viewer, which believed itself
+    /// connected, could later not teleport or cross into this region).
+    /// </summary>
+    /// <returns>false when the agent is not a child here (a root agent's connection is closed as before).</returns>
+    public bool ReplaceChildConnection(UUID agentID, uint circuitCode)
+    {
+        AgentCircuitData acd = m_authenticateHandler.GetAgentCircuitData(circuitCode);
+        ScenePresence sp = GetScenePresence(agentID);
+        if (acd is null || sp is null || !sp.IsChildAgent || sp.IsNPC)
+            return false;
+
+        m_log.LogDebug(
+            "[SCENE]: The viewer of child agent {0} in {1} connected again from another endpoint: replacing its connection",
+            agentID, Name);
+
+        // the first connection took the circuit's appearance for its presence; the new presence starts from it
+        AvatarAppearance appearance = sp.Appearance is null ? null : new AvatarAppearance(sp.Appearance);
+
+        CloseAgent(agentID, true);
+
+        acd.Appearance ??= appearance;
+        if (m_authenticateHandler.GetAgentCircuitData(circuitCode) is null)
+            m_authenticateHandler.AddNewCircuit(circuitCode, acd);
+
+        if (m_capsModule is not null && m_capsModule.GetCapsForUser(circuitCode) is null)
+        {
+            m_capsModule.SetAgentCapsSeeds(acd);
+            m_capsModule.CreateCaps(agentID, circuitCode);
+            m_capsModule.ActivateCaps(circuitCode);
+        }
+        return true;
     }
 
     /// <summary>

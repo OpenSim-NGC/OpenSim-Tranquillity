@@ -1772,10 +1772,14 @@ public class LLUDPServer : OpenSimUDPBase
                 if (client.SceneAgent is not null &&
                         client.CircuitCode == circuitCode &&
                         client.SessionId == sessionID &&
-                        client.RemoteEndPoint == remoteEndPoint &&
+                        remoteEndPoint.Equals(client.RemoteEndPoint) &&
                         client.SceneAgent.ControllingClient.SecureSessionId.Equals(sessionInfo.LoginInfo.SecureSession))
                     return client;
-                Scene.CloseAgent(agentID, true);
+
+                // the viewer opened the region again from another endpoint: a child agent keeps its circuit and caps
+                // for the new connection; anything else is closed as before
+                if (client.CircuitCode != circuitCode || !Scene.ReplaceChildConnection(agentID, circuitCode))
+                    Scene.CloseAgent(agentID, true);
             }
 
             LLUDPClient udpClient = new(this, ThrottleRates, Throttle, circuitCode, agentID, remoteEndPoint, m_defaultRTO, m_maxRTO);
