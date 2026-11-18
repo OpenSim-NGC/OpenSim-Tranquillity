@@ -297,6 +297,16 @@ public static class BakeOrchestrator
     /// current face.
     ///
     /// <para>
+    /// A channel the outfit does not use at all (not in <paramref name="needed"/>: the skirt with no skirt worn, an
+    /// extra Bakes-on-Mesh channel no worn wearable paints) has its face set to IMG_DEFAULT_AVATAR, the value the
+    /// official viewer reads as "no bake" (llvoavatar.cpp:11741-11742). Leaving the previous bake there would keep
+    /// a removed skirt drawn (llvoavatar.cpp:8113-8125) and keep painting a removed layer on Bakes-on-Mesh faces
+    /// (llviewerobject.cpp:5185-5194). A channel that held something is reported <see cref="ChannelStatus.Cleared"/>;
+    /// <see cref="Run"/> then drops its index entry and retires the old bake. With <paramref name="needed"/> null
+    /// such channels are left alone, as before.
+    /// </para>
+    ///
+    /// <para>
     /// Supersede (ADR-004): once a channel's new asset is confirmed stored <i>and</i> its face has been moved to
     /// it, the asset the channel held before is deleted. Never before the store — a store that fails must leave
     /// the old bake serving — and never an asset any baked face still points at.
@@ -305,7 +315,7 @@ public static class BakeOrchestrator
     public static IReadOnlyList<ChannelOutcome> StoreAndApply(IReadOnlyList<BakeResult> results, ResolvedInputs inputs, UUID agentId,
         IAssetService assets, AvatarAppearance appearance,
         IReadOnlyDictionary<BakeChannel, StoredBake> reused = null, IReadOnlyDictionary<BakeChannel, StoredBake> previous = null,
-        List<UUID> superseded = null, BakeTimings timings = null)
+        List<UUID> superseded = null, BakeTimings timings = null, IReadOnlyCollection<BakeChannel> needed = null)
     {
         ArgumentNullException.ThrowIfNull(results);
         ArgumentNullException.ThrowIfNull(assets);
@@ -327,6 +337,19 @@ public static class BakeOrchestrator
             if (inputs.IsFailed(ch))
             {
                 outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Failed, UUID.Zero, result?.InputHash ?? "", inputs.FailureReason(ch), result?.Fidelity ?? empty));
+                continue;
+            }
+            if (needed is not null && !needed.Contains(ch))
+            {
+                // The outfit no longer uses this channel. A failed channel was handled above and keeps its face: a
+                // skirt whose asset could not be fetched is still worn, not taken off.
+                var face = appearance.Texture.FaceTextures[FaceOf(ch)];
+                var held = face is not null && face.TextureID != BakeConstants.DefaultAvatarTexture;
+                if (held) face.TextureID = BakeConstants.DefaultAvatarTexture;
+                if (held || (previous is not null && previous.ContainsKey(ch)))
+                    outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Cleared, UUID.Zero, "", "no longer used by the outfit; face reset to the default avatar texture", empty));
+                else
+                    outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Skipped, UUID.Zero, "", "nothing worn for this channel", empty));
                 continue;
             }
             if (result is null)
@@ -456,7 +479,16 @@ public static class BakeOrchestrator
         }
 
         var superseded = new List<UUID>();
-        var outcomes = StoreAndApply(results, inputs, agentId, assets, appearance, reuse.Reused, index.Bakes, superseded, timings);
+        var outcomes = StoreAndApply(results, inputs, agentId, assets, appearance, reuse.Reused, index.Bakes, superseded, timings, needed);
+
+        // Channels the outfit stopped using: drop their index entries so the appearance service stops serving the
+        // old bake, then retire the old asset. The asset goes only once the entry is gone; if the removal fails the
+        // entry stays, and the next bake finds it and tries again.
+        var cleared = outcomes.Where(o => o.Status == ChannelStatus.Cleared && index.Bakes.ContainsKey(o.Channel))
+            .Select(o => o.Channel).ToList();
+        if (cleared.Count > 0 && BakeIndex.Remove(avatars, agentId, cleared))
+            foreach (var ch in cleared)
+                Supersede(assets, appearance, index.Bakes, ch, BakeConstants.DefaultAvatarTexture, superseded, timings);
 
         // the index: one row pair per channel that now has a live bake, plus the three scalars
         var live = outcomes

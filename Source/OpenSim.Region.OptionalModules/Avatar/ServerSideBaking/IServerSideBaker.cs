@@ -35,10 +35,15 @@ public enum ChannelStatus
     /// the delivery.
     /// </summary>
     Reused,
-    /// <summary>The library produced nothing for the channel (nothing worn for it); the face was left as it was.</summary>
+    /// <summary>The library produced nothing for the channel (nothing worn for it, or nothing drawn); the face was left as it was.</summary>
     Skipped,
     /// <summary>An input for the channel was unusable (missing/unparseable wearable, missing/undecodable texture); the face was left as it was.</summary>
     Failed,
+    /// <summary>
+    /// The outfit no longer uses the channel (a skirt or a universal layer was taken off) and it held a bake: its
+    /// face was reset to IMG_DEFAULT_AVATAR, its bake-index entry was removed and the old bake was retired.
+    /// </summary>
+    Cleared,
 }
 
 /// <summary>One channel's outcome. <see cref="AssetId"/> is the stored bake for Baked/Reused, UUID.Zero otherwise; <see cref="InputHash"/> is the bake's <c>BakeHash</c> (the stored asset's Description) or "".</summary>
