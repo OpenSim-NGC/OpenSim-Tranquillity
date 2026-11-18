@@ -107,4 +107,30 @@ public class TerrainEditTests : OpenSimTestCase
         Task.Run(() => Modify(c, 40, 40, 40, 40, parcel: -1)).Wait();
         Assert.True(r.Height(40, 40) > Ground, "the brush did not change the ground after the refused ModifyLand");
     }
+
+    // The flood kept to a parcel took four metres at a time from where the selection started: a selection off the
+    // 4 m grid changed the next parcel's edge with the first parcel's permission, and one ending near the region's
+    // north edge ran past it.
+    [Fact]
+    public void ATerraformKeptToAParcelChangesThatParcelOnly()
+    {
+        TestHelpers.InMethod();
+        Region r = new Region(s_resident, permissions: false);
+        r.Land.Subdivide(0, 0, 16, 16, s_resident);
+        ILandObject square = r.Land.GetLandObject(0, 0);
+        Assert.NotEqual(r.Parcel.LandData.LocalID, square.LandData.LocalID);
+        TestClient c = r.Client(s_resident);
+
+        Modify(c, 0, 2, 15, 19, square.LandData.LocalID);
+
+        Assert.True(r.Height(5, 2) > Ground, "the parcel's own land did not change");
+        Assert.True(r.Height(5, 15) > Ground, "the parcel's own land did not change");
+        for (int y = 16; y <= 19; y++)
+            Assert.Equal(Ground, r.Height(5, y));
+
+        // a selection to the north edge, off the grid
+        Modify(c, 0, 1, 15, 255, r.Parcel.LandData.LocalID);
+        Assert.True(r.Height(5, 255) > Ground, "the selection to the edge did not change the parcel");
+        Assert.True(r.Height(5, 15) < Ground + 1.5f, "the next parcel changed again");
+    }
 }

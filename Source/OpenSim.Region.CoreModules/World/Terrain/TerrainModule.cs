@@ -1486,24 +1486,28 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                             if(parcel == null)
                                 return;
 
+                            // each metre of the selection by the 4 m cell it is in: only the
+                            // parcel's own land changes, whatever the selection's alignment
                             bool[,] parcelmap = parcel.GetLandBitmap();
-                            //ugly
+                            int cellsX = parcelmap.GetLength(0);
+                            int cellsY = parcelmap.GetLength(1);
                             for (x = startX; x <= endX; x++)
                             {
                                 int px = x >> 2;
-                                y = startY;
-                                while( y <= endY)
+                                if (px >= cellsX)
+                                    break;
+                                for (y = startY; y <= endY; y++)
                                 {
                                     int py = y >> 2;
-                                    bool inp = parcelmap[px, py];
-                                    fillArea[x, y++] = inp;
-                                    fillArea[x, y++] = inp;
-                                    fillArea[x, y++] = inp;
-                                    fillArea[x, y++] = inp;
+                                    if (py >= cellsY)
+                                        break;
+                                    if (parcelmap[px, py])
+                                    {
+                                        fillArea[x, y] = true;
+                                        allowed = true;
+                                    }
                                 }
                             }
-
-                            allowed = true;
                         }
 
                         if (allowed)
