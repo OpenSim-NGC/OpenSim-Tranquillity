@@ -1272,6 +1272,11 @@ public class LandManagementModule : INonSharedRegionModule , ILandChannel
 
         newLand.SetLandBitmap(newLand.GetSquareLandBitmap(start_x, start_y, end_x, end_y));
 
+        // a selection that holds no whole 4 m cell (a point, east of west, off the grid) gives
+        // no land: no parcel, or one of no land would be kept and stored for good
+        if (newLandData.Area <= 0 || newLandData.Area >= startLandData.Area)
+            return;
+
         //lets set the subdivision area of the original to false
         int startLandObjectIndex = startLandObject.LandData.LocalID;
         lock (m_landList)

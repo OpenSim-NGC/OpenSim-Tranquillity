@@ -192,6 +192,26 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.Equal(0u, f.Current.Flags & (uint)ParcelFlags.UseBanList);
     }
 
+    // A selection holding no whole 4 m cell (a point, east of west, off the grid) gave a parcel with no land: kept,
+    // stored, and never removable, one more with each such request.
+    [Theory]
+    [InlineData(8, 8, 8, 8)]
+    [InlineData(9, 9, 11, 11)]
+    [InlineData(20, 20, 8, 8)]
+    public void TestSubdivideOfNoLandMakesNoParcel(int west, int south, int east, int north)
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        f.Stores = 0;
+
+        f.Module.Subdivide(west, south, east, north, f.OwnerId);
+
+        Assert.Single(f.Module.AllParcels());
+        Assert.Equal(f.Parcel.LandData.LocalID, f.Module.GetLandObject(west, south).LandData.LocalID);
+        Assert.Equal((int)(Constants.RegionSize * Constants.RegionSize), f.Parcel.LandData.Area);
+        Assert.Equal(0, f.Stores);
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>
