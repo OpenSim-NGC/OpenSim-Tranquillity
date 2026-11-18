@@ -85,6 +85,12 @@
     ;; same avatar again for 60 seconds. (default is 30)
     ; ChildPresenceWaitSeconds = 30
 
+    ;# {RootAgentWaitSeconds} {} {Seconds a region waits for a teleporting avatar's viewer to finish arriving} {} 25
+    ;; When an avatar teleports into this region, the viewer connects (see ChildPresenceWaitSeconds) and then
+    ;; finishes arriving. The region waits this long for that before the teleport fails and the avatar stays
+    ;; where it was. A wait ends at once if the avatar is closed here or its viewer logs out. (default is 25)
+    ; RootAgentWaitSeconds = 25
+
     ;# {ConsolePrompt} {} {ConsolePrompt} {} "Region (\R) "
     ;; Console prompt
     ;; Certain special characters can be used to customize the prompt
