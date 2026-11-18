@@ -104,15 +104,19 @@ public class SQLiteGenericTableHandler<T> : SQLiteFramework where T: class, new(
         if (m_ColumnNames != null)
             return;
 
-        m_ColumnNames = new List<string>();
+        // filled, then published whole: a query on another thread uses the list as soon as it is set (the first
+        // logins after a start, at the same moment, read rows without the columns not added yet)
+        List<string> columnNames = new List<string>();
 
         DataTable schemaTable = reader.GetSchemaTable();
         foreach (DataRow row in schemaTable.Rows)
         {
             if (row["ColumnName"] != null &&
                     (!m_Fields.ContainsKey(row["ColumnName"].ToString())))
-                m_ColumnNames.Add(row["ColumnName"].ToString());
+                columnNames.Add(row["ColumnName"].ToString());
         }
+
+        m_ColumnNames = columnNames;
     }
 
     public virtual T[] Get(string field, string key)
