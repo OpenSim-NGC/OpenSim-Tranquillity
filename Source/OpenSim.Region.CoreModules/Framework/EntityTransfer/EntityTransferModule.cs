@@ -141,6 +141,14 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     /// </summary>
     private EntityTransferStateMachine m_entityTransferStateMachine;
 
+    /// <summary>
+    /// Teleports waiting for the destination to report the viewer's arrival (UpdateAgent with wait_for_root), by
+    /// agent: where to, and the session id that authorises a close there. A viewer that logs out meanwhile will not
+    /// arrive, so the destination is told at once instead of waiting it out.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<UUID, (GridRegion Destination, string AuthToken)>
+        m_awaitingArrival = new();
+
     // For performance, we keed a cached of banned regions so we don't keep going
     //    to the grid service.
     private class BannedRegionCache
@@ -485,6 +493,19 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
             m_log.LogDebug(
                 "[ENTITY TRANSFER MODULE]: Aborted teleport request from {0} in {1} due to simultaneous logout",
                 client.Name, m_sceneName);
+
+            // the destination is holding the agent for a viewer that has gone: close it there, which ends its wait
+            if (m_awaitingArrival.TryRemove(client.AgentId, out var awaiting))
+            {
+                UUID agentID = client.AgentId;
+                Util.FireAndForget(_ =>
+                {
+                    m_log.LogDebug(
+                        "[ENTITY TRANSFER MODULE]: Closing {0} in {1}: its viewer logged out before arriving",
+                        agentID, awaiting.Destination.RegionName);
+                    m_scene.SimulationService.CloseAgent(awaiting.Destination, agentID, awaiting.AuthToken);
+                }, null, "EntityTransferModule.CloseAbandonedArrival");
+            }
         }
     }
 
@@ -500,6 +521,19 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
     public void Teleport(ScenePresence sp, ulong regionHandle, Vector3 position, Vector3 lookAt, uint teleportFlags)
     {
         UUID spUUID = sp.UUID;
+
+        // A child agent is the avatar seen from a neighbour; the avatar itself is in its root region. Teleporting
+        // from here would move a copy, and a destination that is the root region would close the real avatar and
+        // log it off the grid. A viewer that lost track of a crossing asks the wrong region; tell it so. (The root
+        // region marks its own avatar child while it is in transit; the transit check below answers that.)
+        if (sp.IsChildAgent && !sp.IsInTransit)
+        {
+            m_log.LogDebug(
+                "[ENTITY TRANSFER MODULE]: Ignoring teleport request of {0} in {1}: only a child agent here, the avatar is in another region",
+                sp.Name, m_sceneName);
+            sp.ControllingClient?.SendTeleportFailed("You are not in this region. Please try again in a moment.");
+            return;
+        }
         if (m_scene.Permissions.IsGridGod(spUUID))
         {
             // This user will be a God in the destination scene, too
@@ -973,7 +1007,8 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 "[ENTITY TRANSFER MODULE]: Teleport of {0} from {1} to {2} was refused because {3}",
                 sp.Name, sp.Scene.RegionInfo.RegionName, finalDestination.RegionName, reason);
 
-            sp.ControllingClient.SendTeleportFailed(reason);
+            // the presence can have been closed while the destination was asked (its client is then gone)
+            sp.ControllingClient?.SendTeleportFailed(reason);
             sp.IsInTransit = false;
             return;
         }
@@ -1216,7 +1251,8 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
                 "[ENTITY TRANSFER MODULE]: Teleport of {0} from {1} to {2} was refused because {3}",
                 sp.Name, sp.Scene.RegionInfo.RegionName, finalDestination.RegionName, reason);
 
-            sp.ControllingClient.SendTeleportFailed(reason);
+            // the presence can have been closed while the destination was asked (its client is then gone)
+            sp.ControllingClient?.SendTeleportFailed(reason);
             sp.IsInTransit = false;
             return;
         }
@@ -1292,7 +1328,18 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
         // Send the Update. If this returns true, we know the client has contacted the destination
         // via CompleteMovementIntoRegion, so we can let go.
         // If it returns false, something went wrong, and we need to abort.
-        if (!UpdateAgent(reg, finalDestination, agent, sp, ctx))
+        m_awaitingArrival[spUUID] = (finalDestination, agentCircuit.SessionID.ToString());
+        bool arrived;
+        try
+        {
+            arrived = UpdateAgent(reg, finalDestination, agent, sp, ctx);
+        }
+        finally
+        {
+            m_awaitingArrival.TryRemove(spUUID, out _);
+        }
+
+        if (!arrived)
         {
             sp.IsChildAgent = false;
             if (m_entityTransferStateMachine.GetAgentTransferState(sp.UUID) == AgentTransferState.Aborting)
@@ -1400,11 +1447,16 @@ public class EntityTransferModule : INonSharedRegionModule, IEntityTransferModul
 
         m_interRegionTeleportFailures.Value++;
 
-        sp.ControllingClient.SendTeleportFailed(
+        // the presence can have been closed while the destination was asked: nobody is left to tell
+        IClientAPI client = sp.ControllingClient;
+        if (client is null)
+            return;
+
+        client.SendTeleportFailed(
             string.Format(
                 "Problems connecting to destination {0}, reason: {1}", finalDestination.RegionName, reason));
 
-        sp.Scene.EventManager.TriggerTeleportFail(sp.ControllingClient, logout);
+        sp.Scene.EventManager.TriggerTeleportFail(client, logout);
     }
 
     protected virtual bool CreateAgent(ScenePresence sp, GridRegion reg, GridRegion finalDestination, AgentCircuitData agentCircuit, uint teleportFlags, EntityTransferContext ctx, out string reason, out bool logout)
