@@ -256,6 +256,47 @@ public class LandManagementModuleTests : OpenSimTestCase
         }
     }
 
+    // The UDP ParcelPropertiesUpdate carries no media type, description, size or loop and no avatar visibility or
+    // sound settings. Taking them as the message left them turned "see avatars" and the sounds off and set the
+    // media type to null, which the database refuses (NOT NULL): every later store of the parcel failed.
+    [Fact]
+    public void TestAUdpPropertiesUpdateKeepsWhatItDoesNotCarry()
+    {
+        TestHelpers.InMethod();
+        ParcelFixture f = new ParcelFixture();
+        LandData d = f.Current;
+        d.MediaType = "text/html";
+        d.MediaDescription = "the screen";
+        d.MediaWidth = 640;
+        d.MediaHeight = 480;
+        d.MediaLoop = true;
+        d.SeeAVs = true;
+        d.AnyAVSounds = true;
+        d.GroupAVSounds = true;
+
+        LandUpdateArgs udp = PropertiesSave(d, d.Flags);
+        udp.Name = "renamed";
+        udp.MediaType = null;
+        udp.MediaDescription = null;
+        udp.WithoutMediaDetailsAndAvatarSettings = true;
+        f.Parcel.UpdateLandProperties(udp, f.Client, out _, out _);
+
+        LandData now = f.Current;
+        Assert.Equal("renamed", now.Name);
+        Assert.Equal("text/html", now.MediaType);
+        Assert.Equal("the screen", now.MediaDescription);
+        Assert.Equal((640, 480, true), (now.MediaWidth, now.MediaHeight, now.MediaLoop));
+        Assert.True(now.SeeAVs && now.AnyAVSounds && now.GroupAVSounds);
+
+        // the capability carries them all, and they change
+        LandUpdateArgs cap = PropertiesSave(now, now.Flags);
+        cap.MediaType = "video/mp4";
+        cap.SeeAVs = false;
+        f.Parcel.UpdateLandProperties(cap, f.Client, out _, out _);
+        Assert.Equal("video/mp4", f.Current.MediaType);
+        Assert.False(f.Current.SeeAVs);
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>
