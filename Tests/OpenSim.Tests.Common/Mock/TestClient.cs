@@ -1156,8 +1156,14 @@ public class TestClient : IClientAPI, IClientCore
     {
     }
 
+    /// <summary>
+    /// Test seam: the ParcelProperties the region sends this client (sequence id, parcel).
+    /// </summary>
+    public event Action<int, ILandObject> OnSentLandProperties;
+
     public void SendLandProperties(int sequence_id, bool snap_selection, int request_result, ILandObject lo, float simObjectBonusFactor, int parcelObjectCapacity, int simObjectCapacity, uint regionFlags)
     {
+        OnSentLandProperties?.Invoke(sequence_id, lo);
     }
 
     public void SendLandAccessListData(List<LandAccessEntry> accessList, uint accessFlag, int localLandID)

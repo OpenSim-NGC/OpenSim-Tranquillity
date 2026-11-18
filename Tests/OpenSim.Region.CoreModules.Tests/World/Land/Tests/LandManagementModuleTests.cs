@@ -374,6 +374,28 @@ public class LandManagementModuleTests : OpenSimTestCase
         Assert.True(send.Wait(TimeSpan.FromSeconds(10)), "the overlay was never sent");
     }
 
+    // About Land compared the selection's south edge with the region's width: in a region taller than wide nothing
+    // north of the width was answered, and in one wider than tall a south edge past the height reached the parcel map.
+    [Fact]
+    public void TestAboutLandIsAnsweredAllOverARegionTallerThanWide()
+    {
+        TestHelpers.InMethod();
+        UUID owner = TestHelpers.ParseTail(0x1);
+        LandManagementModule lmm = new LandManagementModule();
+        Scene scene = new SceneHelpers().SetupScene("tall", UUID.Random(), 1000, 1000, 256, 512, new Nini.Config.IniConfigSource());
+        SceneHelpers.SetupSceneModules(scene, lmm);
+        ILandObject lo = new LandObject(owner, false, scene);
+        lo.SetLandBitmap(lo.GetSquareLandBitmap(0, 0, 256, 512));
+        lmm.AddLandObject(lo);
+        TestClient client = (TestClient)SceneHelpers.AddScenePresence(scene, owner).ControllingClient;
+        List<int> answered = new();
+        client.OnSentLandProperties += (sequence, _) => answered.Add(sequence);
+
+        lmm.ClientOnParcelPropertiesRequest(0, 400, 4, 404, 7, false, client);
+
+        Assert.Equal(new List<int> { 7 }, answered);
+    }
+
     /// <summary>
     /// Test parcels on region when no land data exists to be loaded.
     /// </summary>
