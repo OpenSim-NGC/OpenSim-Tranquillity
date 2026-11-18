@@ -163,8 +163,17 @@ public abstract class OpenSimUDPBase
         return new UDPPacketBuffer(remoteEndpoint);
     }
 
+    /// <summary>The size of the buffers the pool hands out (UDPPacketBuffer's default).</summary>
+    public static readonly int PooledBufferSize = new UDPPacketBuffer(null).Data.Length;
+
     public static void FreeUDPBuffer(UDPPacketBuffer buf)
     {
+        // Packets are written into pooled buffers without bounds checks (LLUDPZeroEncoder, Unsafe.Add), sized for the
+        // default buffer. A smaller buffer taken into the pool would be overrun by the next packet built in it,
+        // corrupting the managed heap; the test helpers did that with buffers sized to one incoming packet.
+        if (buf.Data is null || buf.Data.Length < PooledBufferSize)
+            return;
+
         lock (m_udpBuffersPoolLock)
         {
             if(buf.DataLength < 0)
