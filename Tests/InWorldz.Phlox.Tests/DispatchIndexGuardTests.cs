@@ -96,7 +96,8 @@ public class DispatchIndexGuardTests
         // The wind-volume functions add three names (iwWindVolumeCreate, iwWindVolumeRemove, iwWindVolumes).
         // Second Life's forms of twelve ll functions add seven names (llFindNotecardTextCount, llSetParcelForSale, llRemoteLoadScript,
         // llRemoteDataSetRegion and the three llGetGameControlMode functions); the other five are overloads of names already here.
-        Assert.Equal(943, baseline.Count);
+        // osSetScriptEngine adds one name.
+        Assert.Equal(944, baseline.Count);
     }
 
     /// <summary>

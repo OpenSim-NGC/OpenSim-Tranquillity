@@ -6990,6 +6990,13 @@ namespace InWorldz.Phlox.Types
                 ParamNames = new string[] { "agent", "flags", "options" },
                 TableIndex = 983
             }},
+            {"osSetScriptEngine", new FunctionSig {
+                FunctionName = "osSetScriptEngine",
+                ReturnType = VarType.Integer,
+                ParamTypes = new VarType[] { VarType.String, VarType.String },
+                ParamNames = new string[] { "scriptName", "target" },
+                TableIndex = 984
+            }},
          };
 
         /// <summary>

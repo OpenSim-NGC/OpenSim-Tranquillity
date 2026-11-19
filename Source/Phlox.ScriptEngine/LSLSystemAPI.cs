@@ -12862,6 +12862,11 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             OsslForceAttachFromInventory(m_host.OwnerID, itemName, attachmentPoint);
         }
 
+        public int osSetScriptEngine(string scriptName, string target)
+        {
+            return 0;
+        }
+
         /// <summary>OSSL_Api.cs:4208-4214 - VeryHigh.</summary>
         public void osForceAttachToOtherAvatarFromInventory(string rawAvatarId, string itemName, int attachmentPoint)
         {

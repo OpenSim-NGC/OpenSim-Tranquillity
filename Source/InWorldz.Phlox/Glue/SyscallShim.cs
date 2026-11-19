@@ -1074,6 +1074,7 @@ private static string ConvToString(object o)
 								Shim_llMapBeaconRegion,                //981
 								Shim_llGiveAgentInventoryList,         //982
 								Shim_llTransferOwnershipFlags,         //983
+								Shim_osSetScriptEngine,                //984
         };
 
         /// <summary>
@@ -7536,6 +7537,12 @@ private static string ConvToString(object o)
             string p1 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
             string p0 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
             Defer(self, "llGiveAgentInventory", new object[] { p0, p1, p2, p3 }, () => ConvToLSLType(self._systemAPI.llGiveAgentInventory(p0, p1, p2, p3)), -4, false);
+        }
+        static private void Shim_osSetScriptEngine(SyscallShim self)
+        {
+            string p1 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
+            string p0 = ConvToString(self._interpreter.ScriptState.Operands.Pop());
+            Defer(self, "osSetScriptEngine", new object[] { p0, p1 }, () => ConvToLSLType(self._systemAPI.osSetScriptEngine(p0, p1)), 0, false);
         }
         static private void Shim_llTransferOwnershipFlags(SyscallShim self)
         {

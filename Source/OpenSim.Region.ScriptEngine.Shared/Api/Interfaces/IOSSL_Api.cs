@@ -212,6 +212,11 @@ public interface IOSSL_Api
           void osForceAttachToAvatarFromInventory(string itemName, int attachment);
 
     /// <summary>
+    /// Chooses the engine of a script in the same prim, for the prim's owner.
+    /// </summary>
+    LSL_Integer osSetScriptEngine(string scriptName, string target);
+
+    /// <summary>
     /// Attach an inventory item in the object containing this script to any avatar in the region without asking for PERMISSION_ATTACH
     /// </summary>
     /// <remarks>

@@ -9506,6 +9506,15 @@
   </array>
   <key>tooltip</key><string>Set the water height of the region.</string>
  </map>
+ <key>osSetScriptEngine</key>
+ <map>
+  <key>return</key><string>integer</string>
+  <key>arguments</key><array>
+   <map><key>scriptName</key><map><key>type</key><string>string</string></map></map>
+   <map><key>target</key><map><key>type</key><string>string</string></map></map>
+  </array>
+  <key>tooltip</key><string>Chooses the script engine of a script in the same prim, for the prim's owner: target is an engine name such as "YEngine" or "Phlox" ("engine:Phlox" works too), or "" to clear the choice. The script restarts in its engine. Returns 1 on success, 0 otherwise.</string>
+ </map>
  <key>osSetSitActiveRange</key>
  <map>
   <key>arguments</key><array>

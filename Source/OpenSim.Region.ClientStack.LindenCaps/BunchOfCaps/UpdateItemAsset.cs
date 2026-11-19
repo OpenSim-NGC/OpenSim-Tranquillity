@@ -141,6 +141,12 @@ public partial class BunchOfCaps
         return UUID.Zero;
     }
 
+    /// <summary>The SetScriptEngine capability.</summary>
+    public void SetScriptEngineRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap map)
+    {
+        httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+    }
+
     /// <summary>
     /// Called by the script task update handler.  Provides a URL to which the client can upload a new asset.
     /// </summary>

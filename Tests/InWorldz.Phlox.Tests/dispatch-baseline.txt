@@ -946,3 +946,4 @@ llRemoteDataSetRegion 977
 llGetGameControlMode 978
 llGetGameControlModeAxes 979
 llGetGameControlModeButtons 980
+osSetScriptEngine 984

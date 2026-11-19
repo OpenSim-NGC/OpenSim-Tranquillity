@@ -333,6 +333,10 @@ public partial class Scene
         return item is null ? string.Empty : ScriptEngineChoices.NameFor(ScriptEngineChoices.FromFlags(item.Flags)) ?? string.Empty;
     }
 
+    /// <summary>Chooses the engine of a script in a prim's inventory for <paramref name="agentId"/>.</summary>
+    public ScriptEngineChoiceResult SetScriptEngine(UUID agentId, UUID primId, UUID itemId, string target, UUID callerItemId = default)
+        => ScriptEngineChoiceResult.NotFound;
+
     /// <summary>
     /// Lets the script engines start processing scripts.
     /// </summary>

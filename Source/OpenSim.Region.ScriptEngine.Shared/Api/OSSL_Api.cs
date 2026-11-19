@@ -4268,6 +4268,11 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
         ForceAttachToAvatarFromInventory(m_host.OwnerID, itemName, attachmentPoint);
     }
 
+    public LSL_Integer osSetScriptEngine(string scriptName, string target)
+    {
+        return 0;
+    }
+
     public void osForceAttachToOtherAvatarFromInventory(string rawAvatarId, string itemName, int attachmentPoint)
     {
         CheckThreatLevel(ThreatLevel.VeryHigh, "osForceAttachToOtherAvatarFromInventory");

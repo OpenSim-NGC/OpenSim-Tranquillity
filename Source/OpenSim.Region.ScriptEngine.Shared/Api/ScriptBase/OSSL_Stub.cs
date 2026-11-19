@@ -388,6 +388,11 @@ public partial class ScriptBaseClass
         m_OSSL_Functions.osForceAttachToAvatarFromInventory(itemName, attachmentPoint);
     }
 
+    public LSL_Integer osSetScriptEngine(string scriptName, string target)
+    {
+        return m_OSSL_Functions.osSetScriptEngine(scriptName, target);
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void osForceAttachToOtherAvatarFromInventory(string rawAvatarId, string itemName, int attachmentPoint)
     {
