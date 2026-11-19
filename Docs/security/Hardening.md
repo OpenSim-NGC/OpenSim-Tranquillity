@@ -17,7 +17,7 @@ For the active region control-plane checks, configure trusted peer addresses in 
 ControlPlaneTrustedHosts = 10.20.0.10, 10.20.0.21, 10.20.0.22
 ```
 
-The region control-plane endpoints accept trusted hosts from `[Network]` or `[Security]` and may use hostnames, URLs, and the local `[Network] hostname`. The service checks the actual TCP peer address and does not use `X-Forwarded-For`. `/assets` and `/xinventory` are currently excluded from control-plane checks.
+The region control-plane endpoints read trusted hosts from both `[Network]` and `[Security]`. An entry may be an address (`10.20.0.10`, `fd00::1`), an address with a port (`10.20.0.10:8003`, `[fd00::1]:8003`), a hostname with or without a port (`robust`, `robust:8003`), or a URL (`http://robust:8003`); the local `[Network] hostname` is read the same way. Address ranges are not supported. A hostname is looked up once, when the service starts. An entry that names no host, or whose name cannot be looked up, is logged as a warning at startup and trusts nothing; the startup line `Trusted control-plane addresses:` lists every address in use. The service checks the actual TCP peer address and does not use `X-Forwarded-For`. `/assets` and `/xinventory` are currently excluded from control-plane checks.
 
 The configured local `[Network] hostname` is also trusted. This keeps same-host multi-region deployments working when regions contact each other through the host's LAN name instead of loopback.
 

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using Nini.Config;
 using OpenMetaverse.StructuredData;
@@ -14,22 +15,37 @@ public class ControlPlaneAccess
     public const string JsonRpcRemoteAddressKey = "__opensim_remote_address";
     public const string JsonRpcLlHttpRequestKey = "__opensim_llhttprequest";
 
+    private static readonly char[] s_separators = { ',', ';', '|', ' ', '\t', '\r', '\n' };
+
+    /// <summary>The entries already warned about: every service builds its own access list from the same settings.</summary>
+    private static readonly ConcurrentDictionary<string, byte> s_warned = new();
+
     private readonly HashSet<IPAddress> m_trustedHosts = new();
     private readonly HashSet<IPAddress> m_controlPlaneTrustedHosts = new();
+    private readonly Func<string, IPAddress[]> m_lookUp = Dns.GetHostAddresses;
 
-    public ControlPlaneAccess(IConfigSource config)
+    public ControlPlaneAccess(IConfigSource config) : this(config, null)
     {
+    }
+
+    /// <param name="config">The settings holding the trusted hosts.</param>
+    /// <param name="lookUp">Replaces the name lookup; Dns when null.</param>
+    public ControlPlaneAccess(IConfigSource config, Func<string, IPAddress[]> lookUp)
+    {
+        if (lookUp is not null)
+            m_lookUp = lookUp;
+
         AddTrustedAddress(IPAddress.Loopback);
         AddTrustedAddress(IPAddress.IPv6Loopback);
 
-        string hosts = GetConfiguredHosts(config);
-        foreach (string host in hosts.Split(new[] { ',', ';', '|', ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-            AddTrustedHost(host.Trim());
+        foreach (string entry in GetConfiguredHosts(config))
+            AddTrustedHost(entry);
 
         AddConfiguredLocalHost(config);
         AddExplicitControlPlaneTrustedHosts(config);
 
-        m_log.LogInformation("[CONTROL PLANE ACCESS]: Trusted control-plane addresses configured: {0}", m_trustedHosts.Count);
+        m_log.LogInformation("[CONTROL PLANE ACCESS]: Trusted control-plane addresses: {0}",
+            string.Join(", ", m_trustedHosts));
     }
 
     public bool IsTrustedControlPlaneCaller(IPEndPoint remote)
@@ -107,6 +123,33 @@ public class ControlPlaneAccess
         return dialog == 250 || dialog == (byte)OpenMetaverse.InstantMessageDialog.GodLikeRequestTeleport;
     }
 
+    /// <summary>
+    /// The host an entry names: an address, a name, a URL, a host:port or an [IPv6]:port. Empty when it names none.
+    /// An address is read as one first: .NET takes "robust:8003" and "fd00::1" for URIs of the schemes "robust" and
+    /// "fd00", with no host, and a lookup of an empty name answers this machine's own addresses.
+    /// </summary>
+    public static string HostOf(string entry)
+    {
+        entry = entry?.Trim() ?? string.Empty;
+        if (entry.Length == 0 || IPAddress.TryParse(entry, out _))
+            return entry;
+
+        if (Uri.TryCreate(entry, UriKind.Absolute, out Uri uri) && uri.Host.Length > 0)
+            return uri.Host;
+
+        if (entry[0] == '[')
+        {
+            int endBracket = entry.IndexOf(']');
+            return endBracket > 0 ? entry.Substring(1, endBracket - 1) : string.Empty;
+        }
+
+        int colon = entry.LastIndexOf(':');
+        if (colon >= 0 && entry.IndexOf(':') == colon)
+            return entry.Substring(0, colon);
+
+        return entry;
+    }
+
     private static bool IsLlHttpRequest(bool hasSecondLifeShardHeader)
     {
         return hasSecondLifeShardHeader;
@@ -119,7 +162,11 @@ public class ControlPlaneAccess
         return false;
     }
 
-    private static string GetConfiguredHosts(IConfigSource config)
+    /// <summary>
+    /// The entries of every list of trusted hosts. A list in [Security] used to hide the one in [Network], which was
+    /// then still read for the mutation callers.
+    /// </summary>
+    private static IEnumerable<string> GetConfiguredHosts(IConfigSource config)
     {
         string[] sections = ["Security", "Network"];
         string[] keys = ["ControlPlaneTrustedHosts", "TrustedControlPlaneHosts"];
@@ -132,14 +179,14 @@ public class ControlPlaneAccess
 
             foreach (string key in keys)
             {
-                string value = section.GetString(key, string.Empty);
-                if (!string.IsNullOrWhiteSpace(value))
-                    return value;
+                foreach (string entry in Entries(section.GetString(key, string.Empty)))
+                    yield return entry;
             }
         }
-
-        return string.Empty;
     }
+
+    private static string[] Entries(string list) =>
+        (list ?? string.Empty).Split(s_separators, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private void AddConfiguredLocalHost(IConfigSource config)
     {
@@ -153,21 +200,17 @@ public class ControlPlaneAccess
     private void AddExplicitControlPlaneTrustedHosts(IConfigSource config)
     {
         IConfig network = config?.Configs["Network"];
-        string hosts = network?.GetString("ControlPlaneTrustedHosts", string.Empty) ?? string.Empty;
 
-        foreach (string host in hosts.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        // The same list as the trusted hosts, read the same way; only its addresses count here. A name is not an
+        // error: the trusted hosts take it.
+        foreach (string entry in Entries(network?.GetString("ControlPlaneTrustedHosts", string.Empty)))
         {
-            string addressText = host.Trim();
-            if (IPAddress.TryParse(addressText, out IPAddress address))
-            {
+            if (IPAddress.TryParse(HostOf(entry), out IPAddress address))
                 m_controlPlaneTrustedHosts.Add(NormalizeAddress(address));
-            }
             else
-            {
-                m_log.LogWarning(
-                    "[CONTROL PLANE ACCESS]: Ignoring invalid ControlPlaneTrustedHosts address {Address}; IPv4 or IPv6 addresses are required",
-                    addressText);
-            }
+                m_log.LogDebug(
+                    "[CONTROL PLANE ACCESS]: ControlPlaneTrustedHosts entry {Entry} is not an address: not a mutation caller",
+                    entry);
         }
 
         m_log.LogInformation(
@@ -175,40 +218,55 @@ public class ControlPlaneAccess
             m_controlPlaneTrustedHosts.Count);
     }
 
-    private void AddTrustedHost(string host)
+    private void AddTrustedHost(string entry)
     {
-        if (string.IsNullOrWhiteSpace(host))
+        if (string.IsNullOrWhiteSpace(entry))
             return;
 
-        if (Uri.TryCreate(host, UriKind.Absolute, out Uri uri))
-            host = uri.Host;
-        else if (host[0] == '[')
-        {
-            int endBracket = host.IndexOf(']');
-            if (endBracket > 0)
-                host = host.Substring(1, endBracket - 1);
-        }
-        else
-        {
-            int colon = host.LastIndexOf(':');
-            if (colon > 0 && host.IndexOf(':') == colon)
-                host = host.Substring(0, colon);
-        }
-
+        string host = HostOf(entry);
         if (IPAddress.TryParse(host, out IPAddress address))
         {
             AddTrustedAddress(address);
             return;
         }
 
+        // never look up an empty name: the answer is this machine's own addresses
+        if (host.Length == 0)
+        {
+            WarnOnce(entry, "names no host");
+            return;
+        }
+
+        if (host.Contains('/'))
+        {
+            WarnOnce(entry, "is an address range, which is not supported: list each address");
+            return;
+        }
+
+        IPAddress[] resolved;
         try
         {
-            foreach (IPAddress resolvedAddress in Dns.GetHostAddresses(host))
-                AddTrustedAddress(resolvedAddress);
+            resolved = m_lookUp(host) ?? Array.Empty<IPAddress>();
         }
-        catch
+        catch (Exception e)
         {
+            WarnOnce(entry, "could not be looked up (" + e.Message + ")");
+            return;
         }
+
+        if (resolved.Length == 0)
+            WarnOnce(entry, "has no address");
+
+        foreach (IPAddress resolvedAddress in resolved)
+            AddTrustedAddress(resolvedAddress);
+    }
+
+    private static void WarnOnce(string entry, string problem)
+    {
+        if (s_warned.TryAdd(entry + "\n" + problem, 0))
+            m_log.LogWarning(
+                "[CONTROL PLANE ACCESS]: Trusted host {Entry} {Problem}: calls from it will be refused",
+                entry, problem);
     }
 
     private void AddTrustedAddress(IPAddress address)
