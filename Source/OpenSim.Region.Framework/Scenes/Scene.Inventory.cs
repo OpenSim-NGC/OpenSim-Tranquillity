@@ -259,6 +259,18 @@ public partial class Scene
         return item is null ? ScriptCompileTarget.Unspecified : ScriptCompileTargets.FromFlags(item.Flags);
     }
 
+    /// <summary>Whether this region keeps a script engine a person chooses for a script ([Startup] ScriptEngineChoice).</summary>
+    public bool ScriptEngineChoiceEnabled => false;
+
+    /// <summary>Whether an object's owner may choose the engine of a script they cannot edit ([Startup] ScriptEngineChoiceNoMod).</summary>
+    public bool ScriptEngineChoiceNoModEnabled => false;
+
+    /// <summary>The engine number for a name a save or a request used, or <see cref="ScriptEngineChoices.None"/>.</summary>
+    public int ScriptEngineCodeFor(string engineName) => ScriptEngineChoices.None;
+
+    /// <summary>The name of the engine saved with a script in a prim's inventory; empty when there is none.</summary>
+    public string GetScriptEngineChoice(UUID primId, UUID itemId) => string.Empty;
+
     /// <summary>
     /// Lets the script engines start processing scripts.
     /// </summary>

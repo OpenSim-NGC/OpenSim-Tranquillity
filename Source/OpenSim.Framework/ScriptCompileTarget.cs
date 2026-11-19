@@ -56,6 +56,18 @@ public static class ScriptCompileTargets
     /// </summary>
     public static uint ForViewer(uint flags) => flags & ~LslOnLuauFlag;
 
+    /// <summary>
+    /// Whether the item carries a choice the region made for a viewer or a script: a Luau target or a saved engine
+    /// (<see cref="ScriptEngineChoices"/>).
+    /// </summary>
+    public static bool CarriesChoice(uint flags) => FromFlags(flags) != ScriptCompileTarget.Unspecified;
+
+    /// <summary>
+    /// The flags of a script item after a save that named <paramref name="viewerValue"/> as its target.
+    /// </summary>
+    public static uint ApplySaveTarget(uint flags, string viewerValue, Func<string, int> engineCode = null)
+        => viewerValue is null ? flags : WithTarget(flags, Parse(viewerValue));
+
     /// <summary>The target a viewer named in the "target" field of a script upload; anything but "luau" and "lsl-luau" is <see cref="ScriptCompileTarget.Unspecified"/>.</summary>
     public static ScriptCompileTarget Parse(string viewerValue)
     {
@@ -100,4 +112,29 @@ public static class ScriptCompileTargets
             _ => kept,
         };
     }
+}
+
+/// <summary>
+/// The script engine a person chose for a script, kept with the script item.
+/// </summary>
+public static class ScriptEngineChoices
+{
+    public const uint Mask = 0x0E000000u;
+    public const int Shift = 25;
+    public const string TargetPrefix = "engine:";
+    public const int None = 0;
+    public const int YEngine = 1;
+    public const int Phlox = 2;
+
+    public static string NameFor(int code) => null;
+
+    public static int CodeFor(string engineName) => None;
+
+    public static int FromFlags(uint flags) => None;
+
+    public static uint WithChoice(uint flags, int code) => flags;
+
+    public static bool IsEngineTarget(string viewerValue) => false;
+
+    public static string EngineNameOf(string viewerValue) => null;
 }
