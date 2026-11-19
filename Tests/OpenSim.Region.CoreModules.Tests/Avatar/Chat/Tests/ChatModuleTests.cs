@@ -42,6 +42,17 @@ namespace OpenSim.Region.CoreModules.Avatar.Chat.Tests;
 
 public class ChatModuleTests : OpenSimTestCase
 {
+    /// <summary>
+    /// The circuit of a root agent's child in a neighbour region: the same agent and session, as a region gives
+    /// its neighbours (the session is what a neighbour checks on the root's position updates).
+    /// </summary>
+    private static AgentCircuitData ChildOf(ScenePresence root)
+    {
+        AgentCircuitData acd = SceneHelpers.GenerateAgentData(root.UUID);
+        acd.SessionID = root.ControllingClient.SessionId;
+        return acd;
+    }
+
     private void FixtureInit()
     {
         // Don't allow tests to be bamboozled by asynchronous events.  Execute everything on the same thread.
@@ -117,7 +128,7 @@ public class ChatModuleTests : OpenSimTestCase
 
         // When sp1 logs in to sceneEast, it sets up a child agent in sceneWest and informs the sp2 client to
         // make the connection.  For this test, will simplify this chain by making the connection directly.
-        ScenePresence sp1Child = SceneHelpers.AddChildScenePresence(sceneWest, sp1Uuid);
+        ScenePresence sp1Child = SceneHelpers.AddChildScenePresence(sceneWest, ChildOf(sp1));
         TestClient sp1ChildClient = (TestClient)sp1Child.ControllingClient;
 
         sp1.AbsolutePosition = sp1Position;
@@ -126,7 +137,7 @@ public class ChatModuleTests : OpenSimTestCase
         TestClient sp2Client = (TestClient)sp2.ControllingClient;
         sp2.Flying = true;
 
-        ScenePresence sp2Child = SceneHelpers.AddChildScenePresence(sceneEast, sp2Uuid);
+        ScenePresence sp2Child = SceneHelpers.AddChildScenePresence(sceneEast, ChildOf(sp2));
         TestClient sp2ChildClient = (TestClient)sp2Child.ControllingClient;
 
         sp2.AbsolutePosition = sp2Position;
@@ -224,7 +235,7 @@ public class ChatModuleTests : OpenSimTestCase
 
         // When sp1 logs in to sceneEast, it sets up a child agent in sceneNorth and informs the sp2 client to
         // make the connection.  For this test, will simplify this chain by making the connection directly.
-        ScenePresence sp1Child = SceneHelpers.AddChildScenePresence(sceneSouth, sp1Uuid);
+        ScenePresence sp1Child = SceneHelpers.AddChildScenePresence(sceneSouth, ChildOf(sp1));
         TestClient sp1ChildClient = (TestClient)sp1Child.ControllingClient;
 
         sp1.AbsolutePosition = sp1Position;
@@ -233,7 +244,7 @@ public class ChatModuleTests : OpenSimTestCase
         TestClient sp2Client = (TestClient)sp2.ControllingClient;
         sp2.Flying = true;
 
-        ScenePresence sp2Child = SceneHelpers.AddChildScenePresence(sceneNorth, sp2Uuid);
+        ScenePresence sp2Child = SceneHelpers.AddChildScenePresence(sceneNorth, ChildOf(sp2));
         TestClient sp2ChildClient = (TestClient)sp2Child.ControllingClient;
 
         sp2.AbsolutePosition = sp2Position;

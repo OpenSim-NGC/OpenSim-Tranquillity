@@ -322,6 +322,146 @@ public class ControlPlaneAccessTests
         Xunit.Assert.Equal(host, ControlPlaneAccess.HostOf(entry));
     }
 
+    private sealed class FakeClock : TimeProvider
+    {
+        public DateTimeOffset Now = new(2026, 11, 18, 12, 0, 0, TimeSpan.Zero);
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    /// <summary>A name server whose answers change: a name with no answer is not found.</summary>
+    private sealed class ChangingNames
+    {
+        public readonly Dictionary<string, IPAddress[]> Answers = new();
+        public int Lookups;
+
+        public IPAddress[] LookUp(string name)
+        {
+            Interlocked.Increment(ref Lookups);
+            lock (Answers)
+            {
+                if (Answers.TryGetValue(name, out IPAddress[] a))
+                    return a;
+            }
+            throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound);
+        }
+    }
+
+    private static ControlPlaneAccess Trusting(string hosts, ChangingNames names, FakeClock clock)
+    {
+        IniConfigSource config = new();
+        config.AddConfig("Network").Set("ControlPlaneTrustedHosts", hosts);
+        return new ControlPlaneAccess(config, names.LookUp, clock);
+    }
+
+    // A name was looked up once, when the service started: a Robust that was not up yet (its container started
+    // after the region's) was refused until the region restarted.
+    [Fact]
+    public void ANameNotFoundAtStartupIsTrustedOnceItIsFound()
+    {
+        ChangingNames names = new();
+        FakeClock clock = new();
+        ControlPlaneAccess access = Trusting("robust:8003", names, clock);
+        Xunit.Assert.False(access.IsTrustedAddress(s_robust));
+
+        names.Answers["robust"] = new[] { s_robust };
+        clock.Now += TimeSpan.FromSeconds(30);
+        Xunit.Assert.False(access.IsTrustedAddress(s_robust), "looked up again before the interval passed");
+
+        clock.Now += ControlPlaneAccess.NameLookUpInterval;
+        Xunit.Assert.True(access.IsTrustedAddress(s_robust));
+    }
+
+    [Fact]
+    public void AHostThatMovesIsTrustedAtItsNewAddressOnly()
+    {
+        IPAddress moved = IPAddress.Parse("192.0.2.51");
+        ChangingNames names = new();
+        names.Answers["robust"] = new[] { s_robust };
+        FakeClock clock = new();
+        ControlPlaneAccess access = Trusting("robust", names, clock);
+        Xunit.Assert.True(access.IsTrustedAddress(s_robust));
+
+        names.Answers["robust"] = new[] { moved };
+        clock.Now += ControlPlaneAccess.NameLookUpInterval;
+
+        Xunit.Assert.True(access.IsTrustedAddress(moved));
+        Xunit.Assert.False(access.IsTrustedAddress(s_robust), "the address the host left is still trusted");
+    }
+
+    [Fact]
+    public void ALookupThatFailsKeepsTheAddressesLastFound()
+    {
+        ChangingNames names = new();
+        names.Answers["robust"] = new[] { s_robust };
+        FakeClock clock = new();
+        ControlPlaneAccess access = Trusting("robust", names, clock);
+
+        names.Answers.Clear();
+        clock.Now += ControlPlaneAccess.NameLookUpInterval;
+        Xunit.Assert.False(access.IsTrustedAddress(s_thisMachine));
+
+        Xunit.Assert.True(access.IsTrustedAddress(s_robust), "a failed lookup dropped robust");
+    }
+
+    // A refused caller looks the names up at most once an interval, and never when there are none.
+    [Fact]
+    public void RefusedCallsDoNotRepeatTheLookups()
+    {
+        ChangingNames names = new();
+        FakeClock clock = new();
+        ControlPlaneAccess byName = Trusting("robust", names, clock);
+        int atStart = names.Lookups;
+
+        for (int i = 0; i < 100; i++)
+            byName.IsTrustedAddress(s_thisMachine);
+        Xunit.Assert.Equal(atStart, names.Lookups);
+
+        clock.Now += ControlPlaneAccess.NameLookUpInterval;
+        for (int i = 0; i < 100; i++)
+            byName.IsTrustedAddress(s_thisMachine);
+        Xunit.Assert.Equal(atStart + 1, names.Lookups);
+
+        ChangingNames none = new();
+        ControlPlaneAccess byAddress = Trusting("192.0.2.50", none, clock);
+        clock.Now += ControlPlaneAccess.NameLookUpInterval;
+        byAddress.IsTrustedAddress(s_thisMachine);
+        Xunit.Assert.Equal(0, none.Lookups);
+    }
+
+    // A link-local caller arrives with the number of the interface it came in on, which the entry has not got.
+    [Theory]
+    [InlineData("fe80::1")]
+    [InlineData("fe80::1%3")]
+    [InlineData("[fe80::1%3]:8003")]
+    public void ALinkLocalEntryMatchesItsCallerOnAnyInterface(string entry)
+    {
+        ControlPlaneAccess access = Trusting(entry, new ChangingNames(), new FakeClock());
+        IPAddress caller = new(IPAddress.Parse("fe80::1").GetAddressBytes(), 2);
+
+        Xunit.Assert.True(access.IsTrustedAddress(caller));
+        Xunit.Assert.True(access.IsTrustedControlPlaneCaller(new IPEndPoint(caller, 9000)));
+        Xunit.Assert.False(access.IsTrustedAddress(IPAddress.Parse("fe80::2")));
+    }
+
+    // A script's llHTTPRequest to this host's own public address comes from an address it may trust. The HTTP checks
+    // refuse its marker; an XML-RPC handler sees only the caller, which is marked for it.
+    [Fact]
+    public void AScriptsXmlRpcCallFromATrustedAddressIsNotTrusted()
+    {
+        ControlPlaneAccess access = Trusting("203.0.113.10", new ChangingNames(), new FakeClock());
+        IPEndPoint host = new(IPAddress.Parse("203.0.113.10"), 9000);
+        ScriptRequestEndPoint script = new(host);
+
+        Xunit.Assert.True(access.IsTrustedCaller(host));
+        Xunit.Assert.False(access.IsTrustedCaller(script));
+        Xunit.Assert.False(access.AuthorizePrivilegedInstantMessage(250, script));
+        Xunit.Assert.False(access.AuthorizePrivilegedInstantMessage(
+            (byte)OpenMetaverse.InstantMessageDialog.GodLikeRequestTeleport, script));
+        Xunit.Assert.True(access.AuthorizePrivilegedInstantMessage(
+            (byte)OpenMetaverse.InstantMessageDialog.MessageFromAgent, script));
+        Xunit.Assert.False(access.IsTrustedCaller(null));
+    }
+
     private static FakeRequest RequestFrom(string address)
     {
         return new FakeRequest(new IPEndPoint(IPAddress.Parse(address), 9000));

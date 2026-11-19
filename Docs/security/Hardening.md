@@ -17,7 +17,7 @@ For the active region control-plane checks, configure trusted peer addresses in 
 ControlPlaneTrustedHosts = 10.20.0.10, 10.20.0.21, 10.20.0.22
 ```
 
-The region control-plane endpoints read trusted hosts from both `[Network]` and `[Security]`. An entry may be an address (`10.20.0.10`, `fd00::1`), an address with a port (`10.20.0.10:8003`, `[fd00::1]:8003`), a hostname with or without a port (`robust`, `robust:8003`), or a URL (`http://robust:8003`); the local `[Network] hostname` is read the same way. Address ranges are not supported. A hostname is looked up once, when the service starts. An entry that names no host, or whose name cannot be looked up, is logged as a warning at startup and trusts nothing; the startup line `Trusted control-plane addresses:` lists every address in use. The service checks the actual TCP peer address and does not use `X-Forwarded-For`. `/assets` and `/xinventory` are currently excluded from control-plane checks.
+The region control-plane endpoints read trusted hosts from both `[Network]` and `[Security]`. An entry may be an address (`10.20.0.10`, `fd00::1`), an address with a port (`10.20.0.10:8003`, `[fd00::1]:8003`), a hostname with or without a port (`robust`, `robust:8003`), or a URL (`http://robust:8003`); the local `[Network] hostname` is read the same way. Address ranges are not supported. A hostname is looked up when the service starts, and again when a call from an untrusted address arrives, at most once a minute: a host that was not up yet at startup, or that moved, is trusted without a restart, and a lookup that fails keeps the addresses last found. An entry that names no host, or whose name cannot be looked up, is logged as a warning and trusts nothing until it is found; the startup line `Trusted control-plane addresses:` lists every address in use. The service checks the actual TCP peer address and does not use `X-Forwarded-For`. `/assets` and `/xinventory` are currently excluded from control-plane checks.
 
 The configured local `[Network] hostname` is also trusted. This keeps same-host multi-region deployments working when regions contact each other through the host's LAN name instead of loopback.
 
@@ -56,7 +56,11 @@ The same trusted-host policy protects sensitive profile operations, Hypergrid gr
 
 The control-plane authorization calls for `/assets` `POST`/`DELETE` and `/xinventory` inventory-changing RPCs are commented out. The implementation is retained for future work, but `ControlPlaneTrustedHosts` does not currently gate these endpoints. Replacement authentication/authorization is deferred, potentially using ASP.NET Core Identity or mTLS certificates. Existing service authentication, asset deletion-type restrictions, and read behavior remain unchanged. Protect backend asset and inventory endpoints with network access controls; the control-plane allowlist does not protect them.
 
-Requests carrying `X-SecondLife-Shard` are rejected on control-plane paths even when their source address is trusted. This prevents in-world `llHTTPRequest` calls from using a trusted simulator as a control-plane proxy.
+Requests carrying `X-SecondLife-Shard` are rejected on control-plane paths even when their source address is trusted. This prevents in-world `llHTTPRequest` calls from using a trusted simulator as a control-plane proxy. The script filter keeps scripts off loopback and private addresses, but not off a host's own public address, which the host may trust. The XML-RPC checks (privileged instant-message dialogs, Hypergrid logout) treat such a request as untrusted too.
+
+Region `grid_instant_message` calls carrying ordinary dialogs are not limited to trusted hosts. Set the same `[Messaging] MessageKey` on every region and on ROBUST so that a region accepts instant messages only from the grid's own services and regions; without it, anyone who can reach a region's HTTP port can deliver a message, a teleport offer among them, under any sender's name.
+
+`PUT /agent/...` stays open to every caller, because the region a Hypergrid visitor comes from sends its agent update through it. A child agent's position update shares that endpoint: the region applies it only when it carries the agent's session ID, as it already did for the full agent update.
 
 ### Marketplace and third-party delivery services
 
