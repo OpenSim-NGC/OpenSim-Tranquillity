@@ -35,7 +35,8 @@ namespace OpenSim.Region.Framework.RegionStore.Tests;
 public class SQLiteLinkNumberTests : OpenSimTestCase
 {
     private static readonly UUID s_region = new UUID("5d2c8e41-0b7f-4a93-9e16-c4a8f20b7d35");
-    private static readonly UUID s_owner = new UUID("e8a14c07-6d3b-4f52-b9e0-17c5a2d983f6");
+    private static readonly UUID s_otherRegion = new UUID("0b6f2d93-7c41-4e8a-a5d2-93e17c4b0f68");
+    private static readonly UUID s_owner =new UUID("e8a14c07-6d3b-4f52-b9e0-17c5a2d983f6");
 
     private readonly List<IDisposable> m_disposables = new();
     private readonly List<SQLiteSimulationData> m_stores = new();
@@ -167,11 +168,17 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
     /// </summary>
     private static string RowOrderNumbers(int count)
     {
-        Dictionary<int, int> numbers = new() { [0] = 1 };
+        return string.Join(" ", RowOrderMap(count).OrderBy(kv => kv.Value).Select(kv => kv.Key + "=" + kv.Value));
+    }
+
+    /// <summary>The numbers of <see cref="RowOrderNumbers"/>, by prim name.</summary>
+    private static Dictionary<string, int> RowOrderMap(int count)
+    {
+        Dictionary<string, int> numbers = new() { ["L1"] = 1 };
         int next = 2;
         foreach (int i in RezOrder(count).Where(i => i != 0))
-            numbers[i] = next++;
-        return string.Join(" ", numbers.OrderBy(kv => kv.Value).Select(kv => "L" + (kv.Key + 1) + "=" + kv.Value));
+            numbers["L" + (i + 1)] = next++;
+        return numbers;
     }
 
     private SQLiteConnection OpenConnection(string conn)
@@ -217,14 +224,21 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
         SceneObjectPart[] parts = NewParts(count, seed: count * 10 + 1);
         SceneObjectPart alone = NewParts(1, seed: 7)[0];
         alone.Name = "Alone";
+        // a linkset in another region of the same store, its rows between this region's rows
+        SceneObjectPart[] other = NewParts(3, seed: 5);
+        for (int i = 0; i < other.Length; i++)
+            other[i].Name = "O" + (i + 1);
 
         // Rows as the store writes them, copied in the same row order into a database that stops at the step
         // before the column.
         string written = NewMemoryDatabase();
         SQLiteSimulationData writer = NewStore(written);
+        writer.StoreObject(new SceneObjectGroup(other[2]), s_otherRegion);
         StoreSeparately(writer, parts);
+        writer.StoreObject(new SceneObjectGroup(other[1]), s_otherRegion);
         writer.StoreObject(new SceneObjectGroup(alone), s_region);
         writer.StoreObject(Link(parts), s_region);
+        writer.StoreObject(Link(other), s_otherRegion);
 
         string old = NewMemoryDatabase();
         SQLiteConnection oldConn = OpenConnection(old);
@@ -238,10 +252,17 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
         int migratedTo = SQLiteSitTargetActiveTests.RegionStoreVersion(oldConn);
         Assert.Equal(VersionBeforeColumn + 1, migratedTo);
 
+        // every prim's number as the step wrote it: the old loader's numbers, per linkset and per region
         Dictionary<string, int?> stored = StoredLinkNumbers(oldConn);
+        Assert.Equal(count + 1 + other.Length, stored.Count);
         Assert.Equal(0, stored["Alone"]);
-        Assert.Equal(1, stored["L1"]);
-        Assert.All(stored.Values, n => Assert.NotNull(n));
+        foreach (KeyValuePair<string, int> expected in RowOrderMap(count))
+            Assert.Equal(expected.Value, stored[expected.Key]);
+        // O3 and O2 were stored before O1 linked them, so their rows come first: O3 is link 2, O2 link 3
+        Assert.Equal(1, stored["O1"]);
+        Assert.Equal(2, stored["O3"]);
+        Assert.Equal(3, stored["O2"]);
+        Assert.Equal("O1=1 O3=2 O2=3", Describe(Assert.Single(NewStore(old).LoadObjects(s_otherRegion))));
 
         Assert.Equal(2, loaded.Count);
         SceneObjectGroup linkset = Assert.Single(loaded, g => g.RootPart.UUID == parts[0].UUID);
@@ -264,6 +285,7 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
     [InlineData("missing")]
     [InlineData("repeated")]
     [InlineData("root's")]
+    [InlineData("gap")]
     public void LinksetWithUnusableNumbers_LoadsInRowOrder_AndTheNextStoreFixesThem(string damage)
     {
         const int count = 6;
@@ -278,6 +300,7 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
         {
             "missing" => "update prims set LinkNumber = NULL where Name = 'L4'",
             "repeated" => "update prims set LinkNumber = 4 where Name = 'L5'",
+            "gap" => "update prims set LinkNumber = 8 where Name = 'L6'",
             _ => "update prims set LinkNumber = 1 where Name = 'L3'",
         });
 
@@ -290,6 +313,27 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
         Assert.All(StoredLinkNumbers(c).Values, n => Assert.NotNull(n));
         SceneObjectGroup again = Assert.Single(NewStore(conn).LoadObjects(s_region));
         Assert.Equal(RowOrderNumbers(count), Describe(again));
+    }
+
+    /// <summary>
+    /// A row with no SceneGroupID is logged and skipped as before; the region's other objects still load with their
+    /// numbers.
+    /// </summary>
+    [Fact]
+    public void RowWithNoSceneGroupID_IsSkipped_AndTheOtherObjectsLoad()
+    {
+        string conn = NewMemoryDatabase();
+        SQLiteSimulationData before = NewStore(conn);
+        SceneObjectPart[] parts = NewParts(6, seed: 61);
+        StoreSeparately(before, parts);
+        before.StoreObject(Link(parts), s_region);
+        SceneObjectPart broken = NewParts(1, seed: 11)[0];
+        broken.Name = "Broken";
+        before.StoreObject(new SceneObjectGroup(broken), s_region);
+        Execute(OpenConnection(conn), "update prims set SceneGroupID = NULL where Name = 'Broken'");
+
+        SceneObjectGroup reloaded = Assert.Single(NewStore(conn).LoadObjects(s_region));
+        Assert.Equal(Expected(6), Describe(reloaded));
     }
 
     /// <summary>A prim alone is stored with link number 0 and loads with it.</summary>
