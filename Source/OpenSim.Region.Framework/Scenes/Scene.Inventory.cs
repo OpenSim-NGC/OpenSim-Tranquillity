@@ -280,8 +280,11 @@ public partial class Scene
     /// </summary>
     public bool ScriptEngineChoiceEnabled => m_scriptEngineChoice;
 
-    /// <summary>Whether an object's owner may choose the engine of a script in it that they may not edit.</summary>
-    public bool ScriptEngineChoiceNoModEnabled => false;
+    /// <summary>
+    /// Whether an object's owner may choose the engine of a script in it that they may not edit (no modify or no copy)
+    /// ([Startup] ScriptEngineChoiceNoMod, default off: in Second Life no one can retarget a script they cannot edit).
+    /// </summary>
+    public bool ScriptEngineChoiceNoModEnabled => m_scriptEngineChoiceNoMod;
 
     /// <summary>
     /// The engine number for a name a save or a request used: a name or alias in <see cref="ScriptEngineChoices"/>'s
@@ -342,7 +345,8 @@ public partial class Scene
     /// </summary>
     /// <remarks>
     /// <para>Whoever may save the script (<see cref="IPermissionsModule.CanEditScript"/>, which needs modify and copy on it) may
-    /// choose its engine.</para>
+    /// choose its engine, and with [Startup] ScriptEngineChoiceNoMod on, so may the object's owner for a script they cannot
+    /// edit.</para>
     /// <para>The script's text is not stored again: only the saved choice and the engine that runs it change. When the
     /// engine the region now places the script in is the one already running it, the choice is saved and nothing restarts.
     /// Otherwise the script is stopped and started again in that engine, keeping its running or stopped setting. It starts
@@ -473,9 +477,21 @@ public partial class Scene
         }
     }
 
-    /// <summary>Whether <paramref name="agentId"/> may choose the engine of this script: whoever may save it.</summary>
+    /// <summary>
+    /// Whether <paramref name="agentId"/> may choose the engine of this script: whoever may save it, and, when
+    /// <see cref="ScriptEngineChoiceNoModEnabled"/> is on, the owner of the object for a script they may not edit
+    /// (no modify or no copy on the item).
+    /// </summary>
     private bool MayChooseScriptEngine(UUID agentId, SceneObjectPart part, TaskInventoryItem item)
-        => Permissions.CanEditScript(item.ItemID, part.UUID, agentId);
+    {
+        if (Permissions.CanEditScript(item.ItemID, part.UUID, agentId))
+            return true;
+        const uint editable = (uint)(PermissionMask.Modify | PermissionMask.Copy);
+        return m_scriptEngineChoiceNoMod
+            && agentId.IsNotZero()
+            && agentId == part.ParentGroup.OwnerID
+            && (item.CurrentPermissions & editable) != editable;
+    }
 
     /// <summary>A SetScriptEngine target as a save target: a bare engine name becomes "engine:&lt;Name&gt;", nothing becomes "engine:".</summary>
     private static string ScriptEngineSaveTarget(string target)

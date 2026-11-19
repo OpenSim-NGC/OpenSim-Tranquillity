@@ -116,6 +116,9 @@ public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeature
     {
         if (scene.ScriptEngineChoiceEnabled)
             AddOpenSimExtraFeature("ScriptEngineChoice", OSD.FromBoolean(true));
+        // An object's owner may also choose for a script in it they cannot edit ([Startup] ScriptEngineChoiceNoMod).
+        if (scene.ScriptEngineChoiceEnabled && scene.ScriptEngineChoiceNoModEnabled)
+            AddOpenSimExtraFeature("ScriptEngineChoiceNoMod", OSD.FromBoolean(true));
     }
 
     /// <summary>
