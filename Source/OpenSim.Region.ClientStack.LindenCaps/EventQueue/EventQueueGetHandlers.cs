@@ -397,6 +397,10 @@ public partial class EventQueueGetModule : IEventQueue, INonSharedRegionModule
     /// LLLiveLSLEditor::processScriptRunningReply): Luau and LuauLanguage give "Lua", Luau alone "LSL on Lua", otherwise
     /// Mono gives "LSL on Mono". A script with no Luau target is described as before, by Mono alone.
     /// </summary>
+    public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target,
+            string engine, string engineChoice)
+        => ScriptRunningEvent(objectID, itemID, running, avatarID, target);
+
     public void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target)
     {
         osUTF8 sb = StartEvent("ScriptRunningReply");

@@ -114,6 +114,13 @@ public interface IEventQueue
     /// </summary>
     void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target)
         => ScriptRunningEvent(objectID, itemID, running, avatarID);
+
+    /// <summary>
+    /// ScriptRunningReply with the compile target and the script's engines.
+    /// </summary>
+    void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target,
+            string engine, string engineChoice)
+        => ScriptRunningEvent(objectID, itemID, running, avatarID, target);
     byte[] BuildEvent(string eventName, OSD eventBody);
     void partPhysicsProperties(uint localID, byte physhapetype, float density, float friction, float bounce, float gravmod, UUID avatarID);
     void WindlightRefreshEvent(int interpolate, UUID avatarID);

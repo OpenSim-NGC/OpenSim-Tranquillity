@@ -45,6 +45,8 @@ using OpenSim.Region.ClientStack.LindenCaps;
 
 namespace OpenSim.Region.ClientStack.Linden.Tests
 {
+    // Shares MainServer's port 9999 with ScriptEngineReplyTests, so the two never run at once.
+    [Collection("EventQueueMainServer")]
     public class EventQueueTests : OpenSimTestCase
     {
         private TestScene m_scene;

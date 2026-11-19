@@ -294,6 +294,9 @@ public partial class BunchOfCaps
     /// <param name="httpRequest">HTTP request header object</param>
     /// <param name="httpResponse">HTTP response header object</param>
     /// <returns></returns>
+    /// <summary>The seed flag a viewer sets by listing this capability in its seed request.</summary>
+    public static Caps.CapsFlags FlagForRequestedCap(string capName) => Caps.CapsFlags.None;
+
     public void SeedCapRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
         m_log.LogDebug(

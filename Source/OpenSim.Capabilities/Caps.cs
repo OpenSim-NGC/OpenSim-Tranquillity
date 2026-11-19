@@ -125,7 +125,8 @@ public class Caps : IDisposable
         AdvEnv =        0x400,
         PBR =           0x800,
         ViewerBenefits = 0x1000,
-        TPBR =           0x2000
+        TPBR =           0x2000,
+        ScriptEngineChoice = 0x4000
     }
 
     public CapsFlags Flags { get; set;}
