@@ -122,13 +122,13 @@ public class SQLiteSitTargetActiveTests : OpenSimTestCase
         return reader.GetValue(0);
     }
 
-    private static int RegionStoreVersion(SQLiteConnection c)
+    internal static int RegionStoreVersion(SQLiteConnection c)
     {
         using SQLiteCommand cmd = new SQLiteCommand("select version from migrations where name = 'RegionStore'", c);
         return Convert.ToInt32(cmd.ExecuteScalar());
     }
 
-    private static List<string> Columns(SQLiteConnection c, string table)
+    internal static List<string> Columns(SQLiteConnection c, string table)
     {
         List<string> columns = new();
         using SQLiteCommand cmd = new SQLiteCommand("pragma table_info(" + table + ")", c);
@@ -293,7 +293,7 @@ public class SQLiteSitTargetActiveTests : OpenSimTestCase
     /// version, as OpenSim.Data.Migration does: lines that are empty or start with '#' are skipped, and each
     /// ":VERSION n" line starts a step.
     /// </summary>
-    private static void CreateDatabaseAtVersion(SQLiteConnection c, int version)
+    internal static void CreateDatabaseAtVersion(SQLiteConnection c, int version)
     {
         var assembly = typeof(SQLiteSimulationData).Assembly;
         string name = assembly.GetManifestResourceNames().Single(n => n.EndsWith(".RegionStore.migrations"));
@@ -339,7 +339,7 @@ public class SQLiteSitTargetActiveTests : OpenSimTestCase
     }
 
     /// <summary>Copies every row of a table, in the columns the destination has.</summary>
-    private static void CopyRows(SQLiteConnection from, SQLiteConnection to, string table)
+    internal static void CopyRows(SQLiteConnection from, SQLiteConnection to, string table)
     {
         List<string> columns = Columns(to, table);
         DataTable rows = new DataTable();

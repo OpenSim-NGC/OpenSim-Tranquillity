@@ -444,3 +444,19 @@ CREATE TABLE IF NOT EXISTS regionextra (
   PRIMARY KEY (RegionID, Name)
 );
 COMMIT;
+
+:VERSION 47         #----- add each prim's link number to prims, as the MySQL and PostgreSQL region stores have
+# The store writes every prim's link number here, and the loader gives each child its stored number back.
+# Rows saved before this step had no number: the loader numbered each linkset's children in the order of their rows
+# (rowid order), after the root. The step writes those same numbers, so a linkset reads as it did before the step:
+# a root with children 1, a root alone 0, and a child 1 + the count of children of its linkset whose row is at or
+# before its own. A linkset whose numbers had already changed that way keeps the changed numbers: no row holds the
+# numbers it had before. NULL means no stored number: the loader then numbers that linkset's children in row order,
+# as before this step.
+BEGIN;
+ALTER TABLE prims ADD COLUMN LinkNumber integer default NULL;
+CREATE INDEX prims_linknumber_backfill ON prims(SceneGroupID);
+UPDATE prims SET LinkNumber = CASE WHEN EXISTS (SELECT 1 FROM prims c WHERE c.SceneGroupID = prims.UUID AND c.RegionUUID = prims.RegionUUID AND c.UUID <> c.SceneGroupID) THEN 1 ELSE 0 END WHERE UUID = SceneGroupID;
+UPDATE prims SET LinkNumber = 1 + (SELECT count(*) FROM prims c WHERE c.SceneGroupID = prims.SceneGroupID AND c.RegionUUID = prims.RegionUUID AND c.UUID <> c.SceneGroupID AND c.rowid <= prims.rowid) WHERE UUID <> SceneGroupID;
+DROP INDEX prims_linknumber_backfill;
+COMMIT;

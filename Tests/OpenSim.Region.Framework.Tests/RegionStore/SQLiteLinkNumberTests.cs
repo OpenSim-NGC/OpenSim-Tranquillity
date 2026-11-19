@@ -119,18 +119,9 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
         SceneObjectPart[] parts = NewParts(count, seed: count * 10 + (rezzedSeparatelyFirst ? 1 : 0));
 
         if (rezzedSeparatelyFirst)
-        {
-            // Rezzed one at a time, in an order unlike the link order (evens, then odds, from the top), and each
-            // stored as its own object, as the region does before the prims are linked.
-            int[] rezOrder = Enumerable.Range(0, count).Where(i => i % 2 == 1).Reverse()
-                .Concat(Enumerable.Range(0, count).Where(i => i % 2 == 0).Reverse()).ToArray();
-            foreach (int i in rezOrder)
-                before.StoreObject(new SceneObjectGroup(parts[i]), s_region);
-        }
+            StoreSeparately(before, parts);
 
-        SceneObjectGroup linkset = new SceneObjectGroup(parts[0]);
-        for (int i = 1; i < count; i++)
-            linkset.AddPart(parts[i]);
+        SceneObjectGroup linkset = Link(parts);
         Assert.Equal(Expected(count), Describe(linkset));
 
         before.StoreObject(linkset, s_region);
@@ -141,5 +132,216 @@ public class SQLiteLinkNumberTests : OpenSimTestCase
         Assert.Equal(parts[0].UUID, reloaded.RootPart.UUID);
         Assert.Equal(count, reloaded.PrimCount);
         Assert.Equal(Expected(count), Describe(reloaded));
+    }
+
+    /// <summary>
+    /// The order the parts are rezzed in, one at a time, before they are linked: unlike the link order (evens, then
+    /// odds, from the top).
+    /// </summary>
+    private static int[] RezOrder(int count)
+    {
+        return Enumerable.Range(0, count).Where(i => i % 2 == 1).Reverse()
+            .Concat(Enumerable.Range(0, count).Where(i => i % 2 == 0).Reverse()).ToArray();
+    }
+
+    /// <summary>Stores each part as its own object, in <see cref="RezOrder"/>, as the region does before linking.</summary>
+    private static void StoreSeparately(SQLiteSimulationData store, SceneObjectPart[] parts)
+    {
+        foreach (int i in RezOrder(parts.Length))
+            store.StoreObject(new SceneObjectGroup(parts[i]), s_region);
+    }
+
+    /// <summary>Links the parts in array order: parts[0] is the root, parts[k] gets link number k + 1.</summary>
+    private static SceneObjectGroup Link(SceneObjectPart[] parts)
+    {
+        SceneObjectGroup linkset = new SceneObjectGroup(parts[0]);
+        for (int i = 1; i < parts.Length; i++)
+            linkset.AddPart(parts[i]);
+        return linkset;
+    }
+
+    /// <summary>
+    /// The numbers the store's loader gave a linkset stored by <see cref="StoreSeparately"/> and then linked, before
+    /// the LinkNumber column: the root 1, then the children numbered 2, 3, ... in the order of their rows, which is
+    /// the order they were first stored in.
+    /// </summary>
+    private static string RowOrderNumbers(int count)
+    {
+        Dictionary<int, int> numbers = new() { [0] = 1 };
+        int next = 2;
+        foreach (int i in RezOrder(count).Where(i => i != 0))
+            numbers[i] = next++;
+        return string.Join(" ", numbers.OrderBy(kv => kv.Value).Select(kv => "L" + (kv.Key + 1) + "=" + kv.Value));
+    }
+
+    private SQLiteConnection OpenConnection(string conn)
+    {
+        SQLiteConnection c = new SQLiteConnection(conn);
+        c.Open();
+        m_disposables.Add(c);
+        return c;
+    }
+
+    /// <summary>Each stored prim's LinkNumber column, by prim name, null for NULL.</summary>
+    private static Dictionary<string, int?> StoredLinkNumbers(SQLiteConnection c)
+    {
+        Dictionary<string, int?> numbers = new();
+        using SQLiteCommand cmd = new SQLiteCommand("select Name, LinkNumber from prims", c);
+        using SQLiteDataReader reader = cmd.ExecuteReader();
+        while (reader.Read())
+            numbers.Add(reader.GetString(0), reader.IsDBNull(1) ? null : Convert.ToInt32(reader.GetValue(1)));
+        return numbers;
+    }
+
+    private static void Execute(SQLiteConnection c, string sql)
+    {
+        using SQLiteCommand cmd = new SQLiteCommand(sql, c);
+        cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>The last SQLite RegionStore migration step before the LinkNumber column was added.</summary>
+    private const int VersionBeforeColumn = 46;
+
+    /// <summary>
+    /// A database written before the LinkNumber column, holding a linkset whose prims were stored before they were
+    /// linked and a prim alone, migrates once when a store opens it. The step stores the numbers the loader gave
+    /// before it (the children in row order), so the linkset loads with the same numbers as before the step, and
+    /// keeps them from then on. For the 6-prim case the expected text is also the one the loader gave before this
+    /// change in the red run of <see cref="EveryPrimKeepsItsLinkNumberAcrossARestart"/> (same seed, same rows).
+    /// </summary>
+    [Theory]
+    [InlineData(6)]
+    [InlineData(12)]
+    public void DatabaseWrittenBeforeTheColumn_KeepsTheNumbersItLoadedWith(int count)
+    {
+        SceneObjectPart[] parts = NewParts(count, seed: count * 10 + 1);
+        SceneObjectPart alone = NewParts(1, seed: 7)[0];
+        alone.Name = "Alone";
+
+        // Rows as the store writes them, copied in the same row order into a database that stops at the step
+        // before the column.
+        string written = NewMemoryDatabase();
+        SQLiteSimulationData writer = NewStore(written);
+        StoreSeparately(writer, parts);
+        writer.StoreObject(new SceneObjectGroup(alone), s_region);
+        writer.StoreObject(Link(parts), s_region);
+
+        string old = NewMemoryDatabase();
+        SQLiteConnection oldConn = OpenConnection(old);
+        SQLiteSitTargetActiveTests.CreateDatabaseAtVersion(oldConn, VersionBeforeColumn);
+        Assert.DoesNotContain("LinkNumber", SQLiteSitTargetActiveTests.Columns(oldConn, "prims"));
+        SQLiteConnection writtenConn = OpenConnection(written);
+        SQLiteSitTargetActiveTests.CopyRows(writtenConn, oldConn, "prims");
+        SQLiteSitTargetActiveTests.CopyRows(writtenConn, oldConn, "primshapes");
+
+        List<SceneObjectGroup> loaded = NewStore(old).LoadObjects(s_region);
+        int migratedTo = SQLiteSitTargetActiveTests.RegionStoreVersion(oldConn);
+        Assert.Equal(VersionBeforeColumn + 1, migratedTo);
+
+        Dictionary<string, int?> stored = StoredLinkNumbers(oldConn);
+        Assert.Equal(0, stored["Alone"]);
+        Assert.Equal(1, stored["L1"]);
+        Assert.All(stored.Values, n => Assert.NotNull(n));
+
+        Assert.Equal(2, loaded.Count);
+        SceneObjectGroup linkset = Assert.Single(loaded, g => g.RootPart.UUID == parts[0].UUID);
+        Assert.Equal(RowOrderNumbers(count), Describe(linkset));
+        if (count == 6)
+            Assert.Equal("L1=1 L6=2 L4=3 L2=4 L5=5 L3=6", Describe(linkset));
+        Assert.Equal(0, Assert.Single(loaded, g => g.RootPart.UUID == alone.UUID).RootPart.LinkNum);
+
+        // A second open runs nothing and loads the same numbers.
+        List<SceneObjectGroup> again = NewStore(old).LoadObjects(s_region);
+        Assert.Equal(migratedTo, SQLiteSitTargetActiveTests.RegionStoreVersion(oldConn));
+        Assert.Equal(RowOrderNumbers(count), Describe(Assert.Single(again, g => g.RootPart.UUID == parts[0].UUID)));
+    }
+
+    /// <summary>
+    /// A linkset with a child that has no stored number, or two children with the same one, loads with its children
+    /// numbered in row order, as before the column, and the next store writes those numbers, which then hold.
+    /// </summary>
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("repeated")]
+    [InlineData("root's")]
+    public void LinksetWithUnusableNumbers_LoadsInRowOrder_AndTheNextStoreFixesThem(string damage)
+    {
+        const int count = 6;
+        string conn = NewMemoryDatabase();
+        SQLiteSimulationData before = NewStore(conn);
+        SceneObjectPart[] parts = NewParts(count, seed: 61);
+        StoreSeparately(before, parts);
+        before.StoreObject(Link(parts), s_region);
+
+        SQLiteConnection c = OpenConnection(conn);
+        Execute(c, damage switch
+        {
+            "missing" => "update prims set LinkNumber = NULL where Name = 'L4'",
+            "repeated" => "update prims set LinkNumber = 4 where Name = 'L5'",
+            _ => "update prims set LinkNumber = 1 where Name = 'L3'",
+        });
+
+        SQLiteSimulationData restarted = NewStore(conn);
+        SceneObjectGroup reloaded = Assert.Single(restarted.LoadObjects(s_region));
+        Assert.Equal(count, reloaded.PrimCount);
+        Assert.Equal(RowOrderNumbers(count), Describe(reloaded));
+
+        restarted.StoreObject(reloaded, s_region);
+        Assert.All(StoredLinkNumbers(c).Values, n => Assert.NotNull(n));
+        SceneObjectGroup again = Assert.Single(NewStore(conn).LoadObjects(s_region));
+        Assert.Equal(RowOrderNumbers(count), Describe(again));
+    }
+
+    /// <summary>A prim alone is stored with link number 0 and loads with it.</summary>
+    [Fact]
+    public void SinglePrim_StoresAndLoadsLinkNumberZero()
+    {
+        string conn = NewMemoryDatabase();
+        SceneObjectPart part = NewParts(1, seed: 3)[0];
+        NewStore(conn).StoreObject(new SceneObjectGroup(part), s_region);
+
+        Assert.Equal(0, StoredLinkNumbers(OpenConnection(conn))["L1"]);
+        SceneObjectGroup reloaded = Assert.Single(NewStore(conn).LoadObjects(s_region));
+        Assert.Equal(1, reloaded.PrimCount);
+        Assert.Equal(0, reloaded.RootPart.LinkNum);
+    }
+
+    /// <summary>
+    /// The numbers after an unlink (the parts above the unlinked one move down by one, the unlinked prim is alone
+    /// with 0) and after linking that prim back (it is added last) are stored and load the same after a restart.
+    /// The prims were stored one at a time before the first link, so their rows are not in link order.
+    /// </summary>
+    [Fact]
+    public void UnlinkAndRelink_TheNewNumbersSurviveARestart()
+    {
+        const int count = 6;
+        string conn = NewMemoryDatabase();
+        SQLiteSimulationData store = NewStore(conn);
+        SceneObjectPart[] parts = NewParts(count, seed: 97);
+        StoreSeparately(store, parts);
+
+        TestScene scene = new SceneHelpers().SetupScene();
+        SceneObjectGroup linkset = Link(parts);
+        scene.AddSceneObject(linkset);
+        store.StoreObject(linkset, s_region);
+
+        SceneObjectGroup unlinked = linkset.DelinkFromGroup(parts[2], false);
+        Assert.Equal("L1=1 L2=2 L4=3 L5=4 L6=5", Describe(linkset));
+        store.StoreObject(linkset, s_region);
+        store.StoreObject(unlinked, s_region);
+
+        List<SceneObjectGroup> loaded = NewStore(conn).LoadObjects(s_region);
+        Assert.Equal(2, loaded.Count);
+        Assert.Equal("L1=1 L2=2 L4=3 L5=4 L6=5", Describe(Assert.Single(loaded, g => g.RootPart.UUID == parts[0].UUID)));
+        Assert.Equal("L3=0", Describe(Assert.Single(loaded, g => g.RootPart.UUID == parts[2].UUID)));
+
+        unlinked.RootPart.ClearUpdateSchedule();
+        linkset.RootPart.ClearUpdateSchedule();
+        linkset.LinkToGroup(unlinked);
+        Assert.Equal("L1=1 L2=2 L4=3 L5=4 L6=5 L3=6", Describe(linkset));
+        store.StoreObject(linkset, s_region);
+
+        SceneObjectGroup relinked = Assert.Single(NewStore(conn).LoadObjects(s_region));
+        Assert.Equal("L1=1 L2=2 L4=3 L5=4 L6=5 L3=6", Describe(relinked));
     }
 }
