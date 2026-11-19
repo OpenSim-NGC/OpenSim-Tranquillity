@@ -2850,6 +2850,9 @@ namespace Phlox.ScriptEngine
                 ScriptShoutError("llSetScriptState: script '" + name + "' not found");
                 return;
             }
+            // SL wiki, llSetScriptState, Caveats: it "Cannot be used to restart a script that has encountered a run-time
+            // error". Such a script stays stopped; llResetOtherScript restarts it. The viewer's Running box is not this call.
+            if (run != 0 && m_ScriptEngine != null && m_ScriptEngine.IsScriptTerminated(item.ItemID)) return;
             // Use EventManager directly — SetScriptRunning requires IClientAPI
             if (run != 0)
                 World.EventManager.TriggerStartScript(m_host.LocalId, item.ItemID);
