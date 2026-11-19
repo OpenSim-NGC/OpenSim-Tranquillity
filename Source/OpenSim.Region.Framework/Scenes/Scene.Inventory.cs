@@ -349,7 +349,10 @@ public partial class Scene
     /// engine it ran in before. When the request sets an engine, state its earlier engine saved does not hold it back (a
     /// saved engine places a script ahead of saved state, see <see cref="ResolveScriptEngine"/>); when it clears the choice,
     /// the ordinary steps place the script, saved state among them, so a script whose engine holds its state stays there and
-    /// keeps it. A request that leaves the choice as it was restarts nothing.</para>
+    /// keeps it. An engine that still reports state for the script after the discard (one that does not implement it) has
+    /// the script reset as it starts. A request that leaves the choice as it was restarts nothing. When the engine the region
+    /// now places the script in is the one running it, or, while no engine reports the script (it is still loading), the
+    /// one its earlier flags placed it in, nothing restarts and nothing is discarded.</para>
     /// <para>Calls for one script are made one at a time, so a capability call and an OSSL call on the same script cannot
     /// interleave.</para>
     /// </remarks>
@@ -399,8 +402,12 @@ public partial class Scene
                 }
             }
 
+            string source = Utils.BytesToString(text.Data);
+            // An engine may not report a script it is still loading. The engine the script's flags as they were place it in
+            // then stands in for the one running it, so choosing that engine restarts nothing and discards nothing.
+            running ??= ResolveScriptEngine(DefaultScriptEngine, source, item);
             item.Flags = flags;
-            IScriptModule placed = ResolveScriptEngine(DefaultScriptEngine, Utils.BytesToString(text.Data), item);
+            IScriptModule placed = ResolveScriptEngine(DefaultScriptEngine, source, item);
             if (running is not null && running == placed)
             {
                 // the engine running the script stays the same: only the choice changes
@@ -417,8 +424,12 @@ public partial class Scene
                 if (engine is IScriptStateProvider state)
                     state.DiscardSavedScriptState(item.ItemID);
             }
+            // An engine that does not implement the discard still reports its state: the script is reset as it starts there.
+            bool keptState = placed is IScriptStateProvider kept && kept.HasSavedScriptState(item.ItemID, item.AssetID);
             // Not the variant that waits for compile errors: no one reads them here, and the caller may be a script thread.
             part.Inventory.CreateScriptInstance(item.ItemID, 0, false, DefaultScriptEngine, 1);
+            if (keptState)
+                EventManager.TriggerScriptReset(part.LocalId, item.ItemID);
             EventManager.TriggerUpdateScript(agentId, itemId, primId, item.ScriptRunning, item.AssetID);
             part.ParentGroup.ResumeScripts();
             return ScriptEngineChoiceResult.Changed;

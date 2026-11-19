@@ -289,7 +289,8 @@ namespace Phlox.ScriptEngine
         /// and drop its loads still queued. Then on the load worker, after any unload posted before this: unload a Phlox
         /// instance if there is one, with its normal save. The item's state row is kept, as YEngine keeps its own state
         /// file for a script it declines (XMREngine.OnRezScript): if the script comes back to Phlox with the same asset it
-        /// resumes from that row, and an edited script has a new asset, so LoadState does not restore the row.
+        /// resumes from that row, and an edited script has a new asset, so LoadState does not restore the row. When the
+        /// region changes the item's engine, it discards the row first (StateManager.Discard) and the unload saves none.
         /// </summary>
         internal void Disown(uint localID, UUID itemID)
         {

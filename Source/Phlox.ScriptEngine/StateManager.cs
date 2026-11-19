@@ -404,7 +404,8 @@ namespace Phlox.ScriptEngine
         /// The script leaves this engine and its item stays where it is (a derez, take or crossing, a recompile, another
         /// engine taking it). Called on the scheduler thread: the state is captured here and the row written later by the
         /// state thread. The row is kept until state travels with objects, so a crossing inside this simulator and a
-        /// switch back from another engine still restore it.
+        /// switch back from another engine by its first line still restore it. When the region changes the item's engine
+        /// (<see cref="Discard"/>) no save is queued: the row goes and the script starts fresh.
         /// </summary>
         public void QueueUnloadSave(Interpreter interp)
         {
@@ -460,6 +461,7 @@ namespace Phlox.ScriptEngine
                 m_Live.Remove(itemId);
                 m_CaptureFailing.Remove(itemId);
                 m_LoadFailed.Remove(itemId);
+                m_Discarded.Remove(itemId);   // the item left its prim: no later load of it here will clear the mark
             }
             ForgetLive(itemId);
             Queue(new WriteOp { Kind = WriteKind.Delete, ItemId = itemId });
