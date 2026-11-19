@@ -39,8 +39,9 @@ still lists every engine. A region that runs no early-access engine does not sen
 update of the region, scripts that run on such an engine may start fresh: their global variables and current state
 are not guaranteed to survive.
 
-The Lua compile targets (`luau` and `lsl-luau`) belong to the engine named `SLua`. When `SLua` is listed as early
-access, a viewer can treat both targets as early access.
+For this list, the Lua compile targets (`luau` and `lsl-luau`) count as the engine named `SLua`: when `SLua` is
+listed as early access, a viewer can treat both targets as early access. The region does not tie the targets to an
+engine name; a target goes to whichever loaded engine accepts it (see "The viewer's compile target").
 
 ## The viewer's compile target
 
