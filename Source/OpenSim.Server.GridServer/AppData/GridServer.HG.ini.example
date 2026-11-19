@@ -242,6 +242,14 @@
     ;; entries can be unsecure url (host:port) if using ssl, direct login url if different, old grid url, etc
     ; GatekeeperURIAlias = "login.osgrid.org"
 
+    ;# {AllowPrivateGrids} {Hypergrid} {gatekeepers of other grids at private addresses this one may reach} {}
+    ;; Users cannot go to a grid at a private, loopback or link-local address (10/8, 172.16/12,
+    ;; 192.168/16, 127/8, fc00::/7...), and this grid does not call such an address back, so that a
+    ;; grid on the internet cannot be steered at its own network. A grid on a private network (a LAN
+    ;; grid, test grids on one host) names here the other grids it may reach, by their gatekeeper:
+    ;; comma separated, host:port or URL.
+    ; AllowPrivateGrids = "http://192.168.1.20:8002, lan-grid:8002"
+
 [TrustedHypergrid]
     ;# {Enabled} {} {Enable Trusted Hypergrid grid-to-grid trust?} {true false} false
     ;; Trusted Hypergrid adds a signed identity to outbound Hypergrid calls and classifies

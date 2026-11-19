@@ -1,10 +1,38 @@
 using System.Net;
+using Nini.Config;
 
 namespace OpenSim.Services.HypergridService;
 
 public static class HypergridEgressPolicy
 {
-    public static bool IsAllowedTarget(string targetUri, string localGatewayUri = null)
+    /// <summary>
+    /// The grids at a private, loopback or link-local address this grid may still send its users to and
+    /// call back, from [Hypergrid] AllowPrivateGrids: gatekeeper addresses ("http://10.0.0.5:8002",
+    /// "lan-grid:8002"), as host:port in lower case. Empty by default: the address filter keeps a grid on
+    /// the internet from being steered at its own network, and a grid on a private network (a LAN grid,
+    /// two grids on one host) can name the others it trusts.
+    /// </summary>
+    public static HashSet<string> PrivateGridsAllowed(IConfigSource config)
+    {
+        HashSet<string> grids = new(StringComparer.OrdinalIgnoreCase);
+        string list = config?.Configs["Hypergrid"]?.GetString("AllowPrivateGrids", string.Empty) ?? string.Empty;
+        foreach (string entry in list.Split(new[] { ',', ';', '|', ' ', '\t' },
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Authority(entry.Contains("://") ? entry : "http://" + entry) is string authority)
+                grids.Add(authority);
+        }
+        return grids;
+    }
+
+    /// <summary>host:port of an absolute URI, in lower case; null when it has no host.</summary>
+    private static string Authority(string uri) =>
+        Uri.TryCreate(uri, UriKind.Absolute, out Uri u) && u.Host.Length > 0
+            ? u.Host.ToLowerInvariant() + ":" + u.Port
+            : null;
+
+    public static bool IsAllowedTarget(string targetUri, string localGatewayUri = null,
+        ISet<string> privateGridsAllowed = null)
     {
         if (UserAgentService.IsLocalGridURI(localGatewayUri, targetUri))
             return true;
@@ -14,6 +42,10 @@ public static class HypergridEgressPolicy
 
         if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
             return false;
+
+        if (privateGridsAllowed is { Count: > 0 } && Authority(targetUri) is string authority
+            && privateGridsAllowed.Contains(authority))
+            return true;
 
         IPAddress[] addresses;
         try
