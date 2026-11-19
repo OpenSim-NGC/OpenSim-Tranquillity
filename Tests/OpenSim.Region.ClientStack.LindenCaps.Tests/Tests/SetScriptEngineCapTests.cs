@@ -35,6 +35,15 @@ public class SetScriptEngineCapTests
         private readonly string m_name;
         public Engine(string name) { m_name = name; }
         string IScriptModule.ScriptEngineName => m_name;
+        // MockScriptEngine leaves these unimplemented; the region asks every engine when it starts a script.
+        System.Collections.ArrayList IScriptModule.GetScriptErrors(UUID itemID) => new();
+        bool IScriptModule.HasScript(UUID itemID, out bool running) { running = false; return false; }
+        bool IScriptModule.SuspendScript(UUID itemID) => true;
+        bool IScriptModule.ResumeScript(UUID itemID) => true;
+        bool IScriptModule.GetScriptState(UUID itemID) => false;
+        void IScriptModule.SaveAllState() { }
+        string IScriptModule.GetXMLState(UUID itemID) => string.Empty;
+        bool IScriptModule.SetXMLState(UUID itemID, string xml) => false;
     }
 
     private sealed class Listener : BaseHttpServer
