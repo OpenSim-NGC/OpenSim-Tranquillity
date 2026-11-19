@@ -43,7 +43,9 @@ If the two regions run on different hosts, configure each destination host to tr
 
 If each region has its own per-region `.ini` with a `[Network]` section, verify that the destination process logs the expected `Trusted control-plane addresses` line at startup. Put `ControlPlaneTrustedHosts` in the per-region file if the shared setting is not present after per-region overrides are merged.
 
-This is expected fail-closed behavior. There is no separate domain-association configuration. In a multi-host grid, each region should normally list all region-service hosts and relevant ROBUST hosts. A one-host standalone commonly needs no setting for the region control-plane endpoints because loopback is trusted.
+This is expected fail-closed behavior. There is no separate domain-association configuration. In a multi-host grid, each region should normally list all region-service hosts and relevant ROBUST hosts. A one-host standalone commonly needs no setting for the region control-plane endpoints because loopback is trusted, and its gatekeeper reaches its own regions in the process, not over HTTP (before, a Hypergrid standalone not bound to loopback refused every login and arrival with `403`: its gatekeeper called its own region's public address).
+
+Hypergrid destinations and home-grid callbacks at private, loopback or link-local addresses are refused. Grids on a private network list one another in `[Hypergrid] AllowPrivateGrids`, by gatekeeper (`host:port` or URL).
 
 The protected region endpoints are:
 

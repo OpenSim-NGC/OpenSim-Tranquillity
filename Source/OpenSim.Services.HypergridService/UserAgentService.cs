@@ -70,6 +70,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
     protected static FriendsSimConnector m_FriendsSimConnector; // grid
 
     protected static string m_GridName;
+    protected static HashSet<string> m_PrivateGridsAllowed = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Resolves (and periodically re-resolves) the public address of the gatekeeper host.
@@ -143,6 +144,11 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
             LoadTripPermissionsFromConfig(serverConfig, "ForeignTripsAllowed");
             LoadDomainExceptionsFromConfig(serverConfig, "AllowExcept", m_TripsAllowedExceptions);
             LoadDomainExceptionsFromConfig(serverConfig, "DisallowExcept", m_TripsDisallowedExceptions);
+
+            m_PrivateGridsAllowed = HypergridEgressPolicy.PrivateGridsAllowed(config);
+            if (m_PrivateGridsAllowed.Count > 0)
+                m_log.LogWarning("[USER AGENT SERVICE]: Users may go to these grids at private addresses: {0}",
+                    string.Join(", ", m_PrivateGridsAllowed));
 
             m_GridName = Util.GetConfigVarFromSections<string>(config, "GatekeeperURI",
                 new string[] { "Startup", "Hypergrid", "UserAgentService" }, String.Empty);
@@ -383,7 +389,7 @@ public class UserAgentService : UserAgentServiceBase, IUserAgentService
         else
         {
             //TODO: Should there not be a call to QueryAccess here?
-            if (!HypergridEgressPolicy.IsAllowedTarget(region.ServerURI, m_GridName))
+            if (!HypergridEgressPolicy.IsAllowedTarget(region.ServerURI, m_GridName, m_PrivateGridsAllowed))
             {
                 reason = "Destination is not allowed";
                 m_log.LogInformation("[USER AGENT SERVICE]: Refusing outbound Hypergrid agent transfer to disallowed target {0}", region.ServerURI);

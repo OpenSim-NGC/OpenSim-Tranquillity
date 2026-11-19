@@ -99,6 +99,25 @@ public class UserAgentServiceSecurityTests
         Xunit.Assert.True(HypergridEgressPolicy.IsAllowedAddress(System.Net.IPAddress.Parse("8.8.8.8")));
     }
 
+    // The address filter left no way to Hypergrid between grids on a private network (a LAN grid, two grids on
+    // one host): [Hypergrid] AllowPrivateGrids names the ones allowed, by gatekeeper.
+    [Xunit.Fact]
+    public void HypergridEgressPolicyAllowsOnlyThePrivateGridsNamed()
+    {
+        Nini.Config.IniConfigSource config = new();
+        config.AddConfig("Hypergrid").Set("AllowPrivateGrids", "http://172.17.0.1:9400/, LAN-Grid:8002 ;[fd00::5]:8002");
+        HashSet<string> allowed = HypergridEgressPolicy.PrivateGridsAllowed(config);
+
+        Xunit.Assert.True(HypergridEgressPolicy.IsAllowedTarget("http://172.17.0.1:9400/", null, allowed));
+        Xunit.Assert.True(HypergridEgressPolicy.IsAllowedTarget("http://lan-grid:8002", null, allowed));
+        Xunit.Assert.True(HypergridEgressPolicy.IsAllowedTarget("http://[fd00::5]:8002/", null, allowed));
+        Xunit.Assert.False(HypergridEgressPolicy.IsAllowedTarget("http://172.17.0.1:9401/", null, allowed), "another port");
+        Xunit.Assert.False(HypergridEgressPolicy.IsAllowedTarget("http://10.0.0.5:9400/", null, allowed), "another host");
+        Xunit.Assert.False(HypergridEgressPolicy.IsAllowedTarget("ftp://172.17.0.1:9400/", null, allowed), "not http");
+        Xunit.Assert.False(HypergridEgressPolicy.IsAllowedTarget("http://172.17.0.1:9400/", null, null), "none named");
+        Xunit.Assert.Empty(HypergridEgressPolicy.PrivateGridsAllowed(new Nini.Config.IniConfigSource()));
+    }
+
     [Xunit.Fact]
     public void HypergridEgressPolicyAllowsLocalGatewayCarveOut()
     {

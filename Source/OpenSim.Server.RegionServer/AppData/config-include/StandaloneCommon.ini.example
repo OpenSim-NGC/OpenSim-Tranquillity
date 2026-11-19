@@ -68,6 +68,14 @@
     ;; see GatekeeperURIAlias
     ; HomeURIAlias = myoldname.something.org, 127.0.0.1,127.0.0.1:8043	
 
+    ;# {AllowPrivateGrids} {Hypergrid} {gatekeepers of other grids at private addresses this one may reach} {}
+    ;; Users cannot go to a grid at a private, loopback or link-local address (10/8, 172.16/12,
+    ;; 192.168/16, 127/8, fc00::/7...), and this grid does not call such an address back, so that a
+    ;; grid on the internet cannot be steered at its own network. A grid on a private network (a LAN
+    ;; grid, test grids on one host) names here the other grids it may reach, by their gatekeeper:
+    ;; comma separated, host:port or URL.
+    ; AllowPrivateGrids = "http://192.168.1.20:8002, lan-grid:8002"
+
 [Modules]
     ;; Asset cache module.
     ;; Warning this is required for several region features
