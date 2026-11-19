@@ -343,10 +343,12 @@ public partial class Scene
     /// <para>The script's text is not stored again: only the saved choice and the engine that runs it change. When the
     /// engine the region now places the script in is the one already running it, the choice is saved and nothing restarts.
     /// Otherwise the script is stopped and started again in that engine, keeping its running or stopped setting. It starts
-    /// fresh there: its global variables and state are not carried over, since no engine reads another's saved state; state
-    /// its earlier engine saved does not hold it back (a saved engine places a script ahead of saved state, see
-    /// <see cref="ResolveScriptEngine"/>); and when the new engine kept state for the same item and text, the script is
-    /// reset as it starts, so that state is not resumed. A request that leaves the choice as it was restarts nothing.</para>
+    /// fresh there: its global variables and state are not carried over, since no engine reads another's saved state. When
+    /// the request sets an engine, state its earlier engine saved does not hold it back (a saved engine places a script
+    /// ahead of saved state, see <see cref="ResolveScriptEngine"/>); when it clears the choice, the ordinary steps place the
+    /// script, saved state among them, so a script whose engine holds its state stays there. When the new engine reports
+    /// state for the same item and text as the script restarts, the script is reset as it starts, so that state is not
+    /// resumed. A request that leaves the choice as it was restarts nothing.</para>
     /// <para>Calls for one script are made one at a time, so a capability call and an OSSL call on the same script cannot
     /// interleave.</para>
     /// </remarks>

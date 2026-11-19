@@ -183,6 +183,24 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
     }
 
     [Fact]
+    public void ClearingTheChoiceLeavesAScriptWhereItsSavedStateIs()
+    {
+        var rig = new Rig();
+        UUID item = rig.Item.ItemID, asset = rig.Stored.AssetID;
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+        rig.P.HoldsState = (i, a) => i == item && a == asset;
+        rig.P.Started.Clear();
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set(""));
+
+        // the ordinary steps place it: saved state keeps it on Phlox, which already runs it, so nothing restarts
+        Assert.Equal(ScriptEngineChoices.None, rig.Choice);
+        Assert.Empty(rig.P.Removed);
+        Assert.Empty(rig.P.Started);
+        Assert.Empty(rig.Y.Started);
+    }
+
+    [Fact]
     public void ASetScriptEngineCallAndAScriptCallOnOneScriptDoNotInterleave()
     {
         var rig = new Rig();
