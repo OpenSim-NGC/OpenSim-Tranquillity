@@ -55,8 +55,12 @@ public sealed class FakeAvatarService : IAvatarService
         return true;
     }
 
+    /// <summary>When set, RemoveItems fails as an unreachable avatar service would, and removes nothing.</summary>
+    public bool FailRemoveItems;
+
     public bool RemoveItems(UUID userID, string[] names)
     {
+        if (FailRemoveItems) return false;
         var d = Record(userID);
         foreach (var n in names) d.Remove(n);
         return true;
