@@ -128,19 +128,17 @@ public partial class Scene
                 }
             }
 
-            // An engine saved with the script ("engine:<Name>") is the same kind of choice and is placed the same way.
-            // An engine that is not loaded here leaves the script to the steps below, as a first line naming it does.
+            // An engine saved with the script ("engine:<Name>") places it when that engine is loaded here. The choice is
+            // changed without changing the script's text (SetScriptEngine), so state another engine saved for the same item
+            // and text is from before the choice and does not hold the script there. An engine that is not loaded here
+            // leaves the script to the steps below, as a first line naming it does.
             string chosen = ScriptEngineChoices.NameFor(ScriptEngineChoices.FromFlags(item.Flags));
             if (chosen is not null)
             {
                 foreach (IScriptModule engine in engines)
                 {
                     if (engine.ScriptEngineName == chosen)
-                    {
-                        if (!AnotherEngineHoldsSavedState(engines, engine, item))
-                            return engine;
-                        break;
-                    }
+                        return engine;
                 }
             }
         }
@@ -340,12 +338,17 @@ public partial class Scene
     /// (<see cref="ScriptCompileTargets.ApplySaveTarget"/>); null or empty clears the choice.
     /// </summary>
     /// <remarks>
-    /// Whoever may save the script (<see cref="IPermissionsModule.CanEditScript"/>, which needs modify and copy on it) may
-    /// choose its engine. A change restarts the script as a recompile does: the script is stopped, given a new copy of
-    /// the same text, and started again in the engine the region now places it in, keeping its running or stopped
-    /// setting. It starts fresh there: its global variables and state are not carried over, since no engine reads
-    /// another's saved state, and state its earlier engine saved belongs to the earlier copy, so it cannot hold the
-    /// script in that engine. A request that leaves the choice as it was restarts nothing.
+    /// <para>Whoever may save the script (<see cref="IPermissionsModule.CanEditScript"/>, which needs modify and copy on it) may
+    /// choose its engine.</para>
+    /// <para>The script's text is not stored again: only the saved choice and the engine that runs it change. When the
+    /// engine the region now places the script in is the one already running it, the choice is saved and nothing restarts.
+    /// Otherwise the script is stopped and started again in that engine, keeping its running or stopped setting. It starts
+    /// fresh there: its global variables and state are not carried over, since no engine reads another's saved state; state
+    /// its earlier engine saved does not hold it back (a saved engine places a script ahead of saved state, see
+    /// <see cref="ResolveScriptEngine"/>); and when the new engine kept state for the same item and text, the script is
+    /// reset as it starts, so that state is not resumed. A request that leaves the choice as it was restarts nothing.</para>
+    /// <para>Calls for one script are made one at a time, so a capability call and an OSSL call on the same script cannot
+    /// interleave.</para>
     /// </remarks>
     /// <param name="agentId">who asks: the viewer's agent, or the owner of the calling script's prim</param>
     /// <param name="callerItemId">the calling script's item, which may not change its own engine; zero for a viewer</param>
@@ -368,27 +371,85 @@ public partial class Scene
         if (!string.IsNullOrEmpty(engineName) && ScriptEngineCodeFor(engineName) == ScriptEngineChoices.None)
             return ScriptEngineChoiceResult.UnknownEngine;
 
-        uint flags = ScriptCompileTargets.ApplySaveTarget(item.Flags, saveTarget, ScriptEngineCodeFor);
-        if (flags == item.Flags)
-            return ScriptEngineChoiceResult.Unchanged;
+        object gate = EnterScriptEngineChange(itemId);
+        try
+        {
+            // read again under the gate: another call may have changed the script while this one waited
+            item = part.Inventory.GetInventoryItem(itemId);
+            if (item is null)
+                return ScriptEngineChoiceResult.NotFound;
+            uint flags = ScriptCompileTargets.ApplySaveTarget(item.Flags, saveTarget, ScriptEngineCodeFor);
+            if (flags == item.Flags)
+                return ScriptEngineChoiceResult.Unchanged;
 
-        AssetBase text = AssetService.Get(item.AssetID.ToString());
-        if (text?.Data is null)
-            return ScriptEngineChoiceResult.NotFound;
-        if (!UUID.TryParse(text.CreatorID, out UUID creator))
-            creator = agentId;
-        AssetBase copy = CreateAsset(item.Name, item.Description, (sbyte)AssetType.LSLText, text.Data, creator);
-        AssetService.Store(copy);
+            AssetBase text = AssetService.Get(item.AssetID.ToString());
+            if (text?.Data is null)
+                return ScriptEngineChoiceResult.NotFound;
 
-        part.Inventory.RemoveScriptInstance(item.ItemID, false);
-        item.Flags = flags;
-        item.AssetID = copy.FullID;
-        part.ParentGroup.UpdateInventoryItem(item);
-        // Not the variant that waits for compile errors: no one reads them here, and the caller may be a script thread.
-        part.Inventory.CreateScriptInstance(item.ItemID, 0, false, DefaultScriptEngine, 1);
-        EventManager.TriggerUpdateScript(agentId, itemId, primId, item.ScriptRunning, item.AssetID);
-        part.ParentGroup.ResumeScripts();
-        return ScriptEngineChoiceResult.Changed;
+            IScriptModule running = null;
+            foreach (IScriptModule engine in RequestModuleInterfaces<IScriptModule>())
+            {
+                if (engine.HasScript(itemId, out _))
+                {
+                    running = engine;
+                    break;
+                }
+            }
+
+            item.Flags = flags;
+            IScriptModule placed = ResolveScriptEngine(DefaultScriptEngine, Utils.BytesToString(text.Data), item);
+            if (running is not null && running == placed)
+            {
+                // the engine running the script stays the same: only the choice changes
+                part.ParentGroup.UpdateInventoryItem(item);
+                return ScriptEngineChoiceResult.Changed;
+            }
+
+            part.Inventory.RemoveScriptInstance(item.ItemID, false);
+            part.ParentGroup.UpdateInventoryItem(item);
+            bool resetOnStart = placed is IScriptStateProvider state && state.HasSavedScriptState(item.ItemID, item.AssetID);
+            // Not the variant that waits for compile errors: no one reads them here, and the caller may be a script thread.
+            part.Inventory.CreateScriptInstance(item.ItemID, 0, false, DefaultScriptEngine, 1);
+            if (resetOnStart)
+                EventManager.TriggerScriptReset(part.LocalId, item.ItemID);
+            EventManager.TriggerUpdateScript(agentId, itemId, primId, item.ScriptRunning, item.AssetID);
+            part.ParentGroup.ResumeScripts();
+            return ScriptEngineChoiceResult.Changed;
+        }
+        finally
+        {
+            ExitScriptEngineChange(itemId, gate);
+        }
+    }
+
+    // One gate per script while an engine change of it is in progress; removed when no call holds or waits for it.
+    private readonly Dictionary<UUID, (object Gate, int Users)> m_scriptEngineChangeGates = new();
+
+    private object EnterScriptEngineChange(UUID itemId)
+    {
+        object gate;
+        lock (m_scriptEngineChangeGates)
+        {
+            if (!m_scriptEngineChangeGates.TryGetValue(itemId, out var entry))
+                entry = (new object(), 0);
+            gate = entry.Gate;
+            m_scriptEngineChangeGates[itemId] = (gate, entry.Users + 1);
+        }
+        Monitor.Enter(gate);
+        return gate;
+    }
+
+    private void ExitScriptEngineChange(UUID itemId, object gate)
+    {
+        Monitor.Exit(gate);
+        lock (m_scriptEngineChangeGates)
+        {
+            var entry = m_scriptEngineChangeGates[itemId];
+            if (entry.Users <= 1)
+                m_scriptEngineChangeGates.Remove(itemId);
+            else
+                m_scriptEngineChangeGates[itemId] = (gate, entry.Users - 1);
+        }
     }
 
     /// <summary>Whether <paramref name="agentId"/> may choose the engine of this script: whoever may save it.</summary>
