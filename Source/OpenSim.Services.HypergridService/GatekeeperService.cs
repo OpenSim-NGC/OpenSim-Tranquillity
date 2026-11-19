@@ -73,9 +73,20 @@ public class GatekeeperService : IGatekeeperService
     private static GridRegion m_DefaultGatewayRegion;
     private static bool m_allowDuplicatePresences = false;
     private static string m_messageKey;
+    private static HashSet<string> m_privateGridsAllowed = new(StringComparer.OrdinalIgnoreCase);
 
     public GatekeeperService(IConfigSource config, ISimulationService simService)
     {
+        // The services are shared by every instance and set up by the first. In a standalone, the
+        // first is the user agent service's, made by the login service with no simulation service: it
+        // loaded the HTTP connector named in [GatekeeperService] SimulationService, and the
+        // gatekeeper reached its own regions through their public address. The control-plane check
+        // refused that call (it does not come from loopback): no login or Hypergrid arrival worked
+        // on a standalone that was not on loopback. The region's own simulation service, handed in
+        // by the Hypergrid in-connector, replaces it.
+        if (simService is not null)
+            m_SimulationService = simService;
+
         if (!m_Initialized)
         {
             m_Initialized = true;
@@ -112,6 +123,7 @@ public class GatekeeperService : IGatekeeperService
                 throw new Exception("GatekeeperURI is invalid");
             }
             m_gatekeeperURL = m_gatekeeperHost.URIwEndSlash;
+            m_privateGridsAllowed = HypergridEgressPolicy.PrivateGridsAllowed(config);
 
             string gatekeeperURIAlias = Util.GetConfigVarFromSections<string>(config, "GatekeeperURIAlias", sections, string.Empty);
 
@@ -632,7 +644,7 @@ public class GatekeeperService : IGatekeeperService
         }
         else
         {
-            if (!HypergridEgressPolicy.IsAllowedTarget(userURL, m_gatekeeperURL))
+            if (!HypergridEgressPolicy.IsAllowedTarget(userURL, m_gatekeeperURL, m_privateGridsAllowed))
             {
                 m_log.LogInformation("[GATEKEEPER SERVICE]: Refusing verification callback to disallowed HomeURI {0}", userURL);
                 return false;

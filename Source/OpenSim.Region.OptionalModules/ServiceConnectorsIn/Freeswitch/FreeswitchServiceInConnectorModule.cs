@@ -92,7 +92,7 @@ public class FreeswitchServiceInConnectorModule : ISharedRegionModule
 
             m_log.LogInformation("[RegionFreeswitchService]: Starting...");
 
-            Object[] args = new Object[] { m_Config, MainServer.Instance };
+            Object[] args = new Object[] { m_Config, MainServer.Instance.DefaultServer, "FreeswitchService" };
 
             ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:FreeswitchServerConnector", args);
         }

@@ -91,7 +91,7 @@ public class InventoryServiceInConnectorModule : ISharedRegionModule
 
             m_log.LogInformation("[RegionInventoryService]: Starting...");
 
-            Object[] args = new Object[] { m_Config, MainServer.Instance, "HGInventoryService" };
+            Object[] args = new Object[] { m_Config, MainServer.Instance.DefaultServer, "HGInventoryService" };
 
             ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:XInventoryInConnector", args);
         }
