@@ -116,7 +116,10 @@ public interface IEventQueue
         => ScriptRunningEvent(objectID, itemID, running, avatarID);
 
     /// <summary>
-    /// ScriptRunningReply with the compile target and the script's engines.
+    /// ScriptRunningReply with the compile target and, for a viewer that asked for them, the script's engines: "Engine"
+    /// (the engine that runs it, empty when none does) and "EngineChoice" (the engine saved with it, empty when none).
+    /// When <paramref name="engine"/> is null the two fields are left out and the reply is the one sent before they existed.
+    /// The default leaves them out, so an implementation written before this member existed keeps working.
     /// </summary>
     void ScriptRunningEvent(UUID objectID, UUID itemID, bool running, UUID avatarID, ScriptCompileTarget target,
             string engine, string engineChoice)

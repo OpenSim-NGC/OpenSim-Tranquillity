@@ -126,6 +126,7 @@ public class Caps : IDisposable
         PBR =           0x800,
         ViewerBenefits = 0x1000,
         TPBR =           0x2000,
+        /// <summary>The viewer listed SetScriptEngine in its seed request: ScriptRunningReply tells it the script's engines.</summary>
         ScriptEngineChoice = 0x4000
     }
 

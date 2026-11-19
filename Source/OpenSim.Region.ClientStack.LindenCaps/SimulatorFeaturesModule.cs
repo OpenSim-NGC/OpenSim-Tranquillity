@@ -105,6 +105,17 @@ public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeature
     {
         GetGridExtraFeatures(s);
         AddScriptEngines(s);
+        AddScriptEngineChoice(s);
+    }
+
+    /// <summary>
+    /// OpenSimExtras["ScriptEngineChoice"] = true when the region keeps a script engine chosen for a script ("engine:&lt;Name&gt;"
+    /// saves and the SetScriptEngine capability; [Startup] ScriptEngineChoice). Not sent when it does not.
+    /// </summary>
+    private void AddScriptEngineChoice(Scene scene)
+    {
+        if (scene.ScriptEngineChoiceEnabled)
+            AddOpenSimExtraFeature("ScriptEngineChoice", OSD.FromBoolean(true));
     }
 
     /// <summary>

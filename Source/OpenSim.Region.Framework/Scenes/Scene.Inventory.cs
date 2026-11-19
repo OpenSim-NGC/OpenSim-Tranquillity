@@ -310,8 +310,21 @@ public partial class Scene
     private string SaveTargetHere(string target)
         => !m_scriptEngineChoice && ScriptEngineChoices.IsEngineTarget(target) ? null : target;
 
-    /// <summary>The ScriptEngineName of the engine that runs a script; empty when none does.</summary>
-    public string GetScriptEngineRunning(UUID primId, UUID itemId) => string.Empty;
+    /// <summary>
+    /// The ScriptEngineName of the engine that holds a script of a prim's inventory (running or not); empty when the
+    /// prim or the script is not there or no loaded engine holds it, for example while it compiles.
+    /// </summary>
+    public string GetScriptEngineRunning(UUID primId, UUID itemId)
+    {
+        if (GetSceneObjectPart(primId)?.Inventory.GetInventoryItem(itemId) is null)
+            return string.Empty;
+        foreach (IScriptModule engine in RequestModuleInterfaces<IScriptModule>())
+        {
+            if (engine.HasScript(itemId, out _))
+                return engine.ScriptEngineName ?? string.Empty;
+        }
+        return string.Empty;
+    }
 
     /// <summary>The ScriptEngineName of the engine saved with a script in a prim's inventory; empty when there is none.</summary>
     public string GetScriptEngineChoice(UUID primId, UUID itemId)

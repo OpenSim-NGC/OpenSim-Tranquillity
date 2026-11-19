@@ -286,6 +286,14 @@ public partial class BunchOfCaps
         }
     }
     /// <summary>
+    /// The seed flag a viewer sets by listing a capability in its seed request, for the capabilities that also change
+    /// what the region sends it: SetScriptEngine adds the script's engines to ScriptRunningReply
+    /// (<see cref="Caps.CapsFlags.ScriptEngineChoice"/>). <see cref="Caps.CapsFlags.None"/> for any other name.
+    /// </summary>
+    public static Caps.CapsFlags FlagForRequestedCap(string capName)
+        => capName == "SetScriptEngine" ? Caps.CapsFlags.ScriptEngineChoice : Caps.CapsFlags.None;
+
+    /// <summary>
     /// Construct a client response detailing all the capabilities this server can provide.
     /// </summary>
     /// <param name="request"></param>
@@ -294,9 +302,6 @@ public partial class BunchOfCaps
     /// <param name="httpRequest">HTTP request header object</param>
     /// <param name="httpResponse">HTTP response header object</param>
     /// <returns></returns>
-    /// <summary>The seed flag a viewer sets by listing this capability in its seed request.</summary>
-    public static Caps.CapsFlags FlagForRequestedCap(string capName) => Caps.CapsFlags.None;
-
     public void SeedCapRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
         m_log.LogDebug(
@@ -373,6 +378,7 @@ public partial class BunchOfCaps
                     m_HostCapsObj.Flags |= Caps.CapsFlags.PBR;
                     break;
                 default:
+                    m_HostCapsObj.Flags |= FlagForRequestedCap(cstr);
                     break;
             }
             validCaps.Add(cstr);
