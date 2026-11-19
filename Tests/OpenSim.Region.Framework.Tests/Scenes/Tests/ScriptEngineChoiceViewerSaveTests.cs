@@ -143,6 +143,29 @@ public class ScriptEngineChoiceViewerSaveTests : OpenSimTestCase
         Assert.Equal(Phlox, rig.Chosen);
     }
 
+    /// <summary>
+    /// A save that carries no target (a viewer that cannot tell which target the script has) changes neither the saved
+    /// engine nor a saved Lua target, and every other flag bit stays as it was.
+    /// </summary>
+    [Theory]
+    [InlineData("engine:Phlox", Phlox, ScriptCompileTarget.Unspecified)]
+    [InlineData("engine:YEngine", YEngine, ScriptCompileTarget.Unspecified)]
+    [InlineData("luau", null, ScriptCompileTarget.Luau)]
+    [InlineData("lsl-luau", null, ScriptCompileTarget.LslOnLuau)]
+    public void ASaveWithNoTargetKeepsTheSavedEngineAndTheSavedLuaTarget(string first, string engine, ScriptCompileTarget lua)
+    {
+        var rig = new Rig();
+        rig.Save(first);
+        uint before = rig.Flags;
+
+        rig.Save(null);
+        rig.Save(null);
+
+        Assert.Equal(before, rig.Flags);
+        Assert.Equal(engine, rig.Chosen);
+        Assert.Equal(lua, rig.LuaTarget);
+    }
+
     [Fact]
     public void AnEngineNamingViewerChoosesAndClears()
     {

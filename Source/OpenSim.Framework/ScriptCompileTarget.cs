@@ -58,6 +58,12 @@ public static class ScriptCompileTargets
     public static uint ForViewer(uint flags) => flags & ~RegionOnlyFlags;
 
     /// <summary>
+    /// The runtime a viewer is told for a script item with these flags, as Second Life's viewer reads it from an item's
+    /// "script" map ("runtime": "lsl2", "mono" or "luau"; llinventory.cpp, llpreviewscript.cpp); null when none is sent.
+    /// </summary>
+    public static string ViewerRuntime(uint flags) => null;
+
+    /// <summary>
     /// The flag bits only the region sets: <see cref="LslOnLuauFlag"/> and the saved engine. A viewer is never told them,
     /// so flags a viewer sends back are applied with these bits kept as the item has them.
     /// </summary>
