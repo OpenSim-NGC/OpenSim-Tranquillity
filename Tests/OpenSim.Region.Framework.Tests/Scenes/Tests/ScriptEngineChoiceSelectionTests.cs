@@ -139,14 +139,16 @@ public class ScriptEngineChoiceSelectionTests : OpenSimTestCase
     }
 
     [Fact]
-    public void SavedStateInAnotherEngineStillPlacesAScriptThatCarriesAnEngineChoice()
+    public void AnEngineChoicePlacesTheScriptEvenWhenAnotherEngineHoldsSavedState()
     {
+        // A choice of engine is changed without changing the script's text, so state another engine saved for the same
+        // item and text is from before the choice and does not hold the script there.
         var rig = new Rig("x", YEngine);
         rig.Choose(ScriptEngineChoices.Phlox);
         UUID item = rig.Item.ItemID, asset = rig.Item.AssetID;
         rig.Y.HoldsState = (i, a) => i == item && a == asset;
 
-        Assert.Equal(YEngine, rig.Selected("x"));
+        Assert.Equal(Phlox, rig.Selected("x"));
     }
 
     [Fact]

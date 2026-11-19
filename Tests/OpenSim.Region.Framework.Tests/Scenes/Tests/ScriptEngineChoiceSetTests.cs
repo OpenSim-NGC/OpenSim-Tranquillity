@@ -19,8 +19,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests;
 /// <summary>
 /// Choosing a script's engine without saving its text (<see cref="Scene.SetScriptEngine"/>, behind the SetScriptEngine
 /// capability and osSetScriptEngine). Whoever may save the script may choose its engine. A change restarts the script in
-/// the engine it now places the script in, as a recompile does: the script starts fresh there, and state saved by its
-/// earlier engine does not hold it back, because the restart gives it a new copy of its text as a recompile does.
+/// the engine it now places the script in. The script's text is not stored again: only the saved choice and the engine
+/// that runs it change. The script starts fresh there: state its earlier engine saved does not hold it back, and state the
+/// new engine kept for the same text is not resumed (the script is reset). Choosing the engine that already runs the
+/// script saves the choice and restarts nothing. Calls for one script are made one at a time.
 /// </summary>
 public class ScriptEngineChoiceSetTests : OpenSimTestCase
 {
@@ -33,6 +35,10 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         public Func<UUID, UUID, bool> HoldsState { get; set; } = (_, _) => false;
         public readonly List<UUID> Started = new();
         public readonly List<UUID> Removed = new();
+        public readonly List<UUID> Resets = new();
+        public readonly HashSet<UUID> Holds = new();
+        /// <summary>Called on the thread that removes a script this engine holds, before it is removed.</summary>
+        public Action<UUID> OnRemoving { get; set; } = _ => { };
 
         public Engine(string name) { ScriptEngineName = name; }
 
@@ -40,7 +46,7 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         public ArrayList GetScriptErrors(UUID itemID) => new();
         public bool SuspendScript(UUID itemID) => true;
         public bool ResumeScript(UUID itemID) => true;
-        public bool HasScript(UUID itemID, out bool running) { running = false; return false; }
+        public bool HasScript(UUID itemID, out bool running) { lock (Holds) { running = Holds.Contains(itemID); return running; } }
         public bool GetScriptState(UUID itemID) => false;
         public void SetScriptState(UUID itemID, bool state, bool self) { }
         public void SaveAllState() { }
@@ -53,9 +59,27 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
             scene.EventManager.OnRezScript += (localID, itemID, script, startParam, postOnRez, engine, stateSource) =>
             {
                 if (engine == ScriptEngineName)
-                    Started.Add(itemID);
+                {
+                    lock (Holds) { Started.Add(itemID); Holds.Add(itemID); }
+                }
             };
-            scene.EventManager.OnRemoveScript += (localID, itemID) => Removed.Add(itemID);
+            scene.EventManager.OnRemoveScript += (localID, itemID) =>
+            {
+                bool held;
+                lock (Holds) held = Holds.Contains(itemID);
+                if (!held)
+                    return;
+                OnRemoving(itemID);
+                lock (Holds) { Removed.Add(itemID); Holds.Remove(itemID); }
+            };
+            scene.EventManager.OnScriptReset += (localID, itemID) =>
+            {
+                lock (Holds)
+                {
+                    if (Holds.Contains(itemID))
+                        Resets.Add(itemID);
+                }
+            };
         }
     }
 
@@ -112,9 +136,85 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         Assert.Equal(new[] { rig.Item.ItemID }, rig.P.Started);
         Assert.Empty(rig.Y.Started);
         Assert.Contains(rig.Item.ItemID, rig.Y.Removed);
-        // a recompile's restart: a new copy of the same text
-        Assert.NotEqual(before, rig.Stored.AssetID);
+        // the same text, not a new copy of it
+        Assert.Equal(before, rig.Stored.AssetID);
         Assert.Equal(text, Utils.BytesToString(rig.Scene.AssetService.Get(rig.Stored.AssetID.ToString()).Data));
+        Assert.Empty(rig.P.Resets);
+    }
+
+    [Fact]
+    public void ChangingTheEngineAgainAndAgainKeepsTheSameText()
+    {
+        var rig = new Rig();
+        UUID asset = rig.Stored.AssetID;
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+        Assert.Equal(asset, rig.Stored.AssetID);
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("YEngine"));
+        Assert.Equal(asset, rig.Stored.AssetID);
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set(""));
+        Assert.Equal(asset, rig.Stored.AssetID);
+    }
+
+    [Fact]
+    public void ChoosingTheEngineThatAlreadyRunsTheScriptSavesTheChoiceAndRestartsNothing()
+    {
+        var rig = new Rig();
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("YEngine"));
+
+        Assert.Equal(ScriptEngineChoices.YEngine, rig.Choice);
+        Assert.Empty(rig.Y.Removed);
+        Assert.Empty(rig.Y.Started);
+        Assert.Empty(rig.P.Started);
+    }
+
+    [Fact]
+    public void StateTheNewEngineKeptForTheSameTextIsNotResumed()
+    {
+        var rig = new Rig();
+        UUID item = rig.Item.ItemID, asset = rig.Stored.AssetID;
+        rig.P.HoldsState = (i, a) => i == item && a == asset;
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+
+        Assert.Equal(new[] { item }, rig.P.Started);
+        Assert.Equal(new[] { item }, rig.P.Resets);
+    }
+
+    [Fact]
+    public void ASetScriptEngineCallAndAScriptCallOnOneScriptDoNotInterleave()
+    {
+        var rig = new Rig();
+        using var inFirstCall = new ManualResetEventSlim();
+        using var releaseFirstCall = new ManualResetEventSlim();
+        int removals = 0;
+        rig.Y.OnRemoving = _ =>
+        {
+            if (Interlocked.Increment(ref removals) == 1)
+            {
+                inFirstCall.Set();
+                releaseFirstCall.Wait(TimeSpan.FromSeconds(30));
+            }
+        };
+        UUID callingScript = UUID.Random();
+
+        // the capability's call, held inside its restart
+        Task<ScriptEngineChoiceResult> first = Task.Run(() => rig.Scene.SetScriptEngine(rig.Owner, rig.Part.UUID, rig.Item.ItemID, "Phlox"));
+        Assert.True(inFirstCall.Wait(TimeSpan.FromSeconds(30)), "the first call never reached the restart");
+        // an OSSL call from another script on the same script while the first has not finished
+        Task<ScriptEngineChoiceResult> second = Task.Run(() =>
+            rig.Scene.SetScriptEngine(rig.Owner, rig.Part.UUID, rig.Item.ItemID, "engine:InWorldz.Phlox", callingScript));
+
+        // a fixed window, to prove the second call does NOT run while the first holds the script
+        Assert.False(second.Wait(TimeSpan.FromMilliseconds(500)), "the second call ran while the first was still changing the script");
+        releaseFirstCall.Set();
+
+        Assert.True(Task.WaitAll(new Task[] { first, second }, TimeSpan.FromSeconds(30)), "the calls did not finish");
+        Assert.Equal(ScriptEngineChoiceResult.Changed, first.Result);
+        Assert.Equal(ScriptEngineChoiceResult.Unchanged, second.Result);
+        Assert.Equal(new[] { rig.Item.ItemID }, rig.P.Started);
+        Assert.Equal(ScriptEngineChoices.Phlox, rig.Choice);
     }
 
     [Fact]
