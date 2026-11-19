@@ -37,11 +37,11 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: '10.0.x'
 
       - name: Set version with Nerdbank.GitVersioning
         id: nbgv
-        uses: dotnet/nbgv@v0
+        uses: dotnet/nbgv@master
         with:
           setAllVars: true
 
