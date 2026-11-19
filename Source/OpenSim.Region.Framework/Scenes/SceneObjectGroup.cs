@@ -2319,7 +2319,9 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
         if (m_rootPart.LocalId == 0)
             m_rootPart.LocalId = m_scene.AllocateLocalId();
 
-        SceneObjectPart[] parts = m_parts.GetArray();
+        // The children get their local ids in link order, after the root, as the parts are sent to viewers
+        // (see PartsInLinkOrder). Storage order is the order a region store or a serialised object listed them.
+        SceneObjectPart[] parts = PartsInLinkOrder;
         for (int i = 0; i < parts.Length; i++)
         {
             SceneObjectPart part = parts[i];
