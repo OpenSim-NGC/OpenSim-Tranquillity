@@ -333,9 +333,81 @@ public partial class Scene
         return item is null ? string.Empty : ScriptEngineChoices.NameFor(ScriptEngineChoices.FromFlags(item.Flags)) ?? string.Empty;
     }
 
-    /// <summary>Chooses the engine of a script in a prim's inventory for <paramref name="agentId"/>.</summary>
+    /// <summary>
+    /// Chooses the engine of a script in a prim's inventory without saving its text: the SetScriptEngine capability and
+    /// osSetScriptEngine. <paramref name="target"/> is an engine's name or alias ("Phlox"), "engine:&lt;Name&gt;", or any
+    /// other save target ("luau", "lsl-luau", "mono", "lsl2"), and follows the save rule
+    /// (<see cref="ScriptCompileTargets.ApplySaveTarget"/>); null or empty clears the choice.
+    /// </summary>
+    /// <remarks>
+    /// Whoever may save the script (<see cref="IPermissionsModule.CanEditScript"/>, which needs modify and copy on it) may
+    /// choose its engine. A change restarts the script as a recompile does: the script is stopped, given a new copy of
+    /// the same text, and started again in the engine the region now places it in, keeping its running or stopped
+    /// setting. It starts fresh there: its global variables and state are not carried over, since no engine reads
+    /// another's saved state, and state its earlier engine saved belongs to the earlier copy, so it cannot hold the
+    /// script in that engine. A request that leaves the choice as it was restarts nothing.
+    /// </remarks>
+    /// <param name="agentId">who asks: the viewer's agent, or the owner of the calling script's prim</param>
+    /// <param name="callerItemId">the calling script's item, which may not change its own engine; zero for a viewer</param>
     public ScriptEngineChoiceResult SetScriptEngine(UUID agentId, UUID primId, UUID itemId, string target, UUID callerItemId = default)
-        => ScriptEngineChoiceResult.NotFound;
+    {
+        if (!m_scriptEngineChoice)
+            return ScriptEngineChoiceResult.Disabled;
+
+        SceneObjectPart part = GetSceneObjectPart(primId);
+        TaskInventoryItem item = part?.Inventory.GetInventoryItem(itemId);
+        if (item is null || item.InvType != (int)InventoryType.LSL)
+            return ScriptEngineChoiceResult.NotFound;
+        if (itemId == callerItemId)
+            return ScriptEngineChoiceResult.OwnScript;
+        if (!MayChooseScriptEngine(agentId, part, item))
+            return ScriptEngineChoiceResult.NotAllowed;
+
+        string saveTarget = ScriptEngineSaveTarget(target);
+        string engineName = ScriptEngineChoices.EngineNameOf(saveTarget);
+        if (!string.IsNullOrEmpty(engineName) && ScriptEngineCodeFor(engineName) == ScriptEngineChoices.None)
+            return ScriptEngineChoiceResult.UnknownEngine;
+
+        uint flags = ScriptCompileTargets.ApplySaveTarget(item.Flags, saveTarget, ScriptEngineCodeFor);
+        if (flags == item.Flags)
+            return ScriptEngineChoiceResult.Unchanged;
+
+        AssetBase text = AssetService.Get(item.AssetID.ToString());
+        if (text?.Data is null)
+            return ScriptEngineChoiceResult.NotFound;
+        if (!UUID.TryParse(text.CreatorID, out UUID creator))
+            creator = agentId;
+        AssetBase copy = CreateAsset(item.Name, item.Description, (sbyte)AssetType.LSLText, text.Data, creator);
+        AssetService.Store(copy);
+
+        part.Inventory.RemoveScriptInstance(item.ItemID, false);
+        item.Flags = flags;
+        item.AssetID = copy.FullID;
+        part.ParentGroup.UpdateInventoryItem(item);
+        // Not the variant that waits for compile errors: no one reads them here, and the caller may be a script thread.
+        part.Inventory.CreateScriptInstance(item.ItemID, 0, false, DefaultScriptEngine, 1);
+        EventManager.TriggerUpdateScript(agentId, itemId, primId, item.ScriptRunning, item.AssetID);
+        part.ParentGroup.ResumeScripts();
+        return ScriptEngineChoiceResult.Changed;
+    }
+
+    /// <summary>Whether <paramref name="agentId"/> may choose the engine of this script: whoever may save it.</summary>
+    private bool MayChooseScriptEngine(UUID agentId, SceneObjectPart part, TaskInventoryItem item)
+        => Permissions.CanEditScript(item.ItemID, part.UUID, agentId);
+
+    /// <summary>A SetScriptEngine target as a save target: a bare engine name becomes "engine:&lt;Name&gt;", nothing becomes "engine:".</summary>
+    private static string ScriptEngineSaveTarget(string target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+            return ScriptEngineChoices.TargetPrefix;
+        string value = target.Trim();
+        if (ScriptEngineChoices.IsEngineTarget(value)
+            || ScriptCompileTargets.Parse(value) != ScriptCompileTarget.Unspecified
+            || value.Equals("mono", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("lsl2", StringComparison.OrdinalIgnoreCase))
+            return value;
+        return ScriptEngineChoices.TargetPrefix + value;
+    }
 
     /// <summary>
     /// Lets the script engines start processing scripts.

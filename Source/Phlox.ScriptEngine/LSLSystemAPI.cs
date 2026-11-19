@@ -12862,8 +12862,22 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
             OsslForceAttachFromInventory(m_host.OwnerID, itemName, attachmentPoint);
         }
 
+        /// <summary>OSSL_Api.osSetScriptEngine: the engine of another script in this prim, for the prim's owner (Scene.SetScriptEngine).</summary>
         public int osSetScriptEngine(string scriptName, string target)
         {
+            OsslCheck(TlHigh, "osSetScriptEngine");
+
+            TaskInventoryItem item = m_host.Inventory.GetInventoryItem(scriptName);
+            if (item == null || item.InvType != (int)InventoryType.LSL)
+            {
+                ScriptShoutError($"osSetScriptEngine: no script '{scriptName}' in this prim");
+                return 0;
+            }
+
+            ScriptEngineChoiceResult result = World.SetScriptEngine(m_host.OwnerID, m_host.UUID, item.ItemID, target, m_itemID);
+            if (result == ScriptEngineChoiceResult.Changed || result == ScriptEngineChoiceResult.Unchanged)
+                return 1;
+            ScriptShoutError($"osSetScriptEngine: {result} for '{scriptName}'");
             return 0;
         }
 

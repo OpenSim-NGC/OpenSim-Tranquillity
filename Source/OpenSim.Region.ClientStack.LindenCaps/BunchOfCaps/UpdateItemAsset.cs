@@ -141,10 +141,55 @@ public partial class BunchOfCaps
         return UUID.Zero;
     }
 
-    /// <summary>The SetScriptEngine capability.</summary>
+    /// <summary>
+    /// The SetScriptEngine capability: {task_id, item_id, target} chooses the engine of a script in an object without
+    /// saving its text (<see cref="Scene.SetScriptEngine"/>); an empty or missing target clears the choice. The reply is
+    /// {state: "complete", result, EngineChoice} when the choice is in place (result "Changed" or "Unchanged"), and
+    /// {state: "error", result, error} otherwise, where result names the <see cref="ScriptEngineChoiceResult"/>.
+    /// </summary>
     public void SetScriptEngineRequest(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse, OSDMap map)
     {
-        httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
+        UUID itemID = UUID.Zero;
+        UUID objectID = UUID.Zero;
+        string target = null;
+        if (map.TryGetValue("item_id", out OSD tmp))
+            itemID = tmp.AsUUID();
+        if (map.TryGetValue("task_id", out tmp))
+            objectID = tmp.AsUUID();
+        if (map.TryGetValue("target", out tmp))
+            target = tmp.AsString();
+
+        OSDMap reply = new();
+        if (itemID.IsZero() || objectID.IsZero())
+        {
+            reply["state"] = "error";
+            reply["result"] = "BadRequest";
+            reply["error"] = "task_id and item_id are needed";
+        }
+        else
+        {
+            ScriptEngineChoiceResult result = m_Scene.SetScriptEngine(m_AgentID, objectID, itemID, target);
+            reply["result"] = result.ToString();
+            if (result == ScriptEngineChoiceResult.Changed || result == ScriptEngineChoiceResult.Unchanged)
+            {
+                reply["state"] = "complete";
+                reply["EngineChoice"] = m_Scene.GetScriptEngineChoice(objectID, itemID);
+            }
+            else
+            {
+                reply["state"] = "error";
+                reply["error"] = result switch
+                {
+                    ScriptEngineChoiceResult.NotFound => "script not found",
+                    ScriptEngineChoiceResult.NotAllowed => "no permission to choose this script's engine",
+                    ScriptEngineChoiceResult.Disabled => "this region keeps no script engine choices",
+                    ScriptEngineChoiceResult.UnknownEngine => "no such script engine",
+                    _ => result.ToString(),
+                };
+            }
+        }
+        httpResponse.RawBuffer = OSDParser.SerializeLLSDXmlBytes(reply);
     }
 
     /// <summary>

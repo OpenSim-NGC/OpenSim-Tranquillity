@@ -4268,8 +4268,26 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
         ForceAttachToAvatarFromInventory(m_host.OwnerID, itemName, attachmentPoint);
     }
 
+    /// <summary>
+    /// Chooses the engine of another script in this prim for the prim's owner (Scene.SetScriptEngine): the owner may do
+    /// this for a script they may save. Like osForceAttachToAvatarFromInventory, it acts on an item in the host prim's
+    /// own inventory, for the prim's owner, at threat level High.
+    /// </summary>
     public LSL_Integer osSetScriptEngine(string scriptName, string target)
     {
+        CheckThreatLevel(ThreatLevel.High, "osSetScriptEngine");
+
+        TaskInventoryItem item = m_host.Inventory.GetInventoryItem(scriptName);
+        if (item is null || item.InvType != (int)InventoryType.LSL)
+        {
+            OSSLShoutError($"osSetScriptEngine: no script '{scriptName}' in this prim");
+            return 0;
+        }
+
+        ScriptEngineChoiceResult result = World.SetScriptEngine(m_host.OwnerID, m_host.UUID, item.ItemID, target, m_item.ItemID);
+        if (result == ScriptEngineChoiceResult.Changed || result == ScriptEngineChoiceResult.Unchanged)
+            return 1;
+        OSSLShoutError($"osSetScriptEngine: {result} for '{scriptName}'");
         return 0;
     }
 

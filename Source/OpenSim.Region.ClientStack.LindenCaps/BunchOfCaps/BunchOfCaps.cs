@@ -258,6 +258,12 @@ public partial class BunchOfCaps
                 m_HostCapsObj.RegisterSimpleHandler("UpdateScriptTaskInventory", oreq, true); //legacy
             }
 
+            if (m_Scene.ScriptEngineChoiceEnabled)
+            {
+                m_HostCapsObj.RegisterSimpleHandler("SetScriptEngine",
+                    new SimpleOSDMapHandler("POST", GetNewCapPath(), SetScriptEngineRequest));
+            }
+
             m_HostCapsObj.RegisterSimpleHandler("CopyInventoryFromNotecard",
                 new SimpleOSDMapHandler("POST", GetNewCapPath(), CopyInventoryFromNotecard));
 
