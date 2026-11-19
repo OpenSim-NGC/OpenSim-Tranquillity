@@ -129,17 +129,27 @@ public class SimulatorFeaturesModule : INonSharedRegionModule, ISimulatorFeature
     /// Every script engine has stacked its IScriptModule in AddRegion by the time RegionLoaded runs. A region with
     /// no script engine sends an empty list. It is added after the grid's extra features, so the region's own list
     /// is the one sent.
+    /// <para>The engines among them that mark themselves early access (<see cref="IScriptModule.EarlyAccess"/>) are also
+    /// listed under OpenSimExtras["ScriptEngineEarlyAccess"]: an early-access engine may not keep script state across
+    /// future updates until it is declared final. A region that runs none sends no such key, so its reply is as before.</para>
     /// </remarks>
     private void AddScriptEngines(Scene scene)
     {
         OSDArray engines = new();
+        OSDArray earlyAccess = new();
         foreach (IScriptModule engine in scene.RequestModuleInterfaces<IScriptModule>())
         {
             if (engine is not null && !string.IsNullOrEmpty(engine.ScriptEngineName))
+            {
                 engines.Add(engine.ScriptEngineName);
+                if (engine.EarlyAccess)
+                    earlyAccess.Add(engine.ScriptEngineName);
+            }
         }
 
         AddOpenSimExtraFeature("ScriptEngines", engines);
+        if (earlyAccess.Count > 0)
+            AddOpenSimExtraFeature("ScriptEngineEarlyAccess", earlyAccess);
     }
 
     public void Close() { }
