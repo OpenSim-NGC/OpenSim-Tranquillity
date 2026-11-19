@@ -425,6 +425,7 @@ public partial class Scene : SceneBase
     private readonly HashSet<UUID> m_groupsWithTargets = new();
 
     private readonly string m_defaultScriptEngine;
+    private bool m_scriptEngineChoice = true;
 
     private int m_unixStartTime;
     public int UnixStartTime
@@ -1069,6 +1070,7 @@ public partial class Scene : SceneBase
 
             m_defaultScriptEngine = startupConfig.GetString("DefaultScriptEngine", "YEngine");
             m_log.LogInformation("[SCENE]: Default script engine {0}", m_defaultScriptEngine);
+            m_scriptEngineChoice = startupConfig.GetBoolean("ScriptEngineChoice", m_scriptEngineChoice);
 
             m_strictAccessControl = startupConfig.GetBoolean("StrictAccessControl", m_strictAccessControl);
             m_seeIntoBannedRegion = startupConfig.GetBoolean("SeeIntoBannedRegion", m_seeIntoBannedRegion);

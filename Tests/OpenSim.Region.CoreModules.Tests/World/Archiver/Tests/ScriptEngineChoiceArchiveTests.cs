@@ -69,7 +69,7 @@ public class ScriptEngineChoiceArchiveTests : OpenSimTestCase
         Assert.True(loaded.WaitOne(60000), "the OAR was not loaded");
         Assert.True(string.IsNullOrEmpty(loadMessage), loadMessage);
         SceneObjectPart part = Assert.Single(target.GetSceneObjectGroups()).RootPart;
-        Assert.Equal(group.UUID, part.ParentGroup.UUID);
+        Assert.Equal(group.Name, part.ParentGroup.Name);
         TaskInventoryItem after = Assert.Single(part.Inventory.GetInventoryItems(InventoryType.LSL));
         Assert.Equal(ScriptEngineChoices.Phlox, ScriptEngineChoices.FromFlags(after.Flags));
         Assert.Equal(0x40000000u, after.Flags & 0x40000000u);

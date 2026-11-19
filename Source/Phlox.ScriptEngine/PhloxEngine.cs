@@ -789,10 +789,10 @@ namespace Phlox.ScriptEngine
             // Every engine receives the selected engine name; the first-line header still takes priority.
             // Phlox runs it exactly when YEngine's rule picks Phlox, so on a region running
             // both a script runs in one. A script that is not Phlox's has no Phlox instance or load (Disown); its saved state is kept.
-            // A script saved with a viewer's Luau target (the item carries it) belongs to the engine the region chose for
-            // it, whatever its first line says: the region puts that target ahead of the first line.
+            // A script saved with a viewer's Luau target or with an engine (the item carries it) belongs to the engine the
+            // region chose for it, whatever its first line says: the region puts that choice ahead of the first line.
             TaskInventoryItem rezItem = m_Scene?.GetSceneObjectPart(localID)?.Inventory?.GetInventoryItem(itemID);
-            bool chosenByTarget = rezItem is not null && ScriptCompileTargets.FromFlags(rezItem.Flags) != ScriptCompileTarget.Unspecified;
+            bool chosenByTarget = rezItem is not null && ScriptCompileTargets.CarriesChoice(rezItem.Flags);
             if (chosenByTarget ? engine != Name : !IsPhloxScript(script, engine))
             {
                 m_ScriptLoader?.Disown(localID, itemID);

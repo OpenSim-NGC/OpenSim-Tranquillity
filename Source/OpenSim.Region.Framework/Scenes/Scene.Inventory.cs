@@ -96,7 +96,8 @@ public partial class Scene
     }
 
     /// <summary>
-    /// The script engine that will run a script: the engine named on the script's first line
+    /// The script engine that will run a script: a compile target or engine saved with the item, if an engine for it
+    /// is loaded (<see cref="ScriptCompileTargets"/>, <see cref="ScriptEngineChoices"/>), otherwise the engine named on the script's first line
     /// ("//engine:language", the engine's name or one of its header aliases) if loaded, otherwise an engine with
     /// matching saved state (default first), otherwise the first engine that claims the script (a script with
     /// source is offered to each engine that implements <see cref="IScriptEngineSelection"/>),
@@ -119,6 +120,22 @@ public partial class Scene
                 foreach (IScriptModule engine in engines)
                 {
                     if (engine is IScriptEngineSelection selection && selection.AcceptsCompileTarget(target))
+                    {
+                        if (!AnotherEngineHoldsSavedState(engines, engine, item))
+                            return engine;
+                        break;
+                    }
+                }
+            }
+
+            // An engine saved with the script ("engine:<Name>") is the same kind of choice and is placed the same way.
+            // An engine that is not loaded here leaves the script to the steps below, as a first line naming it does.
+            string chosen = ScriptEngineChoices.NameFor(ScriptEngineChoices.FromFlags(item.Flags));
+            if (chosen is not null)
+            {
+                foreach (IScriptModule engine in engines)
+                {
+                    if (engine.ScriptEngineName == chosen)
                     {
                         if (!AnotherEngineHoldsSavedState(engines, engine, item))
                             return engine;
@@ -259,17 +276,46 @@ public partial class Scene
         return item is null ? ScriptCompileTarget.Unspecified : ScriptCompileTargets.FromFlags(item.Flags);
     }
 
-    /// <summary>Whether this region keeps a script engine a person chooses for a script ([Startup] ScriptEngineChoice).</summary>
-    public bool ScriptEngineChoiceEnabled => false;
+    /// <summary>
+    /// Whether this region keeps a script engine a person chooses for a script ([Startup] ScriptEngineChoice, default
+    /// on). When off, "engine:&lt;Name&gt;" saves change nothing; engines already saved with scripts still place them.
+    /// </summary>
+    public bool ScriptEngineChoiceEnabled => m_scriptEngineChoice;
 
-    /// <summary>Whether an object's owner may choose the engine of a script they cannot edit ([Startup] ScriptEngineChoiceNoMod).</summary>
-    public bool ScriptEngineChoiceNoModEnabled => false;
+    /// <summary>
+    /// The engine number for a name a save or a request used: a name or alias in <see cref="ScriptEngineChoices"/>'s
+    /// table, or a header alias of a loaded engine whose name is in the table. <see cref="ScriptEngineChoices.None"/>
+    /// when the name is not known, and always when this region keeps no choices.
+    /// </summary>
+    public int ScriptEngineCodeFor(string engineName)
+    {
+        if (!m_scriptEngineChoice)
+            return ScriptEngineChoices.None;
+        int code = ScriptEngineChoices.CodeFor(engineName);
+        if (code != ScriptEngineChoices.None || string.IsNullOrWhiteSpace(engineName))
+            return code;
+        string name = engineName.Trim();
+        foreach (IScriptModule engine in RequestModuleInterfaces<IScriptModule>())
+        {
+            if (engine is IScriptEngineSelection selection && HasHeaderAlias(selection, name))
+                return ScriptEngineChoices.CodeFor(engine.ScriptEngineName);
+        }
+        return ScriptEngineChoices.None;
+    }
 
-    /// <summary>The engine number for a name a save or a request used, or <see cref="ScriptEngineChoices.None"/>.</summary>
-    public int ScriptEngineCodeFor(string engineName) => ScriptEngineChoices.None;
+    /// <summary>
+    /// A save's target as this region applies it: on a region that keeps no choices an "engine:" target, named or empty,
+    /// is no target at all, so the save changes no choice.
+    /// </summary>
+    private string SaveTargetHere(string target)
+        => !m_scriptEngineChoice && ScriptEngineChoices.IsEngineTarget(target) ? null : target;
 
-    /// <summary>The name of the engine saved with a script in a prim's inventory; empty when there is none.</summary>
-    public string GetScriptEngineChoice(UUID primId, UUID itemId) => string.Empty;
+    /// <summary>The ScriptEngineName of the engine saved with a script in a prim's inventory; empty when there is none.</summary>
+    public string GetScriptEngineChoice(UUID primId, UUID itemId)
+    {
+        TaskInventoryItem item = GetSceneObjectPart(primId)?.Inventory.GetInventoryItem(itemId);
+        return item is null ? string.Empty : ScriptEngineChoices.NameFor(ScriptEngineChoices.FromFlags(item.Flags)) ?? string.Empty;
+    }
 
     /// <summary>
     /// Lets the script engines start processing scripts.
@@ -416,12 +462,12 @@ public partial class Scene
     /// Keeps the compile target with a script in an avatar's inventory (in the item's flags), after the script was saved.
     /// Other kinds of item are left alone.
     /// </summary>
-    private void StoreScriptCompileTarget(UUID avatarId, UUID itemId, ScriptCompileTarget target)
+    private void StoreScriptCompileTarget(UUID avatarId, UUID itemId, string target)
     {
         InventoryItemBase item = InventoryService.GetItem(avatarId, itemId);
         if (item is null || item.InvType != (int)InventoryType.LSL)
             return;
-        uint flags = ScriptCompileTargets.WithTarget(item.Flags, target);
+        uint flags = ScriptCompileTargets.ApplySaveTarget(item.Flags, SaveTargetHere(target), ScriptEngineCodeFor);
         if (flags == item.Flags)
             return;
         item.Flags = flags;
@@ -451,7 +497,7 @@ public partial class Scene
             IInventoryAccessModule invAccess = RequestModuleInterface<IInventoryAccessModule>();
             UUID newAssetId = invAccess is not null ? invAccess.CapsUpdateInventoryItemAsset(avatar.ControllingClient, itemID, data) : UUID.Zero;
             if (!newAssetId.IsZero() && compileTarget is not null)
-                StoreScriptCompileTarget(avatarId, itemID, ScriptCompileTargets.Parse(compileTarget));
+                StoreScriptCompileTarget(avatarId, itemID, compileTarget);
             return newAssetId;
         }
 
@@ -591,9 +637,9 @@ public partial class Scene
         }
 
         item.ScriptRunning = isScriptRunning;
-        // "mono" and "lsl2" are a choice too: they clear an earlier Luau target. A save that names no target leaves it be.
-        if (compileTarget is not null)
-            item.Flags = ScriptCompileTargets.WithTarget(item.Flags, ScriptCompileTargets.Parse(compileTarget));
+        // "mono" and "lsl2" are a choice too: they clear an earlier Luau target, and keep a saved engine, since they are all
+        // a viewer that cannot name engines sends. A save that names no target leaves both be.
+        item.Flags = ScriptCompileTargets.ApplySaveTarget(item.Flags, SaveTargetHere(compileTarget), ScriptEngineCodeFor);
         AssetBase asset = CreateAsset(item.Name, item.Description, (sbyte)AssetType.LSLText, data, remoteClient.AgentId);
         AssetService.Store(asset);
 

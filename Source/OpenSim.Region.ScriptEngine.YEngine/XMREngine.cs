@@ -1315,9 +1315,15 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         // Assume script uses the default engine
         string engineName = defEngine;
 
+        // A script saved with an engine or a compile target (the item's flags carry it) was placed by the region ahead of
+        // its first line (Scene.ResolveScriptEngine), and the region tells only the engine it chose of such a script
+        // (EventManager.TriggerRezScript); its first line does not count.
+        TaskInventoryItem rezItem = m_Scene.GetSceneObjectPart(localID)?.Inventory.GetInventoryItem(itemID);
+        bool chosenByRegion = rezItem is not null && ScriptCompileTargets.CarriesChoice(rezItem.Flags);
+
         // Very first line might contain // scriptengine : language
         string langsrt = "";
-        if (script.StartsWith("//"))
+        if (!chosenByRegion && script.StartsWith("//"))
         {
             int lineEnd = script.IndexOf('\n');
             if(lineEnd > 5)
