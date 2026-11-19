@@ -215,7 +215,7 @@ public class UserAgentServerConnector : ServiceConnector
         UUID userID = UUID.Zero;
         UUID.TryParse(userID_str, out userID);
 
-        bool trustedCaller = remoteClient != null && m_ControlPlaneAccess.IsTrustedAddress(remoteClient.Address);
+        bool trustedCaller = m_ControlPlaneAccess.IsTrustedCaller(remoteClient);
         if (!trustedCaller && !m_HomeUsersService.IsKnownTravelingAgent(userID, sessionID))
             return BoolResponse(false);
 

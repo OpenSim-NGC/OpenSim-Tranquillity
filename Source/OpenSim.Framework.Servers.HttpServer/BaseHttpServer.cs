@@ -1216,7 +1216,8 @@ public class BaseHttpServer : IHttpServer
         XmlRpcResponse xmlRpcResponse;
         if (methodWasFound)
         {
-            xmlRprcRequest.Params.Add(request.RemoteIPEndPoint); // Param[1]
+            IPEndPoint caller = ScriptRequestEndPoint.Of(request);
+            xmlRprcRequest.Params.Add(caller); // Param[1]
             xmlRprcRequest.Params.Add(request.Url); // Param[2]
 
             string xff = "X-Forwarded-For";
@@ -1243,7 +1244,7 @@ public class BaseHttpServer : IHttpServer
 
             try
             {
-                xmlRpcResponse = method(xmlRprcRequest, request.RemoteIPEndPoint);
+                xmlRpcResponse = method(xmlRprcRequest, caller);
             }
             catch(Exception e)
             {
@@ -1354,7 +1355,8 @@ public class BaseHttpServer : IHttpServer
         XmlRpcResponse xmlRpcResponse;
         if (methodWasFound)
         {
-            xmlRprcRequest.Params.Add(request.RemoteIPEndPoint); // Param[1]
+            IPEndPoint caller = ScriptRequestEndPoint.Of(request);
+            xmlRprcRequest.Params.Add(caller); // Param[1]
             xmlRprcRequest.Params.Add(request.Url); // Param[2]
 
             foreach (string s in request.Headers.AllKeys)
@@ -1374,7 +1376,7 @@ public class BaseHttpServer : IHttpServer
 
             try
             {
-                xmlRpcResponse = method(xmlRprcRequest, request.RemoteIPEndPoint);
+                xmlRpcResponse = method(xmlRprcRequest, caller);
             }
             catch (Exception e)
             {

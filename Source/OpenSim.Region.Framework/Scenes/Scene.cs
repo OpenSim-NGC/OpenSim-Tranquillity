@@ -4819,10 +4819,16 @@ Label_GroupsDone:
         ScenePresence childAgentUpdate = GetScenePresence(cAgentData.AgentID);
         if (childAgentUpdate is not null)
         {
-//                if (childAgentUpdate.ControllingClient.SessionId != cAgentData.SessionID)
-//                    // Only warn for now
-//                    m_log.LogWarning("[SCENE]: Attempt at updating position of agent {0} with invalid session id {1}. Neighbor running older version?",
-//                        childAgentUpdate.UUID, cAgentData.SessionID);
+            // PUT /agent is open to any caller (the region a Hypergrid visitor comes from sends its agent update
+            // through it): the session is what shows the update comes from the region the agent is in. Without it anyone who knew an avatar's and a
+            // region's ids could set the agent's throttles, draw distance, seed capabilities and god mode here.
+            if (childAgentUpdate.ControllingClient.SessionId.NotEqual(cAgentData.SessionID))
+            {
+                m_log.LogWarning(
+                    "[SCENE]: Ignoring a position update for agent {0} in {1}: its session id {2} is not the agent's",
+                    childAgentUpdate.UUID, Name, cAgentData.SessionID);
+                return false;
+            }
 
             // I can't imagine *yet* why we would get an update if the agent is a root agent..
             // however to avoid a race condition crossing borders..
