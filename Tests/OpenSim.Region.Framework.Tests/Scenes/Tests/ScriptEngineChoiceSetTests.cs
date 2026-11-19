@@ -57,9 +57,13 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         public string GetXMLState(UUID itemID) => string.Empty;
         public bool SetXMLState(UUID itemID, string xml) => false;
         public bool HasSavedScriptState(UUID itemID, UUID assetID) => HoldsState(itemID, assetID);
+        /// <summary>False: the engine keeps its state when asked to discard it, as an engine that does not implement it.</summary>
+        public bool ForgetsOnDiscard { get; set; } = true;
         public void DiscardSavedScriptState(UUID itemID)
         {
             lock (Holds) { Discarded.Add(itemID); }
+            if (ForgetsOnDiscard)
+                HoldsState = (_, _) => false;
             lock (Events) Events.Add("discard " + ScriptEngineName);
         }
 
@@ -198,6 +202,37 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         Assert.Equal(new[] { "remove YEngine", "discard YEngine", "discard InWorldz.Phlox", "start InWorldz.Phlox" }, rig.Y.Events);
         // the state is gone before the script starts, so no reset follows the start (a second state_entry)
         Assert.Empty(rig.P.Resets);
+    }
+
+    [Fact]
+    public void AnEngineThatKeepsItsStateWhenAskedToDiscardItResetsTheScriptAsItStarts()
+    {
+        var rig = new Rig();
+        UUID item = rig.Item.ItemID, asset = rig.Stored.AssetID;
+        rig.P.ForgetsOnDiscard = false;
+        rig.P.HoldsState = (i, a) => i == item && a == asset;
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+
+        Assert.Equal(new[] { item }, rig.P.Started);
+        Assert.Equal(new[] { item }, rig.P.Resets);
+    }
+
+    [Fact]
+    public void ChoosingTheEngineAScriptStillLoadingWillRunInRestartsNothingAndDiscardsNothing()
+    {
+        var rig = new Rig();
+        UUID item = rig.Item.ItemID, asset = rig.Stored.AssetID;
+        // Phlox holds saved state for the script and is still loading it: no engine reports it yet.
+        rig.Y.Holds.Clear();
+        rig.P.HoldsState = (i, a) => i == item && a == asset;
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+
+        Assert.Equal(ScriptEngineChoices.Phlox, rig.Choice);
+        Assert.Empty(rig.Y.Events);
+        Assert.Empty(rig.P.Discarded);
+        Assert.Empty(rig.Y.Discarded);
     }
 
     [Fact]
