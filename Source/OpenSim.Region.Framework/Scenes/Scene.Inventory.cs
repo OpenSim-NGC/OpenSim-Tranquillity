@@ -280,6 +280,9 @@ public partial class Scene
     /// </summary>
     public bool ScriptEngineChoiceEnabled => m_scriptEngineChoice;
 
+    /// <summary>Whether an object's owner may choose the engine of a script in it that they may not edit.</summary>
+    public bool ScriptEngineChoiceNoModEnabled => false;
+
     /// <summary>
     /// The engine number for a name a save or a request used: a name or alias in <see cref="ScriptEngineChoices"/>'s
     /// table, or a header alias of a loaded engine whose name is in the table. <see cref="ScriptEngineChoices.None"/>
