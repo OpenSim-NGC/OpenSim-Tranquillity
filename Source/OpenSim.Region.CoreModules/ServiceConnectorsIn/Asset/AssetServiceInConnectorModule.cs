@@ -93,7 +93,7 @@ public class AssetServiceInConnectorModule : ISharedRegionModule
             m_log.LogInformation("[HGAssetService]: Starting...");
 
 
-            object[] args = new object[] { m_Config, MainServer.Instance, "HGAssetService" };
+            object[] args = new object[] { m_Config, MainServer.Instance.DefaultServer, "HGAssetService" };
 
             ServerUtils.LoadPlugin<IServiceConnector>("OpenSim.Server.Handlers.dll:AssetServiceConnector", args);
         }
