@@ -1273,6 +1273,25 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     //  defEngine   = engine selected by the scene (saved-state owner or default)
     //  stateSource = post this event to script on load
 
+    /// <summary>
+    /// The item's engine changed: its .state file goes, as OnRemoveScript removes it, so a script that comes back to this
+    /// engine starts fresh.
+    /// </summary>
+    public void DiscardSavedScriptState(UUID itemID)
+    {
+        try
+        {
+            File.Delete(XMRInstance.GetStateFileName(m_ScriptBasePath, itemID));
+        }
+        catch (DirectoryNotFoundException)
+        {
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            m_log.LogError("[YEngine]: Cannot remove the saved state of {0} under {1}: {2}", itemID, m_ScriptBasePath, e.Message);
+        }
+    }
+
     public bool HasSavedScriptState(UUID itemID, UUID assetID)
     {
         try

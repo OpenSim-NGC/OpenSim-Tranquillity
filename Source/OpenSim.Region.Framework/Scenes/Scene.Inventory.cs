@@ -343,12 +343,13 @@ public partial class Scene
     /// <para>The script's text is not stored again: only the saved choice and the engine that runs it change. When the
     /// engine the region now places the script in is the one already running it, the choice is saved and nothing restarts.
     /// Otherwise the script is stopped and started again in that engine, keeping its running or stopped setting. It starts
-    /// fresh there: its global variables and state are not carried over, since no engine reads another's saved state. When
-    /// the request sets an engine, state its earlier engine saved does not hold it back (a saved engine places a script
-    /// ahead of saved state, see <see cref="ResolveScriptEngine"/>); when it clears the choice, the ordinary steps place the
-    /// script, saved state among them, so a script whose engine holds its state stays there. When the new engine reports
-    /// state for the same item and text as the script restarts, the script is reset as it starts, so that state is not
-    /// resumed. A request that leaves the choice as it was restarts nothing.</para>
+    /// fresh there, as a script does after a recompile: every engine discards the state it saved for the script
+    /// (<see cref="IScriptStateProvider.DiscardSavedScriptState"/>) after the old engine has been asked to let it go and
+    /// before the new one starts it, so no state from before the change comes back, also when the script later returns to an
+    /// engine it ran in before. When the request sets an engine, state its earlier engine saved does not hold it back (a
+    /// saved engine places a script ahead of saved state, see <see cref="ResolveScriptEngine"/>); when it clears the choice,
+    /// the ordinary steps place the script, saved state among them, so a script whose engine holds its state stays there and
+    /// keeps it. A request that leaves the choice as it was restarts nothing.</para>
     /// <para>Calls for one script are made one at a time, so a capability call and an OSSL call on the same script cannot
     /// interleave.</para>
     /// </remarks>
@@ -409,11 +410,15 @@ public partial class Scene
 
             part.Inventory.RemoveScriptInstance(item.ItemID, false);
             part.ParentGroup.UpdateInventoryItem(item);
-            bool resetOnStart = placed is IScriptStateProvider state && state.HasSavedScriptState(item.ItemID, item.AssetID);
+            // The script starts fresh in its new engine, as after a recompile: every engine forgets the state it saved for it,
+            // the old one after it has been asked to let the script go, and before the new one starts it.
+            foreach (IScriptModule engine in RequestModuleInterfaces<IScriptModule>())
+            {
+                if (engine is IScriptStateProvider state)
+                    state.DiscardSavedScriptState(item.ItemID);
+            }
             // Not the variant that waits for compile errors: no one reads them here, and the caller may be a script thread.
             part.Inventory.CreateScriptInstance(item.ItemID, 0, false, DefaultScriptEngine, 1);
-            if (resetOnStart)
-                EventManager.TriggerScriptReset(part.LocalId, item.ItemID);
             EventManager.TriggerUpdateScript(agentId, itemId, primId, item.ScriptRunning, item.AssetID);
             part.ParentGroup.ResumeScripts();
             return ScriptEngineChoiceResult.Changed;

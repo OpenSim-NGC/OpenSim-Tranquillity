@@ -783,6 +783,9 @@ namespace Phlox.ScriptEngine
         public bool HasSavedScriptState(UUID itemID, UUID assetID)
             => StateManager != null && StateManager.HasSavedState(itemID, assetID);
 
+        /// <summary>The item's engine changed: its row goes, and so does any save of it queued before its next load here.</summary>
+        public void DiscardSavedScriptState(UUID itemID) => StateManager?.Discard(itemID);
+
         private void OnRezScript(uint localID, UUID itemID, string script,
             int startParam, bool postOnRez, string engine, int stateSource)
         {
