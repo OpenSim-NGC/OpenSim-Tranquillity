@@ -151,8 +151,10 @@ internal sealed class TeleportRig : IDisposable
     /// <summary>Run <paramref name="body"/> in state_entry, then say "done"; waits for it (a sleep in the body included).</summary>
     public void Run(string body)
     {
+        // Wait for this script's "done", not one an earlier Run on the same rig already said.
+        int before = H.Said.Count(s => s == "done");
         H.RezScript("default { state_entry() { " + body + " llSay(0, \"done\"); } }");
-        Assert.True(PumpUntil(() => H.Said.Contains("done")), "the script never finished: " + string.Join(" | ", H.Said));
+        Assert.True(PumpUntil(() => H.Said.Count(s => s == "done") > before), "the script never finished: " + string.Join(" | ", H.Said));
         H.PumpFor(TimeSpan.FromMilliseconds(100));
         m_out.WriteLine("said=[" + string.Join(" | ", H.Said) + "] errors=[" + Errors + "] calls=[" +
                         string.Join(" | ", Tp.Calls.Select(c => c.Kind + " " + c.Agent + " " + c.Pos)) + "]");
