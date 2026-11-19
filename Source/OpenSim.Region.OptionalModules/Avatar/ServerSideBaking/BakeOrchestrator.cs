@@ -287,7 +287,7 @@ public static class BakeOrchestrator
         return exists;
     }
 
-    // ------------------------------------------------------------------ step 6: store + faces + supersede
+    // ------------------------------------------------------------------ step 6: store + faces
 
     /// <summary>
     /// Store each bake as a texture asset (ADR-004 marker: name <c>bake:&lt;agent&gt;:&lt;channel&gt;</c>, description = input
@@ -297,15 +297,28 @@ public static class BakeOrchestrator
     /// current face.
     ///
     /// <para>
-    /// Supersede (ADR-004): once a channel's new asset is confirmed stored <i>and</i> its face has been moved to
-    /// it, the asset the channel held before is deleted. Never before the store — a store that fails must leave
-    /// the old bake serving — and never an asset any baked face still points at.
+    /// A channel the outfit does not use at all (not in <paramref name="needed"/>: the skirt with no skirt worn, an
+    /// extra Bakes-on-Mesh channel no worn wearable paints) has its face set to IMG_DEFAULT_AVATAR, the value the
+    /// official viewer reads as "no bake" (llvoavatar.cpp:11741-11742). Leaving the previous bake there would keep
+    /// a removed skirt drawn (llvoavatar.cpp:8113-8125) and keep painting a removed layer on Bakes-on-Mesh faces
+    /// (llviewerobject.cpp:5185-5194). A channel that held something is reported <see cref="ChannelStatus.Cleared"/>;
+    /// <see cref="Run"/> then drops its index entry; the old bake asset is left in place. With <paramref name="needed"/> null
+    /// such channels are left alone, as before.
+    /// </para>
+    ///
+    /// <para>
+    /// The bake a channel held before is never deleted, whether the channel is re-baked or cleared. Its id can still
+    /// be named outside this avatar's TextureEntry: the OSSL save-appearance functions write every baked face into a
+    /// notecard (<c>AvatarAppearance.PackForNotecard</c>) and an NPC created from it uses those ids. Stock OpenSim
+    /// never deletes bakes either. The bake index moves to the new bake, so the appearance service serves only the
+    /// current one; removing old bake assets is left to a separate tool. <paramref name="superseded"/> is kept for
+    /// callers and stays empty.
     /// </para>
     /// </summary>
     public static IReadOnlyList<ChannelOutcome> StoreAndApply(IReadOnlyList<BakeResult> results, ResolvedInputs inputs, UUID agentId,
         IAssetService assets, AvatarAppearance appearance,
         IReadOnlyDictionary<BakeChannel, StoredBake> reused = null, IReadOnlyDictionary<BakeChannel, StoredBake> previous = null,
-        List<UUID> superseded = null, BakeTimings timings = null)
+        List<UUID> superseded = null, BakeTimings timings = null, IReadOnlyCollection<BakeChannel> needed = null)
     {
         ArgumentNullException.ThrowIfNull(results);
         ArgumentNullException.ThrowIfNull(assets);
@@ -327,6 +340,19 @@ public static class BakeOrchestrator
             if (inputs.IsFailed(ch))
             {
                 outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Failed, UUID.Zero, result?.InputHash ?? "", inputs.FailureReason(ch), result?.Fidelity ?? empty));
+                continue;
+            }
+            if (needed is not null && !needed.Contains(ch))
+            {
+                // The outfit no longer uses this channel. A failed channel was handled above and keeps its face: a
+                // skirt whose asset could not be fetched is still worn, not taken off.
+                var face = appearance.Texture.FaceTextures[FaceOf(ch)];
+                var held = face is not null && face.TextureID != BakeConstants.DefaultAvatarTexture;
+                if (held) face.TextureID = BakeConstants.DefaultAvatarTexture;
+                if (held || (previous is not null && previous.ContainsKey(ch)))
+                    outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Cleared, UUID.Zero, "", "no longer used by the outfit; face reset to the default avatar texture", empty));
+                else
+                    outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Skipped, UUID.Zero, "", "nothing worn for this channel", empty));
                 continue;
             }
             if (result is null)
@@ -361,41 +387,14 @@ public static class BakeOrchestrator
             timings?.AddAssetStore(tStore);
             if (string.IsNullOrEmpty(storedId) || !UUID.TryParse(storedId, out var id) || id.IsZero())
             {
-                // the store failed: the channel's previous bake, if any, is still the one its face points at and
-                // is emphatically not superseded.
+                // the store failed: the channel's previous bake, if any, is still the one its face points at.
                 outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Failed, UUID.Zero, result.InputHash, "asset service refused the bake", result.Fidelity));
                 continue;
             }
             appearance.Texture.CreateFace((uint)FaceOf(ch)).TextureID = id;
             outcomes.Add(new ChannelOutcome(ch, ChannelStatus.Baked, id, result.InputHash, "", result.Fidelity));
-            Supersede(assets, appearance, previous, ch, id, superseded, timings);
         }
         return outcomes;
-    }
-
-    /// <summary>
-    /// Delete the asset the channel held before this run, now that the new one is stored and the face has moved.
-    /// Refuses to delete an asset that any baked face still points at — including the one just written, and
-    /// including a face of some other channel that was left alone this run.
-    /// </summary>
-    private static void Supersede(IAssetService assets, AvatarAppearance appearance, IReadOnlyDictionary<BakeChannel, StoredBake> previous,
-        BakeChannel ch, UUID newId, List<UUID> superseded, BakeTimings timings = null)
-    {
-        if (previous is null || !previous.TryGetValue(ch, out var old)) return;
-        if (old.AssetId.IsZero() || old.AssetId == newId) return;
-        foreach (var other in AllChannels)
-        {
-            var face = appearance.Texture.FaceTextures[FaceOf(other)];
-            if (face is not null && face.TextureID == old.AssetId) return;
-        }
-        try
-        {
-            var t0 = BakeTimings.Now;
-            var gone = assets.Delete(old.AssetId.ToString());
-            timings?.AddAssetStore(t0, deleted: true);
-            if (gone) superseded?.Add(old.AssetId);
-        }
-        catch (Exception) { }
     }
 
     // ------------------------------------------------------------------ the whole scene-free run
@@ -406,7 +405,7 @@ public static class BakeOrchestrator
         => Run(agentId, reason, wearables, visualParams, appearance, assets, null, backend, compositor, bakeSize, 0, ct);
 
     /// <summary>
-    /// Resolve, decide what can be reused, bake the rest, store, write faces, supersede, and record the bake index
+    /// Resolve, decide what can be reused, bake the rest, store, write faces, and record the bake index
     /// in the avatar service. Sending is the caller's.
     /// </summary>
     /// <param name="avatars">The avatar service holding the ADR-004 index, or null for a run that neither reads nor writes it.</param>
@@ -456,7 +455,20 @@ public static class BakeOrchestrator
         }
 
         var superseded = new List<UUID>();
-        var outcomes = StoreAndApply(results, inputs, agentId, assets, appearance, reuse.Reused, index.Bakes, superseded, timings);
+        // A wearable that could not be fetched or parsed may have been the one painting a channel, and which
+        // channels it paints is unknown without it (an extra channel is switched on by any wearable that carries
+        // its texture slot). So a run with such a failure clears nothing; the next clean bake does.
+        var outcomes = StoreAndApply(results, inputs, agentId, assets, appearance, reuse.Reused, index.Bakes, superseded, timings,
+            w.Failures.Count == 0 ? needed : null);
+
+        // Channels the outfit stopped using: drop their index entries so the appearance service stops serving the
+        // old bake. If the removal fails the entry stays, and the next bake finds it and tries again. The old bake
+        // asset is not deleted: its id can still be named outside this avatar's TextureEntry, for example by a
+        // notecard a script saved the appearance to (AvatarAppearance.PackForNotecard writes every baked face) and
+        // any NPC created from it.
+        var cleared = outcomes.Where(o => o.Status == ChannelStatus.Cleared && index.Bakes.ContainsKey(o.Channel))
+            .Select(o => o.Channel).ToList();
+        if (cleared.Count > 0) BakeIndex.Remove(avatars, agentId, cleared);
 
         // the index: one row pair per channel that now has a live bake, plus the three scalars
         var live = outcomes
