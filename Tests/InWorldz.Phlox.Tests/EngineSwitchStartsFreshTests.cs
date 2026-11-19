@@ -62,6 +62,10 @@ public class EngineSwitchStartsFreshTests
         public int Count(string marker) => H.Said.Count(s => s == marker);
         public string SaidText => string.Join(" | ", H.Said);
 
+        /// <summary>The script's listens on channel 5 in each engine's table, for failure messages.</summary>
+        public string ListensText =>
+            $"phlox listens={H.Engine.ListenManager.ListensOnChannel(Item.ItemID, 5)} worldcomm listens={H.WorldComm.GetListeners(Item.ItemID, 5, "", UUID.Zero, "").Count}";
+
         public ScriptEngineChoiceResult Set(string target) => H.Scene.SetScriptEngine(Owner, Group.RootPart.UUID, Item.ItemID, target);
 
         /// <summary>Wait until the script runs in the engine given and has said "entry" <paramref name="entries"/> times.</summary>
@@ -76,21 +80,37 @@ public class EngineSwitchStartsFreshTests
         {
             int before = H.Said.Count(s => s.StartsWith("n "));
             H.Scene.SimChatBroadcast("poke", ChatTypeEnum.Region, 5, Group.AbsolutePosition, "tester", UUID.Zero, false);
-            Assert.True(H.PumpUntil(() => H.Said.Count(s => s.StartsWith("n ")) > before, Cap), $"no answer to the poke: said=[{SaidText}]");
+            Assert.True(H.PumpUntil(() => H.Said.Count(s => s.StartsWith("n ")) > before, Cap), $"no answer to the poke: {ListensText} said=[{SaidText}]");
+            string answer = H.Said.Where(s => s.StartsWith("n ")).Skip(before).First();
+            return int.Parse(answer.Substring(2));
+        }
+
+        /// <summary>Touch the script's Phlox instance directly and return the global it answers with: 10 when it started fresh.</summary>
+        public int TouchInPhlox()
+        {
+            int before = H.Said.Count(s => s.StartsWith("n "));
+            H.PostTouch(Item.ItemID);
+            Assert.True(H.PumpUntil(() => H.Said.Count(s => s.StartsWith("n ")) > before, Cap), $"no answer to the touch: said=[{SaidText}]");
             string answer = H.Said.Where(s => s.StartsWith("n ")).Skip(before).First();
             return int.Parse(answer.Substring(2));
         }
     }
 
+    // After each switch the script answers chat on the listen its fresh state_entry opened. In Phlox the global is read
+    // first by touching Phlox's own instance (10: fresh), then by chat (20); in YEngine by chat (10: fresh). The chat is
+    // sent after the one-second window, so the old engine has let the script go by then: its unload must not take the
+    // new instance's listen with it.
     private static void SwitchAndCheckFresh(Rig rig, string target, bool toPhlox)
     {
         int entries = rig.Count("entry");
         Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set(target));
         rig.WaitStarted(toPhlox, entries + 1);
-        Assert.Equal(10, rig.Poke());
+        if (toPhlox)
+            Assert.Equal(10, rig.TouchInPhlox());
         // A real window: state_entry ran once for this switch, and not again.
         rig.H.PumpFor(TimeSpan.FromSeconds(1));
         Assert.Equal(entries + 1, rig.Count("entry"));
+        Assert.Equal(toPhlox ? 20 : 10, rig.Poke());
     }
 
     [Fact]
@@ -130,21 +150,24 @@ public class EngineSwitchStartsFreshTests
         rig.WaitStarted(inPhlox: true, entries: 1);
         Assert.Equal(10, rig.Poke());
 
-        // Away and back before Phlox's loader has unloaded the script (nothing is pumped in between), so its unload save
-        // is still to come when the script comes back.
+        // Away and back before Phlox's loader has unloaded the script (nothing is pumped in between), so its unload, and the
+        // unload save, are still to come when the script comes back.
+        object first = h.InterpreterFor(rig.Item.ItemID);
+        Assert.NotNull(first);
         Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("YEngine"));
         Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
 
-        // Back in Phlox it starts fresh. YEngine may run state_entry in the moment it holds the script, so the chat lines
-        // alone do not say which engine spoke; the touch goes to Phlox's own instance, and its answer is Phlox's global:
-        // 10 when Phlox started fresh, 20 when it resumed the state from before the switch. The script is touched rather
-        // than poked: after a switch this quick it does not answer chat, for a reason not yet known.
-        Assert.True(h.PumpUntil(() => rig.InPhlox && !rig.InYEngine && rig.Count("entry") >= 2, Cap), $"said=[{rig.SaidText}]");
-        int before = h.Said.Count(s => s.StartsWith("n "));
-        h.PostTouch(rig.Item.ItemID);
-        Assert.True(h.PumpUntil(() => h.Said.Count(s => s.StartsWith("n ")) > before, Cap), $"no answer to the touch: said=[{rig.SaidText}]");
-        Assert.Equal("n 10", h.Said.Where(s => s.StartsWith("n ")).Skip(before).First());
+        // Back in Phlox it starts fresh. Until Phlox's loader has run, its first instance is still loaded, and YEngine may run
+        // state_entry in the moment it holds the script, so neither "Phlox has the script" nor the chat lines say that the
+        // new instance is there: the wait is for an instance other than the first. The touch then goes to Phlox's own
+        // instance, and its answer is Phlox's global: 10 when Phlox started fresh, 20 when it resumed the state from before
+        // the switch. Then it answers chat, on the listen its fresh state_entry opened (20).
+        Assert.True(h.PumpUntil(() => h.InterpreterFor(rig.Item.ItemID) is { } now && !ReferenceEquals(now, first) && !rig.InYEngine, Cap),
+            $"phlox={rig.InPhlox} yengine={rig.InYEngine} said=[{rig.SaidText}]");
+        Assert.Equal(10, rig.TouchInPhlox());
         Assert.DoesNotContain("n 20", h.Said);
+        h.PumpFor(TimeSpan.FromSeconds(1));
+        Assert.Equal(20, rig.Poke());
     }
 
     [Fact]
