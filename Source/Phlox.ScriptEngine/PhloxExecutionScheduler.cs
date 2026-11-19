@@ -78,7 +78,6 @@ namespace Phlox.ScriptEngine
         private readonly PhloxEngine m_Engine;
         /// <summary>Scripts loaded with the item's Running flag off and never started; enabling one owes it a state_entry.</summary>
         private readonly HashSet<UUID> m_HeldFresh = new HashSet<UUID>();
-        private readonly IWorldComm m_WorldComm;
 
         // All scripts regardless of run state
         private readonly System.Collections.Generic.Dictionary<UUID, Interpreter> m_AllScripts = new();
@@ -235,11 +234,10 @@ namespace Phlox.ScriptEngine
 
         private readonly System.Diagnostics.Stopwatch m_SliceWatch = new();
 
-        public PhloxExecutionScheduler(WorkArrivedDelegate workArrived, PhloxEngine engine, IWorldComm worldComm)
+        public PhloxExecutionScheduler(WorkArrivedDelegate workArrived, PhloxEngine engine)
         {
             m_WorkArrived = workArrived;
             m_Engine = engine;
-            m_WorldComm = worldComm;
 
             // [InWorldz.Phlox] ServiceCallTimeoutMs (35000), ServiceCallThreads (4 per region).
             var cfg = engine?.Config;
@@ -3220,8 +3218,9 @@ namespace Phlox.ScriptEngine
                 m_TouchHandles.Remove(script.ItemId);
                 m_SleepHeap.Delete(h);
             }
-
-            m_WorldComm.DeleteListener(script.ItemId);
+            // Phlox keeps its scripts' listens in its own PhloxListenManager, which the API releases (ReleaseScriptResources).
+            // The core WorldComm holds only another engine's listens, keyed by item, so nothing here removes them: an unload
+            // that runs after the region moved the item to YEngine would otherwise take the listen YEngine's instance opened.
         }
 
         /// <summary>

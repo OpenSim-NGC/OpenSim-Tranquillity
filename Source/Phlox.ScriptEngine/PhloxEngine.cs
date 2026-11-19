@@ -428,7 +428,7 @@ namespace Phlox.ScriptEngine
                 return;
             }
             m_WorldComm = worldComm;
-            m_ExeScheduler = new PhloxExecutionScheduler(WorkArrived, this, worldComm);
+            m_ExeScheduler = new PhloxExecutionScheduler(WorkArrived, this);
             m_ScriptLoader = new PhloxScriptLoader(scene.AssetService, m_ExeScheduler, WorkArrived, this);
             m_MasterScheduler = new PhloxMasterScheduler(m_ExeScheduler, m_ScriptLoader, SchedulerThreadPriority);
             ListenManager = new PhloxListenManager(m_ExeScheduler, scene,
