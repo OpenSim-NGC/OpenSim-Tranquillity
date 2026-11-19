@@ -566,7 +566,21 @@ namespace Phlox.ScriptEngine
                 foreach (int evt in m_thisScript.EventTypesHandledIn(m_thisScript.ScriptState.LSLState))
                     flags |= MapEventFlag((SupportedEventList.Events)evt);
             }
-            m_host.SetScriptEvents(m_itemID, flags);
+            WhileHeld(() => m_host.SetScriptEvents(m_itemID, flags));
+        }
+
+        /// <summary>
+        /// Runs a change to what the core keeps by this script's item id (the prim's event mask, URLs, HTTP requests, XML-RPC
+        /// channels, taken controls) only while Phlox holds the item or no engine does (Scene.ScriptItemHolders). When the
+        /// region moves the script to another engine, Phlox lets this instance go later, on its loader thread, and the other
+        /// engine's instance may by then have set up its own under the same item id: an unload, reset or state change of
+        /// this instance that comes after that leaves them alone. Never waits for another engine.
+        /// </summary>
+        private void WhileHeld(Action change)
+        {
+            Scene world = m_ScriptEngine?.World;
+            if (world == null) { change(); return; }
+            world.ScriptItemHolders.ReleaseWhileHeld(m_itemID, PhloxEngineHeader.PhloxName, change);
         }
 
         /// <summary>
@@ -655,7 +669,7 @@ namespace Phlox.ScriptEngine
         public void OnStateChange() => ReleaseScriptResources(ScriptEnd.StateChange);
         public void OnScriptUnloaded(ScriptUnloadReason reason, RuntimeState.LocalDisableFlag localFlag)
         {
-            m_host?.RemoveScriptEvents(m_itemID);
+            WhileHeld(() => m_host?.RemoveScriptEvents(m_itemID));
             ReleaseScriptResources(ScriptEnd.Unload);
             // Halcyon OnScriptUnloaded "silently release controls". The permissions and the Control record stay
             // with the item and its saved state (a crossing object takes them with it); only an avatar still here is let go.
@@ -689,9 +703,17 @@ namespace Phlox.ScriptEngine
             PauseSensorForParcel();
             m_PendingDataserver.Clear();
             var async = m_ScriptEngine?.AsyncCommands;
-            async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID);
-            async?.XmlRequestPlugin.RemoveEvents(m_localID, m_itemID);
+            async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID, stopInCore: false);
+            WhileHeld(() =>
+            {
+                StopHttpRequestsInCore();
+                async?.XmlRequestPlugin.RemoveEvents(m_localID, m_itemID);
+            });
         }
+
+        /// <summary>The core's HTTP module stops this item's requests still in flight (called under <see cref="WhileHeld"/>).</summary>
+        private void StopHttpRequestsInCore()
+            => m_ScriptEngine?.World?.RequestModuleInterface<IHttpRequestModule>()?.StopHttpRequest(m_localID, m_itemID);
 
         /// <summary>
         /// The unload's release of taken controls, from what the script and the region hold, never from the part's
@@ -707,8 +729,11 @@ namespace Phlox.ScriptEngine
             if (misc == null || !misc.ContainsKey((int)RuntimeState.MiscAttr.Control)) return;
             ScenePresence holder = ControlsHolder(UUID.Zero, hadRecord: true);
             if (holder != null)
-                using (PhloxEngine.OwnControlChange())
-                    holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                WhileHeld(() =>
+                {
+                    using (PhloxEngine.OwnControlChange())
+                        holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                });
             m_ScriptEngine?.RequestParcelCheck(m_itemID);
         }
         // ── What ends with the script ──────────────────────────────────────────
@@ -741,6 +766,8 @@ namespace Phlox.ScriptEngine
         /// <item>XML-RPC channels and llSendRemoteData: unload only (Halcyon RemoveScript; its reset did nothing and SL says nothing).</item>
         /// <item>permission requests still waiting for an answer, both kinds: reset and unload (<see cref="CancelPermissionRequests"/>).</item>
         /// </list>
+        /// What the core modules keep by item id (HTTP requests, URLs, XML-RPC channels) is released only while Phlox holds the
+        /// item (<see cref="WhileHeld"/>); Phlox's own records go on every end as listed.
         /// </summary>
         internal void ReleaseScriptResources(ScriptEnd end)
         {
@@ -755,18 +782,23 @@ namespace Phlox.ScriptEngine
             {
                 // Halcyon ScriptLoader: AsyncCommandManager.RemoveScript(engine, localId, itemId) - sensor, HTTP, XML-RPC
                 if (m_ScriptEngine != null && async != null)
-                    Phlox.ScriptEngine.AsyncCommand.AsyncCommandManager.RemoveScript(m_ScriptEngine.ScriptEngine, m_localID, m_itemID);
+                    Phlox.ScriptEngine.AsyncCommand.AsyncCommandManager.RemoveScript(m_ScriptEngine.ScriptEngine, m_localID, m_itemID, releaseInCore: false);
             }
             else
             {
                 async?.SensorRepeatPlugin.RemoveScript(m_itemID);
                 m_thisScript?.ScriptState?.MiscAttributes?.Remove((int)RuntimeState.MiscAttr.SensorRepeat);
-                if (end == ScriptEnd.Reset) async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID);
+                if (end == ScriptEnd.Reset) async?.HttpRequestPlugin.RemoveEvents(m_localID, m_itemID, stopInCore: false);
             }
 
             if (end != ScriptEnd.StateChange)
             {
-                m_ScriptEngine?.World?.RequestModuleInterface<IUrlModule>()?.ScriptRemoved(m_itemID);
+                WhileHeld(() =>
+                {
+                    StopHttpRequestsInCore();
+                    if (end == ScriptEnd.Unload) async?.XmlRequestPlugin.RemoveEvents(m_localID, m_itemID);
+                    m_ScriptEngine?.World?.RequestModuleInterface<IUrlModule>()?.ScriptRemoved(m_itemID);
+                });
                 CancelPermissionRequests();
             }
         }
@@ -3374,8 +3406,11 @@ namespace Phlox.ScriptEngine
                 }
                 ScenePresence holder = ControlsHolder(item?.PermsGranter ?? UUID.Zero, hadRecord);
                 if (holder != null)
-                    using (PhloxEngine.OwnControlChange())
-                        holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                    WhileHeld(() =>
+                    {
+                        using (PhloxEngine.OwnControlChange())
+                            holder.UnRegisterControlEventsToScript(m_host.LocalId, m_itemID);
+                    });
                 if (hadRecord || holder != null)
                     m_ScriptEngine?.RequestParcelCheck(m_itemID);   // Without controls a No Scripts parcel pauses it
             }

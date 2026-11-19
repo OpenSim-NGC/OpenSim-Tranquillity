@@ -799,6 +799,7 @@ namespace Phlox.ScriptEngine
             bool chosenByTarget = rezItem is not null && ScriptCompileTargets.CarriesChoice(rezItem.Flags);
             if (chosenByTarget ? engine != Name : !IsPhloxScript(script, engine))
             {
+                m_Scene?.ScriptItemHolders.Leave(itemID, Name);
                 m_ScriptLoader?.Disown(localID, itemID);
                 return;
             }
@@ -812,6 +813,10 @@ namespace Phlox.ScriptEngine
 
             m_log.LogDebug("[PhloxEngine]: OnRezScript {0} in prim {1}", itemID, localID);
 
+            // Phlox holds the item from now on, so another engine's cleanup leaves what this instance sets up. Taken here, on
+            // the region's thread, before the load is queued: any unload of an earlier Phlox instance is queued ahead of
+            // this load and runs first, so it can release only what that earlier instance set up.
+            m_Scene.ScriptItemHolders.Take(itemID, Name);
             m_ScriptLoader.PostLoadRequest(new PhloxLoadRequest
             {
                 LocalID = localID,
@@ -838,8 +843,43 @@ namespace Phlox.ScriptEngine
         private void OnRemoveScript(uint localID, UUID itemID)
         {
             m_log.LogDebug("[PhloxEngine]: OnRemoveScript {0}", itemID);
+            // Phlox lets the item go now, on the region's thread; its loader unloads the instance later. An engine that
+            // takes the item in between holds it, and that unload then releases nothing the core keeps by item id for it
+            // (LSLSystemAPI.WhileHeld). So what the core keeps for this instance is released here first, while Phlox still
+            // holds the item and before the region can start it in another engine.
+            ScriptItemHolders holders = m_Scene?.ScriptItemHolders;
+            if (holders != null && holders.HolderOf(itemID) == Name)
+                holders.ReleaseWhileHeld(itemID, Name, () => ReleaseCoreHoldsOnRemove(localID, itemID));
+            holders?.Leave(itemID, Name);
             m_ScriptLoader.PostUnloadRequest(localID, itemID);
             OnScriptRemoved?.Invoke(itemID);
+        }
+
+        /// <summary>
+        /// What the core keeps for a script by its item id and the region's removal does not release itself: taken controls,
+        /// HTTP requests in flight, XML-RPC channels and remote data requests. (The core drops the item's event mask in
+        /// SceneObjectPartInventory.RemoveScriptInstance, and the URL module drops its URLs on OnScriptRemoved.) The unload
+        /// releases them again, when no other engine holds the item by then, for anything the instance set up meanwhile.
+        /// </summary>
+        private void ReleaseCoreHoldsOnRemove(uint localID, UUID itemID)
+        {
+            m_Scene.ForEachRootScenePresence(sp =>
+            {
+                if (!sp.HasScriptControls(itemID)) return;
+                using (OwnControlChange())
+                    sp.UnRegisterControlEventsToScript(localID, itemID);
+            });
+            m_Scene.RequestModuleInterface<IHttpRequestModule>()?.StopHttpRequest(localID, itemID);
+            IXMLRPC xmlrpc = m_Scene.RequestModuleInterface<IXMLRPC>();
+            xmlrpc?.DeleteChannels(itemID);
+            xmlrpc?.CancelSRDRequests(itemID);
+        }
+
+        /// <summary>Whether another engine holds the item now (Scene.ScriptItemHolders).</summary>
+        internal bool HeldByAnotherEngine(UUID itemID)
+        {
+            string holder = m_Scene?.ScriptItemHolders.HolderOf(itemID);
+            return holder != null && holder != Name;
         }
 
         private void OnScriptReset(uint localID, UUID itemID)

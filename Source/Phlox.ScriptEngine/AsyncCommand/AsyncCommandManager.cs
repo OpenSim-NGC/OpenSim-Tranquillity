@@ -229,14 +229,16 @@ namespace Phlox.ScriptEngine.AsyncCommand
         /// <summary>
         /// Remove a specific script and all its pending async commands (Halcyon AsyncCommandManager.RemoveScript).
         /// Reached through LSLSystemAPI.ReleaseScriptResources on unload; each plugin forgets the item as well as stopping it.
+        /// With <paramref name="releaseInCore"/> false only Phlox's own records go: the HTTP requests and XML-RPC channels the
+        /// core modules keep by item id are left to the caller, which releases them only while Phlox holds the item.
         /// </summary>
-        public static void RemoveScript(IScriptEngine engine, uint localID, UUID itemID)
+        public static void RemoveScript(IScriptEngine engine, uint localID, UUID itemID, bool releaseInCore = true)
         {
             if (m_SensorRepeat.TryGetValue(engine, out SensorRepeat sr))
                 sr.RemoveScript(itemID);
             if (m_HttpRequest.TryGetValue(engine, out HttpRequest http))
-                http.RemoveEvents(localID, itemID);
-            if (m_XmlRequest.TryGetValue(engine, out XmlRequest xml))
+                http.RemoveEvents(localID, itemID, releaseInCore);
+            if (releaseInCore && m_XmlRequest.TryGetValue(engine, out XmlRequest xml))
                 xml.RemoveEvents(localID, itemID);
         }
 

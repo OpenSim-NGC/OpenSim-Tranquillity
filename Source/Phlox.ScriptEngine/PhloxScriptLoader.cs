@@ -480,6 +480,15 @@ namespace Phlox.ScriptEngine
                 // A load that waited behind its prim's compile while the item went to another engine.
                 if (!IsOwned(req.ItemID)) return;
 
+                // A load queued before the region moved the item to another engine (a switch away and back and away again
+                // before this loader ran): that engine holds the item now, and an instance started here would set up URLs,
+                // requests and controls under the item's id beside the other engine's. It never starts.
+                if (m_Engine != null && m_Engine.HeldByAnotherEngine(req.ItemID))
+                {
+                    PublishOutcome(req, new List<string>());
+                    return;
+                }
+
                 // An instance of this item on another asset is still here: an earlier load started in the moment between a
                 // save's unload and its new asset. The latest load replaces it, as that save's unload would have.
                 if (req.AssetId != UUID.Zero && IsLatest(req))

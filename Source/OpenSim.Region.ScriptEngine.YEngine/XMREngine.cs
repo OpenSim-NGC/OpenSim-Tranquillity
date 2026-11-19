@@ -1411,6 +1411,10 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
         instance.m_IState = XMRInstState.CONSTRUCT;
         instance.m_Running = item.ScriptRunning;
 
+        // YEngine holds the item from now on, before its instance sets anything up, so another engine that lets the item
+        // go later (Phlox unloads on its own thread) leaves this instance's event mask, URLs, channels and requests alone.
+        m_Scene.ScriptItemHolders.Take(itemID, ScriptEngineName);
+
         lock (m_InstancesDict)
         {
             m_LockedDict = "RegisterInstance";
@@ -1546,6 +1550,7 @@ public partial class Yengine: INonSharedRegionModule, IScriptEngine, IScriptModu
     public void OnRemoveScript(uint localID, UUID itemID)
     {
         TraceCalls("[YEngine]: OnRemoveScript(...,{0})", itemID.ToString());
+        m_Scene.ScriptItemHolders.Leave(itemID, ScriptEngineName);
 
         // Remove from our list of known scripts.
         // After this, no more events can queue because we won't be

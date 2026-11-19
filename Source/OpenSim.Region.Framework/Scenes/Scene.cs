@@ -419,6 +419,10 @@ public partial class Scene : SceneBase
 
     // TODO: Possibly stop other classes being able to manipulate this directly.
     private readonly SceneGraph m_sceneGraph;
+
+    /// <summary>Which script engine holds each script item, for the releases core modules keep by item id.</summary>
+    public ScriptItemHolders ScriptItemHolders { get; } = new();
+
     private readonly Timer m_restartTimer = new(15000); // Wait before firing
     private volatile bool m_backingup;
     private readonly Dictionary<UUID, ReturnInfo> m_returns = new();
