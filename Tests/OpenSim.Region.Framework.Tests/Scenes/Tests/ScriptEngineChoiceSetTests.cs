@@ -20,9 +20,10 @@ namespace OpenSim.Region.Framework.Scenes.Tests;
 /// Choosing a script's engine without saving its text (<see cref="Scene.SetScriptEngine"/>, behind the SetScriptEngine
 /// capability and osSetScriptEngine). Whoever may save the script may choose its engine. A change restarts the script in
 /// the engine it now places the script in. The script's text is not stored again: only the saved choice and the engine
-/// that runs it change. The script starts fresh there: state its earlier engine saved does not hold it back, and state the
-/// new engine kept for the same text is not resumed (the script is reset). Choosing the engine that already runs the
-/// script saves the choice and restarts nothing. Calls for one script are made one at a time.
+/// that runs it change. The script starts fresh there: state its earlier engine saved does not hold it back, and every
+/// engine's saved state for it is discarded after the old engine lets it go and before the new one starts it. Choosing the
+/// engine that already runs the script saves the choice, restarts nothing and discards nothing. Calls for one script are
+/// made one at a time.
 /// </summary>
 public class ScriptEngineChoiceSetTests : OpenSimTestCase
 {
@@ -36,6 +37,9 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         public readonly List<UUID> Started = new();
         public readonly List<UUID> Removed = new();
         public readonly List<UUID> Resets = new();
+        public readonly List<UUID> Discarded = new();
+        /// <summary>What the engines did, in order, shared by the rig's engines: "start", "remove" and "discard", with the engine.</summary>
+        public List<string> Events { get; set; } = new();
         public readonly HashSet<UUID> Holds = new();
         /// <summary>Called on the thread that removes a script this engine holds, before it is removed.</summary>
         public Action<UUID> OnRemoving { get; set; } = _ => { };
@@ -53,6 +57,11 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         public string GetXMLState(UUID itemID) => string.Empty;
         public bool SetXMLState(UUID itemID, string xml) => false;
         public bool HasSavedScriptState(UUID itemID, UUID assetID) => HoldsState(itemID, assetID);
+        public void DiscardSavedScriptState(UUID itemID)
+        {
+            lock (Holds) { Discarded.Add(itemID); }
+            lock (Events) Events.Add("discard " + ScriptEngineName);
+        }
 
         public void Attach(Scene scene)
         {
@@ -61,6 +70,7 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
                 if (engine == ScriptEngineName)
                 {
                     lock (Holds) { Started.Add(itemID); Holds.Add(itemID); }
+                    lock (Events) Events.Add("start " + ScriptEngineName);
                 }
             };
             scene.EventManager.OnRemoveScript += (localID, itemID) =>
@@ -71,6 +81,7 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
                     return;
                 OnRemoving(itemID);
                 lock (Holds) { Removed.Add(itemID); Holds.Remove(itemID); }
+                lock (Events) Events.Add("remove " + ScriptEngineName);
             };
             scene.EventManager.OnScriptReset += (localID, itemID) =>
             {
@@ -104,6 +115,7 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
             SceneHelpers.SetupSceneModules(Scene, config, new DefaultPermissionsModule());
             Scene.StackModuleInterface<IScriptModule>(Y);
             Scene.StackModuleInterface<IScriptModule>(P);
+            P.Events = Y.Events;
             Y.Attach(Scene);
             P.Attach(Scene);
             Part = SceneHelpers.AddSceneObject(Scene, "Example Object", Owner).RootPart;
@@ -112,6 +124,7 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
             Item.BasePermissions = Item.CurrentPermissions = itemPerms;
             Assert.True(Part.Inventory.CreateScriptInstance(Item, 0, false, YEngine, 0));
             Y.Started.Clear();
+            Y.Events.Clear();
         }
 
         public TaskInventoryItem Stored => Part.Inventory.GetInventoryItem(Item.ItemID);
@@ -167,6 +180,8 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         Assert.Empty(rig.Y.Removed);
         Assert.Empty(rig.Y.Started);
         Assert.Empty(rig.P.Started);
+        Assert.Empty(rig.Y.Discarded);
+        Assert.Empty(rig.P.Discarded);
     }
 
     [Fact]
@@ -179,7 +194,38 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
 
         Assert.Equal(new[] { item }, rig.P.Started);
-        Assert.Equal(new[] { item }, rig.P.Resets);
+        Assert.Contains(item, rig.P.Discarded);
+        Assert.Equal(new[] { "remove YEngine", "discard YEngine", "discard InWorldz.Phlox", "start InWorldz.Phlox" }, rig.Y.Events);
+        // the state is gone before the script starts, so no reset follows the start (a second state_entry)
+        Assert.Empty(rig.P.Resets);
+    }
+
+    [Fact]
+    public void AnEngineChangeDiscardsEveryEnginesStateForTheScriptAfterTheOldEngineLetsItGoAndBeforeTheNewOneStartsIt()
+    {
+        var rig = new Rig();
+        UUID item = rig.Item.ItemID;
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+        Assert.Equal(new[] { "remove YEngine", "discard YEngine", "discard InWorldz.Phlox", "start InWorldz.Phlox" }, rig.Y.Events);
+        rig.Y.Events.Clear();
+
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("YEngine"));
+        Assert.Equal(new[] { "remove InWorldz.Phlox", "discard YEngine", "discard InWorldz.Phlox", "start YEngine" }, rig.Y.Events);
+        Assert.Equal(new[] { item, item }, rig.Y.Discarded);
+        Assert.Equal(new[] { item, item }, rig.P.Discarded);
+    }
+
+    [Fact]
+    public void ClearingAChoiceThatChangesTheEngineDiscardsTheState()
+    {
+        var rig = new Rig();
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+        rig.Y.Events.Clear();
+
+        // no saved state anywhere: the ordinary steps place it in the default engine, YEngine
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set(""));
+        Assert.Equal(new[] { "remove InWorldz.Phlox", "discard YEngine", "discard InWorldz.Phlox", "start YEngine" }, rig.Y.Events);
     }
 
     [Fact]
@@ -190,6 +236,7 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
         rig.P.HoldsState = (i, a) => i == item && a == asset;
         rig.P.Started.Clear();
+        rig.P.Discarded.Clear();
 
         Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set(""));
 
@@ -198,6 +245,7 @@ public class ScriptEngineChoiceSetTests : OpenSimTestCase
         Assert.Empty(rig.P.Removed);
         Assert.Empty(rig.P.Started);
         Assert.Empty(rig.Y.Started);
+        Assert.Empty(rig.P.Discarded);
     }
 
     [Fact]
