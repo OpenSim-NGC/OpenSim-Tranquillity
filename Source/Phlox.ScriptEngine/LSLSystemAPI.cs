@@ -2746,6 +2746,12 @@ namespace Phlox.ScriptEngine
                 ScriptShoutError("llResetOtherScript: script '" + name + "' not found");
                 return;
             }
+            // SL wiki, llResetOtherScript, Caveats: "If the script is not running, this call has no effect, even after the
+            // script is set running again." Running is what llGetScriptState answers for the same script. A script stopped
+            // by a runtime error is still reset: llResetOtherScript is how SL restarts one (the crash monitor example on the
+            // llGetScriptState page), as llSetScriptState "Cannot be used to restart a script that has encountered a
+            // run-time error" (llSetScriptState, Caveats).
+            if (llGetScriptState(name) == 0 && !m_ScriptEngine.IsScriptTerminated(item.ItemID)) return;
             ResetScriptOfAnyEngine(item.ItemID, api: true);
         }
 

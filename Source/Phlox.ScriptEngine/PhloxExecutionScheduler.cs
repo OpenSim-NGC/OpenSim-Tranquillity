@@ -838,8 +838,15 @@ namespace Phlox.ScriptEngine
             UnregisterFromNotifications(script);
             m_Engine.StateManager?.DeleteState(itemId);
             bool wasCrashed = script.ScriptState.TerminatedReason != null;
+            // The owner's Running flag is off (the viewer's checkbox, llSetScriptState FALSE). RuntimeState.Reset turns
+            // GeneralEnable back on, but a reset does not start a stopped script: it is reset and stays stopped, and
+            // the state_entry posted below waits in its queue until the script is set running (StartAfterStop). The
+            // stock engine does the same: YEngine's reset (XMRInstRun.ResetLocked) posts state_entry and leaves the
+            // running flag alone.
+            bool wasStopped = !wasCrashed && !script.ScriptState.GeneralEnable;
             lock (m_AllScriptsLock) m_HeldFresh.Remove(itemId);   // A reset of a held script owes it nothing more
             script.Reset();
+            if (wasStopped) script.ScriptState.GeneralEnable = false;
             if (wasCrashed)
             {
                 // A reset is how a crashed script comes back - fresh, and running again
@@ -858,12 +865,18 @@ namespace Phlox.ScriptEngine
             lock (m_PendingEvents)
             {
                 DropPendingEventsLocked(itemId);
-                PostEvent(itemId, new PostedEvent
+                var stateEntry = new PostedEvent
                 {
                     EventType = SupportedEventList.Events.STATE_ENTRY,
                     Args = Array.Empty<object>()
-                });
+                };
+                if (wasStopped) script.ScriptState.QueueEvent(stateEntry);   // On its own queue now, so the save below holds it
+                else PostEvent(itemId, stateEntry);
             }
+
+            // The reset deleted the saved state, and a stopped script never runs again to get itself saved: save the
+            // reset state now, stopped and with its state_entry waiting, or a region restart would load it fresh and running.
+            if (wasStopped) m_Engine.StateManager?.ScriptChanged(script);
 
             if (!m_RunIndex.ContainsKey(itemId) && script.ScriptState.Enabled)
             {
@@ -906,6 +919,13 @@ namespace Phlox.ScriptEngine
                 if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
             var st = script.ScriptState;
             return st.GeneralEnable && (st.LocalDisable & ~RuntimeState.LocalDisableFlag.Parcel) == RuntimeState.LocalDisableFlag.None;
+        }
+
+        /// <summary>Was this script stopped by a runtime error? Safe from any thread.</summary>
+        internal bool IsTerminated(UUID itemId)
+        {
+            lock (m_AllScriptsLock)
+                return m_AllScripts.TryGetValue(itemId, out Interpreter s) && s.ScriptState.TerminatedReason != null;
         }
 
         /// <summary>Is this script paused by the parcel rule?</summary>

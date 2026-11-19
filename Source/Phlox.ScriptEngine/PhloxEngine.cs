@@ -2088,6 +2088,8 @@ namespace Phlox.ScriptEngine
             running = m_ExeScheduler.GetScriptRunning(itemID);
             return true;
         }
+
+        public bool IsScriptTerminated(UUID itemID) => m_ExeScheduler?.IsTerminated(itemID) ?? false;
         /// <summary>Every loaded script's state is written to the state database before this returns.</summary>
         public void SaveAllState()
         {
