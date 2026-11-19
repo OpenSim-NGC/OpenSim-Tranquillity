@@ -719,10 +719,22 @@ pauses 15 ms after every chat call instead (`ChatThrottle`).
   (repeating sensors included) are cleared, listeners are removed, the event queue is emptied, and a
   `state_entry` event is queued if the script has one. This holds for every reset: `llResetScript`, `llResetOtherScript`,
   `osResetAllScripts`, the viewer's Reset, a reset asked for while the script is still compiling, and starting a
-  crashed script again. The fresh script's first event is its `state_entry`. An event posted to the script before
+  crashed script again; the next two items say what a reset does to a stopped script and when `llResetOtherScript`
+  does not reset at all. The fresh script's first event is its `state_entry`. An event posted to the script before
   the reset, and a `sensor`, `no_sensor` or `listen` raised by a sensor repeat or a listen of the old script while
   it resets, is dropped. Phlox used to run such an event in the fresh script before its `state_entry` when a sensor
   sweep or a listen delivery was under way at that moment.
+- A reset of a stopped script, one whose Running flag is off (the viewer's Running box unticked, or
+  `llSetScriptState(name, FALSE)`), resets its state and globals and leaves it stopped. Its `state_entry` waits and runs
+  once, when the script is set running again. The script is saved stopped with its `state_entry` waiting, so a region
+  restart does not start it. YEngine does the same: its reset (`XMRInstRun.ResetLocked`) posts `state_entry` and leaves
+  the running flag alone. Phlox used to start a stopped script when it was reset.
+- `llResetOtherScript` on a script that is not running has no effect, even after the script is set running again, as
+  the SL wiki's [llResetOtherScript](https://wiki.secondlife.com/wiki/LlResetOtherScript) page says (Caveats). This
+  holds whichever engine of the region runs that script. A script stopped by a runtime error is not covered by that
+  rule: `llResetOtherScript` restarts it, as the crash monitor example on the SL wiki's
+  [llGetScriptState](https://wiki.secondlife.com/wiki/LlGetScriptState) page does. Phlox used to reset a stopped script
+  on `llResetOtherScript` and queue its `state_entry` for its start.
 - Notecard text, as every notecard reader reads it: `llGetNotecardLine`, `llGetNumberOfNotecardLines`,
   `llGetNotecardLineSync`, `llFindNotecardTextSync`, `iwGetNotecardSegment`, the `iwGetLink*` notecard functions,
   `osGetNotecard`, `osGetNotecardLine` and `osGetNumberOfNotecardLines`. A notecard's stored "Text length" counts bytes
