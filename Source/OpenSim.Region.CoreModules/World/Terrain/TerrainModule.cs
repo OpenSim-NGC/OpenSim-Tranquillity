@@ -909,30 +909,36 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
         // dont overlap execution
         if(Monitor.TryEnter(TerrainCheckUpdatesLock))
         {
-            TerrainData terrData = m_channel.GetTerrainData();
-            bool shouldTaint = false;
-
-            if(terrData.IsTainted())
+            try
             {
-                int nextChanged = 0;
-                while((nextChanged = terrData.GetAndClearNextTaint(nextChanged)) >= 0)
+                TerrainData terrData = m_channel.GetTerrainData();
+                bool shouldTaint = false;
+
+                if(terrData.IsTainted())
                 {
-                    SendToClients(terrData, nextChanged);
-                    ++nextChanged;
-                    shouldTaint = true;
+                    int nextChanged = 0;
+                    while((nextChanged = terrData.GetAndClearNextTaint(nextChanged)) >= 0)
+                    {
+                        SendToClients(terrData, nextChanged);
+                        ++nextChanged;
+                        shouldTaint = true;
+                    }
+                }
+
+                // This event also causes changes to be sent to the clients
+                CheckSendingPatchesToClients();
+
+                // If things changes, generate some events
+                if (shouldTaint)
+                {
+                    m_scene.EventManager.TriggerTerrainTainted();
+                    m_tainted = true;
                 }
             }
-
-            // This event also causes changes to be sent to the clients
-            CheckSendingPatchesToClients();
-
-            // If things changes, generate some events
-            if (shouldTaint)
+            finally
             {
-                m_scene.EventManager.TriggerTerrainTainted();
-                m_tainted = true;
+                Monitor.Exit(TerrainCheckUpdatesLock);
             }
-            Monitor.Exit(TerrainCheckUpdatesLock);
         }
     }
 
@@ -943,8 +949,9 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
     private void EventManager_OnTerrainTick()
     {
         if(Monitor.TryEnter(_modifyLock))
-        { 
-            { 
+        {
+            try
+            {
                 if (m_tainted)
                 {
                     m_tainted = false;
@@ -955,7 +962,11 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                     //m_scene.CreateTerrainTexture(true);
                 }
             }
-            Monitor.Exit(_modifyLock);
+            finally
+            {
+                // a failed save must not keep the lock: terraforming and patch sending need it
+                Monitor.Exit(_modifyLock);
+            }
         }
     }
 
@@ -1475,24 +1486,28 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
                             if(parcel == null)
                                 return;
 
+                            // each metre of the selection by the 4 m cell it is in: only the
+                            // parcel's own land changes, whatever the selection's alignment
                             bool[,] parcelmap = parcel.GetLandBitmap();
-                            //ugly
+                            int cellsX = parcelmap.GetLength(0);
+                            int cellsY = parcelmap.GetLength(1);
                             for (x = startX; x <= endX; x++)
                             {
                                 int px = x >> 2;
-                                y = startY;
-                                while( y <= endY)
+                                if (px >= cellsX)
+                                    break;
+                                for (y = startY; y <= endY; y++)
                                 {
                                     int py = y >> 2;
-                                    bool inp = parcelmap[px, py];
-                                    fillArea[x, y++] = inp;
-                                    fillArea[x, y++] = inp;
-                                    fillArea[x, y++] = inp;
-                                    fillArea[x, y++] = inp;
+                                    if (py >= cellsY)
+                                        break;
+                                    if (parcelmap[px, py])
+                                    {
+                                        fillArea[x, y] = true;
+                                        allowed = true;
+                                    }
                                 }
                             }
-
-                            allowed = true;
                         }
 
                         if (allowed)
@@ -1515,8 +1530,11 @@ public class TerrainModule : INonSharedRegionModule, ICommandableModule, ITerrai
             finally
             {
                 NextModifyTerrainTime = Util.GetTimeStamp() + 0.02; // 20ms cooldown
+                // in the finally: an early return (a parcel the user may not edit, or that does
+                // not exist) or an exception must not keep the lock, or nobody could terraform
+                // again and no terrain patch would be sent until the region restarts
+                Monitor.Exit(_modifyLock);
             }
-           Monitor.Exit(_modifyLock);
         }
     }
 

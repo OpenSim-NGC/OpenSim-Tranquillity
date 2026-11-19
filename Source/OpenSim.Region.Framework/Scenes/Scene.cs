@@ -967,6 +967,7 @@ public partial class Scene : SceneBase
             StartDisabled = startupConfig.GetBoolean("StartDisabled", false);
 
             ChildPresenceWait = TimeSpan.FromSeconds(Math.Max(0, startupConfig.GetInt("ChildPresenceWaitSeconds", 30)));
+            RootAgentWait = TimeSpan.FromSeconds(Math.Max(0, startupConfig.GetInt("RootAgentWaitSeconds", 25)));
 
             m_defaultDrawDistance = startupConfig.GetFloat("DefaultDrawDistance", m_defaultDrawDistance);
             m_maxDrawDistance = startupConfig.GetFloat("MaxDrawDistance", m_maxDrawDistance);
@@ -3280,6 +3281,16 @@ public partial class Scene : SceneBase
         // XXX: A race condition exists here where two simultaneous calls to AddNewAgent can interfere with
         // each other.  In practice, this does not currently occur in the code.
         AgentCircuitData aCircuit = m_authenticateHandler.GetAgentCircuitData(client.CircuitCode);
+        if (aCircuit is null)
+        {
+            // closed while it connected (a close, or a second connection from another endpoint, removed the
+            // circuit): there is nothing to add the agent with
+            m_log.LogWarning(
+                "[SCENE]: Not adding {0} {1} to {2}: its circuit {3} was removed while it connected",
+                client.Name, client.AgentId, RegionInfo.RegionName, client.CircuitCode);
+            StatsReporter.UpdateUsersLoggingIn(false);
+            return null;
+        }
 
         // We lock here on AgentCircuitData to prevent a race condition between the thread adding a new connection
         // and a simultaneous one that removes it (as can happen if the client is closed at a particular point
@@ -4779,20 +4790,8 @@ Label_GroupsDone:
 
             sp.UpdateChildAgent(cAgentData);
 
-            int ntimes = 100;
-            if (cAgentData.SenderWantsToWaitForRoot)
-            {
-                while (sp.IsChildAgent && ntimes-- > 0)
-                    Thread.Sleep(250);
-
-                if (sp.IsChildAgent)
-                {
-                    m_log.LogWarning(
-                        "[SCENE]: Found presence {0} {1} unexpectedly still child in {2}",
-                        sp.Name, sp.UUID, Name);
-                    return false;
-                }
-            }
+            if (cAgentData.SenderWantsToWaitForRoot && !WaitForRoot(sp))
+                return false;
 
             return true;
         }
@@ -4864,16 +4863,156 @@ Label_GroupsDone:
     }
 
     /// <summary>
-    /// Poll until the requested ScenePresence appears or we timeout.
+    /// Close the connection of a child agent that the viewer has opened again from another endpoint, keeping what
+    /// the new connection needs: the circuit it was authorised with and the agent's capabilities at the same seed.
+    /// A plain close removes both, so the new connection was refused (and the viewer, which believed itself
+    /// connected, could later not teleport or cross into this region).
+    /// </summary>
+    /// <returns>false when the agent is not a child here (a root agent's connection is closed as before).</returns>
+    public bool ReplaceChildConnection(UUID agentID, uint circuitCode)
+    {
+        AgentCircuitData acd = m_authenticateHandler.GetAgentCircuitData(circuitCode);
+        ScenePresence sp = GetScenePresence(agentID);
+        if (acd is null || sp is null || !sp.IsChildAgent || sp.IsNPC)
+            return false;
+
+        m_log.LogDebug(
+            "[SCENE]: The viewer of child agent {0} in {1} connected again from another endpoint: replacing its connection",
+            agentID, Name);
+
+        // the first connection took the circuit's appearance for its presence; the new presence starts from it
+        AvatarAppearance appearance = sp.Appearance is null ? null : new AvatarAppearance(sp.Appearance);
+
+        CloseAgent(agentID, true);
+
+        acd.Appearance ??= appearance;
+        if (m_authenticateHandler.GetAgentCircuitData(circuitCode) is null)
+            m_authenticateHandler.AddNewCircuit(circuitCode, acd);
+
+        if (m_capsModule is not null && m_capsModule.GetCapsForUser(circuitCode) is null)
+        {
+            m_capsModule.SetAgentCapsSeeds(acd);
+            m_capsModule.CreateCaps(agentID, circuitCode);
+            m_capsModule.ActivateCaps(circuitCode);
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// How long a teleport's agent update waits, once the viewer has connected, for the viewer to finish arriving
+    /// (CompleteAgentMovement makes the presence root). The departing region holds the avatar until then.
+    /// Set from [Startup] RootAgentWaitSeconds; the default is 25 seconds.
+    /// </summary>
+    public TimeSpan RootAgentWait { get; set; } = TimeSpan.FromSeconds(25);
+
+    /// <summary>
+    /// Wait until <paramref name="sp"/> is root, for at most <see cref="RootAgentWait"/>. Ends at once when the
+    /// presence is closed or removed: a viewer that gave up, or a departing region that cancelled, will not arrive.
+    /// Becoming root and removal wake the wait; the flags are also looked at every 250 ms.
+    /// </summary>
+    /// <returns>true if the presence is root.</returns>
+    protected virtual bool WaitForRoot(ScenePresence sp)
+    {
+        UUID agentID = sp.UUID;
+        if (!sp.IsChildAgent)
+            return true;
+
+        // not disposed: an event raised on another thread just after the handlers are removed may still set it
+        ManualResetEventSlim changed = new(false);
+        void Root(ScenePresence p) { if (p == sp) changed.Set(); }
+        void Removed(UUID id) { if (id == agentID) changed.Set(); }
+
+        EventManager.OnMakeRootAgent += Root;
+        EventManager.OnRemovePresence += Removed;
+        try
+        {
+            long deadline = Environment.TickCount64 + (long)RootAgentWait.TotalMilliseconds;
+            while (sp.IsChildAgent && !Gone(sp))
+            {
+                long left = deadline - Environment.TickCount64;
+                if (left <= 0)
+                    break;
+                changed.Wait((int)Math.Min(left, 250));
+                changed.Reset();
+            }
+        }
+        finally
+        {
+            EventManager.OnMakeRootAgent -= Root;
+            EventManager.OnRemovePresence -= Removed;
+        }
+
+        if (Gone(sp))
+        {
+            m_log.LogInformation(
+                "[SCENE]: {0} {1} was closed in {2} before the viewer finished arriving", sp.Name, agentID, Name);
+            return false;
+        }
+
+        if (sp.IsChildAgent)
+        {
+            m_log.LogWarning(
+                "[SCENE]: Found presence {0} {1} unexpectedly still child in {2} after {3} seconds",
+                sp.Name, agentID, Name, RootAgentWait.TotalSeconds);
+            return false;
+        }
+
+        return true;
+    }
+
+    // being removed, removed, or replaced by another presence for the same agent (PreRemove can still go back to
+    // running: a teleport back may re-establish the agent)
+    private bool Gone(ScenePresence sp)
+        => sp.IsDeleted || sp.LifecycleState is ScenePresenceState.Removing or ScenePresenceState.Removed
+            || GetScenePresence(sp.UUID) != sp;
+
+    /// <summary>
+    /// Wait until the presence for <paramref name="agentID"/> appears (the viewer connected), for at most
+    /// <see cref="ChildPresenceWait"/>. Ends at once when the agent's circuit is removed, which a close of the agent
+    /// does before the viewer connects (a circuit that was never there is waited for, as before). A new presence
+    /// wakes the wait; it is also looked for every 250 ms.
     /// </summary>
     /// <returns>The scene presence is found, else null.</returns>
     /// <param name='agentID'></param>
     protected virtual ScenePresence WaitGetScenePresence(UUID agentID)
     {
-        int ntimes = (int)Math.Ceiling(ChildPresenceWait.TotalMilliseconds / 250.0);
-        ScenePresence sp;
-        while ((sp = GetScenePresence(agentID)) is null && (ntimes-- > 0))
-            Thread.Sleep(250);
+        ScenePresence sp = GetScenePresence(agentID);
+        if (sp is not null)
+            return sp;
+
+        ManualResetEventSlim changed = new(false);
+        void Arrived(ScenePresence p) { if (p.UUID == agentID) changed.Set(); }
+
+        EventManager.OnNewPresence += Arrived;
+        try
+        {
+            long deadline = Environment.TickCount64 + (long)ChildPresenceWait.TotalMilliseconds;
+            // only a circuit that was there and went counts: an update can arrive before the circuit it waits for
+            // (a crossing racing the child agent being set up)
+            bool hadCircuit = false;
+            while ((sp = GetScenePresence(agentID)) is null)
+            {
+                bool hasCircuit = m_authenticateHandler.GetAgentCircuitData(agentID) is not null;
+                hadCircuit |= hasCircuit;
+                if (hadCircuit && !hasCircuit)
+                {
+                    m_log.LogInformation(
+                        "[SCENE PRESENCE]: Stopped waiting for {0} in {1}: the agent was closed before its viewer connected",
+                        agentID, RegionInfo.RegionName);
+                    return null;
+                }
+
+                long left = deadline - Environment.TickCount64;
+                if (left <= 0)
+                    break;
+                changed.Wait((int)Math.Min(left, 250));
+                changed.Reset();
+            }
+        }
+        finally
+        {
+            EventManager.OnNewPresence -= Arrived;
+        }
 
         if (sp is null)
             m_log.LogWarning(

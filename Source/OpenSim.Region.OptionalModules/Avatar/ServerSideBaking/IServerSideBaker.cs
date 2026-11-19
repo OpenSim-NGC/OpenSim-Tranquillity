@@ -35,10 +35,16 @@ public enum ChannelStatus
     /// the delivery.
     /// </summary>
     Reused,
-    /// <summary>The library produced nothing for the channel (nothing worn for it); the face was left as it was.</summary>
+    /// <summary>The library produced nothing for the channel (nothing worn for it, or nothing drawn); the face was left as it was.</summary>
     Skipped,
     /// <summary>An input for the channel was unusable (missing/unparseable wearable, missing/undecodable texture); the face was left as it was.</summary>
     Failed,
+    /// <summary>
+    /// The outfit no longer uses the channel (a skirt or a universal layer was taken off) and it held a bake or an
+    /// index entry: its face was reset to IMG_DEFAULT_AVATAR. When the bake index had an entry for it, the entry is
+    /// removed (if the removal fails it stays and the next bake tries again). The old bake asset is not deleted.
+    /// </summary>
+    Cleared,
 }
 
 /// <summary>One channel's outcome. <see cref="AssetId"/> is the stored bake for Baked/Reused, UUID.Zero otherwise; <see cref="InputHash"/> is the bake's <c>BakeHash</c> (the stored asset's Description) or "".</summary>
@@ -54,7 +60,7 @@ public sealed record BakeOutcome(UUID AgentId, BakeReason Reason, IReadOnlyList<
         return n;
     }
 
-    /// <summary>Assets deleted because a new bake for the same channel superseded them (ADR-004).</summary>
+    /// <summary>Assets deleted because a new bake replaced them. Always empty: previous bakes are no longer deleted (see <see cref="BakeOrchestrator.StoreAndApply"/>).</summary>
     public IReadOnlyList<UUID> Superseded { get; init; } = Array.Empty<UUID>();
 
     /// <summary>Whether the ADR-004 bake index was written to the avatar service on this run.</summary>

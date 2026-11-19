@@ -28,6 +28,10 @@ namespace OpenSim.Region.PhysicsModules.Jolt.Tests;
 [DeleteScratchFolders]
 public class SculptFlagsTests
 {
+    // These tests cast dozens of rays in a row, each charged to the region's script ray budget; on a slow machine
+    // that ran out and a cast was cut short (RayCastTimeExceededException). The budget is not what they test.
+    private static readonly (string, string) RoomForRays = ("RayCastBudgetMs", "1000");
+
     private readonly ITestOutputHelper _out;
     public SculptFlagsTests(ITestOutputHelper output) { _out = output; }
 
@@ -125,7 +129,7 @@ public class SculptFlagsTests
         byte[] map = Map(type);
         bool mirror = (flags & Mirror) != 0;
         string scratch = Scratch();
-        JoltScene scene = NewScene(scratch);
+        JoltScene scene = NewScene(scratch, RoomForRays);
         try
         {
             // The two prims are far apart so that a ray meets one of them only.
@@ -170,7 +174,7 @@ public class SculptFlagsTests
         byte[] map = Map(type);
         bool mirror = (flags & Mirror) != 0;
         string scratch = Scratch();
-        JoltScene scene = NewScene(scratch);
+        JoltScene scene = NewScene(scratch, RoomForRays);
         try
         {
             Vector3 plainAt = Centre;
@@ -202,7 +206,7 @@ public class SculptFlagsTests
         byte[] map = Map(type);
         bool mirror = (flags & Mirror) != 0;
         string scratch = Scratch();
-        JoltScene scene = NewScene(scratch);
+        JoltScene scene = NewScene(scratch, RoomForRays);
         try
         {
             PhysicsActor plain = Add(scene, map, (byte)type, true);

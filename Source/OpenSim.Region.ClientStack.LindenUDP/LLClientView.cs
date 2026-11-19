@@ -2203,8 +2203,11 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         tpLocal.Info.LookAt = lookAt;
         tpLocal.Info.Position = position;
 
-        // Hack to get this out immediately and skip throttles
-        OutPacket(tpLocal, ThrottleOutPacketType.Unknown);
+        // In the queue the avatar's own terse updates use (Task), behind any already built. Sent ahead of them
+        // (it used to skip the throttles), a terse update built a moment before the teleport reached the viewer
+        // after this and put the avatar back where it had been until the next update: the snap back after a local
+        // teleport while moving.
+        OutPacket(tpLocal, ThrottleOutPacketType.Task);
     }
 
     public virtual void SendRegionTeleport(ulong regionHandle, byte simAccess, IPEndPoint newRegionEndPoint, uint locationID,
