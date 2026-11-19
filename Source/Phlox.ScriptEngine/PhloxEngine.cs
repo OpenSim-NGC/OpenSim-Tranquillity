@@ -2282,6 +2282,10 @@ namespace Phlox.ScriptEngine
         {
             m_ScriptLoader?.NoteScriptState(itemID, state);   // Still compiling - applied when it starts
             m_ExeScheduler?.ChangeEnabledStatus(itemID, state);
+            // The item's Running flag, which the viewer's checkbox shows and the region saves, as LSLSystemAPI.llSetScriptState
+            // keeps it for a Phlox caller (another engine's llSetScriptState reaches a Phlox script through here).
+            var script = m_ExeScheduler?.FindScript(itemID);
+            if (script != null) SetItemRunningFlag(script.HostLocalId, itemID, state);
         }
 
         public bool GetScriptState(UUID itemID)

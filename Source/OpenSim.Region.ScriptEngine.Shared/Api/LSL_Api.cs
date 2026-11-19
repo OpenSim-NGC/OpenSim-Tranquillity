@@ -681,8 +681,32 @@ public class LSL_Api : ILSL_Api, IScriptApi
             llResetScript();
         else
         {
-            m_ScriptEngine.ResetScript(item);
+            ScriptEngineRunning(m_ScriptEngine, item).ResetScript(item);
         }
+    }
+
+    /// <summary>
+    /// The script engine of the region that runs a script item: the caller's own engine when it runs it, or when no engine
+    /// runs it yet; else the other engine that does. SL has one script runtime, so llResetOtherScript, llSetScriptState,
+    /// llGetScriptState and osResetAllScripts name a script of the prim whatever engine runs it
+    /// (https://wiki.secondlife.com/wiki/LlResetOtherScript). The caller's own rules for these calls are unchanged; only
+    /// the engine that carries them out is chosen here.
+    /// </summary>
+    internal static IScriptEngine ScriptEngineRunning(IScriptEngine own, UUID itemID)
+    {
+        IScriptModule ownModule = own.ScriptModule;
+        if (ownModule is null || ownModule.HasScript(itemID, out _))
+            return own;
+        IScriptModule[] modules = own.World?.RequestModuleInterfaces<IScriptModule>();
+        if (modules is not null)
+        {
+            foreach (IScriptModule m in modules)
+            {
+                if (!ReferenceEquals(m, ownModule) && m is IScriptEngine other && m.HasScript(itemID, out _))
+                    return other;
+            }
+        }
+        return own;
     }
 
     public LSL_Integer llGetScriptState(string name)
@@ -691,7 +715,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
         if (!item.IsZero())
         {
-            return m_ScriptEngine.GetScriptState(item) ?1:0;
+            return ScriptEngineRunning(m_ScriptEngine, item).GetScriptState(item) ?1:0;
         }
 
         Error("llGetScriptState", "Can't find script '" + name + "'");
@@ -712,7 +736,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
         if (!item.IsZero())
         {
-            m_ScriptEngine.SetScriptState(item, run != 0, item.Equals(m_item.ItemID));
+            ScriptEngineRunning(m_ScriptEngine, item).SetScriptState(item, run != 0, item.Equals(m_item.ItemID));
         }
         else
         {
