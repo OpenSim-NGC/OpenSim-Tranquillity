@@ -11,6 +11,7 @@ using OpenSim.Server.Handlers.Inventory;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 using Xunit;
+using Theory = Xunit.TheoryAttribute;
 
 namespace OpenSim.Server.Handlers.Tests;
 
@@ -175,6 +176,150 @@ public class ControlPlaneAccessTests
         bool authorized = access.AuthorizePrivilegedInstantMessage((byte)OpenMetaverse.InstantMessageDialog.MessageFromAgent, new IPEndPoint(IPAddress.Parse("203.0.113.10"), 9000));
 
         Xunit.Assert.True(authorized);
+    }
+
+    // What a lookup answers: robust's address, and for an empty name (which Dns answers with this machine's own
+    // addresses) a stand-in for those.
+    private static readonly IPAddress s_robust = IPAddress.Parse("192.0.2.50");
+    private static readonly IPAddress s_thisMachine = IPAddress.Parse("198.51.100.7");
+
+    private sealed class Lookups
+    {
+        public readonly List<string> Names = new();
+
+        public IPAddress[] LookUp(string name)
+        {
+            lock (Names)
+                Names.Add(name);
+            return name switch
+            {
+                "" => new[] { s_thisMachine },
+                "robust" or "robust.example.invalid" => new[] { s_robust },
+                _ => throw new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound),
+            };
+        }
+    }
+
+    private static ControlPlaneAccess Trusting(string section, string hosts, Lookups lookups)
+    {
+        IniConfigSource config = new();
+        config.AddConfig(section).Set("ControlPlaneTrustedHosts", hosts);
+        return new ControlPlaneAccess(config, lookups.LookUp);
+    }
+
+    // .NET takes "robust:8003" for a URI of the scheme "robust", with an empty host. The empty name was looked up,
+    // which answers this machine's own addresses: robust was refused, and this machine trusted in its place.
+    [Theory]
+    [InlineData("robust:8003")]
+    [InlineData("robust.example.invalid:8003")]
+    [InlineData("http://robust:8003")]
+    [InlineData("http://robust.example.invalid:8003/")]
+    [InlineData("robust")]
+    public void AHostAndPortEntryTrustsTheHostNotThisMachine(string entry)
+    {
+        Lookups lookups = new();
+        ControlPlaneAccess access = Trusting("Network", entry, lookups);
+
+        Xunit.Assert.True(access.IsTrustedAddress(s_robust), entry + " does not trust robust");
+        Xunit.Assert.False(access.IsTrustedAddress(s_thisMachine), entry + " trusts this machine's addresses");
+        Xunit.Assert.DoesNotContain("", lookups.Names);
+    }
+
+    // "fd00::1" too is a URI to .NET, of the scheme "fd00".
+    [Theory]
+    [InlineData("fd00::1", "fd00::1")]
+    [InlineData("[fd00::1]", "fd00::1")]
+    [InlineData("[fd00::1]:8003", "fd00::1")]
+    [InlineData("http://[fd00::1]:8003/", "fd00::1")]
+    [InlineData("2001:db8::10", "2001:db8::10")]
+    [InlineData("192.168.1.5", "192.168.1.5")]
+    [InlineData("192.168.1.5:8003", "192.168.1.5")]
+    [InlineData("http://192.168.1.5:8003", "192.168.1.5")]
+    public void AnAddressEntryTrustsTheAddressWithoutALookup(string entry, string trusted)
+    {
+        Lookups lookups = new();
+        ControlPlaneAccess access = Trusting("Network", entry, lookups);
+
+        Xunit.Assert.True(access.IsTrustedAddress(IPAddress.Parse(trusted)), entry + " does not trust " + trusted);
+        Xunit.Assert.False(access.IsTrustedAddress(s_thisMachine));
+        Xunit.Assert.Empty(lookups.Names);
+    }
+
+    [Theory]
+    [InlineData(":8003")]
+    [InlineData("[]:8003")]
+    [InlineData("localhost:8003")]
+    [InlineData("file:///etc/hosts")]
+    [InlineData("10.20.0.0/24")]
+    [InlineData("nosuchhost.example.invalid")]
+    public void NoEntryLooksUpAnEmptyName(string entry)
+    {
+        Lookups lookups = new();
+        ControlPlaneAccess access = Trusting("Network", entry, lookups);
+
+        Xunit.Assert.DoesNotContain("", lookups.Names);
+        Xunit.Assert.False(access.IsTrustedAddress(s_thisMachine), entry + " trusts this machine's addresses");
+        Xunit.Assert.True(access.IsTrustedAddress(IPAddress.Loopback));
+    }
+
+    [Fact]
+    public void TheHostnameSettingIsReadTheSameWay()
+    {
+        Lookups lookups = new();
+        IniConfigSource config = new();
+        config.AddConfig("Network").Set("hostname", "robust:8003");
+        ControlPlaneAccess access = new(config, lookups.LookUp);
+
+        Xunit.Assert.True(access.IsTrustedAddress(s_robust));
+        Xunit.Assert.False(access.IsTrustedAddress(s_thisMachine));
+    }
+
+    // The first list found was the only one read: a list in [Security] hid the one in [Network].
+    [Fact]
+    public void TheListsInSecurityAndNetworkAreBothRead()
+    {
+        IniConfigSource config = new();
+        config.AddConfig("Security").Set("ControlPlaneTrustedHosts", "203.0.113.10");
+        config.AddConfig("Network").Set("ControlPlaneTrustedHosts", "203.0.113.11");
+        config.Configs["Network"].Set("TrustedControlPlaneHosts", "203.0.113.12");
+        ControlPlaneAccess access = new(config, new Lookups().LookUp);
+
+        Xunit.Assert.True(access.IsTrustedAddress(IPAddress.Parse("203.0.113.10")));
+        Xunit.Assert.True(access.IsTrustedAddress(IPAddress.Parse("203.0.113.11")));
+        Xunit.Assert.True(access.IsTrustedAddress(IPAddress.Parse("203.0.113.12")));
+    }
+
+    // The mutation callers were read from the same setting split on commas only, and an address with its port was
+    // refused as invalid; the documented separators and forms now work for both lists.
+    [Fact]
+    public void TheMutationCallersAreReadLikeTheTrustedHosts()
+    {
+        IniConfigSource config = new();
+        config.AddConfig("Network").Set("ControlPlaneTrustedHosts", "203.0.113.10 203.0.113.11;[2001:db8::10]:8003|robust:8003");
+        ControlPlaneAccess access = new(config, new Lookups().LookUp);
+
+        foreach (string a in new[] { "203.0.113.10", "203.0.113.11", "2001:db8::10" })
+        {
+            Xunit.Assert.True(access.IsTrustedControlPlaneCaller(new IPEndPoint(IPAddress.Parse(a), 9000)), a);
+            Xunit.Assert.True(access.IsTrustedAddress(IPAddress.Parse(a)), a);
+        }
+
+        // a name is a trusted host, but not a mutation caller: those are addresses only
+        Xunit.Assert.True(access.IsTrustedAddress(s_robust));
+        Xunit.Assert.False(access.IsTrustedControlPlaneCaller(new IPEndPoint(s_robust, 9000)));
+    }
+
+    [Theory]
+    [InlineData("robust:8003", "robust")]
+    [InlineData("fd00::1", "fd00::1")]
+    [InlineData("[fd00::1]:8003", "[fd00::1]:8003")]
+    [InlineData("http://robust:8003/x", "robust")]
+    [InlineData("  robust  ", "robust")]
+    [InlineData(":8003", "")]
+    [InlineData("", "")]
+    public void HostOfNamesTheHost(string entry, string host)
+    {
+        Xunit.Assert.Equal(host, ControlPlaneAccess.HostOf(entry));
     }
 
     private static FakeRequest RequestFrom(string address)
