@@ -344,8 +344,9 @@ public class OpenSim : OpenSimBase
         m_console.Commands.AddCommand("Users", false, "kick user",
                                       "kick user <first> <last> [--force] [message]",
                                       "Kick a user off the simulator",
-                                      "The --force option will kick the user without any checks to see whether it's already in the process of closing\n"
-                                      + "Only use this option if you are sure the avatar is inactive and a normal kick user operation does not removed them",
+                                      "Tells the user why (the message, or a default) and closes their agent in the region they are in.\n"
+                                      + "The --force option also closes a connection the region already counts as inactive, such as a viewer that stopped answering, "
+                                      + "and tells the viewer to drop the region. It does not remove an avatar that is already being removed.",
                                       KickUserCommand);
 
         m_console.Commands.AddCommand("Users", false, "show users",
@@ -469,54 +470,57 @@ public class OpenSim : OpenSimBase
     /// <param name="cmdparams">name of avatar to kick</param>
     private void KickUserCommand(string module, string[] cmdparams)
     {
-        bool force = false;
-
-        OptionSet options = new OptionSet().Add("f|force", delegate (string v) { force = v != null; });
-
-        List<string> mainParams = options.Parse(cmdparams);
-
-        if (mainParams.Count < 4)
-            return;
-
-        string alert = null;
-        if (mainParams.Count > 4)
-            alert = String.Format("\n{0}\n", String.Join(" ", cmdparams, 4, cmdparams.Length - 4));
-
-        IList agents = SceneManager.GetCurrentSceneAvatars();
-
-        foreach (ScenePresence presence in agents)
+        KickUserRequest kick = KickUserRequest.Parse(cmdparams);
+        if (kick is null)
         {
-            RegionInfo regionInfo = presence.Scene.RegionInfo;
+            MainConsole.Instance.Output("Usage: kick user <first> <last> [--force] [message]");
+            return;
+        }
 
-            if (presence.Firstname.Equals(mainParams[2], StringComparison.OrdinalIgnoreCase) &&
-                presence.Lastname.Equals(mainParams[3],StringComparison.OrdinalIgnoreCase))
+        ScenePresence presence = null;
+        foreach (ScenePresence sp in SceneManager.GetCurrentSceneAvatars())
+        {
+            if (sp.Firstname.Equals(kick.FirstName, StringComparison.OrdinalIgnoreCase) &&
+                sp.Lastname.Equals(kick.LastName, StringComparison.OrdinalIgnoreCase))
             {
-                MainConsole.Instance.Output(
-                        "Kicking user: {0,-16} {1,-16} {2,-37} in region: {3,-16}",
-                        presence.Firstname, presence.Lastname, presence.UUID, regionInfo.RegionName);
-
-                if (presence.IsNPC)
-                {
-                    INPCModule npcmodule = presence.Scene.RequestModuleInterface<INPCModule>();
-                    if (npcmodule != null)
-                    {
-                        npcmodule.DeleteNPC(presence.UUID, presence.Scene);
-                        return;
-                    }
-                }
-
-                // kick client...
-                if (alert != null)
-                    presence.ControllingClient.Kick(alert);
-                else
-                    presence.ControllingClient.Kick("\nYou have been logged out by an administrator.\n");
-
-                presence.Scene.CloseAgent(presence.UUID, force);
+                presence = sp;
                 break;
             }
         }
 
-        MainConsole.Instance.Output("");
+        if (presence is null)
+        {
+            string where = SceneManager.CurrentScene is null
+                ? "any region of this simulator"
+                : "region " + SceneManager.CurrentScene.RegionInfo.RegionName;
+            MainConsole.Instance.Output("No user named {0} {1} is in {2}.", kick.FirstName, kick.LastName, where);
+            return;
+        }
+
+        string regionName = presence.Scene.RegionInfo.RegionName;
+        MainConsole.Instance.Output(
+                "Kicking user: {0,-16} {1,-16} {2,-37} in region: {3,-16}",
+                presence.Firstname, presence.Lastname, presence.UUID, regionName);
+
+        if (presence.IsNPC)
+        {
+            INPCModule npcmodule = presence.Scene.RequestModuleInterface<INPCModule>();
+            if (npcmodule is not null)
+            {
+                npcmodule.DeleteNPC(presence.UUID, presence.Scene);
+                return;
+            }
+        }
+
+        presence.ControllingClient.Kick("\n" + kick.Message + "\n");
+
+        if (!presence.Scene.CloseAgent(presence.UUID, kick.Force))
+        {
+            MainConsole.Instance.Output(
+                "{0} {1} was told, but their agent in {2} was not closed: it is already closing, or another region has just "
+                + "taken it over. Run the command again in a moment if they are still there.",
+                presence.Firstname, presence.Lastname, regionName);
+        }
     }
 
     /// <summary>
