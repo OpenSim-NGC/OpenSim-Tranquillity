@@ -1643,6 +1643,12 @@ public class SceneObjectPartInventory : IEntityInventory , IDisposable
                 invString.AddNameValueLine("type", Utils.AssetTypeToString((AssetType)item.Type));
                 invString.AddNameValueLine("inv_type", Utils.InventoryTypeToString((InventoryType)item.InvType));
                 invString.AddNameValueLine("flags", Utils.UIntToHexString(ScriptCompileTargets.ForViewer(item.Flags)));
+                // A script's runtime as Second Life's viewer reads it from an item's metadata line: LLSD XML on one line,
+                // {"script": {"runtime": ...}} (LLInventoryItem::importLegacyStream).
+                string runtime = item.InvType == (int)InventoryType.LSL ? ScriptCompileTargets.ViewerRuntime(item.Flags) : null;
+                if (runtime is not null)
+                    invString.AddNameValueLine("metadata",
+                        "<llsd><map><key>script</key><map><key>runtime</key><string>" + runtime + "</string></map></map></llsd>");
 
                 invString.AddSaleStart();
                 invString.AddNameValueLine("sale_type", "not");

@@ -122,13 +122,13 @@ public class ScriptRuntimeSentToViewersTests
         string file = Encoding.UTF8.GetString(xfer.Data);
         string[] lines = file.Split('\n');
         string[] metadata = lines.Where(l => l.TrimStart().StartsWith("metadata\t")).ToArray();
-        string line = Assert.Single(metadata);
+        string line = Assert.Single(metadata).TrimStart();
         string xml = line[(line.IndexOf('\t') + 1)..];
         Assert.StartsWith("<llsd>", xml);
         OSDMap meta = (OSDMap)OSDParser.DeserializeLLSDXml(xml);
         Assert.Equal("luau", RuntimeIn(meta));
         // the metadata line sits in the item that has the target, before that item's name
-        int at = Array.IndexOf(lines, line);
+        int at = Array.FindIndex(lines, l => l.TrimStart() == line);
         string nameAfter = lines.Skip(at).First(l => l.TrimStart().StartsWith("name\t"));
         Assert.Contains("onluau|", nameAfter);
     }

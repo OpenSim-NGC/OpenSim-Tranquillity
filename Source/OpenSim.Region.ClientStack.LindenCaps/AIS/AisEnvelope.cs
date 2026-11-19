@@ -94,6 +94,10 @@ public static class AisEnvelope
             ["permissions"] = Permissions(item),
             ["sale_info"] = SaleInfo(item),
         };
+        // A script's runtime as Second Life's viewer reads it ("script": {"runtime": ...}, LLInventoryItem::fromLLSD)
+        string runtime = item.InvType == (int)InventoryType.LSL ? ScriptCompileTargets.ViewerRuntime(item.Flags) : null;
+        if (runtime is not null)
+            map["script"] = new OSDMap { ["runtime"] = runtime };
         return map;
     }
 

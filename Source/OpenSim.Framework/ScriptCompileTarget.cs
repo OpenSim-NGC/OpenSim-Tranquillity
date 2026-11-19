@@ -61,7 +61,12 @@ public static class ScriptCompileTargets
     /// The runtime a viewer is told for a script item with these flags, as Second Life's viewer reads it from an item's
     /// "script" map ("runtime": "lsl2", "mono" or "luau"; llinventory.cpp, llpreviewscript.cpp); null when none is sent.
     /// </summary>
-    public static string ViewerRuntime(uint flags) => null;
+    /// <remarks>
+    /// "luau" is sent for an item that carries a Lua target: the Lua subtype, or the "LSL on Lua" flag bit, which
+    /// <see cref="ForViewer"/> keeps from the viewer. Nothing is sent otherwise, so an item without a Lua target, an
+    /// item with only a saved engine among them, reaches a viewer exactly as before. The caller sends it only for script items.
+    /// </remarks>
+    public static string ViewerRuntime(uint flags) => FromFlags(flags) == ScriptCompileTarget.Unspecified ? null : "luau";
 
     /// <summary>
     /// The flag bits only the region sets: <see cref="LslOnLuauFlag"/> and the saved engine. A viewer is never told them,
