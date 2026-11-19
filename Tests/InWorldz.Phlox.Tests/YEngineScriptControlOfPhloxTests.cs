@@ -56,18 +56,21 @@ public class YEngineScriptControlOfPhloxTests
         public readonly DataserverToPrimTests.Rig R;
         public UUID VictimItem;
 
-        public Rig()
+        /// <summary>The YEngine driver starts first; then the Phlox victim is rezzed, and waited for unless <paramref name="victim"/> is given.</summary>
+        public Rig(string threatLevel = "Severe", string victim = null)
         {
             R = new DataserverToPrimTests.Rig(cfg =>
             {
                 var ossl = cfg.AddConfig("OSSL");
                 ossl.Set("AllowOSFunctions", "true");
-                ossl.Set("OSFunctionThreatLevel", "Severe");
+                ossl.Set("OSFunctionThreatLevel", threatLevel);
             }, withYEngine: true);
-            VictimItem = R.Rez(R.H.Prim, Victim, PScript);
             SchedulerHarnessYEngine.Rez(R.H, R.H.Prim, Driver, "ydriver");
-            Assert.True(R.PumpUntil(() => R.Count("D entry") == 1 && R.Count("P entry") == 1 && R.H.Engine.ListenManager.ListenCount >= 1),
-                "not all started: " + string.Join(" | ", R.H.Said));
+            Assert.True(R.PumpUntil(() => R.Count("D entry") == 1), "the driver did not start: " + string.Join(" | ", R.H.Said));
+            VictimItem = R.Rez(R.H.Prim, Victim, victim ?? PScript);
+            if (victim is null)
+                Assert.True(R.PumpUntil(() => R.Count("P entry") == 1 && R.H.Engine.ListenManager.ListenCount >= 1),
+                    "the Phlox script did not start: " + string.Join(" | ", R.H.Said));
         }
 
         /// <summary>Sends a command to the driver and waits until it has made the call.</summary>
@@ -92,7 +95,54 @@ public class YEngineScriptControlOfPhloxTests
             return R.PumpUntil(() => R.Count("P heard " + message) > before, 3);
         }
 
-        public void Dispose() => R.Dispose();
+        public void Dispose()
+        {
+            global::Phlox.ScriptEngine.PhloxScriptLoader.CompileDelayForTest = null;
+            R.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// The target is still compiling when the YEngine script stops it: no engine runs it yet, so the call goes to every
+    /// engine, and Phlox applies it when the script starts. The script never starts running.
+    /// </summary>
+    [Fact]
+    public void LlSetScriptStateFromYEngineOnAPhloxScriptStillCompilingIsApplied()
+    {
+        // CompileDelayForTest is process-wide. Its other users are in "phlox-state", which never runs beside another collection;
+        // within "phlox-yengine" the classes run one at a time.
+        global::Phlox.ScriptEngine.PhloxScriptLoader.CompileDelayForTest = text => text.Contains("SLOW-YSTOP") ? 3000 : 0;
+        using var r = new Rig(victim: "// SLOW-YSTOP" + PScript);
+        Assert.False(r.R.H.Engine.HasScript(r.VictimItem, out _), "the Phlox script was not still compiling");
+        r.Drive("stop");
+        Assert.False(r.R.H.Engine.HasScript(r.VictimItem, out _), "the Phlox script finished compiling before the stop was sent");
+
+        Assert.True(r.R.PumpUntil(() => r.R.H.Engine.HasScript(r.VictimItem, out _)), "the Phlox script never loaded");
+        r.R.Quiet(1000, "P entry");
+        _out.WriteLine(string.Join(" | ", r.R.H.Said));
+        Assert.False(r.R.H.Engine.GetScriptState(r.VictimItem), "the stop sent while it compiled was lost");
+    }
+
+    /// <summary>
+    /// SL wiki, llSetScriptState, Caveats: it "Cannot be used to restart a script that has encountered a run-time error".
+    /// That holds when the caller is a YEngine script too: the crashed Phlox script stays stopped.
+    /// </summary>
+    [Fact]
+    public void LlSetScriptStateTrueFromYEngineDoesNotRestartACrashedPhloxScript()
+    {
+        // osSetRot is VeryHigh; at VeryLow the call is denied and the denial ends the script with a runtime error
+        const string crasher = @"default {
+            state_entry() { llSay(0, ""crasher up""); osSetRot(llGetKey(), <0,0,0,1>); llSay(0, ""after""); }
+        }";
+        using var r = new Rig(threatLevel: "VeryLow", victim: crasher);
+        Assert.True(r.R.PumpUntil(() => r.R.H.RunStateOf(r.VictimItem) == "Killed"), "the script did not crash: " + string.Join(" | ", r.R.H.Said));
+
+        r.Drive("start");
+        r.R.Quiet(1000, "crasher up");
+        _out.WriteLine(string.Join(" | ", r.R.H.Said));
+        Assert.Equal(1, r.R.Count("crasher up"));
+        Assert.False(r.R.H.Engine.GetScriptState(r.VictimItem));
+        Assert.Equal("Killed", r.R.H.RunStateOf(r.VictimItem));
     }
 
     [Fact]

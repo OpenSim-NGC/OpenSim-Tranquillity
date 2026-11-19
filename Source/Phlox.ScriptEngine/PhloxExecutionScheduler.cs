@@ -927,10 +927,13 @@ namespace Phlox.ScriptEngine
             // removes scripts: the read takes the lock the writes take.
             lock (m_AllScriptsLock)
                 if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
-            var st = script.ScriptState;
-            bool on = st.GeneralEnable;
+            // A start or stop asked for and not yet applied answers first. Looked up before the script's own flag: this
+            // thread applies a request before it drops the entry, so a read that finds no entry sees the applied flag.
+            bool? asked = null;
             lock (m_EnableDisableQueue)
-                if (m_PendingEnable.TryGetValue(itemId, out var pending)) on = pending.Enable;   // asked for, not yet applied
+                if (m_PendingEnable.TryGetValue(itemId, out var pending)) asked = pending.Enable;
+            var st = script.ScriptState;
+            bool on = asked ?? st.GeneralEnable;
             return on && (st.LocalDisable & ~RuntimeState.LocalDisableFlag.Parcel) == RuntimeState.LocalDisableFlag.None;
         }
 
