@@ -45,6 +45,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
     private List<Scene> m_sceneList = new List<Scene>();
 
     private IMessageTransferModule m_msgTransferModule = null;
+    private GroupNoticeSender m_noticeSender;
 
     private IGroupsServicesConnector m_groupData = null;
     private IUserManagement m_UserManagement;
@@ -86,6 +87,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
             m_groupNoticesEnabled   = groupsConfig.GetBoolean("NoticesEnabled", true);
             m_debugEnabled          = groupsConfig.GetBoolean("DebugEnabled", false);
             m_levelGroupCreate      = groupsConfig.GetInt("LevelGroupCreate", 0);
+            m_noticeSender          = new GroupNoticeSender(() => m_msgTransferModule);
         }
     }
 
@@ -202,6 +204,7 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
             return;
 
         if (m_debugEnabled) m_log.LogDebug("[Groups]: Shutting down Groups module.");
+        m_noticeSender?.Dispose();
     }
 
     public Type ReplaceableInterface
@@ -496,18 +499,26 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
             {
                 OnNewGroupNotice?.Invoke(GroupID, NoticeID);
 
-                // Send notice out to everyone that wants notices
+                // Send notice out to everyone that wants notices: at once to those in this process, and through the
+                // notice sender, a few at a time, to the others (see GroupNoticeSender).
+                List<GridInstantMessage> away = new List<GridInstantMessage>();
                 foreach (GroupMembersData member in m_groupData.GetGroupMembers(remoteAgentIDstr, GroupID))
                 {
-                    GridInstantMessage msg = CreateGroupNoticeIM(UUID.Zero, NoticeID, (byte)InstantMessageDialog.GroupNotice);
                     // to the members who take notices and whose roles give "Receive notices"
-                    if (member.AcceptNotices && (member.AgentPowers & (ulong)GroupPowers.ReceiveNotices) != 0)
-                    {
-                        // Build notice IIM, one of reach, because the sending may be async
-                        msg.toAgentID = member.AgentID.Guid;
-                        OutgoingInstantMessage(msg, member.AgentID);
-                    }
+                    if (!member.AcceptNotices || (member.AgentPowers & (ulong)GroupPowers.ReceiveNotices) == 0)
+                        continue;
+
+                    // Build notice IIM, one of reach, because the sending may be async
+                    GridInstantMessage msg = CreateGroupNoticeIM(UUID.Zero, NoticeID, (byte)InstantMessageDialog.GroupNotice);
+                    msg.toAgentID = member.AgentID.Guid;
+                    IClientAPI local = GetActiveRootClient(member.AgentID);
+                    if (local != null)
+                        local.SendInstantMessage(msg);
+                    else
+                        away.Add(msg);
                 }
+                if (away.Count > 0)
+                    m_noticeSender.Send(away);
             }
         }
 

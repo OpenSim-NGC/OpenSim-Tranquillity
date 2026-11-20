@@ -121,3 +121,12 @@ ALTER TABLE `os_groups_invites`
 MODIFY `TMStamp` timestamp NOT NULL default CURRENT_TIMESTAMP;
 
 COMMIT;
+
+:VERSION 4         # --------------------------
+
+BEGIN;
+
+-- the roles of one member of one group, looked up for every member listed and every powers check
+ALTER TABLE `os_groups_rolemembership` ADD INDEX `GroupPrincipal` (`GroupID`, `PrincipalID`);
+
+COMMIT;

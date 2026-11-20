@@ -44,7 +44,6 @@ public class GroupsServiceRemoteConnector
 
     private string m_ServerURI;
     private IServiceAuth m_Auth;
-    private object m_Lock = new object();
 
     public GroupsServiceRemoteConnector(IConfigSource config)
     {
@@ -67,6 +66,11 @@ public class GroupsServiceRemoteConnector
                 break;
         }
         ///
+
+        // the key Robust's groups service asks of its callers, when it has one
+        string key = groupsConfig.GetString("SecretKey", string.Empty);
+        if (key.Length > 0)
+            m_Auth = new GroupsSecretKeyAuth(key, m_Auth);
 
         m_log.LogDebug("[Groups.RemoteConnector]: Groups server at {0}, authentication {1}",
             m_ServerURI, (m_Auth == null ? "None" : m_Auth.GetType().ToString()));
@@ -672,9 +676,9 @@ public class GroupsServiceRemoteConnector
     {
         sendData["METHOD"] = method;
 
-        string reply = string.Empty;
-        lock (m_Lock)
-            reply = SynchronousRestFormsRequester.MakeRequest("POST",
+        // Each request has its own HTTP request and response, so the region's groups calls run side by side; they
+        // used to wait for each other behind one lock, every arrival and member list behind the slowest call.
+        string reply = SynchronousRestFormsRequester.MakeRequest("POST",
                      m_ServerURI + "groups",
                      ServerUtils.BuildQueryString(sendData),
                      m_Auth);
