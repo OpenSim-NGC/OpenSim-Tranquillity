@@ -120,6 +120,34 @@ namespace OpenSim.Region.Framework.Scenes.Tests
             Assert.True(m_uuidGatherer.GatheredUuids.ContainsKey(secondLevelEmbeddedId));
         }
 
+        /// <summary>
+        /// An object asset lists the animations its prims play (SOPAnims): a count, then for each an animation id
+        /// and a length-prefixed name. Every one of them is gathered, not only the first.
+        /// </summary>
+        [Fact]
+        public void EveryAnimationAnObjectPlaysIsGathered()
+        {
+            // A prim starts an animation only when it is in a scene.
+            Scene scene = new SceneHelpers().SetupScene();
+            SceneObjectGroup so = SceneHelpers.CreateSceneObject(1, TestHelpers.ParseTail(0x10), "animated", 0x50);
+            scene.AddNewSceneObject(so, false);
+            UUID[] animations = { TestHelpers.ParseTail(0x51), TestHelpers.ParseTail(0x52), TestHelpers.ParseTail(0x53) };
+            Assert.True(so.RootPart.AddAnimation(animations[0], "wave"));
+            Assert.True(so.RootPart.AddAnimation(animations[1], "a longer animation name"));
+            Assert.True(so.RootPart.AddAnimation(animations[2], "x"));
+
+            UUID assetId = TestHelpers.ParseTail(0x60);
+            scene.AssetService.Store(AssetHelpers.CreateAsset(assetId, so));
+
+            UuidGatherer gatherer = new(scene.AssetService);
+            gatherer.AddForInspection(assetId);
+            gatherer.GatherAll();
+
+            foreach (UUID animation in animations)
+                Assert.True(gatherer.GatheredUuids.TryGetValue(animation, out sbyte type) && type == (sbyte)AssetType.Animation,
+                    $"animation {animation} not gathered");
+        }
+
         [Fact]
         public void TestTaskItems()
         {
