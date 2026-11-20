@@ -150,5 +150,12 @@ to the Hypergrid groups path on the two-grid rig.
   `GroupNoticeSender`, four messages at a time, so the region's other instant messages wait behind at most those
   few instead of one job per member. The members reached are unchanged.
 
-Still to do in phase 3: one module in place of the V2 groups and messaging pair; caching that hears about changes;
-group chat to a large group through the same sender; invites through it.
+- **Changes seen by everyone on the region.** On a grid the region caches answers for 30 s, member lists per
+  requester. A role given or taken, a member leaving, notices turned off or a title chosen used to drop only the
+  requester's and the member's entries, so other avatars on the region kept the old answer (and notices and chat
+  still went to a member who had left, or had turned notices off). Every change now clears the region's cache.
+- **Group chat** already goes once per region to members online elsewhere (the receiving region fans it out), so it
+  needs no sender.
+
+Still to do in phase 3: other regions hearing about a change before their 30 s are up (Robust has no way to tell
+them yet); one module in place of the V2 groups and messaging pair.
