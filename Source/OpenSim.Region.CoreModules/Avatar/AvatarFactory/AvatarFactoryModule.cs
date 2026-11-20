@@ -551,12 +551,13 @@ public class AvatarFactoryModule : IAvatarFactoryModule, INonSharedRegionModule
         if (((ScenePresence)sp).IsNPC)
             return true;
 
-        // On a region that bakes, the bake faces are the baking module's, which bakes every agent that becomes a
-        // root agent here (reusing the bakes it stored). What follows checks the bakes a viewer made itself, by the
+        // For an agent the region bakes for, the bake faces are the baking module's, which bakes every such agent
+        // that becomes a root agent here (reusing the bakes it stored). A Hypergrid visitor's viewer bakes it, so
+        // the check below stays for it. What follows checks the bakes a viewer made itself, by the
         // cache ids it sends, and server bakes carry none: the "fs junk" rule below took every Bakes on Mesh face
         // (left arm, left leg, aux 1 to 3) off an avatar teleporting into a region it had been in before, and
         // counted the cache good, so nothing baked them back.
-        if (m_scene.RequestModuleInterface<IServerSideBakingRegion>()?.ServerSideBakingEnabled == true)
+        if (m_scene.RequestModuleInterface<IServerSideBakingRegion>()?.BakesFor(sp.UUID) == true)
             return true;
 
         int hits = 0;

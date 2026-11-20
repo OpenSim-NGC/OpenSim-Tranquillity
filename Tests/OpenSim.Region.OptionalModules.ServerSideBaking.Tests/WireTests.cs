@@ -223,6 +223,34 @@ public class WireTests
         Assert.Equal(0, on.Handshake.MismatchesFor(Agent));
     }
 
+    [Fact]
+    public void ARegionBakesForItsOwnResidentsOnlyAndOnlyWithTheFlagOn()
+    {
+        var visitor = UUID.Random();
+        var on = new ServerSideBakingRegion(true, new CofHandshake(), id => id.NotEqual(visitor));
+        Assert.True(on.BakesFor(Agent));
+        Assert.False(on.BakesFor(visitor));
+
+        var off = new ServerSideBakingRegion(false, new CofHandshake(), _ => true);
+        Assert.False(off.BakesFor(Agent));
+
+        // with no account service to ask, everyone is local: what a region did before visitors were told apart
+        Assert.True(new ServerSideBakingRegion(true, new CofHandshake()).BakesFor(visitor));
+    }
+
+    [Fact]
+    public void WhoIsLocalIsAskedOncePerAgent()
+    {
+        int asked = 0;
+        var on = new ServerSideBakingRegion(true, new CofHandshake(), _ => { asked++; return true; });
+        on.BakesFor(Agent);
+        on.BakesFor(Agent);
+        Assert.Equal(1, asked);
+        on.Forget(Agent);
+        on.BakesFor(Agent);
+        Assert.Equal(2, asked);
+    }
+
     // ------------------------------------------------------------------ ADR-001: the flag-off packet is unchanged
 
     /// <summary>
@@ -371,13 +399,14 @@ public class WireTests
 
     /// <summary>RegionProtocols keeps bit 63 and gains bit 0 only behind the flag.</summary>
     [Fact]
-    public void RegionProtocolsSetsBitZeroOnlyWhenTheFlagIsOn()
+    public void RegionProtocolsSetsBitZeroOnlyForAgentsTheRegionBakesFor()
     {
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var src = File.ReadAllText(Path.Combine(root, "Source", "OpenSim.Region.ClientStack.LindenUDP", "LLClientView.cs")).Replace("\r\n", "\n");
 
         Assert.Contains("ulong regionProtocols = 1UL << 63;", src);
-        Assert.Contains("if (m_scene.RequestModuleInterface<IServerSideBakingRegion>() is { ServerSideBakingEnabled: true })\n            regionProtocols |= 1UL;", src);
+        // the flag on, and the agent one of this grid's: a Hypergrid visitor's viewer bakes it (BakesFor)
+        Assert.Contains("if (m_scene.RequestModuleInterface<IServerSideBakingRegion>() is { } ssb && ssb.BakesFor(m_agentId))\n            regionProtocols |= 1UL;", src);
         Assert.Contains("zc.AddUInt64(regionProtocols);", src);
         Assert.DoesNotContain("zc.AddUInt64(1UL << 63);", src);
 

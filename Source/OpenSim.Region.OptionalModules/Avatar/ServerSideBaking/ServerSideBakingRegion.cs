@@ -24,12 +24,23 @@ namespace OpenSim.Region.OptionalModules.Avatar.ServerSideBaking;
 public sealed class ServerSideBakingRegion : IServerSideBakingRegion
 {
     private readonly ConcurrentDictionary<UUID, int> m_bakedCof = new();
+    private readonly Func<UUID, bool> m_hasLocalAccount;
+    private readonly ConcurrentDictionary<UUID, bool> m_local = new();
 
-    public ServerSideBakingRegion(bool enabled, CofHandshake handshake)
+    /// <param name="hasLocalAccount">
+    /// Whether an agent has an account on this grid, as opposed to a Hypergrid visitor; null when every agent
+    /// counts as local (tests, and grids with no account service to ask).
+    /// </param>
+    public ServerSideBakingRegion(bool enabled, CofHandshake handshake, Func<UUID, bool> hasLocalAccount = null)
     {
         ServerSideBakingEnabled = enabled;
         Handshake = handshake;
+        m_hasLocalAccount = hasLocalAccount;
     }
+
+    /// <inheritdoc/>
+    public bool BakesFor(UUID agentId)
+        => ServerSideBakingEnabled && (m_hasLocalAccount is null || m_local.GetOrAdd(agentId, m_hasLocalAccount));
 
     /// <inheritdoc/>
     public bool ServerSideBakingEnabled { get; }
@@ -58,6 +69,7 @@ public sealed class ServerSideBakingRegion : IServerSideBakingRegion
     public void Forget(UUID agentId)
     {
         m_bakedCof.TryRemove(agentId, out _);
+        m_local.TryRemove(agentId, out _);
         Handshake.Clear(agentId);
         m_lastChangeBake.TryRemove(agentId, out _);
         m_lastGoodBodyParts.TryRemove(agentId, out _);

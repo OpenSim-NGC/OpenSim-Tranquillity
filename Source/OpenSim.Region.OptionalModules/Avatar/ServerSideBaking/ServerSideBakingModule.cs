@@ -132,7 +132,10 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         m_log.LogDebug("[SSB]: region {Region}: server-side baking {State} ({Source})",
             scene.Name, enabled ? "ON" : "off", source);
 
-        var region = new ServerSideBakingRegion(enabled, new CofHandshake());
+        // A Hypergrid visitor is not baked here (IServerSideBakingRegion.BakesFor): the account service, not the
+        // user-management cache a foreign grid can write names into, says who is local.
+        var region = new ServerSideBakingRegion(enabled, new CofHandshake(), agentId =>
+            scene.UserAccountService?.GetUserAccount(scene.RegionInfo.ScopeID, agentId) is not null);
         lock (m_scenes)
         {
             m_scenes.Add(scene);
@@ -342,6 +345,10 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     /// </summary>
     private void RegisterCaps(Scene scene, UUID agentID, Caps caps)
     {
+        // a visitor's viewer bakes it, and is never told this region bakes, so it never asks
+        if (RegionOf(scene) is { } region && !region.BakesFor(agentID))
+            return;
+
         string capPath = "/" + UUID.Random();
         caps.RegisterSimpleHandler(CapName,
             new SimpleStreamHandler(capPath, (httpRequest, httpResponse) => HandleUpdateAvatarAppearance(httpRequest, httpResponse, scene, agentID)));
@@ -553,7 +560,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         if (sp is null || sp.IsChildAgent || sp.IsNPC) return;
         var scene = sp.Scene;
         var region = RegionOf(scene);
-        if (region is not { ServerSideBakingEnabled: true }) return;
+        if (region is null || !region.BakesFor(sp.UUID)) return;
 
         if (!region.TryClaimChangeBake(sp.UUID, DateTime.UtcNow))
         {
@@ -588,7 +595,7 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
     {
         if (sp is null || sp.IsChildAgent || sp.IsNPC) return;
         var scene = sp.Scene;
-        if (RegionOf(scene) is not { ServerSideBakingEnabled: true }) return;
+        if (RegionOf(scene) is not { } region || !region.BakesFor(sp.UUID)) return;
 
         Util.FireAndForget(_ =>
         {
