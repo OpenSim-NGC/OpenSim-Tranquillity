@@ -52,8 +52,14 @@ public class BakeIndexSurvivesAppearanceSaveTests
                        .ToArray();
         }
 
+        /// <summary>Runs once, before the next store: another writer landing in the middle of a save.</summary>
+        public Action BeforeNextStore;
+
         public bool Store(AvatarBaseData data)
         {
+            Action before = BeforeNextStore;
+            BeforeNextStore = null;
+            before?.Invoke();
             Rows[(data.PrincipalID, data.Data["Name"])] = data.Data["Value"];
             return true;
         }
@@ -145,8 +151,9 @@ public class BakeIndexSurvivesAppearanceSaveTests
         Assert.Equal(head, after.Bakes[BakeChannel.Head]);
         Assert.Equal(upper, after.Bakes[BakeChannel.Upper]);
 
-        // and the appearance itself really was rewritten, so this is not passing by doing nothing
-        Assert.Equal(1, db.DeleteAllCalls);
+        // and the appearance itself really was rewritten, so this is not passing by doing nothing; never by
+        // deleting every row, which would take the index with it
+        Assert.Equal(0, db.DeleteAllCalls);
         Assert.Contains(db.KeysOf(Agent).Keys, k => k.StartsWith("Wearable 4:"));
     }
 
@@ -178,9 +185,9 @@ public class BakeIndexSurvivesAppearanceSaveTests
             Assert.True(AvatarDataKeys.IsPreserved(k), k);
     }
 
-    /// <summary>A grid that has never baked must see exactly the old behaviour: one delete, nothing else.</summary>
+    /// <summary>A grid that has never baked: the save leaves exactly the new appearance, and writes nothing else.</summary>
     [Fact]
-    public void WithNoBakeIndexTheSaveIsTheSameSingleDeleteItAlwaysWas()
+    public void WithNoBakeIndexTheSaveLeavesExactlyTheNewAppearance()
     {
         var db = new RowTable();
         var svc = new TestableAvatarService(db);
@@ -188,8 +195,40 @@ public class BakeIndexSurvivesAppearanceSaveTests
         Assert.True(svc.SetAppearance(Agent, AppearanceWearing((WearableType.Pants, UUID.Random(), UUID.Random()))));
         Assert.True(svc.SetAppearance(Agent, AppearanceWearing()));
 
-        Assert.Equal(2, db.DeleteAllCalls);
+        Assert.Equal(0, db.DeleteAllCalls);
+        Assert.DoesNotContain(db.KeysOf(Agent).Keys, k => k.StartsWith("Wearable 5:"));
         Assert.All(db.KeysOf(Agent).Keys, k => Assert.False(AvatarDataKeys.IsPreserved(k)));
+        var fresh = new RowTable();
+        Assert.True(new TestableAvatarService(fresh).SetAppearance(Agent, AppearanceWearing()));
+        Assert.Equal(fresh.KeysOf(Agent).Keys.OrderBy(k => k), db.KeysOf(Agent).Keys.OrderBy(k => k));
+    }
+
+    /// <summary>
+    /// A bake that writes the index while an appearance save is under way (the arrival's bake and the arrival's
+    /// save, seconds apart, an appearance save taking seconds on SQLite) must keep what it wrote. The save used to
+    /// read the index first, delete every row and write that old copy back at the end.
+    /// </summary>
+    [Fact]
+    public void ABakeWrittenDuringAnAppearanceSaveIsKept()
+    {
+        var db = new RowTable();
+        var svc = new TestableAvatarService(db);
+        var oldHead = new StoredBake(UUID.Random(), new string('a', 64));
+        var newHead = new StoredBake(UUID.Random(), new string('b', 64));
+        Assert.True(BakeIndex.Write(svc, Agent,
+            new[] { new KeyValuePair<BakeChannel, StoredBake>(BakeChannel.Head, oldHead) },
+            cofVersion: 7, bakeSize: 1024, updatedUtc: DateTime.UtcNow));
+
+        // the bake lands as the save writes its first row
+        db.BeforeNextStore = () => Assert.True(BakeIndex.Write(svc, Agent,
+            new[] { new KeyValuePair<BakeChannel, StoredBake>(BakeChannel.Head, newHead) },
+            cofVersion: 8, bakeSize: 1024, updatedUtc: DateTime.UtcNow));
+        Assert.True(svc.SetAppearance(Agent, AppearanceWearing((WearableType.Shirt, UUID.Random(), UUID.Random()))));
+
+        var after = BakeIndex.Read(svc, Agent);
+        Assert.Equal(newHead, after.Bakes[BakeChannel.Head]);
+        Assert.Equal(8, after.CofVersion);
+        Assert.Contains(db.KeysOf(Agent).Keys, k => k.StartsWith("Wearable 4:"));
     }
 
     // ------------------------------------------------------------------ 3. a bake after a save still reuses
