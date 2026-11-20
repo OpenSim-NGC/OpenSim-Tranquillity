@@ -223,7 +223,7 @@ public partial class BunchOfCaps
 
             TaskInventoryScriptUpdater uploader = new TaskInventoryScriptUpdater(itemID, objectID, is_script_running, experience_key,
                     uploaderPath, m_HostCapsObj.HttpListener, httpRequest.RemoteIPEndPoint.Address, m_dumpAssetsToFile, compileTarget);
-            uploader.OnUpLoad += TaskScriptUpdated;
+            uploader.OnSave += TaskScriptUpdated;
 
             var uploaderHandler = new SimpleBinaryHandler("POST", uploaderPath, uploader.process);
 
@@ -258,6 +258,38 @@ public partial class BunchOfCaps
                 errors.Add(item);
         }
     }
+
+    /// <summary>
+    /// The same, and gives the id of the asset the save stored in <paramref name="newAssetID"/> (UUID.Zero when it
+    /// stored nothing). Without a <see cref="TaskScriptSavedCall"/> it falls back to <see cref="TaskScriptUpdatedCall"/>
+    /// and reads the item's asset afterwards; an asset id that did not change means nothing was stored.
+    /// </summary>
+    public void TaskScriptUpdated(UUID itemID, UUID primID, bool isScriptRunning, UUID experience, byte[] data, string compileTarget,
+                                  ref ArrayList errors, out UUID newAssetID)
+    {
+        newAssetID = UUID.Zero;
+        ArrayList e = null;
+        if (TaskScriptSavedCall != null)
+        {
+            e = TaskScriptSavedCall(m_HostCapsObj.AgentID, itemID, primID, isScriptRunning, experience, data, compileTarget, out newAssetID);
+        }
+        else if (TaskScriptUpdatedCall != null)
+        {
+            UUID before = ItemAsset(itemID, primID);
+            e = TaskScriptUpdatedCall(m_HostCapsObj.AgentID, itemID, primID, isScriptRunning, experience, data, compileTarget);
+            UUID after = ItemAsset(itemID, primID);
+            if (after != before)
+                newAssetID = after;
+        }
+        if (e != null)
+        {
+            foreach (Object item in e)
+                errors.Add(item);
+        }
+    }
+
+    private UUID ItemAsset(UUID itemID, UUID primID)
+        => m_Scene.GetSceneObjectPart(primID)?.Inventory.GetInventoryItem(itemID)?.AssetID ?? UUID.Zero;
 
     static public bool ValidateAssetData(byte assetType, byte[] data)
     {
@@ -356,6 +388,12 @@ public partial class BunchOfCaps
     public class TaskInventoryScriptUpdater : ExpiringCapBase
     {
         public event UpdateTaskScript OnUpLoad;
+
+        /// <summary>
+        /// Used instead of <see cref="OnUpLoad"/> when set: its reply names the stored asset, or is an error when the
+        /// save stored nothing.
+        /// </summary>
+        public event SaveTaskScript OnSave;
         private UUID m_inventoryItemID;
         private UUID m_primID;
         private bool m_isScriptRunning;
@@ -395,7 +433,7 @@ public partial class BunchOfCaps
                 return;
             }
 
-            if (OnUpLoad == null)
+            if (OnUpLoad == null && OnSave == null)
             {
                 response.StatusCode = (int)HttpStatusCode.Gone;
                 return;
@@ -415,9 +453,30 @@ public partial class BunchOfCaps
                 LLSDTaskScriptUploadComplete uploadComplete = new LLSDTaskScriptUploadComplete();
 
                 ArrayList errors = new ArrayList();
-                OnUpLoad?.Invoke(m_inventoryItemID, m_primID, m_isScriptRunning, m_experienceKey, data, m_compileTarget, ref errors);
+                // new_asset is the id of the asset the save stored, as in the UpdateScriptAgent reply: the LL viewer
+                // reads it as the script's new asset id (LLBufferedAssetUploadInfo::finishUpload, llviewerassetupload.cpp).
+                UUID newAsset;
+                if (OnSave != null)
+                {
+                    OnSave(m_inventoryItemID, m_primID, m_isScriptRunning, m_experienceKey, data, m_compileTarget, ref errors, out newAsset);
+                    if (newAsset.IsZero())
+                    {
+                        // Nothing was stored. The viewer treats a reply whose state is not "complete" as a failed
+                        // upload and shows its message (LLViewerAssetUpload::AssetInventoryUploadCoproc).
+                        LLSDAssetUploadError failed = new LLSDAssetUploadError();
+                        failed.message = "could not update script";
+                        failed.identifier = m_inventoryItemID;
+                        response.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(failed));
+                        return;
+                    }
+                }
+                else
+                {
+                    OnUpLoad?.Invoke(m_inventoryItemID, m_primID, m_isScriptRunning, m_experienceKey, data, m_compileTarget, ref errors);
+                    newAsset = m_inventoryItemID;
+                }
 
-                uploadComplete.new_asset = m_inventoryItemID;
+                uploadComplete.new_asset = newAsset;
                 uploadComplete.compiled = errors.Count > 0 ? false : true;
                 uploadComplete.state = "complete";
                 uploadComplete.errors = new OpenSim.Framework.Capabilities.OSDArray();
