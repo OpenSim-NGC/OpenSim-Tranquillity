@@ -40,6 +40,7 @@ public class PGSQLGroupsData : IGroupsData
     private PGSqlGroupsInvitesHandler m_Invites;
     private PGSqlGroupsNoticesHandler m_Notices;
     private PGSqlGroupsPrincipalsHandler m_Principals;
+    private PGSqlGroupsBansHandler m_Bans;
 
     public PGSQLGroupsData(string connectionString, string realm)
     {
@@ -50,6 +51,7 @@ public class PGSQLGroupsData : IGroupsData
         m_Invites = new PGSqlGroupsInvitesHandler(connectionString, realm + "_invites");
         m_Notices = new PGSqlGroupsNoticesHandler(connectionString, realm + "_notices");
         m_Principals = new PGSqlGroupsPrincipalsHandler(connectionString, realm + "_principals");
+        m_Bans = new PGSqlGroupsBansHandler(connectionString, realm + "_bans");
     }
 
     #region groups table
@@ -79,17 +81,17 @@ public class PGSQLGroupsData : IGroupsData
     public GroupData[] RetrieveGroups(string pattern)
     {
 
-        if (string.IsNullOrEmpty(pattern)) // True for where clause
+        if (string.IsNullOrEmpty(pattern))
         {
-            pattern = "1";
-
-            return m_Groups.Get(pattern);
+            // every listed group, as MySQL's store answers ("WHERE 1" is not a condition PostgreSQL takes)
+            return m_Groups.Get(" \"ShowInList\" = 1");
         }
         else
         {
-            pattern = " \"ShowInList\" = 1 AND lower(\"Name\") LIKE lower('%" + pattern + "%')";
-
-            return m_Groups.Get(pattern, new NpgsqlParameter("pattern", pattern));
+            // the search text is a parameter, never part of the statement; its % and _ are matched as characters
+            string like = "%" + pattern.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+            return m_Groups.Get(" \"ShowInList\" = 1 AND lower(\"Name\") LIKE lower(:pattern) ESCAPE '\\'",
+                new NpgsqlParameter("pattern", like));
         }
     }
 
@@ -349,6 +351,32 @@ public class PGSQLGroupsData : IGroupsData
         return null;
     }
 
+    #region bans table
+    public BanData[] RetrieveBans(UUID groupID) => m_Bans.Get("GroupID", groupID.ToString());
+
+    public BanData RetrieveBan(UUID groupID, string principalID)
+    {
+        BanData[] bans = m_Bans.Get(new string[] { "GroupID", "PrincipalID" }, new string[] { groupID.ToString(), principalID });
+        return bans.Length > 0 ? bans[0] : null;
+    }
+
+    public bool StoreBan(BanData data) => m_Bans.Store(data);
+
+    public bool DeleteBan(UUID groupID, string principalID)
+        => m_Bans.Delete(new string[] { "GroupID", "PrincipalID" }, new string[] { groupID.ToString(), principalID });
+    #endregion
+
+    #region lookups of many rows
+    public GroupData[] RetrieveGroupsByID(UUID[] groupIDs)
+        => GroupsBatch.Get(groupIDs ?? [], ids => m_Groups.Get("GroupID", ids));
+
+    public RoleData[] RetrieveRolesOfGroups(UUID[] groupIDs)
+        => GroupsBatch.Get(groupIDs ?? [], ids => m_Roles.Get("GroupID", ids));
+
+    public RoleMembershipData[] RetrievePrincipalRoles(string principalID)
+        => m_RoleMembership.Get("PrincipalID", principalID);
+    #endregion
+
     #endregion
 }
 
@@ -473,6 +501,16 @@ public class PGSqlGroupsPrincipalsHandler : PGSQLGenericTableHandler<PrincipalDa
     }
 
     public PGSqlGroupsPrincipalsHandler(string connectionString, string realm)
+        : base(connectionString, realm, string.Empty)
+    {
+    }
+}
+
+public class PGSqlGroupsBansHandler : PGSQLGenericTableHandler<BanData>
+{
+    protected override Assembly Assembly => GetType().Assembly;
+
+    public PGSqlGroupsBansHandler(string connectionString, string realm)
         : base(connectionString, realm, string.Empty)
     {
     }

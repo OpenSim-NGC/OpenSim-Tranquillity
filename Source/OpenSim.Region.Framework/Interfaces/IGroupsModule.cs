@@ -37,6 +37,15 @@ public interface IGroupsModule
     event NewGroupNotice OnNewGroupNotice;
 
     /// <summary>
+    /// The group's ban list for the client (the viewer's GroupAPIv1); null when the client may not see it or this
+    /// groups module keeps no bans.
+    /// </summary>
+    List<GroupBanData> GroupBanList(IClientAPI client, UUID groupID) => null;
+
+    /// <summary>Ban (or, with <paramref name="ban"/> false, unban) avatars; false when nothing changed.</summary>
+    bool GroupBanChange(IClientAPI client, UUID groupID, bool ban, UUID[] agentIDs) => false;
+
+    /// <summary>
     /// Create a group
     /// </summary>
     /// <param name="remoteClient"></param>

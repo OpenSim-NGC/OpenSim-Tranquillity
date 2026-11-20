@@ -106,6 +106,8 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
             }
 
             m_log.LogInformation("[xmlGROUPS]: Initializing {0}", this.Name);
+            m_log.LogWarning("[xmlGROUPS]: XmlRpcGroups (GroupsModule) is deprecated and gets none of Groups V2's fixes; " +
+                "Robust's \"groups import flotsam\" moves a grid's groups to V2 (Docs/feature/groups-rebuild/ROLLOUT-groups-v2.md)");
 
             m_groupNoticesEnabled   = groupsConfig.GetBoolean("NoticesEnabled", true);
             m_debugEnabled          = groupsConfig.GetBoolean("DebugEnabled", false);
@@ -523,6 +525,12 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
 
                 if(!itemID.IsZero() && !ownerID.IsZero())
                 {
+                    // the attachment comes from the sender's own inventory
+                    if (ownerID != remoteClient.AgentId)
+                    {
+                        remoteClient.SendAgentAlertMessage("A group notice can only carry an item from your own inventory", false);
+                        return;
+                    }
                     item = scene.InventoryService.GetItem(ownerID, itemID);
                     if (item != null)
                     {
