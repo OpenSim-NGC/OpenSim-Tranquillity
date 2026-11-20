@@ -1385,6 +1385,10 @@
     ; LevelGroupCreate = 0
 
     ;# {Module} {Enabled:true} {Groups module to use? (Use GroupsModule to use Flotsam)} {Default "Groups Module V2"} Default
+    ;; GroupsModule, the XmlRpcGroups module for the Flotsam PHP server, is
+    ;; deprecated: it gets none of Groups V2's fixes. A grid moving to V2 keeps
+    ;; its groups with Robust's console command "groups import flotsam"; see
+    ;; Docs/feature/groups-rebuild/ROLLOUT-groups-v2.md.
     ;; The default module can use a PHP XmlRpc server from the Flotsam project at
     ;; http://code.google.com/p/flotsam/
     ; Module = Default
