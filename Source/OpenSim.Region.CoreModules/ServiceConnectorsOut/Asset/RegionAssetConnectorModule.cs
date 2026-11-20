@@ -575,6 +575,9 @@ public class RegionAssetConnector : ISharedRegionModule, IAssetService
         if (IsHG(id))
             return false;
 
+        // as the standalone connector does: the cache must not go on serving the deleted asset
+        m_Cache?.Expire(id);
+
         return m_localConnector.Delete(id);
     }
 }
