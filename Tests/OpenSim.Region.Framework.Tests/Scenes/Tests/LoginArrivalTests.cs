@@ -203,6 +203,33 @@ public class LoginArrivalTests : OpenSimTestCase
         Assert.Empty(r.Scene.LoginsAwaitingViewer);
     }
 
+    /// <summary>
+    /// The viewer connects again from another address before its avatar is root (LLUDPServer.AddClient, then
+    /// ReplaceChildConnection). Closing the old connection's presence is no viewer giving up: the login must stay
+    /// online, with its presence session, and still be watched until the avatar arrives.
+    /// </summary>
+    [Fact]
+    public void AViewerThatReconnectsBeforeItArrivesStaysOnline()
+    {
+        TestHelpers.InMethod();
+        Region r = new();
+        r.Scene.LoginConnectWait = TimeSpan.FromMinutes(2);
+        UUID user = TestHelpers.ParseTail(0x6);
+        AgentCircuitData acd = r.Login(user);
+
+        r.Scene.AddNewAgent(new TestClient(acd, r.Scene), PresenceType.User);
+        Assert.True(r.Scene.GetScenePresence(user).IsChildAgent);
+
+        Assert.True(r.Scene.ReplaceChildConnection(user, acd.circuitcode));
+
+        // the log-out of a login runs off the caller's thread: give it the time it would take
+        Thread.Sleep(500);
+        Assert.True(r.GridUsers.IsOnline(user), "the user was marked offline");
+        Assert.NotNull(r.Presence.GetAgent(acd.SessionID));
+        Assert.Contains(user, r.Scene.LoginsAwaitingViewer);
+        Assert.True(r.HasCircuit(user), "the new connection's circuit is gone");
+    }
+
     [Fact]
     public void ALaterLoginOfTheSameUserIsLeftOnline()
     {
