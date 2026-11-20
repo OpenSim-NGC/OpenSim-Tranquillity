@@ -59,8 +59,8 @@ for old bakes yet (§4.4).
 3. **Composite and encode** each channel that changed: head, upper, lower, eyes, skirt, hair, left arm, left
    leg, and the three auxiliary Bakes-on-Mesh channels.
 4. **Store** each new bake as a texture asset named `bake:<agent>:<channel>`. Record its id and hash in the
-   avatar service (§4.4), then point the avatar's baked face at it. Only then is the previous asset for that
-   channel deleted (supersede).
+   avatar service (§4.4), then point the avatar's baked face at it. The previous asset for that channel is kept
+   (since v1.1.3): NPCs and notecards saved from the outfit still name it.
 5. **Send** `AvatarAppearance`, with `AppearanceData`, to the agent and to everyone who can see it. This happens
    even when every channel was reused: the viewer will not ask again.
 
@@ -88,7 +88,7 @@ the `AvatarAppearance` either way.
 - The avatar service holds the index per agent: `Bake:<channel>` (asset id), `BakeHash:<channel>`,
   `BakeCOFVersion`, `BakeSize` and `BakeUpdated` (UTC). These are rows in the existing key/value avatar table,
   so no schema change is needed.
-- Supersede keeps at most one stored bake per channel per agent.
+- Nothing deletes a bake, so every outfit change adds the channels it re-baked to the asset store.
 - `BakeUpdated` is recorded for a future expiry reaper. No reaper exists yet, so the bakes of an avatar that
   never returns stay in the asset store.
 
@@ -122,8 +122,8 @@ Baking earlier would be wrong in two ways:
 A bake is refused if the wearables have lost one of the four body-part slots (shape, skin, hair, eyes) since the
 last successful bake of that agent.
 
-- **Why refuse rather than warn.** Storing a bake supersedes, and so deletes, the asset it replaces. A bake made
-  from a set with no skin would replace good bakes with a bake of nothing, and baking again could not bring
+- **Why refuse rather than warn.** A bake made from a set with no skin would replace good bakes with a bake of
+  nothing, on the avatar and in the index. Before v1.1.3 it also deleted them, and baking again could not bring
   them back.
 - **Why only a lost body part.** A resident cannot take off a body part, so that transition always means a
   failure upstream: a stale viewer cache, an inventory service that answered late, or an item from another
