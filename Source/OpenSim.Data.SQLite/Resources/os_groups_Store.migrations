@@ -1,0 +1,90 @@
+:VERSION 1         # --------------------------
+# The Groups V2 tables, as MySQL's os_groups_Store has them, for SQLite standalones.
+# Text compares as SQLite text, so group names are unique case-sensitively, as in MySQL's utf8_bin columns of
+# other stores; the service checks names itself before it creates a group.
+
+BEGIN TRANSACTION;
+
+CREATE TABLE os_groups_groups (
+  GroupID char(36) NOT NULL DEFAULT '',
+  Location varchar(255) NOT NULL DEFAULT '',
+  Name varchar(255) NOT NULL DEFAULT '',
+  Charter text NOT NULL DEFAULT '',
+  InsigniaID char(36) NOT NULL DEFAULT '',
+  FounderID char(36) NOT NULL DEFAULT '',
+  MembershipFee int(11) NOT NULL DEFAULT '0',
+  OpenEnrollment varchar(255) NOT NULL DEFAULT '',
+  ShowInList int(4) NOT NULL DEFAULT '0',
+  AllowPublish int(4) NOT NULL DEFAULT '0',
+  MaturePublish int(4) NOT NULL DEFAULT '0',
+  OwnerRoleID char(36) NOT NULL DEFAULT '',
+  PRIMARY KEY (GroupID),
+  UNIQUE (Name)
+);
+
+CREATE TABLE os_groups_membership (
+  GroupID char(36) NOT NULL DEFAULT '',
+  PrincipalID varchar(255) NOT NULL DEFAULT '',
+  SelectedRoleID char(36) NOT NULL DEFAULT '',
+  Contribution int(11) NOT NULL DEFAULT '0',
+  ListInProfile int(4) NOT NULL DEFAULT '1',
+  AcceptNotices int(4) NOT NULL DEFAULT '1',
+  AccessToken char(36) NOT NULL DEFAULT '',
+  PRIMARY KEY (GroupID, PrincipalID)
+);
+CREATE INDEX os_groups_membership_principal ON os_groups_membership (PrincipalID);
+
+CREATE TABLE os_groups_roles (
+  GroupID char(36) NOT NULL DEFAULT '',
+  RoleID char(36) NOT NULL DEFAULT '',
+  Name varchar(255) NOT NULL DEFAULT '',
+  Description varchar(255) NOT NULL DEFAULT '',
+  Title varchar(255) NOT NULL DEFAULT '',
+  Powers bigint(20) NOT NULL DEFAULT '0',
+  PRIMARY KEY (GroupID, RoleID)
+);
+
+CREATE TABLE os_groups_rolemembership (
+  GroupID char(36) NOT NULL DEFAULT '',
+  RoleID char(36) NOT NULL DEFAULT '',
+  PrincipalID varchar(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (GroupID, RoleID, PrincipalID)
+);
+CREATE INDEX os_groups_rolemembership_principal ON os_groups_rolemembership (PrincipalID);
+-- the roles of one member of one group, looked up for every member listed and every powers check
+CREATE INDEX os_groups_rolemembership_member ON os_groups_rolemembership (GroupID, PrincipalID);
+
+CREATE TABLE os_groups_invites (
+  InviteID char(36) NOT NULL DEFAULT '',
+  GroupID char(36) NOT NULL DEFAULT '',
+  RoleID char(36) NOT NULL DEFAULT '',
+  PrincipalID varchar(255) NOT NULL DEFAULT '',
+  TMStamp timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (InviteID),
+  UNIQUE (GroupID, PrincipalID)
+);
+
+CREATE TABLE os_groups_notices (
+  GroupID char(36) NOT NULL DEFAULT '',
+  NoticeID char(36) NOT NULL DEFAULT '',
+  TMStamp int(10) NOT NULL DEFAULT '0',
+  FromName varchar(255) NOT NULL DEFAULT '',
+  Subject varchar(255) NOT NULL DEFAULT '',
+  Message text NOT NULL DEFAULT '',
+  HasAttachment int(4) NOT NULL DEFAULT '0',
+  AttachmentType int(4) NOT NULL DEFAULT '0',
+  AttachmentName varchar(128) NOT NULL DEFAULT '',
+  AttachmentItemID char(36) NOT NULL DEFAULT '',
+  AttachmentOwnerID varchar(255) NOT NULL DEFAULT '',
+  PRIMARY KEY (NoticeID)
+);
+CREATE INDEX os_groups_notices_group ON os_groups_notices (GroupID);
+CREATE INDEX os_groups_notices_stamp ON os_groups_notices (TMStamp);
+
+CREATE TABLE os_groups_principals (
+  PrincipalID varchar(255) NOT NULL DEFAULT '',
+  ActiveGroupID char(36) NOT NULL DEFAULT '',
+  PRIMARY KEY (PrincipalID)
+);
+
+COMMIT;
