@@ -67,7 +67,13 @@ public class GroupsServiceRobustConnector : ServiceConnector
 
         IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
 
-        server.AddStreamHandler(new GroupsServicePostHandler(m_GroupsService, auth));
+        // The service takes the requesting avatar from the request: without a key or HTTP authentication, anyone who
+        // can reach this port can act as any avatar in any group.
+        if (key.Length == 0 && auth == null)
+            m_log.LogWarning("[Groups.RobustConnector]: [{0}] has no SecretKey and no AuthType: the groups service believes " +
+                "any caller about who is asking. Set the same [Groups] SecretKey here and on the regions.", m_ConfigName);
+
+        server.AddStreamHandler(new GroupsServicePostHandler(m_GroupsService, auth, key));
     }
 }
 
@@ -76,16 +82,31 @@ public class GroupsServicePostHandler : BaseStreamHandler
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private GroupsService m_GroupsService;
+    private readonly string m_secretKey;
 
-    public GroupsServicePostHandler(GroupsService service, IServiceAuth auth) :
+    public GroupsServicePostHandler(GroupsService service, IServiceAuth auth) : this(service, auth, string.Empty)
+    {
+    }
+
+    /// <param name="secretKey">When set, a request must carry it (<see cref="GroupsSecretKey.Header"/>).</param>
+    public GroupsServicePostHandler(GroupsService service, IServiceAuth auth, string secretKey) :
         base("POST", "/groups", auth)
     {
         m_GroupsService = service;
+        m_secretKey = secretKey ?? string.Empty;
     }
 
     protected override byte[] ProcessRequest(string path, Stream requestData,
             IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
+        if (m_secretKey.Length > 0 && !GroupsSecretKey.Matches(m_secretKey, httpRequest.Headers?[GroupsSecretKey.Header]))
+        {
+            m_log.LogWarning("[Groups.Handler]: refused a request from {0}: it did not carry the groups SecretKey",
+                httpRequest.RemoteIPEndPoint);
+            httpResponse.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;
+            return Array.Empty<byte>();
+        }
+
         string body;
         using(StreamReader sr = new StreamReader(requestData))
             body = sr.ReadToEnd();

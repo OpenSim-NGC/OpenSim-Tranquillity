@@ -79,17 +79,17 @@ public class PGSQLGroupsData : IGroupsData
     public GroupData[] RetrieveGroups(string pattern)
     {
 
-        if (string.IsNullOrEmpty(pattern)) // True for where clause
+        if (string.IsNullOrEmpty(pattern))
         {
-            pattern = "1";
-
-            return m_Groups.Get(pattern);
+            // every listed group, as MySQL's store answers ("WHERE 1" is not a condition PostgreSQL takes)
+            return m_Groups.Get(" \"ShowInList\" = 1");
         }
         else
         {
-            pattern = " \"ShowInList\" = 1 AND lower(\"Name\") LIKE lower('%" + pattern + "%')";
-
-            return m_Groups.Get(pattern, new NpgsqlParameter("pattern", pattern));
+            // the search text is a parameter, never part of the statement; its % and _ are matched as characters
+            string like = "%" + pattern.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
+            return m_Groups.Get(" \"ShowInList\" = 1 AND lower(\"Name\") LIKE lower(:pattern) ESCAPE '\\'",
+                new NpgsqlParameter("pattern", like));
         }
     }
 
@@ -348,6 +348,17 @@ public class PGSQLGroupsData : IGroupsData
         // TODO
         return null;
     }
+
+    #region lookups of many rows
+    public GroupData[] RetrieveGroupsByID(UUID[] groupIDs)
+        => GroupsBatch.Get(groupIDs ?? [], ids => m_Groups.Get("GroupID", ids));
+
+    public RoleData[] RetrieveRolesOfGroups(UUID[] groupIDs)
+        => GroupsBatch.Get(groupIDs ?? [], ids => m_Roles.Get("GroupID", ids));
+
+    public RoleMembershipData[] RetrievePrincipalRoles(string principalID)
+        => m_RoleMembership.Get("PrincipalID", principalID);
+    #endregion
 
     #endregion
 }

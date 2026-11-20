@@ -68,6 +68,11 @@ public class GroupsServiceRemoteConnector
         }
         ///
 
+        // the key Robust's groups service asks of its callers, when it has one
+        string key = groupsConfig.GetString("SecretKey", string.Empty);
+        if (key.Length > 0)
+            m_Auth = new GroupsSecretKeyAuth(key, m_Auth);
+
         m_log.LogDebug("[Groups.RemoteConnector]: Groups server at {0}, authentication {1}",
             m_ServerURI, (m_Auth == null ? "None" : m_Auth.GetType().ToString()));
     }

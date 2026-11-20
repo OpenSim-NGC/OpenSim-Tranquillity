@@ -124,6 +124,26 @@ public class SQLiteGenericTableHandler<T> : SQLiteFramework where T: class, new(
         return Get(new string[] { field }, new string[] { key });
     }
 
+    /// <summary>The rows whose <paramref name="field"/> is any of <paramref name="keys"/>, each key a parameter.</summary>
+    public virtual T[] Get(string field, string[] keys)
+    {
+        if (keys == null || keys.Length == 0)
+            return new T[0];
+
+        using (SQLiteCommand cmd = new SQLiteCommand())
+        {
+            var names = new List<string>(keys.Length);
+            for (int i = 0; i < keys.Length; i++)
+            {
+                cmd.Parameters.Add(new SQLiteParameter(":k" + i.ToString(), keys[i]));
+                names.Add(":k" + i.ToString());
+            }
+
+            cmd.CommandText = $"select * from {m_Realm} where `{field}` in ({string.Join(",", names)})";
+            return DoQuery(cmd);
+        }
+    }
+
     public virtual T[] Get(string[] fields, string[] keys)
     {
         if (fields.Length != keys.Length)
