@@ -50,8 +50,30 @@ public interface IGridUserData
     GridUserData[] GetAll(string query);
 
     /// <summary>
+    /// The rows of these users, in any order; a user with no row is left out. The stores answer in a statement per
+    /// <see cref="GridUserBatch.Size"/> users; this default, for a store that does not, asks once per user.
+    /// </summary>
+    GridUserData[] GetMany(string[] userIDs)
+    {
+        var found = new List<GridUserData>();
+        foreach (string id in userIDs ?? [])
+        {
+            GridUserData d = Get(id);
+            if (d != null)
+                found.Add(d);
+        }
+        return found.ToArray();
+    }
+
+    /// <summary>
     /// The users marked online whose last region is <paramref name="regionID"/>.
     /// </summary>
     GridUserData[] GetOnlineInRegion(UUID regionID);
     bool Store(GridUserData data);
+}
+
+/// <summary>How many keys a store puts in one statement when it looks up a list.</summary>
+public static class GridUserBatch
+{
+    public const int Size = 500;
 }

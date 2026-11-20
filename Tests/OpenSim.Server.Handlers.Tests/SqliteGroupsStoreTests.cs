@@ -67,7 +67,7 @@ public class SqliteGroupsStoreTests
         return new SQLiteGroupsData(ConnectionFor("store"), "os_groups");
     });
 
-    private static GroupsService Service => s_service.Value;
+    internal static GroupsService Service => s_service.Value;
 
     private static (UUID Group, string Founder) NewGroup(string name, bool open = false, bool show = true)
     {

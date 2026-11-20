@@ -349,6 +349,17 @@ public class PGSQLGroupsData : IGroupsData
         return null;
     }
 
+    #region lookups of many rows
+    public GroupData[] RetrieveGroupsByID(UUID[] groupIDs)
+        => GroupsBatch.Get(groupIDs ?? [], ids => m_Groups.Get("GroupID", ids));
+
+    public RoleData[] RetrieveRolesOfGroups(UUID[] groupIDs)
+        => GroupsBatch.Get(groupIDs ?? [], ids => m_Roles.Get("GroupID", ids));
+
+    public RoleMembershipData[] RetrievePrincipalRoles(string principalID)
+        => m_RoleMembership.Get("PrincipalID", principalID);
+    #endregion
+
     #endregion
 }
 
