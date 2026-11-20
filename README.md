@@ -19,8 +19,7 @@ For build instructions, see Docs/BUILDING.md.
 
 # Testing
 
-For testing workflows (including YEngine state-load telemetry configuration and commands),
-see Docs/TESTING.txt.
+For running and writing tests, see [Docs/TESTING.md](Docs/TESTING.md).
 
 # Plugin Development
 
@@ -98,6 +97,12 @@ http://192.168.1.2:9000)
 To login, use the avatar details that you gave for your estate ownership or the
 one you set up using the "create user" command.
 
+# Contributing
+
+Start with [CONTRIBUTING.md](CONTRIBUTING.md) and [HUMANS.md](HUMANS.md). The code is mapped in
+[ARCHITECTURE.md](ARCHITECTURE.md), and AI coding agents follow [AGENTS.md](AGENTS.md). Security problems are
+reported privately, as [Docs/SECURITY.md](Docs/SECURITY.md) explains.
+
 # Bug reports
 
 In the very likely event of bugs biting you we encourage you to see whether the problem 
@@ -106,12 +111,9 @@ has already been reported on the [Tranquillity Issue Tracking System](https://gi
 If your bug has already been reported, you might want to add to the
 bug description and supply additional information.
 
-If your bug has not been reported yet, file an issue report. 
-Useful information to include:
- * description of what went wrong
- * stack trace
- * Tranquillity.log (attach as file)
- * Tranquillity.ini (attach as file)
+If your bug has not been reported yet, file an issue report. [Docs/BUG_REPORTING.md](Docs/BUG_REPORTING.md)
+lists what to include (version, setup, steps, log lines) and what to remove first (passwords, connection
+strings, capability URLs).
 
 
 # More Information on Tranquillity
