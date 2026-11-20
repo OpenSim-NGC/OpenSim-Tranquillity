@@ -87,6 +87,7 @@ public class PluginRegistration : IPluginRegistryProvider
         RegisterByName(registry, "/OpenSim/RegionModules", "WorldCommModule", "OpenSim.Region.CoreModules.Scripting.WorldComm.WorldCommModule", "WorldCommModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "XMLRPCModule", "OpenSim.Region.CoreModules.Scripting.XMLRPC.XMLRPCModule", "XMLRPCModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "AssetServiceInConnectorModule", "OpenSim.Region.CoreModules.ServiceConnectorsIn.Asset.AssetServiceInConnectorModule", "AssetServiceInConnectorModule");
+        RegisterByName(registry, "/OpenSim/RegionModules", "AppearanceServiceInConnectorModule", "OpenSim.Region.CoreModules.ServiceConnectorsIn.Appearance.AppearanceServiceInConnectorModule", "AppearanceServiceInConnectorModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "AuthenticationServiceInConnectorModule", "OpenSim.Region.CoreModules.ServiceConnectorsIn.Authentication.AuthenticationServiceInConnectorModule", "AuthenticationServiceInConnectorModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "GridInfoServiceInConnectorModule", "OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid.GridInfoServiceInConnectorModule", "GridInfoServiceInConnectorModule");
         RegisterByName(registry, "/OpenSim/RegionModules", "HypergridServiceInConnectorModule", "OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid.HypergridServiceInConnectorModule", "HypergridServiceInConnectorModule");

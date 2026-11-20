@@ -132,11 +132,10 @@
 
 [LoginService]
 
-    ;; Server-side baking (ADR-002, viewer contract V6). Where viewers fetch other avatars' baked textures.
-    ;; Must point at the AppearanceServiceConnector's port and end with "/". Leave it unset and the login
-    ;; response omits agent_appearance_service entirely, which is correct for a grid with no such service --
-    ;; the viewer then keeps compositing locally. Set it only once the connector is running, because on a
-    ;; bit-0 region a viewer with no service URL never textures anyone.
+    ;; Server-side baking (ADR-002, viewer contract V6). Where viewers fetch avatars' baked textures. Standalone.ini
+    ;; and StandaloneHypergrid.ini already set it to this standalone's own AppearanceServiceInConnector; set it here
+    ;; only to send viewers somewhere else. It must end with "/". On a region with server-side baking on, a viewer
+    ;; with no service URL textures nobody.
     ; AgentAppearanceServiceURL = "${Const|BaseURL}:${Const|PublicPort}/"
     WelcomeMessage = "Welcome, Avatar!"
 
