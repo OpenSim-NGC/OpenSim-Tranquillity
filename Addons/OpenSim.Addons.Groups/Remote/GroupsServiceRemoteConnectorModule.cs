@@ -28,6 +28,7 @@
 using System.Reflection;
 
 using OpenSim.Framework;
+using OpenSim.Framework.Servers;
 using OpenSim.Region.Framework.Scenes;
 using OpenSim.Region.Framework.Interfaces;
 
@@ -63,8 +64,11 @@ public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsSe
     }
     #endregion
 
+    private string m_SecretKey = string.Empty;
+
     private void Init(IConfigSource config)
     {
+        m_SecretKey = config.Configs["Groups"]?.GetString("SecretKey", string.Empty) ?? string.Empty;
         m_GroupsService = new GroupsServiceRemoteConnector(config);
         m_Scenes = new List<Scene>();
 
@@ -128,6 +132,8 @@ public class GroupsServiceRemoteConnectorModule : ISharedRegionModule, IGroupsSe
         {
             m_UserManagement = scene.RequestModuleInterface<IUserManagement>();
             m_CacheWrapper = new RemoteConnectorCacheWrapper(m_UserManagement);
+            // Robust tells this region server of group changes, so its caches forget them at once
+            GroupsChangeNotice.Listen(MainServer.Instance.DefaultServer, m_SecretKey);
         }
     }
 

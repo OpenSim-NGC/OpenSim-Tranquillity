@@ -68,7 +68,15 @@ public class RemoteConnectorCacheWrapper
     public RemoteConnectorCacheWrapper(IUserManagement uman)
     {
         m_ForeignImporter = new ForeignImporter(uman);
+        GroupsChangeNotice.Register(this);
     }
+
+    /// <summary>
+    /// A group changed elsewhere (Robust's <see cref="GroupsChangeNotice"/>): forget what is cached about it. The
+    /// memberships cached per avatar carry every group the avatar is in, so for now this forgets everything, as a
+    /// change made through this region does.
+    /// </summary>
+    public void ForgetGroup(UUID groupID) => ForgetEverything();
 
     public UUID CreateGroup(UUID RequestingAgentID, GroupRecordDelegate d)
     {

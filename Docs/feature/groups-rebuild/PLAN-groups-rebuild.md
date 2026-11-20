@@ -157,5 +157,11 @@ to the Hypergrid groups path on the two-grid rig.
 - **Group chat** already goes once per region to members online elsewhere (the receiving region fans it out), so it
   needs no sender.
 
-Still to do in phase 3: other regions hearing about a change before their 30 s are up (Robust has no way to tell
-them yet); one module in place of the V2 groups and messaging pair.
+- **Other regions told of a change.** With `[Groups] SecretKey` set, Robust's groups service tells every region server
+  online (from the grid service; each server once, however many regions it runs) of the groups each change touched,
+  gathered over a quarter of a second: `POST /groups-changed` with `GroupIDs=…` and the key. The region servers take
+  it only with the key, and their groups caches forget those groups at once. Nothing is sent again: a server that
+  misses a notice keeps its answers until its cache's 30 s are up. Without a key, both sides behave as before.
+
+Still to do in phase 3: forgetting only the groups a notice names (today a region forgets its whole groups cache, as
+a change made through it does); one module in place of the V2 groups and messaging pair.
