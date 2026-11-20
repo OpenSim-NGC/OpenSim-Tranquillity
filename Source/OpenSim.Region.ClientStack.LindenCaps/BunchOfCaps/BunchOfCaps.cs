@@ -106,6 +106,9 @@ public partial class BunchOfCaps
     public ItemUpdatedCallback ItemUpdatedCall = null;
     public TaskScriptUpdatedCallback TaskScriptUpdatedCall = null;
     public TaskScriptSavedCallback TaskScriptSavedCall = null;
+    // what the constructor set, so TaskScriptUpdated can tell a callback a module replaced
+    private readonly TaskScriptUpdatedCallback m_defaultTaskScriptUpdatedCall;
+    private readonly TaskScriptSavedCallback m_defaultTaskScriptSavedCall;
     public GetClientDelegate GetClient = null;
     
     private IAssetService m_assetService;
@@ -151,8 +154,8 @@ public partial class BunchOfCaps
 
         AddNewInventoryItem = m_Scene.AddUploadedInventoryItem;
         ItemUpdatedCall = m_Scene.CapsUpdateItemAsset;
-        TaskScriptUpdatedCall = m_Scene.CapsUpdateTaskInventoryScriptAsset;
-        TaskScriptSavedCall = m_Scene.CapsUpdateTaskInventoryScriptAsset;
+        TaskScriptUpdatedCall = m_defaultTaskScriptUpdatedCall = m_Scene.CapsUpdateTaskInventoryScriptAsset;
+        TaskScriptSavedCall = m_defaultTaskScriptSavedCall = m_Scene.CapsUpdateTaskInventoryScriptAsset;
         GetClient = m_Scene.SceneGraph.GetControllingClient;
 
         RegisterHandlers();

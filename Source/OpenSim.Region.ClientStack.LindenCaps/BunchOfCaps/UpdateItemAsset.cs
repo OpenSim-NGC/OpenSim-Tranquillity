@@ -260,16 +260,20 @@ public partial class BunchOfCaps
     }
 
     /// <summary>
-    /// The same, and gives the id of the asset the save stored in <paramref name="newAssetID"/> (UUID.Zero when it
-    /// stored nothing). Without a <see cref="TaskScriptSavedCall"/> it falls back to <see cref="TaskScriptUpdatedCall"/>
-    /// and reads the item's asset afterwards; an asset id that did not change means nothing was stored.
+    /// The task script save, giving the id of the asset the save stored in <paramref name="newAssetID"/> (UUID.Zero
+    /// when it stored nothing). It uses <see cref="TaskScriptSavedCall"/>, unless a module replaced
+    /// <see cref="TaskScriptUpdatedCall"/> and left <see cref="TaskScriptSavedCall"/> as it was: then the replaced
+    /// callback does the save, as it did before <see cref="TaskScriptSavedCall"/> existed, and the item's asset is read
+    /// before and after it; an asset id that did not change means nothing was stored.
     /// </summary>
     public void TaskScriptUpdated(UUID itemID, UUID primID, bool isScriptRunning, UUID experience, byte[] data, string compileTarget,
                                   ref ArrayList errors, out UUID newAssetID)
     {
         newAssetID = UUID.Zero;
         ArrayList e = null;
-        if (TaskScriptSavedCall != null)
+        bool updatedReplaced = TaskScriptUpdatedCall != m_defaultTaskScriptUpdatedCall;
+        bool savedReplaced = TaskScriptSavedCall != m_defaultTaskScriptSavedCall;
+        if (TaskScriptSavedCall != null && (savedReplaced || !updatedReplaced))
         {
             e = TaskScriptSavedCall(m_HostCapsObj.AgentID, itemID, primID, isScriptRunning, experience, data, compileTarget, out newAssetID);
         }
@@ -447,18 +451,20 @@ public partial class BunchOfCaps
 
             response.StatusCode = (int)HttpStatusCode.OK;
 
+            // new_asset is the id of the asset the save stored, as in the UpdateScriptAgent reply: the LL viewer
+            // reads it as the script's new asset id (LLBufferedAssetUploadInfo::finishUpload, llviewerassetupload.cpp).
+            // The save sets it as soon as the asset is stored, so it is known even if starting the script throws.
+            UUID newAsset = UUID.Zero;
+            SaveTaskScript save = OnSave;
             try
             {
                 string res = String.Empty;
                 LLSDTaskScriptUploadComplete uploadComplete = new LLSDTaskScriptUploadComplete();
 
                 ArrayList errors = new ArrayList();
-                // new_asset is the id of the asset the save stored, as in the UpdateScriptAgent reply: the LL viewer
-                // reads it as the script's new asset id (LLBufferedAssetUploadInfo::finishUpload, llviewerassetupload.cpp).
-                UUID newAsset;
-                if (OnSave != null)
+                if (save != null)
                 {
-                    OnSave(m_inventoryItemID, m_primID, m_isScriptRunning, m_experienceKey, data, m_compileTarget, ref errors, out newAsset);
+                    save(m_inventoryItemID, m_primID, m_isScriptRunning, m_experienceKey, data, m_compileTarget, ref errors, out newAsset);
                     if (newAsset.IsZero())
                     {
                         // Nothing was stored. The viewer treats a reply whose state is not "complete" as a failed
@@ -494,6 +500,19 @@ public partial class BunchOfCaps
             }
             catch
             {
+                if (save != null && !newAsset.IsZero())
+                {
+                    // The script was stored and the item points at it; only what came after failed. Say so, so the
+                    // viewer's editor takes the stored asset and shows the error.
+                    LLSDTaskScriptUploadComplete stored = new LLSDTaskScriptUploadComplete();
+                    stored.new_asset = newAsset;
+                    stored.compiled = false;
+                    stored.state = "complete";
+                    stored.errors = new OpenSim.Framework.Capabilities.OSDArray();
+                    stored.errors.Array = new ArrayList { "could not compile script" };
+                    response.RawBuffer = Util.UTF8NBGetbytes(LLSDHelpers.SerialiseLLSDReply(stored));
+                    return;
+                }
                 LLSDAssetUploadError error = new LLSDAssetUploadError();
                 error.message = "could not compile script";
                 error.identifier = UUID.Zero;

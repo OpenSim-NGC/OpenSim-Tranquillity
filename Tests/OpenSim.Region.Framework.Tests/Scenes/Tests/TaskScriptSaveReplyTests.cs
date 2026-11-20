@@ -5,6 +5,7 @@
  * file, You can obtain one at https://mozilla.org/MPL/2.0/.
  */
 
+using System.Linq;
 using System.Net;
 using System.Reflection;
 using System.Text;
@@ -16,10 +17,12 @@ using OpenSim.Framework.Capabilities;
 using OpenSim.Framework.Servers.HttpServer;
 using OpenSim.Region.ClientStack.LindenCaps;
 using OpenSim.Region.CoreModules.Framework.InventoryAccess;
+using OpenSim.Region.Framework.Interfaces;
 using OpenSim.Services.Interfaces;
 using OpenSim.Tests.Common;
 using Caps = OpenSim.Framework.Capabilities.Caps;
 using OSDMap = OpenMetaverse.StructuredData.OSDMap;
+using OSDArray = OpenMetaverse.StructuredData.OSDArray;
 
 namespace OpenSim.Region.Framework.Scenes.Tests;
 
@@ -136,15 +139,31 @@ public class TaskScriptSaveReplyTests : OpenSimTestCase
             return Reply(response);
         }
 
-        public string AskForTaskUploader()
+        public string AskForTaskUploader(UUID experience = default)
             => AskForUploader(Caps.UpdateScriptTaskInventory, new OSDMap
             {
                 ["item_id"] = Item.ItemID,
                 ["task_id"] = Part.UUID,
                 ["is_script_running"] = false,
+                ["experience"] = experience,
             });
 
-        public OSDMap SaveInObject(string text) => Upload(AskForTaskUploader(), text);
+        public OSDMap SaveInObject(string text, UUID experience = default) => Upload(AskForTaskUploader(experience), text);
+
+        /// <summary>
+        /// Replaces TaskScriptUpdatedCall the way a region module that knows only that field would, with a callback
+        /// that does the scene's save; returns how many times it was called.
+        /// </summary>
+        public Func<int> ReplaceTheOlderCallback()
+        {
+            int calls = 0;
+            Caps.TaskScriptUpdatedCall = (user, item, prim, running, experience, data, target) =>
+            {
+                calls++;
+                return Scene.CapsUpdateTaskInventoryScriptAsset(user, item, prim, running, experience, data, target);
+            };
+            return () => calls;
+        }
 
         public UUID StoredAsset => Part.Inventory.GetInventoryItem(Item.ItemID).AssetID;
     }
@@ -191,11 +210,10 @@ public class TaskScriptSaveReplyTests : OpenSimTestCase
     [InlineData(Cause.ItemRemoved, true)]
     [InlineData(Cause.ObjectDeleted, true)]
     [InlineData(Cause.PermissionWithdrawn, true)]
-    public void ASaveThatStoredNothingAnswersAnError(Cause cause, bool onlyTheOlderCallback)
+    public void ASaveThatStoredNothingAnswersAnError(Cause cause, bool olderCallbackReplaced)
     {
         var rig = new Rig();
-        if (onlyTheOlderCallback)
-            rig.Caps.TaskScriptSavedCall = null; // a region module that set only the older TaskScriptUpdatedCall
+        Func<int> calls = olderCallbackReplaced ? rig.ReplaceTheOlderCallback() : null;
         bool mayEdit = true;
         rig.Scene.Permissions.OnEditScript += (_, _, _) => mayEdit;
         UUID oldAsset = rig.StoredAsset;
@@ -214,20 +232,89 @@ public class TaskScriptSaveReplyTests : OpenSimTestCase
         AssertSaveFailed(reply, rig.Item.ItemID);
         if (cause == Cause.PermissionWithdrawn)
             Assert.Equal(oldAsset, rig.StoredAsset);
+        if (olderCallbackReplaced)
+            Assert.Equal(1, calls());
     }
 
     [Fact]
-    public void WithOnlyTheOlderCallbackSetTheReplyStillNamesTheStoredAsset()
+    public void AModuleThatReplacedTheOlderCallbackStillDoesTheSave()
     {
         var rig = new Rig();
-        // a region module that set only the older TaskScriptUpdatedCall: the reply reads the item's asset afterwards
-        rig.Caps.TaskScriptSavedCall = null;
+        Func<int> calls = rig.ReplaceTheOlderCallback();
 
         OSDMap reply = rig.SaveInObject("default { state_entry() { } }");
 
+        Assert.Equal(1, calls());
         Assert.Equal("complete", reply["state"].AsString());
         Assert.Equal(rig.StoredAsset, reply["new_asset"].AsUUID());
         Assert.NotEqual(rig.Item.ItemID, reply["new_asset"].AsUUID());
+    }
+
+    [Fact]
+    public void AModuleThatClearedTheOlderCallbackStopsTheSave()
+    {
+        var rig = new Rig();
+        UUID oldAsset = rig.StoredAsset;
+        rig.Caps.TaskScriptUpdatedCall = null;
+
+        OSDMap reply = rig.SaveInObject("default { state_entry() { } }");
+
+        AssertSaveFailed(reply, rig.Item.ItemID);
+        Assert.Equal(oldAsset, rig.StoredAsset);
+    }
+
+    [Fact]
+    public void ASaveRefusedTheExperienceStillStoresAndAnswersTheAssetWithTheError()
+    {
+        var rig = new Rig();
+        var (experiences, control) = Fake<IExperienceModule>.Create();
+        control.OnCall = (method, _) => method.Name == nameof(IExperienceModule.IsExperienceContributor) ? (true, false) : (false, null);
+        rig.Scene.RegisterModuleInterface(experiences);
+        UUID oldAsset = rig.StoredAsset;
+
+        OSDMap reply = rig.SaveInObject("default { state_entry() { } }", UUID.Random());
+
+        // Scene.CapsUpdateTaskInventoryScriptAsset stores the text without the experience and reports the refusal
+        UUID stored = rig.StoredAsset;
+        Assert.NotEqual(oldAsset, stored);
+        Assert.Equal("complete", reply["state"].AsString());
+        Assert.Equal(stored, reply["new_asset"].AsUUID());
+        Assert.False(reply["compiled"].AsBoolean());
+        Assert.Contains("Access denied to experience!", ((OSDArray)reply["errors"]).Select(e => e.AsString()));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void ASaveThatThrowsAnswersTheAssetItStoredOrAnError(bool storedFirst)
+    {
+        var rig = new Rig();
+        rig.Caps.TaskScriptSavedCall = (UUID user, UUID item, UUID prim, bool running, UUID experience, byte[] data, string target, out UUID newAsset) =>
+        {
+            newAsset = UUID.Zero;
+            if (storedFirst)
+                rig.Scene.CapsUpdateTaskInventoryScriptAsset(user, item, prim, running, experience, data, target, out newAsset);
+            throw new InvalidOperationException("the script could not be started");
+        };
+        UUID oldAsset = rig.StoredAsset;
+
+        OSDMap reply = rig.SaveInObject("default { state_entry() { } }");
+
+        if (storedFirst)
+        {
+            // the item points at the stored script, so the viewer is told that asset, with the error
+            Assert.NotEqual(oldAsset, rig.StoredAsset);
+            Assert.Equal("complete", reply["state"].AsString());
+            Assert.Equal(rig.StoredAsset, reply["new_asset"].AsUUID());
+            Assert.False(reply["compiled"].AsBoolean());
+            Assert.NotEmpty((OSDArray)reply["errors"]);
+        }
+        else
+        {
+            Assert.Equal(oldAsset, rig.StoredAsset);
+            Assert.NotEqual("complete", reply["state"].AsString());
+            Assert.False(reply.ContainsKey("new_asset"));
+        }
     }
 
     private static void AssertSaveFailed(OSDMap reply, UUID itemId)
