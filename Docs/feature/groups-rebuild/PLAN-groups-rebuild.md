@@ -129,5 +129,13 @@ The default Officers role has Change Identity, Member Options and Role Propertie
 could not edit the charter, the enrollment or a role's title before. A request that mixes parts changes the parts the
 requester may change and keeps the rest, as the viewer sends a whole group or role at once.
 
-Still to do in phase 2: the Robust `/groups` handlers and the Hypergrid connector checked against these rules end to
-end, and the probe extended to an officer's changes.
+Robust and Hypergrid (phase 2, second step):
+
+- Robust's groups service asks every caller for `[Groups] SecretKey` once it is set there; the regions send it. With
+  no key and no `AuthType`, Robust warns at startup that it believes any caller.
+- A Hypergrid proxy group stays with the grid it came from: the same group id from another location is refused.
+- A Hypergrid notice for a proxy group is taken once the group's grid confirms sending it (`VERIFYNOTICE`, which
+  every grid answers).
+
+The probe's `group-admin` scenario covers an officer's changes (Ferrobot). Still to do in phase 2: the probe extended
+to the Hypergrid groups path on the two-grid rig.

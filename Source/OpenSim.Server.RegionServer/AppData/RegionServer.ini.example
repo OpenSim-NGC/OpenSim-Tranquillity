@@ -1408,7 +1408,9 @@
     ; LocalService = local
 
     ;# {SecretKey} {ServicesConnectorModule:Groups Remote Service Connector} {Secret key between sim and remote group service} {} ""
-    ;; Used for V2 in Remote only.
+    ;; Used for V2 in Remote only: sent with every call to Robust's groups
+    ;; service, which refuses calls without it once its own [Groups] SecretKey
+    ;; is set. Use the same key here and on Robust.
     ; SecretKey = ""
 
     ;# {GroupsServerURI} {Module:GroupsModule (ServicesConnectorModule:Groups Remote Service Connector or (ServicesConnectorModule:Groups HG Service Connector and LocalService:remote))} {Groups Server URI} {}
