@@ -40,7 +40,9 @@ namespace OpenSim.Server.Handlers.Tests;
 /// A region's groups calls to Robust (and to other grids' Hypergrid groups services) run side by side: they used to
 /// wait for each other behind one lock per connector, so every arrival and member list waited for the slowest call.
 /// A stand-in server takes half a second per request; six calls at once take about that, not three seconds.
+/// Each caller has its own thread, so how many run at once does not depend on how fast the thread pool grows.
 /// </summary>
+[Collection(GroupsCachesCollection.Name)]
 public class GroupsConnectorConcurrencyTests
 {
     private const int Calls = 6;
@@ -103,10 +105,34 @@ public class GroupsConnectorConcurrencyTests
         return port;
     }
 
+    /// <summary>Runs <paramref name="call"/> on <paramref name="count"/> threads of its own, started together.</summary>
+    private static bool OnThreads(int count, Action<int> call, TimeSpan limit)
+    {
+        var errors = new System.Collections.Concurrent.ConcurrentQueue<Exception>();
+        using var go = new ManualResetEventSlim(false);
+        Thread[] threads = Enumerable.Range(0, count).Select(i => new Thread(() =>
+        {
+            go.Wait();
+            try { call(i); }
+            catch (Exception e) { errors.Enqueue(e); }
+        }) { IsBackground = true }).ToArray();
+        foreach (Thread t in threads)
+            t.Start();
+        go.Set();
+
+        var deadline = Stopwatch.StartNew();
+        foreach (Thread t in threads)
+            if (!t.Join(limit - deadline.Elapsed > TimeSpan.Zero ? limit - deadline.Elapsed : TimeSpan.Zero))
+                return false;
+        if (!errors.IsEmpty)
+            throw new AggregateException(errors);
+        return true;
+    }
+
     private static TimeSpan AllAtOnce(Action call)
     {
         var t = Stopwatch.StartNew();
-        Task.WaitAll(Enumerable.Range(0, Calls).Select(_ => Task.Run(call)).ToArray());
+        Assert.True(OnThreads(Calls, _ => call(), TimeSpan.FromSeconds(20)), "calls still waiting");
         return t.Elapsed;
     }
 
@@ -130,13 +156,12 @@ public class GroupsConnectorConcurrencyTests
             return new ExtendedGroupRecord { GroupID = g, GroupName = "G " + g };
         }
 
-        var callers = Enumerable.Range(0, 40).Select(i => Task.Run(() =>
+        Assert.True(OnThreads(40, i =>
         {
             UUID g = groups[i % groups.Length];
             ExtendedGroupRecord r = cache.GetGroupRecord(UUID.Random().ToString(), g, null, () => Fetch(g));
             Assert.Equal(g, r.GroupID);
-        })).ToArray();
-        Assert.True(Task.WaitAll(callers, TimeSpan.FromSeconds(20)), "callers still waiting");
+        }, TimeSpan.FromSeconds(20)), "callers still waiting");
 
         Assert.All(groups, g => Assert.Equal(1, fetches[g]));
         Assert.True(mostAtOnce > 1, "the groups were fetched one at a time");
@@ -220,4 +245,15 @@ public class GroupsConnectorConcurrencyTests
         Assert.True(server.MostAtOnce > 1, $"the calls came one at a time ({took.TotalMilliseconds:0} ms)");
         Assert.True(took < Delay * (Calls - 1), $"{Calls} calls took {took.TotalMilliseconds:0} ms");
     }
+}
+
+/// <summary>
+/// The tests of the region's groups caches run alone. Every cache of the process hears a change notice
+/// (<see cref="GroupsChangeNotice"/>), so a notice test running beside a cache test would make it forget what it is
+/// counting; and the concurrency tests time their calls, which other tests running at once would slow.
+/// </summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public class GroupsCachesCollection
+{
+    public const string Name = "Groups caches";
 }
