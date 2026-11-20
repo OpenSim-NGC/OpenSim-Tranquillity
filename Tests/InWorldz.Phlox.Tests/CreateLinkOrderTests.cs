@@ -24,7 +24,8 @@ namespace InWorldz.Phlox.Tests;
 /// (https://wiki.secondlife.com/wiki/LlCreateLink): the linked object's prims "are inserted into the parent object's
 /// link set starting at link number 2", and the parent's own children follow them. Its example links a three-prim
 /// object B into a three-prim object A and gets A's root, then B's three prims in their order, then A's other two
-/// (TheWikisExample below). With parent FALSE the script's object is the one inserted into the target. YEngine does the same (LSL_Api.CreateLink calls LinkToGroup with insert set).
+/// (TheWikisExample below). With parent FALSE the script's object is the one inserted into the target.
+/// YEngine does the same (LSL_Api.CreateLink calls LinkToGroup with insert set).
 ///
 /// <para>The calls run inside a SyscallContext, so llCreateLink's 1 s sleep is added to the call's delay instead of
 /// being waited out. No process-wide state is touched, so the class runs in parallel.</para>
@@ -154,12 +155,15 @@ public class CreateLinkOrderTests
         using var r = new Rig();
         r.AddChildren(r.Host, "A2", "A3");
         SceneObjectGroup b = r.Object("B1", "B2", "B3");
+        SceneObjectGroup host = r.Host;
 
         r.Call(a => a.llCreateLink(b.UUID.ToString(), 0));
 
         SceneObjectGroup linked = r.H.Prim.ParentGroup;
         Assert.Same(b, linked);
+        Assert.True(host.IsDeleted, "the script's object is no longer an object of its own");
         Assert.Equal("B1 A1 A2 A3 B2 B3", Order(linked));
+        Assert.Equal(2, r.H.Prim.LinkNum);
     }
 
     [Theory]
