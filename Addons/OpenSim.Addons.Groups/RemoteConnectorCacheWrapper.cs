@@ -150,7 +150,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -240,7 +242,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -285,7 +289,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -329,7 +335,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -380,7 +388,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -504,7 +514,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -559,7 +571,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -677,7 +691,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -774,7 +790,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else
@@ -819,7 +837,9 @@ public class RemoteConnectorCacheWrapper
                 }
                 finally
                 {
-                    m_ActiveRequests.Remove(cacheKey);
+                    // under the cache's lock, as every other use of the set
+                    lock (m_Cache)
+                        m_ActiveRequests.Remove(cacheKey);
                 }
             }
             else

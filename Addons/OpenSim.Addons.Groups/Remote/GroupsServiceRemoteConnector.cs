@@ -44,7 +44,6 @@ public class GroupsServiceRemoteConnector
 
     private string m_ServerURI;
     private IServiceAuth m_Auth;
-    private object m_Lock = new object();
 
     public GroupsServiceRemoteConnector(IConfigSource config)
     {
@@ -677,9 +676,9 @@ public class GroupsServiceRemoteConnector
     {
         sendData["METHOD"] = method;
 
-        string reply = string.Empty;
-        lock (m_Lock)
-            reply = SynchronousRestFormsRequester.MakeRequest("POST",
+        // Each request has its own HTTP request and response, so the region's groups calls run side by side; they
+        // used to wait for each other behind one lock, every arrival and member list behind the slowest call.
+        string reply = SynchronousRestFormsRequester.MakeRequest("POST",
                      m_ServerURI + "groups",
                      ServerUtils.BuildQueryString(sendData),
                      m_Auth);
