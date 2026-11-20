@@ -120,6 +120,7 @@
     <Compile Include="StockJanus\StockJanusPositionFeedTests.cs" />
     <Compile Include="..\WebRtcJanusService.Tests\StockJanus\StockJanusSupport.cs" Link="StockJanus\StockJanusSupport.cs" />
     <Compile Include="..\WebRtcJanusService.Tests\LogCapture.cs" Link="LogCapture.cs" />
+    <Compile Include="..\WebRtcJanusService.Tests\VoiceTestLogging.cs" Link="VoiceTestLogging.cs" />
     <Compile Include="CallRemovalLogTests.cs" />
     <Compile Include="RefusalWarningLogTests.cs" />
     <Compile Include="VoiceLoggerNameTests.cs" />

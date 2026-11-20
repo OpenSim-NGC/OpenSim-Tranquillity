@@ -172,8 +172,7 @@ namespace osWebRtcVoice.Tests
         public void TheService_OnTheStockPlugin_WarnsAboutArming_AndDoesNotDeclareRooms()
         {
             var log = new Capture();
-            ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(log).SetMinimumLevel(LogLevel.Trace));
+            var logging = new LogCapture(log, LogLevel.Trace);
             try
             {
                 IConfigSource cfg = Config("janus.plugin.audiobridge", "VisibilityArmingEnabled", "VisibilityFeederEnabled", "VisibilityEmitEnabled");
@@ -187,9 +186,7 @@ namespace osWebRtcVoice.Tests
             }
             finally
             {
-                ILoggerFactory ours = LoggerProvider.LoggerFactory;
-                LoggerProvider.LoggerFactory = previous;
-                ours.Dispose();
+                logging.Dispose();
                 log.Dispose();
             }
         }
@@ -198,8 +195,7 @@ namespace osWebRtcVoice.Tests
         public void TheService_OnTheSlvoicePlugin_KeepsArming()
         {
             var log = new Capture();
-            ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(log).SetMinimumLevel(LogLevel.Trace));
+            var logging = new LogCapture(log, LogLevel.Trace);
             try
             {
                 IConfigSource cfg = Config("janus.plugin.slvoice", "VisibilityArmingEnabled", "VisibilityFeederEnabled", "VisibilityEmitEnabled");
@@ -212,9 +208,7 @@ namespace osWebRtcVoice.Tests
             }
             finally
             {
-                ILoggerFactory ours = LoggerProvider.LoggerFactory;
-                LoggerProvider.LoggerFactory = previous;
-                ours.Dispose();
+                logging.Dispose();
                 log.Dispose();
             }
         }
@@ -223,8 +217,7 @@ namespace osWebRtcVoice.Tests
         public void TheService_OnTheStockPlugin_WarnsAboutTheJoinCapability_AndDoesNotMintOne()
         {
             var log = new Capture();
-            ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(log).SetMinimumLevel(LogLevel.Trace));
+            var logging = new LogCapture(log, LogLevel.Trace);
             try
             {
                 IConfigSource cfg = Config("janus.plugin.audiobridge", "JoinCapabilityEnabled");
@@ -238,9 +231,7 @@ namespace osWebRtcVoice.Tests
             }
             finally
             {
-                ILoggerFactory ours = LoggerProvider.LoggerFactory;
-                LoggerProvider.LoggerFactory = previous;
-                ours.Dispose();
+                logging.Dispose();
                 log.Dispose();
             }
         }
@@ -249,8 +240,7 @@ namespace osWebRtcVoice.Tests
         public void TheService_OnTheSlvoicePlugin_KeepsTheJoinCapability()
         {
             var log = new Capture();
-            ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(log).SetMinimumLevel(LogLevel.Trace));
+            var logging = new LogCapture(log, LogLevel.Trace);
             try
             {
                 IConfigSource cfg = Config("janus.plugin.slvoice", "JoinCapabilityEnabled");
@@ -263,9 +253,7 @@ namespace osWebRtcVoice.Tests
             }
             finally
             {
-                ILoggerFactory ours = LoggerProvider.LoggerFactory;
-                LoggerProvider.LoggerFactory = previous;
-                ours.Dispose();
+                logging.Dispose();
                 log.Dispose();
             }
         }

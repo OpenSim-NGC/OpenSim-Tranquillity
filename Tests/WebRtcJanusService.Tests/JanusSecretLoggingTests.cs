@@ -93,15 +93,14 @@ namespace osWebRtcVoice.Tests
         }
 
         private Capture _log;
-        private ILoggerFactory _previous;
+        private LogCapture _logging;
         private readonly List<JanusSession> _sessions = new();
 
         [SetUp]
         public void SetUp()
         {
             _log = new Capture();
-            _previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(_log).SetMinimumLevel(LogLevel.Trace));
+            _logging = new LogCapture(_log, LogLevel.Trace);
         }
 
         [TearDown]
@@ -114,9 +113,7 @@ namespace osWebRtcVoice.Tests
                 s.Dispose();
             }
             _sessions.Clear();
-            ILoggerFactory ours = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = _previous;
-            ours.Dispose();
+            _logging.Dispose();
             _log.Dispose();
         }
 
