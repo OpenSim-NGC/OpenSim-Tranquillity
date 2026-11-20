@@ -307,7 +307,16 @@ public class PGSQLAssetData : AssetDataBase
 
     public override bool Delete(string id)
     {
-        return false;
+        if (!UUID.TryParse(id, out UUID assetID))
+            return false;
+
+        using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
+        using (NpgsqlCommand cmd = new NpgsqlCommand("DELETE FROM assets WHERE id = :id", conn))
+        {
+            cmd.Parameters.Add(m_database.CreateParameter("id", assetID));
+            conn.Open();
+            return cmd.ExecuteNonQuery() > 0;
+        }
     }
     #endregion
 }
