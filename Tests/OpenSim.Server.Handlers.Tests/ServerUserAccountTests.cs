@@ -37,33 +37,6 @@ using Assert = Xunit.Assert;
 namespace OpenSim.Server.Handlers.Tests;
 
 /// <summary>
-/// Runs only when OPENSIM_TEST_MYSQL holds a connection string for a MySQL or MariaDB server (no database named) on
-/// which the test may create and drop its own databases. Unset, the test is reported as skipped, never passed.
-/// </summary>
-public sealed class MySQLServerFactAttribute : FactAttribute
-{
-    public const string EnvVar = "OPENSIM_TEST_MYSQL";
-
-    public MySQLServerFactAttribute()
-    {
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnvVar)))
-            Skip = $"Requires a MySQL or MariaDB server; set {EnvVar} to run.";
-    }
-}
-
-/// <summary>As <see cref="MySQLServerFactAttribute"/>, for a PostgreSQL server named by OPENSIM_TEST_PGSQL.</summary>
-public sealed class PGSQLServerFactAttribute : FactAttribute
-{
-    public const string EnvVar = "OPENSIM_TEST_PGSQL";
-
-    public PGSQLServerFactAttribute()
-    {
-        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable(EnvVar)))
-            Skip = $"Requires a PostgreSQL server; set {EnvVar} to run.";
-    }
-}
-
-/// <summary>
 /// The account service on a real MySQL or PostgreSQL server, each test in a new database: the migrations run from
 /// empty, an account with a country is saved and read back, and several accounts are looked up at once with malformed
 /// ids left out.
