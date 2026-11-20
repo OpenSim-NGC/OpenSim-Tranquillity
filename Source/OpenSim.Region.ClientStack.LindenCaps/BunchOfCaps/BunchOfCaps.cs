@@ -193,6 +193,12 @@ public partial class BunchOfCaps
                     new SimpleStreamHandler(GetNewCapPath(), GroupMemberData));
             }
 
+            if (ConfigOptions.AllowCapGroupAPIv1)
+            {
+                m_HostCapsObj.RegisterSimpleHandler("GroupAPIv1",
+                    new SimpleStreamHandler(GetNewCapPath(), GroupAPIv1));
+            }
+
             if (ConfigOptions.AllowCapLandResources)
             {
                 m_HostCapsObj.RegisterSimpleHandler("LandResources",
@@ -2044,6 +2050,83 @@ public partial class BunchOfCaps
     private static int CompareRolesByMembersDesc(GroupRolesData x, GroupRolesData y)
     {
         return -(x.Members.CompareTo(y.Members));
+    }
+
+    /// <summary>
+    /// GroupAPIv1, the viewer's group ban list (LLGroupMgr::getGroupBanRequestCoro, postGroupBanRequestCoro): the
+    /// group in the query (?group_id=). A GET answers {group_id, ban_list: {agent: {ban_date}}}; a POST of
+    /// {ban_action: 1 ban | 2 unban, ban_ids: [agent]} changes it, and the viewer reads only the status. Who may see or
+    /// change the list is the groups module's to decide: 403 when the client may not.
+    /// </summary>
+    public void GroupAPIv1(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
+    {
+        IGroupsModule groups = m_Scene.RequestModuleInterface<IGroupsModule>();
+        m_Scene.TryGetScenePresence(m_AgentID, out ScenePresence sp);
+        if (groups == null || sp == null || sp.IsChildAgent || sp.IsDeleted)
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.NotFound;
+            return;
+        }
+        IClientAPI client = sp.ControllingClient;
+
+        string gid = httpRequest.QueryString?["group_id"];
+        if (!UUID.TryParse(gid, out UUID groupID) || groupID.IsZero())
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+            return;
+        }
+
+        if (httpRequest.HttpMethod == "POST")
+        {
+            OSDMap req;
+            try
+            {
+                req = (OSDMap)OSDParser.DeserializeLLSDXml(httpRequest.InputStream);
+            }
+            catch
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+            int action = req.TryGetValue("ban_action", out OSD a) ? a.AsInteger() : 0;
+            if ((action != 1 && action != 2) || !req.TryGetValue("ban_ids", out OSD ids) || ids is not OSDArray list)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.BadRequest;
+                return;
+            }
+            // who may change the list may read it
+            if (groups.GroupBanList(client, groupID) == null)
+            {
+                httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
+                return;
+            }
+            UUID[] agents = list.Select(o => o.AsUUID()).Where(u => u.IsNotZero()).Distinct().ToArray();
+            groups.GroupBanChange(client, groupID, action == 1, agents);
+            httpResponse.RawBuffer = OSDParser.SerializeLLSDXmlBytes(new OSDMap());
+            httpResponse.ContentType = "application/llsd+xml";
+            httpResponse.StatusCode = (int)HttpStatusCode.OK;
+            return;
+        }
+
+        if (httpRequest.HttpMethod != "GET")
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.MethodNotAllowed;
+            return;
+        }
+
+        List<GroupBanData> bans = groups.GroupBanList(client, groupID);
+        if (bans == null)
+        {
+            httpResponse.StatusCode = (int)HttpStatusCode.Forbidden;
+            return;
+        }
+        OSDMap banList = new OSDMap();
+        foreach (GroupBanData b in bans)
+            banList[b.AgentID.ToString()] = new OSDMap { ["ban_date"] = OSD.FromDate(Utils.UnixTimeToDateTime(b.BanTime)) };
+        OSDMap reply = new OSDMap { ["group_id"] = OSD.FromUUID(groupID), ["ban_list"] = banList };
+        httpResponse.RawBuffer = OSDParser.SerializeLLSDXmlBytes(reply);
+        httpResponse.ContentType = "application/llsd+xml";
+        httpResponse.StatusCode = (int)HttpStatusCode.OK;
     }
 
     public void GroupMemberData(IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)

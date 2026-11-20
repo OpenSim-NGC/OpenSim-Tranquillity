@@ -124,6 +124,13 @@ public struct GroupRoleMembersData
     public UUID MemberID;
 }
 
+/// <summary>An avatar banned from a group, and since when (Unix seconds).</summary>
+public struct GroupBanData
+{
+    public UUID AgentID;
+    public int BanTime;
+}
+
 public struct GroupNoticeData
 {
     public UUID NoticeID;

@@ -27,6 +27,7 @@
 
 using System.Reflection;
 using Nini.Config;
+using OpenSim.Data;
 using OpenSim.Framework;
 using OpenSim.Server.Base;
 using OpenSim.Framework.Servers.HttpServer;
@@ -38,7 +39,7 @@ using Microsoft.Extensions.Logging;
 
 namespace OpenSim.Groups;
 
-public class GroupsServiceRobustConnector : ServiceConnector
+public partial class GroupsServiceRobustConnector : ServiceConnector
 {
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
@@ -67,7 +68,46 @@ public class GroupsServiceRobustConnector : ServiceConnector
 
         IServiceAuth auth = ServiceAuth.Create(config, m_ConfigName);
 
-        server.AddStreamHandler(new GroupsServicePostHandler(m_GroupsService, auth));
+        // The service takes the requesting avatar from the request: without a key or HTTP authentication, anyone who
+        // can reach this port can act as any avatar in any group.
+        if (key.Length == 0 && auth == null)
+            m_log.LogWarning("[Groups.RobustConnector]: [{0}] has no SecretKey and no AuthType: the groups service believes " +
+                "any caller about who is asking. Set the same [Groups] SecretKey here and on the regions.", m_ConfigName);
+
+        server.AddStreamHandler(new GroupsServicePostHandler(m_GroupsService, auth, key, ChangeNotifier(config, groupsConfig, key)));
+    }
+}
+
+public partial class GroupsServiceRobustConnector
+{
+    /// <summary>
+    /// The notifier telling the region servers of group changes (<see cref="GroupsChangeNotice"/>), when a key is set:
+    /// the regions take the notices only with it. It lists the region servers through the grid service named by
+    /// <c>[Groups] GridService</c>, or else <c>[GridService] LocalServiceModule</c>.
+    /// </summary>
+    private static IGroupsChangeNotifier ChangeNotifier(IConfigSource config, IConfig groupsConfig, string key)
+    {
+        if (string.IsNullOrEmpty(key))
+            return null;
+
+        string gridDll = groupsConfig?.GetString("GridService", string.Empty) ?? string.Empty;
+        if (gridDll.Length == 0)
+            gridDll = config.Configs["GridService"]?.GetString("LocalServiceModule", string.Empty) ?? string.Empty;
+        if (gridDll.Length == 0)
+        {
+            m_log.LogWarning("[Groups.RobustConnector]: no grid service to list the region servers: regions will not be told of group changes");
+            return null;
+        }
+
+        var grid = ServerUtils.LoadPlugin<OpenSim.Services.Interfaces.IGridService>(gridDll, new object[] { config });
+        if (grid == null)
+        {
+            m_log.LogWarning("[Groups.RobustConnector]: could not load {0}: regions will not be told of group changes", gridDll);
+            return null;
+        }
+
+        m_log.LogInformation("[Groups.RobustConnector]: telling the region servers of group changes");
+        return new GroupsChangeNotifier(GroupsChangeNotifier.ServersOf(grid), key);
     }
 }
 
@@ -76,16 +116,39 @@ public class GroupsServicePostHandler : BaseStreamHandler
     private static readonly ILogger m_log = LoggerProvider.CreateLogger(MethodBase.GetCurrentMethod().DeclaringType);
 
     private GroupsService m_GroupsService;
+    private readonly string m_secretKey;
+    private readonly IGroupsChangeNotifier m_changes;
 
-    public GroupsServicePostHandler(GroupsService service, IServiceAuth auth) :
+    public GroupsServicePostHandler(GroupsService service, IServiceAuth auth) : this(service, auth, string.Empty)
+    {
+    }
+
+    /// <param name="secretKey">When set, a request must carry it (<see cref="GroupsSecretKey.Header"/>).</param>
+    public GroupsServicePostHandler(GroupsService service, IServiceAuth auth, string secretKey) :
+        this(service, auth, secretKey, null)
+    {
+    }
+
+    /// <param name="changes">Told of each group a request changes, to tell the region servers.</param>
+    public GroupsServicePostHandler(GroupsService service, IServiceAuth auth, string secretKey, IGroupsChangeNotifier changes) :
         base("POST", "/groups", auth)
     {
         m_GroupsService = service;
+        m_secretKey = secretKey ?? string.Empty;
+        m_changes = changes;
     }
 
     protected override byte[] ProcessRequest(string path, Stream requestData,
             IOSHttpRequest httpRequest, IOSHttpResponse httpResponse)
     {
+        if (m_secretKey.Length > 0 && !GroupsSecretKey.Matches(m_secretKey, httpRequest.Headers?[GroupsSecretKey.Header]))
+        {
+            m_log.LogWarning("[Groups.Handler]: refused a request from {0}: it did not carry the groups SecretKey",
+                httpRequest.RemoteIPEndPoint);
+            httpResponse.StatusCode = (int)System.Net.HttpStatusCode.Forbidden;
+            return Array.Empty<byte>();
+        }
+
         string body;
         using(StreamReader sr = new StreamReader(requestData))
             body = sr.ReadToEnd();
@@ -106,6 +169,33 @@ public class GroupsServicePostHandler : BaseStreamHandler
             request.Remove("METHOD");
 
 //                m_log.LogDebug("[Groups.Handler]: {0}", method);
+            // what the region servers cache about the group is out of date after a change: tell them
+            if (m_changes != null && ChangesAGroup(method) && request.TryGetValue("GroupID", out object gid)
+                && UUID.TryParse(gid?.ToString(), out UUID changed) && changed.IsNotZero())
+            {
+                byte[] reply = Dispatch(method, request);
+                m_changes.Changed(changed);
+                return reply;
+            }
+            return Dispatch(method, request);
+        }
+        catch (Exception e)
+        {
+            m_log.LogError(e, string.Format("[GROUPS HANDLER]: Exception {0} ", e.Message));
+        }
+
+        return FailureResult();
+    }
+
+    /// <summary>The methods that change what a region caches about a group (invitations are not cached).</summary>
+    private static bool ChangesAGroup(string method) => method is "PUTGROUP" or "ADDAGENTTOGROUP" or
+        "REMOVEAGENTFROMGROUP" or "PUTROLE" or "REMOVEROLE" or "AGENTROLE" or "SETACTIVE" or "UPDATEMEMBERSHIP" or
+        "ADDNOTICE";
+
+    private byte[] Dispatch(string method, Dictionary<string, object> request)
+    {
+        try
+        {
             switch (method)
             {
                 case "PUTGROUP":
@@ -144,6 +234,10 @@ public class GroupsServicePostHandler : BaseStreamHandler
                     return HandleGetNotices(request);
                 case "FINDGROUPS":
                     return HandleFindGroups(request);
+                case "GETBANS":
+                    return HandleGetBans(request);
+                case "BAN":
+                    return HandleBan(request);
             }
             m_log.LogDebug("[GROUPS HANDLER]: unknown method request: {0}", method);
         }
@@ -432,6 +526,53 @@ public class GroupsServicePostHandler : BaseStreamHandler
         }
 
         //m_log.LogDebug("[XXX]: resp string: {0}", xmlString);
+        return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
+    }
+
+    byte[] HandleGetBans(Dictionary<string, object> request)
+    {
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        if (!request.ContainsKey("RequestingAgentID") || !request.ContainsKey("GroupID"))
+            NullResult(result, "Bad network data");
+        else
+        {
+            List<BanData> bans = m_GroupsService.GetGroupBans(request["RequestingAgentID"].ToString(),
+                new UUID(request["GroupID"].ToString()));
+            if (bans == null)
+                NullResult(result, "Insufficient permission");
+            else
+            {
+                Dictionary<string, object> dict = new Dictionary<string, object>();
+                int i = 0;
+                foreach (BanData b in bans)
+                    dict["b-" + i++] = new Dictionary<string, object>
+                    {
+                        ["AgentID"] = b.PrincipalID,
+                        ["BanTime"] = b.Data != null && b.Data.TryGetValue("BanTime", out string t) ? t : "0",
+                    };
+                result["RESULT"] = "OK";
+                result["BANS"] = dict;
+            }
+        }
+        return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
+    }
+
+    byte[] HandleBan(Dictionary<string, object> request)
+    {
+        Dictionary<string, object> result = new Dictionary<string, object>();
+        if (!request.ContainsKey("RequestingAgentID") || !request.ContainsKey("GroupID") || !request.ContainsKey("OP")
+            || !request.ContainsKey("AgentIDs"))
+            NullResult(result, "Bad network data");
+        else
+        {
+            string requester = request["RequestingAgentID"].ToString();
+            UUID groupID = new UUID(request["GroupID"].ToString());
+            string[] agents = request["AgentIDs"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            bool done = request["OP"].ToString() == "ADD"
+                ? m_GroupsService.BanAgents(requester, groupID, agents, out _)
+                : m_GroupsService.UnbanAgents(requester, groupID, agents);
+            result["RESULT"] = done.ToString().ToLowerInvariant();
+        }
         return Util.UTF8NoBomEncoding.GetBytes(ServerUtils.BuildXmlResponse(result));
     }
 
