@@ -84,10 +84,10 @@ public class CacheSchemaBumpTests
             // The old table wrote IW_POWER_FREEZE_EJECT as 4294967296, which the assembler loads as -1.
             WriteCache(assetId, PowerScript.Replace("IW_POWER_FREEZE_EJECT", "4294967296"));
             h1.RezScript(PowerScript, assetId, itemId);
-            Assert.True(PumpUntil(h1, () => h1.Said.Contains("entry -1"), TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("entry -1"), TestWait.Default),
                 "the old bytecode did not run from the cache: " + h1.Diagnose(itemId));
             h1.PostTouch(itemId);
-            Assert.True(PumpUntil(h1, () => h1.Said.Contains("touch 8 saved -1 now -1"), TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("touch 8 saved -1 now -1"), TestWait.Default),
                 "old bytecode: " + string.Join(" | ", h1.Said));
             h1.SaveState(itemId);
         }
@@ -98,11 +98,11 @@ public class CacheSchemaBumpTests
         Assert.Equal(CurrentSchema.ToString(), File.ReadAllText(VersionFile).Trim());
 
         h2.RezScript(PowerScript, assetId, itemId);
-        Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemId) != null, TimeSpan.FromSeconds(20)),
+        Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemId) != null, TestWait.Default),
             "not recompiled: " + h2.Diagnose(itemId));
         h2.Pump(20);
         h2.PostTouch(itemId);
-        Assert.True(PumpUntil(h2, () => h2.Said.Any(s => s.StartsWith("touch ")), TimeSpan.FromSeconds(20)),
+        Assert.True(PumpUntil(h2, () => h2.Said.Any(s => s.StartsWith("touch ")), TestWait.Default),
             "no touch after the recompile: " + h2.Diagnose(itemId));
         _out.WriteLine("after the bump: " + string.Join(" | ", h2.Said));
 
@@ -138,10 +138,10 @@ public class CacheSchemaBumpTests
         {
             WriteCache(assetId, FloatStateScript.Replace("2147483520.0", "2147483904.0"));
             h1.RezScript(FloatStateScript, assetId, itemId);
-            Assert.True(PumpUntil(h1, () => h1.Said.Contains("entry -2147483648"), TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("entry -2147483648"), TestWait.Default),
                 "the old bytecode did not run from the cache: " + h1.Diagnose(itemId));
             h1.PostTouch(itemId);
-            Assert.True(PumpUntil(h1, () => h1.Said.Contains("touch 14 saved -2147483648 now -2147483648"), TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("touch 14 saved -2147483648 now -2147483648"), TestWait.Default),
                 "old bytecode: " + string.Join(" | ", h1.Said));
             h1.SaveState(itemId);
         }
@@ -152,11 +152,11 @@ public class CacheSchemaBumpTests
         Assert.Equal(CurrentSchema.ToString(), File.ReadAllText(VersionFile).Trim());
 
         h2.RezScript(FloatStateScript, assetId, itemId);
-        Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemId) != null, TimeSpan.FromSeconds(20)),
+        Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemId) != null, TestWait.Default),
             "not recompiled: " + h2.Diagnose(itemId));
         h2.Pump(20);
         h2.PostTouch(itemId);
-        Assert.True(PumpUntil(h2, () => h2.Said.Any(s => s.StartsWith("touch ")), TimeSpan.FromSeconds(20)),
+        Assert.True(PumpUntil(h2, () => h2.Said.Any(s => s.StartsWith("touch ")), TestWait.Default),
             "no touch after the recompile: " + h2.Diagnose(itemId));
         _out.WriteLine("after the bump: " + string.Join(" | ", h2.Said));
 
@@ -190,11 +190,11 @@ public class CacheSchemaBumpTests
         {
             h1.RezScript(Src("alpha"), assetA, itemA);
             h1.RezScript(Src("beta"), assetB, itemB);
-            Assert.True(PumpUntil(h1, () => h1.Said.Contains("entry alpha") && h1.Said.Contains("entry beta"), TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("entry alpha") && h1.Said.Contains("entry beta"), TestWait.Default),
                 string.Join(" | ", h1.Said));
             h1.PostTouch(itemA);
             h1.PostTouch(itemB);
-            Assert.True(PumpUntil(h1, () => h1.Said.Contains("alpha 1") && h1.Said.Contains("beta 1"), TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("alpha 1") && h1.Said.Contains("beta 1"), TestWait.Default),
                 string.Join(" | ", h1.Said));
             h1.SaveState(itemA);
             h1.SaveState(itemB);
@@ -214,12 +214,12 @@ public class CacheSchemaBumpTests
 
             h2.RezScript(Src("alpha"), assetA, itemA);
             h2.RezScript(Src("beta"), assetB, itemB);
-            Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemA) != null && h2.InterpreterFor(itemB) != null, TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemA) != null && h2.InterpreterFor(itemB) != null, TestWait.Default),
                 h2.Diagnose(itemA) + " / " + h2.Diagnose(itemB));
             h2.Pump(20);
             h2.PostTouch(itemA);
             h2.PostTouch(itemB);
-            Assert.True(PumpUntil(h2, () => h2.Said.Contains("alpha 2") && h2.Said.Contains("beta 2"), TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h2, () => h2.Said.Contains("alpha 2") && h2.Said.Contains("beta 2"), TestWait.Default),
                 "state not kept or the wrong code ran: " + string.Join(" | ", h2.Said));
             _out.WriteLine("after the bump: " + string.Join(" | ", h2.Said));
             Assert.DoesNotContain(h2.Said, s => s.StartsWith("entry") || s.StartsWith("stale"));
@@ -234,7 +234,7 @@ public class CacheSchemaBumpTests
         ((global::Phlox.ScriptEngine.PhloxScriptLoader)h3.Loader).BeforeCompileForTest = compiled.Add;
         h3.RezScript(Src("alpha"), assetA, itemA);
         h3.RezScript(Src("beta"), assetB, itemB);
-        Assert.True(PumpUntil(h3, () => h3.InterpreterFor(itemA) != null && h3.InterpreterFor(itemB) != null, TimeSpan.FromSeconds(20)),
+        Assert.True(PumpUntil(h3, () => h3.InterpreterFor(itemA) != null && h3.InterpreterFor(itemB) != null, TestWait.Default),
             h3.Diagnose(itemA) + " / " + h3.Diagnose(itemB));
         Assert.Empty(compiled);   // both from the cache the first start wrote
     }
@@ -264,7 +264,7 @@ public class CacheSchemaBumpTests
             // can see that the saved global is kept across the recompile.
             WriteCache(assetId, "integer count = 5;\n" + setUp);
             h1.RezScript(TextScript, assetId, itemId);
-            Assert.True(PumpUntil(h1, () => h1.Said.Contains("set"), TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h1, () => h1.Said.Contains("set"), TestWait.Default),
                 "the old bytecode did not run from the cache: " + h1.Diagnose(itemId));
             h1.SaveState(itemId);
         }
@@ -276,11 +276,11 @@ public class CacheSchemaBumpTests
         Assert.Equal(CurrentSchema.ToString(), File.ReadAllText(VersionFile).Trim());
 
         h2.RezScript(TextScript, assetId, itemId);
-        Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemId) != null, TimeSpan.FromSeconds(20)),
+        Assert.True(PumpUntil(h2, () => h2.InterpreterFor(itemId) != null, TestWait.Default),
             "not recompiled: " + h2.Diagnose(itemId));
         h2.Pump(20);
         h2.PostTouch(itemId);
-        Assert.True(PumpUntil(h2, () => h2.Said.Any(s => s.StartsWith("local ")), TimeSpan.FromSeconds(20)),
+        Assert.True(PumpUntil(h2, () => h2.Said.Any(s => s.StartsWith("local ")), TestWait.Default),
             "no touch after the recompile: " + h2.Diagnose(itemId));
         _out.WriteLine("after the bump: " + string.Join(" | ", h2.Said));
 
@@ -300,7 +300,7 @@ public class CacheSchemaBumpTests
         using (var h1 = new SchedulerHarness(bytecodeDir: CacheDir))
         {
             h1.RezScript(sleepScript, assetId, itemId);
-            Assert.True(PumpUntil(h1, () => h1.RunStateOf(itemId) == "Sleeping", TimeSpan.FromSeconds(20)),
+            Assert.True(PumpUntil(h1, () => h1.RunStateOf(itemId) == "Sleeping", TestWait.Default),
                 "did not reach llSleep: " + h1.Diagnose(itemId));
             Assert.True(File.Exists(CachePath(assetId)), "the compile was not cached");
             h1.SaveState(itemId);
@@ -311,7 +311,7 @@ public class CacheSchemaBumpTests
         Assert.False(File.Exists(CachePath(assetId)), "the bump did not purge the bytecode");
 
         h2.RezScript(sleepScript, assetId, itemId);
-        Assert.True(PumpUntil(h2, () => h2.Said.Contains("b"), TimeSpan.FromSeconds(20)),
+        Assert.True(PumpUntil(h2, () => h2.Said.Contains("b"), TestWait.Default),
             "the sleep did not resume after the recompile: " + h2.Diagnose(itemId));
         Assert.DoesNotContain("a", h2.Said);
     }

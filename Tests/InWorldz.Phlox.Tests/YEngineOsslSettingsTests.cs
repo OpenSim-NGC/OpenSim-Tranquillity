@@ -35,7 +35,7 @@ public class YEngineOsslSettingsTests
         var part = SceneHelpers.AddSceneObject(h.Scene, "yengine prim", h.Prim.OwnerID).RootPart;
         SchedulerHarnessYEngine.Rez(h, part, "default { state_entry() { osMakeNotecard(\"made\", \"text\"); llSay(0, \"done\"); } }");
         string Errors() => string.Join(" | ", h.SaidOn.Where(s => s.Channel == DebugChannel).Select(s => s.Message));
-        Assert.True(h.PumpUntil(() => h.Said.Contains("done") || Errors().Length > 0, TimeSpan.FromSeconds(30)), "said: " + string.Join(" | ", h.Said));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("done") || Errors().Length > 0, TestWait.Default), "said: " + string.Join(" | ", h.Said));
         int cards = part.Inventory.GetInventoryItems().Count(i => i.Type == (int)OpenMetaverse.AssetType.Notecard);
         return (cards, Errors());
     }

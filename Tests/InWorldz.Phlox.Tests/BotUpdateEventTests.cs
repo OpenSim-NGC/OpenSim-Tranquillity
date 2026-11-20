@@ -119,7 +119,7 @@ public class BotUpdateEventTests
 
             Assert.True(h.PumpUntil(() => Updates(h, "c").Any(s => s.StartsWith("c 1 ", StringComparison.Ordinal))
                                        && Updates(h, "r").Any(s => s.StartsWith("r 1 ", StringComparison.Ordinal)),
-                TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+                TestWait.Default), string.Join(" | ", h.Said));
 
             // Teleport to A (node 0) moves on to node 1; the wait ends and moves on to node 2; the teleport to B
             // moves on to node 3, past the last; the path is done. Halcyon raised an update after every teleport,
@@ -153,7 +153,7 @@ public class BotUpdateEventTests
                 new(), h.Prim.OwnerID);
 
             Assert.True(h.PumpUntil(() => Updates(h, "r").Any(s => s.StartsWith("r 1 ", StringComparison.Ordinal)),
-                TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+                TestWait.Default), string.Join(" | ", h.Said));
             Assert.Equal(new[] { "r 2 1|" + V(A) + " 1,5", "r 1 " + V(A) + " 5" }, Updates(h, "r"));
             Assert.Empty(Updates(h, "c"));
         }
@@ -177,7 +177,7 @@ public class BotUpdateEventTests
 
             // The bot is teleported to the point it did not reach (Halcyon MovementAction.GetNextDestination), so both
             // reports carry that point as the bot's position, then it walks on to B.
-            Assert.True(h.PumpUntil(() => Updates(h, "c").Length >= 2, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.True(h.PumpUntil(() => Updates(h, "c").Length >= 2, TestWait.Default), string.Join(" | ", h.Said));
             Assert.Equal(new[] { "c 3 1|" + V(first) + " 1,5", "c 2 1|" + V(first) + " 1,5" }, Updates(h, "c").Take(2));
         }
         finally { bots.Close(); }
@@ -198,7 +198,7 @@ public class BotUpdateEventTests
 
             h.Scene.CloseAgent(target.UUID, false);
 
-            Assert.True(h.PumpUntil(() => Updates(h, "c").Any(), TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.True(h.PumpUntil(() => Updates(h, "c").Any(), TestWait.Default), string.Join(" | ", h.Said));
             Vector3 botPos = h.Scene.GetScenePresence(bot).AbsolutePosition;
             Assert.Equal("c 4 " + V(Vector3.Zero) + "|0.000000|" + V(botPos) + " 5,2,5", Updates(h, "c").Single());
 
@@ -226,7 +226,7 @@ public class BotUpdateEventTests
             Vector3 far = new Vector3(200, 200, 30);
             target.AbsolutePosition = far;
 
-            Assert.True(h.PumpUntil(() => Updates(h, "c").Any(), TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.True(h.PumpUntil(() => Updates(h, "c").Any(), TestWait.Default), string.Join(" | ", h.Said));
             Vector3 botPos = h.Scene.GetScenePresence(bot).AbsolutePosition;
             Assert.Equal("c 4 " + V(far) + "|0.000000|" + V(botPos) + " 5,2,5", Updates(h, "c").Single());
         }

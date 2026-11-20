@@ -91,7 +91,7 @@ public class GroupLandPowersTests
     private List<string> Run(Rig r, string body)
     {
         r.H.RezScript("default { state_entry() { " + body + " llSay(0, \"done\"); } }");
-        Assert.True(PumpUntil(r.H, () => r.H.Said.Contains("done"), TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(r.H, () => r.H.Said.Contains("done"), TestWait.Default),
             "the script never finished: " + string.Join(" | ", r.H.Said));
         _out.WriteLine(string.Join("\n", r.H.Said));
         return r.H.Said.ToList();

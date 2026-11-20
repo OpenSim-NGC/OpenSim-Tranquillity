@@ -71,7 +71,7 @@ default
         for (int i = 0; i < 64; i++) Post(h, id, SupportedEventList.Events.CHANGED, 1);
         Post(h, id, SupportedEventList.Events.ON_REZ, 7);
 
-        Assert.True(h.PumpUntil(() => Count(h, "rezzed 7") == 1, TimeSpan.FromSeconds(10)),
+        Assert.True(h.PumpUntil(() => Count(h, "rezzed 7") == 1, TestWait.Default),
             "on_rez was dropped by the full queue: " + Said(h));
     }
 
@@ -83,7 +83,7 @@ default
     changed(integer c) { llSay(0, ""c""); }");
         for (int i = 0; i < 70; i++) Post(h, id, SupportedEventList.Events.CHANGED, 1);
 
-        Assert.True(h.PumpUntil(() => Count(h, "c") >= 64, TimeSpan.FromSeconds(10)), Said(h));
+        Assert.True(h.PumpUntil(() => Count(h, "c") >= 64, TestWait.Default), Said(h));
         Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
         Assert.Equal(64, Count(h, "c"));
     }
@@ -101,11 +101,11 @@ default
         for (int i = 0; i < 10; i++)
             Post(h, id, SupportedEventList.Events.CONTROL, agent, 1, 0);   // held, nothing changed
 
-        Assert.True(h.PumpUntil(() => Count(h, "free") == 1, TimeSpan.FromSeconds(10)), Said(h));
+        Assert.True(h.PumpUntil(() => Count(h, "free") == 1, TestWait.Default), Said(h));
         // The key-down runs once the script is back to its queue: wait for it (PumpUntilIdle can find the
         // scheduler quiet while the handler's last llSay is still being completed). Then the window that
         // proves the held repeats were dropped.
-        Assert.True(h.PumpUntil(() => Count(h, "control 1 1") == 1, TimeSpan.FromSeconds(10)), Said(h));
+        Assert.True(h.PumpUntil(() => Count(h, "control 1 1") == 1, TestWait.Default), Said(h));
         Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
         Assert.Equal(1, Count(h, "control 1 1"));
         Assert.Equal(0, Count(h, "control 1 0"));
@@ -121,7 +121,7 @@ default
         for (int i = 0; i < 10; i++)
             Post(h, id, SupportedEventList.Events.CONTROL, agent, 1, 0);
 
-        Assert.True(h.PumpUntil(() => Count(h, "control 1 0") >= 1, TimeSpan.FromSeconds(10)), Said(h));
+        Assert.True(h.PumpUntil(() => Count(h, "control 1 0") >= 1, TestWait.Default), Said(h));
         Assert.True(h.PumpUntilIdle(TimeSpan.FromSeconds(10)));
         Assert.Equal(1, Count(h, "control 1 0"));
     }
@@ -147,7 +147,7 @@ default
         Assert.False(h.IsOnRunQueue(id), "a stopped script was put on the run queue");
 
         h.Engine.SetScriptState(id, true, false);
-        Assert.True(h.PumpUntil(() => Count(h, "entry") == 2, TimeSpan.FromSeconds(10)),
+        Assert.True(h.PumpUntil(() => Count(h, "entry") == 2, TestWait.Default),
             "the held state_entry did not run on start: " + Said(h) + " " + h.StatusOf(id));
     }
 
@@ -170,7 +170,7 @@ default
         for (int i = 1; i <= n; i++)
             h.Engine.PostObjectEvent(h.Prim.LocalId, new EventParams("changed", new object[] { i }, new DetectParams[0]));
 
-        Assert.True(h.PumpUntil(() => h.Said.Count >= n, TimeSpan.FromSeconds(20)), Said(h));
+        Assert.True(h.PumpUntil(() => h.Said.Count >= n, TestWait.Default), Said(h));
         var expected = Enumerable.Range(1, n).Select(i => i.ToString()).ToArray();
         Assert.Equal(expected, h.Said.Take(n).ToArray());
     }

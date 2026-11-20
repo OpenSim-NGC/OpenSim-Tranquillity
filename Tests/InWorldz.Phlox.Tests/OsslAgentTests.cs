@@ -42,10 +42,10 @@ public class OsslAgentTests
         return sp;
     }
 
-    private static void PumpUntil(SchedulerHarness h, Func<bool> done, int maxMs = 30000)
+    private static void PumpUntil(SchedulerHarness h, Func<bool> done, int maxMs = TestWait.DefaultSeconds * 1000)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (sw.ElapsedMilliseconds < maxMs && !done()) h.PumpOnce();
+        while (sw.ElapsedMilliseconds < TestWait.Cap(maxMs / 1000.0) * 1000 && !done()) h.PumpOnce();
         h.PumpFor(TimeSpan.FromMilliseconds(300));
     }
 

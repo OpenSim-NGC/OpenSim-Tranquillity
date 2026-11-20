@@ -93,7 +93,7 @@ public class BotFollowTests
         foreach (Vector3 at in new[] { first, second, third })
         {
             s.Avatar.AbsolutePosition = at;
-            Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at), TimeSpan.FromSeconds(20)), "not heading for " + at);
+            Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at), TestWait.Default), "not heading for " + at);
         }
         Log(s);
     }
@@ -104,7 +104,7 @@ public class BotFollowTests
         using var s = Setup(new Vector3(131, 128, 30));   // 3 m away
         Follow(s, new() { { BOT_STOP_FOLLOWING_DISTANCE, 4 }, { BOT_START_FOLLOWING_DISTANCE, 6.0f } });
 
-        Assert.True(s.H.PumpUntil(() => !s.Bot.MovingToTarget, TimeSpan.FromSeconds(20)), "the bot did not stop 3 m from the avatar");
+        Assert.True(s.H.PumpUntil(() => !s.Bot.MovingToTarget, TestWait.Default), "the bot did not stop 3 m from the avatar");
 
         // Proving something does NOT happen: 5 m is past the stop distance but not the start distance.
         s.Avatar.AbsolutePosition = new Vector3(133, 128, 30);
@@ -114,7 +114,7 @@ public class BotFollowTests
 
         Vector3 far = new Vector3(135, 128, 30);   // 7 m away
         s.Avatar.AbsolutePosition = far;
-        Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, far), TimeSpan.FromSeconds(20)), "the bot did not start again 7 m from the avatar");
+        Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, far), TestWait.Default), "the bot did not start again 7 m from the avatar");
     }
 
     [Theory]
@@ -126,7 +126,7 @@ public class BotFollowTests
         using var s = Setup(at);
         Follow(s, new() { { BOT_ALLOW_FLYING, allowed ? 1 : 0 } });
 
-        Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at), TimeSpan.FromSeconds(20)), "not heading for the avatar");
+        Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at), TestWait.Default), "not heading for the avatar");
         s.H.PumpUntil(() => s.Bot.Flying == allowed, TimeSpan.FromSeconds(5));
         Log(s);
         Assert.Equal(allowed, s.Bot.Flying);
@@ -141,7 +141,7 @@ public class BotFollowTests
 
         float own = s.Bot.AbsolutePosition.Z + 0.15f;
         Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at) && Math.Abs(s.Bot.MoveToPositionTarget.Z - own) < 0.01f,
-            TimeSpan.FromSeconds(20)), "not heading for the avatar at the bot's own height");
+            TestWait.Default), "not heading for the avatar at the bot's own height");
         Log(s);
     }
 
@@ -154,13 +154,13 @@ public class BotFollowTests
         Follow(s, new() { { BOT_ALLOW_JUMPING, 1 } });
 
         Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at) && Math.Abs(s.Bot.MoveToPositionTarget.Z - at.Z) < 0.01f,
-            TimeSpan.FromSeconds(20)), "not heading for the avatar's height");
+            TestWait.Default), "not heading for the avatar's height");
 
         // The same, with jumping not allowed: the bot keeps to its own height.
         Follow(s, new() { { BOT_ALLOW_JUMPING, 0 } });
         float own = s.Bot.AbsolutePosition.Z + 0.15f;
         Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at) && Math.Abs(s.Bot.MoveToPositionTarget.Z - own) < 0.01f,
-            TimeSpan.FromSeconds(20)), "not heading for the avatar at the bot's own height");
+            TestWait.Default), "not heading for the avatar at the bot's own height");
         Log(s);
     }
 
@@ -177,14 +177,14 @@ public class BotFollowTests
         Assert.True(s.H.PumpUntil(() => s.H.Said.Contains("registered")), string.Join(" | ", s.H.Said));
         Follow(s, new() { { BOT_REQUIRES_LINE_OF_SIGHT, 1 } });
 
-        Assert.True(s.H.PumpUntil(() => Updates(s).Length > 0, TimeSpan.FromSeconds(20)), string.Join(" | ", s.H.Said));
+        Assert.True(s.H.PumpUntil(() => Updates(s).Length > 0, TestWait.Default), string.Join(" | ", s.H.Said));
         float distance = Vector3.Distance(at, s.Bot.AbsolutePosition);
         Assert.Equal("u 4 " + V(at) + "|" + distance.ToString("F6", System.Globalization.CultureInfo.InvariantCulture)
             + "|" + V(s.Bot.AbsolutePosition), Updates(s).Single());
         Assert.False(HeadingFor(s.Bot, at), "the bot went on toward an avatar it cannot see");
 
         wall.AbsolutePosition = new Vector3(134, 200, 30);
-        Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at), TimeSpan.FromSeconds(20)), "the bot did not go on once it could see the avatar");
+        Assert.True(s.H.PumpUntil(() => HeadingFor(s.Bot, at), TestWait.Default), "the bot did not go on once it could see the avatar");
         Assert.Single(Updates(s));
     }
 

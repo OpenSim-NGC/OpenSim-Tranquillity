@@ -95,7 +95,7 @@ public class BotNavigationTimeoutTests
             CreateBot(h, @"botSetNavigationPoints(bot, [" + Far + ", " + B + @"],
                 [BOT_TRAVELMODE_WALK, BOT_TRAVELMODE_TELEPORT], [BOT_MOVEMENT_TELEPORT_AFTER, 1]);");
 
-            Assert.True(h.PumpUntil(() => Updates(h).Any(s => s.StartsWith("u 1 ", StringComparison.Ordinal)), TimeSpan.FromSeconds(20)),
+            Assert.True(h.PumpUntil(() => Updates(h).Any(s => s.StartsWith("u 1 ", StringComparison.Ordinal)), TestWait.Default),
                 string.Join(" | ", h.Said));
             Assert.True(clock.Elapsed >= TimeSpan.FromSeconds(1), "teleported after " + clock.Elapsed);
             Assert.Equal(new[]
@@ -119,7 +119,7 @@ public class BotNavigationTimeoutTests
             CreateBot(h, @"botSetNavigationPoints(bot, [" + A + ", " + B + @"],
                 [BOT_TRAVELMODE_TELEPORT, BOT_TRAVELMODE_TELEPORT], [BOT_MOVEMENT_TYPE, BOT_MOVEMENT_FLAG_FOLLOW_INDEFINITELY]);");
 
-            Assert.True(h.PumpUntil(() => Updates(h).Length >= 6, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.True(h.PumpUntil(() => Updates(h).Length >= 6, TestWait.Default), string.Join(" | ", h.Said));
             // Each teleport moves on to the next node; after the last, the path starts again, reported as node 2.
             Assert.Equal(new[]
             {
@@ -152,7 +152,7 @@ public class BotNavigationTimeoutTests
             Assert.False(Near(sp.AbsolutePosition, Far), "the paused bot was teleported");
 
             bots.ResumeBotMovement(bot, h.Prim.OwnerID);
-            Assert.True(h.PumpUntil(() => Updates(h).Any(s => s.StartsWith("u 1 ", StringComparison.Ordinal)), TimeSpan.FromSeconds(20)),
+            Assert.True(h.PumpUntil(() => Updates(h).Any(s => s.StartsWith("u 1 ", StringComparison.Ordinal)), TestWait.Default),
                 string.Join(" | ", h.Said));
             Assert.Equal(new[] { "u 3 1|" + V(Far), "u 2 1|" + V(Far), "u 1 " + V(Far) }, Updates(h));
         }

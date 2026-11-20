@@ -51,7 +51,7 @@ public class AvatarName2KeyTests
         var body = string.Concat(args.Select((a, i) => $"llSay(0, \"K{i}:\" + (string)iwAvatarName2Key({a})); "));
         h.RezScript("default { state_entry() { " + body + "llSay(0, \"done\"); } " +
                     "dataserver(key q, string d) { llSay(0, \"DS:\" + d); } }");
-        Assert.True(PumpUntil(h, () => h.Said.Contains("done"), TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(h, () => h.Said.Contains("done"), TestWait.Default),
             "the script never finished: " + string.Join(" | ", h.Said));
         h.PumpFor(TimeSpan.FromMilliseconds(500));   // room for a stray dataserver event
         _out.WriteLine(string.Join(" | ", h.Said) + " || debug: " +
@@ -146,7 +146,7 @@ public class AvatarName2KeyTests
             h.RezScript(@"default { state_entry() { llSay(0, ""A asks""); key k = iwAvatarName2Key(""Held"", ""Open""); llSay(0, ""A got "" + (string)k); }
                                     dataserver(key q, string d) { llSay(0, ""DS:"" + d); } }");
 
-            Assert.True(PumpUntil(h, () => entered.IsSet, TimeSpan.FromSeconds(30)), "the lookup never reached the account service");
+            Assert.True(PumpUntil(h, () => entered.IsSet, TestWait.Default), "the lookup never reached the account service");
             int ticksBefore = h.Said.Count(s => s == "B tick");
             h.PumpFor(TimeSpan.FromMilliseconds(1500));
             h.PumpUntil(() => h.Said.Count(s => s == "B tick") - ticksBefore >= 8);
@@ -157,7 +157,7 @@ public class AvatarName2KeyTests
         }
         finally { gate.Set(); }
 
-        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("A got")), TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(h, () => h.Said.Any(s => s.StartsWith("A got")), TestWait.Default),
             "A never answered: " + string.Join(" | ", h.Said.TakeLast(5)));
         h.PumpFor(TimeSpan.FromMilliseconds(500));
         Assert.Contains("A got " + id, h.Said);

@@ -84,7 +84,7 @@ public class CheckRezErrorTests
             "  llSay(0, \"names \" + (string)[IW_REZ_OK, IW_REZ_NOT_PERMITTED, IW_REZ_REGION_SCENIC, IW_REZ_NO_LAND_PARCEL, IW_REZ_PARCEL_LAND_IMPACT, IW_REZ_REGION_LAND_IMPACT]);\n" +
             "  llSay(0, \"done\");\n" +
             "} }");
-        Assert.True(PumpUntil(h, () => h.Said.Contains("done"), TimeSpan.FromSeconds(30)),
+        Assert.True(PumpUntil(h, () => h.Said.Contains("done"), TestWait.Default),
             "the script never finished: " + string.Join(" | ", h.Said));
         _out.WriteLine(string.Join("\n", h.Said));
 

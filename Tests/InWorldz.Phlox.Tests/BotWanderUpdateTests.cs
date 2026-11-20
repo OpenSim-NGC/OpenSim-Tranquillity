@@ -89,7 +89,7 @@ public class BotWanderUpdateTests
             // A wander area of no size around where the bot stands: every point is reached at once.
             UUID bot = CreateBot(h, @"botWanderWithin(bot, <128, 128, 30>, 0.0, 0.0, [BOT_WANDER_TIME_BETWEEN_NODES, 1]);");
 
-            Assert.True(h.PumpUntil(() => Updates(h).Length >= 2, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.True(h.PumpUntil(() => Updates(h).Length >= 2, TestWait.Default), string.Join(" | ", h.Said));
             string expected = "u 2 1|" + V(h.Scene.GetScenePresence(bot).AbsolutePosition);
             Assert.All(Updates(h), u => Assert.Equal(expected, u));
         }
@@ -125,7 +125,7 @@ public class BotWanderUpdateTests
             // A point is teleported to after 60 s; bring the time spent walking to it to just under that.
             SetNavElapsed(bots, bot, 59_900);
 
-            Assert.True(h.PumpUntil(() => Updates(h).Length >= 2, TimeSpan.FromSeconds(20)), string.Join(" | ", h.Said));
+            Assert.True(h.PumpUntil(() => Updates(h).Length >= 2, TestWait.Default), string.Join(" | ", h.Said));
             Assert.Equal(new[] { "u 3 1|" + V(far), "u 2 1|" + V(far) }, Updates(h).Take(2));
         }
         finally { bots.Close(); }

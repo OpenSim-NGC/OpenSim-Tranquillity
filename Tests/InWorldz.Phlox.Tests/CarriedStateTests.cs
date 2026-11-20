@@ -263,7 +263,7 @@ public class CarriedStateTests
         try
         {
             Task<string> asked = Task.Run(() => h.Engine.GetXMLState(item));
-            Assert.True(h.PumpUntil(() => asked.IsCompleted, TimeSpan.FromSeconds(20)), "the capture was never answered");
+            Assert.True(h.PumpUntil(() => asked.IsCompleted, TestWait.Default), "the capture was never answered");
             string captured = await asked;
             Assert.Contains("InWorldz.Phlox", captured);
 

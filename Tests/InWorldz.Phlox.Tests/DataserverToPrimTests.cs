@@ -82,9 +82,9 @@ public class DataserverToPrimTests
         public int Count(string line) => H.Said.Count(s => s == line);
         public int CountStart(string prefix) => H.Said.Count(s => s.StartsWith(prefix, StringComparison.Ordinal));
 
-        public bool PumpUntil(Func<bool> done, int seconds = 30)
+        public bool PumpUntil(Func<bool> done, int seconds = TestWait.DefaultSeconds)
         {
-            var until = DateTime.UtcNow + TimeSpan.FromSeconds(seconds);
+            var until = DateTime.UtcNow + TimeSpan.FromSeconds(TestWait.Cap(seconds));
             while (!done())
             {
                 if (DateTime.UtcNow >= until) return false;

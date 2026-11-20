@@ -41,7 +41,7 @@ internal sealed class InventoryGivesRig : IDisposable
 
     public void WaitLoaded(UUID item)
     {
-        Assert.True(H.PumpUntil(() => H.RunStateOf(item) == "Waiting", TimeSpan.FromSeconds(30)),
+        Assert.True(H.PumpUntil(() => H.RunStateOf(item) == "Waiting", TestWait.Default),
             "the script never loaded: " + H.RunStateOf(item));
     }
 
@@ -81,7 +81,7 @@ internal sealed class InventoryGivesRig : IDisposable
     /// <summary>Pump until a line starting with <paramref name="prefix"/> is said; that line.</summary>
     public string WaitSaid(string prefix)
     {
-        Assert.True(H.PumpUntil(() => H.Said.Any(s => s.StartsWith(prefix)), TimeSpan.FromSeconds(15)),
+        Assert.True(H.PumpUntil(() => H.Said.Any(s => s.StartsWith(prefix)), TestWait.Default),
             "nothing starting '" + prefix + "' was said; said: " + string.Join(" | ", H.Said));
         return H.Said.First(s => s.StartsWith(prefix));
     }
