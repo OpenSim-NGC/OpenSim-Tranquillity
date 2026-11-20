@@ -98,8 +98,15 @@ public class EngineSwitchKeepsSharedResourcesTests
             foreach (var kvp in InFlight)
                 if (kvp.Value.ItemID == itemID) InFlight.TryRemove(kvp.Key, out _);
         }
-        public IHttpServiceRequest GetNextCompletedRequest() => null;
-        public void RemoveCompletedRequest(UUID id) { }
+        /// <summary>Completed requests, handed only to the thread <see cref="PumpThread"/> names (0: to none).</summary>
+        public readonly ConcurrentQueue<Req> Completed = new();
+        public int PumpThread;
+        public IHttpServiceRequest GetNextCompletedRequest()
+            => PumpThread == Environment.CurrentManagedThreadId && Completed.TryPeek(out Req r) ? r : null;
+        public void RemoveCompletedRequest(UUID id)
+        {
+            if (Completed.TryPeek(out Req r) && r.ReqID == id) Completed.TryDequeue(out _);
+        }
         public bool CheckThrottle(uint localID, UUID onerID) => true;
         public bool CheckAllowed(Uri url) => true;
     }
@@ -131,19 +138,45 @@ public class EngineSwitchKeepsSharedResourcesTests
         public bool hasRequests() => false;
         public void RemoteDataReply(string channel, string message_id, string sdata, int idata) { }
         public bool IsEnabled() => true;
-        public IXmlRpcRequestInfo GetNextCompletedRequest() => null;
-        public void RemoveCompletedRequest(UUID id) { }
+        public readonly ConcurrentQueue<IXmlRpcRequestInfo> Completed = new();
+        public int PumpThread;
+        public IXmlRpcRequestInfo GetNextCompletedRequest()
+            => PumpThread == Environment.CurrentManagedThreadId && Completed.TryPeek(out var r) ? r : null;
+        public void RemoveCompletedRequest(UUID id)
+        {
+            if (Completed.TryPeek(out var r) && r.GetMessageID() == id) Completed.TryDequeue(out _);
+        }
         public void DeleteChannels(UUID itemID) => ChannelByItem.TryRemove(itemID, out _);
-        public UUID SendRemoteData(uint localID, UUID itemID, string channel, string dest, int idata, string sdata) => UUID.Random();
+        public int RemoteDataSent;
+        public UUID SendRemoteData(uint localID, UUID itemID, string channel, string dest, int idata, string sdata) { System.Threading.Interlocked.Increment(ref RemoteDataSent); return UUID.Random(); }
         public IServiceRequest GetNextCompletedSRDRequest() => null;
         public void RemoveCompletedSRDRequest(UUID id) { }
         public void CancelSRDRequests(UUID itemID) { }
         public int Port => 0;
     }
 
+    /// <summary>An XML-RPC request that came in for a script's channel.</summary>
+    private sealed class Incoming : IXmlRpcRequestInfo
+    {
+        public UUID Item, Channel, Message = UUID.Random();
+        public string Text = "";
+        public bool IsProcessed() => false;
+        public UUID GetChannelKey() => Channel;
+        public void SetProcessed(bool processed) { }
+        public void SetStrRetval(string resp) { }
+        public string GetStrRetval() => "";
+        public void SetIntRetval(int resp) { }
+        public int GetIntRetval() => 0;
+        public uint GetLocalID() => 0;
+        public UUID GetItemID() => Item;
+        public string GetStrVal() => Text;
+        public int GetIntValue() => 0;
+        public UUID GetMessageID() => Message;
+    }
+
     private sealed class Rig : IDisposable
     {
-        public readonly SchedulerHarness H = new(withYEngine: true);
+        public readonly SchedulerHarness H;
         public readonly Http HttpModule = new();
         public readonly Url UrlModule = new();
         public readonly XmlRpc Xml = new();
@@ -151,8 +184,11 @@ public class EngineSwitchKeepsSharedResourcesTests
         public SceneObjectGroup Group;
         public TaskInventoryItem Item;
 
-        public Rig()
+        public Rig(bool osFunctions = false)
         {
+            H = osFunctions
+                ? new SchedulerHarness(cfg => cfg.AddConfig("OSSL").Set("OSFunctionThreatLevel", "Severe"), withYEngine: true)
+                : new SchedulerHarness(withYEngine: true);
             H.Scene.RegisterModuleInterface<IHttpRequestModule>(HttpModule);
             H.Scene.RegisterModuleInterface<IUrlModule>(UrlModule);
             H.Scene.RegisterModuleInterface<IXMLRPC>(Xml);
@@ -316,5 +352,293 @@ public class EngineSwitchKeepsSharedResourcesTests
         LetPhloxUnload(rig);
         Assert.True(rig.InYEngine, rig.Text);
         Assert.False(sp.HasScriptControls(rig.Item.ItemID), "the avatar's controls are still taken for the item");
+    }
+
+    // ── The old Phlox instance after a switch ─────────────────────────────────────────────────────────────────────────
+    // Until Phlox's loader unloads it, Phlox's instance of a script that moved to YEngine is still loaded. It must run
+    // no further event and set nothing up under the item's id: YEngine's instance has the item now, and Phlox's unload
+    // leaves what the core keeps for the item while YEngine holds it.
+
+    // YEngine's instance of this script sets nothing up; only a touch does, and the tests post touches to Phlox alone.
+    private const string QuietBody =
+        "default {\n" +
+        "  state_entry() { llSay(0, \"entry\"); }\n" +
+        "  touch_start(integer t) {\n" +
+        "    llSay(0, \"go\");\n" +
+        "    llSleep(0.5);\n" +
+        "    llRequestURL();\n" +
+        "    llSay(0, \"late\");\n" +
+        "  }\n" +
+        "  http_request(key id, string method, string body) { }\n" +
+        "}\n";
+
+    /// <summary>The region's bot module: records each call, so a registration for a bot's path events shows.</summary>
+    public class BotRecorder : System.Reflection.DispatchProxy
+    {
+        public readonly ConcurrentQueue<string> Calls = new();
+        protected override object Invoke(System.Reflection.MethodInfo method, object[] args)
+        {
+            Calls.Enqueue(method.Name);
+            return method.ReturnType.IsValueType && method.ReturnType != typeof(void) ? Activator.CreateInstance(method.ReturnType) : null;
+        }
+    }
+
+    /// <summary>Switch a quiet script from Phlox to YEngine and wait for YEngine's instance, without pumping Phlox's loader.</summary>
+    private static void SwitchQuietScriptToYEngine(Rig rig)
+    {
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("YEngine"));
+        Assert.True(System.Threading.SpinWait.SpinUntil(() => rig.InYEngine && rig.Entries >= 2, Cap), rig.Text);
+        // Phlox still has its instance: its unload is queued and has not run.
+        Assert.True(rig.InPhlox, rig.Text);
+    }
+
+    /// <summary>Everything a script can set up under its item id, as one line.</summary>
+    private static string SetUps(Rig rig, ScenePresence sp, BotRecorder bots)
+    {
+        UUID item = rig.Item.ItemID;
+        var phlox = rig.H.Engine;
+        return $"urls={rig.UrlModule.Of(item)} http={rig.HttpModule.Started.Count} channels={rig.Xml.ChannelByItem.Count} " +
+               $"remoteData={rig.Xml.RemoteDataSent} controls={sp.HasScriptControls(item)} targets={rig.Group.AtTargets.Count} " +
+               $"rotTargets={rig.Group.RotTargets.Count} listens={phlox.ListenManager.ScriptsWithListens} " +
+               $"sensors={phlox.AsyncCommands.SensorRepeatPlugin.RepeatersFor(item)} mask={rig.Group.RootPart.ScriptEvents} " +
+               $"perms={rig.Item.PermsGranter}/{rig.Item.PermsMask} bots={bots.Calls.Count}";
+    }
+
+    [Theory]
+    [InlineData("URL")]
+    [InlineData("secure URL")]
+    [InlineData("OSSL URL")]
+    [InlineData("HTTP request")]
+    [InlineData("XML-RPC channel")]
+    [InlineData("remote data request")]
+    [InlineData("taken controls")]
+    [InlineData("permissions")]
+    [InlineData("target")]
+    [InlineData("rotation target")]
+    [InlineData("listen")]
+    [InlineData("sensor")]
+    [InlineData("event mask")]
+    [InlineData("bot path events")]
+    public void AnOldPhloxInstanceSetsNothingUpOnceYEngineHoldsTheItem(string what)
+    {
+        using var rig = new Rig(osFunctions: what == "OSSL URL");
+        var bots = System.Reflection.DispatchProxy.Create<IBotManager, BotRecorder>();
+        rig.H.Scene.RegisterModuleInterface<IBotManager>(bots);
+        var recorder = (BotRecorder)(object)bots;
+        rig.Build(ScriptEngineChoices.Phlox, QuietBody);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && rig.Entries >= 1, Cap), rig.Text);
+        var sp = SceneHelpers.AddScenePresence(rig.H.Scene, UUID.Random());
+        var client = (TestClient)sp.ControllingClient;
+
+        SwitchQuietScriptToYEngine(rig);
+        var api = rig.H.ApiFor(rig.Item.ItemID);
+        Assert.NotNull(api);
+        if (what == "taken controls")
+        {
+            // The avatar granted TAKE_CONTROLS to the item (to YEngine's instance, which holds it now).
+            rig.Item.PermsGranter = sp.UUID;
+            rig.Item.PermsMask = 4;
+        }
+        string before = SetUps(rig, sp, recorder);
+
+        switch (what)
+        {
+            case "URL": api.llRequestURL(); break;
+            case "secure URL": api.llRequestSecureURL(); break;
+            case "OSSL URL": api.osRequestURL(new InWorldz.Phlox.Types.LSLList()); break;
+            case "HTTP request": api.llHTTPRequest("http://example.org/", new InWorldz.Phlox.Types.LSLList(), ""); break;
+            case "XML-RPC channel": api.llOpenRemoteDataChannel(); break;
+            case "remote data request": api.llSendRemoteData(UUID.Random().ToString(), "http://example.org/", 0, ""); break;
+            case "taken controls": api.llTakeControls(1, 1, 0); break;
+            case "permissions":
+                int asked = client.ScriptQuestions.Count;
+                api.llRequestPermissions(sp.UUID.ToString(), 16);
+                if (client.ScriptQuestions.Count > asked) client.FireScriptAnswer(rig.Group.RootPart.UUID, rig.Item.ItemID, 16);
+                break;
+            case "target": api.llTarget(new Vector3(1, 2, 3), 1f); break;
+            case "rotation target": api.llRotTarget(Quaternion.Identity, 0.1f); break;
+            case "listen": api.llListen(5, "", "", ""); break;
+            case "sensor": api.llSensorRepeat("", "", 1, 10f, 3.14f, 5f); break;
+            case "event mask":
+                // The old instance stopped (as by its owner): its mask would be none, which would take YEngine's away.
+                object interp = rig.H.InterpreterFor(rig.Item.ItemID);
+                object state = interp.GetType().GetProperty("ScriptState")!.GetValue(interp)!;
+                state.GetType().GetField("GeneralEnable")!.SetValue(state, false);
+                api.SetScriptEventFlags();
+                break;
+            case "bot path events": api.botRegisterForNavigationEvents(UUID.Random().ToString()); break;
+        }
+
+        string after = SetUps(rig, sp, recorder);
+        Assert.True(before == after, $"{what} set up by the old instance: before [{before}] after [{after}]; {rig.Text}");
+    }
+
+    [Fact]
+    public void AnEventPostedToTheOldPhloxInstanceAfterTheSwitchDoesNotRun()
+    {
+        using var rig = new Rig();
+        rig.Build(ScriptEngineChoices.Phlox, QuietBody);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && rig.Entries >= 1, Cap), rig.Text);
+
+        SwitchQuietScriptToYEngine(rig);
+        rig.H.PostTouch(rig.Item.ItemID);
+        // A window that proves the event did NOT run: Phlox's scheduler is pumped, its loader is not.
+        rig.H.PumpExeFor(TimeSpan.FromSeconds(1.5));
+
+        Assert.True(rig.InPhlox, rig.Text);
+        Assert.False(rig.H.Said.Contains("go"), "the old instance ran the touch: " + rig.Text);
+        Assert.Equal(0, rig.UrlModule.Of(rig.Item.ItemID));
+    }
+
+    [Fact]
+    public void AnEventTheOldPhloxInstanceIsRunningStopsAtTheSwitch()
+    {
+        using var rig = new Rig();
+        rig.Build(ScriptEngineChoices.Phlox, QuietBody);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && rig.Entries >= 1, Cap), rig.Text);
+
+        // The touch runs to its llSleep, then the script moves to YEngine.
+        rig.H.PostTouch(rig.Item.ItemID);
+        Assert.True(rig.H.PumpExeUntil(() => rig.H.Said.Contains("go"), Cap), rig.Text);
+        SwitchQuietScriptToYEngine(rig);
+        // Well past the sleep: the rest of the event must not run.
+        rig.H.PumpExeFor(TimeSpan.FromSeconds(1.5));
+
+        Assert.True(rig.InPhlox, rig.Text);
+        Assert.False(rig.H.Said.Contains("late"), "the old instance went on with its event: " + rig.Text);
+        Assert.Equal(0, rig.UrlModule.Of(rig.Item.ItemID));
+    }
+
+    [Fact]
+    public void AResetOfTheOldPhloxInstanceLeavesTheItemsPermissionsAlone()
+    {
+        using var rig = new Rig();
+        rig.Build(ScriptEngineChoices.Phlox, QuietBody);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && rig.Entries >= 1, Cap), rig.Text);
+
+        SwitchQuietScriptToYEngine(rig);
+        // An avatar granted YEngine's instance TRIGGER_ANIMATION.
+        UUID granter = UUID.Random();
+        rig.Item.PermsGranter = granter;
+        rig.Item.PermsMask = 16;
+        rig.H.ResetOnScheduler(rig.Item.ItemID);
+        rig.H.PumpExeFor(TimeSpan.FromSeconds(1));
+
+        Assert.True(rig.InPhlox, rig.Text);
+        Assert.Equal(granter, rig.Item.PermsGranter);
+        Assert.Equal(16, rig.Item.PermsMask);
+    }
+
+    // The responses that come back for YEngine's instance in that window reach it: Phlox's pumps of the core's shared
+    // queues do not take them for Phlox's let-go instance.
+    private const string AnswersBody =
+        "default {\n" +
+        "  state_entry() { llHTTPRequest(\"http://example.org/\", [], \"\"); llSay(0, \"entry\"); }\n" +
+        "  http_response(key id, integer status, list meta, string body) { llSay(0, \"response \" + body); }\n" +
+        "  remote_data(integer type, key channel, key message, string sender, integer i, string s) {\n" +
+        "    if (type == 2) llSay(0, \"remote \" + s);\n" +
+        "  }\n" +
+        "}\n";
+
+    [Fact]
+    public void AnHttpResponseForYEnginesInstanceReachesItThroughPhloxsPump()
+    {
+        using var rig = new Rig();
+        rig.Build(ScriptEngineChoices.Phlox, AnswersBody);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && rig.Entries >= 1, Cap), rig.Text);
+
+        int mark = rig.HttpMark();
+        SwitchQuietScriptToYEngine(rig);
+        Assert.True(System.Threading.SpinWait.SpinUntil(() => rig.HttpSince(mark).Count > 0, Cap), rig.Text);
+        Assert.True(rig.HttpModule.InFlight.TryGetValue(rig.HttpSince(mark)[0], out Req yRequest), rig.Text);
+
+        // YEngine's request completes, and Phlox's pump is the one that takes it from the core's queue.
+        yRequest.ResponseBody = "ok";
+        rig.HttpModule.PumpThread = Environment.CurrentManagedThreadId;
+        rig.HttpModule.Completed.Enqueue(yRequest);
+        rig.H.Engine.AsyncCommands.HttpRequestPlugin.CheckHttpRequests();
+
+        Assert.True(System.Threading.SpinWait.SpinUntil(() => rig.H.Said.Contains("response ok"), Cap),
+            "YEngine's instance never got its http_response: " + rig.Text);
+    }
+
+    [Fact]
+    public void RemoteDataForYEnginesInstanceReachesItThroughPhloxsPump()
+    {
+        using var rig = new Rig();
+        rig.Build(ScriptEngineChoices.Phlox, AnswersBody);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && rig.Entries >= 1, Cap), rig.Text);
+
+        SwitchQuietScriptToYEngine(rig);
+
+        // An XML-RPC request comes in for the script, and Phlox's pump is the one that takes it from the core's queue.
+        rig.Xml.PumpThread = Environment.CurrentManagedThreadId;
+        rig.Xml.Completed.Enqueue(new Incoming { Item = rig.Item.ItemID, Channel = UUID.Random(), Text = "hello" });
+        rig.H.Engine.AsyncCommands.XmlRequestPlugin.CheckXMLRPCRequests();
+
+        Assert.True(System.Threading.SpinWait.SpinUntil(() => rig.H.Said.Contains("remote hello"), Cap),
+            "YEngine's instance never got its remote_data: " + rig.Text);
+    }
+
+    // The same holds when no other engine takes the item, and a later instance of the item runs as usual.
+
+    [Fact]
+    public void AnInstanceTheRegionRemovedFromPhloxSetsNothingUpBeforeItsUnload()
+    {
+        using var rig = new Rig();
+        rig.Build(ScriptEngineChoices.Phlox, QuietBody);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && rig.Entries >= 1, Cap), rig.Text);
+        var api = rig.H.ApiFor(rig.Item.ItemID);
+        Assert.NotNull(api);
+
+        // The owner deletes the script: the region removes it from Phlox, and no engine holds the item.
+        rig.Group.RootPart.Inventory.RemoveInventoryItem(rig.Item.ItemID);
+        Assert.Null(rig.H.Scene.ScriptItemHolders.HolderOf(rig.Item.ItemID));
+        Assert.True(rig.InPhlox, rig.Text);   // its unload is queued and has not run
+
+        api.llRequestURL();
+        api.llHTTPRequest("http://example.org/", new InWorldz.Phlox.Types.LSLList(), "");
+        rig.H.PostTouch(rig.Item.ItemID);
+        rig.H.PumpExeFor(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(0, rig.UrlModule.Of(rig.Item.ItemID));
+        Assert.Empty(rig.HttpModule.Started);
+        Assert.False(rig.H.Said.Contains("go"), "the removed instance ran the touch: " + rig.Text);
+    }
+
+    [Fact]
+    public void ASavedPhloxScriptRunsItsNewInstanceOnceTheOldOneIsUnloaded()
+    {
+        using var h = new SchedulerHarness();
+        UUID item = h.RezScript(QuietBody);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("entry"), Cap), string.Join(" | ", h.Said));
+
+        // A save removes the script from Phlox and starts it again, there.
+        h.ResaveScript(item, QuietBody.Replace("\"entry\"", "\"entry again\""));
+        Assert.True(h.PumpUntil(() => h.Said.Contains("entry again") && !h.Engine.HasLetGo(item), Cap),
+            $"letGo={h.Engine.HasLetGo(item)} said=[{string.Join(" | ", h.Said)}]");
+
+        h.PostTouch(item);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("go"), Cap), "the new instance did not run the touch: " + string.Join(" | ", h.Said));
+    }
+
+    [Fact]
+    public void AScriptSwitchedAwayAndBackBeforeTheUnloadRunsInPhloxAgain()
+    {
+        using var rig = new Rig();
+        rig.Build(ScriptEngineChoices.Phlox, QuietBody);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && rig.Entries >= 1, Cap), rig.Text);
+
+        object first = rig.H.InterpreterFor(rig.Item.ItemID);
+        // Both removals come before Phlox's loader runs, so two let-go unloads are queued ahead of the new load.
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("YEngine"));
+        Assert.Equal(ScriptEngineChoiceResult.Changed, rig.Set("Phlox"));
+        Assert.True(rig.H.Engine.HasLetGo(rig.Item.ItemID), rig.Text);
+        Assert.True(rig.H.PumpUntil(() => rig.InPhlox && !rig.InYEngine && !rig.H.Engine.HasLetGo(rig.Item.ItemID)
+                                           && rig.H.InterpreterFor(rig.Item.ItemID) is { } now && !ReferenceEquals(now, first), Cap), rig.Text);
+
+        rig.H.PostTouch(rig.Item.ItemID);
+        Assert.True(rig.H.PumpUntil(() => rig.H.Said.Contains("go"), Cap), "the new instance did not run the touch: " + rig.Text);
+        Assert.True(rig.H.PumpUntil(() => rig.UrlModule.Of(rig.Item.ItemID) > 0, Cap), "the new instance's URL was refused: " + rig.Text);
     }
 }

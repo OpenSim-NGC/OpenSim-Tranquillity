@@ -599,6 +599,39 @@ public sealed class SchedulerHarness : IDisposable
         return true;
     }
 
+    /// <summary>
+    /// Pump only the execution scheduler, never the loader, until <paramref name="done"/> holds or <paramref name="cap"/>
+    /// passes; false on the cap. A load or unload the loader has queued stays queued.
+    /// </summary>
+    public bool PumpExeUntil(Func<bool> done, TimeSpan cap)
+    {
+        var until = DateTime.UtcNow + cap;
+        while (!done())
+        {
+            if (DateTime.UtcNow >= until) return false;
+            if (!Pending(((global::Phlox.ScriptEngine.PhloxExecutionScheduler)m_exe).DoWork())) System.Threading.Thread.Sleep(1);
+        }
+        return true;
+    }
+
+    /// <summary>Pump only the execution scheduler for a wall-clock window (a window that proves something did NOT happen).</summary>
+    public void PumpExeFor(TimeSpan how)
+    {
+        var until = DateTime.UtcNow + how;
+        while (DateTime.UtcNow < until)
+            if (!Pending(((global::Phlox.ScriptEngine.PhloxExecutionScheduler)m_exe).DoWork())) System.Threading.Thread.Sleep(1);
+    }
+
+    /// <summary>The API of the item's loaded Phlox instance, or null when none is loaded.</summary>
+    public global::Phlox.ScriptEngine.LSLSystemAPI ApiFor(UUID itemId)
+    {
+        var apis = (Dictionary<UUID, global::Phlox.ScriptEngine.LSLSystemAPI>)Field(m_exe, "m_Apis");
+        return apis.TryGetValue(itemId, out var api) ? api : null;
+    }
+
+    /// <summary>Ask the execution scheduler to reset the item's loaded instance, as Phlox's OnScriptReset does.</summary>
+    public void ResetOnScheduler(UUID itemId) => ((global::Phlox.ScriptEngine.PhloxExecutionScheduler)m_exe).ResetScript(itemId);
+
     /// <summary>Scripts handed to the loader's compile thread and not yet taken back by its DoWork.</summary>
     private int CompilesOutstanding => (int)typeof(global::Phlox.ScriptEngine.PhloxScriptLoader)
         .GetField("m_CompilesOutstanding", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(m_loader)!;
