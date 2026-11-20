@@ -150,7 +150,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                                 asset.Local = false;
 
                             asset.Temporary = Convert.ToBoolean(dbReader["Temporary"]);
-                            asset.Flags = (AssetFlags)Convert.ToInt32(dbReader["AssetFlags"]);
+                            asset.Flags = StoredAssetFlags.FromStored(Convert.ToInt32(dbReader["AssetFlags"]), asset.ID);
                             accessTime = (int)dbReader["AccessTime"];
                         }
                     }
@@ -458,7 +458,7 @@ public class MySQLXAssetData : IXAssetDataPlugin
                             metadata.Description = (string)dbReader["Description"];
                             metadata.Type = (sbyte)dbReader["AssetType"];
                             metadata.Temporary = Convert.ToBoolean(dbReader["Temporary"]); // Not sure if this is correct.
-                            metadata.Flags = (AssetFlags)Convert.ToInt32(dbReader["AssetFlags"]);
+                            metadata.Flags = StoredAssetFlags.FromStored(Convert.ToInt32(dbReader["AssetFlags"]), metadata.ID);
                             metadata.FullID = DBGuid.FromDB(dbReader["ID"]);
                             metadata.CreatorID = dbReader["CreatorID"].ToString();
 

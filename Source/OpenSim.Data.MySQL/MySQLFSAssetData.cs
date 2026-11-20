@@ -172,7 +172,7 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
                     meta.Type = (sbyte)Convert.ToInt32(reader["type"]);
                     meta.ContentType = SLUtil.SLAssetTypeToContentType(meta.Type);
                     meta.CreationDate = Util.ToDateTime(Convert.ToInt32(reader["create_time"]));
-                    meta.Flags = (AssetFlags)Convert.ToInt32(reader["asset_flags"]);
+                    meta.Flags = StoredAssetFlags.FromStored(Convert.ToInt32(reader["asset_flags"]), meta.ID);
 
                     int AccessTime = Convert.ToInt32(reader["access_time"]);
                     UpdateAccessTime(id, AccessTime);
