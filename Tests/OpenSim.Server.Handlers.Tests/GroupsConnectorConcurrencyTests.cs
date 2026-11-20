@@ -142,6 +142,57 @@ public class GroupsConnectorConcurrencyTests
         Assert.True(mostAtOnce > 1, "the groups were fetched one at a time");
     }
 
+    /// <summary>One avatar reads the member list (cached), another changes the group through the same region.</summary>
+    private static void AChangeIsSeenByEveryoneOnTheRegion(Action<RemoteConnectorCacheWrapper, UUID> change)
+    {
+        var cache = new RemoteConnectorCacheWrapper(null);
+        UUID group = UUID.Random();
+        string reader = UUID.Random().ToString();
+        int fetches = 0;
+        List<ExtendedGroupMembersData> Fetch() { fetches++; return new List<ExtendedGroupMembersData>(); }
+
+        cache.GetGroupMembers(reader, group, Fetch);
+        cache.GetGroupMembers(reader, group, Fetch);
+        Assert.Equal(1, fetches);   // cached
+
+        change(cache, group);
+
+        cache.GetGroupMembers(reader, group, Fetch);
+        Assert.Equal(2, fetches);   // fetched again after the change
+    }
+
+    [Fact]
+    public void ARoleGivenIsSeenInEveryonesMemberList()
+        => AChangeIsSeenByEveryoneOnTheRegion((c, g) =>
+            c.AddAgentToGroupRole(UUID.Random().ToString(), UUID.Random().ToString(), g, UUID.Random(), () => true));
+
+    [Fact]
+    public void ARoleTakenIsSeenInEveryonesMemberList()
+        => AChangeIsSeenByEveryoneOnTheRegion((c, g) =>
+            c.RemoveAgentFromGroupRole(UUID.Random().ToString(), UUID.Random().ToString(), g, UUID.Random(), () => true));
+
+    [Fact]
+    public void AMemberWhoLeftIsGoneFromEveryonesMemberList()
+        => AChangeIsSeenByEveryoneOnTheRegion((c, g) =>
+            c.RemoveAgentFromGroup(UUID.Random().ToString(), UUID.Random().ToString(), g, () => { }));
+
+    [Fact]
+    public void AMemberWhoTurnedNoticesOffIsSeenSoByEveryone()
+        => AChangeIsSeenByEveryoneOnTheRegion((c, g) =>
+            c.UpdateMembership(UUID.Random().ToString(), g, false, true, () => { }));
+
+    [Fact]
+    public void ATitleChosenIsSeenInEveryonesMemberList()
+        => AChangeIsSeenByEveryoneOnTheRegion((c, g) =>
+            c.SetAgentActiveGroupRole(UUID.Random().ToString(), g, () => { }));
+
+    [Fact]
+    public void AGroupUpdateTheServiceDoesNotAnswerIsAFailureNotACrash()
+    {
+        var cache = new RemoteConnectorCacheWrapper(null);
+        Assert.False(cache.UpdateGroup(UUID.Random(), () => null));
+    }
+
     [Fact]
     public void ARegionsCallsToRobustRunSideBySide()
     {
