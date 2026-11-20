@@ -1,6 +1,6 @@
 # Groups rebuild
 
-**Status: phase 0 built (PR #441); phase 1 built.** The plan for rebuilding the groups code on the existing Groups V2 data
+**Status: phase 0 built (PR #441); phase 1 built (PR #442); phase 2 in progress.** The plan for rebuilding the groups code on the existing Groups V2 data
 (`os_groups_*`), chosen over fixing the two current forks in place or rebuilding with a new schema.
 
 ## Why
@@ -107,3 +107,27 @@ pays a round trip per statement on top, so the old numbers grow with the latency
 | SQLite | 1.9 – 2.1 s | 33 – 52 ms | 4 – 7 ms | 0.4 – 7 ms |
 | MySQL (MariaDB 11) | 1.4 – 1.9 s | 38 – 57 ms | 14 – 17 ms | 1.6 – 2.3 ms |
 | PostgreSQL 17 | 1.24 – 1.26 s | 17 – 26 ms | 4 – 6 ms | 0.6 – 1.1 ms |
+
+## Phase 2, first step: the rules in one place
+
+`Service/GroupRules.cs` decides every permission for one avatar in one group, from three reads: the group, its roles
+and the roles the avatar holds. The service asks it instead of reading the store for each check.
+
+Rules changed, each to match the viewer's group panels (`llgroupmgr.h`, `LLPanelGroupGeneral`, `LLPanelGroupRoles`):
+
+| Change | Before | Now |
+|---|---|---|
+| Group charter, insignia, listing, mature, publishing | Change Actions | Change Identity |
+| Open enrollment and sign-up fee | Change Actions | Member Options (`ChangeOptions`) |
+| A role's name, description and title | Change Actions | Role Properties |
+| A role's abilities | Change Actions | Change Actions |
+| A member's notice and profile settings | anyone | the member |
+| An avatar's active group | anyone, any group | the avatar, among its groups |
+| Removing an invitation | anyone | the invitee, or someone with Invite |
+
+The default Officers role has Change Identity, Member Options and Role Properties but not Change Actions, so officers
+could not edit the charter, the enrollment or a role's title before. A request that mixes parts changes the parts the
+requester may change and keeps the rest, as the viewer sends a whole group or role at once.
+
+Still to do in phase 2: the Robust `/groups` handlers and the Hypergrid connector checked against these rules end to
+end, and the probe extended to an officer's changes.

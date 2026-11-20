@@ -181,21 +181,28 @@ public class GroupsService : GroupsServiceBase
         if (data == null)
             return;
 
-        // Check perms
-        if (!HasPower(RequestingAgentID, groupID, GroupPowers.ChangeActions))
+        // Each part of the settings by its own ability; the viewer sends them all, whichever its user may change.
+        var (identity, enrollment) = GroupRules.For(m_Database, groupID, RequestingAgentID).MayChangeGroup();
+        if (!identity && !enrollment)
         {
             m_log.LogDebug("[Groups]: ({0}) Attempt at updating group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return;
         }
 
         data.GroupID = groupID;
-        data.Data["Charter"] = charter;
-        data.Data["ShowInList"] = showInList ? "1" : "0";
-        data.Data["InsigniaID"] = insigniaID.ToString();
-        data.Data["MembershipFee"] = membershipFee.ToString();
-        data.Data["OpenEnrollment"] = openEnrollment ? "1" : "0";
-        data.Data["AllowPublish"] = allowPublish ? "1" : "0";
-        data.Data["MaturePublish"] = maturePublish ? "1" : "0";
+        if (identity)
+        {
+            data.Data["Charter"] = charter;
+            data.Data["ShowInList"] = showInList ? "1" : "0";
+            data.Data["InsigniaID"] = insigniaID.ToString();
+            data.Data["AllowPublish"] = allowPublish ? "1" : "0";
+            data.Data["MaturePublish"] = maturePublish ? "1" : "0";
+        }
+        if (enrollment)
+        {
+            data.Data["MembershipFee"] = membershipFee.ToString();
+            data.Data["OpenEnrollment"] = openEnrollment ? "1" : "0";
+        }
 
         m_Database.StoreGroup(data);
 
@@ -353,26 +360,34 @@ public class GroupsService : GroupsServiceBase
 
     public bool UpdateGroupRole(string RequestingAgentID, UUID groupID, UUID roleID, string name, string description, string title, ulong powers)
     {
-        // check perms
-        if (!HasPower(RequestingAgentID, groupID, GroupPowers.ChangeActions))
+        // A role's name, description and title need RoleProperties; its abilities need ChangeActions. The viewer
+        // sends the whole role, so what the requester may not change is kept as it is.
+        GroupRules rules = GroupRules.For(m_Database, groupID, RequestingAgentID);
+        var (properties, abilities) = rules.MayChangeRole();
+        RoleData current = m_Database.RetrieveRole(groupID, roleID);
+        if (current == null || (!properties && !abilities))
         {
             m_log.LogDebug("[Groups]: ({0}) Attempt at changing role in group {1} denied because of lack of permission", RequestingAgentID, groupID);
             return false;
         }
+        if (!properties)
+        {
+            name = current.Data["Name"];
+            description = current.Data["Description"];
+            title = current.Data["Title"];
+        }
+        if (!abilities)
+            powers = UInt64.Parse(current.Data["Powers"]);
 
         // SL (wiki Group): "Owners always have all available abilities in the group", and "Owner and Everyone role are
         // the only two roles which can't be renamed".
-        RoleData current = m_Database.RetrieveRole(groupID, roleID);
-        if (current != null)
+        if (roleID == rules.OwnerRoleID)
         {
-            if (roleID == OwnerRoleOf(m_Database.RetrieveGroup(groupID)))
-            {
-                powers = UInt64.Parse(current.Data["Powers"]);
-                name = current.Data["Name"];
-            }
-            else if (roleID.IsZero())
-                name = current.Data["Name"];
+            powers = UInt64.Parse(current.Data["Powers"]);
+            name = current.Data["Name"];
         }
+        else if (roleID.IsZero())
+            name = current.Data["Name"];
 
         return _AddOrUpdateGroupRole(RequestingAgentID, groupID, roleID, name, description, title, powers, false);
     }
@@ -476,17 +491,12 @@ public class GroupsService : GroupsServiceBase
     {
         // check perms. Anyone may leave. SL (wiki Group): "An Owner can eject anyone except another Owner", and "a
         // Member can be ejected from a group if, and only if, they're only in the Everyone Role" by anyone else.
-        if (!SameAgent(RequestingAgentID, AgentID))
+        bool self = SameAgent(RequestingAgentID, AgentID);
+        if (!self)
         {
-            if (!HasPower(RequestingAgentID, GroupID, GroupPowers.Eject) || IsOwner(AgentID, GroupID))
+            GroupRules ejector = GroupRules.For(m_Database, GroupID, RequestingAgentID);
+            if (!ejector.CanEject(ejector.ForOther(m_Database, AgentID), self))
                 return false;
-
-            if (!IsOwner(RequestingAgentID, GroupID))
-            {
-                RoleMembershipData[] held = m_Database.RetrieveMemberRoles(GroupID, AgentID);
-                if (held != null && Array.Exists(held, r => r != null && !r.RoleID.IsZero()))
-                    return false;
-            }
         }
 
         _RemoveAgentFromGroup(RequestingAgentID, AgentID, GroupID);
@@ -541,7 +551,26 @@ public class GroupsService : GroupsServiceBase
 
     public void RemoveAgentToGroupInvite(string RequestingAgentID, UUID inviteID)
     {
+        // The invitee answers their invitation; someone who may invite to the group may withdraw it.
+        InvitationData invite = m_Database.RetrieveInvitation(inviteID);
+        if (invite == null)
+            return;
+        if (!SameInvitee(invite.PrincipalID, RequestingAgentID)
+            && !GroupRules.For(m_Database, invite.GroupID, RequestingAgentID).Has(GroupPowers.Invite))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at removing invitation {1}, sent to {2}, denied", RequestingAgentID, inviteID, invite.PrincipalID);
+            return;
+        }
         m_Database.DeleteInvite(inviteID);
+    }
+
+    /// <summary>The invitee: as stored, or by its UUID when one side names a hypergrid visitor by uuid;url;name.</summary>
+    private static bool SameInvitee(string invitee, string agentID)
+    {
+        if (SameAgent(invitee, agentID))
+            return true;
+        return Util.ParseUniversalUserIdentifier(invitee ?? "", out UUID a) && Util.ParseUniversalUserIdentifier(agentID ?? "", out UUID b)
+            && a.IsNotZero() && a == b;
     }
 
     public bool AddAgentToGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID)
@@ -574,15 +603,7 @@ public class GroupsService : GroupsServiceBase
 
         // check permissions. SL (wiki Group): "Owners can't be removed"; the founder, like any owner, may leave the
         // owners role. Removing members from other roles is the "Remove Members from Roles" ability (RemoveMember).
-        if (RoleID == OwnerRoleOf(m_Database.RetrieveGroup(GroupID)))
-        {
-            if (!SameAgent(RequestingAgentID, AgentID))
-            {
-                m_log.LogDebug("[Groups]: ({0}) Attempt at removing owner {1} from the owners role denied", RequestingAgentID, AgentID);
-                return false;
-            }
-        }
-        else if (!HasPower(RequestingAgentID, GroupID, GroupPowers.RemoveMember))
+        if (!GroupRules.For(m_Database, GroupID, RequestingAgentID).CanRemoveFromRole(RoleID, SameAgent(RequestingAgentID, AgentID)))
         {
             m_log.LogDebug("[Groups]: ({0}) Attempt at removing {1} from role {2} denied because of lack of permission", RequestingAgentID, AgentID, RoleID);
             return false;
@@ -647,7 +668,18 @@ public class GroupsService : GroupsServiceBase
 
     public ExtendedGroupMembershipData SetAgentActiveGroup(string RequestingAgentID, string AgentID, UUID GroupID)
     {
-        // TODO: check perms
+        // An avatar chooses its own active group, among the groups it is in (or none).
+        if (!SameAgent(RequestingAgentID, AgentID))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at choosing the active group of {1} denied", RequestingAgentID, AgentID);
+            return null;
+        }
+        if (!GroupID.IsZero() && m_Database.RetrieveMember(GroupID, AgentID) == null)
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at making group {1}, which they are not in, active denied", AgentID, GroupID);
+            return null;
+        }
+
         PrincipalData principal = new PrincipalData();
         principal.PrincipalID = AgentID;
         principal.ActiveGroupID = GroupID;
@@ -775,7 +807,12 @@ public class GroupsService : GroupsServiceBase
 
     public void UpdateMembership(string RequestingAgentID, string AgentID, UUID GroupID, bool AcceptNotices, bool ListInProfile)
     {
-        // TODO: check perms
+        // Whether to take notices and to list the group in one's profile are the member's own to choose.
+        if (!SameAgent(RequestingAgentID, AgentID))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at changing the membership settings of {1} denied", RequestingAgentID, AgentID);
+            return;
+        }
 
         MembershipData membership = m_Database.RetrieveMember(GroupID, AgentID);
         if (membership == null)
@@ -1126,14 +1163,9 @@ public class GroupsService : GroupsServiceBase
     #region permissions
 
     /// <summary>The viewer's GP_ALL_POWERS: every ability, which owners always have.</summary>
-    public const ulong AllPowers = ulong.MaxValue;
+    public const ulong AllPowers = GroupRules.AllPowers;
 
-    private static UUID OwnerRoleOf(GroupData group)
-    {
-        if (group != null && group.Data != null && group.Data.TryGetValue("OwnerRoleID", out string id) && UUID.TryParse(id, out UUID ownerRoleID))
-            return ownerRoleID;
-        return UUID.Zero;
-    }
+    private static UUID OwnerRoleOf(GroupData group) => GroupRules.OwnerRoleOf(group);
 
     /// <summary>
     /// The pending invitation of <paramref name="agentID"/> to the group. A hypergrid visitor may be named by a
@@ -1151,67 +1183,18 @@ public class GroupsService : GroupsServiceBase
     private static bool SameAgent(string a, string b)
         => string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>
-    /// A member's abilities: those of every role they hold, the Everyone role included; every ability for an owner.
-    /// </summary>
-    private ulong MemberPowers(UUID groupID, string agentID, UUID ownerRoleID)
-    {
-        RoleMembershipData[] held = m_Database.RetrieveMemberRoles(groupID, agentID);
-        if (held == null || held.Length == 0)
-            return 0;
-
-        RoleData[] roles = m_Database.RetrieveRoles(groupID);
-        return PowersOf(held, roles == null ? new List<RoleData>() : new List<RoleData>(roles), ownerRoleID);
-    }
-
     private static ulong PowersOf(IEnumerable<RoleMembershipData> held, List<RoleData> roles, UUID ownerRoleID)
-    {
-        ulong powers = 0;
-        foreach (RoleMembershipData r in held)
-        {
-            if (r == null)
-                continue;
-            if (!ownerRoleID.IsZero() && r.RoleID == ownerRoleID)
-                return AllPowers;
-            RoleData role = roles.Find(x => x.RoleID == r.RoleID);
-            if (role != null && UInt64.TryParse(role.Data["Powers"], out ulong p))
-                powers |= p;
-        }
-        return powers;
-    }
+        => GroupRules.PowersOf(held, roles, ownerRoleID);
 
     private bool HasPower(string agentID, UUID groupID, GroupPowers power)
-    {
-        ulong p = MemberPowers(groupID, agentID, OwnerRoleOf(m_Database.RetrieveGroup(groupID)));
-        return (p & (ulong)power) == (ulong)power;
-    }
+        => GroupRules.For(m_Database, groupID, agentID).Has(power);
 
     private bool IsOwner(string agentID, UUID groupID)
-    {
-        UUID ownerRoleID = OwnerRoleOf(m_Database.RetrieveGroup(groupID));
-        return !ownerRoleID.IsZero() && m_Database.RetrieveRoleMember(groupID, ownerRoleID, agentID) != null;
-    }
+        => GroupRules.For(m_Database, groupID, agentID).IsOwner;
 
-    /// <summary>
-    /// Whether <paramref name="agentID"/> may put a member in <paramref name="roleID"/>: anyone may for Everyone; only
-    /// an owner for the owners role (SL: "Assign Members to Any Role" reaches non-Owner roles); otherwise "Assign
-    /// Members to Any Role" (AssignMember), or "Assign Members to Assigner's Roles" (AssignMemberLimited) for a role
-    /// the assigner holds.
-    /// </summary>
+    /// <summary>Whether <paramref name="agentID"/> may put a member in <paramref name="roleID"/>; see <see cref="GroupRules.CanAssign"/>.</summary>
     private bool CanAssignRole(string agentID, UUID groupID, UUID roleID)
-    {
-        if (roleID.IsZero())
-            return true;
-
-        UUID ownerRoleID = OwnerRoleOf(m_Database.RetrieveGroup(groupID));
-        if (roleID == ownerRoleID)
-            return IsOwner(agentID, groupID);
-
-        ulong p = MemberPowers(groupID, agentID, ownerRoleID);
-        if ((p & (ulong)GroupPowers.AssignMember) != 0)
-            return true;
-        return (p & (ulong)GroupPowers.AssignMemberLimited) != 0 && m_Database.RetrieveRoleMember(groupID, roleID, agentID) != null;
-    }
+        => GroupRules.For(m_Database, groupID, agentID).CanAssign(roleID);
     #endregion
 
 }
