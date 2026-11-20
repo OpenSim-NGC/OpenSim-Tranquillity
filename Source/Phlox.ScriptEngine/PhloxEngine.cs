@@ -847,12 +847,63 @@ namespace Phlox.ScriptEngine
             // takes the item in between holds it, and that unload then releases nothing the core keeps by item id for it
             // (LSLSystemAPI.WhileHeld). So what the core keeps for this instance is released here first, while Phlox still
             // holds the item and before the region can start it in another engine.
+            // From now until that unload, the instance runs nothing from its next timeslice on and sets nothing up under
+            // the item's id (HasLetGo). The mark is set under the lock its set-ups take (LSLSystemAPI.WhileOurs), so each
+            // set-up is made either before it, as by any live instance, or not at all. Only an item Phlox has or is
+            // loading is marked: the region tells every engine of every removal.
             ScriptItemHolders holders = m_Scene?.ScriptItemHolders;
-            if (holders != null && holders.HolderOf(itemID) == Name)
-                holders.ReleaseWhileHeld(itemID, Name, () => ReleaseCoreHoldsOnRemove(localID, itemID));
+            bool letGo = HasOrIsLoading(itemID), marked = false;
+            holders?.ReleaseWhileHeld(itemID, Name, () =>
+            {
+                if (letGo) { LetGo(itemID); marked = true; }
+                if (holders.HolderOf(itemID) == Name) ReleaseCoreHoldsOnRemove(localID, itemID);
+            });
+            // Another engine holds the item, so the guard refuses these set-ups already; the mark stops the instance and
+            // keeps the count in step with the unload posted below.
+            if (letGo && !marked) LetGo(itemID);
             holders?.Leave(itemID, Name);
-            m_ScriptLoader.PostUnloadRequest(localID, itemID);
+            m_ScriptLoader.PostUnloadRequest(localID, itemID, letGo);
             OnScriptRemoved?.Invoke(itemID);
+        }
+
+        /// <summary>
+        /// Items whose instance the region has let go (<see cref="OnRemoveScript"/>) and whose unload has not run yet, with
+        /// the number of such unloads queued. A save, or a switch away and back, can queue a second removal before the
+        /// first unload runs.
+        /// </summary>
+        private readonly Dictionary<UUID, int> m_LetGo = new();
+        private int m_LetGoCount;
+
+        private void LetGo(UUID itemID)
+        {
+            lock (m_LetGo)
+            {
+                m_LetGo[itemID] = m_LetGo.TryGetValue(itemID, out int n) ? n + 1 : 1;
+                Volatile.Write(ref m_LetGoCount, m_LetGo.Count);
+            }
+        }
+
+        /// <summary>The loader has run an unload that <see cref="OnRemoveScript"/> queued.</summary>
+        internal void LetGoUnloaded(UUID itemID)
+        {
+            lock (m_LetGo)
+            {
+                if (!m_LetGo.TryGetValue(itemID, out int n)) return;
+                if (n <= 1) m_LetGo.Remove(itemID);
+                else m_LetGo[itemID] = n - 1;
+                Volatile.Write(ref m_LetGoCount, m_LetGo.Count);
+            }
+        }
+
+        /// <summary>
+        /// The region removed the item's script from Phlox and Phlox's loader has not unloaded the instance yet. The
+        /// scheduler runs nothing more of it, and its API sets nothing up under the item's id (LSLSystemAPI.WhileOurs).
+        /// Any thread; one volatile read while no instance is let go.
+        /// </summary>
+        public bool HasLetGo(UUID itemID)
+        {
+            if (Volatile.Read(ref m_LetGoCount) == 0) return false;
+            lock (m_LetGo) return m_LetGo.ContainsKey(itemID);
         }
 
         /// <summary>
@@ -2063,6 +2114,13 @@ namespace Phlox.ScriptEngine
 
         /// <summary>Is a load of this item in flight (so its early events are worth holding)?</summary>
         internal bool IsLoading(UUID itemID) => m_ScriptLoader?.IsLoading(itemID) ?? false;
+
+        /// <summary>
+        /// Phlox runs the item's script, or is loading it, and no other engine holds the item. Until Phlox's loader unloads
+        /// an instance the region let go, Phlox still has it while another engine may run the script. The pumps of the
+        /// core's shared HTTP and XML-RPC queues ask this, so an answer for the other engine's instance reaches it.
+        /// </summary>
+        internal bool RunsLive(UUID itemID) => HasOrIsLoading(itemID) && !HeldByAnotherEngine(itemID);
 
         /// <summary>
         /// A dataserver answer goes to every script in the asking script's prim, as

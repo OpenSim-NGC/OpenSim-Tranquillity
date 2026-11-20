@@ -215,7 +215,7 @@ namespace Phlox.ScriptEngine.AsyncCommand.Plugins
                 if (m_Forgotten.Remove(req.ReqID)) return Owner.Dropped;   // its Phlox script was reset or removed since
             }
 
-            if (m_CmdManager.m_ScriptEngine is global::Phlox.ScriptEngine.PhloxEngine phlox && phlox.HasOrIsLoading(req.ItemID))
+            if (m_CmdManager.m_ScriptEngine is global::Phlox.ScriptEngine.PhloxEngine phlox && phlox.RunsLive(req.ItemID))
                 return Owner.Dropped;   // a Phlox script that has been reset since it asked
             SceneObjectPart part = m_CmdManager.m_ScriptEngine.World?.GetSceneObjectPart(req.LocalID);
             return part?.Inventory?.GetInventoryItem(req.ItemID) != null

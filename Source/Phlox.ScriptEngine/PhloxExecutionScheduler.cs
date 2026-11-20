@@ -832,6 +832,9 @@ namespace Phlox.ScriptEngine
         {
             Interpreter script;
             if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
+            // An instance the region has let go is not reset: a reset would end the item's permissions and start the
+            // script again, and the item may run in another engine by now (PhloxEngine.HasLetGo).
+            if (m_Engine != null && m_Engine.HasLetGo(itemId)) return false;
 
             UnregisterFromNotifications(script);
             m_Engine.StateManager?.DeleteState(itemId);
@@ -1392,6 +1395,14 @@ namespace Phlox.ScriptEngine
                 var followingScript = m_NextScript.Next;
                 var currentNode = m_NextScript;
                 var current = currentNode.Value;
+                // The region has let this instance go (PhloxEngine.HasLetGo): from this timeslice on it runs nothing more,
+                // not even the rest of the event it is in, and leaves the run queue until its unload. Whatever wakes it
+                // puts it back here.
+                if (m_Engine != null && m_Engine.HasLetGo(current.ItemId))
+                {
+                    RemoveFromRunQueue(current.ItemId);
+                    continue;
+                }
                 int ticks = 0;
                 bool terminated = false;
                 lock (m_SliceLock)
@@ -1726,6 +1737,14 @@ namespace Phlox.ScriptEngine
                     // script's late sensor, HTTP or dataserver event, another engine's script, a failed compile - is dropped.
                     if (m_Engine != null && m_Engine.IsLoading(pe.ItemId)) AddDeferredEvent(pe.ItemId, pe.Evt);
                     else m_DroppedForUnloaded++;
+                    continue;
+                }
+
+                // An instance the region has let go hears nothing more: the item may run in another engine by now.
+                if (m_Engine != null && m_Engine.HasLetGo(pe.ItemId))
+                {
+                    pe.Evt.SignalCompleted();
+                    m_DroppedForUnloaded++;
                     continue;
                 }
 

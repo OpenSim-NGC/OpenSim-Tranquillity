@@ -66,6 +66,11 @@ namespace Phlox.ScriptEngine
         bool HasScript(UUID itemID, out bool running);
         /// <summary>True when this engine runs the script and a runtime error stopped it.</summary>
         bool IsScriptTerminated(UUID itemID) => false;
+        /// <summary>
+        /// True when the region has removed the item's script from this engine and the engine has not unloaded that
+        /// instance yet. Such an instance runs no further event and sets nothing up under the item's id: another engine
+        /// may run the script by now. An engine that unloads at once never has one.</summary>
+        bool HasLetGo(UUID itemID) => false;
         void SetTimerEvent(uint localID, UUID itemID, float sec);
         void SetMinEventDelay(UUID itemID, float seconds);
         void SetItemRunningFlag(uint localId, UUID itemId, bool running);
