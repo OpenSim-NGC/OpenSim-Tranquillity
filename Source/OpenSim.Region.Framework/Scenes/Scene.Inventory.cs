@@ -474,6 +474,16 @@ public partial class Scene
                 avatar.ControllingClient.SendAlertMessage("Notecard updated");
                 break;
             }
+            case InventoryType.LSL:
+            {
+                // as the script task cap (CapsUpdateTaskInventoryScriptAsset) and the agent inventory path require
+                if (!Permissions.CanEditScript(itemID, objectID, avatarId))
+                {
+                    avatar.ControllingClient.SendAgentAlertMessage("Insufficient permissions to edit script", false);
+                    return UUID.Zero;
+                }
+                break;
+            }
             case (InventoryType)CustomInventoryType.AnimationSet:
             {
                 AnimationSet animSet = new(data);
