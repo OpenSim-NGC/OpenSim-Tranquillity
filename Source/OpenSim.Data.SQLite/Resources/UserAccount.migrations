@@ -45,3 +45,14 @@ ALTER TABLE `UserAccounts` ADD `DisplayName` VARCHAR(31) NULL;
 ALTER TABLE `UserAccounts` ADD `NameChanged` INTEGER NULL DEFAULT 0;
 
 COMMIT;
+
+:VERSION 5		# -------------------------
+
+-- UserAccountService stores UserCountry whenever an account has one (osGetAgentCountry reads it back); with no column
+-- the whole store failed.
+
+BEGIN;
+
+ALTER TABLE `UserAccounts` ADD `UserCountry` VARCHAR(100) NOT NULL DEFAULT '';
+
+COMMIT;

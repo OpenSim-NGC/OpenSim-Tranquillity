@@ -309,7 +309,13 @@ public class UserAccountService : UserAccountServiceBase, IUserAccountService
 
     public List<UserAccount> GetUserAccounts(UUID scopeID, List<string> IDs)
     {
-        UserAccountData[] ret = m_Database.GetUsersWhere(scopeID, "PrincipalID in ('" + string.Join("', '", IDs) + "')");
+        // the ids go into the statement as text: only ones that are UUIDs, written the way the stores keep them
+        List<string> ids = IDs?.Select(id => UUID.TryParse(id, out UUID u) ? u.ToString() : null)
+                               .Where(id => id is not null).Distinct().ToList() ?? [];
+        if (ids.Count == 0)
+            return [];
+
+        UserAccountData[] ret = m_Database.GetUsersWhere(scopeID, "PrincipalID in ('" + string.Join("', '", ids) + "')");
         if(ret == null || ret.Length == 0)
             return [];
 

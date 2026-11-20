@@ -79,8 +79,24 @@ public class SQLiteUserAccountData : SQLiteGenericTableHandler<UserAccountData>,
         }
     }
 
+    /// <summary>
+    /// The accounts matching a condition the account service builds (GetUserAccounts' id list,
+    /// GetUserAccountsWhere), in the scope or the default one, as the MySQL and PostgreSQL stores do. It returned
+    /// nothing at all, so every multi-account lookup on a SQLite grid or standalone came back empty.
+    /// </summary>
     public UserAccountData[] GetUsersWhere(UUID scopeID, string where)
     {
-        return null;
+        using (SQLiteCommand cmd = new SQLiteCommand())
+        {
+            if (!scopeID.IsZero())
+            {
+                where = "(ScopeID=:ScopeID or ScopeID='00000000-0000-0000-0000-000000000000') and (" + where + ")";
+                cmd.Parameters.Add(new SQLiteParameter(":ScopeID", scopeID.ToString()));
+            }
+
+            cmd.CommandText = String.Format("select * from {0} where " + where, m_Realm);
+
+            return DoQuery(cmd);
+        }
     }
 }
