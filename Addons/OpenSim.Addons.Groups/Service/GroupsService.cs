@@ -459,6 +459,14 @@ public class GroupsService : GroupsServiceBase
             return false;
         }
 
+        // a banned avatar joins neither by itself nor through anyone, invited or not
+        if (IsBanned(GroupID, AgentID))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at adding {1}, who is banned, to group {2} denied", RequestingAgentID, AgentID, GroupID);
+            reason = "You are banned from this group";
+            return false;
+        }
+
         // An agent joins through an invitation (to the role it names), or into the Everyone role of a group open to
         // enrollment. Adding someone else needs the power to invite and to assign the role.
         InvitationData invite = FindInvitation(GroupID, AgentID);
@@ -506,6 +514,13 @@ public class GroupsService : GroupsServiceBase
 
     public bool AddAgentToGroupInvite(string RequestingAgentID, UUID inviteID, UUID groupID, UUID roleID, string agentID)
     {
+        // a banned avatar is not invited
+        if (IsBanned(groupID, agentID))
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at inviting {1}, who is banned, to group {2} denied", RequestingAgentID, agentID, groupID);
+            return false;
+        }
+
         // Check whether the invitee is already a member of the group
         MembershipData m = m_Database.RetrieveMember(groupID, agentID);
         if (m != null)
@@ -1185,6 +1200,98 @@ public class GroupsService : GroupsServiceBase
 
     private static ulong PowersOf(IEnumerable<RoleMembershipData> held, List<RoleData> roles, UUID ownerRoleID)
         => GroupRules.PowersOf(held, roles, ownerRoleID);
+
+    #region bans (GroupAPIv1)
+    /// <summary>The most bans a group keeps, as SL's ban list does.</summary>
+    public const int MaxBans = 500;
+
+    /// <summary>The group's bans, for someone who may manage them; null otherwise.</summary>
+    public List<BanData> GetGroupBans(string RequestingAgentID, UUID GroupID)
+    {
+        if (!GroupRules.For(m_Database, GroupID, RequestingAgentID).CanManageBans)
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at reading the bans of group {1} denied because of lack of permission", RequestingAgentID, GroupID);
+            return null;
+        }
+        return new List<BanData>(m_Database.RetrieveBans(GroupID) ?? []);
+    }
+
+    /// <summary>
+    /// Ban avatars from the group: someone who may manage bans; never an owner or oneself; at most
+    /// <see cref="MaxBans"/>. A pending invitation of a banned avatar is withdrawn. The viewer ejects banned members
+    /// itself (LLPanelGroupMembersSubTab), so a member stays one until ejected. False when nothing was banned.
+    /// </summary>
+    public bool BanAgents(string RequestingAgentID, UUID GroupID, string[] AgentIDs, out string reason)
+    {
+        reason = string.Empty;
+        GroupRules rules = GroupRules.For(m_Database, GroupID, RequestingAgentID);
+        if (!rules.GroupExists || !rules.CanManageBans)
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at banning from group {1} denied because of lack of permission", RequestingAgentID, GroupID);
+            reason = "Insufficient permission";
+            return false;
+        }
+
+        int count = (m_Database.RetrieveBans(GroupID) ?? []).Length;
+        bool any = false;
+        foreach (string agent in (AgentIDs ?? []).Where(a => !string.IsNullOrEmpty(a)).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (SameAgent(agent, RequestingAgentID) || rules.ForOther(m_Database, agent).IsOwner)
+                continue;   // not oneself, not an owner
+            if (m_Database.RetrieveBan(GroupID, agent) != null)
+                continue;   // banned already
+            if (count >= MaxBans)
+            {
+                reason = "The group's ban list is full";
+                break;
+            }
+
+            BanData ban = new BanData
+            {
+                GroupID = GroupID,
+                PrincipalID = agent,
+                Data = new Dictionary<string, string> { ["BanTime"] = Util.UnixTimeSinceEpoch().ToString() },
+            };
+            if (!m_Database.StoreBan(ban))
+                continue;
+            count++;
+            any = true;
+
+            InvitationData invite = FindInvitation(GroupID, agent);
+            if (invite != null)
+                m_Database.DeleteInvite(invite.InviteID);
+        }
+        return any;
+    }
+
+    /// <summary>Lift bans: someone who may manage bans. False when nothing was lifted.</summary>
+    public bool UnbanAgents(string RequestingAgentID, UUID GroupID, string[] AgentIDs)
+    {
+        if (!GroupRules.For(m_Database, GroupID, RequestingAgentID).CanManageBans)
+        {
+            m_log.LogDebug("[Groups]: ({0}) Attempt at unbanning from group {1} denied because of lack of permission", RequestingAgentID, GroupID);
+            return false;
+        }
+        bool any = false;
+        foreach (string agent in (AgentIDs ?? []).Where(a => !string.IsNullOrEmpty(a)))
+            any |= m_Database.DeleteBan(GroupID, agent);
+        return any;
+    }
+
+    /// <summary>
+    /// Banned from the group. A hypergrid visitor may be named by a universal identifier (uuid;url;name) on one side
+    /// and by the bare UUID on the other (the viewer bans by UUID), so the UUID is tried too.
+    /// </summary>
+    private bool IsBanned(UUID groupID, string agentID)
+    {
+        if (string.IsNullOrEmpty(agentID))
+            return false;
+        if (m_Database.RetrieveBan(groupID, agentID) != null)
+            return true;
+        return agentID.Contains(';') && Util.ParseUniversalUserIdentifier(agentID, out UUID id)
+            && m_Database.RetrieveBan(groupID, id.ToString()) != null;
+    }
+    #endregion
 
     private bool HasPower(string agentID, UUID groupID, GroupPowers power)
         => GroupRules.For(m_Database, groupID, agentID).Has(power);

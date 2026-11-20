@@ -40,6 +40,7 @@ public class PGSQLGroupsData : IGroupsData
     private PGSqlGroupsInvitesHandler m_Invites;
     private PGSqlGroupsNoticesHandler m_Notices;
     private PGSqlGroupsPrincipalsHandler m_Principals;
+    private PGSqlGroupsBansHandler m_Bans;
 
     public PGSQLGroupsData(string connectionString, string realm)
     {
@@ -50,6 +51,7 @@ public class PGSQLGroupsData : IGroupsData
         m_Invites = new PGSqlGroupsInvitesHandler(connectionString, realm + "_invites");
         m_Notices = new PGSqlGroupsNoticesHandler(connectionString, realm + "_notices");
         m_Principals = new PGSqlGroupsPrincipalsHandler(connectionString, realm + "_principals");
+        m_Bans = new PGSqlGroupsBansHandler(connectionString, realm + "_bans");
     }
 
     #region groups table
@@ -349,6 +351,21 @@ public class PGSQLGroupsData : IGroupsData
         return null;
     }
 
+    #region bans table
+    public BanData[] RetrieveBans(UUID groupID) => m_Bans.Get("GroupID", groupID.ToString());
+
+    public BanData RetrieveBan(UUID groupID, string principalID)
+    {
+        BanData[] bans = m_Bans.Get(new string[] { "GroupID", "PrincipalID" }, new string[] { groupID.ToString(), principalID });
+        return bans.Length > 0 ? bans[0] : null;
+    }
+
+    public bool StoreBan(BanData data) => m_Bans.Store(data);
+
+    public bool DeleteBan(UUID groupID, string principalID)
+        => m_Bans.Delete(new string[] { "GroupID", "PrincipalID" }, new string[] { groupID.ToString(), principalID });
+    #endregion
+
     #region lookups of many rows
     public GroupData[] RetrieveGroupsByID(UUID[] groupIDs)
         => GroupsBatch.Get(groupIDs ?? [], ids => m_Groups.Get("GroupID", ids));
@@ -484,6 +501,16 @@ public class PGSqlGroupsPrincipalsHandler : PGSQLGenericTableHandler<PrincipalDa
     }
 
     public PGSqlGroupsPrincipalsHandler(string connectionString, string realm)
+        : base(connectionString, realm, string.Empty)
+    {
+    }
+}
+
+public class PGSqlGroupsBansHandler : PGSQLGenericTableHandler<BanData>
+{
+    protected override Assembly Assembly => GetType().Assembly;
+
+    public PGSqlGroupsBansHandler(string connectionString, string realm)
         : base(connectionString, realm, string.Empty)
     {
     }

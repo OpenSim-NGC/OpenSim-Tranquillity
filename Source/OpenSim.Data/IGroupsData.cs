@@ -42,6 +42,14 @@ public class MembershipData
     public Dictionary<string, string> Data;
 }
 
+/// <summary>An avatar banned from a group (GroupAPIv1); Data["BanTime"] is when, in Unix seconds.</summary>
+public class BanData
+{
+    public UUID GroupID;
+    public string PrincipalID;
+    public Dictionary<string, string> Data;
+}
+
 public class RoleData
 {
     public UUID GroupID;
@@ -136,6 +144,18 @@ public interface IGroupsData
     // combinations
     MembershipData RetrievePrincipalGroupMembership(string principalID, UUID groupID);
     MembershipData[] RetrievePrincipalGroupMemberships(string principalID);
+
+    // Bans (GroupAPIv1). The defaults are a store without bans: none are kept, none are found.
+
+    /// <summary>The avatars banned from the group.</summary>
+    BanData[] RetrieveBans(UUID groupID) => [];
+
+    /// <summary>The ban of one avatar from the group, or null.</summary>
+    BanData RetrieveBan(UUID groupID, string principalID) => null;
+
+    bool StoreBan(BanData data) => false;
+
+    bool DeleteBan(UUID groupID, string principalID) => false;
 
     // Lookups of many rows at once. The stores answer each in a statement per GroupsBatch.Size keys, whatever the
     // number of groups; these defaults, for a store that does not, ask once per group.

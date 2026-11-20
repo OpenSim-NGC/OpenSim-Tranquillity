@@ -45,6 +45,7 @@ public class SQLiteGroupsData : IGroupsData
     private readonly SqliteGroupsHandler<InvitationData> m_Invites;
     private readonly SqliteGroupsHandler<NoticeData> m_Notices;
     private readonly SqliteGroupsHandler<PrincipalData> m_Principals;
+    private readonly SqliteGroupsHandler<BanData> m_Bans;
 
     public SQLiteGroupsData(string connectionString, string realm)
     {
@@ -58,6 +59,7 @@ public class SQLiteGroupsData : IGroupsData
         m_Invites = new SqliteGroupsHandler<InvitationData>(connectionString, realm + "_invites");
         m_Notices = new SqliteGroupsHandler<NoticeData>(connectionString, realm + "_notices");
         m_Principals = new SqliteGroupsHandler<PrincipalData>(connectionString, realm + "_principals");
+        m_Bans = new SqliteGroupsHandler<BanData>(connectionString, realm + "_bans");
     }
 
     private static T First<T>(T[] rows) where T : class => rows is { Length: > 0 } ? rows[0] : null;
@@ -182,6 +184,21 @@ public class SQLiteGroupsData : IGroupsData
     public MembershipData RetrievePrincipalGroupMembership(string principalID, UUID groupID) => null;
 
     public MembershipData[] RetrievePrincipalGroupMemberships(string principalID) => null;
+    #endregion
+
+    #region bans table
+    public BanData[] RetrieveBans(UUID groupID) => m_Bans.Get("GroupID", groupID.ToString());
+
+    public BanData RetrieveBan(UUID groupID, string principalID)
+    {
+        BanData[] bans = m_Bans.Get(new[] { "GroupID", "PrincipalID" }, new[] { groupID.ToString(), principalID });
+        return bans.Length > 0 ? bans[0] : null;
+    }
+
+    public bool StoreBan(BanData data) => m_Bans.Store(data);
+
+    public bool DeleteBan(UUID groupID, string principalID)
+        => m_Bans.Delete(new[] { "GroupID", "PrincipalID" }, new[] { groupID.ToString(), principalID });
     #endregion
 
     #region lookups of many rows

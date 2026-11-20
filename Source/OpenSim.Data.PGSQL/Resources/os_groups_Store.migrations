@@ -224,3 +224,17 @@ CREATE INDEX IF NOT EXISTS os_groups_notices_group ON os_groups_notices ("GroupI
 CREATE INDEX IF NOT EXISTS os_groups_notices_stamp ON os_groups_notices ("TMStamp");
 
 COMMIT;
+
+:VERSION 6
+
+BEGIN;
+
+-- the avatars banned from each group (GroupAPIv1)
+CREATE TABLE IF NOT EXISTS os_groups_bans (
+  "GroupID" uuid NOT NULL,
+  "PrincipalID" VARCHAR(255) NOT NULL DEFAULT '',
+  "BanTime" integer NOT NULL DEFAULT '0',
+  constraint os_groupsbanspk PRIMARY KEY ("GroupID", "PrincipalID")
+);
+
+COMMIT;

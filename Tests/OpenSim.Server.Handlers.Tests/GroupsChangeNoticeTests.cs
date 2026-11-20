@@ -191,6 +191,56 @@ public class GroupsChangeNoticeTests
         Assert.Equal(2, region.Fetches);
     }
 
+    [Fact]
+    public void BansGoThroughRobust()
+    {
+        // a stand-in Robust: its HTTP listener hands each request to the real groups handler
+        int port = FreePort();
+        using var listener = new HttpListener();
+        listener.Prefixes.Add($"http://127.0.0.1:{port}/");
+        listener.Start();
+        var handler = new GroupsServicePostHandler(SqliteGroupsStoreTests.Service, null, string.Empty);
+        using var stop = new CancellationTokenSource();
+        _ = Task.Run(async () =>
+        {
+            while (!stop.IsCancellationRequested)
+            {
+                HttpListenerContext ctx;
+                try { ctx = await listener.GetContextAsync(); } catch { return; }
+                var response = new TestOSHttpResponse { StatusCode = 200 };
+                byte[] reply = handler.Handle("/groups", ctx.Request.InputStream,
+                    new TestOSHttpRequest { Headers = new NameValueCollection() }, response);
+                ctx.Response.StatusCode = response.StatusCode;
+                ctx.Response.ContentLength64 = reply.Length;
+                ctx.Response.OutputStream.Write(reply);
+                ctx.Response.Close();
+            }
+        });
+
+        var config = new Nini.Config.IniConfigSource();
+        config.AddConfig("Groups").Set("GroupsServerURI", $"http://127.0.0.1:{port}/");
+        var robust = new GroupsServiceRemoteConnector(config);
+
+        string owner = UUID.Random().ToString(), member = UUID.Random().ToString(), stranger = UUID.Random().ToString();
+        UUID group = SqliteGroupsStoreTests.Service.CreateGroup(owner, "Robust bans " + Guid.NewGuid().ToString("N")[..8], "",
+            true, UUID.Zero, 0, true, true, false, new UUID(owner), out string reason);
+        Assert.True(group.IsNotZero(), reason);
+        Assert.True(SqliteGroupsStoreTests.Service.AddAgentToGroup(member, member, group, UUID.Zero, string.Empty, out reason), reason);
+
+        Assert.Empty(robust.GetGroupBans(owner, group));          // none yet: an empty list
+        Assert.Null(robust.GetGroupBans(member, group));          // not theirs to see: no list at all
+        Assert.False(robust.ChangeGroupBans(member, group, true, new[] { stranger }));
+        Assert.True(robust.ChangeGroupBans(owner, group, true, new[] { stranger }));
+
+        ExtendedGroupBanData ban = Assert.Single(robust.GetGroupBans(owner, group));
+        Assert.Equal(stranger, ban.AgentID);
+        Assert.True(ban.BanTime > 0);
+
+        Assert.True(robust.ChangeGroupBans(owner, group, false, new[] { stranger }));
+        Assert.Empty(robust.GetGroupBans(owner, group));
+        stop.Cancel();
+    }
+
     private sealed class Recorder : IGroupsChangeNotifier
     {
         private readonly System.Collections.Concurrent.ConcurrentBag<UUID> m_told;
