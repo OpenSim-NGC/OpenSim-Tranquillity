@@ -38,9 +38,11 @@ using OpenSim.Server.Base;
 namespace OpenSim.Groups;
 
 /// <summary>
-/// "These groups changed": what Robust's groups service tells the region servers after a change, so each forgets
-/// what its groups caches hold about those groups at once instead of keeping it until the cache's 30 s are up. A
-/// POST of <c>GroupIDs=uuid,uuid</c> to <see cref="Path"/>, carrying the groups key (<see cref="GroupsSecretKey"/>).
+/// "These groups and avatars changed": what Robust's groups service tells the region servers after a change, so each
+/// forgets what its groups caches hold about them at once instead of keeping it until the cache's 30 s are up. A POST
+/// of <c>GroupIDs=uuid,uuid&amp;AgentIDs=id,id</c> to <see cref="Path"/> (each value URL-encoded, the avatars as the
+/// groups service names them: a UUID, or a hypergrid visitor's universal identifier), carrying the groups key
+/// (<see cref="GroupsSecretKey"/>).
 /// Both sides take part only when <c>[Groups] SecretKey</c> is set; without it the caches expire as before.
 /// </summary>
 public static class GroupsChangeNotice
@@ -63,7 +65,10 @@ public static class GroupsChangeNotice
     }
 
     /// <summary>Every groups cache of this process forgets the groups; how many caches did.</summary>
-    public static int Forget(IEnumerable<UUID> groups)
+    public static int Forget(IEnumerable<UUID> groups) => Forget(groups, []);
+
+    /// <summary>Every groups cache of this process forgets the groups and the avatars; how many caches did.</summary>
+    public static int Forget(IEnumerable<UUID> groups, IEnumerable<string> agents)
     {
         List<RemoteConnectorCacheWrapper> caches = new();
         lock (s_caches)
@@ -72,9 +77,14 @@ public static class GroupsChangeNotice
                     caches.Add(c);
 
         UUID[] ids = groups.ToArray();
+        string[] who = (agents ?? []).ToArray();
         foreach (RemoteConnectorCacheWrapper c in caches)
+        {
             foreach (UUID g in ids)
                 c.ForgetGroup(g);
+            foreach (string a in who)
+                c.ForgetAgent(a);
+        }
         return caches.Count;
     }
 
@@ -94,23 +104,35 @@ public static class GroupsChangeNotice
     }
 
     /// <summary>The body of a notice.</summary>
-    public static string Body(IEnumerable<UUID> groups) => "GroupIDs=" + string.Join(",", groups);
+    public static string Body(IEnumerable<UUID> groups) => Body(groups, []);
 
-    /// <summary>The groups a notice names; malformed ids are left out.</summary>
-    public static List<UUID> Groups(string body)
+    /// <summary>The body of a notice naming groups and avatars.</summary>
+    public static string Body(IEnumerable<UUID> groups, IEnumerable<string> agents)
     {
-        var groups = new List<UUID>();
+        string body = "GroupIDs=" + WebUtility.UrlEncode(string.Join(",", groups));
+        string[] who = (agents ?? []).Where(a => !string.IsNullOrEmpty(a)).ToArray();
+        return who.Length == 0 ? body : body + "&AgentIDs=" + WebUtility.UrlEncode(string.Join(",", who));
+    }
+
+    private static IEnumerable<string> Values(string body, string name)
+    {
         foreach (string part in (body ?? string.Empty).Split('&'))
         {
             int eq = part.IndexOf('=');
-            if (eq < 0 || !part[..eq].Equals("GroupIDs", StringComparison.Ordinal))
+            if (eq < 0 || !part[..eq].Equals(name, StringComparison.Ordinal))
                 continue;
-            foreach (string id in WebUtility.UrlDecode(part[(eq + 1)..]).Split(','))
-                if (UUID.TryParse(id.Trim(), out UUID g) && g.IsNotZero())
-                    groups.Add(g);
+            foreach (string v in WebUtility.UrlDecode(part[(eq + 1)..]).Split(','))
+                if (v.Trim().Length > 0)
+                    yield return v.Trim();
         }
-        return groups;
     }
+
+    /// <summary>The groups a notice names; malformed ids are left out.</summary>
+    public static List<UUID> Groups(string body)
+        => Values(body, "GroupIDs").Select(id => UUID.TryParse(id, out UUID g) ? g : UUID.Zero).Where(g => g.IsNotZero()).ToList();
+
+    /// <summary>The avatars a notice names.</summary>
+    public static List<string> Agents(string body) => Values(body, "AgentIDs").ToList();
 }
 
 /// <summary>A region server's end of <see cref="GroupsChangeNotice"/>.</summary>
@@ -144,8 +166,9 @@ public sealed class GroupsChangedHandler : BaseStreamHandler
         using (var reader = new StreamReader(requestData))
             body = reader.ReadToEnd();
         List<UUID> groups = GroupsChangeNotice.Groups(body);
-        int caches = GroupsChangeNotice.Forget(groups);
-        m_log.LogDebug("[Groups]: {0} group(s) changed; {1} cache(s) forgot them", groups.Count, caches);
+        List<string> agents = GroupsChangeNotice.Agents(body);
+        int caches = GroupsChangeNotice.Forget(groups, agents);
+        m_log.LogDebug("[Groups]: {0} group(s) and {1} avatar(s) changed; {2} cache(s) forgot them", groups.Count, agents.Count, caches);
 
         httpResponse.StatusCode = (int)HttpStatusCode.OK;
         return Encoding.UTF8.GetBytes("OK");
@@ -155,7 +178,8 @@ public sealed class GroupsChangedHandler : BaseStreamHandler
 /// <summary>Robust's end of <see cref="GroupsChangeNotice"/>: told of each change, it tells the region servers.</summary>
 public interface IGroupsChangeNotifier
 {
-    void Changed(UUID groupID);
+    /// <summary>The group changed; <paramref name="agentID"/>, when given, is the avatar whose own groups changed with it.</summary>
+    void Changed(UUID groupID, string agentID = null);
 }
 
 /// <summary>
@@ -175,6 +199,7 @@ public sealed class GroupsChangeNotifier : IGroupsChangeNotifier, IDisposable
     private readonly Func<string, string, string, bool> m_post;
     private readonly TimeSpan m_gather;
     private readonly ConcurrentDictionary<UUID, byte> m_pending = new();
+    private readonly ConcurrentDictionary<string, byte> m_pendingAgents = new(StringComparer.OrdinalIgnoreCase);
     private int m_scheduled;
     private volatile bool m_disposed;
 
@@ -195,11 +220,13 @@ public sealed class GroupsChangeNotifier : IGroupsChangeNotifier, IDisposable
             .Select(r => r.ServerURI)
             .Where(u => !string.IsNullOrEmpty(u));
 
-    public void Changed(UUID groupID)
+    public void Changed(UUID groupID, string agentID = null)
     {
         if (m_disposed || groupID.IsZero())
             return;
         m_pending.TryAdd(groupID, 0);
+        if (!string.IsNullOrEmpty(agentID))
+            m_pendingAgents.TryAdd(agentID, 0);
         if (Interlocked.Exchange(ref m_scheduled, 1) == 0)
             _ = Task.Run(SendSoon);
     }
@@ -213,6 +240,10 @@ public sealed class GroupsChangeNotifier : IGroupsChangeNotifier, IDisposable
         foreach (UUID g in m_pending.Keys)
             if (m_pending.TryRemove(g, out _))
                 groups.Add(g);
+        List<string> agents = new();
+        foreach (string a in m_pendingAgents.Keys)
+            if (m_pendingAgents.TryRemove(a, out _))
+                agents.Add(a);
         if (groups.Count == 0)
             return;
 
@@ -230,7 +261,7 @@ public sealed class GroupsChangeNotifier : IGroupsChangeNotifier, IDisposable
             return;
         }
 
-        string body = GroupsChangeNotice.Body(groups);
+        string body = GroupsChangeNotice.Body(groups, agents);
         await Task.WhenAll(servers.Select(server => Task.Run(() =>
         {
             try

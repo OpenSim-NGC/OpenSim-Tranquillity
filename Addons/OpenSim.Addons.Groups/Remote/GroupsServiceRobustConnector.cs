@@ -174,7 +174,8 @@ public class GroupsServicePostHandler : BaseStreamHandler
                 && UUID.TryParse(gid?.ToString(), out UUID changed) && changed.IsNotZero())
             {
                 byte[] reply = Dispatch(method, request);
-                m_changes.Changed(changed);
+                // the avatar whose own groups changed with it (a join, a leave, a role, a title, a setting)
+                m_changes.Changed(changed, request.TryGetValue("AgentID", out object aid) ? aid?.ToString() : null);
                 return reply;
             }
             return Dispatch(method, request);
