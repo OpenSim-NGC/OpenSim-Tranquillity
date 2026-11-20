@@ -1,6 +1,6 @@
 # Groups rebuild
 
-**Status: phase 0 built (PR #441); phase 1 built (PR #442); phase 2 in progress.** The plan for rebuilding the groups code on the existing Groups V2 data
+**Status: phase 0 built (PR #441); phase 1 built (PR #442); phase 2 built (PR #445); phase 3 in progress.** The plan for rebuilding the groups code on the existing Groups V2 data
 (`os_groups_*`), chosen over fixing the two current forks in place or rebuilding with a new schema.
 
 ## Why
@@ -139,3 +139,16 @@ Robust and Hypergrid (phase 2, second step):
 
 The probe's `group-admin` scenario covers an officer's changes (Ferrobot). Still to do in phase 2: the probe extended
 to the Hypergrid groups path on the two-grid rig.
+
+## Phase 3, first steps
+
+- **Calls side by side.** The region's connectors to Robust's groups service and to other grids' Hypergrid groups
+  services made every request inside one lock, so a region's groups calls ran one at a time behind the slowest. The
+  locks are gone (six half-second calls: 3.0 s before, about 0.5 s now), and the region's cache keeps its set of
+  fetches under way under its own lock.
+- **Notices a few at a time.** A notice to members outside the process goes to the message transfer module through
+  `GroupNoticeSender`, four messages at a time, so the region's other instant messages wait behind at most those
+  few instead of one job per member. The members reached are unchanged.
+
+Still to do in phase 3: one module in place of the V2 groups and messaging pair; caching that hears about changes;
+group chat to a large group through the same sender; invites through it.
