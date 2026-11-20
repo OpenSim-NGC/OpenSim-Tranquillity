@@ -518,6 +518,16 @@ public sealed class AisHandler : SimpleStreamHandler
             var refused = AisMutation.RefusedItemChanges(body, item);
             if (refused.Count > 0) { WriteRefused(response, "item", route, refused); return; }
 
+            // An asset named directly must be one the agent may give this item: their own upload of its type.
+            // Refused whole, before anything is applied, like the refusals above.
+            if (body.TryGetValue("asset_id", out var assetField) && assetField.AsUUID() != item.AssetID
+                && !m_backend.MayUseAsset(m_agentId, assetField.AsUUID(), (sbyte)item.AssetType))
+            {
+                WriteError(response, HttpStatusCode.Forbidden,
+                    $"asset {assetField.AsUUID()} cannot be given to item {route.Id}; the item still points at its previous asset", route);
+                return;
+            }
+
             // Captured before ApplyToItem, which mutates the item in place.
             var assetBefore = item.AssetID;
 

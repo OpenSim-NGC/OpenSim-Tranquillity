@@ -97,6 +97,14 @@ public interface IAisInventoryBackend
     /// </summary>
     void OnItemAssetChanged(UUID agentId, UUID itemId, UUID newAssetId);
 
+    /// <summary>
+    /// Whether a PATCH's <c>asset_id</c> may point the agent's item, of asset type <paramref name="assetType"/>, at
+    /// <paramref name="assetId"/>: an asset of that type which the agent created, that is their own upload. A
+    /// viewer never sends a changed <c>asset_id</c> (it sends <c>hash_id</c>, resolved by
+    /// <see cref="ApplyAssetTransaction"/>), so this only decides what a PATCH naming an asset directly may do.
+    /// </summary>
+    bool MayUseAsset(UUID agentId, UUID assetId, sbyte assetType);
+
     /// <summary>Update a folder's mutable fields (name, type, parent on move).</summary>
     bool UpdateFolder(InventoryFolderBase folder);
 

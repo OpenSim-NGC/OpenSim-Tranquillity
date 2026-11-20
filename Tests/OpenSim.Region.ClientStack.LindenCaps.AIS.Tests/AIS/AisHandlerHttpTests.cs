@@ -44,6 +44,7 @@ public class AisHandlerHttpTests
         public bool UpdateItem(InventoryItemBase item) => throw Boom();
         public AisAssetTransaction ApplyAssetTransaction(UUID agentId, UUID transactionId, InventoryItemBase item) => throw Boom();
         public void OnItemAssetChanged(UUID agentId, UUID itemId, UUID newAssetId) => throw Boom();
+        public bool MayUseAsset(UUID agentId, UUID assetId, sbyte assetType) => throw Boom();
         public bool UpdateFolder(InventoryFolderBase folder) => throw Boom();
         public bool DeleteItems(UUID agentId, IReadOnlyList<UUID> itemIds) => throw Boom();
         public bool DeleteFolders(UUID agentId, IReadOnlyList<UUID> folderIds, bool onlyIfTrash) => throw Boom();

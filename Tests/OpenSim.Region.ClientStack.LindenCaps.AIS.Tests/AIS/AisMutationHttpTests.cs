@@ -199,6 +199,29 @@ public class AisMutationHttpTests
     // ------------------------------------------------------------------ A16: the asset id
 
     /// <summary>
+    /// An asset named directly in <c>asset_id</c> must be the resident's own upload of the item's type; any other
+    /// is refused whole, and the item keeps its asset. (A viewer sends <c>hash_id</c>, never a changed asset_id.)
+    /// </summary>
+    [Test]
+    public void patching_asset_id_to_an_asset_that_is_not_the_residents_is_refused()
+    {
+        var b = Inventory();
+        var others = UUID.Random();
+        b.OthersAssets.Add(others);
+        var before = b.Items[Shirt].AssetID;
+        var versionBefore = b.Folders[Clothing].Version;
+
+        var (status, body) = Send(b, "PATCH", $"/item/{Shirt}", new OSDMap { ["name"] = "Mine now", ["asset_id"] = others });
+
+        Assert.That(status, Is.EqualTo((int)HttpStatusCode.Forbidden));
+        Assert.That(body.ContainsKey("_updated_category_versions"), Is.False, "a refusal reports no folder version");
+        Assert.That(b.Items[Shirt].AssetID, Is.EqualTo(before), "the item keeps its asset");
+        Assert.That(b.Items[Shirt].Name, Is.Not.EqualTo("Mine now"), "nothing in a refused body is applied");
+        Assert.That(b.Writes, Is.Empty);
+        Assert.That(b.Folders[Clothing].Version, Is.EqualTo(versionBefore));
+    }
+
+    /// <summary>
     /// The A16 defect, reproduced. A wearable save uploads a new asset and then PATCHes the item; the PATCH
     /// answered 200 and the item kept its old asset, so the edit survived only in the viewer's cache. Live on
     /// 2026-09-05: asset 44f77403 uploaded at 16:27:24,899, PATCH of item e2c03d62 answered 200 at :24,958, and
