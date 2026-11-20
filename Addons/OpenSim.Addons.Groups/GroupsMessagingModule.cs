@@ -102,7 +102,10 @@ public class GroupsMessagingModule : ISharedRegionModule, IGroupsMessagingModule
         if (!m_groupMessagingEnabled)
             return;
 
-        m_messageOnlineAgentsOnly = groupsConfig.GetBoolean("MessageOnlineUsersOnly", false);
+        // V2 messages online members only, always ("V2 has this always on, no other option", as the ini says).
+        // MessageOnlineUsersOnly belongs to the Flotsam module, and RegionServerDefaults.ini sets it false for that
+        // one: read here, it switched V2 group chat and notices off on every region that chose V2.
+        m_messageOnlineAgentsOnly = true;
 
         if (m_messageOnlineAgentsOnly)
         {
@@ -110,12 +113,13 @@ public class GroupsMessagingModule : ISharedRegionModule, IGroupsMessagingModule
         }
         else
         {
-            m_log.LogError("[Groups.Messaging]: GroupsMessagingModule V2 requires MessageOnlineUsersOnly = true");
+            m_log.LogError("[Groups.Messaging]: GroupsMessagingModule V2 needs MessageOnlineUsersOnly = true; [Groups] sets it false, so group messaging is off");
             m_groupMessagingEnabled = false;
             return;
         }
 
-        m_debugEnabled = groupsConfig.GetBoolean("MessagingDebugEnabled", m_debugEnabled);
+        // the ini documents DebugMessagingEnabled; the module long read only MessagingDebugEnabled
+        m_debugEnabled = groupsConfig.GetBoolean("MessagingDebugEnabled", groupsConfig.GetBoolean("DebugMessagingEnabled", m_debugEnabled));
 
         m_log.LogInformation(
             "[Groups.Messaging]: GroupsMessagingModule enabled with MessageOnlineOnly = {0}, DebugEnabled = {1}",

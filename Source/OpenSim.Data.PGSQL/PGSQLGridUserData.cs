@@ -45,6 +45,14 @@ public class PGSQLGridUserData : PGSQLGenericTableHandler<GridUserData>,
     {
     }
 
+    public GridUserData[] GetMany(string[] userIDs)
+    {
+        var found = new List<GridUserData>();
+        foreach (string[] batch in (userIDs ?? []).Distinct().Chunk(GridUserBatch.Size))
+            found.AddRange(Get("UserID", batch));
+        return found.ToArray();
+    }
+
     public new GridUserData Get(string userID)
     {
         GridUserData[] ret = Get("UserID", userID);
