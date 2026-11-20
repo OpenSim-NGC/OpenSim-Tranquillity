@@ -58,6 +58,7 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
         public bool ActorHasPowers;
         public readonly HashSet<UUID> Members = new();
         public readonly Dictionary<UUID, UUID> Invites = new();   // invite id -> invitee
+        public readonly List<GridInstantMessage> Sent = new();   // the instant messages the module sent
 
         public bool Invite(UUID inviteId, UUID invitee)
         {
@@ -109,16 +110,21 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
         return source;
     }
 
-    private static void RegisterCommonStandIns(TestScene scene)
+    private static void RegisterCommonStandIns(TestScene scene, FakeGroupsService svc)
     {
-        scene.RegisterModuleInterface<IMessageTransferModule>(Stand<IMessageTransferModule>.Create((_, _) => null));
+        scene.RegisterModuleInterface<IMessageTransferModule>(Stand<IMessageTransferModule>.Create((name, a) =>
+        {
+            if (name == "SendInstantMessage" && a.Length > 0 && a[0] is GridInstantMessage im)
+                svc.Sent.Add(im);
+            return null;
+        }));
         scene.RegisterModuleInterface<IUserManagement>(Stand<IUserManagement>.Create((_, _) => null));
     }
 
     private static IGroupsModule XmlRpcModule(FakeGroupsService svc)
     {
         TestScene scene = new SceneHelpers().SetupScene();
-        RegisterCommonStandIns(scene);
+        RegisterCommonStandIns(scene, svc);
         scene.RegisterModuleInterface<XmlRpcGroups.IGroupsServicesConnector>(
             Stand<XmlRpcGroups.IGroupsServicesConnector>.Create((name, a) => name switch
             {
@@ -142,7 +148,7 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
     private static IGroupsModule V2Module(FakeGroupsService svc)
     {
         TestScene scene = new SceneHelpers().SetupScene();
-        RegisterCommonStandIns(scene);
+        RegisterCommonStandIns(scene, svc);
         scene.RegisterModuleInterface<V2Groups.IGroupsServicesConnector>(
             Stand<V2Groups.IGroupsServicesConnector>.Create((name, a) => name switch
             {
@@ -233,5 +239,32 @@ public class GroupInviteEjectResultTests : OpenSimTestCase
 
         Assert.False(gm.EjectGroupMember(null, ActorId, GroupId, TargetId));
         Assert.Contains(TargetId, svc.Members);
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void AnEjectTheServiceRefusesTellsNobodyTheyWereEjected(string which)
+    {
+        FakeGroupsService svc = new() { ActorHasPowers = false };
+        svc.Members.Add(TargetId);
+        IGroupsModule gm = Module(which, svc);
+
+        gm.EjectGroupMember(null, ActorId, GroupId, TargetId);
+
+        Assert.Empty(svc.Sent);
+    }
+
+    [Theory]
+    [MemberData(nameof(Modules))]
+    public void AnEjectThatRemovesTheMemberTellsBothSides(string which)
+    {
+        FakeGroupsService svc = new() { ActorHasPowers = true };
+        svc.Members.Add(TargetId);
+        IGroupsModule gm = Module(which, svc);
+
+        gm.EjectGroupMember(null, ActorId, GroupId, TargetId);
+
+        Assert.Contains(svc.Sent, m => new UUID(m.toAgentID) == TargetId && m.message.Contains("You have been ejected"));
+        Assert.Contains(svc.Sent, m => new UUID(m.toAgentID) == ActorId && m.message.Contains("has been ejected"));
     }
 }
