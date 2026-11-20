@@ -525,6 +525,12 @@ public class GroupsModule : ISharedRegionModule, IGroupsModule
 
                 if(!itemID.IsZero() && !ownerID.IsZero())
                 {
+                    // the attachment comes from the sender's own inventory
+                    if (ownerID != remoteClient.AgentId)
+                    {
+                        remoteClient.SendAgentAlertMessage("A group notice can only carry an item from your own inventory", false);
+                        return;
+                    }
                     item = scene.InventoryService.GetItem(ownerID, itemID);
                     if (item != null)
                     {
