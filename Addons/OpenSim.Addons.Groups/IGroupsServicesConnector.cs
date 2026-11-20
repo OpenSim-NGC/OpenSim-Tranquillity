@@ -51,6 +51,11 @@ public interface IGroupsServicesConnector
 
     bool AddAgentToGroupInvite(string RequestingAgentID, UUID inviteID, UUID groupID, UUID roleID, string agentID);
     GroupInviteInfo GetAgentToGroupInvite(string RequestingAgentID, UUID inviteID);
+
+    /// <summary>The group's bans (GroupAPIv1); null when the requester may not see them.</summary>
+    List<ExtendedGroupBanData> GetGroupBans(string RequestingAgentID, UUID GroupID);
+    /// <summary>Ban (or, with <paramref name="ban"/> false, unban) avatars; false when nothing changed.</summary>
+    bool ChangeGroupBans(string RequestingAgentID, UUID GroupID, bool ban, string[] AgentIDs);
     void RemoveAgentToGroupInvite(string RequestingAgentID, UUID inviteID);
 
     void AddAgentToGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID);

@@ -41,6 +41,14 @@ public class MySQLGridUserData : MySQLGenericTableHandler<GridUserData>, IGridUs
 
     public MySQLGridUserData(string connectionString, string realm) : base(connectionString, realm, "GridUserStore") {}
 
+    public GridUserData[] GetMany(string[] userIDs)
+    {
+        var found = new List<GridUserData>();
+        foreach (string[] batch in (userIDs ?? []).Distinct().Chunk(GridUserBatch.Size))
+            found.AddRange(Get("UserID", batch));
+        return found.ToArray();
+    }
+
     public new GridUserData Get(string userID)
     {
         GridUserData[] ret = Get("UserID", userID);

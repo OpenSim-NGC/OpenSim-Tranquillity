@@ -51,6 +51,7 @@ public class BunchOfCapsConfigOptions
 
     public bool AllowCapHomeLocation = true;
     public bool AllowCapGroupMemberData = true;
+    public bool AllowCapGroupAPIv1 = true;
     public bool AllowCapLandResources = true;
     public bool AllowCapAttachmentResources = true;
 
@@ -141,6 +142,7 @@ public class BunchOfCapsModule : INonSharedRegionModule
 
                 string GroupMemberDataUrl = CapsConfig.GetString("Cap_GroupMemberData", "localhost");
                 ConfigOptions.AllowCapGroupMemberData = !string.IsNullOrEmpty(GroupMemberDataUrl);
+                ConfigOptions.AllowCapGroupAPIv1 = !string.IsNullOrEmpty(CapsConfig.GetString("Cap_GroupAPIv1", "localhost"));
 
                 string LandResourcesUrl = CapsConfig.GetString("Cap_LandResources", "localhost");
                 ConfigOptions.AllowCapLandResources = !string.IsNullOrEmpty(LandResourcesUrl);
