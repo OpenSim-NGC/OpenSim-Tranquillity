@@ -156,8 +156,7 @@ namespace osWebRtcVoice.Tests
             string createRoom = Env("LVM_LIVE_CREATE_ROOM");
 
             var collector = new LineCollector();
-            ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(collector).SetMinimumLevel(LogLevel.Debug));
+            var logging = new LogCapture(collector, LogLevel.Debug);
             try
             {
                 UUID a = new UUID("0a000000-0000-4000-8000-00000000000a"), b = new UUID("0b000000-0000-4000-8000-00000000000b");
@@ -206,7 +205,7 @@ namespace osWebRtcVoice.Tests
             }
             finally
             {
-                LoggerProvider.LoggerFactory = previous;
+                logging.Dispose();
             }
         }
     }
