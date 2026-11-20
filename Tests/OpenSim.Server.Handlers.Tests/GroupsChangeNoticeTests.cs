@@ -41,7 +41,7 @@ namespace OpenSim.Server.Handlers.Tests;
 /// Robust tells the region servers of group changes (GroupsChangeNotice), so a change made through one region is
 /// seen at once on the others instead of after their caches' 30 s. A region takes a notice only with the groups key.
 /// </summary>
-[Collection("SQLite stores")]
+[Collection(GroupsCachesCollection.Name)]
 public class GroupsChangeNoticeTests
 {
     private const string Key = "the groups key";
