@@ -236,4 +236,23 @@ public class GroupRulesTests
         Assert.True(Service.RemoveAgentFromGroup(g.Owner, g.Officer, g.Id));   // an owner reaches officers
         Assert.True(Service.RemoveAgentFromGroup(g.Member, g.Member, g.Id));   // anyone may leave
     }
+
+    [Fact]
+    public void AHypergridMemberIsEjectedAndGivenRolesByTheirUUID()
+    {
+        // the visitor is stored by their universal identifier; the viewer names them by UUID alone
+        Group g = NewGroup();
+        UUID visitorID = UUID.Random();
+        string visitor = visitorID + ";http://elsewhere.example:8002/;Visiting Person";
+        Assert.True(Service.AddAgentToGroup(g.Owner, visitor, g.Id, UUID.Zero, string.Empty, out string reason), reason);
+
+        Assert.True(Service.AddAgentToGroupRole(g.Owner, visitorID.ToString(), g.Id, g.Officers));
+        Assert.Contains(Service.GetAgentGroupRoles(g.Owner, visitor, g.Id), r => r.RoleID == g.Officers);
+        Assert.True(Service.RemoveAgentFromGroupRole(g.Owner, visitorID.ToString(), g.Id, g.Officers));
+        Assert.DoesNotContain(Service.GetAgentGroupRoles(g.Owner, visitor, g.Id), r => r.RoleID == g.Officers);
+
+        Assert.True(Service.RemoveAgentFromGroup(g.Owner, visitorID.ToString(), g.Id));
+        Assert.Null(Service.GetAgentGroupMembership(visitor, visitor, g.Id));
+        Assert.DoesNotContain(Service.GetGroupMembers(g.Owner, g.Id), m => m.AgentID.StartsWith(visitorID.ToString()));
+    }
 }

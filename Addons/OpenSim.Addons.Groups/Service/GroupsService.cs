@@ -536,6 +536,7 @@ public class GroupsService : GroupsServiceBase
 
     public bool RemoveAgentFromGroup(string RequestingAgentID, string AgentID, UUID GroupID)
     {
+        AgentID = MemberPrincipal(GroupID, AgentID);
         // check perms. Anyone may leave. SL (wiki Group): "An Owner can eject anyone except another Owner", and "a
         // Member can be ejected from a group if, and only if, they're only in the Everyone Role" by anyone else.
         bool self = SameAgent(RequestingAgentID, AgentID);
@@ -629,6 +630,7 @@ public class GroupsService : GroupsServiceBase
 
     public bool AddAgentToGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID)
     {
+        AgentID = MemberPrincipal(GroupID, AgentID);
         //if (!m_Database.CheckOwnerRole(RequestingAgentID, GroupID, RoleID))
         //    return;
 
@@ -651,6 +653,7 @@ public class GroupsService : GroupsServiceBase
 
     public bool RemoveAgentFromGroupRole(string RequestingAgentID, string AgentID, UUID GroupID, UUID RoleID)
     {
+        AgentID = MemberPrincipal(GroupID, AgentID);
         // Don't remove from Everyone role!
         if (RoleID.IsZero())
             return false;
@@ -1232,6 +1235,24 @@ public class GroupsService : GroupsServiceBase
             && Util.ParseUniversalUserIdentifier(agentID, out UUID id))
             invite = m_Database.RetrieveInvitation(groupID, id.ToString());
         return invite;
+    }
+
+    /// <summary>
+    /// The member as the group stores them. A hypergrid visitor is stored by their universal identifier
+    /// (uuid;home-url;name) but named by the viewer by UUID alone (an ejection, a role given or taken), and the region
+    /// knows the identifier only of visitors it has met: a bare UUID that is no member is looked for among the
+    /// group's members by that UUID.
+    /// </summary>
+    private string MemberPrincipal(UUID groupID, string agentID)
+    {
+        if (string.IsNullOrEmpty(agentID) || m_Database.RetrieveMember(groupID, agentID) != null)
+            return agentID;
+        if (!UUID.TryParse(agentID, out UUID id) || id.IsZero())
+            return agentID;
+        string prefix = id.ToString() + ";";
+        MembershipData visitor = (m_Database.RetrieveMembers(groupID) ?? [])
+            .FirstOrDefault(m => m.PrincipalID != null && m.PrincipalID.StartsWith(prefix, StringComparison.OrdinalIgnoreCase));
+        return visitor?.PrincipalID ?? agentID;
     }
 
     private static bool SameAgent(string a, string b)
