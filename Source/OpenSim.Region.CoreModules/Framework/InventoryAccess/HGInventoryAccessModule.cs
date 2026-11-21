@@ -54,6 +54,12 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
     private bool m_RestrictInventoryAccessAbroad;
     private bool m_bypassPermissions = true;
 
+    // Items whose content this region kept and whose owner it told so (see TellContentKeptHere),
+    // so a notecard or script saved again and again is announced once. Entries expire, which
+    // bounds the cache.
+    private readonly ExpiringCacheOS<UUID, bool> m_toldKeptHere = new(60000);
+    private const int TOLD_KEPT_HERE_MS = 3600 * 1000;
+
     // This simple check makes it possible to support grids in which all the simulators
     // share all central services of the Robust server EXCEPT assets. In other words,
     // grids where the simulators' assets are kept in one DB and the users' inventory assets
@@ -204,18 +210,57 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
     {
         InventoryFolderBase f = m_Scene.InventoryService.GetFolderForType(item.Owner, FolderType.Trash);
         if (f is null || item.Folder.NotEqual(f.ID))
-            PostInventoryAsset(item.Owner, (AssetType)item.AssetType, item.AssetID, item.Name, userlevel);
+            PostInventoryAsset(item.Owner, item.ID, (AssetType)item.AssetType, item.AssetID, item.Name, userlevel);
     }
 
-    private void PostInventoryAsset(UUID avatarID, AssetType type, UUID assetID, string name, int userlevel)
+    private void PostInventoryAsset(UUID avatarID, UUID itemID, AssetType type, UUID assetID, string name, int userlevel)
     {
         if (type == AssetType.Link)
             return;
 
-        if (IsForeignUser(avatarID, out string userAssetServer) && userAssetServer.Length > 0 && (m_OutboundPermission || (type == AssetType.Landmark)))
+        if (IsForeignUser(avatarID, out string userAssetServer) && userAssetServer.Length > 0)
         {
-            m_assMapper.Post(assetID, avatarID, userAssetServer);
+            if (m_OutboundPermission || (type == AssetType.Landmark))
+                m_assMapper.Post(assetID, avatarID, userAssetServer);
+            else
+                TellContentKeptHere(avatarID, itemID, assetID, name, userAssetServer);
         }
+    }
+
+    /// <summary>
+    /// With OutboundPermission false the item still goes into the user's home inventory, but its
+    /// asset stays here, so away from this grid it does not rez, open or play. Tell the user,
+    /// once for each item, and log it.
+    /// </summary>
+    private void TellContentKeptHere(UUID avatarID, UUID itemID, UUID assetID, string name, string userAssetServer)
+    {
+        if (assetID.IsZero())
+            return;
+
+        UUID key = itemID.IsZero() ? assetID : itemID;
+        if (m_toldKeptHere.ContainsKey(key))
+            return;
+        m_toldKeptHere.Add(key, true, TOLD_KEPT_HERE_MS);
+
+        if (string.IsNullOrEmpty(name) && itemID.IsNotZero())
+            name = m_Scene.InventoryService.GetItem(avatarID, itemID)?.Name;
+
+        m_log.LogInformation(
+            "[HG INVENTORY ACCESS MODULE]: Not sending asset {0} ({1}) of {2} to {3}: OutboundPermission is false",
+            assetID, name, avatarID, userAssetServer);
+
+        ScenePresence sp = m_Scene.GetScenePresence(avatarID);
+        if (sp is null || sp.IsChildAgent)
+            return;
+
+        sp.ControllingClient.SendAlertMessage(ContentKeptHereMessage(name));
+    }
+
+    private static string ContentKeptHereMessage(string name)
+    {
+        string what = string.IsNullOrEmpty(name) ? "The item" : "\"" + name + "\"";
+        return "This grid does not send content to other grids. " + what +
+               " is in your inventory, but it will only work on this grid.";
     }
 
     #endregion
@@ -249,6 +294,7 @@ public class HGInventoryAccessModule : BasicInventoryAccessModule, INonSharedReg
         // Better this in two places than five formal params in all others.
         InventoryItemBase item = new InventoryItemBase
         {
+            ID = itemID,
             Owner = remoteClient.AgentId,
             AssetType = (int)AssetType.Unknown,
             AssetID = newAssetID,

@@ -188,10 +188,12 @@
     ; Change this to your server
     ; accessible from other grids
     ;
-    ;; If you want to protect your assets from being copied by foreign visitors
-    ;; set this to false. You may want to do this on sims that have licensed content.
-    ;; Default is true.
-    ; OutboundPermission = True
+    ;; Whether content that foreign visitors take, upload or save here is sent to their home
+    ;; grid. Default is false: it is not, except landmarks. Their inventory items still go
+    ;; home, but away from this grid those items do not rez or open, and the visitor is told so
+    ;; when it happens. Keep it false to protect licensed content; set it to true to let
+    ;; visitors take what they make here home.
+    ; OutboundPermission = false
 
     ;; Send visual reminder to local users that their inventories are unavailable while they are traveling
     ;; and available when they return. True by default.
