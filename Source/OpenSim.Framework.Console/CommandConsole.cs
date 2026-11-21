@@ -495,29 +495,49 @@ public class Commands : ICommands
         return result;
     }
 
+    /// <summary>
+    /// Takes a top-level command that is kept out of the help tree a server sends (help and quit) out of the
+    /// tree, and returns it, or null when this console has not registered it. The console client registers
+    /// help but not quit, so quit is often absent there.
+    /// </summary>
+    private CommandInfo TakeLocalCommand(string name)
+    {
+        if (!tree.TryGetValue(name, out object node) || node is not Dictionary<string, object> level)
+            return null;
+
+        level.TryGetValue(String.Empty, out object info);
+        level.Remove(String.Empty);
+        if (level.Count == 0)
+            tree.Remove(name);
+
+        return info as CommandInfo;
+    }
+
+    /// <summary>Puts back a command taken by <see cref="TakeLocalCommand"/>; does nothing when there was none.</summary>
+    private void RestoreLocalCommand(string name, CommandInfo info)
+    {
+        if (info == null)
+            return;
+
+        if (!tree.TryGetValue(name, out object node) || node is not Dictionary<string, object> level)
+        {
+            level = new Dictionary<string, object>();
+            tree[name] = level;
+        }
+        level[String.Empty] = info;
+    }
+
     public XmlElement GetXml(XmlDocument doc)
     {
-        CommandInfo help = (CommandInfo)((Dictionary<string, object>)tree["help"])[String.Empty];
-        ((Dictionary<string, object>)tree["help"]).Remove(string.Empty);
-        if (((Dictionary<string, object>)tree["help"]).Count == 0)
-            tree.Remove("help");
-
-        CommandInfo quit = (CommandInfo)((Dictionary<string, object>)tree["quit"])[String.Empty];
-        ((Dictionary<string, object>)tree["quit"]).Remove(string.Empty);
-        if (((Dictionary<string, object>)tree["quit"]).Count == 0)
-            tree.Remove("quit");
+        CommandInfo help = TakeLocalCommand("help");
+        CommandInfo quit = TakeLocalCommand("quit");
 
         XmlElement root = doc.CreateElement("", "HelpTree", "");
 
         ProcessTreeLevel(tree, root, doc);
 
-        if (!tree.ContainsKey("help"))
-            tree["help"] = (object) new Dictionary<string, object>();
-        ((Dictionary<string, object>)tree["help"])[String.Empty] = help;
-
-        if (!tree.ContainsKey("quit"))
-            tree["quit"] = (object) new Dictionary<string, object>();
-        ((Dictionary<string, object>)tree["quit"])[String.Empty] = quit;
+        RestoreLocalCommand("help", help);
+        RestoreLocalCommand("quit", quit);
 
         return root;
     }
@@ -570,27 +590,15 @@ public class Commands : ICommands
 
     public void FromXml(XmlElement root, CommandDelegate fn)
     {
-        CommandInfo help = (CommandInfo)((Dictionary<string, object>)tree["help"])[String.Empty];
-        ((Dictionary<string, object>)tree["help"]).Remove(string.Empty);
-        if (((Dictionary<string, object>)tree["help"]).Count == 0)
-            tree.Remove("help");
-
-        CommandInfo quit = (CommandInfo)((Dictionary<string, object>)tree["quit"])[String.Empty];
-        ((Dictionary<string, object>)tree["quit"]).Remove(string.Empty);
-        if (((Dictionary<string, object>)tree["quit"]).Count == 0)
-            tree.Remove("quit");
+        CommandInfo help = TakeLocalCommand("help");
+        CommandInfo quit = TakeLocalCommand("quit");
 
         tree.Clear();
 
         ReadTreeLevel(tree, root, fn);
 
-        if (!tree.ContainsKey("help"))
-            tree["help"] = (object) new Dictionary<string, object>();
-        ((Dictionary<string, object>)tree["help"])[String.Empty] = help;
-
-        if (!tree.ContainsKey("quit"))
-            tree["quit"] = (object) new Dictionary<string, object>();
-        ((Dictionary<string, object>)tree["quit"])[String.Empty] = quit;
+        RestoreLocalCommand("help", help);
+        RestoreLocalCommand("quit", quit);
     }
 
     private void ReadTreeLevel(Dictionary<string, object> level, XmlNode node, CommandDelegate fn)
@@ -654,6 +662,10 @@ public class Parser
 
     public static string[] Parse(string text)
     {
+        // A console reads null at the end of its input (stdin closed); that is no command.
+        if (text == null)
+            return new string[0];
+
         List<string> result = new List<string>();
 
         int index;
@@ -750,7 +762,7 @@ public class CommandConsole : ConsoleBase, ICommandConsole
     {
         string line = ReadLine(DefaultPrompt + "# ", true, true);
 
-        if (line != String.Empty)
+        if (!string.IsNullOrEmpty(line))
             Output("Invalid command");
     }
 
