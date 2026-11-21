@@ -2228,6 +2228,12 @@ public partial class SceneObjectGroup : EntityBase, ISceneObject, IDisposable
             IsDeleted = true;
             disposed = true;
 
+            // Only an explicit Dispose lets go of the parts. From the finalizer they may already belong to another
+            // group (a group made around a part, then the part linked elsewhere): disposing them there cleared a live
+            // part's inventory at whatever moment the collector ran. A part nobody holds has its own finalizer.
+            if (!disposing)
+                return;
+
             SceneObjectPart[] parts = m_parts.GetArray();
             for(int i= 0; i < parts.Length; ++i)
                 parts[i].Dispose();
