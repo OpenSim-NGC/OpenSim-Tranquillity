@@ -250,6 +250,17 @@ public sealed class FakeAisBackend : IAisInventoryBackend
     /// </summary>
     public readonly HashSet<UUID> RefusedTransactions = new();
 
+    /// <summary>
+    /// Assets the resident may not give an item by naming it in <c>asset_id</c> (in the region: anything that is not
+    /// their own upload of the item's type, <c>AISv3Module.AssetUseFor</c>). Every other asset is the resident's own.
+    /// </summary>
+    public readonly HashSet<UUID> OthersAssets = new();
+
+    public bool MayUseAsset(UUID agentId, UUID assetId, sbyte assetType)
+    {
+        return agentId == Owner && !OthersAssets.Contains(assetId);
+    }
+
     public AisAssetTransaction ApplyAssetTransaction(UUID agentId, UUID transactionId, InventoryItemBase item)
     {
         Record($"ApplyAssetTransaction({transactionId})");

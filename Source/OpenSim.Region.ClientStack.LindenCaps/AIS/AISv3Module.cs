@@ -169,7 +169,7 @@ public class AISv3Module : ISharedRegionModule
         // AIS-SEC-1: the backend is bound to the agent this cap belongs to. The cap URL is unguessable, but a cap
         // that leaked (or a client of the agent's own) could otherwise name any resident's object UUID and the
         // inventory service would serve it, because it resolves by id and ignores the principal.
-        var invHandler = new AisHandler("/" + UUID.Random(), agentID, new InventoryServiceBackend(inventory, agentID, TransactionResolverFor(scene), WornAssetObserverFor(scene)));
+        var invHandler = new AisHandler("/" + UUID.Random(), agentID, new InventoryServiceBackend(inventory, agentID, TransactionResolverFor(scene), WornAssetObserverFor(scene), AssetUseFor(scene)));
         caps.RegisterSimpleHandler(CapName, invHandler, varPath: VarPath);
         m_log.LogDebug("[AIS]: registered {Cap} at {Path} for agent {Agent} in {Region}",
             CapName, invHandler.CapPath, agentID, scene.Name);
@@ -185,7 +185,7 @@ public class AISv3Module : ISharedRegionModule
         // to the agent too, so a COPY cannot be steered into another resident's folder by its Destination header.
         // The source backend is the library's own and stays as it is: it is read-only by construction.
         var libHandler = new AisHandler("/" + UUID.Random(), libraryOwner, new LibraryServiceBackend(library), AisMode.Library,
-            new InventoryServiceBackend(inventory, agentID, TransactionResolverFor(scene), WornAssetObserverFor(scene)), agentID);
+            new InventoryServiceBackend(inventory, agentID, TransactionResolverFor(scene), WornAssetObserverFor(scene), AssetUseFor(scene)), agentID);
         caps.RegisterSimpleHandler(LibraryCapName, libHandler, varPath: VarPath);
         m_log.LogDebug("[AIS]: registered {Cap} at {Path} for agent {Agent} in {Region}",
             LibraryCapName, libHandler.CapPath, agentID, scene.Name);
@@ -203,6 +203,22 @@ public class AISv3Module : ISharedRegionModule
     /// for field (<c>Scene.Inventory.cs:579-582</c>).
     /// </para>
     /// </summary>
+    /// <summary>
+    /// The asset check behind <see cref="IAisInventoryBackend.MayUseAsset"/>: the asset exists, is of the item's
+    /// type, and its creator is the agent. Kept here for the same reason as the transaction resolver; without it
+    /// (Phase 2 on Robust) a PATCH cannot name an asset directly.
+    /// </summary>
+    public static InventoryServiceBackend.AssetUseCheck AssetUseFor(Scene scene)
+        => (agentId, assetId, assetType) =>
+        {
+            AssetMetadata asset = scene.AssetService?.GetMetadata(assetId.ToString());
+            if (asset is null || asset.Type != assetType)
+                return false;
+            string creator = asset.CreatorID ?? string.Empty;
+            int end = creator.IndexOf(';');
+            return UUID.TryParse(end < 0 ? creator : creator.Substring(0, end), out UUID creatorId) && creatorId == agentId;
+        };
+
     private static InventoryServiceBackend.AssetTransactionResolver TransactionResolverFor(Scene scene)
         => (agentId, transactionId, item) =>
         {
@@ -304,17 +320,21 @@ public class AISv3Module : ISharedRegionModule
         /// <summary>Told that an item's asset changed, so a worn one can rebake.</summary>
         public delegate void WornAssetObserver(UUID agentId, UUID itemId, UUID newAssetId);
 
+        /// <summary>Whether the agent may point an item of the given asset type at the asset (their own upload).</summary>
+        public delegate bool AssetUseCheck(UUID agentId, UUID assetId, sbyte assetType);
+
         private readonly IInventoryService m_service;
         private readonly UUID m_ownerId;
         private readonly AssetTransactionResolver m_transactions;
         private readonly WornAssetObserver m_wornAssets;
+        private readonly AssetUseCheck m_assetUse;
 
         /// <param name="ownerId">
         /// The one resident this backend serves. Zero is refused rather than defaulted: a zero owner would scope
         /// nothing, which is exactly the state AIS-SEC-1 fixed, and a quiet guard is how that state would come back.
         /// </param>
         public InventoryServiceBackend(IInventoryService service, UUID ownerId,
-            AssetTransactionResolver transactions = null, WornAssetObserver wornAssets = null)
+            AssetTransactionResolver transactions = null, WornAssetObserver wornAssets = null, AssetUseCheck assetUse = null)
         {
             m_service = service ?? throw new ArgumentNullException(nameof(service));
             if (ownerId.IsZero())
@@ -322,6 +342,7 @@ public class AISv3Module : ISharedRegionModule
             m_ownerId = ownerId;
             m_transactions = transactions;
             m_wornAssets = wornAssets;
+            m_assetUse = assetUse;
         }
 
         /// <summary>The resident whose inventory this is, and the only principal this class ever passes down.</summary>
@@ -442,6 +463,10 @@ public class AISv3Module : ISharedRegionModule
             if (GetFolder(m_ownerId, item.Folder) is null) return false;
             return m_service.UpdateItem(item);
         }
+
+        /// <summary>Only the owner, and only with an asset check; without one, no asset can be named directly.</summary>
+        public bool MayUseAsset(UUID agentId, UUID assetId, sbyte assetType)
+            => IsCaller(agentId) && m_assetUse is not null && m_assetUse(agentId, assetId, assetType);
 
         /// <summary>
         /// The parent is checked only when <c>ParentID</c> is non-zero: the agent's own inventory root legitimately
@@ -582,5 +607,7 @@ public class AISv3Module : ISharedRegionModule
         public AisAssetTransaction ApplyAssetTransaction(UUID agentId, UUID transactionId, InventoryItemBase item) => AisAssetTransaction.NotResolvable;
         /// <summary>Nothing in the library is worn.</summary>
         public void OnItemAssetChanged(UUID agentId, UUID itemId, UUID newAssetId) { }
+        /// <summary>The library is read-only.</summary>
+        public bool MayUseAsset(UUID agentId, UUID assetId, sbyte assetType) => false;
     }
 }
