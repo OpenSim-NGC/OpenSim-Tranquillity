@@ -1039,8 +1039,9 @@ public class LLClientView : IClientAPI, IClientCore, IClientIM, IClientChat, ICl
         // Viewer contract V1 (llviewerregion.cpp:3097): the viewer chooses the server-bake path for this region
         // iff bit 0 is set. It is set only where [Appearance] ServerSideBaking resolved true, so a region without
         // the module, or with the flag off, sends the value it always sent.
+        // Only for an agent the region bakes for: a Hypergrid visitor's viewer bakes it itself (BakesFor).
         ulong regionProtocols = 1UL << 63;
-        if (m_scene.RequestModuleInterface<IServerSideBakingRegion>() is { ServerSideBakingEnabled: true })
+        if (m_scene.RequestModuleInterface<IServerSideBakingRegion>() is { } ssb && ssb.BakesFor(m_agentId))
             regionProtocols |= 1UL;
         zc.AddUInt64(regionProtocols);
 

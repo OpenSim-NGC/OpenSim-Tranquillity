@@ -45,6 +45,7 @@ public class AvatarFactoryServerBakesTests : OpenSimTestCase
     {
         public bool ServerSideBakingEnabled => true;
         public int BakedCofVersion(UUID agentId) => 7;
+        public bool BakesFor(UUID agentId) => true;
     }
 
     /// <summary>An avatar as it arrives back in a region it was in: cache items with no ids, and server bakes.</summary>

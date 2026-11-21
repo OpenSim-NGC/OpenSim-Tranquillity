@@ -91,9 +91,10 @@ public class AppearanceVersionParamTests
     /// baked; the stored array itself otherwise - except for an NPC, which is never baked anywhere and says 0 on a
     /// copy (its stored byte is the owner's, which is 1 on a server-bake region).
     /// </summary>
-    private static byte[] ParamsForSend(byte[] stored, int cofVersion, bool isNpc = false)
+    /// <param name="notBakedHere">A Hypergrid visitor on a region that bakes: the region never bakes it.</param>
+    private static byte[] ParamsForSend(byte[] stored, int cofVersion, bool isNpc = false, bool notBakedHere = false)
         => cofVersion >= 0 ? AvatarAppearance.WithAppearanceVersion(stored, 1)
-         : isNpc ? AvatarAppearance.WithAppearanceVersion(stored, 0)
+         : isNpc || notBakedHere ? AvatarAppearance.WithAppearanceVersion(stored, 0)
          : stored;
 
     [Fact]
@@ -175,8 +176,11 @@ public class AppearanceVersionParamTests
         var expected = (byte[])stored.Clone(); expected[AvatarAppearance.APPEARANCE_VERSION_PARAM_INDEX] = 0;
         Assert.Equal(AppearanceBodyBeforeS3(expected), AppearanceBody(sent, -1));
 
-        // and a human with the same stored byte and no bake here is still sent as-is: the exception is the NPC alone
+        // and a resident with the same stored byte and no bake here yet is still sent as-is: this grid's appearance
+        // service has its index. The exceptions are the NPC and the Hypergrid visitor, neither ever baked here.
         Assert.Same(stored, ParamsForSend(stored, -1));
+        Assert.Equal(0, ParamsForSend(stored, -1, notBakedHere: true)[AvatarAppearance.APPEARANCE_VERSION_PARAM_INDEX]);
+        Assert.Equal(storedBefore, stored);
     }
 
     /// <summary>The replay above is only worth anything if it matches the shipped code.</summary>
@@ -186,7 +190,7 @@ public class AppearanceVersionParamTests
         var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", ".."));
         var src = File.ReadAllText(Path.Combine(root, "Source", "OpenSim.Region.Framework", "Scenes", "ScenePresence.cs")).Replace("\r\n", "\n");
 
-        Assert.Contains("byte[] visualParams;\n        if (cofVersion >= 0)\n            visualParams = AvatarAppearance.WithAppearanceVersion(Appearance.VisualParams, 1);\n        else if (IsNPC)", src);
+        Assert.Contains("byte[] visualParams;\n        if (cofVersion >= 0)\n            visualParams = AvatarAppearance.WithAppearanceVersion(Appearance.VisualParams, 1);\n        else if (IsNPC || (ssb is { ServerSideBakingEnabled: true } && !ssb.BakesFor(UUID)))", src);
         Assert.Contains("            visualParams = AvatarAppearance.WithAppearanceVersion(Appearance.VisualParams, 0);\n        else\n            visualParams = Appearance.VisualParams;", src);
         Assert.Contains("avatar.ControllingClient.SendAppearance(UUID, visualParams, Appearance.Texture.GetBakesBytes(), Appearance.AvatarPreferencesHoverZ, cofVersion);", src);
         // the stored array must never be written through

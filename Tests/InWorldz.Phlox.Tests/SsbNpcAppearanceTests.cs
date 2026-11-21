@@ -108,9 +108,11 @@ public class SsbNpcAppearanceTests
         return bakes;
     }
 
-    private static CapturingClient AddObserver(Scene scene)
+    private static CapturingClient AddObserver(Scene scene) => AddObserver(scene, UUID.Random());
+
+    private static CapturingClient AddObserver(Scene scene, UUID id)
     {
-        var acd = SceneHelpers.GenerateAgentData(UUID.Random());
+        var acd = SceneHelpers.GenerateAgentData(id);
         var client = new CapturingClient(acd, scene);
         SceneHelpers.AddScenePresence(scene, client, acd);
         return client;
@@ -154,6 +156,72 @@ public class SsbNpcAppearanceTests
         // the bake store is keyed by agent UUID, and the region never baked the NPC's
         Assert.Equal(7, region.BakedCofVersion(owner.UUID));
         Assert.Equal(-1, region.BakedCofVersion(npc.UUID));
+    }
+
+    // ------------------------------------------------------------------ a Hypergrid visitor watching
+
+    /// <summary>
+    /// A visitor's viewer fetches server bakes from its own grid's appearance service, which has none of this
+    /// grid's. Every appearance it is sent must be the pre-SSB form, which sends it to this region for the bakes by
+    /// id; a local resident watching the same avatar still gets the server-bake form.
+    /// </summary>
+    [Fact]
+    public void AVisitorIsSentThePreServerBakeFormOfABakedAvatar()
+    {
+        using var h = NpcScene();
+        var visitorId = UUID.Random();
+        var region = new ServerSideBakingRegion(true, new CofHandshake(), id => id.NotEqual(visitorId));
+        h.Scene.RegisterModuleInterface<IServerSideBakingRegion>(region);
+
+        var owner = h.Scene.GetScenePresence(h.AddClient().AgentId);
+        var bakes = MakeBaked(owner);
+        region.RecordBake(owner.UUID, 7);
+        var local = AddObserver(h.Scene);
+        var visitor = AddObserver(h.Scene, visitorId);
+
+        owner.SendAppearanceToAllOtherAgents();
+        var forLocal = local.LastFor(owner.UUID);
+        var forVisitor = visitor.LastFor(owner.UUID);
+
+        Assert.Equal(7, forLocal.Cof);
+        Assert.Equal(1, forLocal.Params[VersionIndex]);
+
+        Assert.Equal(-1, forVisitor.Cof);
+        Assert.Equal(0, forVisitor.Params[VersionIndex]);
+        var sent = BakedFaces(forVisitor.Te);
+        foreach (int face in AvatarAppearance.BAKE_INDICES) Assert.Equal(bakes[face], sent[face]);
+
+        Assert.True(region.BakesFor(owner.UUID));
+        Assert.False(region.BakesFor(visitorId));
+    }
+
+    /// <summary>
+    /// A visitor arrives with its home grid's appearance, whose version parameter says 1 where that grid bakes. Not
+    /// baked here, it must reach this grid's residents as an avatar with no server bake, parameter 0, or their
+    /// viewers ask this grid's appearance service for bakes it has no index of.
+    /// </summary>
+    [Fact]
+    public void AVisitorBakedAtHomeReachesResidentsWithoutAServerBakeClaim()
+    {
+        using var h = NpcScene();
+        var visitorId = UUID.Random();
+        var region = new ServerSideBakingRegion(true, new CofHandshake(), id => id.NotEqual(visitorId));
+        h.Scene.RegisterModuleInterface<IServerSideBakingRegion>(region);
+
+        var resident = AddObserver(h.Scene);
+        AddObserver(h.Scene, visitorId);
+        var visitor = h.Scene.GetScenePresence(visitorId);
+        var bakes = MakeBaked(visitor);
+
+        visitor.SendAppearanceToAllOtherAgents();
+        var seen = resident.LastFor(visitorId);
+
+        Assert.Equal(-1, seen.Cof);
+        Assert.Equal(0, seen.Params[VersionIndex]);
+        var sent = BakedFaces(seen.Te);
+        foreach (int face in AvatarAppearance.BAKE_INDICES) Assert.Equal(bakes[face], sent[face]);
+        // the stored appearance keeps what the visitor came with
+        Assert.Equal(1, visitor.Appearance.VisualParams[VersionIndex]);
     }
 
     // ------------------------------------------------------------------ the wire, before and after the fix

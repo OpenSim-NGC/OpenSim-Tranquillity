@@ -43,4 +43,14 @@ public interface IServerSideBakingRegion
     /// form it always has, with no <c>AppearanceData</c> block.
     /// </summary>
     int BakedCofVersion(UUID agentId);
+
+    /// <summary>
+    /// Whether this region bakes for the agent: baking is on and the agent has an account on this grid. A
+    /// Hypergrid visitor has none. Its viewer fetches server bakes only from its own grid's appearance service (the
+    /// URL its login gave), which has none of the bakes made here, and a visitor from a grid without server-side
+    /// baking has no such service at all. So for a visitor the region stays a client-bake region: bit 0 of
+    /// <c>RegionProtocols</c> is clear, its viewer bakes it, and every appearance it is sent is the pre-SSB form,
+    /// whose bakes its viewer fetches from this region by id.
+    /// </summary>
+    bool BakesFor(UUID agentId);
 }
