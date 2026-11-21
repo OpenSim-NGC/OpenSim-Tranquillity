@@ -199,13 +199,14 @@ public class PGSQLAssetData : AssetDataBase
             try
             {
                 command.ExecuteNonQuery();
+                return true;
             }
             catch(Exception e)
             {
                 m_log.LogError("[ASSET DB]: Error storing item :" + e.Message + " sql "+sql);
+                return false;
             }
         }
-        return true;
     }
 
 
