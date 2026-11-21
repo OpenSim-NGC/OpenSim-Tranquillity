@@ -54,13 +54,22 @@ public class AppearanceService : ServiceBase, IAppearanceService
         if (serviceConfig is null)
             throw new Exception($"No section '{configName}' in config file");
 
-        string avatarService = serviceConfig.GetString("AvatarService", string.Empty);
-        string assetService = serviceConfig.GetString("AssetService", string.Empty);
+        (string avatarService, string assetService) = ServiceModules(config, serviceConfig.Name);
+
+        // The bakes are stored by the simulators through the grid's asset service. Read from any other and every
+        // fetch is a 404: the old example config named the plain AssetService here, which on an FSAssets grid
+        // reads a table the bakes never reach.
+        string gridAssets = config.Configs["AssetService"]?.GetString("LocalServiceModule", string.Empty) ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(gridAssets) && !string.Equals(assetService, gridAssets, StringComparison.Ordinal))
+            m_log.LogWarning(
+                "[APPEARANCE SERVICE]: [{Section}] AssetService is {Ours}, but the grid stores assets through {Grid}. "
+                + "Bakes stored there cannot be served from here; remove AssetService from [{Section}] to use the grid's.",
+                serviceConfig.Name, assetService, gridAssets);
 
         if (string.IsNullOrWhiteSpace(avatarService))
-            throw new Exception($"[{configName}] AvatarService not set; the appearance service has no bake index to read");
+            throw new Exception($"[{configName}] AvatarService not set, nor [AvatarService] LocalServiceModule; the appearance service has no bake index to read");
         if (string.IsNullOrWhiteSpace(assetService))
-            throw new Exception($"[{configName}] AssetService not set; the appearance service has no assets to serve");
+            throw new Exception($"[{configName}] AssetService not set, nor [AssetService] LocalServiceModule; the appearance service has no assets to serve");
 
         object[] args = new object[] { config };
         m_AvatarService = ServerUtils.LoadPlugin<IAvatarService>(avatarService, args);
@@ -72,6 +81,23 @@ public class AppearanceService : ServiceBase, IAppearanceService
             throw new Exception($"Could not load AssetService '{assetService}' for the appearance service");
 
         m_log.LogInformation("[APPEARANCE SERVICE]: serving baked textures for {Count} channels", AppearanceChannels.Tokens.Count);
+    }
+
+    /// <summary>
+    /// The avatar and asset services the appearance service reads through: its own section's <c>AvatarService</c> and
+    /// <c>AssetService</c>, and where either is not set, the <c>LocalServiceModule</c> of <c>[AvatarService]</c> or
+    /// <c>[AssetService]</c>, which is where the simulators store the bake index and the bakes.
+    /// </summary>
+    public static (string AvatarService, string AssetService) ServiceModules(IConfigSource config, string configName)
+    {
+        IConfig own = config.Configs[string.IsNullOrEmpty(configName) ? ConfigName : configName];
+        string avatar = own?.GetString("AvatarService", string.Empty) ?? string.Empty;
+        string asset = own?.GetString("AssetService", string.Empty) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(avatar))
+            avatar = config.Configs["AvatarService"]?.GetString("LocalServiceModule", string.Empty) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(asset))
+            asset = config.Configs["AssetService"]?.GetString("LocalServiceModule", string.Empty) ?? string.Empty;
+        return (avatar, asset);
     }
 
     /// <summary>Test seam: the service over supplied dependencies, bypassing plugin loading.</summary>

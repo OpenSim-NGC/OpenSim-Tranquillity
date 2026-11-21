@@ -759,8 +759,11 @@
 ;; with a "/", because the viewer appends "texture/..." to it with no separator.
 [AppearanceService]
     LocalServiceModule = "OpenSim.Services.AvatarService.dll:AppearanceService"
-    AvatarService = "OpenSim.Services.AvatarService.dll:AvatarService"
-    AssetService = "OpenSim.Services.AssetService.dll:AssetService"
+    ;; The bake index and the bakes are read through [AvatarService] and [AssetService] LocalServiceModule, the
+    ;; services the simulators store them with. Set AvatarService or AssetService here only to read other ones: a
+    ;; grid on FSAssets that names the plain AssetService here serves no bakes, because the bakes are in FSAssets.
+    ; AvatarService = "OpenSim.Services.AvatarService.dll:AvatarService"
+    ; AssetService = "OpenSim.Services.AssetService.dll:AssetService"
 
 [BakedTextureService]
     LocalServiceModule = "OpenSim.Server.Handlers.dll:XBakes"

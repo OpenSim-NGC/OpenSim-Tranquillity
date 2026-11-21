@@ -209,4 +209,44 @@ public class AppearanceServiceTests
         // outcome before the index was preserved; the real AvatarService preserves the Bake* namespace and is tested separately.
         Assert.Null(svc.GetBake(Agent, "head", headAsset));
     }
+
+    // ------------------------------------------------------------------ which services it reads
+
+    private static IConfigSource Config(params (string Section, string Key, string Value)[] settings)
+    {
+        var config = new IniConfigSource();
+        config.AddConfig("AppearanceService");
+        foreach (var (section, key, value) in settings)
+            (config.Configs[section] ?? config.AddConfig(section)).Set(key, value);
+        return config;
+    }
+
+    [Fact]
+    public void WithNoneOfItsOwnItReadsTheServicesTheRegionsStoreBakesWith()
+    {
+        // an FSAssets grid: the bakes are in FSAssets, so the appearance service must read FSAssets too
+        var config = Config(
+            ("AssetService", "LocalServiceModule", "OpenSim.Services.FSAssetService.dll:FSAssetConnector"),
+            ("AvatarService", "LocalServiceModule", "OpenSim.Services.AvatarService.dll:AvatarService"));
+        Assert.Equal(
+            ("OpenSim.Services.AvatarService.dll:AvatarService", "OpenSim.Services.FSAssetService.dll:FSAssetConnector"),
+            AppearanceService.ServiceModules(config, "AppearanceService"));
+    }
+
+    [Fact]
+    public void ItsOwnSettingsWin()
+    {
+        var config = Config(
+            ("AssetService", "LocalServiceModule", "OpenSim.Services.FSAssetService.dll:FSAssetConnector"),
+            ("AvatarService", "LocalServiceModule", "OpenSim.Services.AvatarService.dll:AvatarService"),
+            ("AppearanceService", "AssetService", "Elsewhere.dll:Assets"),
+            ("AppearanceService", "AvatarService", "Elsewhere.dll:Avatars"));
+        Assert.Equal(("Elsewhere.dll:Avatars", "Elsewhere.dll:Assets"), AppearanceService.ServiceModules(config, "AppearanceService"));
+    }
+
+    [Fact]
+    public void NothingAnywhereLeavesThemEmpty()
+    {
+        Assert.Equal((string.Empty, string.Empty), AppearanceService.ServiceModules(Config(), "AppearanceService"));
+    }
 }

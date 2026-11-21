@@ -211,9 +211,9 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         var region = RegionOf(scene);
 
         // Step 0: refuse a bake whose wearable set has lost a body part since the last one. Composing from a
-        // set with no skin produces a valid-looking bake of nothing, and storing it supersedes - deletes - the
-        // good bakes it replaces, so the damage is not recoverable by baking again. Observed 2026-09-05: four
-        // unresolvable item ids emptied slots 1-4 and the CofChanged bake that followed stored 4 and superseded 4.
+        // set with no skin produces a valid-looking bake of nothing, and storing it replaces the good bakes on the
+        // avatar and in the index (before v1.1.3 it also deleted them). Observed 2026-09-05: four unresolvable
+        // item ids emptied slots 1-4 and the CofChanged bake that followed stored 4 and superseded 4.
         var refusal = region?.RefusalForBodyPartLoss(sp.UUID, appearance.Wearables);
         if (refusal is not null)
         {
@@ -253,10 +253,9 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
         //
         // No QueueAppearanceSave here, deliberately. A bake changes only the baked faces of the TextureEntry, and
         // the avatar service does not persist those at all: AvatarData(AvatarAppearance) carries the serial,
-        // height, wearables, visual params and attachments and nothing else (IAvatarService.cs:142-189). What a
-        // save would do is destroy this bake's index, because AvatarService.SetAvatar deletes every row for the
-        // agent before rewriting those keys (AvatarService.cs:93). The bake index written above IS the
-        // persistence of the baked faces.
+        // height, wearables, visual params and attachments and nothing else (IAvatarService.cs:142-189), so a
+        // save would only cost a write and set off another bake. The bake index written above IS the persistence
+        // of the baked faces; AvatarService.SetAvatar leaves its rows alone.
         // A run that only reset unused slots (every other channel failed) still changed faces and is sent too.
         if ((live || outcome.Count(ChannelStatus.Cleared) > 0) && !closed)
         {

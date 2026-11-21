@@ -65,6 +65,7 @@
         <RegionModule id="WorldCommModule" class="OpenSim.Region.CoreModules.Scripting.WorldComm.WorldCommModule" />
         <RegionModule id="XMLRPCModule" class="OpenSim.Region.CoreModules.Scripting.XMLRPC.XMLRPCModule" />
         <RegionModule id="AssetServiceInConnectorModule" class="OpenSim.Region.CoreModules.ServiceConnectorsIn.Asset.AssetServiceInConnectorModule" />
+        <RegionModule id="AppearanceServiceInConnectorModule" class="OpenSim.Region.CoreModules.ServiceConnectorsIn.Appearance.AppearanceServiceInConnectorModule" />
         <RegionModule id="AuthenticationServiceInConnectorModule" class="OpenSim.Region.CoreModules.ServiceConnectorsIn.Authentication.AuthenticationServiceInConnectorModule" />
         <RegionModule id="GridInfoServiceInConnectorModule" class="OpenSim.Region.CoreModules.ServiceConnectorsIn.Grid.GridInfoServiceInConnectorModule" />
         <RegionModule id="HypergridServiceInConnectorModule" class="OpenSim.Region.CoreModules.ServiceConnectorsIn.Hypergrid.HypergridServiceInConnectorModule" />

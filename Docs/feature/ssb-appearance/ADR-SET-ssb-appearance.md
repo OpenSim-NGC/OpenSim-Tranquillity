@@ -47,14 +47,17 @@ reference the same library instead of carrying a copy.
 
 ---
 
-## ADR-004: Bakes are assets, indexed in the avatar service, superseded at once
+## ADR-004: Bakes are assets, indexed in the avatar service, and kept
 
 **Decision.**
 - Bakes are stored through `IAssetService` as texture assets named `bake:<agent>:<channel>`.
 - The index lives in the avatar service's key/value rows: `Bake:<channel>`, `BakeHash:<channel>`,
   `BakeCOFVersion`, `BakeSize` and `BakeUpdated`.
-- When a new bake for a channel is confirmed stored and its face has moved to it, the previous asset is
-  deleted (supersede). An asset that any baked face still points at is never deleted.
+- A new bake does not delete the one it replaces. Until v1.1.3 the previous asset was deleted once the new one
+  was stored and the face had moved to it (supersede), and a channel the outfit no longer used had its asset
+  deleted too. Both broke NPCs and notecards saved with `osAgentSaveAppearance`, which name the bakes of the
+  moment, so v1.1.3 stopped deleting. Every change of outfit now adds its new bakes to the asset store, about 11
+  textures at most; an unchanged outfit reuses its bakes and adds nothing.
 - `AssetFlags.Collectable` is not used as a marker: stock code paths treat it as temporary.
 
 **Why.** The key/value avatar table already expresses the index, so no new table and no migration are needed.
@@ -64,11 +67,14 @@ The index is read and written through the existing `IAvatarService` calls (`GetA
 **As built.** The hash skip is per channel and runs before any texture is fetched. A channel is reused only when
 the stored hash matches **and** the stored asset still resolves.
 
-**Not built.** An expiry reaper that would use `BakeUpdated` to remove bakes of avatars that have not returned.
+**Not built.** Anything that removes bakes: neither the bakes an outfit change replaced nor those of avatars that
+have not returned (`BakeUpdated` was recorded for that). Removing a replaced bake safely has to allow for NPCs and
+notecards that still name it.
 
-**Watch out.** Any appearance save rewrites the avatar's record (`AvatarService.SetAvatar` deletes every row for
-the agent first), which wipes the index. That is why bakes run only after a save completes
-(`DESIGN-BRIEF-ssb-appearance.md` §4.6).
+**Watch out.** The index shares the avatar's record with its appearance. `AvatarService.SetAvatar` deletes only the
+appearance rows the new appearance does not have and overwrites the rest; the index rows (the preserved `Bake`
+prefix) are never touched. It used to delete every row, then write the index it had read back afterwards, so a
+bake that wrote the index during a save, which takes seconds on SQLite, was overwritten with the old one.
 
 ---
 
