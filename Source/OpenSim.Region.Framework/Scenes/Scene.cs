@@ -4917,7 +4917,18 @@ Label_GroupsDone:
         // the first connection took the circuit's appearance for its presence; the new presence starts from it
         AvatarAppearance appearance = sp.Appearance is null ? null : new AvatarAppearance(sp.Appearance);
 
-        CloseAgent(agentID, true);
+        // A login still waiting for its viewer is not given up on: the old connection's presence goes here, and the
+        // watcher would read its removal as the viewer leaving and log the login out (presence session gone, the
+        // user offline) while the new connection carries on.
+        LoginArrival arrival = TakeLoginArrival(agentID);
+        try
+        {
+            CloseAgent(agentID, true);
+        }
+        finally
+        {
+            RestoreLoginArrival(agentID, arrival);
+        }
 
         acd.Appearance ??= appearance;
         if (m_authenticateHandler.GetAgentCircuitData(circuitCode) is null)

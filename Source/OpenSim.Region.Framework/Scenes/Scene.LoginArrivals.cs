@@ -101,6 +101,20 @@ public partial class Scene
         WorkManager.RunInThreadPool(_ => LogOutLogin(agentID, arrival.SessionID), null, $"LogOutLogin ({Name})");
     }
 
+    /// <summary>
+    /// Take out the login an agent is still arriving from, while its connection is replaced: the old connection's
+    /// presence is removed then, which is no viewer leaving. Null when there is none.
+    /// </summary>
+    private LoginArrival TakeLoginArrival(UUID agentID)
+        => m_loginArrivals.TryRemove(agentID, out LoginArrival arrival) ? arrival : null;
+
+    /// <summary>Put back what <see cref="TakeLoginArrival"/> took, unless a later login has its place.</summary>
+    private void RestoreLoginArrival(UUID agentID, LoginArrival arrival)
+    {
+        if (arrival is not null)
+            m_loginArrivals.TryAdd(agentID, arrival);
+    }
+
     private bool ForgetLoginArrival(UUID agentID, LoginArrival arrival)
         => ((ICollection<KeyValuePair<UUID, LoginArrival>>)m_loginArrivals).Remove(new(agentID, arrival));
 
