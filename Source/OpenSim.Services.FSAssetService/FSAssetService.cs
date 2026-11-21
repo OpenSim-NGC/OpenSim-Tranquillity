@@ -401,10 +401,20 @@ public class FSAssetConnector : ServiceBase, IAssetService
         return false;
     }
 
+    /// <summary>
+    /// Whether each asset is there to be served: it has a row, and its file holds its content. Hypergrid and
+    /// region archive loads do not send or store again an asset that is there, so one whose file is missing or
+    /// damaged must not count.
+    /// </summary>
     public virtual bool[] AssetsExist(string[] ids)
     {
         UUID[] uuid = Array.ConvertAll(ids, id => UUID.Parse(id));
-        return m_DataConnector.AssetsExist(uuid);
+        (string Hash, sbyte Type)[] rows = m_DataConnector.GetHashes(uuid);
+
+        bool[] exist = new bool[ids.Length];
+        for (int i = 0; i < ids.Length; i++)
+            exist[i] = rows[i].Hash != null && GetCheckedFsData(rows[i].Hash, rows[i].Type) != null;
+        return exist;
     }
 
     public string HashToFile(string hash)
@@ -552,67 +562,138 @@ public class FSAssetConnector : ServiceBase, IAssetService
         return true;
     }
 
+    /// <summary>
+    /// The bytes of the file for <paramref name="hash"/> as they are on disk, unchecked: empty when there is no
+    /// file that can be read. <see cref="GetCheckedFsData"/> answers only content that matches the hash.
+    /// </summary>
     public byte[] GetFsData(string hash)
     {
-        string spoolFile = Path.Combine(m_SpoolDirectory, hash + ".asset");
+        return ReadFsFile(hash, out _, out _) ?? Array.Empty<byte>();
+    }
 
-        if (File.Exists(spoolFile))
+    /// <summary>The SHA-256 of no bytes: the hash of an asset that really is empty.</summary>
+    private static readonly string m_emptyHash = Util.SHA256Hash(Array.Empty<byte>());
+
+    /// <summary>
+    /// The content of the asset whose row names <paramref name="hash"/>, or null when its file does not hold it:
+    /// there is no file, it cannot be read, or what it holds does not match the hash (an empty file, a file cut
+    /// short, any other damage). An asset whose hash is that of no bytes needs no file.
+    /// </summary>
+    private byte[] GetCheckedFsData(string hash, sbyte type)
+    {
+        if (string.IsNullOrEmpty(hash))
+            return null;
+
+        if (string.Equals(hash, m_emptyHash, StringComparison.OrdinalIgnoreCase))
+            return Array.Empty<byte>();
+
+        byte[] data = ReadFsFile(hash, out string file, out bool whole);
+        if (data == null)
+            return null;
+
+        if (FileContentMatches(data, hash, type, whole))
+            return data;
+
+        m_log.LogWarning("[FSASSETS]: {0} holds {1} bytes that do not match hash {2}; assets with that hash are answered as missing until their content is stored again",
+                file, data.Length, hash);
+        return null;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="data"/>, read from a file, is the content whose SHA-256 is <paramref name="hash"/>.
+    /// Store writes an object as its XML cleaned by SanitizeXml and ending in a NUL, while its hash is that of the
+    /// bytes it was given, so an object also matches without its last NUL, or else when the file was read
+    /// <paramref name="whole"/>.
+    /// </summary>
+    private static bool FileContentMatches(byte[] data, string hash, sbyte type, bool whole)
+    {
+        if (string.Equals(Util.SHA256Hash(data), hash, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (type != (sbyte)AssetType.Object || data.Length == 0)
+            return false;
+
+        if (data[data.Length - 1] == 0 &&
+                string.Equals(Util.SHA256Hash(data.AsSpan(0, data.Length - 1)), hash, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return whole;
+    }
+
+    /// <summary>
+    /// Reads the file for <paramref name="hash"/>: the copy waiting in the spool, else the compressed file, else an
+    /// uncompressed one. Null when there is none or it cannot be read. <paramref name="whole"/> is false when the
+    /// read may hold only part of the file: a compressed file whose gzip trailer does not give the length read,
+    /// as when the file was cut short. An uncompressed file has no length to check.
+    /// </summary>
+    private byte[] ReadFsFile(string hash, out string file, out bool whole)
+    {
+        whole = false;
+        file = Path.Combine(m_SpoolDirectory, hash + ".asset");
+
+        if (File.Exists(file))
         {
             try
             {
-                byte[] content = File.ReadAllBytes(spoolFile);
-
+                byte[] content = File.ReadAllBytes(file);
+                whole = true;
                 return content;
             }
             catch
             {
+                // The writer may have just moved it into the store.
             }
         }
 
-        string file = HashToFile(hash);
-        string diskFile = Path.Combine(m_FSBase, file);
+        string diskFile = Path.Combine(m_FSBase, HashToFile(hash));
 
-        if (File.Exists(diskFile + ".gz"))
+        file = diskFile + ".gz";
+        if (File.Exists(file))
         {
             try
             {
-                using (GZipStream gz = new GZipStream(new FileStream(diskFile + ".gz", FileMode.Open, FileAccess.Read), CompressionMode.Decompress))
+                using (FileStream fs = new FileStream(file, FileMode.Open, FileAccess.Read))
+                using (MemoryStream ms = new MemoryStream())
                 {
-                    using (MemoryStream ms = new MemoryStream())
+                    using (GZipStream gz = new GZipStream(fs, CompressionMode.Decompress, true))
+                        gz.CopyTo(ms);
+
+                    // A gzip file ends with the length of what it holds, modulo 2^32. A file cut short ends
+                    // somewhere else, and unpacks without an error to the part that is left.
+                    if (fs.Length >= 18)
                     {
-                        byte[] data = new byte[32768];
-                        int bytesRead;
-
-                        do
-                        {
-                            bytesRead = gz.Read(data, 0, 32768);
-                            if (bytesRead > 0)
-                                ms.Write(data, 0, bytesRead);
-                        } while (bytesRead > 0);
-
-                        return ms.ToArray();
+                        byte[] trailer = new byte[4];
+                        fs.Seek(-4, SeekOrigin.End);
+                        fs.ReadExactly(trailer, 0, 4);
+                        whole = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(trailer) == (uint)ms.Length;
                     }
+                    return ms.ToArray();
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return Array.Empty<byte>();
+                m_log.LogWarning("[FSASSETS]: Could not read {0}: {1}", file, e.Message);
+                return null;
             }
         }
-        else if (File.Exists(diskFile))
+
+        file = diskFile;
+        if (File.Exists(file))
         {
             try
             {
-                byte[] content = File.ReadAllBytes(diskFile);
-
+                byte[] content = File.ReadAllBytes(file);
+                whole = true;
                 return content;
             }
-            catch
+            catch (Exception e)
             {
+                m_log.LogWarning("[FSASSETS]: Could not read {0}: {1}", file, e.Message);
+                return null;
             }
         }
-        return Array.Empty<byte>();
 
+        return null;
     }
 
     public virtual string Store(AssetBase asset)
