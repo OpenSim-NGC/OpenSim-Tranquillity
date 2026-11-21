@@ -39,3 +39,14 @@ ADD COLUMN `DisplayName` VARCHAR(31) NULL AFTER `active`,
 ADD COLUMN `NameChanged` INT NULL DEFAULT 0 AFTER `DisplayName`;
 
 COMMIT;
+
+:VERSION 8		# -------------------------
+
+# UserAccountService stores UserCountry whenever an account has one (osGetAgentCountry reads it back); with no column
+# the whole store failed.
+
+BEGIN;
+
+ALTER TABLE `UserAccounts` ADD COLUMN `UserCountry` VARCHAR(100) NOT NULL DEFAULT '' AFTER `NameChanged`;
+
+COMMIT;

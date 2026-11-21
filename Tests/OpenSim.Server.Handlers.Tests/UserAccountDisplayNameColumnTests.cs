@@ -79,7 +79,7 @@ public class UserAccountDisplayNameColumnTests
 
         Migrate(conn);
 
-        Xunit.Assert.Equal(4L, ScalarLong(conn, "select version from migrations where name = 'UserAccount'"));
+        Xunit.Assert.Equal(5L, ScalarLong(conn, "select version from migrations where name = 'UserAccount'"));
         Xunit.Assert.Equal(1L, ScalarLong(conn, "select count(*) from pragma_table_info('UserAccounts') where name = 'DisplayName'"));
         Xunit.Assert.Equal(1L, ScalarLong(conn, "select count(*) from pragma_table_info('UserAccounts') where name = 'NameChanged'"));
     }
@@ -107,7 +107,7 @@ public class UserAccountDisplayNameColumnTests
 
         Migrate(conn);
 
-        Xunit.Assert.Equal(4L, ScalarLong(conn, "select version from migrations where name = 'UserAccount'"));
+        Xunit.Assert.Equal(5L, ScalarLong(conn, "select version from migrations where name = 'UserAccount'"));
         Xunit.Assert.Equal(1L, ScalarLong(conn,
             "select count(*) from UserAccounts where PrincipalID = '" + id + "' and FirstName = 'Old'" +
             " and DisplayName is null and NameChanged = 0"));
@@ -141,6 +141,7 @@ public class UserAccountDisplayNameColumnTests
     [Xunit.Theory]
     [Xunit.InlineData("DisplayName")]
     [Xunit.InlineData("NameChanged")]
+    [Xunit.InlineData("UserCountry")]
     public void PostgresMigrationAddsTheColumnWithItsQuotedName(string column)
     {
         var assembly = typeof(PGSQLUserAccountData).Assembly;

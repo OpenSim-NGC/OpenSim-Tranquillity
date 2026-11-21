@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\Source\OpenSim.ApplicationPlugins.RemoteController\OpenSim.ApplicationPlugins.RemoteController.csproj" />
     <ProjectReference Include="..\..\Addons\OpenSim.Addons.Groups\OpenSim.Addons.Groups.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data.SQLite\OpenSim.Data.SQLite.csproj" />
+    <ProjectReference Include="..\..\Source\OpenSim.Data.MySQL\OpenSim.Data.MySQL.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Data.PGSQL\OpenSim.Data.PGSQL.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services.UserAccountService\OpenSim.Services.UserAccountService.csproj" />
     <ProjectReference Include="..\..\Addons\Gloebit.GloebitMoneyModule\Gloebit.GloebitMoneyModule.csproj" />
