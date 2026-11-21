@@ -37,7 +37,9 @@ public sealed class RegionStatusHandlerRegistrar : IRegionStatusHandlerRegistrar
 
         if (!string.IsNullOrEmpty(app.managedStatsURI))
         {
-            string urlBase = $"/{app.managedStatsURI}/";
+            // The server looks a path up without its trailing slash, so a path registered with one
+            // never matches; registered without one, it answers both /name and /name/.
+            string urlBase = "/" + app.managedStatsURI.Trim('/');
             StatsManager.StatsPassword = app.managedStatsPassword;
             defaultServer.AddHTTPHandler(urlBase, StatsManager.HandleStatsRequest);
             m_log.LogInformation("[OPENSIM] Enabling remote managed stats fetch. URL = {0}", urlBase);

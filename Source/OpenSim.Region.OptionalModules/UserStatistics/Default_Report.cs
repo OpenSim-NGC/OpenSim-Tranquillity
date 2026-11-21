@@ -204,9 +204,12 @@ TD.align_top { vertical-align: top; }
         returnstruct.all_scenes = m_scene.ToArray();
         lock (db)
         {
-            string SQL = @"SELECT COUNT(DISTINCT agent_id) as agents, COUNT(*) as sessions, AVG(avg_fps) as client_fps,
-                                AVG(avg_sim_fps) as savg_sim_fps, AVG(avg_ping) as sav_ping, SUM(n_out_kb) as num_in_kb,
-                                SUM(n_out_pk) as num_in_packets, SUM(n_in_kb) as num_out_kb, SUM(n_in_pk) as num_out_packets, AVG(mem_use) as sav_mem_use
+            // AVG and SUM are NULL over no rows, so each is 0 then.
+            // n_in and n_out are as the viewer reports them: what the viewer sent is what the
+            // region took in, so the region's KB in is the viewer's n_out, and its KB out the viewer's n_in.
+            string SQL = @"SELECT COUNT(DISTINCT agent_id) as agents, COUNT(*) as sessions, COALESCE(AVG(avg_fps), 0) as client_fps,
+                                COALESCE(AVG(avg_sim_fps), 0) as savg_sim_fps, COALESCE(AVG(avg_ping), 0) as sav_ping, COALESCE(SUM(n_out_kb), 0) as num_in_kb,
+                                COALESCE(SUM(n_out_pk), 0) as num_in_packets, COALESCE(SUM(n_in_kb), 0) as num_out_kb, COALESCE(SUM(n_in_pk), 0) as num_out_packets, COALESCE(AVG(mem_use), 0) as sav_mem_use
                                 FROM stats_session_data;";
             SQLiteCommand cmd = new SQLiteCommand(SQL, db);
             SQLiteDataReader sdr = cmd.ExecuteReader();
