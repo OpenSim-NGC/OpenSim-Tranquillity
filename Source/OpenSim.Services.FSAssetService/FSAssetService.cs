@@ -172,6 +172,7 @@ public class FSAssetConnector : ServiceBase, IAssetService
 
         // Setup directory structure including temp directory
         m_SpoolDirectory = assetConfig.GetString("SpoolDirectory", "/tmp");
+        WarnIfSpoolIsTemporary(m_SpoolDirectory);
 
         string spoolTmp = Path.Combine(m_SpoolDirectory, "spool");
 
@@ -243,117 +244,196 @@ public class FSAssetConnector : ServiceBase, IAssetService
         }
     }
 
+    /// <summary>The writer's pause between passes over the spool.</summary>
+    private const int WriterInterval = 1000;
+
+    /// <summary>The longest pause after passes that could not write everything, as with a full disk.</summary>
+    private const int WriterMaxRetryInterval = 60000;
+
+    /// <summary>
+    /// The spool holds the only copy of an asset until the writer has written it, while its row already says it
+    /// is stored. A temporary directory is cleared at a restart, or is memory (tmpfs) and lost with it.
+    /// </summary>
+    private static void WarnIfSpoolIsTemporary(string spoolDirectory)
+    {
+        string spool = Path.TrimEndingDirectorySeparator(Path.GetFullPath(spoolDirectory)) + Path.DirectorySeparatorChar;
+        foreach (string temp in new[] { "/tmp", Path.GetTempPath() })
+        {
+            string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(temp)) + Path.DirectorySeparatorChar;
+            if (spool.StartsWith(root, StringComparison.Ordinal))
+            {
+                m_log.LogWarning("[FSASSETS]: SpoolDirectory {0} is in the temporary directory {1}. Assets wait there until they are written to BaseDirectory, and are lost if it is cleared, as at a restart. Set SpoolDirectory to a directory on the same disk as BaseDirectory.",
+                        spoolDirectory, root);
+                return;
+            }
+        }
+    }
+
     private void Writer()
     {
         m_log.LogInformation("[FSASSETS]: Writer started with spooldir {0} and basedir {1}", m_SpoolDirectory, m_FSBase);
 
+        int interval = WriterInterval;
         while (true)
         {
-            string[] files = Directory.GetFiles(m_SpoolDirectory);
-
-            if (files.Length > 0)
+            bool written;
+            try
             {
-                int tickCount = Environment.TickCount;
-                for (int i = 0 ; i < files.Length ; i++)
-                {
-                    string hash = Path.GetFileNameWithoutExtension(files[i]);
-                    string s = HashToFile(hash);
-                    string diskFile = Path.Combine(m_FSBase, s);
-                    bool pathOk = false;
-
-                    // The cure for chicken bones!
-                    while(true)
-                    {
-                        try
-                        {
-                            // Try to make the directory we need for this file
-                            Directory.CreateDirectory(Path.GetDirectoryName(diskFile));
-                            pathOk = true;
-                            break;
-                        }
-                        catch (System.IO.IOException)
-                        {
-                            // Creating the directory failed. This can't happen unless
-                            // a part of the path already exists as a file. Sadly the
-                            // SRAS data contains such files.
-                            string d = Path.GetDirectoryName(diskFile);
-
-                            // Test each path component in turn. If we can successfully
-                            // make a directory, the level below must be the chicken bone.
-                            while (d.Length > 0)
-                            {
-                                Console.WriteLine(d);
-                                try
-                                {
-                                    Directory.CreateDirectory(Path.GetDirectoryName(d));
-                                }
-                                catch (System.IO.IOException)
-                                {
-                                    d = Path.GetDirectoryName(d);
-
-                                    // We failed making the directory and need to
-                                    // go up a bit more
-                                    continue;
-                                }
-
-                                // We succeeded in making the directory and (d) is
-                                // the chicken bone
-                                break;
-                            }
-
-                            // Is the chicken alive?
-                            if (d.Length > 0)
-                            {
-                                Console.WriteLine(d);
-
-                                FileAttributes attr = File.GetAttributes(d);
-
-                                if ((attr & FileAttributes.Directory) == 0)
-                                {
-                                    // The chicken bone should be resolved.
-                                    // Return to writing the file.
-                                    File.Delete(d);
-                                    continue;
-                                }
-                            }
-                        }
-                        // Could not resolve, skipping
-                        m_log.LogError("[FSASSETS]: Could not resolve path creation error for {0}", diskFile);
-                        break;
-                    }
-
-                    if (pathOk)
-                    {
-                        try
-                        {
-                            byte[] data = File.ReadAllBytes(files[i]);
-
-                            using (GZipStream gz = new GZipStream(new FileStream(diskFile + ".gz", FileMode.Create), CompressionMode.Compress))
-                            {
-                                gz.Write(data, 0, data.Length);
-                            }
-                            File.Delete(files[i]);
-
-                            //File.Move(files[i], diskFile);
-                        }
-                        catch(System.IO.IOException e)
-                        {
-                            if (e.Message.StartsWith("Win32 IO returned ERROR_ALREADY_EXISTS"))
-                                File.Delete(files[i]);
-                            else
-                                throw;
-                        }
-                    }
-                }
-
-                int totalTicks = System.Environment.TickCount - tickCount;
-                if (totalTicks > 0) // Wrap?
-                {
-                    m_log.LogInformation("[FSASSETS]: Write cycle complete, {0} files, {1} ticks, avg {2:F2}", files.Length, totalTicks, (double)totalTicks / (double)files.Length);
-                }
+                written = WriteSpooledFiles();
+            }
+            catch (Exception e)
+            {
+                // Nothing may end this thread, and with it the process: what the pass did not write stays in
+                // the spool for the next one.
+                m_log.LogError(e, "[FSASSETS]: Writer pass over {0} failed", m_SpoolDirectory);
+                written = false;
             }
 
-            Thread.Sleep(1000);
+            // A full disk does not empty by itself: wait longer after each pass that left files behind.
+            interval = written ? WriterInterval : Math.Min(interval * 2, WriterMaxRetryInterval);
+            Thread.Sleep(interval);
+        }
+    }
+
+    /// <summary>
+    /// Writes each asset waiting in the spool to the store and then deletes its spool copy. One that cannot be
+    /// written stays in the spool. Answers whether every one was written.
+    /// </summary>
+    private bool WriteSpooledFiles()
+    {
+        // Only the spool's own files: anything else in the directory is not ours to move or delete.
+        string[] files = Directory.GetFiles(m_SpoolDirectory, "*.asset");
+        if (files.Length == 0)
+            return true;
+
+        int tickCount = Environment.TickCount;
+        int failed = 0;
+        for (int i = 0 ; i < files.Length ; i++)
+        {
+            string hash = Path.GetFileNameWithoutExtension(files[i]);
+            string diskFile = Path.Combine(m_FSBase, HashToFile(hash));
+            try
+            {
+                if (MakeDirectoryFor(diskFile))
+                    WriteStoreFile(files[i], diskFile + ".gz");
+                else
+                    failed++;
+            }
+            catch (Exception e)
+            {
+                if (failed == 0)
+                    m_log.LogError("[FSASSETS]: Could not write {0} to {1}, it stays in the spool to be written again: {2}",
+                            files[i], diskFile + ".gz", e.Message);
+                failed++;
+            }
+        }
+
+        int totalTicks = System.Environment.TickCount - tickCount;
+        if (failed > 0)
+        {
+            m_log.LogError("[FSASSETS]: Write cycle wrote {0} of {1} files; the others stay in the spool to be written again",
+                    files.Length - failed, files.Length);
+        }
+        else if (totalTicks > 0) // Wrap?
+        {
+            m_log.LogInformation("[FSASSETS]: Write cycle complete, {0} files, {1} ticks, avg {2:F2}", files.Length, totalTicks, (double)totalTicks / (double)files.Length);
+        }
+
+        return failed == 0;
+    }
+
+    /// <summary>
+    /// Writes the compressed copy of <paramref name="spoolFile"/> to a temporary file beside
+    /// <paramref name="storeFile"/>, forces it to disk and renames it into place, so the store file is never
+    /// seen part written, even after a crash or a full disk. Then deletes the spool copy.
+    /// </summary>
+    private static void WriteStoreFile(string spoolFile, string storeFile)
+    {
+        byte[] data = File.ReadAllBytes(spoolFile);
+        string tempFile = storeFile + "." + Environment.ProcessId + ".tmp";
+        try
+        {
+            using (FileStream fs = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                using (GZipStream gz = new GZipStream(fs, CompressionMode.Compress, true))
+                    gz.Write(data, 0, data.Length);
+                fs.Flush(true);
+            }
+            File.Move(tempFile, storeFile, true);
+        }
+        catch
+        {
+            try { File.Delete(tempFile); } catch { /* the write's error is the one to report */ }
+            throw;
+        }
+
+        File.Delete(spoolFile);
+    }
+
+    /// <summary>
+    /// Makes the directory that holds <paramref name="diskFile"/>. A file where a directory of the path should be
+    /// is deleted ("chicken bones": the SRAS data contains such files). False when the path cannot be made.
+    /// </summary>
+    private static bool MakeDirectoryFor(string diskFile)
+    {
+        // The cure for chicken bones!
+        while(true)
+        {
+            try
+            {
+                // Try to make the directory we need for this file
+                Directory.CreateDirectory(Path.GetDirectoryName(diskFile));
+                return true;
+            }
+            catch (System.IO.IOException)
+            {
+                // Creating the directory failed. This can't happen unless
+                // a part of the path already exists as a file. Sadly the
+                // SRAS data contains such files.
+                string d = Path.GetDirectoryName(diskFile);
+
+                // Test each path component in turn. If we can successfully
+                // make a directory, the level below must be the chicken bone.
+                while (d.Length > 0)
+                {
+                    Console.WriteLine(d);
+                    try
+                    {
+                        Directory.CreateDirectory(Path.GetDirectoryName(d));
+                    }
+                    catch (System.IO.IOException)
+                    {
+                        d = Path.GetDirectoryName(d);
+
+                        // We failed making the directory and need to
+                        // go up a bit more
+                        continue;
+                    }
+
+                    // We succeeded in making the directory and (d) is
+                    // the chicken bone
+                    break;
+                }
+
+                // Is the chicken alive?
+                if (d.Length > 0)
+                {
+                    Console.WriteLine(d);
+
+                    FileAttributes attr = File.GetAttributes(d);
+
+                    if ((attr & FileAttributes.Directory) == 0)
+                    {
+                        // The chicken bone should be resolved.
+                        // Return to writing the file.
+                        File.Delete(d);
+                        continue;
+                    }
+                }
+            }
+            // Could not resolve, skipping
+            m_log.LogError("[FSASSETS]: Could not resolve path creation error for {0}", diskFile);
+            return false;
         }
     }
 
