@@ -89,9 +89,9 @@ public class PGSQLMigration : Migration
                     cmd.ExecuteNonQuery();
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                throw new Exception(sql);
+                throw new Exception(e.Message + " in SQL: " + sql, e);
 
             }
         }
