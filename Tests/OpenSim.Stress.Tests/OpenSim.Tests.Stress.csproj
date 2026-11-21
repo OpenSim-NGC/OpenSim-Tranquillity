@@ -20,7 +20,6 @@
     <ProjectReference Include="..\..\Source\OpenSim.Region.Framework\OpenSim.Region.Framework.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.OptionalModules\OpenSim.Region.OptionalModules.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Region.ScriptEngine.Shared\OpenSim.Region.ScriptEngine.Shared.csproj" />
-    <ProjectReference Include="..\..\Source\OpenSim.Services\OpenSim.Services.csproj" />
     <ProjectReference Include="..\..\Source\OpenSim.Services.Interfaces\OpenSim.Services.Interfaces.csproj" />
     <ProjectReference Include="..\..\Tests\OpenSim.Tests.Common\OpenSim.Tests.Common.csproj" />
   </ItemGroup>
