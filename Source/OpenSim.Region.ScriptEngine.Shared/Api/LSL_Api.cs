@@ -681,8 +681,66 @@ public class LSL_Api : ILSL_Api, IScriptApi
             llResetScript();
         else
         {
-            m_ScriptEngine.ResetScript(item);
+            foreach (IScriptEngine e in ScriptEnginesFor(m_ScriptEngine, item))
+                e.ResetScript(item);
         }
+    }
+
+    /// <summary>
+    /// The script engine of the region that runs a script item: the caller's own engine when it runs it, else the other
+    /// engine that does, else null (no engine runs it yet; it may still be compiling). SL has one script runtime, so
+    /// llResetOtherScript, llSetScriptState, llGetScriptState and osResetAllScripts name a script of the prim whatever
+    /// engine runs it (https://wiki.secondlife.com/wiki/LlResetOtherScript). The caller's own rules for these calls are
+    /// unchanged; only the engine that carries them out is chosen here.
+    /// </summary>
+    internal static IScriptEngine ScriptEngineRunning(IScriptEngine own, UUID itemID)
+    {
+        IScriptModule ownModule = own.ScriptModule;
+        if (ownModule is null || ownModule.HasScript(itemID, out _))
+            return own;
+        foreach (IScriptEngine other in OtherScriptEngines(own))
+        {
+            try
+            {
+                if (other.ScriptModule is not null && other.ScriptModule.HasScript(itemID, out _))
+                    return other;
+            }
+            catch (Exception e)
+            {
+                m_log.LogWarning("[LSL_Api]: another script engine failed to say whether it runs a script: {0}", e.Message);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// The engines a call on a script item goes to: the one that runs it; or, when none does yet, the caller's own engine
+    /// and then every other one, as an engine ignores an item it does not know and one that is compiling it keeps the
+    /// call for when it starts.
+    /// </summary>
+    internal static List<IScriptEngine> ScriptEnginesFor(IScriptEngine own, UUID itemID)
+    {
+        IScriptEngine running = ScriptEngineRunning(own, itemID);
+        if (running is not null)
+            return new List<IScriptEngine> { running };
+        List<IScriptEngine> all = new() { own };
+        all.AddRange(OtherScriptEngines(own));
+        return all;
+    }
+
+    /// <summary>Each script engine of the region other than <paramref name="own"/>, once.</summary>
+    private static List<IScriptEngine> OtherScriptEngines(IScriptEngine own)
+    {
+        List<IScriptEngine> others = new();
+        IScriptModule[] modules = own.World?.RequestModuleInterfaces<IScriptModule>();
+        if (modules is null)
+            return others;
+        foreach (IScriptModule m in modules)
+        {
+            if (!ReferenceEquals(m, own.ScriptModule) && !ReferenceEquals(m, own) && m is IScriptEngine other && !others.Contains(other))
+                others.Add(other);
+        }
+        return others;
     }
 
     public LSL_Integer llGetScriptState(string name)
@@ -691,7 +749,7 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
         if (!item.IsZero())
         {
-            return m_ScriptEngine.GetScriptState(item) ?1:0;
+            return (ScriptEngineRunning(m_ScriptEngine, item) ?? m_ScriptEngine).GetScriptState(item) ?1:0;
         }
 
         Error("llGetScriptState", "Can't find script '" + name + "'");
@@ -712,7 +770,9 @@ public class LSL_Api : ILSL_Api, IScriptApi
 
         if (!item.IsZero())
         {
-            m_ScriptEngine.SetScriptState(item, run != 0, item.Equals(m_item.ItemID));
+            bool self = item.Equals(m_item.ItemID);
+            foreach (IScriptEngine e in ScriptEnginesFor(m_ScriptEngine, item))
+                e.SetScriptState(item, run != 0, self);
         }
         else
         {

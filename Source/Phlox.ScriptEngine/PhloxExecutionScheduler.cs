@@ -131,7 +131,13 @@ namespace Phlox.ScriptEngine
 
         // Enable/disable requests
         private readonly Queue<EnableDisableReq> m_EnableDisableQueue = new();
-        private struct EnableDisableReq { public UUID ItemId; public bool Enable; }
+        private struct EnableDisableReq { public UUID ItemId; public bool Enable; public long Seq; }
+
+        // The latest start or stop asked for each script and not yet applied, under the m_EnableDisableQueue lock. Once
+        // llSetScriptState returns, the script is in the state it set (llGetScriptState answers it, and llResetOtherScript
+        // ignores a script it just stopped), though this thread applies the request later.
+        private readonly Dictionary<UUID, (bool Enable, long Seq)> m_PendingEnable = new();
+        private long m_EnableSeq;
 
         // Transient suspend/resume requests (posted from estate/console threads) and the
         // suspended set itself. The set is scheduler-thread-only (drained-queue pattern, like
@@ -770,7 +776,11 @@ namespace Phlox.ScriptEngine
         public void ChangeEnabledStatus(UUID itemId, bool enable)
         {
             lock (m_EnableDisableQueue)
-                m_EnableDisableQueue.Enqueue(new EnableDisableReq { ItemId = itemId, Enable = enable });
+            {
+                long seq = ++m_EnableSeq;
+                m_EnableDisableQueue.Enqueue(new EnableDisableReq { ItemId = itemId, Enable = enable, Seq = seq });
+                m_PendingEnable[itemId] = (enable, seq);
+            }
             m_WorkArrived();
         }
 
@@ -917,8 +927,14 @@ namespace Phlox.ScriptEngine
             // removes scripts: the read takes the lock the writes take.
             lock (m_AllScriptsLock)
                 if (!m_AllScripts.TryGetValue(itemId, out script)) return false;
+            // A start or stop asked for and not yet applied answers first. Looked up before the script's own flag: this
+            // thread applies a request before it drops the entry, so a read that finds no entry sees the applied flag.
+            bool? asked = null;
+            lock (m_EnableDisableQueue)
+                if (m_PendingEnable.TryGetValue(itemId, out var pending)) asked = pending.Enable;
             var st = script.ScriptState;
-            return st.GeneralEnable && (st.LocalDisable & ~RuntimeState.LocalDisableFlag.Parcel) == RuntimeState.LocalDisableFlag.None;
+            bool on = asked ?? st.GeneralEnable;
+            return on && (st.LocalDisable & ~RuntimeState.LocalDisableFlag.Parcel) == RuntimeState.LocalDisableFlag.None;
         }
 
         /// <summary>Was this script stopped by a runtime error? Safe from any thread.</summary>
@@ -1991,42 +2007,54 @@ namespace Phlox.ScriptEngine
 
             foreach (var req in batch)
             {
-                Interpreter script;
-                if (!m_AllScripts.TryGetValue(req.ItemId, out script)) continue;
-
-                if (req.Enable)
+                try { ApplyEnableDisable(req); }
+                finally
                 {
-                    // Ticking Running on a crashed script starts it fresh, never from its dead frame
-                    if (script.ScriptState.TerminatedReason != null) { ResetNow(req.ItemId); continue; }
-                    bool wasOn = script.ScriptState.GeneralEnable;
-                    script.ScriptState.GeneralEnable = true;
-                    bool heldFresh;
-                    lock (m_AllScriptsLock) heldFresh = m_HeldFresh.Remove(req.ItemId);
-                    if (heldFresh)
-                    {
-                        // Loaded with the Running flag off and never started - its state_entry is owed now
-                        PostEvent(req.ItemId, new PostedEvent { EventType = SupportedEventList.Events.STATE_ENTRY, Args = Array.Empty<object>() });
-                        if (!m_RunIndex.ContainsKey(req.ItemId))
-                            AddToRunQueue(script);
-                    }
-                    else if (!wasOn)
-                        StartAfterStop(script);
+                    // Applied: the script's own state answers from now on, unless a newer request is waiting
+                    lock (m_EnableDisableQueue)
+                        if (m_PendingEnable.TryGetValue(req.ItemId, out var p) && p.Seq == req.Seq)
+                            m_PendingEnable.Remove(req.ItemId);
                 }
-                else if (script.ScriptState.GeneralEnable)
-                {
-                    bool wasEnabled = script.ScriptState.Enabled;
-                    script.ScriptState.GeneralEnable = false;
-                    RemoveFromRunQueue(req.ItemId);
-                    ulong? timerLeft = wasEnabled ? TimerTimeLeft(script) : null;
-                    UnregisterFromNotifications(script);
-                    if (timerLeft.HasValue) m_StoppedTimerLeft[req.ItemId] = timerLeft.Value;
-                    // Halcyon AfterDisable -> OnScriptUnloaded(GloballyDisabled): the async handlers stop and taken
-                    // controls are let go. Their records stay, so a start takes them up again (StartAfterStop).
-                    if (wasEnabled && m_Apis.TryGetValue(req.ItemId, out LSLSystemAPI api)) api.OnScriptStopped();
-                    m_Engine.StateManager?.ScriptChanged(script);   // A stopped script never runs again to get itself saved
-                }
-                script.SetScriptEventFlags();
             }
+        }
+
+        private void ApplyEnableDisable(EnableDisableReq req)
+        {
+            Interpreter script;
+            if (!m_AllScripts.TryGetValue(req.ItemId, out script)) return;
+
+            if (req.Enable)
+            {
+                // Ticking Running on a crashed script starts it fresh, never from its dead frame
+                if (script.ScriptState.TerminatedReason != null) { ResetNow(req.ItemId); return; }
+                bool wasOn = script.ScriptState.GeneralEnable;
+                script.ScriptState.GeneralEnable = true;
+                bool heldFresh;
+                lock (m_AllScriptsLock) heldFresh = m_HeldFresh.Remove(req.ItemId);
+                if (heldFresh)
+                {
+                    // Loaded with the Running flag off and never started - its state_entry is owed now
+                    PostEvent(req.ItemId, new PostedEvent { EventType = SupportedEventList.Events.STATE_ENTRY, Args = Array.Empty<object>() });
+                    if (!m_RunIndex.ContainsKey(req.ItemId))
+                        AddToRunQueue(script);
+                }
+                else if (!wasOn)
+                    StartAfterStop(script);
+            }
+            else if (script.ScriptState.GeneralEnable)
+            {
+                bool wasEnabled = script.ScriptState.Enabled;
+                script.ScriptState.GeneralEnable = false;
+                RemoveFromRunQueue(req.ItemId);
+                ulong? timerLeft = wasEnabled ? TimerTimeLeft(script) : null;
+                UnregisterFromNotifications(script);
+                if (timerLeft.HasValue) m_StoppedTimerLeft[req.ItemId] = timerLeft.Value;
+                // Halcyon AfterDisable -> OnScriptUnloaded(GloballyDisabled): the async handlers stop and taken
+                // controls are let go. Their records stay, so a start takes them up again (StartAfterStop).
+                if (wasEnabled && m_Apis.TryGetValue(req.ItemId, out LSLSystemAPI api)) api.OnScriptStopped();
+                m_Engine.StateManager?.ScriptChanged(script);   // A stopped script never runs again to get itself saved
+            }
+            script.SetScriptEventFlags();
         }
 
         /// <summary>

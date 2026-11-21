@@ -2280,8 +2280,15 @@ namespace Phlox.ScriptEngine
 
         public void SetScriptState(UUID itemID, bool state, bool self)
         {
+            // Another engine's llSetScriptState reaches a Phlox script here. SL wiki, llSetScriptState, Caveats: it "Cannot
+            // be used to restart a script that has encountered a run-time error", whichever engine runs the caller.
+            if (state && IsScriptTerminated(itemID)) return;
             m_ScriptLoader?.NoteScriptState(itemID, state);   // Still compiling - applied when it starts
             m_ExeScheduler?.ChangeEnabledStatus(itemID, state);
+            // The item's Running flag, which the viewer's checkbox shows and the region saves, as LSLSystemAPI.llSetScriptState
+            // keeps it for a Phlox caller (another engine's llSetScriptState reaches a Phlox script through here).
+            var script = m_ExeScheduler?.FindScript(itemID);
+            if (script != null) SetItemRunningFlag(script.HostLocalId, itemID, state);
         }
 
         public bool GetScriptState(UUID itemID)

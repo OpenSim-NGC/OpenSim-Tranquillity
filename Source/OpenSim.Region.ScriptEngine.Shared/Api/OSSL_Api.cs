@@ -6025,7 +6025,8 @@ public class OSSL_Api : IOSSL_Api, IScriptApi
         {
             if(script.ItemID.Equals(me))
                 continue;
-            m_ScriptEngine.ResetScript(script.ItemID);
+            foreach (IScriptEngine e in LSL_Api.ScriptEnginesFor(m_ScriptEngine, script.ItemID))
+                e.ResetScript(script.ItemID);
         }
 
         m_UrlModule?.ScriptRemoved(me);

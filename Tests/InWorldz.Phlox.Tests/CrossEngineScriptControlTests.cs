@@ -49,6 +49,7 @@ public class CrossEngineScriptControlTests
                 else if (m == ""start"") llSetScriptState(""" + Victim + @""", TRUE);
                 else if (m == ""state"") llSay(0, ""D state "" + (string)llGetScriptState(""" + Victim + @"""));
                 else if (m == ""resetall"") osResetAllScripts(FALSE);
+                else if (m == ""stopreset"") { llSetScriptState(""" + Victim + @""", FALSE); llResetOtherScript(""" + Victim + @"""); }
                 else if (m == ""remove"") llRemoveInventory(""" + Victim + @""");
                 llSay(0, ""D did "" + m);
             }
@@ -194,5 +195,21 @@ public class CrossEngineScriptControlTests
         r.SayToY("after");
         r.R.Quiet(700, "Y heard ");
         Assert.Equal(heard, r.R.CountStart("Y heard "));
+    }
+
+    /// <summary>
+    /// llSetScriptState(FALSE) and then llResetOtherScript in one event, on a script YEngine runs: the script is not running
+    /// once the first call returns, so the reset has no effect (llResetOtherScript, Caveats).
+    /// </summary>
+    [Fact]
+    public void LlSetScriptStateFalseThenLlResetOtherScriptOfAYEngineScriptHasNoEffect()
+    {
+        using var r = new Rig();
+        r.Drive("stopreset");
+        r.Drive("start");
+        Assert.True(r.YHears("after"), "the YEngine script does not hear after it was started: " + string.Join(" | ", r.R.H.Said));
+        r.R.Quiet(500, "Y entry");
+        _out.WriteLine(string.Join(" | ", r.R.H.Said));
+        Assert.Equal(1, r.R.Count("Y entry"));
     }
 }

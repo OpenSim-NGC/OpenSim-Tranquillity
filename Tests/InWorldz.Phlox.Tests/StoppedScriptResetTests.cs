@@ -252,4 +252,119 @@ public class StoppedScriptResetTests
         Assert.Equal(2, h.Said.Count(s => s == "crasher up"));
         Assert.DoesNotContain("after", h.Said);
     }
+
+    /// <summary>
+    /// The SL wiki, llSetScriptState, Caveats: it "Cannot be used to restart a script that has encountered a run-time
+    /// error" (https://wiki.secondlife.com/wiki/LlSetScriptState). The crashed script stays stopped and its state_entry does
+    /// not run again.
+    /// </summary>
+    [Fact]
+    public void LlSetScriptStateTrueDoesNotRestartACrashedScript()
+    {
+        const string crasher = @"default {
+            state_entry() { llSay(0, ""crasher up""); osSetRot(llGetKey(), <0,0,0,1>); llSay(0, ""after""); }
+        }";
+        const string starter = @"default {
+            touch_start(integer t) { llSetScriptState(""script1"", TRUE); llSay(0, ""start sent "" + (string)llGetScriptState(""script1"")); }
+        }";
+        using var h = new SchedulerHarness(cfg => cfg.AddConfig("OSSL").Set("OSFunctionThreatLevel", "VeryLow"));
+        var itemId = h.RezScript(crasher);   // "script1"
+        Assert.True(h.PumpUntil(() => h.RunStateOf(itemId) == "Killed"), "the script did not crash: " + Log(h));
+        var starterId = h.RezScript(starter);
+
+        h.PostTouch(starterId);
+        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("start sent "))));
+        h.PumpFor(TimeSpan.FromSeconds(1));   // a window in which a restart must NOT happen
+        _out.WriteLine("said=[" + Log(h) + "]");
+
+        Assert.Equal(1, h.Said.Count(s => s == "crasher up"));
+        Assert.Contains("start sent 0", h.Said);
+        Assert.False(h.Engine.GetScriptState(itemId));
+        Assert.Equal("Killed", h.RunStateOf(itemId));
+    }
+
+    /// <summary>
+    /// llSetScriptState(FALSE) and then llResetOtherScript on the same script, in one event: once the first call returns the
+    /// script is not running, so the second has no effect (llResetOtherScript, Caveats: "If the script is not running, this
+    /// call has no effect, even after the script is set running again."). Started again, it carries on from its old globals.
+    /// </summary>
+    [Fact]
+    public void LlSetScriptStateFalseThenLlResetOtherScriptInOneEventHasNoEffect()
+    {
+        const string stopReset = @"default {
+            touch_start(integer t) { llSetScriptState(""script1"", FALSE); llResetOtherScript(""script1""); llSay(0, ""stop reset sent""); }
+        }";
+        using var h = new SchedulerHarness();
+        var itemId = h.RezScript(Target);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("up 1")));
+        h.PostTouch(itemId);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("n 11")));
+        var driverId = h.RezScript(stopReset);
+
+        h.PostTouch(driverId);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("stop reset sent")));
+        Assert.True(h.PumpUntil(() => !h.Engine.GetScriptState(itemId)));
+        h.PumpFor(TimeSpan.FromSeconds(1));   // a window in which a reset must NOT be applied
+        _out.WriteLine("after stop and reset: said=[" + Log(h) + "]");
+
+        Assert.False(GlobalsCleared(h, itemId), "llResetOtherScript reset a script llSetScriptState had just stopped");
+        Assert.Equal(1, Ups(h));
+
+        h.Scene.EventManager.TriggerStartScript(h.Prim.LocalId, itemId);
+        Assert.True(h.PumpUntil(() => h.Engine.GetScriptState(itemId)));
+        h.PumpFor(TimeSpan.FromSeconds(1));   // a window in which a held-back state_entry must NOT run
+        h.PostTouch(itemId);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("n 21")), "the started script did not carry on from its own globals: " + Log(h));
+        Assert.Equal(1, Ups(h));
+    }
+
+    /// <summary>
+    /// The other order: llSetScriptState(TRUE) on a stopped script and then llResetOtherScript in one event. The script is
+    /// running once the first call returns, so the reset applies: state_entry runs once, from fresh globals.
+    /// </summary>
+    [Fact]
+    public void LlSetScriptStateTrueThenLlResetOtherScriptInOneEventResetsIt()
+    {
+        const string startReset = @"default {
+            touch_start(integer t) { llSetScriptState(""script1"", TRUE); llResetOtherScript(""script1""); llSay(0, ""start reset sent""); }
+        }";
+        using var h = new SchedulerHarness();
+        var itemId = RezTouchedAndStopped(h);
+        var driverId = h.RezScript(startReset);
+
+        h.PostTouch(driverId);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("start reset sent")));
+        Assert.True(h.PumpUntil(() => Ups(h) >= 2), "the started script was not reset: " + Log(h));
+        h.PumpFor(TimeSpan.FromSeconds(1));   // a window in which a second state_entry must NOT run
+        _out.WriteLine("said=[" + Log(h) + "]");
+
+        Assert.Equal(2, Ups(h));
+        Assert.Equal("up 1", h.Said.Last(s => s.StartsWith("up ")));
+        Assert.True(h.Engine.GetScriptState(itemId));
+    }
+
+    /// <summary>llGetScriptState right after llSetScriptState in the same event answers the state just set.</summary>
+    [Fact]
+    public void LlGetScriptStateRightAfterLlSetScriptStateAnswersTheNewState()
+    {
+        const string flipper = @"default {
+            touch_start(integer t) {
+                llSetScriptState(""script1"", FALSE); llSay(0, ""after stop "" + (string)llGetScriptState(""script1""));
+                llSetScriptState(""script1"", TRUE); llSay(0, ""after start "" + (string)llGetScriptState(""script1""));
+            }
+        }";
+        using var h = new SchedulerHarness();
+        var itemId = h.RezScript(Target);
+        Assert.True(h.PumpUntil(() => h.Said.Contains("up 1")));
+        var driverId = h.RezScript(flipper);
+
+        h.PostTouch(driverId);
+        Assert.True(h.PumpUntil(() => h.Said.Any(s => s.StartsWith("after start "))));
+        _out.WriteLine("said=[" + Log(h) + "]");
+
+        Assert.Contains("after stop 0", h.Said);
+        Assert.Contains("after start 1", h.Said);
+        Assert.True(h.PumpUntil(() => h.Engine.GetScriptState(itemId)));
+        Assert.Equal(1, Ups(h));
+    }
 }
