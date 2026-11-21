@@ -520,9 +520,10 @@ public class FSAssetConnector : ServiceBase, IAssetService
         }
         catch (Exception exception)
         {
-            m_log.LogError(exception.ToString());
-            Thread.Sleep(5000);
-            Environment.Exit(1);
+            // Reading the file cannot throw here (GetFsData catches its own errors); what can is the fallback
+            // service, storing what it returned, or cleaning an object's XML. None of them is a reason to stop
+            // the server: the asset is answered as missing, as when its file is gone.
+            m_log.LogError(exception, "[FSASSETS]: Could not get asset {0}", id);
             return null;
         }
     }
