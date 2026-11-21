@@ -213,6 +213,32 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
         }
     }
 
+    /// <summary>
+    /// The table is <c>utf8</c>, three bytes a character at most. In strict mode MariaDB and MySQL refuse a row
+    /// whose name or description holds a character outside the Basic Multilingual Plane, such as an emoji, so
+    /// those characters (UTF-16 surrogates, paired or not) are left out.
+    /// </summary>
+    private static string WithoutFourByteCharacters(string s)
+    {
+        if (string.IsNullOrEmpty(s))
+            return string.Empty;
+
+        int first = 0;
+        while (first < s.Length && !char.IsSurrogate(s[first]))
+            first++;
+        if (first == s.Length)
+            return s;
+
+        System.Text.StringBuilder kept = new System.Text.StringBuilder(s.Length);
+        kept.Append(s, 0, first);
+        for (int i = first; i < s.Length; i++)
+        {
+            if (!char.IsSurrogate(s[i]))
+                kept.Append(s[i]);
+        }
+        return kept.ToString();
+    }
+
     public bool Store(AssetMetadata meta, string hash)
     {
         try
@@ -223,8 +249,8 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
             using (MySqlCommand cmd = new MySqlCommand())
             {
                 cmd.Parameters.AddWithValue("?id", meta.ID);
-                cmd.Parameters.AddWithValue("?name", meta.Name);
-                cmd.Parameters.AddWithValue("?description", meta.Description);
+                cmd.Parameters.AddWithValue("?name", WithoutFourByteCharacters(meta.Name));
+                cmd.Parameters.AddWithValue("?description", WithoutFourByteCharacters(meta.Description));
 //                    cmd.Parameters.AddWithValue("?type", meta.Type.ToString());
                 cmd.Parameters.AddWithValue("?type", meta.Type);
                 cmd.Parameters.AddWithValue("?hash", hash);
@@ -234,9 +260,9 @@ public class MySQLFSAssetData : IFSAssetDataPlugin
                 {
                     cmd.CommandText = String.Format("insert into {0} (id, name, description, type, hash, asset_flags, create_time, access_time) values ( ?id, ?name, ?description, ?type, ?hash, ?asset_flags, UNIX_TIMESTAMP(), UNIX_TIMESTAMP())", m_Table);
 
-                    ExecuteNonQuery(cmd);
-
-                    return true;
+                    // Without its row the asset cannot be read, although its file is written: a failed insert
+                    // is a failed store.
+                    return ExecuteNonQuery(cmd);
                 }
 
                 //cmd.CommandText = String.Format("update {0} set hash = ?hash, access_time = UNIX_TIMESTAMP() where id = ?id", m_Table);
