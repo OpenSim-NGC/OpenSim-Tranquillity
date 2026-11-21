@@ -1362,6 +1362,9 @@ public static class SynchronousRestFormsRequester
                 WebUtil.LogOutgoingDetail("SEND", reqnum, System.Text.Encoding.UTF8.GetString(data));
 
             responseMessage = client.Send(request, HttpCompletionOption.ResponseHeadersRead);
+            // an error answer is an error, whatever its body says: Robust's 500 can still carry <Result>Success</Result>,
+            // which a region read as a registration that worked (MakeRequest checks this already)
+            responseMessage.EnsureSuccessStatusCode();
 
             if ((responseMessage.Content.Headers.ContentLength is long contentLength) && contentLength != 0)
             {
