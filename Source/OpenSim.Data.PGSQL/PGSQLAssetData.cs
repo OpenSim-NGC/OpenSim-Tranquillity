@@ -133,7 +133,7 @@ public class PGSQLAssetData : AssetDataBase
                     asset.Description = (string)reader["description"];
                     asset.Local = Convert.ToBoolean(reader["local"]);
                     asset.Temporary = Convert.ToBoolean(reader["temporary"]);
-                    asset.Flags = (AssetFlags)(Convert.ToInt32(reader["asset_flags"]));
+                    asset.Flags = StoredAssetFlags.FromStored(Convert.ToInt32(reader["asset_flags"]), asset.ID);
                     asset.Data = (byte[])reader["data"];
                     return asset;
                 }

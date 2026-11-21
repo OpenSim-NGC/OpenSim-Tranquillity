@@ -265,7 +265,7 @@ public class SQLiteAssetData : AssetDataBase
         asset.Description = (String) row["Description"];
         asset.Local = Convert.ToBoolean(row["Local"]);
         asset.Temporary = Convert.ToBoolean(row["Temporary"]);
-        asset.Flags = (AssetFlags)Convert.ToInt32(row["asset_flags"]);
+        asset.Flags = StoredAssetFlags.FromStored(Convert.ToInt32(row["asset_flags"]), asset.ID);
         asset.Data = (byte[])row["Data"];
         return asset;
     }
@@ -279,7 +279,7 @@ public class SQLiteAssetData : AssetDataBase
         metadata.Description = (string) row["Description"];
         metadata.Type = Convert.ToSByte(row["Type"]);
         metadata.Temporary = Convert.ToBoolean(row["Temporary"]); // Not sure if this is correct.
-        metadata.Flags = (AssetFlags)Convert.ToInt32(row["asset_flags"]);
+        metadata.Flags = StoredAssetFlags.FromStored(Convert.ToInt32(row["asset_flags"]), metadata.ID);
         metadata.CreatorID = row["CreatorID"].ToString();
 
         // Current SHA1s are not stored/computed.
