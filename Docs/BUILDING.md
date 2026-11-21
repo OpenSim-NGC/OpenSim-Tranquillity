@@ -24,8 +24,7 @@ The output from the publish will be in build/<Configuration>/net10.0/<platform>/
 
 Where Configuration is either Debug or Release and Platform is either linux-x64 or win-x64 as shown above.
 
-For testing workflows (including YEngine state-load telemetry configuration and commands),
-see Docs/TESTING.txt.
+For running and writing tests (including YEngine state-load telemetry), see [TESTING.md](TESTING.md).
 
 For the completed solution warning cleanup, verification commands and excluded-project backlog, see
 [WarningCleanup.md](WarningCleanup.md).
