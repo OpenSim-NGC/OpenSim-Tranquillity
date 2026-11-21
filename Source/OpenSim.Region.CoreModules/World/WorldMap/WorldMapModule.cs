@@ -1175,28 +1175,37 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
                     return;
                 }
 
-                // Decode JPEG2000 image using CoreJ2K
-                try
+                // The region stores its map tile as JPEG (GenerateMaptile), so it is sent as it is.
+                // A tile stored before that, as JPEG2000, is decoded.
+                if (IsJpeg(mapasset.Data))
                 {
-                    var j2k = J2kImage.FromBytes(mapasset.Data);
-                    if (j2k != null)
+                    jpeg = mapasset.Data;
+                    myMapImageJPEG = jpeg;
+                }
+                else
+                {
+                    try
                     {
-                        // CoreJ2K.Skia only registers an image creator for SKBitmap, not SKImage.
-                        skBitmap = j2k.As<SKBitmap>();
-                        if (skBitmap != null)
+                        var j2k = J2kImage.FromBytes(mapasset.Data);
+                        if (j2k != null)
                         {
-                            using (SKImage skImage = SKImage.FromBitmap(skBitmap))
-                            using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, 95))
+                            // CoreJ2K.Skia only registers an image creator for SKBitmap, not SKImage.
+                            skBitmap = j2k.As<SKBitmap>();
+                            if (skBitmap != null)
                             {
-                                jpeg = encoded.ToArray();
-                                myMapImageJPEG = jpeg;
+                                using (SKImage skImage = SKImage.FromBitmap(skBitmap))
+                                using (SKData encoded = skImage.Encode(SKEncodedImageFormat.Jpeg, 95))
+                                {
+                                    jpeg = encoded.ToArray();
+                                    myMapImageJPEG = jpeg;
+                                }
                             }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    m_log.LogWarning("[WORLD MAP]: Failed to decode terrain image with CoreJ2K: {0}", ex.Message);
+                    catch (Exception ex)
+                    {
+                        m_log.LogWarning("[WORLD MAP]: Failed to decode terrain image with CoreJ2K: {0}", ex.Message);
+                    }
                 }
             }
             catch (Exception e)
@@ -1228,6 +1237,12 @@ public class WorldMapModule : INonSharedRegionModule, IWorldMapModule, IDisposab
     }
 
 
+
+    /// <summary>True if the data starts with a JPEG start-of-image marker.</summary>
+    private static bool IsJpeg(byte[] data)
+    {
+        return data.Length > 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF;
+    }
 
     /// <summary>
     /// Export the world map
