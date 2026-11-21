@@ -6747,8 +6747,10 @@ public void llRezObject(string inventory, Vector3 pos, Vector3 vel, Quaternion r
 
             if (group1 == group2) return null; // already in same linkset
 
-            // Link group2 into group1 — group2 ceases to exist as a separate object
-            group1.LinkToGroup(group2);
+            // Link group2 into group1 — group2 ceases to exist as a separate object. Its prims are inserted from link 2
+            // and group1's own children move up after them, as SL documents ("are inserted into the parent object's
+            // link set starting at link number 2", https://wiki.secondlife.com/wiki/LlCreateLink) and YEngine does.
+            group1.LinkToGroup(group2, true);
 
             group1.TriggerScriptChangedEvent(Changed.LINK);
             group1.HasGroupChanged = true;
