@@ -800,7 +800,17 @@ public partial class Scene
     /// </summary>
     public ArrayList CapsUpdateTaskInventoryScriptAsset(IClientAPI remoteClient, UUID itemId,
                                                    UUID primId, bool isScriptRunning, UUID experience, byte[] data, string compileTarget)
+        => CapsUpdateTaskInventoryScriptAsset(remoteClient, itemId, primId, isScriptRunning, experience, data, compileTarget, out _);
+
+    /// <summary>
+    /// The same, and gives the id of the asset the save stored in <paramref name="newAssetId"/>: UUID.Zero when the
+    /// save stored nothing (no permission to edit the script, or the prim or the item is gone).
+    /// </summary>
+    public ArrayList CapsUpdateTaskInventoryScriptAsset(IClientAPI remoteClient, UUID itemId,
+                                                   UUID primId, bool isScriptRunning, UUID experience, byte[] data, string compileTarget,
+                                                   out UUID newAssetId)
     {
+        newAssetId = UUID.Zero;
         if (!Permissions.CanEditScript(itemId, primId, remoteClient.AgentId))
         {
             remoteClient.SendAgentAlertMessage("Insufficient permissions to edit script", false);
@@ -832,6 +842,7 @@ public partial class Scene
         item.Flags = ScriptCompileTargets.ApplySaveTarget(item.Flags, SaveTargetHere(compileTarget), ScriptEngineCodeFor);
         AssetBase asset = CreateAsset(item.Name, item.Description, (sbyte)AssetType.LSLText, data, remoteClient.AgentId);
         AssetService.Store(asset);
+        newAssetId = asset.FullID;
 
         //m_log.LogDebug(
         //    "[PRIM INVENTORY]: Stored asset {0} when updating item {1} in prim {2} for {3}",
@@ -889,14 +900,24 @@ public partial class Scene
     /// </summary>
     public ArrayList CapsUpdateTaskInventoryScriptAsset(UUID avatarId, UUID itemId,
                                                     UUID primId, bool isScriptRunning, UUID experience, byte[] data, string compileTarget)
+        => CapsUpdateTaskInventoryScriptAsset(avatarId, itemId, primId, isScriptRunning, experience, data, compileTarget, out _);
+
+    /// <summary>
+    /// The same, and gives the id of the asset the save stored in <paramref name="newAssetId"/> (UUID.Zero when it
+    /// stored nothing).
+    /// </summary>
+    public ArrayList CapsUpdateTaskInventoryScriptAsset(UUID avatarId, UUID itemId,
+                                                    UUID primId, bool isScriptRunning, UUID experience, byte[] data, string compileTarget,
+                                                    out UUID newAssetId)
     {
         if (TryGetScenePresence(avatarId, out ScenePresence avatar))
         {
             return CapsUpdateTaskInventoryScriptAsset(
-                avatar.ControllingClient, itemId, primId, isScriptRunning, experience, data, compileTarget);
+                avatar.ControllingClient, itemId, primId, isScriptRunning, experience, data, compileTarget, out newAssetId);
         }
         else
         {
+            newAssetId = UUID.Zero;
             m_log.LogError("[PRIM INVENTORY]: Avatar {0} cannot be found to update its prim item asset", avatarId);
             return new ArrayList();
         }

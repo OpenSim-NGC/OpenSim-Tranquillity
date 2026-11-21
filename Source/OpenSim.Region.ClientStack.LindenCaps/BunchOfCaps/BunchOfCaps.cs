@@ -60,12 +60,24 @@ public delegate void UpLoadedAsset(
 
 public delegate void UpdateTaskScript(UUID itemID, UUID primID, bool isScriptRunning, UUID experience, byte[] data, string compileTarget, ref ArrayList errors);
 
+/// <summary>
+/// As <see cref="UpdateTaskScript"/>, and gives the id of the asset the save stored (UUID.Zero when it stored nothing).
+/// </summary>
+public delegate void SaveTaskScript(UUID itemID, UUID primID, bool isScriptRunning, UUID experience, byte[] data, string compileTarget,
+                                    ref ArrayList errors, out UUID newAssetID);
+
 public delegate void NewInventoryItem(UUID userID, InventoryItemBase item, uint cost);
 
 public delegate void NewAsset(AssetBase asset);
 
 public delegate ArrayList TaskScriptUpdatedCallback(UUID userID, UUID itemID, UUID primID,
                                                bool isScriptRunning, UUID experience, byte[] data, string compileTarget);
+
+/// <summary>
+/// As <see cref="TaskScriptUpdatedCallback"/>, and gives the id of the asset the save stored (UUID.Zero when it stored nothing).
+/// </summary>
+public delegate ArrayList TaskScriptSavedCallback(UUID userID, UUID itemID, UUID primID,
+                                               bool isScriptRunning, UUID experience, byte[] data, string compileTarget, out UUID newAssetID);
 
 /// <summary>
 /// XXX Probably not a particularly nice way of allow us to get the scene presence from the scene (chiefly so that
@@ -93,6 +105,10 @@ public partial class BunchOfCaps
     public NewAsset AddNewAsset = null;
     public ItemUpdatedCallback ItemUpdatedCall = null;
     public TaskScriptUpdatedCallback TaskScriptUpdatedCall = null;
+    public TaskScriptSavedCallback TaskScriptSavedCall = null;
+    // what the constructor set, so TaskScriptUpdated can tell a callback a module replaced
+    private readonly TaskScriptUpdatedCallback m_defaultTaskScriptUpdatedCall;
+    private readonly TaskScriptSavedCallback m_defaultTaskScriptSavedCall;
     public GetClientDelegate GetClient = null;
     
     private IAssetService m_assetService;
@@ -138,7 +154,8 @@ public partial class BunchOfCaps
 
         AddNewInventoryItem = m_Scene.AddUploadedInventoryItem;
         ItemUpdatedCall = m_Scene.CapsUpdateItemAsset;
-        TaskScriptUpdatedCall = m_Scene.CapsUpdateTaskInventoryScriptAsset;
+        TaskScriptUpdatedCall = m_defaultTaskScriptUpdatedCall = m_Scene.CapsUpdateTaskInventoryScriptAsset;
+        TaskScriptSavedCall = m_defaultTaskScriptSavedCall = m_Scene.CapsUpdateTaskInventoryScriptAsset;
         GetClient = m_Scene.SceneGraph.GetControllingClient;
 
         RegisterHandlers();
