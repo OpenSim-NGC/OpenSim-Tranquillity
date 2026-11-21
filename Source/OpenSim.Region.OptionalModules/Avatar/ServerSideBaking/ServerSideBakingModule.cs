@@ -133,9 +133,12 @@ public class ServerSideBakingModule : ISharedRegionModule, IServerSideBaker
             scene.Name, enabled ? "ON" : "off", source);
 
         // A Hypergrid visitor is not baked here (IServerSideBakingRegion.BakesFor): the account service, not the
-        // user-management cache a foreign grid can write names into, says who is local.
+        // user-management cache a foreign grid can write names into, says who is local: an account it holds counts
+        // only when it is local to this grid (UserAccount.LocalToGrid). With no account service to ask, every agent
+        // counts as local, as before visitors were told apart.
         var region = new ServerSideBakingRegion(enabled, new CofHandshake(), agentId =>
-            scene.UserAccountService?.GetUserAccount(scene.RegionInfo.ScopeID, agentId) is not null);
+            scene.UserAccountService is not { } accounts
+            || accounts.GetUserAccount(scene.RegionInfo.ScopeID, agentId) is { LocalToGrid: true });
         lock (m_scenes)
         {
             m_scenes.Add(scene);
