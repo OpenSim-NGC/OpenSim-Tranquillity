@@ -64,9 +64,9 @@ public class SQLiteGridUserData : SQLiteGenericTableHandler<GridUserData>, IGrid
 
     public GridUserData[] GetAll(string userID)
     {
-        using (SQLiteCommand cmd = new SQLiteCommand("select * from " + m_Realm + " where UserID LIKE :userID"))
+        using (SQLiteCommand cmd = new SQLiteCommand("select * from " + m_Realm + " where UserID LIKE :userID ESCAPE '" + SqlLike.Escape + "'"))
         {
-            cmd.Parameters.Add(new SQLiteParameter(":userID", userID + "%"));
+            cmd.Parameters.Add(new SQLiteParameter(":userID", SqlLike.PrefixPattern(userID)));
 
             return DoQuery(cmd);
         }
