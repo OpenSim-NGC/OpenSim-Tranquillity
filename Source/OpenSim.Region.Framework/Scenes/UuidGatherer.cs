@@ -1068,7 +1068,7 @@ public class UuidGatherer
                                     GatheredUuids[id] = (sbyte)AssetType.Animation;
                                 }
                                 pos += 16;
-                                int strlen = data[pos++];
+                                int strlen = abytes[pos++];
                                 pos += strlen;
                             }
                         }
