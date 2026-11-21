@@ -277,14 +277,14 @@ public class PGSQLAssetData : AssetDataBase
         string sql = @" SELECT id, name, description, " + "\"assetType\"" + @", temporary, creatorid
                               FROM assets
                              order by id
-                             limit :stop
+                             limit :count
                             offset :start;";
 
         using (NpgsqlConnection conn = new NpgsqlConnection(m_connectionString))
         using (NpgsqlCommand cmd = new NpgsqlCommand(sql, conn))
         {
             cmd.Parameters.Add(m_database.CreateParameter("start", start));
-            cmd.Parameters.Add(m_database.CreateParameter("stop", start + count - 1));
+            cmd.Parameters.Add(m_database.CreateParameter("count", count));
             conn.Open();
             using (NpgsqlDataReader reader = cmd.ExecuteReader())
             {
