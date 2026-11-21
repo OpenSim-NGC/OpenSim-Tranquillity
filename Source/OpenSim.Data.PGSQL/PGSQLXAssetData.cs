@@ -165,7 +165,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                                     asset.Local = false;
 
                                 asset.Temporary = Convert.ToBoolean(dbReader["temporary"]);
-                                asset.Flags = (AssetFlags)Convert.ToInt32(dbReader["asset_flags"]);
+                                asset.Flags = StoredAssetFlags.FromStored(Convert.ToInt32(dbReader["asset_flags"]), asset.ID);
 
                                 if (m_enableCompression)
                                 {
@@ -533,7 +533,7 @@ public class PGSQLXAssetData : IXAssetDataPlugin
                                 metadata.Description = (string)dbReader["description"];
                                 metadata.Type = Convert.ToSByte(dbReader["AssetType"]);
                                 metadata.Temporary = Convert.ToBoolean(dbReader["temporary"]);
-                                metadata.Flags = (AssetFlags)Convert.ToInt32(dbReader["asset_flags"]);
+                                metadata.Flags = StoredAssetFlags.FromStored(Convert.ToInt32(dbReader["asset_flags"]), metadata.ID);
                                 metadata.FullID = DBGuid.FromDB(dbReader["id"]);
                                 metadata.CreatorID = dbReader["creatorid"].ToString();
 

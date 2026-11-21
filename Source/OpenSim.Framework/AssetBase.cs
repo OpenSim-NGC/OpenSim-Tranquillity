@@ -43,6 +43,31 @@ public enum AssetFlags : int
 }
 
 /// <summary>
+/// The flags of an asset as a store reads them back. <see cref="AssetFlags"/> is a fixed set, and the XmlSerializer
+/// that regions and Robust exchange assets with refuses a value with any other bit (an InvalidOperationException), so
+/// a row holding, say, 8 could not be sent at all. A store keeps the known bits and says once which asset had others.
+/// </summary>
+public static class StoredAssetFlags
+{
+    private static readonly ILogger m_log = LoggerProvider.CreateLogger(typeof(StoredAssetFlags));
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> s_warned = new();
+
+    /// <summary>Every bit <see cref="AssetFlags"/> names.</summary>
+    public const int Known = (int)(AssetFlags.Maptile | AssetFlags.Rewritable | AssetFlags.Collectable);
+
+    /// <summary>The known flags of a stored value; any other bits are dropped, with a warning once per asset.</summary>
+    public static AssetFlags FromStored(int stored, string assetID)
+    {
+        int unknown = stored & ~Known;
+        if (unknown != 0 && s_warned.Count < 10000 && s_warned.TryAdd(assetID ?? string.Empty, 0))
+            m_log.LogWarning(
+                "[ASSETS]: asset {AssetID} has flags {Stored}, with bits {Unknown} no version knows; they are dropped when it is read",
+                assetID, stored, unknown);
+        return (AssetFlags)(stored & Known);
+    }
+}
+
+/// <summary>
 /// Asset class.   All Assets are reference by this class or a class derived from this class
 /// </summary>
 [Serializable]
