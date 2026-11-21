@@ -59,22 +59,19 @@ namespace osWebRtcVoice.Tests
         }
 
         private Capture m_log;
-        private ILoggerFactory m_previous;
+        private LogCapture m_logging;
 
         [SetUp]
         public void SetUp()
         {
             m_log = new Capture();
-            m_previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(m_log).SetMinimumLevel(LogLevel.Trace));
+            m_logging = new LogCapture(m_log, LogLevel.Trace);
         }
 
         [TearDown]
         public void TearDown()
         {
-            ILoggerFactory ours = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = m_previous;
-            ours.Dispose();
+            m_logging.Dispose();
             m_log.Dispose();
         }
 

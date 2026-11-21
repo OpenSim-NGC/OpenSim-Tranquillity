@@ -75,8 +75,7 @@ namespace osWebRtcVoice.Tests
         public async Task StockPlugin_PlainJoinAndLeave_WritesNoWarningsOrErrors()
         {
             var problems = new ProblemCollector();
-            ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(problems).SetMinimumLevel(LogLevel.Warning));
+            var logging = new LogCapture(problems, LogLevel.Warning);
             try
             {
                 using var region = StockRegion.Create();
@@ -99,7 +98,7 @@ namespace osWebRtcVoice.Tests
             }
             finally
             {
-                LoggerProvider.LoggerFactory = previous;
+                logging.Dispose();
             }
         }
 
@@ -108,8 +107,7 @@ namespace osWebRtcVoice.Tests
         {
             StockJanusEnvironment.IgnoreUnlessPeerAvailable();
             var problems = new ProblemCollector();
-            ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(problems).SetMinimumLevel(LogLevel.Warning));
+            var logging = new LogCapture(problems, LogLevel.Warning);
             try
             {
                 using var region = StockRegion.Create(MixerOnlySwitchesOn);
@@ -145,7 +143,7 @@ namespace osWebRtcVoice.Tests
             }
             finally
             {
-                LoggerProvider.LoggerFactory = previous;
+                logging.Dispose();
             }
         }
 

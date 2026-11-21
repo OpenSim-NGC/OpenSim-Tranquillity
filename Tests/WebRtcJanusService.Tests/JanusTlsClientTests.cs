@@ -24,17 +24,12 @@ namespace osWebRtcVoice.Tests
     public class JanusTlsClientTests
     {
         private string _dir;
-        private ILoggerFactory _previous;
 
         [SetUp]
         public void SetUp()
         {
             _dir = Path.Combine(TestContext.CurrentContext.WorkDirectory, "tls-client-" + Guid.NewGuid().ToString("N"));
-            _previous = LoggerProvider.LoggerFactory;
         }
-
-        [TearDown]
-        public void TearDown() => LoggerProvider.LoggerFactory = _previous;
 
         private static async Task<bool> SessionReaches(TlsTestServer server, string caFile)
         {

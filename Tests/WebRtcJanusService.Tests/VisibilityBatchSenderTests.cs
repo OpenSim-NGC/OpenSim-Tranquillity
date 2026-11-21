@@ -29,7 +29,7 @@ using osWebRtcVoice;
 namespace osWebRtcVoice.Tests
 {
     [TestFixture]
-    [NonParallelizable]   // the log capture swaps the ambient LoggerProvider.LoggerFactory, a process-wide static
+    [NonParallelizable]   // the log capture is the process-wide current capture while it is alive
     public class VisibilityBatchSenderTests
     {
         private const int Room = -999;
@@ -507,7 +507,7 @@ namespace osWebRtcVoice.Tests
         /// <see cref="LoggerProvider"/> (commit 5d43d3e1d3, "convert the last four log4net call sites to ILogger"),
         /// whose default factory is <c>NullLoggerFactory</c> - so a log4net appender, which is what these tests used
         /// before, receives nothing and every assertion about a log line reads 0..</summary>
-        private sealed class LogCapture : ILoggerProvider, ILogger
+        private sealed class SenderLog : ILoggerProvider, ILogger
         {
             public readonly List<(LogLevel Level, string Text)> Lines = new();
             public ILogger CreateLogger(string categoryName) => this;
@@ -522,20 +522,14 @@ namespace osWebRtcVoice.Tests
             public void Dispose() { }
         }
 
-        private static (LogCapture capture, Action detach) CaptureVisibilityLog()
+        private static (SenderLog capture, Action detach) CaptureVisibilityLog()
         {
-            var capture = new LogCapture();
-            ILoggerFactory previous = LoggerProvider.LoggerFactory;
-            ILoggerFactory ours = LoggerFactory.Create(b => b.AddProvider(capture).SetMinimumLevel(LogLevel.Trace));
-            LoggerProvider.LoggerFactory = ours;
-            return (capture, () =>
-            {
-                LoggerProvider.LoggerFactory = previous;
-                ours.Dispose();
-            });
+            var capture = new SenderLog();
+            var logging = new LogCapture(capture);
+            return (capture, logging.Dispose);
         }
 
-        private static int StallLogCount(LogCapture capture)
+        private static int StallLogCount(SenderLog capture)
         {
             lock (capture.Lines)
                 return capture.Lines.Count(l => l.Level == LogLevel.Error

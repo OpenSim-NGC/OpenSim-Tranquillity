@@ -66,7 +66,7 @@ namespace osWebRtcVoice.Tests
 
         private FakeJanusGateway _gw;
         private Capture _log;
-        private ILoggerFactory _previous;
+        private LogCapture _logging;
         private readonly List<WebRtcJanusService> _services = new();
 
         [SetUp]
@@ -74,17 +74,14 @@ namespace osWebRtcVoice.Tests
         {
             _gw = new FakeJanusGateway { ModelRooms = true };
             _log = new Capture();
-            _previous = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(_log).SetMinimumLevel(LogLevel.Trace));
+            _logging = new LogCapture(_log, LogLevel.Trace);
         }
 
         [TearDown]
         public void TearDown()
         {
             _services.Clear();   // the fake gateway is in-memory; nothing outlives the test process
-            ILoggerFactory ours = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = _previous;
-            ours.Dispose();
+            _logging.Dispose();
             _log.Dispose();
         }
 

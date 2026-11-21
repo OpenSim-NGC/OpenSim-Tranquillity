@@ -60,7 +60,7 @@ namespace osWebRtcVoice.Tests
         }
 
         private Capture m_capture;
-        private ILoggerFactory m_previousFactory;
+        private LogCapture m_logging;
         private BaseHttpServer m_server;
         private VoiceConnectorJoinCapEndpoint m_endpoint;
         private readonly List<string> m_minted = new();
@@ -69,8 +69,7 @@ namespace osWebRtcVoice.Tests
         public void SetUp()
         {
             m_capture = new Capture();
-            m_previousFactory = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = LoggerFactory.Create(b => b.AddProvider(m_capture).SetMinimumLevel(LogLevel.Trace));
+            m_logging = new LogCapture(m_capture, LogLevel.Trace);
             JoinCapabilityAuthority.Clear();
         }
 
@@ -79,9 +78,7 @@ namespace osWebRtcVoice.Tests
         {
             m_server = null;
             m_endpoint = null;
-            ILoggerFactory ours = LoggerProvider.LoggerFactory;
-            LoggerProvider.LoggerFactory = m_previousFactory;
-            ours.Dispose();
+            m_logging.Dispose();
             m_capture.Dispose();
             JoinCapabilityAuthority.Clear();
         }
